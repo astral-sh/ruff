@@ -1,6 +1,6 @@
 import _tkinter
 import sys
-from _typeshed import Incomplete, StrEnum, StrOrBytesPath
+from _typeshed import Incomplete, MaybeNone, StrEnum, StrOrBytesPath
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from tkinter.constants import *
 from tkinter.font import _FontDescription
@@ -509,7 +509,7 @@ class Misc:
         pad: _ScreenUnits = ...,
         uniform: str = ...,
         weight: int = ...,
-    ) -> _GridIndexInfo | Any: ...  # can be None but annoying to check
+    ) -> _GridIndexInfo | MaybeNone: ...  # can be None but annoying to check
     def grid_rowconfigure(
         self,
         index: int | str | list[int] | tuple[int, ...],
@@ -519,7 +519,7 @@ class Misc:
         pad: _ScreenUnits = ...,
         uniform: str = ...,
         weight: int = ...,
-    ) -> _GridIndexInfo | Any: ...  # can be None but annoying to check
+    ) -> _GridIndexInfo | MaybeNone: ...  # can be None but annoying to check
     columnconfigure = grid_columnconfigure
     rowconfigure = grid_rowconfigure
     def grid_location(self, x: _ScreenUnits, y: _ScreenUnits) -> tuple[int, int]: ...

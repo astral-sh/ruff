@@ -11,15 +11,14 @@ reveal_type(__name__)  # revealed: str
 reveal_type(__file__)  # revealed: str | None
 reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
-reveal_type(__spec__)  # revealed: ModuleSpec | None
+reveal_type(__doc__)  # revealed: str | None
+
+# TODO: Should be `ModuleSpec | None`
+# (needs support for `*` imports)
+reveal_type(__spec__)  # revealed: Unknown | None
 
 # TODO: generics
 reveal_type(__path__)  # revealed: @Todo
-
-# TODO: this should probably be added to typeshed; not sure why it isn't?
-# error: [unresolved-reference]
-# revealed: Unknown
-reveal_type(__doc__)
 
 class X:
     reveal_type(__name__)  # revealed: str

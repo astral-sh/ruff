@@ -1,14 +1,15 @@
-from typing import Any, ClassVar
+from _typeshed import Incomplete
+from typing import ClassVar
 
 from ..cmd import Command
 
 class install_egg_info(Command):
     description: ClassVar[str]
     user_options: ClassVar[list[tuple[str, str, str]]]
-    install_dir: Any
+    install_dir: Incomplete
     def initialize_options(self) -> None: ...
-    target: Any
-    outputs: Any
+    target: Incomplete
+    outputs: Incomplete
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...
     def get_outputs(self) -> list[str]: ...
