@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.2
+
+### Preview features
+
+- Fix formatting of single with-item with trailing comment ([#14005](https://github.com/astral-sh/ruff/pull/14005))
+- \[`pyupgrade`\] Add PEP 646 `Unpack` conversion to `*` with fix (`UP044`) ([#13988](https://github.com/astral-sh/ruff/pull/13988))
+
+### Rule changes
+
+- Regenerate `known_stdlibs.rs` with stdlibs 2024.10.25 ([#13963](https://github.com/astral-sh/ruff/pull/13963))
+- \[`flake8-no-pep420`\] Skip namespace package enforcement for PEP 723 scripts (`INP001`) ([#13974](https://github.com/astral-sh/ruff/pull/13974))
+
+### Server
+
+- Fix server panic when undoing an edit ([#14010](https://github.com/astral-sh/ruff/pull/14010))
+
+### Bug fixes
+
+- Fix issues in discovering ruff in pip build environments ([#13881](https://github.com/astral-sh/ruff/pull/13881))
+- \[`flake8-type-checking`\] Fix false positive for `singledispatchmethod` (`TCH003`) ([#13941](https://github.com/astral-sh/ruff/pull/13941))
+- \[`flake8-type-checking`\] Treat return type of `singledispatch` as runtime-required (`TCH003`) ([#13957](https://github.com/astral-sh/ruff/pull/13957))
+
+### Documentation
+
+- \[`flake8-simplify`\] Include caveats of enabling `if-else-block-instead-of-if-exp` (`SIM108`) ([#14019](https://github.com/astral-sh/ruff/pull/14019))
+
 ## 0.7.1
 
 ### Preview features
