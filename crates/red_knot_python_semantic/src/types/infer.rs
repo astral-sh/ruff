@@ -3789,8 +3789,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         known_instance: KnownInstance,
         parameters: &ast::Expr,
     ) -> Type<'db> {
-        // slice_ty is treated as expression because Literal accepts expression
-        // inside the []
         match known_instance {
             KnownInstance::Literal => {
                 match parameters {
@@ -3851,6 +3849,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the values
         match parameters {
             ruff_python_ast::Expr::Subscript(inner_literal_subscript) => {
+                // slice_ty is inferred using infer_expression method because Literal parameters can be
+                // expressions.
                 let inner_subscript_value = self.infer_expression(&inner_literal_subscript.value);
                 if let Type::Instance(inner_instance) = inner_subscript_value {
                     if inner_instance.is_known(KnownInstance::Literal) {
