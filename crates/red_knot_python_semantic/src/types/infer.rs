@@ -3871,11 +3871,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             ruff_python_ast::Expr::Tuple(t) => {
-                let mut elts = vec![];
-                for elm in &t.elts {
-                    elts.push(self.infer_literal_parameter_type(elm));
-                }
-                Type::Tuple(TupleType::new(self.db, elts.into_boxed_slice()))
+                let elements: Box<_> = t
+                    .iter()
+                    .map(|elt| self.infer_literal_parameter_type(elt))
+                    .collect();
+                Type::Tuple(TupleType::new(self.db, elements))
             }
             _ => self.infer_expression(parameters),
         }
