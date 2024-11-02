@@ -529,23 +529,29 @@ impl<'db> Type<'db> {
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
             (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
+                // Check that all target positive values are covered in self positive values
                 target_intersection
                     .positive(db)
                     .iter()
-                    .all(|&target_elem_ty| {
+                    .all(|&target_pos_elem| {
                         self_intersection
                             .positive(db)
                             .iter()
-                            .any(|&self_elem_ty| self_elem_ty.is_subtype_of(db, target_elem_ty))
+                            .any(|&self_pos_elem| self_pos_elem.is_subtype_of(db, target_pos_elem))
                     })
+                    // Check that all target negative values are excluded in self, either by being
+                    // subtypes of a self negative value or being disjoint from a self positive value.
                     && target_intersection
                         .negative(db)
                         .iter()
-                        .all(|&target_elem_ty| {
-                            self_intersection
-                                .negative(db)
-                                .iter()
-                                .any(|&self_elem_ty| target_elem_ty.is_subtype_of(db, self_elem_ty))
+                        .all(|&target_neg_elem| {
+                            // Is target negative value is subtype of a self negative value
+                            self_intersection.negative(db).iter().any(|&self_neg_elem| {
+                                target_neg_elem.is_subtype_of(db, self_neg_elem)
+                            // Is target negative value is disjoint from a self positive value?
+                            }) || self_intersection.positive(db).iter().any(|&self_pos_elem| {
+                                target_neg_elem.is_disjoint_from(db, self_pos_elem)
+                            })
                         })
             }
             (Type::Intersection(intersection), ty) => intersection
@@ -2230,6 +2236,7 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]})]
+    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("str")], neg: vec![Ty::StringLiteral("foo")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
