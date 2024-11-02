@@ -86,6 +86,11 @@ impl Violation for MutableArgumentDefault {
 
 /// B006
 pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    // Skip stub files
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     for ParameterWithDefault {
         parameter,
         default,
