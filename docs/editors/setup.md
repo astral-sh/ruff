@@ -399,7 +399,7 @@ You can enable Ruff as a source of code warnings as follows:
 1. Optionally, set the Ruff command line or other options.  The default command line runs Ruff
    using the project's Python configuration.  If Ruff isn't installed there, you can either add
    it using the `Packages` tool in Wing Pro or select a different command line for running Ruff.
-   
+
 Once this is done, Wing Pro will show code warnings sourced from Ruff along with any other warnings
 in the editor and Code Warnings tool. The warnings produced by Ruff are updated when you open or
 save a file.
@@ -414,14 +414,14 @@ The Code Warnings tool is [`documented here`](https://wingware.com/doc/warnings)
 You can also use Ruff to reformat code in Wing Pro, either on demand or automatically as you work.
 
 To request reformatting on-demand with Ruff, use `Reformat File with Ruff` or `Reformat Selection with Ruff`
-in the `Reformatting` sub-menu of the `Source` menu.  You can also bind a key binding to the commands 
-`ruff-file` or `ruff-selection`, using the `User Interface > Keyboard > Custom Key Bindings` preference 
+in the `Reformatting` sub-menu of the `Source` menu.  You can also bind a key binding to the commands
+`ruff-file` or `ruff-selection`, using the `User Interface > Keyboard > Custom Key Bindings` preference
 in Wing.
 
 To enable automatic reformatting, set `Auto-Reformat` under the `Options` tab of `Project Properties`,
-accessed from the `Project` menu, to either `Lines After Edit` or `Whole Files After Save` and then 
+accessed from the `Project` menu, to either `Lines After Edit` or `Whole Files After Save` and then
 set the `Reformatter` property to Ruff.  Note that you can click on the icons next to these
-properties to instead set the values in preferences.  This will apply to all projects that don't 
+properties to instead set the values in preferences.  This will apply to all projects that don't
 override the default setting.
 
 Wing Pro's auto-reformatting integration is [`documented here`](https://wingware.com/doc/edit/auto-reformatting).
