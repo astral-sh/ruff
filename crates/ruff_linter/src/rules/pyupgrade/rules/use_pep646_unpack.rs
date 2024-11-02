@@ -11,7 +11,7 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 /// ## Why is this bad?
 /// [PEP 646] introduced a new syntax for unpacking sequences based on the `*`
 /// operator. This syntax is more concise and readable than the previous
-/// `typing.Unpack` syntax.
+/// `Unpack[]` syntax.
 ///
 /// ## Example
 ///
@@ -30,8 +30,7 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 ///     pass
 /// ```
 ///
-/// ## References
-/// - [PEP 646](https://peps.python.org/pep-0646/#unpack-for-backwards-compatibility)
+/// [PEP 646]: https://peps.python.org/pep-0646/
 #[violation]
 pub struct NonPEP646Unpack;
 
@@ -58,13 +57,19 @@ pub(crate) fn use_pep646_unpack(checker: &mut Checker, expr: &ExprSubscript) {
         return;
     }
 
-    // ignore kwarg unpacks like `def f(**kwargs: Unpack[CustomTypedDict]):`
+    // Ignore `kwarg` unpacking, as in:
+    // ```python
+    // def f(**kwargs: Unpack[Array]):
+    //     ...
+    // ```
     if checker
         .semantic()
         .current_statement()
         .as_function_def_stmt()
         .and_then(|stmt| stmt.parameters.kwarg.as_ref())
-        .map_or(false, |kwarg| kwarg.range.contains_range(expr.range))
+        .and_then(|kwarg| kwarg.annotation.as_ref())
+        .and_then(|annotation| annotation.as_subscript_expr())
+        .is_some_and(|subscript| subscript == expr)
     {
         return;
     }
