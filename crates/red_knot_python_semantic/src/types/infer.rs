@@ -26,7 +26,6 @@
 //! stringified annotations. We have a fourth Salsa query for inferring the deferred types
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
-use crate::types::SliceLiteralType;
 use std::borrow::Cow;
 use std::num::NonZeroU32;
 
@@ -53,20 +52,14 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{
     TypeCheckDiagnostic, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder,
 };
-use crate::types::{bindings_ty, declarations_ty, TupleType, Type, TypeArrayDisplay};
+use crate::types::{
+    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
+    Boundness, BytesLiteralType, ClassType, FunctionType, InstanceType, IterationOutcome,
+    KnownClass, KnownFunction, KnownInstance, SliceLiteralType, StringLiteralType, Symbol,
+    Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
+};
+use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
-use crate::{
-    types::{
-        builtins_symbol, global_symbol, symbol, typing_extensions_symbol, Boundness, InstanceType,
-        KnownInstance, Symbol,
-    },
-    util::subscript::{PyIndex, PySlice},
-};
-
-use super::{
-    BytesLiteralType, ClassType, FunctionType, IterationOutcome, KnownClass, KnownFunction,
-    StringLiteralType, Truthiness, UnionBuilder, UnionType,
-};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
