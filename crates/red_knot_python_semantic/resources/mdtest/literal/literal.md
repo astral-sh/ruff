@@ -55,7 +55,8 @@ invalid3: Literal[(3, 4)]
 
 ## Detecting Literal outside typing and typing_extensions
 
-Only Literal that is defined in typing and typing_extension modules is detected as the special Literal.
+Only Literal that is defined in typing and typing_extension modules is detected as the special
+Literal.
 
 ```py
 from typing import _SpecialForm
