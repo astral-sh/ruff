@@ -1353,8 +1353,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If the declared variable is annotated with SpecialForm then we treat it instances differently
         // by assigning known instances.
-        if let Type::Instance(instance) = annotation_ty {
-            if instance.is_known_class(self.db, KnownClass::SpecialForm) {
+        if let Type::Instance(InstanceType { class, .. }) = annotation_ty {
+            if class.is_known(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
                     let maybe_known_instance = file_to_module(self.db, definition.file(self.db))
                         .as_ref()
@@ -1362,8 +1362,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             KnownInstance::maybe_from_module(module, name_expr.id.as_str())
                         });
                     if let Some(known_instance) = maybe_known_instance {
-                        annotation_ty =
-                            Type::Instance(InstanceType::known(instance.class, known_instance));
+                        annotation_ty = Type::Instance(InstanceType::known(class, known_instance));
                     }
                 }
             }
@@ -1426,8 +1425,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
-        if let Type::Instance(instance) = target_type {
-            let class_member = instance.class.class_member(self.db, op.in_place_dunder());
+        if let Type::Instance(InstanceType { class, .. }) = target_type {
+            let class_member = class.class_member(self.db, op.in_place_dunder());
             if !class_member.is_unbound() {
                 let call = class_member.call(self.db, &[target_type, value_type]);
                 return match call.return_ty_result(
@@ -2495,7 +2494,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
             (_, Type::Any) => Type::Any,
             (_, Type::Unknown) => Type::Unknown,
-            (op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert), Type::Instance(instance)) => {
+            (
+                op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert),
+                Type::Instance(InstanceType { class, .. }),
+            ) => {
                 let unary_dunder_method = match op {
                     UnaryOp::Invert => "__invert__",
                     UnaryOp::UAdd => "__pos__",
@@ -2504,7 +2506,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         unreachable!("Not operator is handled in its own case");
                     }
                 };
-                let class_member = instance.class.class_member(self.db, unary_dunder_method);
+                let class_member = class.class_member(self.db, unary_dunder_method);
                 let call = class_member.call(self.db, &[operand_type]);
 
                 match call.return_ty_result(
@@ -2726,9 +2728,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (Type::Instance(left_instance), Type::Instance(right_instance), op) => {
-                let left_class = left_instance.class;
-                let right_class = right_instance.class;
+            (
+                Type::Instance(InstanceType {
+                    class: left_class, ..
+                }),
+                Type::Instance(InstanceType {
+                    class: right_class, ..
+                }),
+                op,
+            ) => {
                 if left_class != right_class && right_class.is_subclass_of(self.db, left_class) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.class_member(self.db, reflected_dunder);
@@ -3125,9 +3133,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Lookup the rich comparison `__dunder__` methods on instances
-            (Type::Instance(left_instance), Type::Instance(right_instance)) => {
-                let left_class = left_instance.class;
-                let right_class = right_instance.class;
+            (
+                Type::Instance(InstanceType {
+                    class: left_class, ..
+                }),
+                Type::Instance(InstanceType {
+                    class: right_class, ..
+                }),
+            ) => {
                 let rich_comparison =
                     |op| perform_rich_comparison(self.db, left_class, right_class, op);
                 let membership_test_comparison =
