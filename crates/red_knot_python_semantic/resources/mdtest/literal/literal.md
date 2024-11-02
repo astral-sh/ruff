@@ -17,7 +17,7 @@ a3: Literal[-4]
 a4: Literal["hello world"]
 a5: Literal[b"hello world"]
 a6: Literal[True]
-a7: Literal[None] = None
+a7: Literal[None]
 a8: Literal[Literal[1]]
 a9: Literal[Literal["w"], Literal["r"], Literal[Literal["w+"]]]
 
