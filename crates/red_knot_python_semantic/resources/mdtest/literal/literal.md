@@ -9,10 +9,8 @@ from typing import Literal
 from enum import Enum
 
 mode: Literal["w", "r"]
-
 mode2: Literal["w"] | Literal["r"]
 union_var: Literal[Literal[Literal[1, 2, 3], "foo"], 5, None]
-
 a1: Literal[26]
 a2: Literal[0x1A]
 a3: Literal[-4]
