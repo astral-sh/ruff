@@ -26,6 +26,7 @@
 //! stringified annotations. We have a fourth Salsa query for inferring the deferred types
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
+use crate::types::SliceLiteralType;
 use std::borrow::Cow;
 use std::num::NonZeroU32;
 
@@ -52,18 +53,20 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{
     TypeCheckDiagnostic, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder,
 };
-use crate::types::{
-    bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, InstanceType,
-    IterationOutcome, KnownClass, KnownFunction, KnownInstance, SliceLiteralType,
-    StringLiteralType, Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
-    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
-    Boundness, BytesLiteralType, ClassType, FunctionType, IterationOutcome, KnownClass,
-    KnownFunction, SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type,
-    TypeArrayDisplay, UnionBuilder, UnionType,
-};
-use crate::util::subscript::{PyIndex, PySlice};
+use crate::types::{bindings_ty, declarations_ty, TupleType, Type, TypeArrayDisplay};
 use crate::Db;
+use crate::{
+    types::{
+        builtins_symbol, global_symbol, symbol, typing_extensions_symbol, Boundness, InstanceType,
+        KnownInstance, Symbol,
+    },
+    util::subscript::{PyIndex, PySlice},
+};
+
+use super::{
+    BytesLiteralType, ClassType, FunctionType, IterationOutcome, KnownClass, KnownFunction,
+    StringLiteralType, Truthiness, UnionBuilder, UnionType,
+};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -1553,7 +1556,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_augmented_op(assignment, target_type, value_type)
                 })
             }
-            Type::Instance(class) => {
+            Type::Instance(InstanceType { class, .. }) => {
                 if let Symbol::Type(class_member, boundness) =
                     class.class_member(self.db, op.in_place_dunder())
                 {
@@ -4110,7 +4113,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ruff_python_ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
                 // TODO: Check that value type is enum otherwise return None
-                value_ty.member(self.db, &Name::new(&attr.id))
+                value_ty.member(self.db, &attr.id).unwrap_or_unknown()
             }
             ruff_python_ast::Expr::NoneLiteral(_) => Type::None,
             // for negative and positive numbers
@@ -4293,10 +4296,7 @@ fn perform_rich_comparison<'db>(
         |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
             match left_class.class_member(db, op.dunder()) {
                 Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .call(
-                        db,
-                        &[left_class.to_instance(), right_class.to_instance()],
-                    )
+                    .call(db, &[left_class.to_instance(), right_class.to_instance()])
                     .return_ty(db),
                 _ => None,
             }

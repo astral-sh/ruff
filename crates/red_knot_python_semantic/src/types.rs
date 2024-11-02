@@ -10,10 +10,8 @@ use crate::semantic_index::{
     BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::stdlib::{
-    builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
-    typing_symbol_ty,
+    builtins_symbol, types_symbol, typeshed_symbol, typing_extensions_symbol, typing_symbol,
 };
-use crate::stdlib::{builtins_symbol, types_symbol, typeshed_symbol, typing_extensions_symbol};
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
@@ -1338,7 +1336,7 @@ impl<'db> KnownClass {
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
                 types_symbol(db, self.as_str()).unwrap_or_unknown()
             }
-            Self::SpecialForm => typing_symbol_ty(db, self.as_str()),
+            Self::SpecialForm => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
             Self::NoneType => typeshed_symbol(db, self.as_str()).unwrap_or_unknown(),
         }
     }
