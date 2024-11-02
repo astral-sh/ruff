@@ -1516,6 +1516,96 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    fn infer_augmented_op(
+        &mut self,
+        assignment: &ast::StmtAugAssign,
+        target_type: Type<'db>,
+        value_type: Type<'db>,
+    ) -> Type<'db> {
+        // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
+        // dunder.
+        let op = assignment.op;
+        match target_type {
+            Type::Union(union) => {
+                return union.map(self.db, |&target_type| {
+                    self.infer_augmented_op(assignment, target_type, value_type)
+                })
+            }
+            Type::Instance(class) => {
+                if let Symbol::Type(class_member, boundness) =
+                    class.class_member(self.db, op.in_place_dunder())
+                {
+                    let call = class_member.call(self.db, &[target_type, value_type]);
+                    let augmented_return_ty = match call.return_ty_result(
+                        self.db,
+                        AnyNodeRef::StmtAugAssign(assignment),
+                        &mut self.diagnostics,
+                    ) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            self.diagnostics.add(
+                                assignment.into(),
+                                "unsupported-operator",
+                                format_args!(
+                                    "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                                    target_type.display(self.db),
+                                    value_type.display(self.db)
+                                ),
+                            );
+                            e.return_ty()
+                        }
+                    };
+
+                    return match boundness {
+                        Boundness::Bound => augmented_return_ty,
+                        Boundness::MayBeUnbound => {
+                            let left_ty = target_type;
+                            let right_ty = value_type;
+
+                            let binary_return_ty = self.infer_binary_expression_type(left_ty, right_ty, op)
+                                .unwrap_or_else(|| {
+                                    self.diagnostics.add(
+                                        assignment.into(),
+                                        "unsupported-operator",
+                                        format_args!(
+                                            "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                                            left_ty.display(self.db),
+                                            right_ty.display(self.db)
+                                        ),
+                                    );
+                                    Type::Unknown
+                                });
+
+                            UnionType::from_elements(
+                                self.db,
+                                [augmented_return_ty, binary_return_ty],
+                            )
+                        }
+                    };
+                }
+            }
+            _ => {}
+        }
+
+        // By default, fall back to non-augmented binary operator inference.
+        let left_ty = target_type;
+        let right_ty = value_type;
+
+        self.infer_binary_expression_type(left_ty, right_ty, op)
+            .unwrap_or_else(|| {
+                self.diagnostics.add(
+                    assignment.into(),
+                    "unsupported-operator",
+                    format_args!(
+                        "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                        left_ty.display(self.db),
+                        right_ty.display(self.db)
+                    ),
+                );
+                Type::Unknown
+            })
+    }
+
     fn infer_augment_assignment_definition(
         &mut self,
         assignment: &ast::StmtAugAssign,
@@ -1529,7 +1619,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtAugAssign {
             range: _,
             target,
-            op,
+            op: _,
             value,
         } = assignment;
 
@@ -1547,54 +1637,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
         let value_type = self.infer_expression(value);
 
-        // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
-        // dunder.
-        if let Type::Instance(class) = target_type {
-            if let Some(class_member) = class.class_member(self.db, op.in_place_dunder()).as_type()
-            {
-                // TODO: Handle the case where boundness is `MayBeUnbound`: fall back
-                // to the binary-op behavior below and union the result with calling
-                // the possibly-unbound in-place dunder.
-
-                let call = class_member.call(self.db, &[target_type, value_type]);
-                return match call.return_ty_result(
-                    self.db,
-                    AnyNodeRef::StmtAugAssign(assignment),
-                    &mut self.diagnostics,
-                ) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        self.diagnostics.add(
-                            assignment.into(),
-                            "unsupported-operator",
-                            format_args!(
-                                "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                                target_type.display(self.db),
-                                value_type.display(self.db)
-                            ),
-                        );
-                        e.return_ty()
-                    }
-                };
-            }
-        }
-
-        let left_ty = target_type;
-        let right_ty = value_type;
-
-        self.infer_binary_expression_type(left_ty, right_ty, *op)
-            .unwrap_or_else(|| {
-                self.diagnostics.add(
-                    assignment.into(),
-                    "unsupported-operator",
-                    format_args!(
-                        "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                        left_ty.display(self.db),
-                        right_ty.display(self.db)
-                    ),
-                );
-                Type::Unknown
-            })
+        self.infer_augmented_op(assignment, target_type, value_type)
     }
 
     fn infer_type_alias_statement(&mut self, type_alias_statement: &ast::StmtTypeAlias) {
@@ -2341,13 +2384,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             orelse,
         } = if_expression;
 
-        self.infer_expression(test);
-
-        // TODO detect statically known truthy or falsy test
+        let test_ty = self.infer_expression(test);
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
-        UnionType::from_elements(self.db, [body_ty, orelse_ty])
+        match test_ty.bool(self.db) {
+            Truthiness::AlwaysTrue => body_ty,
+            Truthiness::AlwaysFalse => orelse_ty,
+            Truthiness::Ambiguous => UnionType::from_elements(self.db, [body_ty, orelse_ty]),
+        }
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda) {

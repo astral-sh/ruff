@@ -39,7 +39,8 @@ reveal_type(UnionClassGetItem[0])  # revealed: str | int
 ## Class getitem with class union
 
 ```py
-flag = True
+def bool_instance() -> bool:
+    return True
 
 class A:
     def __class_getitem__(cls, item: int) -> str:
@@ -49,7 +50,7 @@ class B:
     def __class_getitem__(cls, item: int) -> int:
         return item
 
-x = A if flag else B
+x = A if bool_instance() else B
 
 reveal_type(x)  # revealed: Literal[A, B]
 reveal_type(x[0])  # revealed: str | int
