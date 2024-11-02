@@ -396,7 +396,7 @@ You can enable Ruff as a source of code warnings as follows:
 1. Click on the dropdown at the top to select `Configuration: Defaults`
 1. Turn on `Enable External Checkers`
 1. Click on `Configure`, go to the `Ruff` tab, and check on `Enabled`
-1. Optionally, set the command line to use or other options.  The default command line runs Ruff
+1. Optionally, set the Ruff command line or other options.  The default command line runs Ruff
    using the project's Python configuration.  If Ruff isn't installed there, you can either add
    it using the `Packages` tool in Wing Pro or select a different command line for running Ruff.
    
@@ -415,8 +415,8 @@ You can also use Ruff to reformat code in Wing Pro, either on demand or automati
 
 To request reformatting on-demand with Ruff, use `Reformat File with Ruff` or `Reformat Selection with Ruff`
 in the `Reformatting` sub-menu of the `Source` menu.  You can also bind a key binding to the commands 
-`ruff-file` or `ruff-selection` for these, using the `User Interface > Keyboard > Custom Key Bindings` 
-preference in Wing.
+`ruff-file` or `ruff-selection`, using the `User Interface > Keyboard > Custom Key Bindings` preference 
+in Wing.
 
 To enable automatic reformatting, set `Auto-Reformat` under the `Options` tab of `Project Properties`,
 accessed from the `Project` menu, to either `Lines After Edit` or `Whole Files After Save` and then 
@@ -424,7 +424,7 @@ set the `Reformatter` property to Ruff.  Note that you can click on the icons ne
 properties to instead set the values in preferences.  This will apply to all projects that don't 
 override the default setting.
 
-Wing Pro's auto-reformatting integration is [`documented here``](https://wingware.com/doc/edit/auto-reformatting).
+Wing Pro's auto-reformatting integration is [`documented here`](https://wingware.com/doc/edit/auto-reformatting).
 
 ## Zed
 
