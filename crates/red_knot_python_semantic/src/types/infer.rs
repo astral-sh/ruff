@@ -1351,8 +1351,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut annotation_ty = self.infer_annotation_expression(annotation);
 
-        // If the declared variable is annotated with SpecialForm then we treat it instances differently
-        // by assigning known instances.
+        // If the declared variable is annotated with _SpecialForm class then we treat it differently
+        // by assigning the known field to the instance.
         if let Type::Instance(InstanceType { class, .. }) = annotation_ty {
             if class.is_known(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
