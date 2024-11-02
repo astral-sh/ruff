@@ -168,12 +168,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
             ast::Expr::Compare(expr_compare) => {
-                self.add_expr_compare(expr_compare, expression, is_positive)
+                self.evaluate_expr_compare(expr_compare, expression, is_positive)
             }
-            ast::Expr::Call(expr_call) => self.add_expr_call(expr_call, expression, is_positive),
+            ast::Expr::Call(expr_call) => {
+                self.evaluate_expr_call(expr_call, expression, is_positive)
+            }
             ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => self
                 .evaluate_expression_node_constraint(&unary_op.operand, expression, !is_positive),
-            ast::Expr::BoolOp(bool_op) => self.add_bool_op(bool_op, expression, is_positive),
+            ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
             _ => None, // TODO other test expression kinds
         }
     }
@@ -189,7 +191,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 None // TODO
             }
             ast::Pattern::MatchSingleton(singleton_pattern) => {
-                self.add_match_pattern_singleton(subject, singleton_pattern)
+                self.evaluate_match_pattern_singleton(subject, singleton_pattern)
             }
             ast::Pattern::MatchSequence(_) => {
                 None // TODO
@@ -223,7 +225,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn add_expr_compare(
+    fn evaluate_expr_compare(
         &mut self,
         expr_compare: &ast::ExprCompare,
         expression: Expression<'db>,
@@ -296,7 +298,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         Some(constraints)
     }
 
-    fn add_expr_call(
+    fn evaluate_expr_call(
         &mut self,
         expr_call: &ast::ExprCall,
         expression: Expression<'db>,
@@ -335,7 +337,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         None
     }
 
-    fn add_match_pattern_singleton(
+    fn evaluate_match_pattern_singleton(
         &mut self,
         subject: &ast::Expr,
         pattern: &ast::PatternMatchSingleton,
@@ -357,7 +359,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn add_bool_op(
+    fn evaluate_bool_op(
         &mut self,
         expr_bool_op: &ExprBoolOp,
         expression: Expression<'db>,
