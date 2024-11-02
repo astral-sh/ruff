@@ -250,7 +250,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         } else {
             // ~Literal[True] & bool = Literal[False]
             if let Type::Instance(instance_type) = new_positive {
-                if instance_type.is_known_class(db, KnownClass::Bool) {
+                if instance_type.class.is_known(db, KnownClass::Bool) {
                     if let Some(&Type::BooleanLiteral(value)) = self
                         .negative
                         .iter()

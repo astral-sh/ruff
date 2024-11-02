@@ -518,7 +518,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Instance(instance)
                 if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
                     .iter()
-                    .any(|&k| instance.is_known_class(self.db, k)) => {}
+                    .any(|&k| instance.class.is_known(self.db, k)) => {}
             _ => return,
         };
 
@@ -3455,7 +3455,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
             Some(Type::Instance(instance))
-                if instance.is_known_class(self.db, KnownClass::NoneType) =>
+                if instance.class.is_known(self.db, KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
             }

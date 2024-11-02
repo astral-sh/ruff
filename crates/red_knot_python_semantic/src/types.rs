@@ -504,30 +504,30 @@ impl<'db> Type<'db> {
             (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
-            (_, Type::Instance(instance)) if instance.is_known_class(db, KnownClass::Object) => {
+            (_, Type::Instance(instance)) if instance.class.is_known(db, KnownClass::Object) => {
                 true
             }
-            (Type::Instance(instance), _) if instance.is_known_class(db, KnownClass::Object) => {
+            (Type::Instance(instance), _) if instance.class.is_known(db, KnownClass::Object) => {
                 false
             }
             (Type::BooleanLiteral(_), Type::Instance(instance))
-                if instance.is_known_class(db, KnownClass::Bool) =>
+                if instance.class.is_known(db, KnownClass::Bool) =>
             {
                 true
             }
             (Type::IntLiteral(_), Type::Instance(instance))
-                if instance.is_known_class(db, KnownClass::Int) =>
+                if instance.class.is_known(db, KnownClass::Int) =>
             {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(instance))
-                if instance.is_known_class(db, KnownClass::Str) =>
+                if instance.class.is_known(db, KnownClass::Str) =>
             {
                 true
             }
             (Type::BytesLiteral(_), Type::Instance(instance))
-                if instance.is_known_class(db, KnownClass::Bytes) =>
+                if instance.class.is_known(db, KnownClass::Bytes) =>
             {
                 true
             }
@@ -542,7 +542,7 @@ impl<'db> Type<'db> {
                     )
             }
             (Type::ClassLiteral(..), Type::Instance(instance))
-                if instance.is_known_class(db, KnownClass::Type) =>
+                if instance.class.is_known(db, KnownClass::Type) =>
             {
                 true
             }
@@ -711,7 +711,7 @@ impl<'db> Type<'db> {
             | (
                 Type::Instance(instance_type),
                 Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
-            ) => !instance_type.is_known_class(db, KnownClass::Object),
+            ) => !instance_type.class.is_known(db, KnownClass::Object),
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
@@ -1941,10 +1941,6 @@ impl<'db> InstanceType<'db> {
             class,
             known: Some(known),
         }
-    }
-
-    pub fn is_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        self.class.is_known(db, known_class)
     }
 
     pub fn is_known(&self, known_instance: KnownInstance) -> bool {
