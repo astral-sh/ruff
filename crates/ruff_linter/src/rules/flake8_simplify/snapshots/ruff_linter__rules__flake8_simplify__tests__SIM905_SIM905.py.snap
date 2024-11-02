@@ -13,7 +13,7 @@ SIM905.py:6:1: SIM905 [*] Consider using a list instead of `str.split`
 11 |   
 12 |   "a,b,c,d".split(",")
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 3  3  | no_sep = None
@@ -38,7 +38,7 @@ SIM905.py:12:1: SIM905 [*] Consider using a list instead of `str.split`
 13 | "a,b,c,d".split(None)
 14 | "a,b,c,d".split(",", 1)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 9  9  | 	itemC
@@ -58,7 +58,7 @@ SIM905.py:13:1: SIM905 [*] Consider using a list instead of `str.split`
 14 | "a,b,c,d".split(",", 1)
 15 | "a,b,c,d".split(None, 1)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 10 10 | """.split()
@@ -79,7 +79,7 @@ SIM905.py:14:1: SIM905 [*] Consider using a list instead of `str.split`
 15 | "a,b,c,d".split(None, 1)
 16 | "a,b,c,d".split(sep=",")
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 11 11 | 
@@ -100,7 +100,7 @@ SIM905.py:15:1: SIM905 Consider using a list instead of `str.split`
 16 | "a,b,c,d".split(sep=",")
 17 | "a,b,c,d".split(sep=None)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 SIM905.py:16:1: SIM905 [*] Consider using a list instead of `str.split`
    |
@@ -111,7 +111,7 @@ SIM905.py:16:1: SIM905 [*] Consider using a list instead of `str.split`
 17 | "a,b,c,d".split(sep=None)
 18 | "a,b,c,d".split(sep=",", maxsplit=1)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 13 13 | "a,b,c,d".split(None)
@@ -132,7 +132,7 @@ SIM905.py:17:1: SIM905 [*] Consider using a list instead of `str.split`
 18 | "a,b,c,d".split(sep=",", maxsplit=1)
 19 | "a,b,c,d".split(sep=None, maxsplit=1)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 14 14 | "a,b,c,d".split(",", 1)
@@ -153,7 +153,7 @@ SIM905.py:18:1: SIM905 [*] Consider using a list instead of `str.split`
 19 | "a,b,c,d".split(sep=None, maxsplit=1)
 20 | "a,b,c,d".split(maxsplit=1, sep=",")
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 15 15 | "a,b,c,d".split(None, 1)
@@ -174,7 +174,7 @@ SIM905.py:19:1: SIM905 Consider using a list instead of `str.split`
 20 | "a,b,c,d".split(maxsplit=1, sep=",")
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 SIM905.py:20:1: SIM905 [*] Consider using a list instead of `str.split`
    |
@@ -185,7 +185,7 @@ SIM905.py:20:1: SIM905 [*] Consider using a list instead of `str.split`
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
 22 | "a,b,c,d".split(",", maxsplit=1)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 17 17 | "a,b,c,d".split(sep=None)
@@ -206,7 +206,7 @@ SIM905.py:21:1: SIM905 Consider using a list instead of `str.split`
 22 | "a,b,c,d".split(",", maxsplit=1)
 23 | "a,b,c,d".split(None, maxsplit=1)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 SIM905.py:22:1: SIM905 [*] Consider using a list instead of `str.split`
    |
@@ -217,7 +217,7 @@ SIM905.py:22:1: SIM905 [*] Consider using a list instead of `str.split`
 23 | "a,b,c,d".split(None, maxsplit=1)
 24 | "a,b,c,d".split(maxsplit=1)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
@@ -238,7 +238,7 @@ SIM905.py:23:1: SIM905 Consider using a list instead of `str.split`
 24 | "a,b,c,d".split(maxsplit=1)
 25 | "a,b,c,d".split(maxsplit=1.0)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 SIM905.py:24:1: SIM905 Consider using a list instead of `str.split`
    |
@@ -249,7 +249,7 @@ SIM905.py:24:1: SIM905 Consider using a list instead of `str.split`
 25 | "a,b,c,d".split(maxsplit=1.0)
 26 | "a,b,c,d".split(maxsplit=1)
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 SIM905.py:26:1: SIM905 Consider using a list instead of `str.split`
    |
@@ -260,7 +260,7 @@ SIM905.py:26:1: SIM905 Consider using a list instead of `str.split`
 27 | "a,b,c,d".split(maxsplit=0)
 28 | "VERB AUX PRON ADP DET".split(" ")
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 SIM905.py:27:1: SIM905 [*] Consider using a list instead of `str.split`
    |
@@ -271,7 +271,7 @@ SIM905.py:27:1: SIM905 [*] Consider using a list instead of `str.split`
 28 | "VERB AUX PRON ADP DET".split(" ")
 29 | '   1   2   3   '.split()
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 24 24 | "a,b,c,d".split(maxsplit=1)
@@ -292,7 +292,7 @@ SIM905.py:28:1: SIM905 [*] Consider using a list instead of `str.split`
 29 | '   1   2   3   '.split()
 30 | '1<>2<>3<4'.split('<>')
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 25 25 | "a,b,c,d".split(maxsplit=1.0)
@@ -312,7 +312,7 @@ SIM905.py:29:1: SIM905 [*] Consider using a list instead of `str.split`
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 30 | '1<>2<>3<4'.split('<>')
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 26 26 | "a,b,c,d".split(maxsplit=1)
@@ -333,7 +333,7 @@ SIM905.py:30:1: SIM905 [*] Consider using a list instead of `str.split`
 31 | 
 32 | " a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 27 27 | "a,b,c,d".split(maxsplit=0)
@@ -354,7 +354,7 @@ SIM905.py:32:1: SIM905 [*] Consider using a list instead of `str.split`
 33 | "".split()  # []
 34 | """     
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 29 29 | '   1   2   3   '.split()
@@ -374,7 +374,7 @@ SIM905.py:33:1: SIM905 [*] Consider using a list instead of `str.split`
 34 | """     
 35 | """.split()  # []
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 30 30 | '1<>2<>3<4'.split('<>')
@@ -396,7 +396,7 @@ SIM905.py:34:1: SIM905 [*] Consider using a list instead of `str.split`
 36 |   "       ".split()  # []
 37 |   "/abc/".split() # ['/abc/']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 31 31 | 
@@ -418,7 +418,7 @@ SIM905.py:36:1: SIM905 [*] Consider using a list instead of `str.split`
 37 | "/abc/".split() # ['/abc/']
 38 | ("a,b,c"
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 33 33 | "".split()  # []
@@ -439,7 +439,7 @@ SIM905.py:37:1: SIM905 [*] Consider using a list instead of `str.split`
 38 | ("a,b,c"
 39 | # comment
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 34 34 | """ 	
@@ -463,7 +463,7 @@ SIM905.py:38:2: SIM905 [*] Consider using a list instead of `str.split`
 41 |   )  # ['a,b,c']
 42 |   ("a,b,c"
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 35 35 | """.split()  # []
@@ -489,7 +489,7 @@ SIM905.py:42:2: SIM905 [*] Consider using a list instead of `str.split`
 45 |   ) # ['a', 'b', 'c']
 46 |   ("a,"
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 39 39 | # comment
@@ -516,7 +516,7 @@ SIM905.py:46:2: SIM905 [*] Consider using a list instead of `str.split`
    | |___________^ SIM905
 51 |   ) # ['a', 'b', 'c']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 43 43 | # comment
@@ -541,7 +541,7 @@ SIM905.py:53:1: SIM905 [*] Consider using a list instead of `str.split`
    | |___________________^ SIM905
 55 |   # ['hello', 'world']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 50 50 | .split(",")
@@ -562,7 +562,7 @@ SIM905.py:58:1: SIM905 [*] Consider using a list instead of `str.split`
 59 | r"a \n b".split()  # ['a', '\\n', 'b']
 60 | ("a " "b").split()  # ['a', 'b']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 55 55 | # ['hello', 'world']
@@ -583,7 +583,7 @@ SIM905.py:59:1: SIM905 [*] Consider using a list instead of `str.split`
 60 | ("a " "b").split()  # ['a', 'b']
 61 | "a " "b".split()  # ['a', 'b']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 56 56 | 
@@ -604,7 +604,7 @@ SIM905.py:60:1: SIM905 [*] Consider using a list instead of `str.split`
 61 | "a " "b".split()  # ['a', 'b']
 62 | u"a " "b".split()  # ['a', 'b']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 57 57 | # prefixes and isc
@@ -625,7 +625,7 @@ SIM905.py:61:1: SIM905 [*] Consider using a list instead of `str.split`
 62 | u"a " "b".split()  # ['a', 'b']
 63 | "a " u"b".split()  # ['a', 'b']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 58 58 | u"a b".split()  # ['a', 'b']
@@ -646,7 +646,7 @@ SIM905.py:62:1: SIM905 [*] Consider using a list instead of `str.split`
 63 | "a " u"b".split()  # ['a', 'b']
 64 | u"a " r"\n".split()  # ['a', '\\n']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 59 59 | r"a \n b".split()  # ['a', '\\n', 'b']
@@ -667,7 +667,7 @@ SIM905.py:63:1: SIM905 [*] Consider using a list instead of `str.split`
 64 | u"a " r"\n".split()  # ['a', '\\n']
 65 | r"\n " u"\n".split()  # ['\\n']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 60 60 | ("a " "b").split()  # ['a', 'b']
@@ -688,7 +688,7 @@ SIM905.py:64:1: SIM905 [*] Consider using a list instead of `str.split`
 65 | r"\n " u"\n".split()  # ['\\n']
 66 | r"\n " "\n".split()  # ['\\n']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 61 61 | "a " "b".split()  # ['a', 'b']
@@ -709,7 +709,7 @@ SIM905.py:65:1: SIM905 [*] Consider using a list instead of `str.split`
 66 | r"\n " "\n".split()  # ['\\n']
 67 | "a " r"\n".split()  # ['a', '\\n']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 62 62 | u"a " "b".split()  # ['a', 'b']
@@ -729,7 +729,7 @@ SIM905.py:66:1: SIM905 [*] Consider using a list instead of `str.split`
    | ^^^^^^^^^^^^^^^^^^^ SIM905
 67 | "a " r"\n".split()  # ['a', '\\n']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 63 63 | "a " u"b".split()  # ['a', 'b']
@@ -750,7 +750,7 @@ SIM905.py:67:1: SIM905 [*] Consider using a list instead of `str.split`
 68 | 
 69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 64 64 | u"a " r"\n".split()  # ['a', '\\n']
@@ -771,7 +771,7 @@ SIM905.py:69:1: SIM905 [*] Consider using a list instead of `str.split`
 70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
 71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 66 66 | r"\n " "\n".split()  # ['\\n']
@@ -791,7 +791,7 @@ SIM905.py:70:1: SIM905 [*] Consider using a list instead of `str.split`
 71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
 72 | "a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 67 67 | "a " r"\n".split()  # ['a', '\\n']
@@ -811,7 +811,7 @@ SIM905.py:71:1: SIM905 [*] Consider using a list instead of `str.split`
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 72 | "a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 68 68 | 
@@ -832,7 +832,7 @@ SIM905.py:72:1: SIM905 [*] Consider using a list instead of `str.split`
 73 | 
 74 | # negatives
    |
-   = help: Replace `str.split` with list literal
+   = help: Replace with list literal
 
 ℹ Unsafe fix
 69 69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
