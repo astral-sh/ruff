@@ -1152,7 +1152,10 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unknown,
             Type::Never => Type::Never,
-            Type::ClassLiteral(class) => Type::Instance(*class),
+            Type::ClassLiteral(class) => Type::Instance(InstanceType {
+                class: *class,
+                known: None,
+            }),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
