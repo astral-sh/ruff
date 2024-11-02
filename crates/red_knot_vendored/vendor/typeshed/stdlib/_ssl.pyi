@@ -105,7 +105,7 @@ class _SSLContext:
     if sys.version_info >= (3, 13):
         def set_psk_client_callback(self, callback: Callable[[str | None], tuple[str | None, bytes]] | None) -> None: ...
         def set_psk_server_callback(
-            self, callback: Callable[[str | None], tuple[str | None, bytes]] | None, identity_hint: str | None = None
+            self, callback: Callable[[str | None], bytes] | None, identity_hint: str | None = None
         ) -> None: ...
 
 @final

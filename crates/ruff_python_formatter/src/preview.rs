@@ -72,3 +72,10 @@ pub(crate) fn is_docstring_code_block_in_docstring_indent_enabled(
 pub(crate) fn is_join_implicit_concatenated_string_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the bugfix for single-with items with a trailing comment targeting Python 3.9 or newer is enabled.
+///
+/// See [#14001](https://github.com/astral-sh/ruff/issues/14001)
+pub(crate) fn is_with_single_target_parentheses_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

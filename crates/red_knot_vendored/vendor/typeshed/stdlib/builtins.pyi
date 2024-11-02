@@ -9,6 +9,7 @@ from _typeshed import (
     ConvertibleToFloat,
     ConvertibleToInt,
     FileDescriptorOrPath,
+    MaybeNone,
     OpenBinaryMode,
     OpenBinaryModeReading,
     OpenBinaryModeUpdating,
@@ -94,6 +95,9 @@ _SupportsAnextT = TypeVar("_SupportsAnextT", bound=SupportsAnext[Any], covariant
 _AwaitableT = TypeVar("_AwaitableT", bound=Awaitable[Any])
 _AwaitableT_co = TypeVar("_AwaitableT_co", bound=Awaitable[Any], covariant=True)
 _P = ParamSpec("_P")
+_StartT = TypeVar("_StartT", covariant=True, default=Any)
+_StopT = TypeVar("_StopT", covariant=True, default=Any)
+_StepT = TypeVar("_StepT", covariant=True, default=Any)
 
 class object:
     __doc__: str | None
@@ -834,7 +838,7 @@ _IntegerFormats: TypeAlias = Literal[
 ]
 
 @final
-class memoryview(Generic[_I]):
+class memoryview(Sequence[_I]):
     @property
     def format(self) -> str: ...
     @property
@@ -884,7 +888,7 @@ class memoryview(Generic[_I]):
     @overload
     def __setitem__(self, key: slice, value: ReadableBuffer, /) -> None: ...
     @overload
-    def __setitem__(self, key: SupportsIndex | tuple[SupportsIndex, ...], value: SupportsIndex, /) -> None: ...
+    def __setitem__(self, key: SupportsIndex | tuple[SupportsIndex, ...], value: _I, /) -> None: ...
     if sys.version_info >= (3, 10):
         def tobytes(self, order: Literal["C", "F", "A"] | None = "C") -> bytes: ...
     else:
@@ -896,6 +900,11 @@ class memoryview(Generic[_I]):
     def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = ...) -> str: ...
     def __buffer__(self, flags: int, /) -> memoryview: ...
     def __release_buffer__(self, buffer: memoryview, /) -> None: ...
+
+    # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
+    # See https://github.com/python/cpython/issues/125420
+    index: ClassVar[None]  # type: ignore[assignment]
+    count: ClassVar[None]  # type: ignore[assignment]
 
 @final
 class bool(int):
@@ -931,19 +940,31 @@ class bool(int):
     def __invert__(self) -> int: ...
 
 @final
-class slice:
+class slice(Generic[_StartT, _StopT, _StepT]):
     @property
-    def start(self) -> Any: ...
+    def start(self) -> _StartT: ...
     @property
-    def step(self) -> Any: ...
+    def step(self) -> _StepT: ...
     @property
-    def stop(self) -> Any: ...
+    def stop(self) -> _StopT: ...
     @overload
-    def __new__(cls, stop: Any, /) -> Self: ...
+    def __new__(cls, stop: int | None, /) -> slice[int | MaybeNone, int | MaybeNone, int | MaybeNone]: ...
     @overload
-    def __new__(cls, start: Any, stop: Any, step: Any = ..., /) -> Self: ...
+    def __new__(
+        cls, start: int | None, stop: int | None, step: int | None = None, /
+    ) -> slice[int | MaybeNone, int | MaybeNone, int | MaybeNone]: ...
+    @overload
+    def __new__(cls, stop: _T2, /) -> slice[Any, _T2, Any]: ...
+    @overload
+    def __new__(cls, start: _T1, stop: _T2, /) -> slice[_T1, _T2, Any]: ...
+    @overload
+    def __new__(cls, start: _T1, stop: _T2, step: _T3, /) -> slice[_T1, _T2, _T3]: ...
     def __eq__(self, value: object, /) -> bool: ...
-    __hash__: ClassVar[None]  # type: ignore[assignment]
+    if sys.version_info >= (3, 12):
+        def __hash__(self) -> int: ...
+    else:
+        __hash__: ClassVar[None]  # type: ignore[assignment]
+
     def indices(self, len: SupportsIndex, /) -> tuple[int, int, int]: ...
 
 class tuple(Sequence[_T_co]):
@@ -1207,7 +1228,7 @@ class frozenset(AbstractSet[_T_co]):
     if sys.version_info >= (3, 9):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
-class enumerate(Iterator[tuple[int, _T]]):
+class enumerate(Generic[_T]):
     def __new__(cls, iterable: Iterable[_T], start: int = 0) -> Self: ...
     def __iter__(self) -> Self: ...
     def __next__(self) -> tuple[int, _T]: ...
@@ -1401,7 +1422,7 @@ else:
 
 def exit(code: sys._ExitCode = None) -> NoReturn: ...
 
-class filter(Iterator[_T]):
+class filter(Generic[_T]):
     @overload
     def __new__(cls, function: None, iterable: Iterable[_T | None], /) -> Self: ...
     @overload
@@ -1462,7 +1483,7 @@ def len(obj: Sized, /) -> int: ...
 def license() -> None: ...
 def locals() -> dict[str, Any]: ...
 
-class map(Iterator[_S]):
+class map(Generic[_S]):
     @overload
     def __new__(cls, func: Callable[[_T1], _S], iter1: Iterable[_T1], /) -> Self: ...
     @overload
@@ -1704,7 +1725,7 @@ def pow(base: _SupportsSomeKindOfPow, exp: float, mod: None = None) -> Any: ...
 def pow(base: _SupportsSomeKindOfPow, exp: complex, mod: None = None) -> complex: ...
 def quit(code: sys._ExitCode = None) -> NoReturn: ...
 
-class reversed(Iterator[_T]):
+class reversed(Generic[_T]):
     @overload
     def __new__(cls, sequence: Reversible[_T], /) -> Iterator[_T]: ...  # type: ignore[misc]
     @overload
@@ -1765,7 +1786,7 @@ def vars(object: type, /) -> types.MappingProxyType[str, Any]: ...
 @overload
 def vars(object: Any = ..., /) -> dict[str, Any]: ...
 
-class zip(Iterator[_T_co]):
+class zip(Generic[_T_co]):
     if sys.version_info >= (3, 10):
         @overload
         def __new__(cls, *, strict: bool = ...) -> zip[Any]: ...
@@ -1895,7 +1916,7 @@ class StopIteration(Exception):
     value: Any
 
 class OSError(Exception):
-    errno: int
+    errno: int | None
     strerror: str
     # filename, filename2 are actually str | bytes | None
     filename: Any

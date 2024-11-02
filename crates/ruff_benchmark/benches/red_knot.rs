@@ -26,6 +26,7 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     // We don't support `*` imports yet:
     "/src/tomllib/_parser.py:7:29: Module `collections.abc` has no member `Iterable`",
     // We don't support terminal statements in control flow yet:
+    "/src/tomllib/_parser.py:246:15: Method `__class_getitem__` of type `Literal[frozenset]` is possibly unbound",
     "/src/tomllib/_parser.py:66:18: Name `s` used when possibly not defined",
     "/src/tomllib/_parser.py:98:12: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:101:12: Name `char` used when possibly not defined",
@@ -36,13 +37,11 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:267:9: Conflicting declared types for `char`: Unknown, str | None",
     "/src/tomllib/_parser.py:348:20: Name `nest` used when possibly not defined",
     "/src/tomllib/_parser.py:353:5: Name `nest` used when possibly not defined",
-    "/src/tomllib/_parser.py:353:5: Method `__getitem__` of type `Unbound | @Todo` is not callable on object of type `Unbound | @Todo`",
     "/src/tomllib/_parser.py:364:9: Conflicting declared types for `char`: Unknown, str | None",
     "/src/tomllib/_parser.py:381:13: Conflicting declared types for `char`: Unknown, str | None",
     "/src/tomllib/_parser.py:395:9: Conflicting declared types for `char`: Unknown, str | None",
     "/src/tomllib/_parser.py:453:24: Name `nest` used when possibly not defined",
     "/src/tomllib/_parser.py:455:9: Name `nest` used when possibly not defined",
-    "/src/tomllib/_parser.py:455:9: Method `__getitem__` of type `Unbound | @Todo` is not callable on object of type `Unbound | @Todo`",
     "/src/tomllib/_parser.py:482:16: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:566:12: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:573:12: Name `char` used when possibly not defined",
@@ -121,40 +120,42 @@ fn setup_rayon() {
 }
 
 fn benchmark_incremental(criterion: &mut Criterion) {
+    fn setup() -> Case {
+        let case = setup_case();
+        let result = case.db.check().unwrap();
+
+        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+
+        case.fs
+            .write_file(
+                &case.re_path,
+                format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
+            )
+            .unwrap();
+
+        case
+    }
+
+    fn incremental(case: &mut Case) {
+        let Case { db, .. } = case;
+
+        db.apply_changes(
+            vec![ChangeEvent::Changed {
+                path: case.re_path.clone(),
+                kind: ChangedKind::FileContent,
+            }],
+            None,
+        );
+
+        let result = db.check().unwrap();
+
+        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+    }
+
     setup_rayon();
 
     criterion.bench_function("red_knot_check_file[incremental]", |b| {
-        b.iter_batched_ref(
-            || {
-                let case = setup_case();
-                case.db.check().unwrap();
-
-                case.fs
-                    .write_file(
-                        &case.re_path,
-                        format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
-                    )
-                    .unwrap();
-
-                case
-            },
-            |case| {
-                let Case { db, .. } = case;
-
-                db.apply_changes(
-                    vec![ChangeEvent::Changed {
-                        path: case.re_path.clone(),
-                        kind: ChangedKind::FileContent,
-                    }],
-                    None,
-                );
-
-                let result = db.check().unwrap();
-
-                assert_eq!(result, EXPECTED_DIAGNOSTICS);
-            },
-            BatchSize::SmallInput,
-        );
+        b.iter_batched_ref(setup, incremental, BatchSize::SmallInput);
     });
 }
 

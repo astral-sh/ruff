@@ -39,7 +39,8 @@ reveal_type(UnionClassGetItem[0])  # revealed: str | int
 ## Class getitem with class union
 
 ```py
-flag = True
+def bool_instance() -> bool:
+    return True
 
 class A:
     def __class_getitem__(cls, item: int) -> str:
@@ -49,7 +50,7 @@ class B:
     def __class_getitem__(cls, item: int) -> int:
         return item
 
-x = A if flag else B
+x = A if bool_instance() else B
 
 reveal_type(x)  # revealed: Literal[A, B]
 reveal_type(x[0])  # revealed: str | int
@@ -68,8 +69,8 @@ if flag:
 else:
     class Spam: ...
 
-# error: [call-non-callable] "Method `__class_getitem__` of type `Literal[__class_getitem__] | Unbound` is not callable on object of type `Literal[Spam, Spam]`"
-# revealed: str | Unknown
+# error: [call-possibly-unbound-method] "Method `__class_getitem__` of type `Literal[Spam, Spam]` is possibly unbound"
+# revealed: str
 reveal_type(Spam[42])
 ```
 

@@ -12,11 +12,10 @@ if flag:
 
 x = y  # error: [possibly-unresolved-reference]
 
-# revealed: Unbound | Literal[3]
-# error: [possibly-unresolved-reference]
+# revealed: Literal[3]
 reveal_type(x)
 
-# revealed: Unbound | Literal[3]
+# revealed: Literal[3]
 # error: [possibly-unresolved-reference]
 reveal_type(y)
 ```
@@ -40,11 +39,10 @@ if flag:
     y: int = 3
 x = y  # error: [possibly-unresolved-reference]
 
-# revealed: Unbound | Literal[3]
-# error: [possibly-unresolved-reference]
+# revealed: Literal[3]
 reveal_type(x)
 
-# revealed: Unbound | Literal[3]
+# revealed: Literal[3]
 # error: [possibly-unresolved-reference]
 reveal_type(y)
 ```
@@ -56,6 +54,24 @@ from maybe_unbound_annotated import x, y
 
 reveal_type(x)  # revealed: Literal[3]
 reveal_type(y)  # revealed: int
+```
+
+## Maybe undeclared
+
+Importing a possibly undeclared name still gives us its declared type:
+
+```py path=maybe_undeclared.py
+def bool_instance() -> bool:
+    return True
+
+if bool_instance():
+    x: int
+```
+
+```py
+from maybe_undeclared import x
+
+reveal_type(x)  # revealed: int
 ```
 
 ## Reimport

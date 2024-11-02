@@ -94,7 +94,6 @@ impl TextDocument {
             return;
         }
 
-        let old_contents = self.contents().to_string();
         let mut new_contents = self.contents().to_string();
         let mut active_index = self.index().clone();
 
@@ -115,15 +114,11 @@ impl TextDocument {
                 new_contents = change;
             }
 
-            if new_contents != old_contents {
-                active_index = LineIndex::from_source_text(&new_contents);
-            }
+            active_index = LineIndex::from_source_text(&new_contents);
         }
 
         self.modify_with_manual_index(|contents, version, index| {
-            if contents != &new_contents {
-                *index = active_index;
-            }
+            *index = active_index;
             *contents = new_contents;
             *version = new_version;
         });
@@ -151,5 +146,77 @@ impl TextDocument {
         let old_version = self.version;
         func(&mut self.contents, &mut self.version, &mut self.index);
         debug_assert!(self.version >= old_version);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{PositionEncoding, TextDocument};
+    use lsp_types::{Position, TextDocumentContentChangeEvent};
+
+    #[test]
+    fn redo_edit() {
+        let mut document = TextDocument::new(
+            r#""""
+测试comment
+一些测试内容
+"""
+import click
+
+
+@click.group()
+def interface():
+    pas
+"#
+            .to_string(),
+            0,
+        );
+
+        // Add an `s`, remove it again (back to the original code), and then re-add the `s`
+        document.apply_changes(
+            vec![
+                TextDocumentContentChangeEvent {
+                    range: Some(lsp_types::Range::new(
+                        Position::new(9, 7),
+                        Position::new(9, 7),
+                    )),
+                    range_length: Some(0),
+                    text: "s".to_string(),
+                },
+                TextDocumentContentChangeEvent {
+                    range: Some(lsp_types::Range::new(
+                        Position::new(9, 7),
+                        Position::new(9, 8),
+                    )),
+                    range_length: Some(1),
+                    text: String::new(),
+                },
+                TextDocumentContentChangeEvent {
+                    range: Some(lsp_types::Range::new(
+                        Position::new(9, 7),
+                        Position::new(9, 7),
+                    )),
+                    range_length: Some(0),
+                    text: "s".to_string(),
+                },
+            ],
+            1,
+            PositionEncoding::UTF16,
+        );
+
+        assert_eq!(
+            &document.contents,
+            r#""""
+测试comment
+一些测试内容
+"""
+import click
+
+
+@click.group()
+def interface():
+    pass
+"#
+        );
     }
 }

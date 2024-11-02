@@ -150,6 +150,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::subscript_with_parenthesized_tuple(checker, subscript);
             }
 
+            if checker.enabled(Rule::NonPEP646Unpack) {
+                pyupgrade::rules::use_pep646_unpack(checker, subscript);
+            }
+
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {

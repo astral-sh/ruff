@@ -1,4 +1,4 @@
-from _typeshed import Incomplete
+from _typeshed import Incomplete, MaybeNone
 from abc import abstractmethod
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import IO, Any, AnyStr, Literal, NoReturn, overload
@@ -56,7 +56,7 @@ class HelpFormatter:
     current_indent: int
     default_tag: str
     help_position: int
-    help_width: int | Any  # initialized as None and computed later as int when storing option strings
+    help_width: int | MaybeNone  # initialized as None and computed later as int when storing option strings
     indent_increment: int
     level: int
     max_help_position: int

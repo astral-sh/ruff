@@ -1,3 +1,4 @@
+import csv
 import sys
 from _typeshed import SupportsWrite
 from collections.abc import Iterable, Iterator
@@ -20,7 +21,7 @@ _QuotingType: TypeAlias = int
 
 class Error(Exception): ...
 
-_DialectLike: TypeAlias = str | Dialect | type[Dialect]
+_DialectLike: TypeAlias = str | Dialect | csv.Dialect | type[Dialect | csv.Dialect]
 
 class Dialect:
     delimiter: str

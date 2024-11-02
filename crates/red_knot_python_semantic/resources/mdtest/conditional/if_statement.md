@@ -37,11 +37,11 @@ x = y
 
 reveal_type(x)  # revealed: Literal[3, 4, 5]
 
-# revealed: Unbound | Literal[2]
+# revealed: Literal[2]
 # error: [possibly-unresolved-reference]
 reveal_type(r)
 
-# revealed: Unbound | Literal[5]
+# revealed: Literal[5]
 # error: [possibly-unresolved-reference]
 reveal_type(s)
 ```
