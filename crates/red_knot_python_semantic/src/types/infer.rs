@@ -3791,52 +3791,19 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         match known_instance {
             KnownInstance::Literal => {
-                match parameters {
-                    ruff_python_ast::Expr::StringLiteral(_)
-                    | ruff_python_ast::Expr::BytesLiteral(_)
-                    | ruff_python_ast::Expr::BooleanLiteral(_)
-                    // For enum values
-                    | ruff_python_ast::Expr::Attribute(_)
-                    // For Another Literal inside this Literal
-                    | ruff_python_ast::Expr::Subscript(_)
-                    | ruff_python_ast::Expr::NoneLiteral(_) => {}
-                    // for negative numbers
-                    ruff_python_ast::Expr::UnaryOp(ref u) if (u.op == UnaryOp::USub || u.op == UnaryOp::UAdd) && u.operand.is_number_literal_expr() => {}
-                    ruff_python_ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {}
-                    ruff_python_ast::Expr::Tuple(ref t) if !t.parenthesized => {}
-                    _ => {
-                        self.diagnostics.add(
-                            parameters.into(),
-                            "invalid-literal-parameter",
-                            format_args!(""),
-                        );
-                        return Type::Unknown;
-                    }
+                let Some(slice_ty) = self.infer_literal_parameter_type(parameters) else {
+                    self.diagnostics.add(
+                        parameters.into(),
+                        "invalid-literal-parameter",
+                        format_args!(""),
+                    );
+                    return Type::Unknown;
                 };
 
-                let slice_ty = self.infer_literal_parameter_type(parameters);
-
                 match slice_ty {
-                    Type::Never
-                    | Type::Unknown
-                    | Type::Unbound
-                    | Type::Todo
-                    | Type::FunctionLiteral(_)
-                    | Type::ModuleLiteral(_)
-                    | Type::ClassLiteral(_)
-                    | Type::Union(_)
-                    | Type::Intersection(_)
-                    | Type::Any => {
-                        self.diagnostics.add(
-                            parameters.into(),
-                            "invalid-literal-parameter",
-                            format_args!(""),
-                        );
-                        Type::Unknown
-                    }
                     Type::Tuple(tuple) => {
                         let elts = tuple.elements(self.db);
-                        Type::Union(UnionType::new(self.db, elts))
+                        UnionType::from_elements(self.db, elts)
                     }
                     ty => ty,
                 }
@@ -3844,41 +3811,69 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_literal_parameter_type(&mut self, parameters: &ast::Expr) -> Type<'db> {
+    fn infer_literal_parameter_type(&mut self, parameters: &ast::Expr) -> Option<Type<'db>> {
         // If the slice itself is another subscript and it is another Literal then flatten
         // the values
-        match parameters {
-            ruff_python_ast::Expr::Subscript(inner_literal_subscript) => {
-                // slice_ty is inferred using infer_expression method because Literal parameters can be
-                // expressions.
-                let inner_subscript_value = self.infer_expression(&inner_literal_subscript.value);
-                if let Type::Instance(inner_instance) = inner_subscript_value {
-                    if inner_instance.is_known(KnownInstance::Literal) {
-                        self.infer_parameterized_known_instance_type_expression(
-                            KnownInstance::Literal,
-                            &inner_literal_subscript.slice,
-                        )
-                    } else {
-                        Type::Unknown
-                    }
-                } else {
-                    self.diagnostics.add(
-                        parameters.into(),
-                        "invalid-literal-parameter",
-                        format_args!(""),
-                    );
-                    Type::Unknown
+        Some(match parameters {
+            subscript @ ruff_python_ast::Expr::Subscript(_) => {
+                let inner_ty = self.infer_type_expression(subscript);
+                if !matches!(
+                    inner_ty,
+                    Type::IntLiteral(_)
+                        | Type::BooleanLiteral(_)
+                        | Type::BytesLiteral(_)
+                        | Type::StringLiteral(_)
+                        | Type::Union(_)
+                ) {
+                    return None;
                 }
+                inner_ty
             }
-            ruff_python_ast::Expr::Tuple(t) => {
-                let elements: Box<_> = t
+            ruff_python_ast::Expr::Tuple(t) if !t.parenthesized => {
+                let Ok(elements): Result<Box<_>, _> = t
                     .iter()
-                    .map(|elt| self.infer_literal_parameter_type(elt))
-                    .collect();
+                    .map(|elt| {
+                        self.infer_literal_parameter_type(elt)
+                            .ok_or("invalid element")
+                    })
+                    .collect()
+                else {
+                    return None;
+                };
                 Type::Tuple(TupleType::new(self.db, elements))
             }
-            _ => self.infer_expression(parameters),
-        }
+
+            ruff_python_ast::Expr::StringLiteral(literal) => {
+                self.infer_string_literal_expression(literal)
+            }
+            ruff_python_ast::Expr::BytesLiteral(literal) => {
+                self.infer_bytes_literal_expression(literal)
+            }
+            ruff_python_ast::Expr::BooleanLiteral(literal) => {
+                self.infer_boolean_literal_expression(literal)
+            }
+            // For enum values
+            ruff_python_ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                let value_ty = self.infer_expression(value);
+                // TODO: Check that value type is enum otherwise return None
+                value_ty.member(self.db, &Name::new(&attr.id))
+            }
+            // For Another Literal inside this Literal
+            ruff_python_ast::Expr::NoneLiteral(_) => Type::None,
+            // for negative and positive numbers
+            ruff_python_ast::Expr::UnaryOp(ref u)
+                if (u.op == UnaryOp::USub || u.op == UnaryOp::UAdd)
+                    && u.operand.is_number_literal_expr() =>
+            {
+                self.infer_unary_expression(u)
+            }
+            ruff_python_ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
+                self.infer_number_literal_expression(number)
+            }
+            _ => {
+                return None;
+            }
+        })
     }
 }
 

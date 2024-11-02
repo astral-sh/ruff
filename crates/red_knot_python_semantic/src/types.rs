@@ -1156,14 +1156,8 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => Type::Todo,
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
-            Type::Instance(instance) => {
-                if instance.known.is_some() {
-                    *self
-                } else {
-                    Type::Unknown
-                }
-            }
-            Type::BooleanLiteral(_)
+            Type::Instance(_)
+            | Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::ModuleLiteral(_)

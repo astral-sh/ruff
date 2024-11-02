@@ -45,7 +45,7 @@ def f():
     # TODO: This should be Color.RED
     reveal_type(b1)  # revealed: Literal[0]
     # TODO: revealed: Literal[1, 2, 3, "foo", 5] | None
-    reveal_type(union_var)  # revealed: Literal[1, 2, 3] | Literal["foo"] | Literal[5] | None
+    reveal_type(union_var)  # revealed: Literal[1, 2, 3, 5] | Literal["foo"] | None
 
 # error: [invalid-literal-parameter]
 invalid1: Literal[3 + 4]
