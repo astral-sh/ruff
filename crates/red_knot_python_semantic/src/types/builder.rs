@@ -29,7 +29,7 @@ use crate::types::{IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
-use super::KnownClass;
+use super::{InstanceType, KnownClass};
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
@@ -249,8 +249,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
         } else {
             // ~Literal[True] & bool = Literal[False]
-            if let Type::Instance(instance_type) = new_positive {
-                if instance_type.class.is_known(db, KnownClass::Bool) {
+            if let Type::Instance(InstanceType { class, .. }) = new_positive {
+                if class.is_known(db, KnownClass::Bool) {
                     if let Some(&Type::BooleanLiteral(value)) = self
                         .negative
                         .iter()
