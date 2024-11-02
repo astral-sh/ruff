@@ -9,7 +9,7 @@ use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for uses of comparators other than `<` and `>=` for
-/// `sys.version_info` checks in `.pyi` files. All other comparators, such
+/// `sys.version_info` checks. All other comparators, such
 /// as `>`, `<=`, and `==`, are banned.
 ///
 /// ## Why is this bad?
