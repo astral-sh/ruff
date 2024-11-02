@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     Expr, ExprCall, ExprContext, ExprList, ExprStringLiteral, ExprUnaryOp, StringLiteral,
@@ -27,8 +27,17 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe as it may not preserve comments within implicit string
-/// concatenations.
+/// This rule's fix is marked as unsafe for implicit string concatenations with comments interleaved
+/// between segments, as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// (
+///     "a"  # comment
+///     ","  # comment
+///     "b"  # comment
+/// ).split(",")
+/// ```
 ///
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
@@ -41,7 +50,7 @@ impl Violation for SplitStaticString {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Consider using a list instead of `str.split`")
+        format!("Consider using a list literal instead of `str.split`")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -83,7 +92,7 @@ pub(crate) fn split_static_string(
                     direction,
                 ))
             }
-            // Ignore names until type inference is available
+            // Ignore names until type inference is available.
             _ => {
                 return;
             }
@@ -94,11 +103,15 @@ pub(crate) fn split_static_string(
 
     let mut diagnostic = Diagnostic::new(SplitStaticString, call.range());
     if let Some(ref replacement_expr) = split_replacement {
-        // Unsafe because the fix does not preserve comments within implicit string concatenation
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(replacement_expr),
-            call.range(),
-        )));
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(replacement_expr), call.range()),
+            // The fix does not preserve comments within implicit string concatenations.
+            if checker.comment_ranges().intersects(call.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }
