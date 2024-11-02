@@ -507,25 +507,27 @@ impl<'db> Type<'db> {
             (_, Type::Instance(instance)) if instance.is_known_class(db, KnownClass::Object) => {
                 true
             }
-            (Type::Instance(class), _) if class.is_known_class(db, KnownClass::Object) => false,
-            (Type::BooleanLiteral(_), Type::Instance(class))
-                if class.is_known_class(db, KnownClass::Bool) =>
+            (Type::Instance(instance), _) if instance.is_known_class(db, KnownClass::Object) => {
+                false
+            }
+            (Type::BooleanLiteral(_), Type::Instance(instance))
+                if instance.is_known_class(db, KnownClass::Bool) =>
             {
                 true
             }
-            (Type::IntLiteral(_), Type::Instance(class))
-                if class.is_known_class(db, KnownClass::Int) =>
+            (Type::IntLiteral(_), Type::Instance(instance))
+                if instance.is_known_class(db, KnownClass::Int) =>
             {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
-            (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
-                if class.is_known_class(db, KnownClass::Str) =>
+            (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(instance))
+                if instance.is_known_class(db, KnownClass::Str) =>
             {
                 true
             }
-            (Type::BytesLiteral(_), Type::Instance(class))
-                if class.is_known_class(db, KnownClass::Bytes) =>
+            (Type::BytesLiteral(_), Type::Instance(instance))
+                if instance.is_known_class(db, KnownClass::Bytes) =>
             {
                 true
             }
@@ -539,8 +541,8 @@ impl<'db> Type<'db> {
                         },
                     )
             }
-            (Type::ClassLiteral(..), Type::Instance(class))
-                if class.is_known_class(db, KnownClass::Type) =>
+            (Type::ClassLiteral(..), Type::Instance(instance))
+                if instance.is_known_class(db, KnownClass::Type) =>
             {
                 true
             }
