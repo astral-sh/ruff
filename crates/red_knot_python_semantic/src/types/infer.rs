@@ -3454,8 +3454,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
-            Some(Type::Instance(instanec))
-                if instanec.is_known_class(self.db, KnownClass::NoneType) =>
+            Some(Type::Instance(instance))
+                if instance.is_known_class(self.db, KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
             }
@@ -3517,124 +3517,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.diagnostics = self.diagnostics.finish();
         self.types.shrink_to_fit();
         self.types
-    }
-
-    fn infer_subscript_type_expression(
-        &mut self,
-        subscript: &ruff_python_ast::ExprSubscript,
-        value_ty: Type<'db>,
-    ) -> Type<'db> {
-        let ast::ExprSubscript {
-            range: _,
-            value: _,
-            slice,
-            ctx: _,
-        } = subscript;
-
-        match value_ty {
-            Type::Instance(InstanceType {
-                class: _,
-                known: Some(known_instance),
-            }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
-            _ => Type::Todo,
-        }
-    }
-
-    fn infer_parameterized_known_instance_type_expression(
-        &mut self,
-        known_instance: KnownInstance,
-        parameters: &ast::Expr,
-    ) -> Type<'db> {
-        // slice_ty is treated as expression because Literal accepts expression
-        // inside the []
-        match known_instance {
-            KnownInstance::Literal => {
-                match parameters {
-                    ruff_python_ast::Expr::StringLiteral(_)
-                    | ruff_python_ast::Expr::BytesLiteral(_)
-                    | ruff_python_ast::Expr::BooleanLiteral(_)
-                    // For enum values
-                    | ruff_python_ast::Expr::Attribute(_)
-                    // For Another Literal inside this Literal
-                    | ruff_python_ast::Expr::Subscript(_)
-                    | ruff_python_ast::Expr::NoneLiteral(_) => {}
-                    // for negative numbers
-                    ruff_python_ast::Expr::UnaryOp(ref u) if (u.op == UnaryOp::USub || u.op == UnaryOp::UAdd) && u.operand.is_number_literal_expr() => {}
-                    ruff_python_ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {}
-                    ruff_python_ast::Expr::Tuple(ref t) if !t.parenthesized => {}
-                    _ => {
-                        self.diagnostics.add(
-                            parameters.into(),
-                            "invalid-literal-parameter",
-                            format_args!(""),
-                        );
-                        return Type::Unknown;
-                    }
-                };
-
-                let slice_ty = self.infer_literal_parameter_type(parameters);
-
-                match slice_ty {
-                    Type::Never
-                    | Type::Unknown
-                    | Type::Unbound
-                    | Type::Todo
-                    | Type::FunctionLiteral(_)
-                    | Type::ModuleLiteral(_)
-                    | Type::ClassLiteral(_)
-                    | Type::Union(_)
-                    | Type::Intersection(_)
-                    | Type::Any => {
-                        self.diagnostics.add(
-                            parameters.into(),
-                            "invalid-literal-parameter",
-                            format_args!(""),
-                        );
-                        Type::Unknown
-                    }
-                    Type::Tuple(tuple) => {
-                        let elts = tuple.elements(self.db);
-                        Type::Union(UnionType::new(self.db, elts))
-                    }
-                    ty => ty,
-                }
-            }
-        }
-    }
-
-    fn infer_literal_parameter_type(&mut self, parameters: &ast::Expr) -> Type<'db> {
-        // If the slice itself is another subscript and it is another Literal then flatten
-        // the values
-        match parameters {
-            ruff_python_ast::Expr::Subscript(inner_literal_subscript) => {
-                let inner_subscript_value = self.infer_expression(&inner_literal_subscript.value);
-                if let Type::Instance(inner_instance) = inner_subscript_value {
-                    if inner_instance.is_known(KnownInstance::Literal) {
-                        self.infer_parameterized_known_instance_type_expression(
-                            KnownInstance::Literal,
-                            &inner_literal_subscript.slice,
-                        )
-                    } else {
-                        Type::Unknown
-                    }
-                } else {
-                    self.diagnostics.add(
-                        parameters.into(),
-                        "invalid-literal-parameter",
-                        format_args!(""),
-                    );
-                    Type::Unknown
-                }
-            }
-            ruff_python_ast::Expr::Tuple(t) => {
-                let mut elts = vec![];
-                for elm in &t.elts {
-                    elts.push(self.infer_literal_parameter_type(elm));
-                }
-                Type::Tuple(TupleType::new(self.db, elts.into_boxed_slice()))
-            }
-            _ => self.infer_expression(parameters),
-        }
     }
 }
 
@@ -3878,6 +3760,124 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Tuple(TupleType::new(self.db, Box::from([single_element_ty])))
                 }
             }
+        }
+    }
+
+    fn infer_subscript_type_expression(
+        &mut self,
+        subscript: &ruff_python_ast::ExprSubscript,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        let ast::ExprSubscript {
+            range: _,
+            value: _,
+            slice,
+            ctx: _,
+        } = subscript;
+
+        match value_ty {
+            Type::Instance(InstanceType {
+                class: _,
+                known: Some(known_instance),
+            }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
+            _ => Type::Todo,
+        }
+    }
+
+    fn infer_parameterized_known_instance_type_expression(
+        &mut self,
+        known_instance: KnownInstance,
+        parameters: &ast::Expr,
+    ) -> Type<'db> {
+        // slice_ty is treated as expression because Literal accepts expression
+        // inside the []
+        match known_instance {
+            KnownInstance::Literal => {
+                match parameters {
+                    ruff_python_ast::Expr::StringLiteral(_)
+                    | ruff_python_ast::Expr::BytesLiteral(_)
+                    | ruff_python_ast::Expr::BooleanLiteral(_)
+                    // For enum values
+                    | ruff_python_ast::Expr::Attribute(_)
+                    // For Another Literal inside this Literal
+                    | ruff_python_ast::Expr::Subscript(_)
+                    | ruff_python_ast::Expr::NoneLiteral(_) => {}
+                    // for negative numbers
+                    ruff_python_ast::Expr::UnaryOp(ref u) if (u.op == UnaryOp::USub || u.op == UnaryOp::UAdd) && u.operand.is_number_literal_expr() => {}
+                    ruff_python_ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {}
+                    ruff_python_ast::Expr::Tuple(ref t) if !t.parenthesized => {}
+                    _ => {
+                        self.diagnostics.add(
+                            parameters.into(),
+                            "invalid-literal-parameter",
+                            format_args!(""),
+                        );
+                        return Type::Unknown;
+                    }
+                };
+
+                let slice_ty = self.infer_literal_parameter_type(parameters);
+
+                match slice_ty {
+                    Type::Never
+                    | Type::Unknown
+                    | Type::Unbound
+                    | Type::Todo
+                    | Type::FunctionLiteral(_)
+                    | Type::ModuleLiteral(_)
+                    | Type::ClassLiteral(_)
+                    | Type::Union(_)
+                    | Type::Intersection(_)
+                    | Type::Any => {
+                        self.diagnostics.add(
+                            parameters.into(),
+                            "invalid-literal-parameter",
+                            format_args!(""),
+                        );
+                        Type::Unknown
+                    }
+                    Type::Tuple(tuple) => {
+                        let elts = tuple.elements(self.db);
+                        Type::Union(UnionType::new(self.db, elts))
+                    }
+                    ty => ty,
+                }
+            }
+        }
+    }
+
+    fn infer_literal_parameter_type(&mut self, parameters: &ast::Expr) -> Type<'db> {
+        // If the slice itself is another subscript and it is another Literal then flatten
+        // the values
+        match parameters {
+            ruff_python_ast::Expr::Subscript(inner_literal_subscript) => {
+                let inner_subscript_value = self.infer_expression(&inner_literal_subscript.value);
+                if let Type::Instance(inner_instance) = inner_subscript_value {
+                    if inner_instance.is_known(KnownInstance::Literal) {
+                        self.infer_parameterized_known_instance_type_expression(
+                            KnownInstance::Literal,
+                            &inner_literal_subscript.slice,
+                        )
+                    } else {
+                        Type::Unknown
+                    }
+                } else {
+                    self.diagnostics.add(
+                        parameters.into(),
+                        "invalid-literal-parameter",
+                        format_args!(""),
+                    );
+                    Type::Unknown
+                }
+            }
+            ruff_python_ast::Expr::Tuple(t) => {
+                let mut elts = vec![];
+                for elm in &t.elts {
+                    elts.push(self.infer_literal_parameter_type(elm));
+                }
+                Type::Tuple(TupleType::new(self.db, elts.into_boxed_slice()))
+            }
+            _ => self.infer_expression(parameters),
         }
     }
 }
