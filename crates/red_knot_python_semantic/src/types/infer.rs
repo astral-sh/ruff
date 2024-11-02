@@ -3812,8 +3812,6 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_literal_parameter_type(&mut self, parameters: &ast::Expr) -> Option<Type<'db>> {
-        // If the slice itself is another subscript and it is another Literal then flatten
-        // the values
         Some(match parameters {
             subscript @ ruff_python_ast::Expr::Subscript(_) => {
                 let inner_ty = self.infer_type_expression(subscript);
@@ -3832,10 +3830,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ruff_python_ast::Expr::Tuple(t) if !t.parenthesized => {
                 let Ok(elements): Result<Box<_>, _> = t
                     .iter()
-                    .map(|elt| {
-                        self.infer_literal_parameter_type(elt)
-                            .ok_or("invalid element")
-                    })
+                    .map(|elt| self.infer_literal_parameter_type(elt).ok_or(()))
                     .collect()
                 else {
                     return None;
@@ -3858,7 +3853,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // TODO: Check that value type is enum otherwise return None
                 value_ty.member(self.db, &Name::new(&attr.id))
             }
-            // For Another Literal inside this Literal
             ruff_python_ast::Expr::NoneLiteral(_) => Type::None,
             // for negative and positive numbers
             ruff_python_ast::Expr::UnaryOp(ref u)
