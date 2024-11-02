@@ -119,6 +119,9 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
+# With uv.
+uv tool install ruff
+
 # With pip.
 pip install ruff
 
