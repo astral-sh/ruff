@@ -4035,7 +4035,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 class: _,
                 known: Some(known_instance),
             }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
-            _ => Type::Todo,
+            _ => {
+                self.infer_type_expression(slice);
+                Type::Todo
+            }
         }
     }
 
