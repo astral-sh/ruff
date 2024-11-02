@@ -396,9 +396,11 @@ You can enable Ruff as a source of code warnings as follows:
 1. Click on the dropdown at the top to select `Configuration: Defaults`
 1. Turn on `Enable External Checkers`
 1. Click on `Configure`, go to the `Ruff` tab, and check on `Enabled`
-1. Optionally, set the Ruff command line or other options.  The default command line runs Ruff
-   using the project's Python configuration.  If Ruff isn't installed there, you can either add
-   it using the `Packages` tool in Wing Pro or select a different command line for running Ruff.
+1. Optionally, set the Ruff command line or other options
+
+The default command line runs Ruff using the project's Python configuration. If Ruff isn't installed
+there, you can either add it using the `Packages` tool in Wing Pro or select a different command
+line for running Ruff.
 
 Once this is done, Wing Pro will show code warnings sourced from Ruff along with any other warnings
 in the editor and Code Warnings tool. The warnings produced by Ruff are updated when you open or
