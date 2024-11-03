@@ -60,3 +60,6 @@ for item in {1, 2, 3, 4, 5, 6, int("7")}:  # calls in set literals are fine
 for item in {1, 2, 2}:  # duplicate literals will be ignored
     # B033 catches this
     print(f"I like {item}.")
+
+for item in {False, 0, 0.0, 0j, True, 1, 1.0}:
+    print(item)
