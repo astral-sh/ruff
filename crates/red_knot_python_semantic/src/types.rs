@@ -2,8 +2,6 @@ use mro::{ClassBase, Mro, MroError};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
-use indexmap::IndexSet;
-
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
@@ -1944,41 +1942,6 @@ impl<'db> ClassType<'db> {
         }
 
         Symbol::Unbound
-    }
-
-    /// Return `true` if this class appears to be a cyclic definition,
-    /// i.e., it inherits either directly or indirectly from itself.
-    ///
-    /// A class definition like this will fail at runtime,
-    /// but we must be resilient to it or we could panic.
-    #[salsa::tracked]
-    fn is_cyclically_defined(self, db: &'db dyn Db) -> bool {
-        fn is_cyclically_defined_recursive<'db>(
-            db: &'db dyn Db,
-            class: ClassType<'db>,
-            classes_to_watch: &mut IndexSet<ClassType<'db>>,
-        ) -> bool {
-            if !classes_to_watch.insert(class) {
-                return true;
-            }
-            for explicit_base_class in class
-                .explicit_bases(db)
-                .filter_map(Type::into_class_literal_type)
-            {
-                let classes_to_watch_len = classes_to_watch.len();
-                if is_cyclically_defined_recursive(db, explicit_base_class, classes_to_watch) {
-                    return true;
-                }
-                classes_to_watch.truncate(classes_to_watch_len);
-            }
-            false
-        }
-
-        self.explicit_bases(db)
-            .filter_map(Type::into_class_literal_type)
-            .any(|base_class| {
-                is_cyclically_defined_recursive(db, base_class, &mut IndexSet::default())
-            })
     }
 }
 

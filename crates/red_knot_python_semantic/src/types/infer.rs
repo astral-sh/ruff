@@ -462,18 +462,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             .filter_map(|ty| ty.into_class_literal_type());
 
         for class in class_definitions {
-            if class.is_cyclically_defined(self.db) {
-                self.diagnostics.add(
-                    class.node(self.db).into(),
-                    "cyclic-class-def",
-                    format_args!(
-                        "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
-                        class.name(self.db),
-                        class.name(self.db)
-                    )
-                );
-            }
-
             match class.try_mro(self.db).as_ref().map_err(|err| &err.kind) {
                 Ok(_) => {},
                 Err(MroErrorKind::DuplicateBases(duplicates)) => {
@@ -486,6 +474,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                     }
                 }
+                Err(MroErrorKind::CyclicClassDefinition) => self.diagnostics.add(
+                    class.node(self.db).into(),
+                    "cyclic-class-def",
+                    format_args!(
+                        "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
+                        class.name(self.db),
+                        class.name(self.db)
+                    )
+                ),
                 Err(MroErrorKind::InvalidBases(bases)) => {
                     let base_nodes = class.node(self.db).bases();
                     for (index, base_ty) in bases {

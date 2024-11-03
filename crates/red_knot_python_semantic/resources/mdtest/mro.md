@@ -370,9 +370,9 @@ class Foo(Bar): ...  # error: [cyclic-class-def]
 class Bar(Baz): ...  # error: [cyclic-class-def]
 class Baz(Foo): ...  # error: [cyclic-class-def]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[Bar], Unknown, Literal[object]]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Baz], Unknown, Literal[object]]
-reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
+reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
 ```
 
 ## Classes with cycles in their MROs, and multiple inheritance
@@ -383,8 +383,8 @@ class Foo(Bar): ...  # error: [cyclic-class-def]
 class Bar(Baz): ...  # error: [cyclic-class-def]
 class Baz(Foo, Spam): ...  # error: [cyclic-class-def]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[Bar], Unknown, Literal[object]]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Baz], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
 reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
 ```
 
@@ -402,8 +402,8 @@ class Bar(Foo): ...
 class Baz(Bar, BarCycle): ...  # error: [cyclic-class-def]
 class Spam(Baz): ...  # error: [cyclic-class-def]
 
-reveal_type(FooCycle.__mro__)  # revealed: tuple[Literal[FooCycle], Literal[BarCycle], Unknown, Literal[object]]
-reveal_type(BarCycle.__mro__)  # revealed: tuple[Literal[BarCycle], Literal[FooCycle], Unknown, Literal[object]]
+reveal_type(FooCycle.__mro__)  # revealed: tuple[Literal[FooCycle], Unknown, Literal[object]]
+reveal_type(BarCycle.__mro__)  # revealed: tuple[Literal[BarCycle], Unknown, Literal[object]]
 reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
-reveal_type(Spam.__mro__)  # revealed: tuple[Literal[Spam], Literal[Baz], Unknown, Literal[object]]
+reveal_type(Spam.__mro__)  # revealed: tuple[Literal[Spam], Unknown, Literal[object]]
 ```
