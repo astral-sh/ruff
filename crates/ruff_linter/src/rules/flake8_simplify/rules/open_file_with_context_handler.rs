@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 ///
-/// # References
+/// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct OpenFileWithContextHandler;
