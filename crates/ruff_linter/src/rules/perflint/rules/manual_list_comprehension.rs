@@ -1,10 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
+use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::TextRange;
 
 use anyhow::{anyhow, Result};
@@ -49,29 +50,33 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct ManualListComprehension {
     is_async: bool,
-    comprehension_type: Option<ComprehensionType>,
+    comprehension_type: ComprehensionType,
 }
 
-impl Violation for ManualListComprehension {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for ManualListComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ManualListComprehension { is_async, .. } = self;
+        let ManualListComprehension {
+            is_async,
+            comprehension_type,
+        } = self;
+        let comprehension_str = match comprehension_type {
+            ComprehensionType::Extend => "extend",
+            ComprehensionType::ListComprehension => "comprehension",
+        };
         match is_async {
-            false => format!("Use a list comprehension to create a transformed list"),
-            true => format!("Use an async list comprehension to create a transformed list"),
+            false => format!("Use a list {comprehension_str} to create a transformed list"),
+            true => format!("Use an async list {comprehension_str} to create a transformed list"),
         }
     }
 
-    fn fix_title(&self) -> Option<String> {
-        self.comprehension_type
-            .map(|comprehension_type| match comprehension_type {
-                ComprehensionType::ListComprehension => {
-                    format!("Replace for loop with list comprehension")
-                }
-                ComprehensionType::Extend => format!("Replace for loop with list.extend"),
-            })
+    fn fix_title(&self) -> String {
+        match self.comprehension_type {
+            ComprehensionType::ListComprehension => {
+                format!("Replace for loop with list comprehension")
+            }
+            ComprehensionType::Extend => format!("Replace for loop with list.extend"),
+        }
     }
 }
 
@@ -215,12 +220,6 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
             None => false,
         });
 
-    let comprehension_type = if binding_is_empty_list {
-        ComprehensionType::ListComprehension
-    } else {
-        ComprehensionType::Extend
-    };
-
     // If the for loop does not have the same parent element as the binding, then it cannot always be
     // deleted and replaced with a list comprehension. This does not apply when using an extend.
     let assignment_in_same_statement = {
@@ -235,20 +234,19 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     // If the binding is not a single name expression, it could be replaced with a list comprehension,
     // but not necessarily, so this needs to be manually fixed. This does not apply when using an extend.
     let binding_has_one_target = {
-        let only_target = binding_stmt.is_some_and(|binding_stmt| binding_stmt.targets.len() == 1);
-        let is_name =
-            binding_stmt.is_some_and(|binding_stmt| binding_stmt.targets[0].is_name_expr());
-        only_target && is_name
+        match binding_stmt.map(|binding_stmt| binding_stmt.targets.as_slice()) {
+            Some([only_target]) => only_target.is_name_expr(),
+            _ => false,
+        }
     };
 
     // A list extend works in every context, while a list comprehension only works when all the criteria are true
     let comprehension_type =
-        Some(comprehension_type).filter(|comprehension_type| match comprehension_type {
-            ComprehensionType::ListComprehension => {
-                binding_stmt.is_some() && assignment_in_same_statement && binding_has_one_target
-            }
-            ComprehensionType::Extend => true,
-        });
+        if binding_is_empty_list && assignment_in_same_statement && binding_has_one_target {
+            ComprehensionType::ListComprehension
+        } else {
+            ComprehensionType::Extend
+        };
 
     let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
@@ -258,8 +256,9 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         *range,
     );
 
-    diagnostic.try_set_optional_fix(|| match comprehension_type {
-        Some(comprehension_type) => convert_to_list_extend(
+    // if checker.settings.preview.is_enabled() {
+    diagnostic.try_set_fix(|| {
+        convert_to_list_extend(
             comprehension_type,
             binding,
             for_stmt,
@@ -267,10 +266,8 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
             arg,
             checker,
         )
-        .map(Some),
-        None => Ok(None),
     });
-
+    // }
     checker.diagnostics.push(diagnostic);
 }
 
@@ -289,6 +286,23 @@ fn convert_to_list_extend(
         ifs: if_test.into_iter().cloned().collect(),
         range: TextRange::default(),
     };
+
+    let locator = checker.locator();
+    let for_stmt_end = for_stmt.range.end();
+
+    let comment_strings_in_range = |range| {
+        checker
+            .comment_ranges()
+            .comments_in_range(range)
+            .iter()
+            .map(|range| locator.slice(range).trim_whitespace_start())
+            .collect()
+    };
+    let for_loop_inline_comments: Vec<&str> = comment_strings_in_range(for_stmt.range);
+    let for_loop_trailing_comment =
+        comment_strings_in_range(TextRange::new(for_stmt_end, locator.line_end(for_stmt_end)));
+    let newline = checker.stylist().line_ending().as_str();
+
     match fix_type {
         ComprehensionType::Extend => {
             let generator = ast::ExprGenerator {
@@ -323,8 +337,17 @@ fn convert_to_list_extend(
 
             let comprehension_body = checker.generator().expr(&Expr::Call(list_extend));
 
+            let indent_range = TextRange::new(
+                locator.line_start(for_stmt.range.start()),
+                for_stmt.range.start(),
+            );
+            let indentation = format!("{newline}{}", locator.slice(indent_range));
+            let text_to_replace = format!(
+                "{}{indentation}{comprehension_body}",
+                for_loop_inline_comments.join(&indentation)
+            );
             Ok(Fix::unsafe_edit(Edit::range_replacement(
-                comprehension_body,
+                text_to_replace,
                 for_stmt.range,
             )))
         }
@@ -346,9 +369,27 @@ fn convert_to_list_extend(
             };
 
             let comprehension_body = checker.generator().expr(&Expr::ListComp(list_comp));
+
+            let indent_range = TextRange::new(
+                locator.line_start(binding_stmt.range.start()),
+                binding_stmt.range.start(),
+            );
+            let indentation = format!("{newline}{}", locator.slice(indent_range));
+
+            let mut for_loop_comments = for_loop_inline_comments;
+            for_loop_comments.extend(for_loop_trailing_comment);
+            let leading_comments = format!("{}{indentation}", for_loop_comments.join(&indentation));
+
             Ok(Fix::unsafe_edits(
                 Edit::range_replacement(comprehension_body, empty_list_to_replace.range),
-                [Edit::range_deletion(for_stmt.range)],
+                [
+                    Edit::range_deletion(
+                        for_stmt
+                            .range
+                            .cover(TextRange::new(for_stmt_end, locator.line_end(for_stmt_end))),
+                    ),
+                    Edit::insertion(leading_comments, binding_stmt.range.start()),
+                ],
             ))
         }
     }
