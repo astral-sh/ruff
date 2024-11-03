@@ -1827,7 +1827,7 @@ impl<'db> ClassType<'db> {
             })
     }
 
-    /// Iterate through the inferred types of the class's explicit bases.
+    /// Return an iterator over the types of this class's explicit bases.
     ///
     /// Note that any class (except for `object`) that has no explicit
     /// bases will implicitly inherit from `object` at runtime. Nonetheless,
