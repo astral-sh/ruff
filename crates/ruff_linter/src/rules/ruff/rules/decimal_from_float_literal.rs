@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for DecimalFromFloatLiteral {
     }
 
     fn fix_title(&self) -> String {
-        "Use a string literal instead".to_string()
+        "Replace with string literal".to_string()
     }
 }
 
