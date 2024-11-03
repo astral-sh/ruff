@@ -35,6 +35,13 @@ impl<'db> Mro<'db> {
 
     /// Attempt to resolve the MRO of a given class
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Result<Self, MroError<'db>> {
+        Self::of_class_impl(db, class).map_err(|error_kind| MroError {
+            kind: error_kind,
+            fallback_mro: Mro::from_error(db, class),
+        })
+    }
+
+    fn of_class_impl(db: &'db dyn Db, class: ClassType<'db>) -> Result<Self, MroErrorKind<'db>> {
         let class_stmt_node = class.node(db);
         let class_bases = class_stmt_node.bases();
 
@@ -74,9 +81,8 @@ impl<'db> Mro<'db> {
                 );
                 single_base.map_or_else(
                     |invalid_base_ty| {
-                        let error_kind =
-                            MroErrorKind::InvalidBases(Box::from([(0, invalid_base_ty)]));
-                        Err(MroError::new(db, class, error_kind))
+                        let bases_info = Box::from([(0, invalid_base_ty)]);
+                        Err(MroErrorKind::InvalidBases(bases_info))
                     },
                     |single_base| {
                         if let ClassBase::Class(class_base) = single_base {
@@ -124,8 +130,7 @@ impl<'db> Mro<'db> {
                 }
 
                 if !invalid_bases.is_empty() {
-                    let error_kind = MroErrorKind::InvalidBases(invalid_bases.into_boxed_slice());
-                    return Err(MroError::new(db, class, error_kind));
+                    return Err(MroErrorKind::InvalidBases(invalid_bases.into_boxed_slice()));
                 }
 
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
@@ -147,15 +152,13 @@ impl<'db> Mro<'db> {
                         }
                     }
 
-                    let error_kind = if duplicate_bases.is_empty() {
+                    if duplicate_bases.is_empty() {
                         MroErrorKind::UnresolvableMro {
                             bases_list: valid_bases.into_boxed_slice(),
                         }
                     } else {
                         MroErrorKind::DuplicateBases(duplicate_bases.into_boxed_slice())
-                    };
-
-                    MroError::new(db, class, error_kind)
+                    }
                 })
             }
         }
@@ -216,15 +219,6 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 pub(super) struct MroError<'db> {
     pub(super) kind: MroErrorKind<'db>,
     pub(super) fallback_mro: Mro<'db>,
-}
-
-impl<'db> MroError<'db> {
-    fn new(db: &'db dyn Db, class: ClassType<'db>, kind: MroErrorKind<'db>) -> Self {
-        Self {
-            kind,
-            fallback_mro: Mro::from_error(db, class),
-        }
-    }
 }
 
 /// Possible ways in which attempting to resolve the MRO of a class might fail.
