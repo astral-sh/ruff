@@ -6,7 +6,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
 use ruff_python_trivia::PythonWhitespace;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use anyhow::{anyhow, Result};
 
@@ -279,16 +279,22 @@ fn convert_to_list_extend(
     to_append: &Expr,
     checker: &Checker,
 ) -> Result<Fix> {
-    let comprehension = ast::Comprehension {
-        target: (*for_stmt.target).clone(),
-        iter: (*for_stmt.iter).clone(),
-        is_async: for_stmt.is_async,
-        ifs: if_test.into_iter().cloned().collect(),
-        range: TextRange::default(),
-    };
-
     let locator = checker.locator();
     let for_stmt_end = for_stmt.range.end();
+
+    let if_str = match if_test {
+        Some(test) => format!(" if {}", locator.slice(test.range())),
+        None => String::new(),
+    };
+    let for_iter_str = locator.slice(for_stmt.iter.range());
+    let for_type = if for_stmt.is_async {
+        "async for"
+    } else {
+        "for"
+    };
+    let target_str = locator.slice(for_stmt.target.range());
+    let elt_str = locator.slice(to_append.range());
+    let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
 
     let comment_strings_in_range = |range| {
         checker
@@ -305,37 +311,9 @@ fn convert_to_list_extend(
 
     match fix_type {
         ComprehensionType::Extend => {
-            let generator = ast::ExprGenerator {
-                elt: Box::new(to_append.clone()),
-                generators: vec![comprehension],
-                parenthesized: false,
-                range: TextRange::default(),
-            };
-
             let variable_name = checker.locator().slice(binding.range);
 
-            let extend = ast::ExprAttribute {
-                value: Box::new(Expr::Name(ast::ExprName {
-                    id: ast::name::Name::new(variable_name),
-                    ctx: ast::ExprContext::Load,
-                    range: TextRange::default(),
-                })),
-                attr: ast::Identifier::new("extend", TextRange::default()),
-                ctx: ast::ExprContext::Load,
-                range: TextRange::default(),
-            };
-
-            let list_extend = ast::ExprCall {
-                func: Box::new(ast::Expr::Attribute(extend)),
-                arguments: Arguments {
-                    args: Box::new([ast::Expr::Generator(generator)]),
-                    range: TextRange::default(),
-                    keywords: Box::new([]),
-                },
-                range: TextRange::default(),
-            };
-
-            let comprehension_body = checker.generator().expr(&Expr::Call(list_extend));
+            let comprehension_body = format!("{variable_name}.extend({generator_str})");
 
             let indent_range = TextRange::new(
                 locator.line_start(for_stmt.range.start()),
@@ -362,13 +340,7 @@ fn convert_to_list_extend(
                 "Assignment value must be an empty list literal in order to replace with a list comprehension"
             ))?;
 
-            let list_comp = ast::ExprListComp {
-                elt: Box::new(to_append.clone()),
-                generators: vec![comprehension],
-                range: TextRange::default(),
-            };
-
-            let comprehension_body = checker.generator().expr(&Expr::ListComp(list_comp));
+            let comprehension_body = format!("[{generator_str}]");
 
             let indent_range = TextRange::new(
                 locator.line_start(binding_stmt.range.start()),
