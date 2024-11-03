@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
-use rustc_hash::FxHashSet;
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::comparable::HashableExpr;
+use ruff_python_ast::Expr;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
@@ -30,6 +31,7 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct DuplicateValue {
     value: String,
+    existing: String,
 }
 
 impl Violation for DuplicateValue {
@@ -37,8 +39,14 @@ impl Violation for DuplicateValue {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateValue { value } = self;
-        format!("Sets should not contain duplicate item `{value}`")
+        let DuplicateValue { value, existing } = self;
+        if value == existing {
+            format!("Sets should not contain duplicate item `{value}`")
+        } else {
+            format!(
+                "Sets should not contain duplicate items, but `{existing}` and `{value}` has the same value"
+            )
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -48,15 +56,14 @@ impl Violation for DuplicateValue {
 
 /// B033
 pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
-    let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
+    let mut seen_values: FxHashMap<HashableExpr, &Expr> = FxHashMap::default();
     for (index, value) in set.iter().enumerate() {
         if value.is_literal_expr() {
-            let comparable_value = ComparableExpr::from(value);
-
-            if !seen_values.insert(comparable_value) {
+            if let Some(existing) = seen_values.insert(HashableExpr::from(value), value) {
                 let mut diagnostic = Diagnostic::new(
                     DuplicateValue {
                         value: checker.generator().expr(value),
+                        existing: checker.generator().expr(existing),
                     },
                     value.range(),
                 );
