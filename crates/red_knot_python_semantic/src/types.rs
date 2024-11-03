@@ -1828,6 +1828,22 @@ impl<'db> ClassType<'db> {
             })
     }
 
+    /// Iterate through the inferred types of the class's explicit bases.
+    ///
+    /// Note that any class (except for `object`) that has no explicit
+    /// bases will implicitly inherit from `object` at runtime. Nonetheless,
+    /// this method does *not* include `object` in the bases it iterates over.
+    fn explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+        let definition = self.definition(db);
+        let class_stmt = self.node(db);
+        let has_type_params = class_stmt.type_params.is_some();
+
+        class_stmt
+            .bases()
+            .iter()
+            .map(move |base_node| infer_class_base_type(db, base_node, definition, has_type_params))
+    }
+
     /// Return the original [`ast::StmtClassDef`] node associated with this class
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
         match self.definition(db).kind(db) {
@@ -1929,26 +1945,6 @@ impl<'db> ClassType<'db> {
         Symbol::Unbound
     }
 
-    /// Iterate through the inferred types of the class's explicit bases.
-    ///
-    /// Note that any class (except for `object`) that has no explicit
-    /// bases will implicitly inherit from `object` at runtime. Nonetheless,
-    /// this method does *not* include `object` in the bases it iterates over.
-    fn bases(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
-        let definition = self.definition(db);
-        let class_stmt = self.node(db);
-        let has_type_params = class_stmt.type_params.is_some();
-
-        class_stmt.bases().iter().map(move |base_node| {
-            if has_type_params {
-                let model = SemanticModel::new(db, definition.file(db));
-                base_node.ty(&model)
-            } else {
-                definition_expression_ty(db, definition, base_node)
-            }
-        })
-    }
-
     /// Return `true` if this class appears to be a cyclic definition,
     /// i.e., it inherits either directly or indirectly from itself.
     ///
@@ -1965,16 +1961,36 @@ impl<'db> ClassType<'db> {
                 return true;
             }
             class
-                .bases(db)
+                .explicit_bases(db)
                 .filter_map(Type::into_class_literal_type)
                 .any(|base_class| {
                     is_cyclically_defined_recursive(db, base_class, classes_to_watch.clone())
                 })
         }
 
-        self.bases(db)
+        self.explicit_bases(db)
             .filter_map(Type::into_class_literal_type)
             .any(|base_class| is_cyclically_defined_recursive(db, base_class, FxHashSet::default()))
+    }
+}
+
+/// Infer the type of a node representing an explicit class base.
+///
+/// For example, infer the type of `Foo` in the statement `class Bar(Foo, Baz): ...`.
+fn infer_class_base_type<'db>(
+    db: &'db dyn Db,
+    base_node: &'db ast::Expr,
+    class_definition: Definition<'db>,
+    class_has_type_params: bool,
+) -> Type<'db> {
+    if class_has_type_params {
+        // when we have a specialized scope, we'll look up the inference
+        // within that scope
+        let model = SemanticModel::new(db, class_definition.file(db));
+        base_node.ty(&model)
+    } else {
+        // Otherwise, we can do the lookup based on the definition scope
+        definition_expression_ty(db, class_definition, base_node)
     }
 }
 

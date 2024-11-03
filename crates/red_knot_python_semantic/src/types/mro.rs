@@ -6,9 +6,9 @@ use rustc_hash::FxHashSet;
 
 use ruff_python_ast as ast;
 
-use super::{definition_expression_ty, ClassType, KnownClass, TupleType, Type};
+use super::{infer_class_base_type, ClassType, KnownClass, TupleType, Type};
 use crate::semantic_index::definition::Definition;
-use crate::{Db, HasTy, SemanticModel};
+use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
@@ -76,8 +76,8 @@ impl<'db> Mro<'db> {
                 let single_base = ClassBase::try_from_node(
                     db,
                     single_base_node,
-                    class_stmt_node,
                     class.definition(db),
+                    class_stmt_node.type_params.is_some(),
                 );
                 single_base.map_or_else(
                     |invalid_base_ty| {
@@ -119,11 +119,12 @@ impl<'db> Mro<'db> {
                 }
 
                 let definition = class.definition(db);
+                let has_type_params = class_stmt_node.type_params.is_some();
                 let mut valid_bases = vec![];
                 let mut invalid_bases = vec![];
 
                 for (i, base_node) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_node(db, base_node, class_stmt_node, definition) {
+                    match ClassBase::try_from_node(db, base_node, definition, has_type_params) {
                         Ok(valid_base) => valid_bases.push(valid_base),
                         Err(invalid_base) => invalid_bases.push((i, invalid_base)),
                     }
@@ -307,19 +308,10 @@ impl<'db> ClassBase<'db> {
     fn try_from_node(
         db: &'db dyn Db,
         base_node: &'db ast::Expr,
-        class_stmt_node: &'db ast::StmtClassDef,
-        definition: Definition<'db>,
+        class_definition: Definition<'db>,
+        class_has_type_params: bool,
     ) -> Result<Self, Type<'db>> {
-        let base_ty = if class_stmt_node.type_params.is_some() {
-            // when we have a specialized scope, we'll look up the inference
-            // within that scope
-            let model = SemanticModel::new(db, definition.file(db));
-            base_node.ty(&model)
-        } else {
-            // Otherwise, we can do the lookup based on the definition scope
-            definition_expression_ty(db, definition, base_node)
-        };
-
+        let base_ty = infer_class_base_type(db, base_node, class_definition, class_has_type_params);
         Self::try_from_ty(base_ty).ok_or(base_ty)
     }
 
