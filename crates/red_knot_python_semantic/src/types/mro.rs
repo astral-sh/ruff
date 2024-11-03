@@ -1,13 +1,13 @@
-use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::ops::Deref;
 
 use indexmap::IndexSet;
+use itertools::Either;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast as ast;
 
-use super::{infer_class_base_type, ClassType, KnownClass, TupleType, Type};
+use super::{infer_class_base_type, ClassType, KnownClass, Type};
 use crate::semantic_index::definition::Definition;
 use crate::Db;
 
@@ -18,22 +18,6 @@ use crate::Db;
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
-    /// In the event that a possible list of bases would (or could) lead to a
-    /// `TypeError` being raised at runtime due to an unresolvable MRO, we
-    /// infer the class as being `[<the class in question>, Unknown, object]`.
-    /// This seems most likely to reduce the possibility of cascading errors
-    /// elsewhere.
-    ///
-    /// (We emit a diagnostic warning about the runtime `TypeError` in
-    /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
-    pub(super) fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        Self::from([
-            ClassBase::Class(class),
-            ClassBase::Unknown,
-            ClassBase::object(db),
-        ])
-    }
-
     /// Attempt to resolve the MRO of a given class
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Result<Self, MroError<'db>> {
         Self::of_class_impl(db, class).map_err(|error_kind| MroError {
@@ -92,7 +76,7 @@ impl<'db> Mro<'db> {
                             }
                         }
                         let mro = std::iter::once(ClassBase::Class(class))
-                            .chain(Mro::of_base(db, single_base).elements())
+                            .chain(single_base.mro(db))
                             .collect();
                         Ok(mro)
                     },
@@ -127,7 +111,7 @@ impl<'db> Mro<'db> {
 
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
                 for base in &valid_bases {
-                    seqs.push(Mro::of_base(db, *base).elements().collect());
+                    seqs.push(base.mro(db).collect());
                 }
                 seqs.push(valid_bases.iter().copied().collect());
 
@@ -156,28 +140,20 @@ impl<'db> Mro<'db> {
         }
     }
 
-    /// Iterate over the elements of the MRO
-    pub(super) fn elements(&self) -> impl Iterator<Item = ClassBase<'db>> + '_ {
-        self.0.iter().copied()
-    }
-
-    /// Return a [`TupleType`] instance where each element in the tuple
-    /// represents an element in the class's MRO.
-    pub(super) fn as_tuple_type(&self, db: &'db dyn Db) -> TupleType<'db> {
-        let element_tys: Box<_> = self.elements().map(Type::from).collect();
-        TupleType::new(db, element_tys)
-    }
-
-    /// Resolve the MRO of a [`ClassBase`]
-    fn of_base(db: &'db dyn Db, base: ClassBase<'db>) -> Cow<'db, Self> {
-        match base {
-            ClassBase::Any => Cow::Owned(Mro::from([ClassBase::Any, ClassBase::object(db)])),
-            ClassBase::Unknown => {
-                Cow::Owned(Mro::from([ClassBase::Unknown, ClassBase::object(db)]))
-            }
-            ClassBase::Todo => Cow::Owned(Mro::from([ClassBase::Todo, ClassBase::object(db)])),
-            ClassBase::Class(class) => Cow::Borrowed(class.mro(db)),
-        }
+    /// In the event that a possible list of bases would (or could) lead to a
+    /// `TypeError` being raised at runtime due to an unresolvable MRO, we
+    /// infer the class as being `[<the class in question>, Unknown, object]`.
+    /// This seems most likely to reduce the possibility of cascading errors
+    /// elsewhere.
+    ///
+    /// (We emit a diagnostic warning about the runtime `TypeError` in
+    /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
+    fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        Self::from([
+            ClassBase::Class(class),
+            ClassBase::Unknown,
+            ClassBase::object(db),
+        ])
     }
 }
 
@@ -343,6 +319,21 @@ impl<'db> ClassBase<'db> {
         match self {
             Self::Class(class) => Some(class),
             _ => None,
+        }
+    }
+
+    /// Iterate over the MRO of this base
+    fn mro(
+        self,
+        db: &'db dyn Db,
+    ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
+        match self {
+            ClassBase::Any => Either::Left([ClassBase::Any, ClassBase::object(db)].into_iter()),
+            ClassBase::Unknown => {
+                Either::Left([ClassBase::Unknown, ClassBase::object(db)].into_iter())
+            }
+            ClassBase::Todo => Either::Left([ClassBase::Todo, ClassBase::object(db)].into_iter()),
+            ClassBase::Class(class) => Either::Right(class.mro(db)),
         }
     }
 }

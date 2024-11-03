@@ -1864,7 +1864,7 @@ impl<'db> ClassType<'db> {
         Mro::of_class(db, self)
     }
 
-    /// Return the [method resolution order] ("MRO") of the class.
+    /// Iterate over the [method resolution order] ("MRO") of the class.
     ///
     /// If the MRO could not be accurately resolved, this method falls back to
     /// an MRO that has the class directly inheriting from `Unknown`. Use
@@ -1872,16 +1872,33 @@ impl<'db> ClassType<'db> {
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    fn mro(self, db: &'db dyn Db) -> &'db Mro<'db> {
-        match self.try_mro(db) {
-            Ok(mro) => mro,
-            Err(MroError { fallback_mro, .. }) => fallback_mro,
-        }
+    fn mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+        // We avoid materialising the *full* MRO unless it is actually necessary:
+        //
+        // - Materialising the full MRO is expensive
+        // - We need to do it for every class in the code that we're checking, as we need to make sure
+        //   that there are no class definitions in the code we're checking that would cause an
+        //   exception to be raised at runtime. But the same does *not* apply for every class
+        //   in third-party and stdlib dependencies: we never emit diagnostics about non-first-party code.
+        // - However, we *do* need to resolve attribute accesses on classes/instances from
+        //   third-party and stdlib dependencies. That requires iterating over the MRO of third-party/stdlib
+        //   classes, but not necessarily the *whole* MRO: often just the first element is enough.
+        //   Luckily we know that for any class `X`, the first element of `X`'s MRO will always be `X` itself.
+        //   We can therefore avoid resolving the full MRO for many third-party/stdlib classes while still
+        //   being faithful to the runtime semantics.
+        std::iter::once(ClassBase::Class(self)).chain(
+            [()].into_iter()
+                .flat_map(move |()| match self.try_mro(db) {
+                    Ok(mro) => mro.iter().copied(),
+                    Err(MroError { fallback_mro, .. }) => fallback_mro.iter().copied(),
+                })
+                .skip(1),
+        )
     }
 
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
         (other == self)
-            || self.mro(db).elements().any(|superclass| match superclass {
+            || self.mro(db).any(|superclass| match superclass {
                 ClassBase::Class(superclass) => superclass == other,
                 // `is_subclass_of` is checking the subtype relation, in which gradual types do not
                 // participate, so we should not return `True` if we find `Any/Unknown` in the
@@ -1895,37 +1912,14 @@ impl<'db> ClassType<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
+            let tuple_elements: Box<_> = self.mro(db).map(Type::from).collect();
             return Symbol::Type(
-                Type::Tuple(self.mro(db).as_tuple_type(db)),
+                Type::Tuple(TupleType::new(db, tuple_elements)),
                 Boundness::Bound,
             );
         }
 
-        let member = self.own_class_member(db, name);
-        if !member.is_unbound() {
-            return member;
-        }
-
-        self.inherited_class_member(db, name)
-    }
-
-    /// Returns the inferred type of the class member named `name`.
-    ///
-    /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
-    /// directly. Use [`ClassType::class_member`] if you require a method that will
-    /// traverse through the MRO until it finds the member.
-    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let scope = self.body_scope(db);
-        symbol(db, scope, name)
-    }
-
-    /// Iterate over all superclasses of this class, excluding this class itself.
-    fn proper_superclasses(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
-        self.mro(db).elements().skip(1)
-    }
-
-    pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        for superclass in self.proper_superclasses(db) {
+        for superclass in self.mro(db) {
             match superclass {
                 // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
                 // the type found on the next "real" class.
@@ -1942,6 +1936,16 @@ impl<'db> ClassType<'db> {
         }
 
         Symbol::Unbound
+    }
+
+    /// Returns the inferred type of the class member named `name`.
+    ///
+    /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
+    /// directly. Use [`ClassType::class_member`] if you require a method that will
+    /// traverse through the MRO until it finds the member.
+    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let scope = self.body_scope(db);
+        symbol(db, scope, name)
     }
 }
 

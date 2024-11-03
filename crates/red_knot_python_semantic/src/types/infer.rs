@@ -4562,12 +4562,12 @@ mod tests {
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol(&db, a, "C").expect_type();
         let c_class = c_ty.expect_class_literal();
-        let c_mro = c_class.mro(&db);
-        let b_ty = c_mro[1];
+        let mut c_mro = c_class.mro(&db);
+        let b_ty = c_mro.nth(1).unwrap();
         let b_class = b_ty.expect_class();
         assert_eq!(b_class.name(&db), "B");
-        let b_mro = b_class.mro(&db);
-        let a_ty = b_mro[1];
+        let mut b_mro = b_class.mro(&db);
+        let a_ty = b_mro.nth(1).unwrap();
         let a_class = a_ty.expect_class();
         assert_eq!(a_class.name(&db), "A");
 
@@ -4717,7 +4717,7 @@ mod tests {
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
         let ty = global_symbol(&db, file, "C").expect_type();
-        let base = ty.expect_class_literal().mro(&db)[1];
+        let base = ty.expect_class_literal().mro(&db).nth(1).unwrap();
         assert_eq!(base.display(&db).to_string(), "<class 'object'>");
         Ok(())
     }
