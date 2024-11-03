@@ -88,6 +88,7 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 ///
 /// ## Options
 /// - `lint.ignore-init-module-imports`
+/// - `lint.pyflakes.allowed-unused-imports`
 ///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
