@@ -41,17 +41,46 @@ if bool_instance() and isinstance(x, A):
 else:
     reveal_type(x)  # revealed: A | B
 
-if True and isinstance(x, A):
-    reveal_type(x)  # revealed: A
-else:
-    # TODO: Consider statically known arms. Should be B & ~A
-    reveal_type(x)  # revealed: A | B
+reveal_type(x)  # revealed: A | B
+```
+
+## Statically known arms
+
+```py
+class A: ...
+class B: ...
+
+def instance() -> A | B:
+    return A()
+
+x = instance()
 
 if isinstance(x, A) and True:
     reveal_type(x)  # revealed: A
 else:
-    # TODO: Consider statically known arms. Should be B & ~A
+    reveal_type(x)  # revealed: B & ~A
+
+if True and isinstance(x, A):
+    reveal_type(x)  # revealed: A
+else:
+    reveal_type(x)  # revealed: B & ~A
+
+if False and isinstance(x, A):
+    # TODO: should emit an `unreachable code` diagnostic
+    reveal_type(x)  # revealed: A
+else:
     reveal_type(x)  # revealed: A | B
+
+if False or isinstance(x, A):
+    reveal_type(x)  # revealed: A
+else:
+    reveal_type(x)  # revealed: B & ~A
+
+if True or isinstance(x, A):
+    reveal_type(x)  # revealed: A | B
+else:
+    # TODO: should emit an `unreachable code` diagnostic
+    reveal_type(x)  # revealed: B & ~A
 
 reveal_type(x)  # revealed: A | B
 ```

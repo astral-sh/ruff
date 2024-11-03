@@ -559,15 +559,14 @@ impl<'db> Type<'db> {
                 .iter()
                 .any(|&elem_ty| elem_ty.is_subtype_of(db, ty)),
             (ty, Type::Intersection(intersection)) => {
-                let pos = intersection
+                intersection
                     .positive(db)
                     .iter()
-                    .all(|&pos_ty| ty.is_subtype_of(db, pos_ty));
-                let neg = intersection
-                    .negative(db)
-                    .iter()
-                    .all(|&neg_ty| neg_ty.is_disjoint_from(db, ty));
-                pos && neg
+                    .all(|&pos_ty| ty.is_subtype_of(db, pos_ty))
+                    && intersection
+                        .negative(db)
+                        .iter()
+                        .all(|&neg_ty| neg_ty.is_disjoint_from(db, ty))
             }
             (Type::Instance(self_class), Type::Instance(target_class)) => {
                 self_class.is_subclass_of(db, target_class)

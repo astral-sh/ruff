@@ -5,7 +5,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
-    infer_expression_types, IntersectionBuilder, KnownClass, KnownFunction, Type, UnionBuilder,
+    infer_expression_types, IntersectionBuilder, KnownClass, KnownFunction, Truthiness, Type,
+    UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -387,9 +388,21 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        let inference = infer_expression_types(self.db, expression);
+        let scope = self.scope();
         let mut sub_constraints = expr_bool_op
             .values
             .iter()
+            // filter our arms with statically known truthiness
+            .filter(|expr| {
+                inference
+                    .expression_ty(expr.scoped_ast_id(self.db, scope))
+                    .bool(self.db)
+                    != match expr_bool_op.op {
+                        BoolOp::And => Truthiness::AlwaysTrue,
+                        BoolOp::Or => Truthiness::AlwaysFalse,
+                    }
+            })
             .map(|sub_expr| {
                 self.evaluate_expression_node_constraint(sub_expr, expression, is_positive)
             })
