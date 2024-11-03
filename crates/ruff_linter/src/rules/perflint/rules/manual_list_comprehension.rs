@@ -1,14 +1,14 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
+use anyhow::{anyhow, Result};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
 use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-
-use anyhow::{anyhow, Result};
 
 use crate::checkers::ast::Checker;
 
