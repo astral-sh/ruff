@@ -15,9 +15,10 @@
 //! an implicit concatenation of string literals, as these expressions are considered to
 //! have the same shape in that they evaluate to the same value.
 
-use std::borrow::Cow;
-
 use crate as ast;
+use crate::{Expr, Number};
+use std::borrow::Cow;
+use std::hash::Hash;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableBoolOp {
@@ -861,8 +862,8 @@ pub struct ExprNumberLiteral<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprBoolLiteral<'a> {
-    value: &'a bool,
+pub struct ExprBoolLiteral {
+    value: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -934,7 +935,7 @@ pub enum ComparableExpr<'a> {
     StringLiteral(ExprStringLiteral<'a>),
     BytesLiteral(ExprBytesLiteral<'a>),
     NumberLiteral(ExprNumberLiteral<'a>),
-    BoolLiteral(ExprBoolLiteral<'a>),
+    BoolLiteral(ExprBoolLiteral),
     NoneLiteral,
     EllipsisLiteral,
     Attribute(ExprAttribute<'a>),
@@ -1109,7 +1110,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 })
             }
             ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, range: _ }) => {
-                Self::BoolLiteral(ExprBoolLiteral { value })
+                Self::BoolLiteral(ExprBoolLiteral { value: *value })
             }
             ast::Expr::NoneLiteral(_) => Self::NoneLiteral,
             ast::Expr::EllipsisLiteral(_) => Self::EllipsisLiteral,
@@ -1673,5 +1674,78 @@ impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
         Self {
             body: (&expr.body).into(),
         }
+    }
+}
+
+/// Wrapper around [`Expr`] that implements [`Hash`] and [`PartialEq`] according to Python
+/// semantics:
+///
+/// > Values that compare equal (such as 1, 1.0, and True) can be used interchangeably to index the
+/// > same dictionary entry.
+///
+/// For example, considers `True`, `1`, and `1.0` to be equal, as they hash to the same value
+/// in Python, along with `False`, `0`, and `0.0`.
+///
+/// See: <https://docs.python.org/3/library/stdtypes.html#mapping-types-dict>
+#[derive(Debug)]
+pub struct HashableExpr<'a>(ComparableExpr<'a>);
+
+impl Hash for HashableExpr<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl PartialEq<Self> for HashableExpr<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for HashableExpr<'_> {}
+
+impl<'a> From<&'a Expr> for HashableExpr<'a> {
+    fn from(expr: &'a Expr) -> Self {
+        /// Returns a version of the given expression that can be hashed and compared according to
+        /// Python  semantics.
+        fn as_hashable(expr: &Expr) -> ComparableExpr {
+            match expr {
+                Expr::Named(named) => ComparableExpr::NamedExpr(ExprNamed {
+                    target: Box::new(ComparableExpr::from(&named.target)),
+                    value: Box::new(as_hashable(&named.value)),
+                }),
+                Expr::NumberLiteral(number) => as_bool(number)
+                    .map(|value| ComparableExpr::BoolLiteral(ExprBoolLiteral { value }))
+                    .unwrap_or_else(|| ComparableExpr::from(expr)),
+                Expr::Tuple(tuple) => ComparableExpr::Tuple(ExprTuple {
+                    elts: tuple.iter().map(as_hashable).collect(),
+                }),
+                _ => ComparableExpr::from(expr),
+            }
+        }
+
+        /// Returns the `bool` value of the given expression, if it has an equivalent hash to
+        /// `True` or `False`.
+        fn as_bool(number: &crate::ExprNumberLiteral) -> Option<bool> {
+            match &number.value {
+                Number::Int(int) => match int.as_u8() {
+                    Some(0) => Some(false),
+                    Some(1) => Some(true),
+                    _ => None,
+                },
+                Number::Float(float) => match float {
+                    0.0 => Some(false),
+                    1.0 => Some(true),
+                    _ => None,
+                },
+                Number::Complex { real, imag } => match (real, imag) {
+                    (0.0, 0.0) => Some(false),
+                    (1.0, 0.0) => Some(true),
+                    _ => None,
+                },
+            }
+        }
+
+        Self(as_hashable(expr))
     }
 }
