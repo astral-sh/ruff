@@ -256,18 +256,18 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         *range,
     );
 
-    // if checker.settings.preview.is_enabled() {
-    diagnostic.try_set_fix(|| {
-        convert_to_list_extend(
-            comprehension_type,
-            binding,
-            for_stmt,
-            if_test.map(std::convert::AsRef::as_ref),
-            arg,
-            checker,
-        )
-    });
-    // }
+    if checker.settings.preview.is_enabled() {
+        diagnostic.try_set_fix(|| {
+            convert_to_list_extend(
+                comprehension_type,
+                binding,
+                for_stmt,
+                if_test.map(std::convert::AsRef::as_ref),
+                arg,
+                checker,
+            )
+        });
+    }
     checker.diagnostics.push(diagnostic);
 }
 
