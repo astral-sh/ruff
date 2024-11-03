@@ -319,7 +319,11 @@ fn convert_to_list_extend(
                 locator.line_start(for_stmt.range.start()),
                 for_stmt.range.start(),
             );
-            let indentation = format!("{newline}{}", locator.slice(indent_range));
+            let indentation = if for_loop_inline_comments.is_empty() {
+                String::new()
+            } else {
+                format!("{newline}{}", locator.slice(indent_range))
+            };
             let text_to_replace = format!(
                 "{}{indentation}{comprehension_body}",
                 for_loop_inline_comments.join(&indentation)
@@ -346,20 +350,21 @@ fn convert_to_list_extend(
                 locator.line_start(binding_stmt.range.start()),
                 binding_stmt.range.start(),
             );
-            let indentation = format!("{newline}{}", locator.slice(indent_range));
 
             let mut for_loop_comments = for_loop_inline_comments;
             for_loop_comments.extend(for_loop_trailing_comment);
+
+            let indentation = if for_loop_comments.is_empty() {
+                String::new()
+            } else {
+                format!("{newline}{}", locator.slice(indent_range))
+            };
             let leading_comments = format!("{}{indentation}", for_loop_comments.join(&indentation));
 
             Ok(Fix::unsafe_edits(
                 Edit::range_replacement(comprehension_body, empty_list_to_replace.range),
                 [
-                    Edit::range_deletion(
-                        for_stmt
-                            .range
-                            .cover(TextRange::new(for_stmt_end, locator.line_end(for_stmt_end))),
-                    ),
+                    Edit::range_deletion(locator.full_lines_range(for_stmt.range)),
                     Edit::insertion(leading_comments, binding_stmt.range.start()),
                 ],
             ))
