@@ -278,6 +278,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::StmtIpyEscapeCommand(_)
         | AnyNodeRef::ExceptHandlerExceptHandler(_)
         | AnyNodeRef::MatchCase(_)
+        | AnyNodeRef::Decorator(_)
         | AnyNodeRef::ElifElseClause(_) => true,
 
         AnyNodeRef::ExprBoolOp(_)
@@ -333,7 +334,6 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::Keyword(_)
         | AnyNodeRef::Alias(_)
         | AnyNodeRef::WithItem(_)
-        | AnyNodeRef::Decorator(_)
         | AnyNodeRef::TypeParams(_)
         | AnyNodeRef::TypeParamTypeVar(_)
         | AnyNodeRef::TypeParamTypeVarTuple(_)
