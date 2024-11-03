@@ -168,6 +168,8 @@ mod tests {
     }
 
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
+    #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.py"))]
+    #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
