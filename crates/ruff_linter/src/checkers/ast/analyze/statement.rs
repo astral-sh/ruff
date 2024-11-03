@@ -1224,34 +1224,37 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder]) {
-                fn bad_version_info_comparison(
-                    checker: &mut Checker,
-                    test: &Expr,
-                    has_else_clause: bool,
-                ) {
-                    if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test {
-                        for value in values {
+                if checker.source_type.is_stub() || checker.settings.preview.is_enabled() {
+                    fn bad_version_info_comparison(
+                        checker: &mut Checker,
+                        test: &Expr,
+                        has_else_clause: bool,
+                    ) {
+                        if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test {
+                            for value in values {
+                                flake8_pyi::rules::bad_version_info_comparison(
+                                    checker,
+                                    value,
+                                    has_else_clause,
+                                );
+                            }
+                        } else {
                             flake8_pyi::rules::bad_version_info_comparison(
                                 checker,
-                                value,
+                                test,
                                 has_else_clause,
                             );
                         }
-                    } else {
-                        flake8_pyi::rules::bad_version_info_comparison(
-                            checker,
-                            test,
-                            has_else_clause,
-                        );
                     }
-                }
 
-                let has_else_clause = elif_else_clauses.iter().any(|clause| clause.test.is_none());
+                    let has_else_clause =
+                        elif_else_clauses.iter().any(|clause| clause.test.is_none());
 
-                bad_version_info_comparison(checker, test.as_ref(), has_else_clause);
-                for clause in elif_else_clauses {
-                    if let Some(test) = clause.test.as_ref() {
-                        bad_version_info_comparison(checker, test, has_else_clause);
+                    bad_version_info_comparison(checker, test.as_ref(), has_else_clause);
+                    for clause in elif_else_clauses {
+                        if let Some(test) = clause.test.as_ref() {
+                            bad_version_info_comparison(checker, test, has_else_clause);
+                        }
                     }
                 }
             }
