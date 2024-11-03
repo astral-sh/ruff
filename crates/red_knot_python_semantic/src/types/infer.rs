@@ -433,17 +433,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         if self.types.has_deferred {
-            let mut deferred_expression_types: FxHashMap<ScopedExpressionId, Type<'db>> =
-                FxHashMap::default();
             // invariant: only annotations and base classes are deferred, and both of these only
             // occur within a declaration (annotated assignment, function or class definition)
             for definition in self.types.declarations.keys() {
                 if infer_definition_types(self.db, *definition).has_deferred {
                     let deferred = infer_deferred_types(self.db, *definition);
-                    deferred_expression_types.extend(&deferred.expressions);
+                    self.types.expressions.extend(&deferred.expressions);
+                    self.diagnostics.extend(&deferred.diagnostics);
                 }
             }
-            self.types.expressions.extend(deferred_expression_types);
         }
 
         self.check_class_definitions();

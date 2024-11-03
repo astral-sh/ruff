@@ -8,8 +8,8 @@ In type stubs, classes can reference themselves in their base class definitions.
 ```py path=a.pyi
 class Foo[T]: ...
 
-# TODO we resolve `Foo[Bar]` to `Unknown` here without emitting a diagnostic.
-# (Ideally we'd understand generics, but failing that, we shouldn't *silently* infer `Unknown`)
+# TODO: actually is subscriptable
+# error: [non-subscriptable]
 class Bar(Foo[Bar]): ...
 
 reveal_type(Bar)  # revealed: Literal[Bar]
