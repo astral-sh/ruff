@@ -214,6 +214,11 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::
         return;
     }
 
+    // Ex) `return open("foo.txt")`
+    if semantic.current_statement().is_return_stmt() {
+        return;
+    }
+
     // Ex) `with contextlib.ExitStack() as exit_stack: ...`
     if match_exit_stack(semantic) {
         return;
