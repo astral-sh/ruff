@@ -16,7 +16,7 @@ static CODE_INDICATORS: LazyLock<AhoCorasick> = LazyLock::new(|| {
 
 static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:|(?:en)?coding[:=][ \t]*([-_.a-zA-Z0-9]+))",
+        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:|language=[a-zA-Z](?: ?[-_.a-zA-Z0-9]+)+(?:\s+prefix=\S+)?(?:\s+suffix=\S+)?|(?:en)?coding[:=][ \t]*([-_.a-zA-Z0-9]+))",
     ).unwrap()
 });
 
@@ -294,6 +294,23 @@ mod tests {
         assert!(!comment_contains_code(
             "# XXX: What ever",
             &["XXX".to_string()]
+        ));
+    }
+
+    #[test]
+    fn comment_contains_language_injection() {
+        assert!(comment_contains_code("# language=123", &[]));
+        assert!(comment_contains_code("# language=\"pt\"", &[]));
+        assert!(comment_contains_code("# language='en'", &[]));
+
+        assert!(!comment_contains_code("# language=xml", &[]));
+        assert!(!comment_contains_code(
+            "# language=HTML prefix=<body> suffix=</body>",
+            &[]
+        ));
+        assert!(!comment_contains_code(
+            "# language=ecma script level 4",
+            &[]
         ));
     }
 
