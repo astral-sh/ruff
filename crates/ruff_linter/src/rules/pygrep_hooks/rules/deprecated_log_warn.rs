@@ -45,6 +45,6 @@ impl Violation for DeprecatedLogWarn {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `warning`"))
+        Some("Replace with `warning`".to_string())
     }
 }

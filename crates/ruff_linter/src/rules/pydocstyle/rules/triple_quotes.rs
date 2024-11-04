@@ -57,8 +57,8 @@ impl Violation for TripleSingleQuotes {
     fn fix_title(&self) -> Option<String> {
         let TripleSingleQuotes { expected_quote } = self;
         Some(match expected_quote {
-            Quote::Double => format!("Convert to triple double quotes"),
-            Quote::Single => format!("Convert to triple single quotes"),
+            Quote::Double => "Convert to triple double quotes".to_string(),
+            Quote::Single => "Convert to triple single quotes".to_string(),
         })
     }
 }

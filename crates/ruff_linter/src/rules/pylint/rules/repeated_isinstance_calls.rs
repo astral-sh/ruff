@@ -70,7 +70,7 @@ impl AlwaysFixableViolation for RepeatedIsinstanceCalls {
         if let Some(expression) = expression.full_display() {
             format!("Replace with `{expression}`")
         } else {
-            format!("Replace with merged `isinstance` call")
+            "Replace with merged `isinstance` call".to_string()
         }
     }
 }

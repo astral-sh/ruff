@@ -40,7 +40,7 @@ impl Violation for UnnecessarySpread {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove unnecessary dict"))
+        Some("Remove unnecessary dict".to_string())
     }
 }
 

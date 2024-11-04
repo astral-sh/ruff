@@ -45,9 +45,9 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 
     fn fix_title(&self) -> Option<String> {
         if self.is_value_none_literal {
-            Some(format!("Replace with `dict.fromkeys(iterable, value)`)"))
+            Some("Replace with `dict.fromkeys(iterable, value)`)".to_string())
         } else {
-            Some(format!("Replace with `dict.fromkeys(iterable)`)"))
+            Some("Replace with `dict.fromkeys(iterable)`)".to_string())
         }
     }
 }

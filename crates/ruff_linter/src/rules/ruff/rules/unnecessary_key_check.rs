@@ -38,7 +38,7 @@ impl AlwaysFixableViolation for UnnecessaryKeyCheck {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `dict.get`")
+        "Replace with `dict.get`".to_string()
     }
 }
 

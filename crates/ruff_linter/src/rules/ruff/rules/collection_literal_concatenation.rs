@@ -59,7 +59,7 @@ impl Violation for CollectionLiteralConcatenation {
         if let Some(expression) = expression.full_display() {
             Some(format!("Replace with `{expression}`"))
         } else {
-            Some(format!("Replace with iterable unpacking"))
+            Some("Replace with iterable unpacking".to_string())
         }
     }
 }

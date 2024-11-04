@@ -35,7 +35,7 @@ impl AlwaysFixableViolation for TabBeforeOperator {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 

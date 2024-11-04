@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
     }
 
     fn fix_title(&self) -> String {
-        format!("Insert spaces")
+        "Insert spaces".to_string()
     }
 }
 

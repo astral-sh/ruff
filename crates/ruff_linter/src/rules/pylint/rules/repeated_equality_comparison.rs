@@ -63,7 +63,7 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
     }
 
     fn fix_title(&self) -> String {
-        format!("Merge multiple comparisons")
+        "Merge multiple comparisons".to_string()
     }
 }
 

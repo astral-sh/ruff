@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for IterationOverSet {
     }
 
     fn fix_title(&self) -> String {
-        format!("Convert to `tuple`")
+        "Convert to `tuple`".to_string()
     }
 }
 

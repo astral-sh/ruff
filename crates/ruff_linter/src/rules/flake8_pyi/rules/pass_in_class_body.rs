@@ -36,7 +36,7 @@ impl AlwaysFixableViolation for PassInClassBody {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary `pass`")
+        "Remove unnecessary `pass`".to_string()
     }
 }
 

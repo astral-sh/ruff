@@ -41,7 +41,7 @@ impl AlwaysFixableViolation for UnnecessaryListIndexLookup {
     }
 
     fn fix_title(&self) -> String {
-        format!("Use the loop variable directly")
+        "Use the loop variable directly".to_string()
     }
 }
 

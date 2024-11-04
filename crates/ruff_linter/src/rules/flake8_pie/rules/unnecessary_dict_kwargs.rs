@@ -51,7 +51,7 @@ impl Violation for UnnecessaryDictKwargs {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove unnecessary kwargs"))
+        Some("Remove unnecessary kwargs".to_string())
     }
 }
 

@@ -54,7 +54,7 @@ impl Violation for UnaliasedCollectionsAbcSetImport {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Alias `Set` to `AbstractSet`"))
+        Some("Alias `Set` to `AbstractSet`".to_string())
     }
 }
 

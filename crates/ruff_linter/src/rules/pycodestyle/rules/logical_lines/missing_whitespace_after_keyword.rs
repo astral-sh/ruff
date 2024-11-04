@@ -36,7 +36,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {
     }
 
     fn fix_title(&self) -> String {
-        format!("Added missing whitespace after keyword")
+        "Added missing whitespace after keyword".to_string()
     }
 }
 

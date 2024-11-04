@@ -56,7 +56,7 @@ impl Violation for FStringNumberFormat {
         {
             Some(format!("Replace with `{display}`"))
         } else {
-            Some(format!("Replace with f-string"))
+            Some("Replace with f-string".to_string())
         }
     }
 }

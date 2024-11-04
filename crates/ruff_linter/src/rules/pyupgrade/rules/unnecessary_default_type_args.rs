@@ -60,7 +60,7 @@ impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove default type arguments")
+        "Remove default type arguments".to_string()
     }
 }
 

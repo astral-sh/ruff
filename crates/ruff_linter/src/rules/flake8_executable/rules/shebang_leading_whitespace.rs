@@ -39,7 +39,7 @@ impl AlwaysFixableViolation for ShebangLeadingWhitespace {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove whitespace before shebang")
+        "Remove whitespace before shebang".to_string()
     }
 }
 

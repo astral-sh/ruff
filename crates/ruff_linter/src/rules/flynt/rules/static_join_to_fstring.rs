@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for StaticJoinToFString {
         if let Some(expression) = expression.full_display() {
             format!("Replace with `{expression}`")
         } else {
-            format!("Replace with f-string")
+            "Replace with f-string".to_string()
         }
     }
 }

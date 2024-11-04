@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for BitCount {
         if let Some(replacement) = replacement.full_display() {
             format!("Replace with `{replacement}`")
         } else {
-            format!("Replace with `.bit_count()`")
+            "Replace with `.bit_count()`".to_string()
         }
     }
 }

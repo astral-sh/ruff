@@ -39,7 +39,7 @@ impl Violation for EmptyComment {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Delete the empty comment"))
+        Some("Delete the empty comment".to_string())
     }
 }
 

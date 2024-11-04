@@ -71,8 +71,8 @@ impl AlwaysFixableViolation for UnnecessaryPlaceholder {
     fn fix_title(&self) -> String {
         let Self { kind } = self;
         match kind {
-            Placeholder::Pass => format!("Remove unnecessary `pass`"),
-            Placeholder::Ellipsis => format!("Remove unnecessary `...`"),
+            Placeholder::Pass => "Remove unnecessary `pass`".to_string(),
+            Placeholder::Ellipsis => "Remove unnecessary `...`".to_string(),
         }
     }
 }

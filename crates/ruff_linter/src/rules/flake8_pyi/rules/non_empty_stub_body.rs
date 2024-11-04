@@ -38,7 +38,7 @@ impl AlwaysFixableViolation for NonEmptyStubBody {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace function body with `...`")
+        "Replace function body with `...`".to_string()
     }
 }
 

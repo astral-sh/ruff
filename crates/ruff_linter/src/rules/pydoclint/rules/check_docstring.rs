@@ -65,7 +65,7 @@ impl Violation for DocstringMissingReturns {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add a \"Returns\" section to the docstring"))
+        Some("Add a \"Returns\" section to the docstring".to_string())
     }
 }
 

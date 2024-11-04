@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
     }
 
     fn fix_title(&self) -> String {
-        format!("Use existing variable")
+        "Use existing variable".to_string()
     }
 }
 

@@ -76,7 +76,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
         if let Some(name) = name.full_display() {
             Some(format!("Remove repeated key literal `{name}`"))
         } else {
-            Some(format!("Remove repeated key literal"))
+            Some("Remove repeated key literal".to_string())
         }
     }
 }
@@ -133,7 +133,7 @@ impl Violation for MultiValueRepeatedKeyVariable {
         if let Some(name) = name.full_display() {
             Some(format!("Remove repeated key `{name}`"))
         } else {
-            Some(format!("Remove repeated key"))
+            Some("Remove repeated key".to_string())
         }
     }
 }

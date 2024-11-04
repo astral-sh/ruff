@@ -76,7 +76,7 @@ impl Violation for ReimplementedStarmap {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `itertools.starmap`"))
+        Some("Replace with `itertools.starmap`".to_string())
     }
 }
 

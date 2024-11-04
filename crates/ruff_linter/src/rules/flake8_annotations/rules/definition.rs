@@ -233,7 +233,7 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
         if let Some(annotation) = annotation {
             Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return type annotation"))
+            Some("Add return type annotation".to_string())
         }
     }
 }
@@ -277,7 +277,7 @@ impl Violation for MissingReturnTypePrivateFunction {
         if let Some(annotation) = annotation {
             Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return type annotation"))
+            Some("Add return type annotation".to_string())
         }
     }
 }
@@ -334,7 +334,7 @@ impl Violation for MissingReturnTypeSpecialMethod {
         if let Some(annotation) = annotation {
             Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return type annotation"))
+            Some("Add return type annotation".to_string())
         }
     }
 }
@@ -382,7 +382,7 @@ impl Violation for MissingReturnTypeStaticMethod {
         if let Some(annotation) = annotation {
             Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return type annotation"))
+            Some("Add return type annotation".to_string())
         }
     }
 }
@@ -430,7 +430,7 @@ impl Violation for MissingReturnTypeClassMethod {
         if let Some(annotation) = annotation {
             Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return type annotation"))
+            Some("Add return type annotation".to_string())
         }
     }
 }

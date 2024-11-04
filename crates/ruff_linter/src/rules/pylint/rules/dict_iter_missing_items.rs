@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for DictIterMissingItems {
     }
 
     fn fix_title(&self) -> String {
-        format!("Add a call to `.items()`")
+        "Add a call to `.items()`".to_string()
     }
 }
 

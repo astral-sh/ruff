@@ -41,7 +41,7 @@ impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove whitespace")
+        "Remove whitespace".to_string()
     }
 }
 

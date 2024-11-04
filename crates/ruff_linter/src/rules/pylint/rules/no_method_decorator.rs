@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
     }
 
     fn fix_title(&self) -> String {
-        format!("Add @classmethod decorator")
+        "Add @classmethod decorator".to_string()
     }
 }
 

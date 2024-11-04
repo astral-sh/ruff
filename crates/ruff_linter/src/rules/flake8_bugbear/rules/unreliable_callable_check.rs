@@ -46,7 +46,7 @@ impl Violation for UnreliableCallableCheck {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `callable()`"))
+        Some("Replace with `callable()`".to_string())
     }
 }
 
