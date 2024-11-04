@@ -166,3 +166,106 @@ FURB157.py:12:17: FURB157 [*] Verbose expression in `Decimal` constructor
 13 13 | 
 14 14 | # OK
 15 15 | Decimal(0)
+
+FURB157.py:23:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+22 | # Errors
+23 | Decimal("1_000")
+   |         ^^^^^^^ FURB157
+24 | Decimal("__1____000") 
+25 | Decimal("2e4")
+   |
+   = help: Replace with `1000`
+
+ℹ Safe fix
+20 20 | # See https://github.com/astral-sh/ruff/issues/13807
+21 21 | 
+22 22 | # Errors
+23    |-Decimal("1_000")
+   23 |+Decimal(1000)
+24 24 | Decimal("__1____000") 
+25 25 | Decimal("2e4")
+26 26 | Decimal("2e+4")
+
+FURB157.py:24:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+22 | # Errors
+23 | Decimal("1_000")
+24 | Decimal("__1____000") 
+   |         ^^^^^^^^^^^^ FURB157
+25 | Decimal("2e4")
+26 | Decimal("2e+4")
+   |
+   = help: Replace with `1000`
+
+ℹ Safe fix
+21 21 | 
+22 22 | # Errors
+23 23 | Decimal("1_000")
+24    |-Decimal("__1____000") 
+   24 |+Decimal(1000) 
+25 25 | Decimal("2e4")
+26 26 | Decimal("2e+4")
+27 27 | Decimal("2E4")
+
+FURB157.py:25:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+23 | Decimal("1_000")
+24 | Decimal("__1____000") 
+25 | Decimal("2e4")
+   |         ^^^^^ FURB157
+26 | Decimal("2e+4")
+27 | Decimal("2E4")
+   |
+   = help: Replace with `2e4`
+
+ℹ Safe fix
+22 22 | # Errors
+23 23 | Decimal("1_000")
+24 24 | Decimal("__1____000") 
+25    |-Decimal("2e4")
+   25 |+Decimal(2e4)
+26 26 | Decimal("2e+4")
+27 27 | Decimal("2E4")
+28 28 | 
+
+FURB157.py:26:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+24 | Decimal("__1____000") 
+25 | Decimal("2e4")
+26 | Decimal("2e+4")
+   |         ^^^^^^ FURB157
+27 | Decimal("2E4")
+   |
+   = help: Replace with `2e4`
+
+ℹ Safe fix
+23 23 | Decimal("1_000")
+24 24 | Decimal("__1____000") 
+25 25 | Decimal("2e4")
+26    |-Decimal("2e+4")
+   26 |+Decimal(2e4)
+27 27 | Decimal("2E4")
+28 28 | 
+29 29 | # Ok
+
+FURB157.py:27:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+25 | Decimal("2e4")
+26 | Decimal("2e+4")
+27 | Decimal("2E4")
+   |         ^^^^^ FURB157
+28 | 
+29 | # Ok
+   |
+   = help: Replace with `2E4`
+
+ℹ Safe fix
+24 24 | Decimal("__1____000") 
+25 25 | Decimal("2e4")
+26 26 | Decimal("2e+4")
+27    |-Decimal("2E4")
+   27 |+Decimal(2E4)
+28 28 | 
+29 29 | # Ok
+30 30 | Decimal("2e-4")
