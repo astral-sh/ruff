@@ -50,7 +50,6 @@ impl AlwaysFixableViolation for InDictKeys {
     }
 
     fn fix_title(&self) -> String {
-        let InDictKeys { operator: _ } = self;
         "Remove `.keys()`".to_string()
     }
 }
