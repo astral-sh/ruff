@@ -1786,9 +1786,9 @@ dependencies = [
 
 [[package]]
 name = "pep440_rs"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c8ee724d21f351f9d47276614ac9710975db827ba9fe2ca5a517ba648193307"
+checksum = "0922a442c78611fa8c5ed6065d2d898a820cf12fa90604217fdb2d01675efec7"
 dependencies = [
  "serde",
  "unicode-width 0.2.0",
@@ -2546,7 +2546,7 @@ dependencies = [
  "natord",
  "path-absolutize",
  "pathdiff",
- "pep440_rs 0.7.1",
+ "pep440_rs 0.7.2",
  "pyproject-toml",
  "quick-junit",
  "regex",
@@ -2876,7 +2876,7 @@ dependencies = [
  "matchit",
  "path-absolutize",
  "path-slash",
- "pep440_rs 0.7.1",
+ "pep440_rs 0.7.2",
  "regex",
  "ruff_cache",
  "ruff_formatter",
