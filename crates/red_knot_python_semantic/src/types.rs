@@ -1897,7 +1897,7 @@ impl<'db> ClassType<'db> {
             [()].into_iter()
                 .flat_map(move |()| match self.try_mro(db) {
                     Ok(mro) => mro.iter().copied(),
-                    Err(MroError { fallback_mro, .. }) => fallback_mro.iter().copied(),
+                    Err(error) => error.fallback_mro().iter().copied(),
                 })
                 .skip(1),
         )

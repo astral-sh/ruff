@@ -185,8 +185,18 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct MroError<'db> {
-    pub(super) kind: MroErrorKind<'db>,
-    pub(super) fallback_mro: Mro<'db>,
+    kind: MroErrorKind<'db>,
+    fallback_mro: Mro<'db>,
+}
+
+impl<'db> MroError<'db> {
+    pub(super) fn reason(&self) -> &MroErrorKind<'db> {
+        &self.kind
+    }
+
+    pub(super) fn fallback_mro(&self) -> &Mro<'db> {
+        &self.fallback_mro
+    }
 }
 
 /// Possible ways in which attempting to resolve the MRO of a class might fail.

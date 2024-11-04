@@ -459,10 +459,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             .values()
             .filter_map(|ty| ty.into_class_literal_type());
 
-        for class in class_definitions {
-            match class.try_mro(self.db).as_ref().map_err(|err| &err.kind) {
-                Ok(_) => {},
-                Err(MroErrorKind::DuplicateBases(duplicates)) => {
+        let invalid_mros = class_definitions.filter_map(|class| {
+            class
+                .try_mro(self.db)
+                .as_ref()
+                .err()
+                .map(|mro_error| (class, mro_error))
+        });
+
+        for (class, mro_error) in invalid_mros {
+            match mro_error.reason() {
+                MroErrorKind::DuplicateBases(duplicates) => {
                     let base_nodes = class.node(self.db).bases();
                     for (index, duplicate) in duplicates {
                         self.diagnostics.add(
@@ -472,7 +479,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                     }
                 }
-                Err(MroErrorKind::CyclicClassDefinition) => self.diagnostics.add(
+                MroErrorKind::CyclicClassDefinition => self.diagnostics.add(
                     class.node(self.db).into(),
                     "cyclic-class-def",
                     format_args!(
@@ -481,7 +488,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         class.name(self.db)
                     )
                 ),
-                Err(MroErrorKind::InvalidBases(bases)) => {
+                MroErrorKind::InvalidBases(bases) => {
                     let base_nodes = class.node(self.db).bases();
                     for (index, base_ty) in bases {
                         self.diagnostics.add(
@@ -494,7 +501,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                     }
                 },
-                Err(MroErrorKind::UnresolvableMro{bases_list}) => self.diagnostics.add(
+                MroErrorKind::UnresolvableMro{bases_list} => self.diagnostics.add(
                     class.node(self.db).into(),
                     "inconsistent-mro",
                     format_args!(
