@@ -10,7 +10,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -25,6 +25,25 @@ mod tests {
         let diagnostics = test_path(
             Path::new("perflint").join(path).as_path(),
             &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::Py310),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("perflint").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                target_version: PythonVersion::Py310,
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
