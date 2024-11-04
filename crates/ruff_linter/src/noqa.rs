@@ -432,7 +432,7 @@ pub(crate) enum ParsedFileExemption<'a> {
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn try_extract(line: &'a str) -> Result<Option<Self>, ParseError> {
+    pub(crate) fn try_extract(line: &'a str) -> Result<Option<Self>, ParseError> {
         let line = Self::lex_whitespace(line);
         let Some(line) = Self::lex_char(line, '#') else {
             return Ok(None);

@@ -26,6 +26,7 @@ pub(crate) use sort_dunder_slots::*;
 pub(crate) use static_key_dict_comprehension::*;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) use test_rules::*;
+pub(crate) use unformatted_special_comment::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unused_async::*;
@@ -65,6 +66,7 @@ mod static_key_dict_comprehension;
 mod suppression_comment_visitor;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) mod test_rules;
+mod unformatted_special_comment;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unused_async;
