@@ -47,7 +47,7 @@ impl Violation for UnnecessaryLiteralUnion {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with a single `Literal`",))
+        Some("Replace with a single `Literal`".to_string())
     }
 }
 

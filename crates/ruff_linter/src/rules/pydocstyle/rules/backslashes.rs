@@ -53,7 +53,7 @@ impl Violation for EscapeSequenceInDocstring {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!(r#"Add `r` prefix"#))
+        Some(r#"Add `r` prefix"#.to_string())
     }
 }
 
