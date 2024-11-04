@@ -20,20 +20,25 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         ^
         (?:
             # Case-sensitive
-            pyright|
-            type:\s*ignore|
-            SPDX-License-Identifier:|
-            fmt:\s*(on|off)|
+            pyright
+        |   type:\s*ignore
+        |   SPDX-License-Identifier:
+        |   fmt:\s*(on|off)
 
             # Case-insensitive
-            (?i:noqa)|
-            (?i:mypy):|
+        |   (?i:
+                noqa
+            |   mypy:
+            )
 
             # Unknown case sensitivity
-            pylint|
-            nosec|
-            region|endregion|
-            isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|
+        |   (?i:
+                pylint
+            |   nosec
+            |   region|endregion
+            |   isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)
+            |   (?:en)?coding[:=][\x20\t]*([-_.A-Z0-9]+)
+            )
 
             # IntelliJ language injection comments:
             # * `language` must be lowercase.
@@ -42,9 +47,8 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             #   though to IntelliJ they can be anything.
             # * May optionally contain `prefix=` and/or `suffix=`,
             #   not declared here since we use `.is_match()`.
-            (?-i:language)=[-_.A-Z0-9]+|
+        |   (?-i:language)=[-_.a-zA-Z0-9]+
 
-            (?:en)?coding[:=][\x20\t]*([-_.A-Z0-9]+)
         )
         ",
     )
