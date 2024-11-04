@@ -13,7 +13,7 @@ use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
-/// See [`ClassType::mro`] for more details.
+/// See [`ClassType::iter_mro`] for more details.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
@@ -203,8 +203,18 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 /// Salsa-tracked [`ClassType::try_mro`] method unless it's absolutely necessary.
 pub(super) struct MroIterator<'db> {
     db: &'db dyn Db,
+
+    /// The class whose MRO we're iterating over
     class: ClassType<'db>,
+
+    /// Whether or not we've already yielded the first element of the MRO
     first_element_yielded: bool,
+
+    /// Iterator over all elements of the MRO except the first.
+    ///
+    /// The full MRO is expensive to materialize, so this field is `None`
+    /// unless we actually *need* to iterate past the first element of the MRO,
+    /// at which point it is lazily materialized.
     subsequent_elements: Option<std::slice::Iter<'db, ClassBase<'db>>>,
 }
 
@@ -218,15 +228,17 @@ impl<'db> MroIterator<'db> {
         }
     }
 
+    /// Materialize the full MRO of the class.
+    /// Return an iterator over that MRO which skips the first element of the MRO.
     fn full_mro_except_first_element(&mut self) -> impl Iterator<Item = ClassBase<'db>> + '_ {
         self.subsequent_elements
             .get_or_insert_with(|| {
-                let mut full_mro = match self.class.try_mro(self.db) {
+                let mut full_mro_iter = match self.class.try_mro(self.db) {
                     Ok(mro) => mro.iter(),
                     Err(error) => error.fallback_mro().iter(),
                 };
-                full_mro.next();
-                full_mro
+                full_mro_iter.next();
+                full_mro_iter
             })
             .copied()
     }
@@ -253,10 +265,13 @@ pub(super) struct MroError<'db> {
 }
 
 impl<'db> MroError<'db> {
+    /// Return an [`MroErrorKind`] variant describing why we could not resolve the MRO for this class.
     pub(super) fn reason(&self) -> &MroErrorKind<'db> {
         &self.kind
     }
 
+    /// Return the fallback MRO we should infer for this class during type inference
+    /// (since accurate resolution of its "true" MRO was impossible)
     pub(super) fn fallback_mro(&self) -> &Mro<'db> {
         &self.fallback_mro
     }
@@ -274,13 +289,13 @@ pub(super) enum MroErrorKind<'db> {
     ///
     /// This variant records the indices and types of class bases
     /// that we deem to be invalid. The indices are the indices of nodes
-    /// in the bases list of the class's [`ast::StmtClassDef`] node:
-    /// each index is the index of a node representing an invalid base.
+    /// in the bases list of the class's [`ast::StmtClassDef`] node.
+    /// Each index is the index of a node representing an invalid base.
     InvalidBases(Box<[(usize, Type<'db>)]>),
 
     /// The class inherits from itself!
     ///
-    /// This is very unlikely to happen in real-world code,
+    /// This is very unlikely to happen in working real-world code,
     /// but it's important to explicitly account for it.
     /// If we don't, there's a possibility of an infinite loop and a panic.
     CyclicClassDefinition,
@@ -289,11 +304,13 @@ pub(super) enum MroErrorKind<'db> {
     ///
     /// This variant records the indices and [`ClassType`]s
     /// of the duplicate bases. The indices are the indices of nodes
-    /// in the bases list of the class's [`ast::StmtClassDef`] node:
-    /// each index is the index of a node representing a duplicate base.
+    /// in the bases list of the class's [`ast::StmtClassDef`] node.
+    /// Each index is the index of a node representing a duplicate base.
     DuplicateBases(Box<[(usize, ClassType<'db>)]>),
 
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
+    ///
+    /// See [`c3_merge`] for more details.
     UnresolvableMro { bases_list: Box<[ClassBase<'db>]> },
 }
 

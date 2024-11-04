@@ -1814,11 +1814,9 @@ pub struct ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    /// Return `true` if this class represents `known_class`
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        match self.known(db) {
-            Some(known) => known == known_class,
-            None => false,
-        }
+        self.known(db) == Some(known_class)
     }
 
     /// Return true if this class is a standard library type with given module name and name.
@@ -1829,7 +1827,7 @@ impl<'db> ClassType<'db> {
             })
     }
 
-    /// Return an iterator over the types of this class's explicit bases.
+    /// Return an iterator over the inferred types of this class's *explicit* bases.
     ///
     /// Note that any class (except for `object`) that has no explicit
     /// bases will implicitly inherit from `object` at runtime. Nonetheless,
@@ -1869,8 +1867,8 @@ impl<'db> ClassType<'db> {
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
     ///
-    /// If the MRO could not be accurately resolved, this method falls back to
-    /// an MRO that has the class directly inheriting from `Unknown`. Use
+    /// If the MRO could not be accurately resolved, this method falls back to iterating
+    /// over an MRO that has the class directly inheriting from `Unknown`. Use
     /// [`ClassType::try_mro`] if you need to distinguish between the success and failure
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
@@ -1879,6 +1877,7 @@ impl<'db> ClassType<'db> {
         MroIterator::new(db, self)
     }
 
+    /// Return `true` if `other` is present in this class's MRO.
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.

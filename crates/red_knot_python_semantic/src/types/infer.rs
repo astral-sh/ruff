@@ -447,9 +447,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.check_class_definitions();
     }
 
-    /// Iterate over all class definitions to check that Python will be able to create
-    /// a consistent "[method resolution order]" for each class at runtime. If not,
-    /// issue a diagnostic.
+    /// Iterate over all class definitions to check that Python will be able to create a
+    /// consistent "[method resolution order]" for each class at runtime. If not, issue a diagnostic.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     fn check_class_definitions(&mut self) {
