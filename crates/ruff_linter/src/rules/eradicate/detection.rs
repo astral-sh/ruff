@@ -17,7 +17,7 @@ static CODE_INDICATORS: LazyLock<AhoCorasick> = LazyLock::new(|| {
 static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"^(?xi)
-        (?:
+
             pylint|pyright|noqa|nosec|region|endregion|
             type:\s*ignore|
             fmt:\s*(on|off)|
@@ -35,7 +35,8 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             (?-i:language)=[-_.A-Z0-9]+|
 
             (?:en)?coding[:=][\x20\t]*([-_.A-Z0-9]+)
-        )",
+
+        ",
     )
     .unwrap()
 });
