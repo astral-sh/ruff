@@ -58,10 +58,15 @@ invalid3: Literal[(3, 4)]
 Only Literal that is defined in typing and typing_extension modules is detected as the special
 Literal.
 
-```py
+```pyi path=other.pyi
 from typing import _SpecialForm
 
 Literal: _SpecialForm
+```
+
+```py
+from other import Literal
+
 a1: Literal[26]
 
 def f():
