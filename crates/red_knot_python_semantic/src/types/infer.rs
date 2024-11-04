@@ -26,7 +26,6 @@
 //! stringified annotations. We have a fourth Salsa query for inferring the deferred types
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
-use std::borrow::Cow;
 use std::num::NonZeroU32;
 
 use itertools::Itertools;
@@ -42,7 +41,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    AssignmentKind, Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind, TargetKind,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
@@ -52,12 +51,14 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{
     TypeCheckDiagnostic, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder,
 };
+use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, ClassType, FunctionType, IterationOutcome, KnownClass,
     KnownFunction, SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type,
     TypeArrayDisplay, UnionBuilder, UnionType,
 };
+use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
@@ -159,6 +160,30 @@ pub(crate) fn infer_expression_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
+}
+
+/// Infer the types for an [`Unpack`] operation.
+///
+/// This infers the expression type and performs structural match against the target expression
+/// involved in an unpacking operation. It returns a result-like object that can be used to get the
+/// type of the variables involved in this unpacking along with any violations that are detected
+/// during this unpacking.
+#[salsa::tracked(return_ref)]
+fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
+    let file = unpack.file(db);
+    let _span =
+        tracing::trace_span!("infer_unpack_types", unpack=?unpack.as_id(), file=%file.path(db))
+            .entered();
+
+    let value = unpack.value(db);
+    let scope = unpack.scope(db);
+
+    let result = infer_expression_types(db, value);
+    let value_ty = result.expression_ty(value.node_ref(db).scoped_ast_id(db, scope));
+
+    let mut unpacker = Unpacker::new(db, file);
+    unpacker.unpack(unpack.target(db), value_ty, scope);
+    unpacker.finish()
 }
 
 /// A region within which we can infer types.
@@ -443,7 +468,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     assignment.target(),
                     assignment.value(),
                     assignment.name(),
-                    assignment.kind(),
                     definition,
                 );
             }
@@ -1321,10 +1345,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
-        target: &ast::Expr,
+        target: TargetKind<'db>,
         value: &ast::Expr,
         name: &ast::ExprName,
-        kind: AssignmentKind,
         definition: Definition<'db>,
     ) {
         let expression = self.index.expression(value);
@@ -1332,132 +1355,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.extend(result);
 
         let value_ty = self.expression_ty(value);
+        let name_ast_id = name.scoped_ast_id(self.db, self.scope());
 
-        let target_ty = match kind {
-            AssignmentKind::Sequence => self.infer_sequence_unpacking(target, value_ty, name),
-            AssignmentKind::Name => value_ty,
+        let target_ty = match target {
+            TargetKind::Sequence(unpack) => {
+                let unpacked = infer_unpack_types(self.db, unpack);
+                self.diagnostics.extend(unpacked.diagnostics());
+                unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
+            }
+            TargetKind::Name => value_ty,
         };
 
         self.add_binding(name.into(), definition, target_ty);
-        self.types
-            .expressions
-            .insert(name.scoped_ast_id(self.db, self.scope()), target_ty);
-    }
-
-    fn infer_sequence_unpacking(
-        &mut self,
-        target: &ast::Expr,
-        value_ty: Type<'db>,
-        name: &ast::ExprName,
-    ) -> Type<'db> {
-        // The inner function is recursive and only differs in the return type which is an `Option`
-        // where if the variable is found, the corresponding type is returned otherwise `None`.
-        fn inner<'db>(
-            builder: &mut TypeInferenceBuilder<'db>,
-            target: &ast::Expr,
-            value_ty: Type<'db>,
-            name: &ast::ExprName,
-        ) -> Option<Type<'db>> {
-            match target {
-                ast::Expr::Name(target_name) if target_name == name => {
-                    return Some(value_ty);
-                }
-                ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                    return inner(builder, value, value_ty, name);
-                }
-                ast::Expr::List(ast::ExprList { elts, .. })
-                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
-                    Type::Tuple(tuple_ty) => {
-                        let starred_index = elts.iter().position(ast::Expr::is_starred_expr);
-
-                        let element_types = if let Some(starred_index) = starred_index {
-                            if tuple_ty.len(builder.db) >= elts.len() - 1 {
-                                let mut element_types = Vec::with_capacity(elts.len());
-                                element_types.extend_from_slice(
-                                    // SAFETY: Safe because of the length check above.
-                                    &tuple_ty.elements(builder.db)[..starred_index],
-                                );
-
-                                // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
-                                // is 1 and the remaining elements after that are 2.
-                                let remaining = elts.len() - (starred_index + 1);
-                                // This index represents the type of the last element that belongs
-                                // to the starred expression, in an exclusive manner.
-                                let starred_end_index = tuple_ty.len(builder.db) - remaining;
-                                // SAFETY: Safe because of the length check above.
-                                let _starred_element_types = &tuple_ty.elements(builder.db)
-                                    [starred_index..starred_end_index];
-                                // TODO: Combine the types into a list type. If the
-                                // starred_element_types is empty, then it should be `List[Any]`.
-                                // combine_types(starred_element_types);
-                                element_types.push(Type::Todo);
-
-                                element_types.extend_from_slice(
-                                    // SAFETY: Safe because of the length check above.
-                                    &tuple_ty.elements(builder.db)[starred_end_index..],
-                                );
-                                Cow::Owned(element_types)
-                            } else {
-                                let mut element_types = tuple_ty.elements(builder.db).to_vec();
-                                // Subtract 1 to insert the starred expression type at the correct
-                                // index.
-                                element_types.resize(elts.len() - 1, Type::Unknown);
-                                // TODO: This should be `list[Unknown]`
-                                element_types.insert(starred_index, Type::Todo);
-                                Cow::Owned(element_types)
-                            }
-                        } else {
-                            Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
-                        };
-
-                        for (index, element) in elts.iter().enumerate() {
-                            if let Some(ty) = inner(
-                                builder,
-                                element,
-                                element_types.get(index).copied().unwrap_or(Type::Unknown),
-                                name,
-                            ) {
-                                return Some(ty);
-                            }
-                        }
-                    }
-                    Type::StringLiteral(string_literal_ty) => {
-                        // Deconstruct the string literal to delegate the inference back to the
-                        // tuple type for correct handling of starred expressions. We could go
-                        // further and deconstruct to an array of `StringLiteral` with each
-                        // individual character, instead of just an array of `LiteralString`, but
-                        // there would be a cost and it's not clear that it's worth it.
-                        let value_ty = Type::Tuple(TupleType::new(
-                            builder.db,
-                            vec![Type::LiteralString; string_literal_ty.len(builder.db)]
-                                .into_boxed_slice(),
-                        ));
-                        if let Some(ty) = inner(builder, target, value_ty, name) {
-                            return Some(ty);
-                        }
-                    }
-                    _ => {
-                        let value_ty = if value_ty.is_literal_string() {
-                            Type::LiteralString
-                        } else {
-                            value_ty.iterate(builder.db).unwrap_with_diagnostic(
-                                AnyNodeRef::from(target),
-                                &mut builder.diagnostics,
-                            )
-                        };
-                        for element in elts {
-                            if let Some(ty) = inner(builder, element, value_ty, name) {
-                                return Some(ty);
-                            }
-                        }
-                    }
-                },
-                _ => {}
-            }
-            None
-        }
-
-        inner(self, target, value_ty, name).unwrap_or(Type::Unknown)
+        self.types.expressions.insert(name_ast_id, target_ty);
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
