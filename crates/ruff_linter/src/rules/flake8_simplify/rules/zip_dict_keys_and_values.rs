@@ -40,9 +40,8 @@ pub struct ZipDictKeysAndValues {
 impl AlwaysFixableViolation for ZipDictKeysAndValues {
     #[derive_message_formats]
     fn message(&self) -> String {
-        if let (Some(expected), Some(actual)) =
-            (self.expected.full_display(), self.actual.full_display())
-        {
+        let ZipDictKeysAndValues { expected, actual } = self;
+        if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use `{expected}` instead of `{actual}`")
         } else {
             "Use `dict.items()` instead of `zip(dict.keys(), dict.values())`".to_string()
@@ -50,9 +49,8 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
     }
 
     fn fix_title(&self) -> String {
-        if let (Some(expected), Some(actual)) =
-            (self.expected.full_display(), self.actual.full_display())
-        {
+        let ZipDictKeysAndValues { expected, actual } = self;
+        if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Replace `{actual}` with `{expected}`")
         } else {
             "Replace `zip(dict.keys(), dict.values())` with `dict.items()`".to_string()

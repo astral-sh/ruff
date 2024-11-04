@@ -55,13 +55,10 @@ impl Violation for NeedlessBool {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        if let Some(condition) = self
-            .condition
-            .as_ref()
-            .and_then(SourceCodeSnippet::full_display)
-        {
+        let NeedlessBool { condition, negate } = self;
+        if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
             format!("Return the condition `{condition}` directly")
-        } else if self.negate {
+        } else if *negate {
             "Return the negated condition directly".to_string()
         } else {
             "Return the condition directly".to_string()
@@ -69,12 +66,9 @@ impl Violation for NeedlessBool {
     }
 
     fn fix_title(&self) -> Option<String> {
+        let NeedlessBool { condition, .. } = self;
         Some(
-            if let Some(condition) = self
-                .condition
-                .as_ref()
-                .and_then(SourceCodeSnippet::full_display)
-            {
+            if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
                 format!("Replace with `return {condition}`")
             } else {
                 "Inline condition".to_string()
