@@ -40,7 +40,7 @@ pub struct ManualListCopy;
 impl Violation for ManualListCopy {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `list` or `list.copy` to create a copy of a list")
+        "Use `list` or `list.copy` to create a copy of a list".to_string()
     }
 }
 

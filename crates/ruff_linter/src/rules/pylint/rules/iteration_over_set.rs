@@ -36,7 +36,7 @@ pub struct IterationOverSet;
 impl AlwaysFixableViolation for IterationOverSet {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a sequence type instead of a `set` when iterating over values")
+        "Use a sequence type instead of a `set` when iterating over values".to_string()
     }
 
     fn fix_title(&self) -> String {

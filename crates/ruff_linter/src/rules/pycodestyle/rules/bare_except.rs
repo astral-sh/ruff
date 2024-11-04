@@ -50,7 +50,7 @@ pub struct BareExcept;
 impl Violation for BareExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use bare `except`")
+        "Do not use bare `except`".to_string()
     }
 }
 

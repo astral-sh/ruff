@@ -64,7 +64,7 @@ pub struct MultiLineSummaryFirstLine;
 impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multi-line docstring summary should start at the first line")
+        "Multi-line docstring summary should start at the first line".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -127,7 +127,7 @@ pub struct MultiLineSummarySecondLine;
 impl AlwaysFixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multi-line docstring summary should start at the second line")
+        "Multi-line docstring summary should start at the second line".to_string()
     }
 
     fn fix_title(&self) -> String {

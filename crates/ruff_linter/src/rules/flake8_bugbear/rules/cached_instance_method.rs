@@ -68,9 +68,8 @@ pub struct CachedInstanceMethod;
 impl Violation for CachedInstanceMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-        )
+        "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+            .to_string()
     }
 }
 

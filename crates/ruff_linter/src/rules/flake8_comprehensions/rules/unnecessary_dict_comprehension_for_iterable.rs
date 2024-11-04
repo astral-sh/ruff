@@ -40,7 +40,7 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead")
+        "Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

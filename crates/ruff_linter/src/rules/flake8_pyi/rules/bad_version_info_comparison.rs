@@ -56,7 +56,7 @@ pub struct BadVersionInfoComparison;
 impl Violation for BadVersionInfoComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `<` or `>=` for `sys.version_info` comparisons")
+        "Use `<` or `>=` for `sys.version_info` comparisons".to_string()
     }
 }
 
@@ -101,7 +101,7 @@ pub struct BadVersionInfoOrder;
 impl Violation for BadVersionInfoOrder {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `>=` when using `if`-`else` with `sys.version_info` comparisons")
+        "Use `>=` when using `if`-`else` with `sys.version_info` comparisons".to_string()
     }
 }
 

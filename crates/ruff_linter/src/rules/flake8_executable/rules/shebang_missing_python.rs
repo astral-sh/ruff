@@ -36,7 +36,7 @@ pub struct ShebangMissingPython;
 impl Violation for ShebangMissingPython {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Shebang should contain `python`")
+        "Shebang should contain `python`".to_string()
     }
 }
 

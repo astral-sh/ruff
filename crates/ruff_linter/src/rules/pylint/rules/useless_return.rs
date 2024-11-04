@@ -34,7 +34,7 @@ pub struct UselessReturn;
 impl AlwaysFixableViolation for UselessReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Useless `return` statement at end of function")
+        "Useless `return` statement at end of function".to_string()
     }
 
     fn fix_title(&self) -> String {

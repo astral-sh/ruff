@@ -35,7 +35,7 @@ pub struct EmptyDocstring;
 impl Violation for EmptyDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring is empty")
+        "Docstring is empty".to_string()
     }
 }
 

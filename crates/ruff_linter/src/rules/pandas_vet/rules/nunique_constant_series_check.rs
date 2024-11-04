@@ -56,7 +56,7 @@ pub struct PandasNuniqueConstantSeriesCheck;
 impl Violation for PandasNuniqueConstantSeriesCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `series.nunique()` for checking that a series is constant is inefficient")
+        "Using `series.nunique()` for checking that a series is constant is inefficient".to_string()
     }
 }
 

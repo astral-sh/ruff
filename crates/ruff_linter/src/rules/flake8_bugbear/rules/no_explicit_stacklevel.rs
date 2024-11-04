@@ -32,7 +32,7 @@ pub struct NoExplicitStacklevel;
 impl Violation for NoExplicitStacklevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No explicit `stacklevel` keyword argument found")
+        "No explicit `stacklevel` keyword argument found".to_string()
     }
 }
 

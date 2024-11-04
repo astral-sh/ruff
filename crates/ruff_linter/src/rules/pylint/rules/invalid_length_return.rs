@@ -45,7 +45,7 @@ pub struct InvalidLengthReturnType;
 impl Violation for InvalidLengthReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__len__` does not return a non-negative integer")
+        "`__len__` does not return a non-negative integer".to_string()
     }
 }
 

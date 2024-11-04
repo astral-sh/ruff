@@ -75,7 +75,7 @@ impl Violation for UnsortedDunderAll {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__all__` is not sorted")
+        "`__all__` is not sorted".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

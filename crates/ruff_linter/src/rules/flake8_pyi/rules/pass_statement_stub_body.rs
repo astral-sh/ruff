@@ -31,7 +31,7 @@ pub struct PassStatementStubBody;
 impl AlwaysFixableViolation for PassStatementStubBody {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Empty body should contain `...`, not `pass`")
+        "Empty body should contain `...`, not `pass`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -47,7 +47,7 @@ pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
 
     let mut diagnostic = Diagnostic::new(PassStatementStubBody, pass.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        format!("..."),
+        "...".to_string(),
         pass.range(),
     )));
     checker.diagnostics.push(diagnostic);

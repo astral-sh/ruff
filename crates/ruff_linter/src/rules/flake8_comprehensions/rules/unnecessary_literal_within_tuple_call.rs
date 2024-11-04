@@ -54,31 +54,26 @@ pub struct UnnecessaryLiteralWithinTupleCall {
 impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralWithinTupleCall { literal_kind } = self;
-        match literal_kind {
+        match self.literal_kind {
             TupleLiteralKind::List => {
-                format!(
-                    "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-                )
+                "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)".to_string()
             }
             TupleLiteralKind::Tuple => {
-                format!("Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)")
+                "Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)".to_string()
             }
             TupleLiteralKind::ListComp => {
-                format!(
-                    "Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)"
-                )
+                "Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)".to_string()
             }
         }
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryLiteralWithinTupleCall { literal_kind } = self;
-        match literal_kind {
-            TupleLiteralKind::List => "Rewrite as a `tuple` literal".to_string(),
-            TupleLiteralKind::Tuple => "Remove the outer call to `tuple()`".to_string(),
-            TupleLiteralKind::ListComp => "Rewrite as a generator".to_string(),
-        }
+        let title = match self.literal_kind {
+            TupleLiteralKind::List => "Rewrite as a `tuple` literal",
+            TupleLiteralKind::Tuple => "Remove the outer call to `tuple()`",
+            TupleLiteralKind::ListComp => "Rewrite as a generator",
+        };
+        title.to_string()
     }
 }
 

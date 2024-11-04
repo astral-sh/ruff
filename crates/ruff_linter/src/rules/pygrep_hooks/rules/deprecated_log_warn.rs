@@ -41,7 +41,7 @@ impl Violation for DeprecatedLogWarn {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`warn` is deprecated in favor of `warning`")
+        "`warn` is deprecated in favor of `warning`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

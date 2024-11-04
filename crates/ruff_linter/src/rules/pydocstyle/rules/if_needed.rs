@@ -72,7 +72,7 @@ pub struct OverloadWithDocstring;
 impl Violation for OverloadWithDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function decorated with `@overload` shouldn't contain a docstring")
+        "Function decorated with `@overload` shouldn't contain a docstring".to_string()
     }
 }
 

@@ -45,7 +45,7 @@ pub struct SubprocessPopenPreexecFn;
 impl Violation for SubprocessPopenPreexecFn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`preexec_fn` argument is unsafe when using threads")
+        "`preexec_fn` argument is unsafe when using threads".to_string()
     }
 }
 

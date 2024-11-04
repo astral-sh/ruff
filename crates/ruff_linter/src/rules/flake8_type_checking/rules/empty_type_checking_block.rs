@@ -38,7 +38,7 @@ pub struct EmptyTypeCheckingBlock;
 impl AlwaysFixableViolation for EmptyTypeCheckingBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Found empty type-checking block")
+        "Found empty type-checking block".to_string()
     }
 
     fn fix_title(&self) -> String {

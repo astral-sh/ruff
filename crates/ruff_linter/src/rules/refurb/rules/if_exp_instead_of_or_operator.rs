@@ -46,7 +46,7 @@ impl Violation for IfExpInsteadOfOrOperator {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace ternary `if` expression with `or` operator")
+        "Replace ternary `if` expression with `or` operator".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

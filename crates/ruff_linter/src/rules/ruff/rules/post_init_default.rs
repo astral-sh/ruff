@@ -74,7 +74,7 @@ impl Violation for PostInitDefault {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__post_init__` method with argument defaults")
+        "`__post_init__` method with argument defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

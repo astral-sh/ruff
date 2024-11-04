@@ -28,7 +28,7 @@ pub struct MissingNewlineAtEndOfFile;
 impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No newline at end of file")
+        "No newline at end of file".to_string()
     }
 
     fn fix_title(&self) -> String {

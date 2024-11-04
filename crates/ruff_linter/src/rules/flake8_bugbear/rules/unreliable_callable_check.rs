@@ -39,10 +39,9 @@ impl Violation for UnreliableCallableCheck {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Using `hasattr(x, \"__call__\")` to test if x is callable is unreliable. Use \
+        "Using `hasattr(x, \"__call__\")` to test if x is callable is unreliable. Use \
              `callable(x)` for consistent results."
-        )
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

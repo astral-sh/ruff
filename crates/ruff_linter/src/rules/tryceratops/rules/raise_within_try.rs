@@ -55,7 +55,7 @@ pub struct RaiseWithinTry;
 impl Violation for RaiseWithinTry {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Abstract `raise` to an inner function")
+        "Abstract `raise` to an inner function".to_string()
     }
 }
 

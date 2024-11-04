@@ -34,7 +34,7 @@ pub struct UnnecessaryKeyCheck;
 impl AlwaysFixableViolation for UnnecessaryKeyCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary key check before dictionary access")
+        "Unnecessary key check before dictionary access".to_string()
     }
 
     fn fix_title(&self) -> String {

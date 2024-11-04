@@ -27,7 +27,7 @@ pub struct MultipleSpacesAfterKeyword;
 impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple spaces after keyword")
+        "Multiple spaces after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -56,11 +56,11 @@ pub struct MultipleSpacesBeforeKeyword;
 impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple spaces before keyword")
+        "Multiple spaces before keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
@@ -85,11 +85,11 @@ pub struct TabAfterKeyword;
 impl AlwaysFixableViolation for TabAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Tab after keyword")
+        "Tab after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
@@ -114,11 +114,11 @@ pub struct TabBeforeKeyword;
 impl AlwaysFixableViolation for TabBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Tab before keyword")
+        "Tab before keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 

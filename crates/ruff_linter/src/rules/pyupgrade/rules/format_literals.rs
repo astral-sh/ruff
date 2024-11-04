@@ -50,7 +50,7 @@ impl Violation for FormatLiterals {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use implicit references for positional format fields")
+        "Use implicit references for positional format fields".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

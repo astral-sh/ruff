@@ -51,11 +51,10 @@ pub struct UselessElseOnLoop;
 
 impl Violation for UselessElseOnLoop {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents"
-        )
+        "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

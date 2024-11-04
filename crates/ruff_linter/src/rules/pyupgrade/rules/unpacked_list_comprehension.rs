@@ -38,7 +38,7 @@ pub struct UnpackedListComprehension;
 impl AlwaysFixableViolation for UnpackedListComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace unpacked list comprehension with a generator expression")
+        "Replace unpacked list comprehension with a generator expression".to_string()
     }
 
     fn fix_title(&self) -> String {

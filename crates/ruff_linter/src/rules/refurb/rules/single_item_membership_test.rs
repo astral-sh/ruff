@@ -38,7 +38,7 @@ impl Violation for SingleItemMembershipTest {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Membership test against single-item container")
+        "Membership test against single-item container".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

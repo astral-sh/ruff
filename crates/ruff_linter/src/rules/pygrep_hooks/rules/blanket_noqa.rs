@@ -55,35 +55,23 @@ impl Violation for BlanketNOQA {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlanketNOQA {
-            missing_colon,
-            space_before_colon,
-            file_exemption,
-        } = self;
-
         // This awkward branching is necessary to ensure that the generic message is picked up by
         // `derive_message_formats`.
-        if !missing_colon && !space_before_colon && !file_exemption {
-            format!("Use specific rule codes when using `noqa`")
-        } else if *file_exemption {
-            format!("Use specific rule codes when using `ruff: noqa`")
-        } else if *missing_colon {
-            format!("Use a colon when specifying `noqa` rule codes")
+        if !self.missing_colon && !self.space_before_colon && !self.file_exemption {
+            "Use specific rule codes when using `noqa`".to_string()
+        } else if self.file_exemption {
+            "Use specific rule codes when using `ruff: noqa`".to_string()
+        } else if self.missing_colon {
+            "Use a colon when specifying `noqa` rule codes".to_string()
         } else {
-            format!("Do not add spaces between `noqa` and its colon")
+            "Do not add spaces between `noqa` and its colon".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let BlanketNOQA {
-            missing_colon,
-            space_before_colon,
-            ..
-        } = self;
-
-        if *missing_colon {
+        if self.missing_colon {
             Some("Add missing colon".to_string())
-        } else if *space_before_colon {
+        } else if self.space_before_colon {
             Some("Remove space(s) before colon".to_string())
         } else {
             None

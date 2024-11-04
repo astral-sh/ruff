@@ -57,23 +57,24 @@ impl Violation for SortedMinMax {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { min_max } = self;
-        match min_max {
+        match self.min_max {
             MinMax::Min => {
-                format!("Prefer `min` over `sorted()` to compute the minimum value in a sequence")
+                "Prefer `min` over `sorted()` to compute the minimum value in a sequence"
+                    .to_string()
             }
             MinMax::Max => {
-                format!("Prefer `max` over `sorted()` to compute the maximum value in a sequence")
+                "Prefer `max` over `sorted()` to compute the maximum value in a sequence"
+                    .to_string()
             }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Self { min_max } = self;
-        match min_max {
-            MinMax::Min => Some("Replace with `min`".to_string()),
-            MinMax::Max => Some("Replace with `max`".to_string()),
-        }
+        let title = match self.min_max {
+            MinMax::Min => "Replace with `min`",
+            MinMax::Max => "Replace with `max`",
+        };
+        Some(title.to_string())
     }
 }
 

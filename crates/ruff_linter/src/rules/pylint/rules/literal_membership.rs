@@ -37,7 +37,7 @@ pub struct LiteralMembership;
 impl AlwaysFixableViolation for LiteralMembership {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a set literal when testing for membership")
+        "Use a set literal when testing for membership".to_string()
     }
 
     fn fix_title(&self) -> String {

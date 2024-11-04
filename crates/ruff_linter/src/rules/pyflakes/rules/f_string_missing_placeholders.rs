@@ -59,7 +59,7 @@ pub struct FStringMissingPlaceholders;
 impl AlwaysFixableViolation for FStringMissingPlaceholders {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("f-string without any placeholders")
+        "f-string without any placeholders".to_string()
     }
 
     fn fix_title(&self) -> String {

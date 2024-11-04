@@ -49,7 +49,7 @@ pub struct TypedArgumentDefaultInStub;
 impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for typed arguments")
+        "Only simple default values allowed for typed arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -95,7 +95,7 @@ pub struct ArgumentDefaultInStub;
 impl AlwaysFixableViolation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for arguments")
+        "Only simple default values allowed for arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -139,7 +139,7 @@ pub struct AssignmentDefaultInStub;
 impl AlwaysFixableViolation for AssignmentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for assignments")
+        "Only simple default values allowed for assignments".to_string()
     }
 
     fn fix_title(&self) -> String {

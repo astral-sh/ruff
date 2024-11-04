@@ -66,7 +66,7 @@ impl Violation for PytestCompositeAssertion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assertion should be broken down into multiple parts")
+        "Assertion should be broken down into multiple parts".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -152,7 +152,7 @@ pub struct PytestAssertAlwaysFalse;
 impl Violation for PytestAssertAlwaysFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assertion always fails, replace with `pytest.fail()`")
+        "Assertion always fails, replace with `pytest.fail()`".to_string()
     }
 }
 

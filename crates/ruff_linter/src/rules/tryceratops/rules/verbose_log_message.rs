@@ -39,7 +39,7 @@ pub struct VerboseLogMessage;
 impl Violation for VerboseLogMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Redundant exception object included in `logging.exception` call")
+        "Redundant exception object included in `logging.exception` call".to_string()
     }
 }
 

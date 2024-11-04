@@ -42,7 +42,7 @@ pub struct ContinueInFinally;
 impl Violation for ContinueInFinally {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`continue` not supported inside `finally` clause")
+        "`continue` not supported inside `finally` clause".to_string()
     }
 }
 

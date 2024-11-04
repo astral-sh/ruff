@@ -36,7 +36,7 @@ pub struct ExceptionWithoutExcInfo;
 impl Violation for ExceptionWithoutExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `logging.exception` with falsy `exc_info`")
+        "Use of `logging.exception` with falsy `exc_info`".to_string()
     }
 }
 

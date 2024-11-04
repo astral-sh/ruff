@@ -50,15 +50,13 @@ pub struct RepeatedEqualityComparison {
 impl AlwaysFixableViolation for RepeatedEqualityComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedEqualityComparison { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!(
                 "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
             )
         } else {
-            format!(
-                "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
-            )
+            "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
+                .to_string()
         }
     }
 

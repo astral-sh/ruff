@@ -43,7 +43,7 @@ pub struct SysVersionSlice3;
 impl Violation for SysVersionSlice3 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`sys.version[:3]` referenced (python3.10), use `sys.version_info`")
+        "`sys.version[:3]` referenced (python3.10), use `sys.version_info`".to_string()
     }
 }
 
@@ -83,7 +83,7 @@ pub struct SysVersion2;
 impl Violation for SysVersion2 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`sys.version[2]` referenced (python3.10), use `sys.version_info`")
+        "`sys.version[2]` referenced (python3.10), use `sys.version_info`".to_string()
     }
 }
 
@@ -123,7 +123,7 @@ pub struct SysVersion0;
 impl Violation for SysVersion0 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`sys.version[0]` referenced (python10), use `sys.version_info`")
+        "`sys.version[0]` referenced (python10), use `sys.version_info`".to_string()
     }
 }
 
@@ -163,7 +163,7 @@ pub struct SysVersionSlice1;
 impl Violation for SysVersionSlice1 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`sys.version[:1]` referenced (python10), use `sys.version_info`")
+        "`sys.version[:1]` referenced (python10), use `sys.version_info`".to_string()
     }
 }
 

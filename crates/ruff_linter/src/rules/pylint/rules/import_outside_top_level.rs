@@ -48,7 +48,7 @@ pub struct ImportOutsideTopLevel;
 impl Violation for ImportOutsideTopLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`import` should be at the top-level of a file")
+        "`import` should be at the top-level of a file".to_string()
     }
 }
 

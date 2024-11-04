@@ -43,7 +43,7 @@ pub struct YieldInForLoop;
 impl AlwaysFixableViolation for YieldInForLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace `yield` over `for` loop with `yield from`")
+        "Replace `yield` over `for` loop with `yield from`".to_string()
     }
 
     fn fix_title(&self) -> String {

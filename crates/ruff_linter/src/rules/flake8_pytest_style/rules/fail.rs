@@ -51,7 +51,7 @@ pub struct PytestFailWithoutMessage;
 impl Violation for PytestFailWithoutMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No message passed to `pytest.fail()`")
+        "No message passed to `pytest.fail()`".to_string()
     }
 }
 

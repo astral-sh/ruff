@@ -19,7 +19,7 @@ pub struct ExpressionsInStarAssignment;
 impl Violation for ExpressionsInStarAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many expressions in star-unpacking assignment")
+        "Too many expressions in star-unpacking assignment".to_string()
     }
 }
 
@@ -45,7 +45,7 @@ pub struct MultipleStarredExpressions;
 impl Violation for MultipleStarredExpressions {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Two starred expressions in assignment")
+        "Two starred expressions in assignment".to_string()
     }
 }
 

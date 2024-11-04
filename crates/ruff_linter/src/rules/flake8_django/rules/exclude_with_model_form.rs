@@ -41,7 +41,7 @@ pub struct DjangoExcludeWithModelForm;
 impl Violation for DjangoExcludeWithModelForm {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use `exclude` with `ModelForm`, use `fields` instead")
+        "Do not use `exclude` with `ModelForm`, use `fields` instead".to_string()
     }
 }
 

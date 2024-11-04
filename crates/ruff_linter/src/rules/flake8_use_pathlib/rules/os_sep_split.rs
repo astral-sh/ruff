@@ -48,7 +48,7 @@ pub struct OsSepSplit;
 impl Violation for OsSepSplit {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace `.split(os.sep)` with `Path.parts`")
+        "Replace `.split(os.sep)` with `Path.parts`".to_string()
     }
 }
 

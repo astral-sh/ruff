@@ -47,10 +47,9 @@ impl Violation for TripleSingleQuotes {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TripleSingleQuotes { expected_quote } = self;
-        match expected_quote {
-            Quote::Double => format!(r#"Use triple double quotes `"""`"#),
-            Quote::Single => format!(r"Use triple single quotes `'''`"),
+        match self.expected_quote {
+            Quote::Double => r#"Use triple double quotes `"""`"#.to_string(),
+            Quote::Single => r"Use triple single quotes `'''`".to_string(),
         }
     }
 

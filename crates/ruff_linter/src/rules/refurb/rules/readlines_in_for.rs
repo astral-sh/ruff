@@ -37,7 +37,7 @@ pub(crate) struct ReadlinesInFor;
 impl AlwaysFixableViolation for ReadlinesInFor {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Instead of calling `readlines()`, iterate over file object directly")
+        "Instead of calling `readlines()`, iterate over file object directly".to_string()
     }
 
     fn fix_title(&self) -> String {

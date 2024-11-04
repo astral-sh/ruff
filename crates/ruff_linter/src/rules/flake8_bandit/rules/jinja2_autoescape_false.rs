@@ -42,17 +42,15 @@ pub struct Jinja2AutoescapeFalse {
 impl Violation for Jinja2AutoescapeFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Jinja2AutoescapeFalse { value } = self;
-        match value {
-            true => format!(
-                "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. \
+        if self.value {
+            "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. \
                  Ensure `autoescape=True` or use the `select_autoescape` function."
-            ),
-            false => format!(
-                "By default, jinja2 sets `autoescape` to `False`. Consider using \
-                 `autoescape=True` or the `select_autoescape` function to mitigate XSS \
-                 vulnerabilities."
-            ),
+                .to_string()
+        } else {
+            "By default, jinja2 sets `autoescape` to `False`. Consider using \
+                `autoescape=True` or the `select_autoescape` function to mitigate XSS \
+                vulnerabilities."
+                .to_string()
         }
     }
 }

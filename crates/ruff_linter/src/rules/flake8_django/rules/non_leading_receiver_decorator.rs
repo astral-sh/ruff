@@ -46,7 +46,7 @@ pub struct DjangoNonLeadingReceiverDecorator;
 impl Violation for DjangoNonLeadingReceiverDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`@receiver` decorator must be on top of all the other decorators")
+        "`@receiver` decorator must be on top of all the other decorators".to_string()
     }
 }
 

@@ -38,7 +38,7 @@ impl Violation for IsinstanceTypeNone {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `is` operator over `isinstance` to check if an object is `None`")
+        "Prefer `is` operator over `isinstance` to check if an object is `None`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

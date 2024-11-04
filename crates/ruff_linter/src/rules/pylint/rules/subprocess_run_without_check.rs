@@ -51,7 +51,7 @@ pub struct SubprocessRunWithoutCheck;
 impl AlwaysFixableViolation for SubprocessRunWithoutCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`subprocess.run` without explicit `check` argument")
+        "`subprocess.run` without explicit `check` argument".to_string()
     }
 
     fn fix_title(&self) -> String {

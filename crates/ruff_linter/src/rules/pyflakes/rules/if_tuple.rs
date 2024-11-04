@@ -34,7 +34,7 @@ pub struct IfTuple;
 impl Violation for IfTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("If test is a tuple, which is always `True`")
+        "If test is a tuple, which is always `True`".to_string()
     }
 }
 

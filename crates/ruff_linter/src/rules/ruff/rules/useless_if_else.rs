@@ -31,7 +31,7 @@ pub struct UselessIfElse;
 impl Violation for UselessIfElse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Useless `if`-`else` condition")
+        "Useless `if`-`else` condition".to_string()
     }
 }
 

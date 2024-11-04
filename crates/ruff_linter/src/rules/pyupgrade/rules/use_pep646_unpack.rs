@@ -39,7 +39,7 @@ impl Violation for NonPEP646Unpack {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `*` for unpacking")
+        "Use `*` for unpacking".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

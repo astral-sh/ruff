@@ -42,7 +42,7 @@ impl Violation for PandasUseOfInplaceArgument {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`inplace=True` should be avoided; it has inconsistent behavior")
+        "`inplace=True` should be avoided; it has inconsistent behavior".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

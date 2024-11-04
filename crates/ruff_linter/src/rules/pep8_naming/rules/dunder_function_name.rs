@@ -38,7 +38,7 @@ pub struct DunderFunctionName;
 impl Violation for DunderFunctionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function name should not start and end with `__`")
+        "Function name should not start and end with `__`".to_string()
     }
 }
 

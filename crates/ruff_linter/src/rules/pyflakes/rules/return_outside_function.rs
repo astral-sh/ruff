@@ -28,7 +28,7 @@ pub struct ReturnOutsideFunction;
 impl Violation for ReturnOutsideFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`return` statement outside of a function/method")
+        "`return` statement outside of a function/method".to_string()
     }
 }
 

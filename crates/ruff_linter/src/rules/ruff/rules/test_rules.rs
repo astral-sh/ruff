@@ -74,7 +74,7 @@ impl Violation for StableTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a stable test rule.")
+        "Hey this is a stable test rule.".to_string()
     }
 }
 
@@ -110,13 +110,13 @@ impl Violation for StableTestRuleSafeFix {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a stable test rule with a safe fix.")
+        "Hey this is a stable test rule with a safe fix.".to_string()
     }
 }
 
 impl TestRule for StableTestRuleSafeFix {
     fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        let comment = format!("# fix from stable-test-rule-safe-fix\n");
+        let comment = "# fix from stable-test-rule-safe-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
@@ -151,13 +151,13 @@ impl Violation for StableTestRuleUnsafeFix {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a stable test rule with an unsafe fix.")
+        "Hey this is a stable test rule with an unsafe fix.".to_string()
     }
 }
 
 impl TestRule for StableTestRuleUnsafeFix {
     fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        let comment = format!("# fix from stable-test-rule-unsafe-fix\n");
+        let comment = "# fix from stable-test-rule-unsafe-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
@@ -195,13 +195,13 @@ impl Violation for StableTestRuleDisplayOnlyFix {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a stable test rule with a display only fix.")
+        "Hey this is a stable test rule with a display only fix.".to_string()
     }
 }
 
 impl TestRule for StableTestRuleDisplayOnlyFix {
     fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        let comment = format!("# fix from stable-test-rule-display-only-fix\n");
+        let comment = "# fix from stable-test-rule-display-only-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
@@ -242,7 +242,7 @@ impl Violation for PreviewTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a preview test rule.")
+        "Hey this is a preview test rule.".to_string()
     }
 }
 
@@ -278,7 +278,7 @@ impl Violation for DeprecatedTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a deprecated test rule.")
+        "Hey this is a deprecated test rule.".to_string()
     }
 }
 
@@ -314,7 +314,7 @@ impl Violation for AnotherDeprecatedTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is another deprecated test rule.")
+        "Hey this is another deprecated test rule.".to_string()
     }
 }
 
@@ -350,7 +350,7 @@ impl Violation for RemovedTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a removed test rule.")
+        "Hey this is a removed test rule.".to_string()
     }
 }
 
@@ -386,7 +386,7 @@ impl Violation for AnotherRemovedTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a another removed test rule.")
+        "Hey this is a another removed test rule.".to_string()
     }
 }
 
@@ -422,7 +422,7 @@ impl Violation for RedirectedFromTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a test rule that was redirected to another.")
+        "Hey this is a test rule that was redirected to another.".to_string()
     }
 }
 
@@ -458,7 +458,7 @@ impl Violation for RedirectedToTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a test rule that was redirected from another.")
+        "Hey this is a test rule that was redirected from another.".to_string()
     }
 }
 
@@ -494,7 +494,7 @@ impl Violation for RedirectedFromPrefixTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a test rule that was redirected to another by prefix.")
+        "Hey this is a test rule that was redirected to another by prefix.".to_string()
     }
 }
 

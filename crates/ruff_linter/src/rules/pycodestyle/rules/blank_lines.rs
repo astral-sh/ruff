@@ -341,7 +341,7 @@ pub struct BlankLinesBeforeNestedDefinition;
 impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected 1 blank line before a nested definition, found 0")
+        "Expected 1 blank line before a nested definition, found 0".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -41,7 +41,7 @@ pub struct HardcodedSQLExpression;
 impl Violation for HardcodedSQLExpression {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible SQL injection vector through string-based query construction")
+        "Possible SQL injection vector through string-based query construction".to_string()
     }
 }
 

@@ -45,7 +45,7 @@ pub struct PytestPatchWithLambda;
 impl Violation for PytestPatchWithLambda {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `return_value=` instead of patching with `lambda`")
+        "Use `return_value=` instead of patching with `lambda`".to_string()
     }
 }
 

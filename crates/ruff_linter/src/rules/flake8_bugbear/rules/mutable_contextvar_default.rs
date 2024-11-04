@@ -58,7 +58,7 @@ pub struct MutableContextvarDefault;
 impl Violation for MutableContextvarDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use mutable data structures for `ContextVar` defaults")
+        "Do not use mutable data structures for `ContextVar` defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

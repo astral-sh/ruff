@@ -32,7 +32,7 @@ pub struct MissingWhitespaceAfterKeyword;
 impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace after keyword")
+        "Missing whitespace after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {

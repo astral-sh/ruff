@@ -33,7 +33,7 @@ pub struct BadStringFormatType;
 impl Violation for BadStringFormatType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Format type does not match argument type")
+        "Format type does not match argument type".to_string()
     }
 }
 

@@ -42,10 +42,9 @@ pub struct UselessContextlibSuppress;
 impl Violation for UselessContextlibSuppress {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and \
-             therefore this context manager is redundant"
-        )
+        "No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and \
+            therefore this context manager is redundant"
+            .to_string()
     }
 }
 

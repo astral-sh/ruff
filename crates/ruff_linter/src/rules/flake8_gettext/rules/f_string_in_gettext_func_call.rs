@@ -46,7 +46,7 @@ pub struct FStringInGetTextFuncCall;
 impl Violation for FStringInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("f-string is resolved before function call; consider `_(\"string %s\") % arg`")
+        "f-string is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
     }
 }
 

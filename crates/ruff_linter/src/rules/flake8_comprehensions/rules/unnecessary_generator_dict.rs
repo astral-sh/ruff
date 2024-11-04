@@ -37,7 +37,7 @@ pub struct UnnecessaryGeneratorDict;
 impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary generator (rewrite as a `dict` comprehension)")
+        "Unnecessary generator (rewrite as a `dict` comprehension)".to_string()
     }
 
     fn fix_title(&self) -> String {

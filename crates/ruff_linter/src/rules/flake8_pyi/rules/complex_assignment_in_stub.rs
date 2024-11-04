@@ -47,7 +47,7 @@ pub struct ComplexAssignmentInStub;
 impl Violation for ComplexAssignmentInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Stubs should not contain assignments to attributes or multiple targets")
+        "Stubs should not contain assignments to attributes or multiple targets".to_string()
     }
 }
 

@@ -51,7 +51,7 @@ pub struct StarArgUnpackingAfterKeywordArg;
 impl Violation for StarArgUnpackingAfterKeywordArg {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Star-arg unpacking after a keyword argument is strongly discouraged")
+        "Star-arg unpacking after a keyword argument is strongly discouraged".to_string()
     }
 }
 

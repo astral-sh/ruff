@@ -111,7 +111,7 @@ pub struct PytestUseFixturesWithoutParameters;
 impl AlwaysFixableViolation for PytestUseFixturesWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Useless `pytest.mark.usefixtures` without parameters")
+        "Useless `pytest.mark.usefixtures` without parameters".to_string()
     }
 
     fn fix_title(&self) -> String {
