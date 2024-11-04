@@ -1,5 +1,8 @@
+use mro::{ClassBase, Mro, MroError, MroIterator};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+
+use itertools::Itertools;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -26,6 +29,7 @@ mod builder;
 mod diagnostic;
 mod display;
 mod infer;
+mod mro;
 mod narrow;
 mod unpacker;
 
@@ -1808,12 +1812,11 @@ pub struct ClassType<'db> {
     known: Option<KnownClass>,
 }
 
+#[salsa::tracked]
 impl<'db> ClassType<'db> {
+    /// Return `true` if this class represents `known_class`
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        match self.known(db) {
-            Some(known) => known == known_class,
-            None => false,
-        }
+        self.known(db) == Some(known_class)
     }
 
     /// Return true if this class is a standard library type with given module name and name.
@@ -1824,70 +1827,122 @@ impl<'db> ClassType<'db> {
             })
     }
 
-    /// Return an iterator over the types of this class's bases.
+    /// Return an iterator over the inferred types of this class's *explicit* bases.
     ///
-    /// # Panics:
-    /// If `definition` is not a `DefinitionKind::Class`.
-    pub fn bases(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+    /// Note that any class (except for `object`) that has no explicit
+    /// bases will implicitly inherit from `object` at runtime. Nonetheless,
+    /// this method does *not* include `object` in the bases it iterates over.
+    fn explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         let definition = self.definition(db);
-        let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
-            panic!("Class type definition must have DefinitionKind::Class");
-        };
-        class_stmt_node
+        let class_stmt = self.node(db);
+        let has_type_params = class_stmt.type_params.is_some();
+
+        class_stmt
             .bases()
             .iter()
-            .map(move |base_expr: &ast::Expr| {
-                if class_stmt_node.type_params.is_some() {
-                    // when we have a specialized scope, we'll look up the inference
-                    // within that scope
-                    let model: SemanticModel<'db> = SemanticModel::new(db, definition.file(db));
-                    base_expr.ty(&model)
-                } else {
-                    // Otherwise, we can do the lookup based on the definition scope
-                    definition_expression_ty(db, definition, base_expr)
-                }
-            })
+            .map(move |base_node| infer_class_base_type(db, base_node, definition, has_type_params))
     }
 
+    /// Return the original [`ast::StmtClassDef`] node associated with this class
+    fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
+        match self.definition(db).kind(db) {
+            DefinitionKind::Class(class_stmt_node) => class_stmt_node,
+            _ => unreachable!("Class type definition should always have DefinitionKind::Class"),
+        }
+    }
+
+    /// Attempt to resolve the [method resolution order] ("MRO") for this class.
+    /// If the MRO is unresolvable, return an error indicating why the class's MRO
+    /// cannot be accurately determined. The error returned contains a fallback MRO
+    /// that will be used instead for the purposes of type inference.
+    ///
+    /// The MRO is the tuple of classes that can be retrieved as the `__mro__`
+    /// attribute on a class at runtime.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[salsa::tracked(return_ref)]
+    fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, MroError<'db>> {
+        Mro::of_class(db, self)
+    }
+
+    /// Iterate over the [method resolution order] ("MRO") of the class.
+    ///
+    /// If the MRO could not be accurately resolved, this method falls back to iterating
+    /// over an MRO that has the class directly inheriting from `Unknown`. Use
+    /// [`ClassType::try_mro`] if you need to distinguish between the success and failure
+    /// cases rather than simply iterating over the inferred resolution order for the class.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+        MroIterator::new(db, self)
+    }
+
+    /// Return `true` if `other` is present in this class's MRO.
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
-        // TODO: we need to iterate over the *MRO* here, not the bases
-        (other == self)
-            || self.bases(db).any(|base| match base {
-                Type::ClassLiteral(base_class) => base_class == other,
-                // `is_subclass_of` is checking the subtype relation, in which gradual types do not
-                // participate, so we should not return `True` if we find `Any/Unknown` in the
-                // bases.
-                _ => false,
-            })
+        // `is_subclass_of` is checking the subtype relation, in which gradual types do not
+        // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
+        self.iter_mro(db).contains(&ClassBase::Class(other))
     }
 
     /// Returns the class member of this class named `name`.
     ///
-    /// The member resolves to a member of the class itself or any of its bases.
+    /// The member resolves to a member on the class itself or any of its proper superclasses.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let member = self.own_class_member(db, name);
-        if !member.is_unbound() {
-            return member;
+        if name == "__mro__" {
+            let tuple_elements: Box<_> = self.iter_mro(db).map(Type::from).collect();
+            return Symbol::Type(
+                Type::Tuple(TupleType::new(db, tuple_elements)),
+                Boundness::Bound,
+            );
         }
 
-        self.inherited_class_member(db, name)
-    }
-
-    /// Returns the inferred type of the class member named `name`.
-    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let scope = self.body_scope(db);
-        symbol(db, scope, name)
-    }
-
-    pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        for base in self.bases(db) {
-            let member = base.member(db, name);
-            if !member.is_unbound() {
-                return member;
+        for superclass in self.iter_mro(db) {
+            match superclass {
+                // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
+                // the type found on the next "real" class.
+                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo => {
+                    return Type::from(superclass).member(db, name)
+                }
+                ClassBase::Class(class) => {
+                    let member = class.own_class_member(db, name);
+                    if !member.is_unbound() {
+                        return member;
+                    }
+                }
             }
         }
 
         Symbol::Unbound
+    }
+
+    /// Returns the inferred type of the class member named `name`.
+    ///
+    /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
+    /// directly. Use [`ClassType::class_member`] if you require a method that will
+    /// traverse through the MRO until it finds the member.
+    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let scope = self.body_scope(db);
+        symbol(db, scope, name)
+    }
+}
+
+/// Infer the type of a node representing an explicit class base.
+///
+/// For example, infer the type of `Foo` in the statement `class Bar(Foo, Baz): ...`.
+fn infer_class_base_type<'db>(
+    db: &'db dyn Db,
+    base_node: &'db ast::Expr,
+    class_definition: Definition<'db>,
+    class_has_type_params: bool,
+) -> Type<'db> {
+    if class_has_type_params {
+        // when we have a specialized scope, we'll look up the inference
+        // within that scope
+        let model = SemanticModel::new(db, class_definition.file(db));
+        base_node.ty(&model)
+    } else {
+        // Otherwise, we can do the lookup based on the definition scope
+        definition_expression_ty(db, class_definition, base_node)
     }
 }
 
@@ -2131,6 +2186,10 @@ mod tests {
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::BuiltinInstance("str")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(
+        Ty::BuiltinInstance("FloatingPointError"),
+        Ty::BuiltinInstance("Exception")
+    )]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));

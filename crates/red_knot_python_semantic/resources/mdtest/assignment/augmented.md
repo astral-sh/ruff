@@ -85,7 +85,7 @@ f = Foo()
 # that `Foo.__iadd__` may be unbound as additional context.
 f += "Hello, world!"
 
-reveal_type(f)  # revealed: int | @Todo
+reveal_type(f)  # revealed: int | Unknown
 ```
 
 ## Partially bound with `__add__`
