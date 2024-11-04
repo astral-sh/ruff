@@ -1500,9 +1500,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(name_expr) = target.as_name_expr() {
                     let maybe_known_instance = file_to_module(self.db, definition.file(self.db))
                         .as_ref()
-                        .and_then(|module| {
-                            KnownInstance::maybe_from_module(module, name_expr.id.as_str())
-                        });
+                        .and_then(|module| KnownInstance::maybe_from_module(module, &name_expr.id));
                     if let Some(known_instance) = maybe_known_instance {
                         annotation_ty = Type::Instance(InstanceType::known(class, known_instance));
                     }
@@ -4037,7 +4035,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
             _ => {
                 self.infer_type_expression(slice);
-                Type::Todo
+                Type::Todo  // TODO: generics
             }
         }
     }
@@ -4086,13 +4084,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 inner_ty
             }
             ruff_python_ast::Expr::Tuple(t) if !t.parenthesized => {
-                let Ok(elements): Result<Box<_>, _> = t
+                let elements = t
                     .iter()
-                    .map(|elt| self.infer_literal_parameter_type(elt).ok_or(()))
-                    .collect()
-                else {
-                    return None;
-                };
+                    .map(|elt| self.infer_literal_parameter_type(elt))
+                    .collect::<Option<Box<_>>>()?;
                 Type::Tuple(TupleType::new(self.db, elements))
             }
 
@@ -4114,7 +4109,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ruff_python_ast::Expr::NoneLiteral(_) => Type::None,
             // for negative and positive numbers
             ruff_python_ast::Expr::UnaryOp(ref u)
-                if (u.op == UnaryOp::USub || u.op == UnaryOp::UAdd)
+                if matches!(u.op, UnaryOp::USub | UnaryOp::UAdd)
                     && u.operand.is_number_literal_expr() =>
             {
                 self.infer_unary_expression(u)

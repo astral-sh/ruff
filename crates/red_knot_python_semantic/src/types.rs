@@ -1397,7 +1397,7 @@ impl<'db> KnownClass {
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm => {
-                matches!(module.name().as_str(), "typing")
+                matches!(module.name().as_str(), "typing" | "typing_extensions")
             }
         }
     }
@@ -1406,6 +1406,7 @@ impl<'db> KnownClass {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KnownInstance {
     Literal,
+    // TODO: fill this enum out with more special forms, etc.
 }
 
 impl KnownInstance {
@@ -1417,11 +1418,7 @@ impl KnownInstance {
 
     pub fn maybe_from_module(module: &Module, instance_name: &str) -> Option<Self> {
         let candidate = Self::from_name(instance_name)?;
-        if candidate.check_module(module) {
-            Some(candidate)
-        } else {
-            None
-        }
+        candidate.check_module(module).then_some(candidate)
     }
 
     fn from_name(name: &str) -> Option<Self> {
@@ -1954,7 +1951,7 @@ impl<'db> InstanceType<'db> {
     }
 
     pub fn is_known(&self, known_instance: KnownInstance) -> bool {
-        self.known.is_some_and(|k| k == known_instance)
+        self.known == Some(known_instance)
     }
 }
 
