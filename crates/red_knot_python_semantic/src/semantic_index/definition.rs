@@ -9,6 +9,19 @@ use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 use crate::unpack::Unpack;
 use crate::Db;
 
+/// A definition of a symbol.
+///
+/// ## Module local type
+/// This type should not be used as part of any cross module API because
+/// it holds a reference to the AST node and range offset changes
+/// then propagate through all usages and deserialization requires
+/// reparsing the entire module.
+///
+/// E.g. don't use this type in:
+///
+/// * a return type of a cross-module query
+/// * a field of a type that is a return type of a cross-module query
+/// * an argument of a cross-module query
 #[salsa::tracked]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.

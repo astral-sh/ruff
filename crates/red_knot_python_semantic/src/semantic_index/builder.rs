@@ -121,9 +121,11 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
+        #[allow(unsafe_code)]
         let scope = Scope {
             parent,
-            kind: node.scope_kind(),
+            // SAFETY: `node` is guaranteed to be a child of `self.module`
+            node: unsafe { node.to_kind(self.module.clone()) },
             descendents: children_start..children_start,
         };
         self.try_node_context_stack_manager.enter_nested_scope();
@@ -133,15 +135,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.use_def_maps.push(UseDefMapBuilder::new());
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::new());
 
-        #[allow(unsafe_code)]
-        // SAFETY: `node` is guaranteed to be a child of `self.module`
-        let scope_id = ScopeId::new(
-            self.db,
-            self.file,
-            file_scope_id,
-            unsafe { node.to_kind(self.module.clone()) },
-            countme::Count::default(),
-        );
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
 
         self.scope_ids_by_scope.push(scope_id);
         self.scopes_by_node.insert(node.node_key(), file_scope_id);

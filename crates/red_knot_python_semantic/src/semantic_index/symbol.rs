@@ -103,13 +103,9 @@ pub struct ScopedSymbolId;
 pub struct ScopeId<'db> {
     #[id]
     pub file: File,
+
     #[id]
     pub file_scope_id: FileScopeId,
-
-    /// The node that introduces this scope.
-    #[no_eq]
-    #[return_ref]
-    pub node: NodeWithScopeKind,
 
     #[no_eq]
     count: countme::Count<ScopeId<'static>>,
@@ -129,6 +125,14 @@ impl<'db> ScopeId<'db> {
                 | NodeWithScopeKind::DictComprehension(_)
                 | NodeWithScopeKind::GeneratorExpression(_)
         )
+    }
+
+    pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
+        self.scope(db).node()
+    }
+
+    pub(crate) fn scope(self, db: &dyn Db) -> &Scope {
+        semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
     }
 
     #[cfg(test)]
@@ -169,10 +173,10 @@ impl FileScopeId {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Scope {
     pub(super) parent: Option<FileScopeId>,
-    pub(super) kind: ScopeKind,
+    pub(super) node: NodeWithScopeKind,
     pub(super) descendents: Range<FileScopeId>,
 }
 
@@ -181,8 +185,12 @@ impl Scope {
         self.parent
     }
 
+    pub fn node(&self) -> &NodeWithScopeKind {
+        &self.node
+    }
+
     pub fn kind(&self) -> ScopeKind {
-        self.kind
+        self.node().scope_kind()
     }
 }
 
@@ -376,21 +384,6 @@ impl NodeWithScopeRef<'_> {
         }
     }
 
-    pub(super) fn scope_kind(self) -> ScopeKind {
-        match self {
-            NodeWithScopeRef::Module => ScopeKind::Module,
-            NodeWithScopeRef::Class(_) => ScopeKind::Class,
-            NodeWithScopeRef::Function(_) => ScopeKind::Function,
-            NodeWithScopeRef::Lambda(_) => ScopeKind::Function,
-            NodeWithScopeRef::FunctionTypeParameters(_)
-            | NodeWithScopeRef::ClassTypeParameters(_) => ScopeKind::Annotation,
-            NodeWithScopeRef::ListComprehension(_)
-            | NodeWithScopeRef::SetComprehension(_)
-            | NodeWithScopeRef::DictComprehension(_)
-            | NodeWithScopeRef::GeneratorExpression(_) => ScopeKind::Comprehension,
-        }
-    }
-
     pub(crate) fn node_key(self) -> NodeWithScopeKey {
         match self {
             NodeWithScopeRef::Module => NodeWithScopeKey::Module,
@@ -436,6 +429,22 @@ pub enum NodeWithScopeKind {
     SetComprehension(AstNodeRef<ast::ExprSetComp>),
     DictComprehension(AstNodeRef<ast::ExprDictComp>),
     GeneratorExpression(AstNodeRef<ast::ExprGenerator>),
+}
+
+impl NodeWithScopeKind {
+    pub(super) const fn scope_kind(&self) -> ScopeKind {
+        match self {
+            Self::Module => ScopeKind::Module,
+            Self::Class(_) => ScopeKind::Class,
+            Self::Function(_) => ScopeKind::Function,
+            Self::Lambda(_) => ScopeKind::Function,
+            Self::FunctionTypeParameters(_) | Self::ClassTypeParameters(_) => ScopeKind::Annotation,
+            Self::ListComprehension(_)
+            | Self::SetComprehension(_)
+            | Self::DictComprehension(_)
+            | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
