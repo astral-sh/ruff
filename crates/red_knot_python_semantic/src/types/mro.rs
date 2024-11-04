@@ -183,6 +183,69 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
     }
 }
 
+/// Iterator that yields elements of a class's MRO.
+///
+/// We avoid materialising the *full* MRO unless it is actually necessary:
+/// - Materialising the full MRO is expensive
+/// - We need to do it for every class in the code that we're checking, as we need to make sure
+///   that there are no class definitions in the code we're checking that would cause an
+///   exception to be raised at runtime. But the same does *not* necessarily apply for every class
+///   in third-party and stdlib dependencies: we never emit diagnostics about non-first-party code.
+/// - However, we *do* need to resolve attribute accesses on classes/instances from
+///   third-party and stdlib dependencies. That requires iterating over the MRO of third-party/stdlib
+///   classes, but not necessarily the *whole* MRO: often just the first element is enough.
+///   Luckily we know that for any class `X`, the first element of `X`'s MRO will always be `X` itself.
+///   We can therefore avoid resolving the full MRO for many third-party/stdlib classes while still
+///   being faithful to the runtime semantics.
+///
+/// Even for first-party code, where we will have to resolve the MRO for every class we encounter,
+/// loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
+/// Salsa-tracked [`ClassType::try_mro`] method unless it's absolutely necessary.
+pub(super) struct MroIterator<'db> {
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    first_element_yielded: bool,
+    subsequent_elements: Option<std::slice::Iter<'db, ClassBase<'db>>>,
+}
+
+impl<'db> MroIterator<'db> {
+    pub(super) fn new(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        Self {
+            db,
+            class,
+            first_element_yielded: false,
+            subsequent_elements: None,
+        }
+    }
+
+    fn full_mro_except_first_element(&mut self) -> impl Iterator<Item = ClassBase<'db>> + '_ {
+        self.subsequent_elements
+            .get_or_insert_with(|| {
+                let mut full_mro = match self.class.try_mro(self.db) {
+                    Ok(mro) => mro.iter(),
+                    Err(error) => error.fallback_mro().iter(),
+                };
+                full_mro.next();
+                full_mro
+            })
+            .copied()
+    }
+}
+
+impl<'db> Iterator for MroIterator<'db> {
+    type Item = ClassBase<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.first_element_yielded {
+            self.first_element_yielded = true;
+            return Some(ClassBase::Class(self.class));
+        }
+        self.full_mro_except_first_element().next()
+    }
+}
+
+impl std::iter::FusedIterator for MroIterator<'_> {}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct MroError<'db> {
     kind: MroErrorKind<'db>,

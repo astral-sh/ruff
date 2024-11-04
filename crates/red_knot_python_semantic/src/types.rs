@@ -1,4 +1,4 @@
-use mro::{ClassBase, Mro, MroError};
+use mro::{ClassBase, Mro, MroError, MroIterator};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -1876,31 +1876,7 @@ impl<'db> ClassType<'db> {
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
-        // We avoid materialising the *full* MRO unless it is actually necessary:
-        //
-        // - Materialising the full MRO is expensive
-        // - We need to do it for every class in the code that we're checking, as we need to make sure
-        //   that there are no class definitions in the code we're checking that would cause an
-        //   exception to be raised at runtime. But the same does *not* apply for every class
-        //   in third-party and stdlib dependencies: we never emit diagnostics about non-first-party code.
-        // - However, we *do* need to resolve attribute accesses on classes/instances from
-        //   third-party and stdlib dependencies. That requires iterating over the MRO of third-party/stdlib
-        //   classes, but not necessarily the *whole* MRO: often just the first element is enough.
-        //   Luckily we know that for any class `X`, the first element of `X`'s MRO will always be `X` itself.
-        //   We can therefore avoid resolving the full MRO for many third-party/stdlib classes while still
-        //   being faithful to the runtime semantics.
-        //
-        // Even for first-party code, where we will have to resolve the MRO for every class we encounter,
-        // loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
-        // Salsa-tracked [`ClassType::try_mro`] method unless it's absolutely necessary.
-        std::iter::once(ClassBase::Class(self)).chain(
-            [()].into_iter()
-                .flat_map(move |()| match self.try_mro(db) {
-                    Ok(mro) => mro.iter().copied(),
-                    Err(error) => error.fallback_mro().iter().copied(),
-                })
-                .skip(1),
-        )
+        MroIterator::new(db, self)
     }
 
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
