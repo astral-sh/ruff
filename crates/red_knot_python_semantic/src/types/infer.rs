@@ -1149,7 +1149,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if exit_ty
                             .call(
                                 self.db,
-                                &[context_manager_ty, Type::None, Type::None, Type::None],
+                                &[
+                                    context_manager_ty,
+                                    Type::none(self.db),
+                                    Type::none(self.db),
+                                    Type::none(self.db),
+                                ],
                             )
                             .return_ty_result(
                                 self.db,
@@ -1877,7 +1882,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let ty = match expression {
-            ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::None,
+            ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::none(self.db),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
             ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
             ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
@@ -3582,7 +3587,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::None) => SliceArg::Arg(None),
             Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
                 SliceArg::Arg(None)
             }
@@ -3686,7 +3690,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .to_instance(self.db)
             }
 
-            ast::Expr::NoneLiteral(_literal) => Type::None,
+            ast::Expr::NoneLiteral(_literal) => Type::none(self.db),
 
             // TODO: parse the expression and check whether it is a string annotation.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
