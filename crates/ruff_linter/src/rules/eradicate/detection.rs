@@ -47,7 +47,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             #   though to IntelliJ they can be anything.
             # * May optionally contain `prefix=` and/or `suffix=`,
             #   not declared here since we use `.is_match()`.
-        |   (?-i:language)=[-_.a-zA-Z0-9]+
+        |   language=[-_.a-zA-Z0-9]+
 
         )
         ",
