@@ -23,7 +23,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             pyright|
             type:\s*ignore|
             SPDX-License-Identifier:|
-            fmt:\s*(on|off)
+            fmt:\s*(on|off)|
 
             # Case-insensitive
             (?i:noqa)|
