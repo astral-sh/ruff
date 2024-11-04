@@ -192,12 +192,7 @@ fn definition_expression_ty<'db>(
     if let Some(ty) = inference.try_expression_ty(expr_id) {
         ty
     } else {
-        infer_deferred_types(db, definition)
-            .try_expression_ty(expr_id)
-            .unwrap_or(
-                // Some deferred cases like string annotations are not yet implemented
-                Type::Todo,
-            )
+        infer_deferred_types(db, definition).expression_ty(expr_id)
     }
 }
 
