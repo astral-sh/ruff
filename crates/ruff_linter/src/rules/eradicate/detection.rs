@@ -21,14 +21,14 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         (?:
             # Case-sensitive
             pyright
+        |   mypy:
         |   type:\s*ignore
         |   SPDX-License-Identifier:
-        |   fmt:\s*(on|off)
+        |   fmt:\s*(on|off|skip)
 
             # Case-insensitive
         |   (?i:
                 noqa
-            |   mypy:
             )
 
             # Unknown case sensitivity
