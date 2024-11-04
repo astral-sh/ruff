@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
+use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
 
@@ -75,22 +76,58 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             value: str_literal, ..
         }) => {
             // Parse the inner string as an integer.
-            let trimmed = str_literal.to_str().trim_whitespace();
-
+            //
+            // For reference, a string argument to `Decimal` is parsed in CPython
+            // using this regex:
+            // https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
+            // _after_ trimming whitespace from the string and removing all occurrences of "_".
+            let mut trimmed = Cow::from(str_literal.to_str().trim_whitespace());
+            if memchr::memchr(b'_', trimmed.as_bytes()).is_some() {
+                trimmed = Cow::from(trimmed.replace('_', ""));
+            }
             // Extract the unary sign, if any.
-            let (unary, rest) = if let Some(trimmed) = trimmed.strip_prefix('+') {
-                ("+", trimmed)
+            let (unary, mut rest) = if let Some(trimmed) = trimmed.strip_prefix('+') {
+                ("+", Cow::from(trimmed))
             } else if let Some(trimmed) = trimmed.strip_prefix('-') {
-                ("-", trimmed)
+                ("-", Cow::from(trimmed))
             } else {
                 ("", trimmed)
             };
+            // Extract the exponent, if any.
+            let mut e_indices = memchr::memrchr2_iter(b'e', b'E', rest.as_bytes());
+            if let Some(index) = e_indices.next() {
+                // More than one `e` is an error of type `decimal.InvalidOperation`
+                // when calling Decimal on a string. The suggested
+                // fix would turn this into a SyntaxError. To maintain
+                // the behavior of the code, we abort the check in this case.
+                if e_indices.next().is_some() {
+                    return;
+                }
+                // This range will not cause a panic: in the worst case,
+                // 'e' was the last character in `rest`, and then the right
+                // hand side will be `""`.
+                let exponent = rest[index + 1..]
+                    .strip_prefix('+')
+                    .unwrap_or(&rest[index + 1..]);
+                // Verify that the exponent is a nonnegative integer
+                if !exponent.bytes().all(|c| c.is_ascii_digit()) {
+                    return;
+                };
+                // NB: We need not convert, e.g., `2e3` to `2000`.
+                // However, `2e+3` is a syntax error, so we remove
+                // the sign on the exponent.
+                rest = Cow::from(rest.replace('+', ""));
+            }
 
             // Skip leading zeros.
             let rest = rest.trim_start_matches('0');
 
             // Verify that the rest of the string is a valid integer.
-            if !rest.chars().all(|c| c.is_ascii_digit()) {
+            // NB: We have already checked that there is at most one 'e'.
+            if !rest
+                .bytes()
+                .all(|c| c.is_ascii_digit() || c == b'e' || c == b'E')
+            {
                 return;
             };
 
@@ -159,3 +196,26 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
 
     checker.diagnostics.push(diagnostic);
 }
+
+// // Slightly modified from [CPython regex] to ignore  https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
+// static DECIMAL_PARSER_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+//     Regex::new(
+//         r"(?x)                   # Verbose mode for comments
+// ^                                             # Start of string
+// (?P<sign>[-+])?                               # Optional sign
+// (?:
+//     (?P<int>\d*)                              # Integer part (can be empty)
+//     (\.(?P<frac>\d+))?                        # Optional fractional part
+//     (E(?P<exp>[-+]?\d+))?                     # Optional exponent
+// |
+//     Inf(inity)?                               # Infinity
+// |
+//     (?P<signal>s)?                            # Optional signal
+//     NaN                                       # NaN
+//     (?P<diag>\d*)                             # Optional diagnostic info
+// )
+// $                                             # End of string
+// ",
+//     )
+//     .unwrap()
+// });
