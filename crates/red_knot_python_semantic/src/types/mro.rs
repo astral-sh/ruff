@@ -19,10 +19,26 @@ pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
     /// Attempt to resolve the MRO of a given class
+    ///
+    /// In the event that a possible list of bases would (or could) lead to a
+    /// `TypeError` being raised at runtime due to an unresolvable MRO, we infer
+    /// the MRO of the class as being `[<the class in question>, Unknown, object]`.
+    /// This seems most likely to reduce the possibility of cascading errors
+    /// elsewhere.
+    ///
+    /// (We emit a diagnostic warning about the runtime `TypeError` in
+    /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Result<Self, MroError<'db>> {
-        Self::of_class_impl(db, class).map_err(|error_kind| MroError {
-            kind: error_kind,
-            fallback_mro: Mro::from_error(db, class),
+        Self::of_class_impl(db, class).map_err(|error_kind| {
+            let fallback_mro = Self::from([
+                ClassBase::Class(class),
+                ClassBase::Unknown,
+                ClassBase::object(db),
+            ]);
+            MroError {
+                kind: error_kind,
+                fallback_mro,
+            }
         })
     }
 
@@ -138,22 +154,6 @@ impl<'db> Mro<'db> {
                 })
             }
         }
-    }
-
-    /// In the event that a possible list of bases would (or could) lead to a
-    /// `TypeError` being raised at runtime due to an unresolvable MRO, we
-    /// infer the class as being `[<the class in question>, Unknown, object]`.
-    /// This seems most likely to reduce the possibility of cascading errors
-    /// elsewhere.
-    ///
-    /// (We emit a diagnostic warning about the runtime `TypeError` in
-    /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
-    fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        Self::from([
-            ClassBase::Class(class),
-            ClassBase::Unknown,
-            ClassBase::object(db),
-        ])
     }
 }
 
