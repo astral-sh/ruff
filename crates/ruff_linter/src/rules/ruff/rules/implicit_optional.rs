@@ -84,7 +84,7 @@ impl Violation for ImplicitOptional {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("PEP 484 prohibits implicit `Optional`")
+        "PEP 484 prohibits implicit `Optional`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

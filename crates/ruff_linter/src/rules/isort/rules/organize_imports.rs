@@ -46,7 +46,7 @@ impl Violation for UnsortedImports {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Import block is un-sorted or un-formatted")
+        "Import block is un-sorted or un-formatted".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

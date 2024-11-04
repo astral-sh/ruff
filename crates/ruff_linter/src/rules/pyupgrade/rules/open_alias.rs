@@ -37,7 +37,7 @@ impl Violation for OpenAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use builtin `open`")
+        "Use builtin `open`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

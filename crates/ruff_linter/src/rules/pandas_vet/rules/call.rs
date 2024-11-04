@@ -45,7 +45,7 @@ pub struct PandasUseOfDotIsNull;
 impl Violation for PandasUseOfDotIsNull {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`.isna` is preferred to `.isnull`; functionality is equivalent")
+        "`.isna` is preferred to `.isnull`; functionality is equivalent".to_string()
     }
 }
 
@@ -85,7 +85,7 @@ pub struct PandasUseOfDotNotNull;
 impl Violation for PandasUseOfDotNotNull {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`.notna` is preferred to `.notnull`; functionality is equivalent")
+        "`.notna` is preferred to `.notnull`; functionality is equivalent".to_string()
     }
 }
 
@@ -121,9 +121,8 @@ pub struct PandasUseOfDotPivotOrUnstack;
 impl Violation for PandasUseOfDotPivotOrUnstack {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality"
-        )
+        "`.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality"
+            .to_string()
     }
 }
 
@@ -159,7 +158,7 @@ pub struct PandasUseOfDotStack;
 impl Violation for PandasUseOfDotStack {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`.melt` is preferred to `.stack`; provides same functionality")
+        "`.melt` is preferred to `.stack`; provides same functionality".to_string()
     }
 }
 

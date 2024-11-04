@@ -20,7 +20,7 @@ pub struct GlobalAtModuleLevel;
 impl Violation for GlobalAtModuleLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`global` at module level is redundant")
+        "`global` at module level is redundant".to_string()
     }
 }
 

@@ -48,7 +48,7 @@ impl Violation for InvalidGetLoggerArgument {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `__name__` with `logging.getLogger()`")
+        "Use `__name__` with `logging.getLogger()`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

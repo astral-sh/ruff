@@ -46,11 +46,10 @@ impl Violation for CollectionLiteralConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CollectionLiteralConcatenation { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!("Consider `{expression}` instead of concatenation")
         } else {
-            format!("Consider iterable unpacking instead of concatenation")
+            "Consider iterable unpacking instead of concatenation".to_string()
         }
     }
 

@@ -34,7 +34,7 @@ pub struct StubBodyMultipleStatements;
 impl Violation for StubBodyMultipleStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function body must contain exactly one statement")
+        "Function body must contain exactly one statement".to_string()
     }
 }
 

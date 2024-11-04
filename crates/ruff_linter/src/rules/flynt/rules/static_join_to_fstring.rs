@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for StaticJoinToFString {
         if let Some(expression) = expression.full_display() {
             format!("Consider `{expression}` instead of string join")
         } else {
-            format!("Consider f-string instead of string join")
+            "Consider f-string instead of string join".to_string()
         }
     }
 

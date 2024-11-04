@@ -31,7 +31,7 @@ pub struct UnnecessaryDirectLambdaCall;
 impl Violation for UnnecessaryDirectLambdaCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Lambda expression called directly. Execute the expression inline instead.")
+        "Lambda expression called directly. Execute the expression inline instead.".to_string()
     }
 }
 

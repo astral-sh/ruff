@@ -35,7 +35,7 @@ pub struct ShebangLeadingWhitespace;
 impl AlwaysFixableViolation for ShebangLeadingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid whitespace before shebang")
+        "Avoid whitespace before shebang".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -53,8 +53,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyLiteral { name, existing } = self;
-        match (name.full_display(), existing.full_display()) {
+        match (self.name.full_display(), self.existing.full_display()) {
             (Some(name), None) => {
                 format!("Dictionary key literal `{name}` repeated")
             }
@@ -67,7 +66,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
                     )
                 }
             }
-            _ => format!("Dictionary key literal repeated"),
+            _ => "Dictionary key literal repeated".to_string(),
         }
     }
 
@@ -119,11 +118,10 @@ impl Violation for MultiValueRepeatedKeyVariable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultiValueRepeatedKeyVariable { name } = self;
-        if let Some(name) = name.full_display() {
+        if let Some(name) = self.name.full_display() {
             format!("Dictionary key `{name}` repeated")
         } else {
-            format!("Dictionary key repeated")
+            "Dictionary key repeated".to_string()
         }
     }
 

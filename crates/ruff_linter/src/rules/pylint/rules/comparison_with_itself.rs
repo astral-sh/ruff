@@ -38,11 +38,10 @@ pub struct ComparisonWithItself {
 impl Violation for ComparisonWithItself {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ComparisonWithItself { actual } = self;
-        if let Some(actual) = actual.full_display() {
+        if let Some(actual) = self.actual.full_display() {
             format!("Name compared with itself, consider replacing `{actual}`")
         } else {
-            format!("Name compared with itself")
+            "Name compared with itself".to_string()
         }
     }
 }

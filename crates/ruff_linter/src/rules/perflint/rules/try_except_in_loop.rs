@@ -83,7 +83,7 @@ pub struct TryExceptInLoop;
 impl Violation for TryExceptInLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`try`-`except` within a loop incurs performance overhead")
+        "`try`-`except` within a loop incurs performance overhead".to_string()
     }
 }
 

@@ -49,7 +49,7 @@ pub struct DefaultExceptNotLast;
 impl Violation for DefaultExceptNotLast {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("An `except` block as not the last exception handler")
+        "An `except` block as not the last exception handler".to_string()
     }
 }
 

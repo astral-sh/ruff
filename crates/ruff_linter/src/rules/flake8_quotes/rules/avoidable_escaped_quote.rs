@@ -41,7 +41,7 @@ pub struct AvoidableEscapedQuote;
 impl AlwaysFixableViolation for AvoidableEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Change outer quotes to avoid escaping inner quotes")
+        "Change outer quotes to avoid escaping inner quotes".to_string()
     }
 
     fn fix_title(&self) -> String {

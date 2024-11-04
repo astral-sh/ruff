@@ -35,7 +35,7 @@ impl Violation for EmptyComment {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line with empty comment")
+        "Line with empty comment".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

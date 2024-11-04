@@ -44,7 +44,7 @@ pub struct NoSlotsInStrSubclass;
 impl Violation for NoSlotsInStrSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Subclasses of `str` should define `__slots__`")
+        "Subclasses of `str` should define `__slots__`".to_string()
     }
 }
 

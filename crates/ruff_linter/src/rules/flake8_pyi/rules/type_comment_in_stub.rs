@@ -32,7 +32,7 @@ pub struct TypeCommentInStub;
 impl Violation for TypeCommentInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Don't use type comments in stub file")
+        "Don't use type comments in stub file".to_string()
     }
 }
 

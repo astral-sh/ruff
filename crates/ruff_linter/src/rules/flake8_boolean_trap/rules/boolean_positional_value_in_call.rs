@@ -47,7 +47,7 @@ pub struct BooleanPositionalValueInCall;
 impl Violation for BooleanPositionalValueInCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Boolean positional value in function call")
+        "Boolean positional value in function call".to_string()
     }
 }
 

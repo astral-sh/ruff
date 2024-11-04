@@ -39,7 +39,8 @@ pub struct ExceptWithEmptyTuple;
 impl Violation for ExceptWithEmptyTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `except ():` with an empty tuple does not catch anything; add exceptions to handle")
+        "Using `except ():` with an empty tuple does not catch anything; add exceptions to handle"
+            .to_string()
     }
 }
 

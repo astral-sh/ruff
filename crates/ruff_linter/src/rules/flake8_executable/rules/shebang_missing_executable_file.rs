@@ -41,7 +41,7 @@ pub struct ShebangMissingExecutableFile;
 impl Violation for ShebangMissingExecutableFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The file is executable but no shebang is present")
+        "The file is executable but no shebang is present".to_string()
     }
 }
 

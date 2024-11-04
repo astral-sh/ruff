@@ -34,7 +34,7 @@ pub struct NonEmptyStubBody;
 impl AlwaysFixableViolation for NonEmptyStubBody {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function body must contain only `...`")
+        "Function body must contain only `...`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -68,7 +68,7 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
 
     let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        format!("..."),
+        "...".to_string(),
         stmt.range(),
     )));
     checker.diagnostics.push(diagnostic);

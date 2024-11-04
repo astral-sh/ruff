@@ -46,7 +46,7 @@ pub struct BlanketTypeIgnore;
 impl Violation for BlanketTypeIgnore {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use specific rule codes when ignoring type issues")
+        "Use specific rule codes when ignoring type issues".to_string()
     }
 }
 

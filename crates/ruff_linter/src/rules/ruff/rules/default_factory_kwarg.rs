@@ -59,7 +59,7 @@ impl Violation for DefaultFactoryKwarg {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`default_factory` is a positional-only argument to `defaultdict`")
+        "`default_factory` is a positional-only argument to `defaultdict`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

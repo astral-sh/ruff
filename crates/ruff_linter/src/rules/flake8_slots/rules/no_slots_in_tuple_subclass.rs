@@ -45,7 +45,7 @@ pub struct NoSlotsInTupleSubclass;
 impl Violation for NoSlotsInTupleSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Subclasses of `tuple` should define `__slots__`")
+        "Subclasses of `tuple` should define `__slots__`".to_string()
     }
 }
 

@@ -57,7 +57,7 @@ impl Violation for NonPEP604Annotation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `X | Y` for type annotations")
+        "Use `X | Y` for type annotations".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

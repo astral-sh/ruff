@@ -39,9 +39,8 @@ pub struct RedundantOpenModes {
 impl AlwaysFixableViolation for RedundantOpenModes {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedundantOpenModes { replacement } = self;
-        match replacement {
-            None => format!("Unnecessary open mode parameters"),
+        match &self.replacement {
+            None => "Unnecessary open mode parameters".to_string(),
             Some(replacement) => {
                 format!("Unnecessary open mode parameters, use \"{replacement}\"")
             }
@@ -49,8 +48,7 @@ impl AlwaysFixableViolation for RedundantOpenModes {
     }
 
     fn fix_title(&self) -> String {
-        let RedundantOpenModes { replacement } = self;
-        match replacement {
+        match &self.replacement {
             None => "Remove open mode parameters".to_string(),
             Some(replacement) => {
                 format!("Replace with \"{replacement}\"")

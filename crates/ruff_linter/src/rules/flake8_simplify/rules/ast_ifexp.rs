@@ -39,11 +39,10 @@ impl Violation for IfExprWithTrueFalse {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfExprWithTrueFalse { is_compare } = self;
-        if *is_compare {
-            format!("Remove unnecessary `True if ... else False`")
+        if self.is_compare {
+            "Remove unnecessary `True if ... else False`".to_string()
         } else {
-            format!("Use `bool(...)` instead of `True if ... else False`")
+            "Use `bool(...)` instead of `True if ... else False`".to_string()
         }
     }
 
@@ -84,11 +83,11 @@ pub struct IfExprWithFalseTrue;
 impl AlwaysFixableViolation for IfExprWithFalseTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `not ...` instead of `False if ... else True`")
+        "Use `not ...` instead of `False if ... else True`".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `not ...`")
+        "Replace with `not ...`".to_string()
     }
 }
 

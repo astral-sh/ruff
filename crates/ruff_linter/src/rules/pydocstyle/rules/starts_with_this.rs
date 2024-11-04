@@ -45,7 +45,7 @@ pub struct DocstringStartsWithThis;
 impl Violation for DocstringStartsWithThis {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"First word of the docstring should not be "This""#)
+        r#"First word of the docstring should not be "This""#.to_string()
     }
 }
 

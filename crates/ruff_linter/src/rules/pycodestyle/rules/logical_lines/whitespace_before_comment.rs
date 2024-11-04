@@ -36,7 +36,7 @@ pub struct TooFewSpacesBeforeInlineComment;
 impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Insert at least two spaces before an inline comment")
+        "Insert at least two spaces before an inline comment".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -72,11 +72,11 @@ pub struct NoSpaceAfterInlineComment;
 impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Inline comment should start with `# `")
+        "Inline comment should start with `# `".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Format space")
+        "Format space".to_string()
     }
 }
 
@@ -109,11 +109,11 @@ pub struct NoSpaceAfterBlockComment;
 impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Block comment should start with `# `")
+        "Block comment should start with `# `".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Format space")
+        "Format space".to_string()
     }
 }
 
@@ -155,11 +155,11 @@ pub struct MultipleLeadingHashesForBlockComment;
 impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many leading `#` before block comment")
+        "Too many leading `#` before block comment".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove leading `#`")
+        "Remove leading `#`".to_string()
     }
 }
 

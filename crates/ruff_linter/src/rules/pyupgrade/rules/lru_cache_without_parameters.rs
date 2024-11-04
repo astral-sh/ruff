@@ -44,7 +44,7 @@ pub struct LRUCacheWithoutParameters;
 impl AlwaysFixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parentheses to `functools.lru_cache`")
+        "Unnecessary parentheses to `functools.lru_cache`".to_string()
     }
 
     fn fix_title(&self) -> String {

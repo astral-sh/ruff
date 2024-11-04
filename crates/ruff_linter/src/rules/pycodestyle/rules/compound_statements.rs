@@ -33,7 +33,7 @@ pub struct MultipleStatementsOnOneLineColon;
 impl Violation for MultipleStatementsOnOneLineColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple statements on one line (colon)")
+        "Multiple statements on one line (colon)".to_string()
     }
 }
 
@@ -63,7 +63,7 @@ pub struct MultipleStatementsOnOneLineSemicolon;
 impl Violation for MultipleStatementsOnOneLineSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple statements on one line (semicolon)")
+        "Multiple statements on one line (semicolon)".to_string()
     }
 }
 
@@ -88,11 +88,11 @@ pub struct UselessSemicolon;
 impl AlwaysFixableViolation for UselessSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Statement ends with an unnecessary semicolon")
+        "Statement ends with an unnecessary semicolon".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary semicolon")
+        "Remove unnecessary semicolon".to_string()
     }
 }
 

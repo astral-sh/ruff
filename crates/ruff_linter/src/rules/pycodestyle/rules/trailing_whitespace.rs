@@ -32,7 +32,7 @@ pub struct TrailingWhitespace;
 impl AlwaysFixableViolation for TrailingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing whitespace")
+        "Trailing whitespace".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -64,7 +64,7 @@ pub struct BlankLineWithWhitespace;
 impl AlwaysFixableViolation for BlankLineWithWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Blank line contains whitespace")
+        "Blank line contains whitespace".to_string()
     }
 
     fn fix_title(&self) -> String {

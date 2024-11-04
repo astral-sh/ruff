@@ -35,7 +35,7 @@ pub struct RedundantBackslash;
 impl AlwaysFixableViolation for RedundantBackslash {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Redundant backslash")
+        "Redundant backslash".to_string()
     }
 
     fn fix_title(&self) -> String {

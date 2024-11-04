@@ -46,9 +46,9 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.prefer_parentheses {
-            format!("Use parentheses for tuples in subscripts")
+            "Use parentheses for tuples in subscripts".to_string()
         } else {
-            format!("Avoid parentheses for tuples in subscripts")
+            "Avoid parentheses for tuples in subscripts".to_string()
         }
     }
 

@@ -57,9 +57,9 @@ impl Violation for RelativeImports {
     fn message(&self) -> String {
         match self.strictness {
             Strictness::Parents => {
-                format!("Prefer absolute imports over relative imports from parent modules")
+                "Prefer absolute imports over relative imports from parent modules".to_string()
             }
-            Strictness::All => format!("Prefer absolute imports over relative imports"),
+            Strictness::All => "Prefer absolute imports over relative imports".to_string(),
         }
     }
 

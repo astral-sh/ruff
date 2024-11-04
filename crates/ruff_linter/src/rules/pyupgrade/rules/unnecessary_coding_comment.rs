@@ -36,7 +36,7 @@ pub struct UTF8EncodingDeclaration;
 impl AlwaysFixableViolation for UTF8EncodingDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("UTF-8 encoding declaration is unnecessary")
+        "UTF-8 encoding declaration is unnecessary".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -62,8 +62,8 @@ impl AlwaysFixableViolation for UnnecessaryPlaceholder {
     #[derive_message_formats]
     fn message(&self) -> String {
         match &self.kind {
-            Placeholder::Pass => format!("Unnecessary `pass` statement"),
-            Placeholder::Ellipsis => format!("Unnecessary `...` literal"),
+            Placeholder::Pass => "Unnecessary `pass` statement".to_string(),
+            Placeholder::Ellipsis => "Unnecessary `...` literal".to_string(),
         }
     }
 

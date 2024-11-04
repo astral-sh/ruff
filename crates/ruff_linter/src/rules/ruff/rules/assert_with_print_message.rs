@@ -41,7 +41,7 @@ pub struct AssertWithPrintMessage;
 impl AlwaysFixableViolation for AssertWithPrintMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`print()` expression in `assert` statement is likely unintentional")
+        "`print()` expression in `assert` statement is likely unintentional".to_string()
     }
 
     fn fix_title(&self) -> String {

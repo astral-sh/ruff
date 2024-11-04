@@ -38,7 +38,7 @@ pub struct StringOrBytesTooLong;
 impl AlwaysFixableViolation for StringOrBytesTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("String and bytes literals longer than 50 characters are not permitted")
+        "String and bytes literals longer than 50 characters are not permitted".to_string()
     }
 
     fn fix_title(&self) -> String {

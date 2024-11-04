@@ -47,7 +47,7 @@ pub struct ManualDictComprehension;
 impl Violation for ManualDictComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a dictionary comprehension instead of a for-loop")
+        "Use a dictionary comprehension instead of a for-loop".to_string()
     }
 }
 

@@ -39,7 +39,7 @@ impl Violation for SurroundingWhitespace {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No whitespaces allowed surrounding docstring text")
+        "No whitespaces allowed surrounding docstring text".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

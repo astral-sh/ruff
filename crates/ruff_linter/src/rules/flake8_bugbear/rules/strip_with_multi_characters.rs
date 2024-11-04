@@ -50,7 +50,7 @@ pub struct StripWithMultiCharacters;
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `.strip()` with multi-character strings is misleading")
+        "Using `.strip()` with multi-character strings is misleading".to_string()
     }
 }
 

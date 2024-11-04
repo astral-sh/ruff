@@ -50,7 +50,7 @@ impl Violation for SplitStaticString {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Consider using a list literal instead of `str.split`")
+        "Consider using a list literal instead of `str.split`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

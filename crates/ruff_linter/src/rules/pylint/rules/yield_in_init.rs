@@ -34,7 +34,7 @@ pub struct YieldInInit;
 impl Violation for YieldInInit {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__init__` method is a generator")
+        "`__init__` method is a generator".to_string()
     }
 }
 

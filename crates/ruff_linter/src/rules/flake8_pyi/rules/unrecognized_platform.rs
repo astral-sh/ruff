@@ -47,7 +47,7 @@ pub struct UnrecognizedPlatformCheck;
 impl Violation for UnrecognizedPlatformCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unrecognized `sys.platform` check")
+        "Unrecognized `sys.platform` check".to_string()
     }
 }
 

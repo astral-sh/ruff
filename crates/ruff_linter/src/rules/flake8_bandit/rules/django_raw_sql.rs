@@ -30,7 +30,7 @@ pub struct DjangoRawSql;
 impl Violation for DjangoRawSql {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `RawSQL` can lead to SQL injection vulnerabilities")
+        "Use of `RawSQL` can lead to SQL injection vulnerabilities".to_string()
     }
 }
 

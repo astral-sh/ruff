@@ -67,7 +67,7 @@ pub struct UndocumentedPublicModule;
 impl Violation for UndocumentedPublicModule {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing docstring in public module")
+        "Missing docstring in public module".to_string()
     }
 }
 
@@ -150,7 +150,7 @@ pub struct UndocumentedPublicClass;
 impl Violation for UndocumentedPublicClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing docstring in public class")
+        "Missing docstring in public class".to_string()
     }
 }
 
@@ -232,7 +232,7 @@ pub struct UndocumentedPublicMethod;
 impl Violation for UndocumentedPublicMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing docstring in public method")
+        "Missing docstring in public method".to_string()
     }
 }
 
@@ -322,7 +322,7 @@ pub struct UndocumentedPublicFunction;
 impl Violation for UndocumentedPublicFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing docstring in public function")
+        "Missing docstring in public function".to_string()
     }
 }
 
@@ -365,7 +365,7 @@ pub struct UndocumentedPublicPackage;
 impl Violation for UndocumentedPublicPackage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing docstring in public package")
+        "Missing docstring in public package".to_string()
     }
 }
 
@@ -422,7 +422,7 @@ pub struct UndocumentedMagicMethod;
 impl Violation for UndocumentedMagicMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing docstring in magic method")
+        "Missing docstring in magic method".to_string()
     }
 }
 
@@ -477,7 +477,7 @@ pub struct UndocumentedPublicNestedClass;
 impl Violation for UndocumentedPublicNestedClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing docstring in public nested class")
+        "Missing docstring in public nested class".to_string()
     }
 }
 
@@ -525,7 +525,7 @@ pub struct UndocumentedPublicInit;
 impl Violation for UndocumentedPublicInit {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing docstring in `__init__`")
+        "Missing docstring in `__init__`".to_string()
     }
 }
 

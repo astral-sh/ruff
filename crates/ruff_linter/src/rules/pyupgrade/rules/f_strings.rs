@@ -47,7 +47,7 @@ impl Violation for FString {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use f-string instead of `format` call")
+        "Use f-string instead of `format` call".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

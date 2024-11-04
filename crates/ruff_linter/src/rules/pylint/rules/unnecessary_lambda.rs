@@ -49,7 +49,7 @@ pub struct UnnecessaryLambda;
 impl AlwaysFixableViolation for UnnecessaryLambda {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Lambda may be unnecessary; consider inlining inner function")
+        "Lambda may be unnecessary; consider inlining inner function".to_string()
     }
 
     fn fix_title(&self) -> String {

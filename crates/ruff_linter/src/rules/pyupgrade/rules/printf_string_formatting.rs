@@ -81,7 +81,7 @@ impl Violation for PrintfStringFormatting {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use format specifiers instead of percent format")
+        "Use format specifiers instead of percent format".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

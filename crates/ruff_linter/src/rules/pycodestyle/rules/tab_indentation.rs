@@ -28,7 +28,7 @@ pub struct TabIndentation;
 impl Violation for TabIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Indentation contains tabs")
+        "Indentation contains tabs".to_string()
     }
 }
 

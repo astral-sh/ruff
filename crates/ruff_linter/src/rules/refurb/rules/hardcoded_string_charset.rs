@@ -35,7 +35,7 @@ pub struct HardcodedStringCharset {
 impl AlwaysFixableViolation for HardcodedStringCharset {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of hardcoded string charset")
+        "Use of hardcoded string charset".to_string()
     }
 
     fn fix_title(&self) -> String {

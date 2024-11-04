@@ -48,9 +48,7 @@ impl Violation for UnaliasedCollectionsAbcSetImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin"
-        )
+        "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

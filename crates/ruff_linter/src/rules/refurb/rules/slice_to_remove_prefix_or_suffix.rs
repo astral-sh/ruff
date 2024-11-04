@@ -47,10 +47,10 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
     fn message(&self) -> String {
         match self.affix_kind {
             AffixKind::StartsWith => {
-                format!("Prefer `removeprefix` over conditionally replacing with slice.")
+                "Prefer `removeprefix` over conditionally replacing with slice.".to_string()
             }
             AffixKind::EndsWith => {
-                format!("Prefer `removesuffix` over conditionally replacing with slice.")
+                "Prefer `removesuffix` over conditionally replacing with slice.".to_string()
             }
         }
     }

@@ -52,7 +52,7 @@ pub struct CallDatetimeUtcfromtimestamp;
 impl Violation for CallDatetimeUtcfromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`datetime.datetime.utcfromtimestamp()` used")
+        "`datetime.datetime.utcfromtimestamp()` used".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

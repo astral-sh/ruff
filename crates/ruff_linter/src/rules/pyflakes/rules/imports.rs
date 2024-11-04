@@ -114,7 +114,7 @@ pub struct LateFutureImport;
 impl Violation for LateFutureImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`from __future__` imports must occur at the beginning of the file")
+        "`from __future__` imports must occur at the beginning of the file".to_string()
     }
 }
 

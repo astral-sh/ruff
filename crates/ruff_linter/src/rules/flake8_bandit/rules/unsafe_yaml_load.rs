@@ -42,18 +42,18 @@ pub struct UnsafeYAMLLoad {
 impl Violation for UnsafeYAMLLoad {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnsafeYAMLLoad { loader } = self;
-        match loader {
+        match &self.loader {
             Some(name) => {
                 format!(
                     "Probable use of unsafe loader `{name}` with `yaml.load`. Allows \
                      instantiation of arbitrary objects. Consider `yaml.safe_load`."
                 )
             }
-            None => format!(
+            None => {
                 "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. \
                  Consider `yaml.safe_load`."
-            ),
+                    .to_string()
+            }
         }
     }
 }

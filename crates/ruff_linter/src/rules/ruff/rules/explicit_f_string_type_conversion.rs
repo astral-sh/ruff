@@ -43,7 +43,7 @@ pub struct ExplicitFStringTypeConversion;
 impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use explicit conversion flag")
+        "Use explicit conversion flag".to_string()
     }
 
     fn fix_title(&self) -> String {

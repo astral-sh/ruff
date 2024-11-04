@@ -51,10 +51,10 @@ pub struct ManualListComprehension {
 impl Violation for ManualListComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ManualListComprehension { is_async } = self;
-        match is_async {
-            false => format!("Use a list comprehension to create a transformed list"),
-            true => format!("Use an async list comprehension to create a transformed list"),
+        if self.is_async {
+            "Use an async list comprehension to create a transformed list".to_string()
+        } else {
+            "Use a list comprehension to create a transformed list".to_string()
         }
     }
 }

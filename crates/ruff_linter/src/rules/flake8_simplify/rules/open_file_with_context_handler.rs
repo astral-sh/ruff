@@ -39,7 +39,7 @@ pub struct OpenFileWithContextHandler;
 impl Violation for OpenFileWithContextHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a context manager for opening files")
+        "Use a context manager for opening files".to_string()
     }
 }
 

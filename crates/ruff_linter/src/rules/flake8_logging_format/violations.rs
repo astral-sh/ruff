@@ -79,7 +79,7 @@ pub struct LoggingStringFormat;
 impl Violation for LoggingStringFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `str.format`")
+        "Logging statement uses `str.format`".to_string()
     }
 }
 
@@ -163,7 +163,7 @@ pub struct LoggingPercentFormat;
 impl Violation for LoggingPercentFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `%`")
+        "Logging statement uses `%`".to_string()
     }
 }
 
@@ -246,7 +246,7 @@ pub struct LoggingStringConcat;
 impl Violation for LoggingStringConcat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `+`")
+        "Logging statement uses `+`".to_string()
     }
 }
 
@@ -328,7 +328,7 @@ pub struct LoggingFString;
 impl Violation for LoggingFString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses f-string")
+        "Logging statement uses f-string".to_string()
     }
 }
 
@@ -379,7 +379,7 @@ pub struct LoggingWarn;
 impl AlwaysFixableViolation for LoggingWarn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement uses `warn` instead of `warning`")
+        "Logging statement uses `warn` instead of `warning`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -508,7 +508,8 @@ pub struct LoggingExcInfo;
 impl Violation for LoggingExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`")
+        "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
+            .to_string()
     }
 }
 
@@ -569,6 +570,6 @@ pub struct LoggingRedundantExcInfo;
 impl Violation for LoggingRedundantExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Logging statement has redundant `exc_info`")
+        "Logging statement has redundant `exc_info`".to_string()
     }
 }

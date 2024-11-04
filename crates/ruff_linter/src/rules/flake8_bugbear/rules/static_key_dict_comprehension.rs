@@ -38,11 +38,10 @@ pub struct StaticKeyDictComprehension {
 impl Violation for StaticKeyDictComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StaticKeyDictComprehension { key } = self;
-        if let Some(key) = key.full_display() {
+        if let Some(key) = self.key.full_display() {
             format!("Dictionary comprehension uses static key: `{key}`")
         } else {
-            format!("Dictionary comprehension uses static key")
+            "Dictionary comprehension uses static key".to_string()
         }
     }
 }

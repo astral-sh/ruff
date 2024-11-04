@@ -41,7 +41,7 @@ pub struct VerboseRaise;
 impl AlwaysFixableViolation for VerboseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `raise` without specifying exception name")
+        "Use `raise` without specifying exception name".to_string()
     }
 
     fn fix_title(&self) -> String {

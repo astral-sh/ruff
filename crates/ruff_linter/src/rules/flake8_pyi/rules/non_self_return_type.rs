@@ -86,7 +86,7 @@ impl Violation for NonSelfReturnType {
             method_name,
         } = self;
         if matches!(class_name.as_str(), "__new__") {
-            format!("`__new__` methods usually return `self` at runtime")
+            "`__new__` methods usually return `self` at runtime".to_string()
         } else {
             format!("`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime")
         }

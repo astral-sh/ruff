@@ -56,7 +56,7 @@ pub struct UnnecessaryDefaultTypeArgs;
 impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary default type arguments")
+        "Unnecessary default type arguments".to_string()
     }
 
     fn fix_title(&self) -> String {

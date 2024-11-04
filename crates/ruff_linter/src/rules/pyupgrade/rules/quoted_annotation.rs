@@ -63,7 +63,7 @@ pub struct QuotedAnnotation;
 impl AlwaysFixableViolation for QuotedAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Remove quotes from type annotation")
+        "Remove quotes from type annotation".to_string()
     }
 
     fn fix_title(&self) -> String {

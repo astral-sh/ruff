@@ -34,7 +34,7 @@ pub struct UselessTryExcept;
 impl Violation for UselessTryExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Remove exception handler; error is immediately re-raised")
+        "Remove exception handler; error is immediately re-raised".to_string()
     }
 }
 

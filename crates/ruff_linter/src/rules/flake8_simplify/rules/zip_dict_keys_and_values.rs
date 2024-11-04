@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use `{expected}` instead of `{actual}`")
         } else {
-            format!("Use `dict.items()` instead of `zip(dict.keys(), dict.values())`")
+            "Use `dict.items()` instead of `zip(dict.keys(), dict.values())`".to_string()
         }
     }
 

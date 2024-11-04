@@ -45,7 +45,7 @@ pub struct PandasUseOfDotIx;
 impl Violation for PandasUseOfDotIx {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`.ix` is deprecated; use more explicit `.loc` or `.iloc`")
+        "`.ix` is deprecated; use more explicit `.loc` or `.iloc`".to_string()
     }
 }
 
@@ -87,7 +87,7 @@ pub struct PandasUseOfDotAt;
 impl Violation for PandasUseOfDotAt {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `.loc` instead of `.at`. If speed is important, use NumPy.")
+        "Use `.loc` instead of `.at`. If speed is important, use NumPy.".to_string()
     }
 }
 
@@ -138,7 +138,7 @@ pub struct PandasUseOfDotIat;
 impl Violation for PandasUseOfDotIat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `.iloc` instead of `.iat`. If speed is important, use NumPy.")
+        "Use `.iloc` instead of `.iat`. If speed is important, use NumPy.".to_string()
     }
 }
 

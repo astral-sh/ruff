@@ -35,7 +35,7 @@ pub struct UnnecessaryListCall;
 impl AlwaysFixableViolation for UnnecessaryListCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary `list` call (remove the outer call to `list()`)")
+        "Unnecessary `list` call (remove the outer call to `list()`)".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -36,9 +36,7 @@ pub struct FStringDocstring;
 impl Violation for FStringDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "f-string used as docstring. Python will interpret this as a joined string, rather than a docstring."
-        )
+        "f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.".to_string()
     }
 }
 

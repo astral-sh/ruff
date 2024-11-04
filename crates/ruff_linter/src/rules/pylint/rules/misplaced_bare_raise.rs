@@ -46,7 +46,7 @@ pub struct MisplacedBareRaise;
 impl Violation for MisplacedBareRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Bare `raise` statement is not inside an exception handler")
+        "Bare `raise` statement is not inside an exception handler".to_string()
     }
 }
 

@@ -34,7 +34,7 @@ pub struct UselessMetaclassType;
 impl AlwaysFixableViolation for UselessMetaclassType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__metaclass__ = type` is implied")
+        "`__metaclass__ = type` is implied".to_string()
     }
 
     fn fix_title(&self) -> String {

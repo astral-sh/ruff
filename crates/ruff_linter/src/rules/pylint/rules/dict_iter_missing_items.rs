@@ -55,7 +55,7 @@ pub struct DictIterMissingItems;
 impl AlwaysFixableViolation for DictIterMissingItems {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unpacking a dictionary in iteration without calling `.items()`")
+        "Unpacking a dictionary in iteration without calling `.items()`".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -30,7 +30,7 @@ pub struct DeprecatedCElementTree;
 impl AlwaysFixableViolation for DeprecatedCElementTree {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`cElementTree` is deprecated, use `ElementTree`")
+        "`cElementTree` is deprecated, use `ElementTree`".to_string()
     }
 
     fn fix_title(&self) -> String {

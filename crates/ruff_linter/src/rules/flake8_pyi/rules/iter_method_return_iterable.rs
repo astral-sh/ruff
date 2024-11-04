@@ -76,11 +76,11 @@ pub struct IterMethodReturnIterable {
 impl Violation for IterMethodReturnIterable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IterMethodReturnIterable { is_async } = self;
-        if *is_async {
-            format!("`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`")
+        if self.is_async {
+            "`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`"
+                .to_string()
         } else {
-            format!("`__iter__` methods should return an `Iterator`, not an `Iterable`")
+            "`__iter__` methods should return an `Iterator`, not an `Iterable`".to_string()
         }
     }
 }

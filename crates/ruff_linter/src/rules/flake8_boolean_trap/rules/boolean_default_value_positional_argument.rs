@@ -95,7 +95,7 @@ pub struct BooleanDefaultValuePositionalArgument;
 impl Violation for BooleanDefaultValuePositionalArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Boolean default positional argument in function definition")
+        "Boolean default positional argument in function definition".to_string()
     }
 }
 

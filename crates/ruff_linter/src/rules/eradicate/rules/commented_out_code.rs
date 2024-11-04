@@ -37,7 +37,7 @@ impl Violation for CommentedOutCode {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Found commented-out code")
+        "Found commented-out code".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
