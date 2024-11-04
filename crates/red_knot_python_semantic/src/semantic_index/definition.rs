@@ -6,6 +6,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_resolver::file_to_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
+use crate::unpack::Unpack;
 use crate::Db;
 
 #[salsa::tracked]
@@ -24,7 +25,7 @@ pub struct Definition<'db> {
 
     #[no_eq]
     #[return_ref]
-    pub(crate) kind: DefinitionKind,
+    pub(crate) kind: DefinitionKind<'db>,
 
     #[no_eq]
     count: countme::Count<Definition<'static>>,
@@ -158,22 +159,6 @@ impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum TargetNodeRef<'a> {
-    Sequence(&'a ast::Expr),
-    Name,
-}
-
-impl TargetNodeRef<'_> {
-    pub(super) fn from_expr(expr: &ast::Expr) -> Option<TargetNodeRef<'_>> {
-        match expr {
-            ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(TargetNodeRef::Sequence(expr)),
-            ast::Expr::Name(_) => Some(TargetNodeRef::Name),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
@@ -182,7 +167,6 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
-    pub(crate) target: TargetNodeRef<'a>,
     pub(crate) value: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
 }
@@ -228,7 +212,11 @@ pub(crate) struct MatchPatternDefinitionNodeRef<'a> {
 
 impl DefinitionNodeRef<'_> {
     #[allow(unsafe_code)]
-    pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind {
+    pub(super) unsafe fn into_owned(
+        self,
+        parsed: ParsedModule,
+        unpack: Option<Unpack<'_>>,
+    ) -> DefinitionKind<'_> {
         match self {
             DefinitionNodeRef::Import(alias) => {
                 DefinitionKind::Import(AstNodeRef::new(parsed, alias))
@@ -248,19 +236,9 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::NamedExpression(named) => {
                 DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
-            DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef {
-                value,
-                target,
-                name,
-            }) => {
-                let target = match target {
-                    TargetNodeRef::Sequence(node) => {
-                        TargetKind::Sequence(AstNodeRef::new(parsed.clone(), node))
-                    }
-                    TargetNodeRef::Name => TargetKind::Name,
-                };
+            DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef { value, name }) => {
                 DefinitionKind::Assignment(AssignmentDefinitionKind {
-                    target,
+                    target: TargetKind::from(unpack),
                     value: AstNodeRef::new(parsed.clone(), value),
                     name: AstNodeRef::new(parsed, name),
                 })
@@ -336,11 +314,7 @@ impl DefinitionNodeRef<'_> {
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
             Self::NamedExpression(node) => node.into(),
-            Self::Assignment(AssignmentDefinitionNodeRef {
-                value: _,
-                target: _,
-                name,
-            }) => name.into(),
+            Self::Assignment(AssignmentDefinitionNodeRef { value: _, name }) => name.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
             Self::For(ForStmtDefinitionNodeRef {
@@ -402,13 +376,13 @@ impl DefinitionCategory {
 }
 
 #[derive(Clone, Debug)]
-pub enum DefinitionKind {
+pub enum DefinitionKind<'db> {
     Import(AstNodeRef<ast::Alias>),
     ImportFrom(ImportFromDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
-    Assignment(AssignmentDefinitionKind),
+    Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
     For(ForStmtDefinitionKind),
@@ -420,7 +394,7 @@ pub enum DefinitionKind {
     ExceptHandler(ExceptHandlerDefinitionKind),
 }
 
-impl DefinitionKind {
+impl DefinitionKind<'_> {
     pub(crate) fn category(&self) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
@@ -465,10 +439,19 @@ impl DefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum TargetKind {
-    Sequence(AstNodeRef<ast::Expr>),
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum TargetKind<'db> {
+    Sequence(Unpack<'db>),
     Name,
+}
+
+impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
+    fn from(value: Option<Unpack<'db>>) -> Self {
+        match value {
+            Some(unpack) => TargetKind::Sequence(unpack),
+            None => TargetKind::Name,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -532,15 +515,15 @@ impl ImportFromDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct AssignmentDefinitionKind {
-    target: TargetKind,
+pub struct AssignmentDefinitionKind<'db> {
+    target: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
     name: AstNodeRef<ast::ExprName>,
 }
 
-impl AssignmentDefinitionKind {
-    pub(crate) fn target(&self) -> &TargetKind {
-        &self.target
+impl AssignmentDefinitionKind<'_> {
+    pub(crate) fn target(&self) -> TargetKind {
+        self.target
     }
 
     pub(crate) fn value(&self) -> &ast::Expr {

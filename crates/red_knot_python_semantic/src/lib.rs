@@ -22,6 +22,7 @@ pub(crate) mod site_packages;
 mod stdlib;
 pub(crate) mod symbol;
 pub mod types;
+mod unpack;
 mod util;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;

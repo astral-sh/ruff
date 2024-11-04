@@ -4,36 +4,10 @@ use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use rustc_hash::FxHashMap;
 
-use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
-use crate::semantic_index::symbol::{FileScopeId, ScopeId};
+use crate::semantic_index::symbol::ScopeId;
 use crate::types::{TupleType, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
 use crate::Db;
-
-#[salsa::tracked]
-pub struct Unpack<'db> {
-    #[id]
-    pub(crate) file: File,
-
-    #[id]
-    pub(crate) file_scope: FileScopeId,
-
-    #[no_eq]
-    #[return_ref]
-    pub(crate) target: AstNodeRef<ast::Expr>,
-
-    #[no_eq]
-    pub(crate) value_ty: Type<'db>,
-
-    #[no_eq]
-    count: countme::Count<Unpack<'static>>,
-}
-
-impl<'db> Unpack<'db> {
-    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
-    }
-}
 
 pub(crate) struct Unpacker<'db> {
     db: &'db dyn Db,
@@ -50,22 +24,22 @@ impl<'db> Unpacker<'db> {
         }
     }
 
-    pub(crate) fn unpack(&mut self, unpack: Unpack<'db>) {
-        self.unpack_inner(
-            unpack.target(self.db),
-            unpack.value_ty(self.db),
-            unpack.scope(self.db),
-        );
-    }
+    //pub(crate) fn unpack(&mut self, unpack: Unpack<'db>) {
+    //    self.unpack_inner(
+    //        unpack.target(self.db),
+    //        unpack.value_ty(self.db),
+    //        unpack.scope(self.db),
+    //    );
+    //}
 
-    fn unpack_inner(&mut self, target: &ast::Expr, value_ty: Type<'db>, scope: ScopeId<'db>) {
+    pub(crate) fn unpack(&mut self, target: &ast::Expr, value_ty: Type<'db>, scope: ScopeId<'db>) {
         match target {
             ast::Expr::Name(target_name) => {
                 self.targets
                     .insert(target_name.scoped_ast_id(self.db, scope), value_ty);
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.unpack_inner(value, value_ty, scope);
+                self.unpack(value, value_ty, scope);
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
@@ -113,7 +87,7 @@ impl<'db> Unpacker<'db> {
                     };
 
                     for (index, element) in elts.iter().enumerate() {
-                        self.unpack_inner(
+                        self.unpack(
                             element,
                             element_types.get(index).copied().unwrap_or(Type::Unknown),
                             scope,
@@ -131,7 +105,7 @@ impl<'db> Unpacker<'db> {
                         vec![Type::LiteralString; string_literal_ty.len(self.db)]
                             .into_boxed_slice(),
                     ));
-                    self.unpack_inner(target, value_ty, scope);
+                    self.unpack(target, value_ty, scope);
                 }
                 _ => {
                     let value_ty = if value_ty.is_literal_string() {
@@ -142,7 +116,7 @@ impl<'db> Unpacker<'db> {
                             .unwrap_with_diagnostic(AnyNodeRef::from(target), &mut self.diagnostics)
                     };
                     for element in elts {
-                        self.unpack_inner(element, value_ty, scope);
+                        self.unpack(element, value_ty, scope);
                     }
                 }
             },

@@ -51,13 +51,14 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{
     TypeCheckDiagnostic, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder,
 };
-use crate::types::unpack::{Unpack, UnpackResult, Unpacker};
+use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, ClassType, FunctionType, IterationOutcome, KnownClass,
     KnownFunction, SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type,
     TypeArrayDisplay, UnionBuilder, UnionType,
 };
+use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
@@ -168,8 +169,14 @@ fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult
         tracing::trace_span!("infer_unpack_types", unpack=?unpack.as_id(), file=%file.path(db))
             .entered();
 
+    let value = unpack.value(db);
+    let scope = unpack.scope(db);
+
+    let result = infer_expression_types(db, value);
+    let value_ty = result.expression_ty(value.node_ref(db).scoped_ast_id(db, scope));
+
     let mut unpacker = Unpacker::new(db, file);
-    unpacker.unpack(unpack);
+    unpacker.unpack(unpack.target(db), value_ty, scope);
     unpacker.finish()
 }
 
@@ -1332,7 +1339,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
-        target: &TargetKind,
+        target: TargetKind<'db>,
         value: &ast::Expr,
         name: &ast::ExprName,
         definition: Definition<'db>,
@@ -1345,15 +1352,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let name_ast_id = name.scoped_ast_id(self.db, self.scope());
 
         let target_ty = match target {
-            TargetKind::Sequence(target) => {
-                let unpack = Unpack::new(
-                    self.db,
-                    self.file,
-                    definition.file_scope(self.db),
-                    target.clone(),
-                    value_ty,
-                    countme::Count::default(),
-                );
+            TargetKind::Sequence(unpack) => {
                 let unpacked = infer_unpack_types(self.db, unpack);
                 self.diagnostics.extend(unpacked.diagnostics());
                 unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
