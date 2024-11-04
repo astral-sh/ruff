@@ -375,7 +375,6 @@ impl<'db> ClassBase<'db> {
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
             Type::Never
-            | Type::None
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::BytesLiteral(_)
