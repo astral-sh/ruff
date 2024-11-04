@@ -61,16 +61,14 @@ pub struct UnnecessaryPlaceholder {
 impl AlwaysFixableViolation for UnnecessaryPlaceholder {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { kind } = self;
-        match kind {
+        match &self.kind {
             Placeholder::Pass => format!("Unnecessary `pass` statement"),
             Placeholder::Ellipsis => format!("Unnecessary `...` literal"),
         }
     }
 
     fn fix_title(&self) -> String {
-        let Self { kind } = self;
-        let title = match kind {
+        let title = match &self.kind {
             Placeholder::Pass => "Remove unnecessary `pass`",
             Placeholder::Ellipsis => "Remove unnecessary `...`",
         };
