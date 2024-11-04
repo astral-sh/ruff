@@ -52,8 +52,8 @@ impl AlwaysFixableViolation for InvalidEscapeSequence {
 
     fn fix_title(&self) -> String {
         match self.fix_title {
-            FixTitle::AddBackslash => format!("Add backslash to escape sequence"),
-            FixTitle::UseRawStringLiteral => format!("Use a raw string literal"),
+            FixTitle::AddBackslash => "Add backslash to escape sequence".to_string(),
+            FixTitle::UseRawStringLiteral => "Use a raw string literal".to_string(),
         }
     }
 }

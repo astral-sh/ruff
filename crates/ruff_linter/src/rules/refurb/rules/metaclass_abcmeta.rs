@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for MetaClassABCMeta {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `abc.ABC`")
+        "Replace with `abc.ABC`".to_string()
     }
 }
 

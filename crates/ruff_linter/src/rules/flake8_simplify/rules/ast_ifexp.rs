@@ -48,12 +48,12 @@ impl Violation for IfExprWithTrueFalse {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let IfExprWithTrueFalse { is_compare } = self;
-        if *is_compare {
-            Some(format!("Remove unnecessary `True if ... else False`"))
+        let title = if self.is_compare {
+            "Remove unnecessary `True if ... else False`"
         } else {
-            Some(format!("Replace with `bool(...)"))
-        }
+            "Replace with `bool(...)"
+        };
+        Some(title.to_string())
     }
 }
 

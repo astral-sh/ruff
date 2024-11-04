@@ -63,7 +63,7 @@ impl Violation for ErrorInsteadOfException {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `exception`"))
+        Some("Replace with `exception`".to_string())
     }
 }
 

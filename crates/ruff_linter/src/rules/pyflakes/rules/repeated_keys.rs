@@ -72,12 +72,11 @@ impl Violation for MultiValueRepeatedKeyLiteral {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let MultiValueRepeatedKeyLiteral { name, .. } = self;
-        if let Some(name) = name.full_display() {
-            Some(format!("Remove repeated key literal `{name}`"))
-        } else {
-            Some(format!("Remove repeated key literal"))
-        }
+        let title = match self.name.full_display() {
+            Some(name) => format!("Remove repeated key literal `{name}`"),
+            None => "Remove repeated key literal".to_string(),
+        };
+        Some(title)
     }
 }
 
@@ -129,12 +128,11 @@ impl Violation for MultiValueRepeatedKeyVariable {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let MultiValueRepeatedKeyVariable { name } = self;
-        if let Some(name) = name.full_display() {
-            Some(format!("Remove repeated key `{name}`"))
-        } else {
-            Some(format!("Remove repeated key"))
-        }
+        let title = match self.name.full_display() {
+            Some(name) => format!("Remove repeated key `{name}`"),
+            None => "Remove repeated key".to_string(),
+        };
+        Some(title)
     }
 }
 

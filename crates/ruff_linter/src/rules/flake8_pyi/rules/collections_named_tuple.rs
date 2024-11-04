@@ -45,7 +45,7 @@ impl Violation for CollectionsNamedTuple {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `typing.NamedTuple`"))
+        Some("Replace with `typing.NamedTuple`".to_string())
     }
 }
 

@@ -38,7 +38,7 @@ impl AlwaysFixableViolation for UselessReturn {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove useless `return` statement")
+        "Remove useless `return` statement".to_string()
     }
 }
 

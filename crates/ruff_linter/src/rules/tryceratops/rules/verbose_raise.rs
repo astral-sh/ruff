@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for VerboseRaise {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove exception name")
+        "Remove exception name".to_string()
     }
 }
 

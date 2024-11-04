@@ -43,7 +43,7 @@ impl Violation for UndocumentedWarn {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace `logging.WARN` with `logging.WARNING`"))
+        Some("Replace `logging.WARN` with `logging.WARNING`".to_string())
     }
 }
 

@@ -78,7 +78,7 @@ impl Violation for PostInitDefault {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Use `dataclasses.InitVar` instead"))
+        Some("Use `dataclasses.InitVar` instead".to_string())
     }
 }
 

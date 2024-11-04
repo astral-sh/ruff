@@ -42,7 +42,7 @@ impl Violation for MultipleImportsOnOneLine {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Split imports"))
+        Some("Split imports".to_string())
     }
 }
 

@@ -37,7 +37,7 @@ impl AlwaysFixableViolation for UnnecessaryRangeStart {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove `start` argument")
+        "Remove `start` argument".to_string()
     }
 }
 

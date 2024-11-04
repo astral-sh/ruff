@@ -49,7 +49,7 @@ impl Violation for DirectLoggerInstantiation {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `logging.getLogger()`"))
+        Some("Replace with `logging.getLogger()`".to_string())
     }
 }
 

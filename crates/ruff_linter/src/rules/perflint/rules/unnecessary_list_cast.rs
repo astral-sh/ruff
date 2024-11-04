@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for UnnecessaryListCast {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove `list()` cast")
+        "Remove `list()` cast".to_string()
     }
 }
 

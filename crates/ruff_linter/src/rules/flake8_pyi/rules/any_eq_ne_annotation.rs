@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for AnyEqNeAnnotation {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `object`")
+        "Replace with `object`".to_string()
     }
 }
 

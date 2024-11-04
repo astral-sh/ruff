@@ -41,7 +41,7 @@ impl Violation for CommentedOutCode {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove commented-out code"))
+        Some("Remove commented-out code".to_string())
     }
 }
 

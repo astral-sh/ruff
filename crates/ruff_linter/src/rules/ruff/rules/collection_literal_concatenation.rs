@@ -55,12 +55,11 @@ impl Violation for CollectionLiteralConcatenation {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let CollectionLiteralConcatenation { expression } = self;
-        if let Some(expression) = expression.full_display() {
-            Some(format!("Replace with `{expression}`"))
-        } else {
-            Some(format!("Replace with iterable unpacking"))
-        }
+        let title = match self.expression.full_display() {
+            Some(expression) => format!("Replace with `{expression}`"),
+            None => "Replace with iterable unpacking".to_string(),
+        };
+        Some(title)
     }
 }
 

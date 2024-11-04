@@ -49,14 +49,14 @@ impl Violation for FStringNumberFormat {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let FStringNumberFormat { replacement, .. } = self;
-        if let Some(display) = replacement
+        if let Some(display) = self
+            .replacement
             .as_ref()
             .and_then(SourceCodeSnippet::full_display)
         {
             Some(format!("Replace with `{display}`"))
         } else {
-            Some(format!("Replace with f-string"))
+            Some("Replace with f-string".to_string())
         }
     }
 }

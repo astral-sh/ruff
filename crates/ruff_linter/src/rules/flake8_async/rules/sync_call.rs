@@ -46,7 +46,7 @@ impl Violation for TrioSyncCall {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add `await`"))
+        Some("Add `await`".to_string())
     }
 }
 

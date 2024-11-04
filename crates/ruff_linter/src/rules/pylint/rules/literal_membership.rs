@@ -41,7 +41,7 @@ impl AlwaysFixableViolation for LiteralMembership {
     }
 
     fn fix_title(&self) -> String {
-        format!("Convert to `set`")
+        "Convert to `set`".to_string()
     }
 }
 

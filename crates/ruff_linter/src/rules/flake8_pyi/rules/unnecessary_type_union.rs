@@ -48,7 +48,7 @@ impl Violation for UnnecessaryTypeUnion {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Combine multiple `type` members"))
+        Some("Combine multiple `type` members".to_string())
     }
 }
 

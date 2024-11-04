@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for EmptyTypeCheckingBlock {
     }
 
     fn fix_title(&self) -> String {
-        format!("Delete empty type-checking block")
+        "Delete empty type-checking block".to_string()
     }
 }
 

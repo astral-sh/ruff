@@ -50,7 +50,7 @@ impl Violation for IfExpInsteadOfOrOperator {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `or` operator"))
+        Some("Replace with `or` operator".to_string())
     }
 }
 

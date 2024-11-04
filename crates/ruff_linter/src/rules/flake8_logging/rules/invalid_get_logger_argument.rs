@@ -52,7 +52,7 @@ impl Violation for InvalidGetLoggerArgument {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `__name__`"))
+        Some("Replace with `__name__`".to_string())
     }
 }
 

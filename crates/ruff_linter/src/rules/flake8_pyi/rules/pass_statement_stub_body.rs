@@ -35,7 +35,7 @@ impl AlwaysFixableViolation for PassStatementStubBody {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace `pass` with `...`")
+        "Replace `pass` with `...`".to_string()
     }
 }
 

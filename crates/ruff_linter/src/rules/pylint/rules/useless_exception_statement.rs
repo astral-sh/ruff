@@ -45,7 +45,7 @@ impl Violation for UselessExceptionStatement {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add `raise` keyword"))
+        Some("Add `raise` keyword".to_string())
     }
 }
 

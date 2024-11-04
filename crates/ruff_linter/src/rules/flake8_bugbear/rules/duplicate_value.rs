@@ -50,7 +50,7 @@ impl Violation for DuplicateValue {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove duplicate item"))
+        Some("Remove duplicate item".to_string())
     }
 }
 

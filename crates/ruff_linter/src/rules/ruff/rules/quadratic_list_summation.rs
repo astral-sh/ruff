@@ -62,7 +62,7 @@ impl AlwaysFixableViolation for QuadraticListSummation {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `functools.reduce`")
+        "Replace with `functools.reduce`".to_string()
     }
 }
 

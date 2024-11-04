@@ -72,7 +72,7 @@ impl Violation for NeedlessBool {
         if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
             Some(format!("Replace with `return {condition}`"))
         } else {
-            Some(format!("Inline condition"))
+            Some("Inline condition".to_string())
         }
     }
 }

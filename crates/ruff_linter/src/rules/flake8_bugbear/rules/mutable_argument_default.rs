@@ -80,7 +80,7 @@ impl Violation for MutableArgumentDefault {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `None`; initialize within function"))
+        Some("Replace with `None`; initialize within function".to_string())
     }
 }
 

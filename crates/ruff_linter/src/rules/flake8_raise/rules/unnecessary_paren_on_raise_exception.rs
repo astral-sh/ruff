@@ -48,7 +48,7 @@ impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary parentheses")
+        "Remove unnecessary parentheses".to_string()
     }
 }
 
