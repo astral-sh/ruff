@@ -766,7 +766,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
         let function_ty = Type::FunctionLiteral(FunctionType::new(
             self.db,
-            name.id.clone(),
+            &*name.id,
             function_kind,
             definition,
             decorator_tys,
@@ -875,7 +875,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let class_ty = Type::ClassLiteral(ClassType::new(
             self.db,
-            name.id.clone(),
+            &*name.id,
             definition,
             body_scope,
             maybe_known_class,
