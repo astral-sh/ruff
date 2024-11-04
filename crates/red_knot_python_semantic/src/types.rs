@@ -2,6 +2,8 @@ use mro::{ClassBase, Mro, MroError};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
+use itertools::Itertools;
+
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
@@ -1853,7 +1855,8 @@ impl<'db> ClassType<'db> {
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
     /// If the MRO is unresolvable, return an error indicating why the class's MRO
-    /// cannot be accurately determined.
+    /// cannot be accurately determined. The error returned contains a fallback MRO
+    /// that will be used instead for the purposes of type inference.
     ///
     /// The MRO is the tuple of classes that can be retrieved as the `__mro__`
     /// attribute on a class at runtime.
@@ -1872,7 +1875,7 @@ impl<'db> ClassType<'db> {
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    fn mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+    fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         // We avoid materialising the *full* MRO unless it is actually necessary:
         //
         // - Materialising the full MRO is expensive
@@ -1886,6 +1889,10 @@ impl<'db> ClassType<'db> {
         //   Luckily we know that for any class `X`, the first element of `X`'s MRO will always be `X` itself.
         //   We can therefore avoid resolving the full MRO for many third-party/stdlib classes while still
         //   being faithful to the runtime semantics.
+        //
+        // Even for first-party code, where we will have to resolve the MRO for every class we encounter,
+        // loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
+        // Salsa-tracked [`ClassType::try_mro`] method unless it's absolutely necessary.
         std::iter::once(ClassBase::Class(self)).chain(
             [()].into_iter()
                 .flat_map(move |()| match self.try_mro(db) {
@@ -1897,14 +1904,9 @@ impl<'db> ClassType<'db> {
     }
 
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
-        (other == self)
-            || self.mro(db).any(|superclass| match superclass {
-                ClassBase::Class(superclass) => superclass == other,
-                // `is_subclass_of` is checking the subtype relation, in which gradual types do not
-                // participate, so we should not return `True` if we find `Any/Unknown` in the
-                // MRO.
-                _ => false,
-            })
+        // `is_subclass_of` is checking the subtype relation, in which gradual types do not
+        // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
+        self.iter_mro(db).contains(&ClassBase::Class(other))
     }
 
     /// Returns the class member of this class named `name`.
@@ -1912,14 +1914,14 @@ impl<'db> ClassType<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
-            let tuple_elements: Box<_> = self.mro(db).map(Type::from).collect();
+            let tuple_elements: Box<_> = self.iter_mro(db).map(Type::from).collect();
             return Symbol::Type(
                 Type::Tuple(TupleType::new(db, tuple_elements)),
                 Boundness::Bound,
             );
         }
 
-        for superclass in self.mro(db) {
+        for superclass in self.iter_mro(db) {
             match superclass {
                 // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
                 // the type found on the next "real" class.

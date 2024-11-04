@@ -333,7 +333,7 @@ impl<'db> ClassBase<'db> {
                 Either::Left([ClassBase::Unknown, ClassBase::object(db)].into_iter())
             }
             ClassBase::Todo => Either::Left([ClassBase::Todo, ClassBase::object(db)].into_iter()),
-            ClassBase::Class(class) => Either::Right(class.mro(db)),
+            ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
     }
 }
