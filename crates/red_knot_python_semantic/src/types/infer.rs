@@ -162,6 +162,12 @@ pub(crate) fn infer_expression_types<'db>(
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
 }
 
+/// Infer the types for an [`Unpack`] operation.
+///
+/// This infers the expression type and performs structural match against the target expression
+/// involved in an unpacking operation. It returns a result-like object that can be used to get the
+/// type of the variables involved in this unpacking along with any violations that are detected
+/// during this unpacking.
 #[salsa::tracked(return_ref)]
 fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);

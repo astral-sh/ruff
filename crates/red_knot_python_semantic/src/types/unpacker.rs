@@ -9,6 +9,7 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::types::{TupleType, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
 use crate::Db;
 
+/// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db> {
     db: &'db dyn Db,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
@@ -23,14 +24,6 @@ impl<'db> Unpacker<'db> {
             diagnostics: TypeCheckDiagnosticsBuilder::new(db, file),
         }
     }
-
-    //pub(crate) fn unpack(&mut self, unpack: Unpack<'db>) {
-    //    self.unpack_inner(
-    //        unpack.target(self.db),
-    //        unpack.value_ty(self.db),
-    //        unpack.scope(self.db),
-    //    );
-    //}
 
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value_ty: Type<'db>, scope: ScopeId<'db>) {
         match target {
