@@ -16,15 +16,24 @@ static CODE_INDICATORS: LazyLock<AhoCorasick> = LazyLock::new(|| {
 
 static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?xi)
+        r"(?x)
         ^
         (?:
-            pylint|pyright|noqa|nosec|region|endregion|
+            # Case-sensitive
+            pyright|
             type:\s*ignore|
-            fmt:\s*(on|off)|
-            isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|
-            mypy:|
             SPDX-License-Identifier:|
+            fmt:\s*(on|off)
+
+            # Case-insensitive
+            (?i:noqa)|
+            (?i:mypy):|
+
+            # Unknown case sensitivity
+            pylint|
+            nosec|
+            region|endregion|
+            isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|
 
             # IntelliJ language injection comments:
             # * `language` must be lowercase.
