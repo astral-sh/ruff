@@ -444,6 +444,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
+        // TODO: Only call this function when diagnostics are enabled.
         self.check_class_definitions();
     }
 
@@ -854,11 +855,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => None,
         };
+
+        let body_scope = self
+            .index
+            .node_scope(NodeWithScopeRef::Function(function))
+            .to_scope_id(self.db, self.file);
+
         let function_ty = Type::FunctionLiteral(FunctionType::new(
             self.db,
             &*name.id,
             function_kind,
-            definition,
+            body_scope,
             decorator_tys,
         ));
 
@@ -966,7 +973,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         let class_ty = Type::ClassLiteral(ClassType::new(
             self.db,
             &*name.id,
-            definition,
             body_scope,
             maybe_known_class,
         ));
@@ -4684,7 +4690,7 @@ mod tests {
         let function = global_symbol(&db, mod_file, "example")
             .expect_type()
             .expect_function_literal();
-        let returns = function.return_type(&db);
+        let returns = function.return_ty(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
 
         Ok(())

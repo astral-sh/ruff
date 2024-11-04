@@ -445,6 +445,20 @@ impl NodeWithScopeKind {
             | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
         }
     }
+
+    pub fn expect_class(&self) -> &ast::StmtClassDef {
+        match self {
+            Self::Class(class) => class.node(),
+            _ => panic!("expected class"),
+        }
+    }
+
+    pub fn expect_function(&self) -> &ast::StmtFunctionDef {
+        match self {
+            Self::Function(function) => function.node(),
+            _ => panic!("expected function"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]

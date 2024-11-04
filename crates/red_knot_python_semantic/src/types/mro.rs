@@ -5,10 +5,7 @@ use indexmap::IndexSet;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
-use ruff_python_ast as ast;
-
-use super::{infer_class_base_type, ClassType, KnownClass, Type};
-use crate::semantic_index::definition::Definition;
+use super::{ClassType, KnownClass, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
@@ -43,8 +40,7 @@ impl<'db> Mro<'db> {
     }
 
     fn of_class_impl(db: &'db dyn Db, class: ClassType<'db>) -> Result<Self, MroErrorKind<'db>> {
-        let class_stmt_node = class.node(db);
-        let class_bases = class_stmt_node.bases();
+        let class_bases = class.explicit_bases(db);
 
         match class_bases {
             // `builtins.object` is the special case:
@@ -73,13 +69,8 @@ impl<'db> Mro<'db> {
             // This *could* theoretically be handled by the final branch below,
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
-            [single_base_node] => {
-                let single_base = ClassBase::try_from_node(
-                    db,
-                    single_base_node,
-                    class.definition(db),
-                    class_stmt_node.type_params.is_some(),
-                );
+            [single_base] => {
+                let single_base = ClassBase::try_from_ty(*single_base).ok_or(*single_base);
                 single_base.map_or_else(
                     |invalid_base_ty| {
                         let bases_info = Box::from([(0, invalid_base_ty)]);
@@ -109,13 +100,11 @@ impl<'db> Mro<'db> {
                     return Err(MroErrorKind::CyclicClassDefinition);
                 }
 
-                let definition = class.definition(db);
-                let has_type_params = class_stmt_node.type_params.is_some();
                 let mut valid_bases = vec![];
                 let mut invalid_bases = vec![];
 
-                for (i, base_node) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_node(db, base_node, definition, has_type_params) {
+                for (i, base) in multiple_bases.iter().enumerate() {
+                    match ClassBase::try_from_ty(*base).ok_or(*base) {
                         Ok(valid_base) => valid_bases.push(valid_base),
                         Err(invalid_base) => invalid_bases.push((i, invalid_base)),
                     }
@@ -289,7 +278,7 @@ pub(super) enum MroErrorKind<'db> {
     ///
     /// This variant records the indices and types of class bases
     /// that we deem to be invalid. The indices are the indices of nodes
-    /// in the bases list of the class's [`ast::StmtClassDef`] node.
+    /// in the bases list of the class's [`StmtClassDef`](ruff_python_ast::StmtClassDef) node.
     /// Each index is the index of a node representing an invalid base.
     InvalidBases(Box<[(usize, Type<'db>)]>),
 
@@ -304,7 +293,7 @@ pub(super) enum MroErrorKind<'db> {
     ///
     /// This variant records the indices and [`ClassType`]s
     /// of the duplicate bases. The indices are the indices of nodes
-    /// in the bases list of the class's [`ast::StmtClassDef`] node.
+    /// in the bases list of the class's [`StmtClassDef`](ruff_python_ast::StmtClassDef) node.
     /// Each index is the index of a node representing a duplicate base.
     DuplicateBases(Box<[(usize, ClassType<'db>)]>),
 
@@ -363,20 +352,6 @@ impl<'db> ClassBase<'db> {
             .to_class(db)
             .into_class_literal_type()
             .map_or(Self::Unknown, Self::Class)
-    }
-
-    /// Attempt to resolve the node `base_node` into a `ClassBase`.
-    ///
-    /// If the inferred type of `base_node` is not an acceptable class-base type,
-    /// return an error indicating what the inferred type was.
-    fn try_from_node(
-        db: &'db dyn Db,
-        base_node: &'db ast::Expr,
-        class_definition: Definition<'db>,
-        class_has_type_params: bool,
-    ) -> Result<Self, Type<'db>> {
-        let base_ty = infer_class_base_type(db, base_node, class_definition, class_has_type_params);
-        Self::try_from_ty(base_ty).ok_or(base_ty)
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -496,6 +471,8 @@ fn class_is_cyclically_defined(db: &dyn Db, class: ClassType) -> bool {
         }
         for explicit_base_class in class
             .explicit_bases(db)
+            .iter()
+            .copied()
             .filter_map(Type::into_class_literal_type)
         {
             // Each base must be considered in isolation.
@@ -513,6 +490,8 @@ fn class_is_cyclically_defined(db: &dyn Db, class: ClassType) -> bool {
 
     class
         .explicit_bases(db)
+        .iter()
+        .copied()
         .filter_map(Type::into_class_literal_type)
         .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::default()))
 }
