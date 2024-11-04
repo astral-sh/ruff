@@ -1,7 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
-use syn::{Block, Expr, ItemFn, Stmt};
+use syn::token::{Dot, Paren};
+use syn::{Block, Expr, ExprLit, ExprMethodCall, ItemFn, Lit, Stmt};
 
 pub(crate) fn derive_message_formats(func: &ItemFn) -> TokenStream {
     let mut strings = quote!();
@@ -29,10 +30,21 @@ fn parse_block(block: &Block, strings: &mut TokenStream) -> Result<(), TokenStre
 fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream> {
     match expr {
         Expr::Macro(mac) if mac.mac.path.is_ident("format") => {
-            let Some(first_token) = mac.mac.tokens.to_token_stream().into_iter().next() else {
+            let mut tokens = mac.mac.tokens.to_token_stream().into_iter();
+            let Some(first_token) = tokens.next() else {
                 return Err(
-                    quote_spanned!(expr.span() => compile_error!("expected format! to have an argument")),
+                    quote_spanned!(expr.span() => compile_error!("expected `format!` to have an argument")),
                 );
+            };
+            // do not throw an error if the `format!` argument contains a formatting argument
+
+            if !first_token.to_string().contains('{') {
+                // comma and string
+                if tokens.next().is_none() || tokens.next().is_none() {
+                    return Err(
+                        quote_spanned!(expr.span() => compile_error!("prefer `String::to_string` over `format!` without arguments")),
+                    );
+                };
             };
             strings.extend(quote! {#first_token,});
             Ok(())
@@ -45,6 +57,40 @@ fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream>
             }
             Ok(())
         }
+        Expr::MethodCall(method_call) => match method_call {
+            ExprMethodCall {
+                method,
+                receiver,
+                attrs,
+                dot_token,
+                turbofish: None,
+                paren_token,
+                args,
+            } if *method == *"to_string"
+                && attrs.is_empty()
+                && args.is_empty()
+                && *paren_token == Paren::default()
+                && *dot_token == Dot::default() =>
+            {
+                let Expr::Lit(ExprLit {
+                    lit: Lit::Str(ref literal_string),
+                    ..
+                }) = **receiver
+                else {
+                    return Err(
+                        quote_spanned!(expr.span() => compile_error!("expected `String::to_string` method on str literal")),
+                    );
+                };
+
+                let str_token = literal_string.token();
+
+                strings.extend(quote! {#str_token,});
+                Ok(())
+            }
+            _ => Err(
+                quote_spanned!(expr.span() => compile_error!("expected `String::to_string` method on str literal")),
+            ),
+        },
         Expr::Match(block) => {
             for arm in &block.arms {
                 parse_expr(&arm.body, strings)?;
@@ -53,7 +99,7 @@ fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream>
         }
         _ => Err(quote_spanned!(
             expr.span() =>
-            compile_error!("expected last expression to be a format! macro or a match block")
+            compile_error!("expected last expression to be a `format!` macro, a static String or a match block")
         )),
     }
 }

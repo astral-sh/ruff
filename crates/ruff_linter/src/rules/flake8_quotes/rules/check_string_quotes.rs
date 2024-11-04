@@ -46,19 +46,18 @@ impl Violation for BadQuotesInlineString {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadQuotesInlineString { preferred_quote } = self;
-        match preferred_quote {
-            Quote::Double => format!("Single quotes found but double quotes preferred"),
-            Quote::Single => format!("Double quotes found but single quotes preferred"),
+        match self.preferred_quote {
+            Quote::Double => "Single quotes found but double quotes preferred".to_string(),
+            Quote::Single => "Double quotes found but single quotes preferred".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let BadQuotesInlineString { preferred_quote } = self;
-        match preferred_quote {
-            Quote::Double => Some("Replace single quotes with double quotes".to_string()),
-            Quote::Single => Some("Replace double quotes with single quotes".to_string()),
-        }
+        let title = match self.preferred_quote {
+            Quote::Double => "Replace single quotes with double quotes",
+            Quote::Single => "Replace double quotes with single quotes",
+        };
+        Some(title.to_string())
     }
 }
 
@@ -104,8 +103,8 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
     fn message(&self) -> String {
         let BadQuotesMultilineString { preferred_quote } = self;
         match preferred_quote {
-            Quote::Double => format!("Single quote multiline found but double quotes preferred"),
-            Quote::Single => format!("Double quote multiline found but single quotes preferred"),
+            Quote::Double => "Single quote multiline found but double quotes preferred".to_string(),
+            Quote::Single => "Double quote multiline found but single quotes preferred".to_string(),
         }
     }
 
@@ -159,16 +158,14 @@ impl Violation for BadQuotesDocstring {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadQuotesDocstring { preferred_quote } = self;
-        match preferred_quote {
-            Quote::Double => format!("Single quote docstring found but double quotes preferred"),
-            Quote::Single => format!("Double quote docstring found but single quotes preferred"),
+        match self.preferred_quote {
+            Quote::Double => "Single quote docstring found but double quotes preferred".to_string(),
+            Quote::Single => "Double quote docstring found but single quotes preferred".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let BadQuotesDocstring { preferred_quote } = self;
-        match preferred_quote {
+        match self.preferred_quote {
             Quote::Double => Some("Replace single quotes docstring with double quotes".to_string()),
             Quote::Single => Some("Replace double quotes docstring with single quotes".to_string()),
         }

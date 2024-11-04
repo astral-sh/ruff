@@ -36,7 +36,7 @@ pub struct SnmpInsecureVersion;
 impl Violation for SnmpInsecureVersion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.")
+        "The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.".to_string()
     }
 }
 

@@ -41,7 +41,7 @@ impl Violation for DatetimeTimezoneUTC {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `datetime.UTC` alias")
+        "Use `datetime.UTC` alias".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

@@ -54,7 +54,7 @@ impl Violation for CollapsibleIf {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a single `if` statement instead of nested `if` statements")
+        "Use a single `if` statement instead of nested `if` statements".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

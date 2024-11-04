@@ -37,9 +37,7 @@ pub struct MakoTemplates;
 impl Violation for MakoTemplates {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks"
-        )
+        "Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks".to_string()
     }
 }
 

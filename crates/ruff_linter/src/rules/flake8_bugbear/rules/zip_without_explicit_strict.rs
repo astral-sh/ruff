@@ -43,7 +43,7 @@ pub struct ZipWithoutExplicitStrict;
 impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`zip()` without an explicit `strict=` parameter")
+        "`zip()` without an explicit `strict=` parameter".to_string()
     }
 
     fn fix_title(&self) -> String {

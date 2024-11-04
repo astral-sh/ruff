@@ -183,7 +183,7 @@ impl<'a> Directive<'a> {
         // Extract, e.g., the `401` in `F401`.
         let suffix = line[prefix..]
             .chars()
-            .take_while(char::is_ascii_digit)
+            .take_while(char::is_ascii_alphanumeric)
             .count();
         if prefix > 0 && suffix > 0 {
             Some(&line[..prefix + suffix])
@@ -549,7 +549,7 @@ impl<'a> ParsedFileExemption<'a> {
         // Extract, e.g., the `401` in `F401`.
         let suffix = line[prefix..]
             .chars()
-            .take_while(char::is_ascii_digit)
+            .take_while(char::is_ascii_alphanumeric)
             .count();
         if prefix > 0 && suffix > 0 {
             Some(&line[..prefix + suffix])
@@ -895,7 +895,7 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
     pub(crate) matches: Vec<NoqaCode>,
-    // Whether the directive applies to range.end
+    /// Whether the directive applies to `range.end`.
     pub(crate) includes_end: bool,
 }
 
@@ -1188,6 +1188,24 @@ mod tests {
     #[test]
     fn noqa_invalid_codes() {
         let source = "# noqa: unused-import, F401, some other code";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_squashed_codes() {
+        let source = "# noqa: F401F841";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_empty_comma() {
+        let source = "# noqa: F401,,F841";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_empty_comma_space() {
+        let source = "# noqa: F401, ,F841";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 

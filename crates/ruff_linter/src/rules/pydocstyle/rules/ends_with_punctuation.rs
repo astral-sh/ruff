@@ -53,7 +53,7 @@ impl Violation for EndsInPunctuation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("First line should end with a period, question mark, or exclamation point")
+        "First line should end with a period, question mark, or exclamation point".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

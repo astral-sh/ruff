@@ -46,7 +46,7 @@ pub struct DjangoModelWithoutDunderStr;
 impl Violation for DjangoModelWithoutDunderStr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Model does not define `__str__` method")
+        "Model does not define `__str__` method".to_string()
     }
 }
 

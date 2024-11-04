@@ -38,7 +38,7 @@ pub struct UnrecognizedVersionInfoCheck;
 impl Violation for UnrecognizedVersionInfoCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unrecognized `sys.version_info` check")
+        "Unrecognized `sys.version_info` check".to_string()
     }
 }
 
@@ -77,7 +77,7 @@ pub struct PatchVersionComparison;
 impl Violation for PatchVersionComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Version comparison must use only major and minor version")
+        "Version comparison must use only major and minor version".to_string()
     }
 }
 

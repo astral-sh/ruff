@@ -26,7 +26,6 @@
 //! stringified annotations. We have a fourth Salsa query for inferring the deferred types
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
-use std::borrow::Cow;
 use std::num::NonZeroU32;
 
 use itertools::Itertools;
@@ -42,7 +41,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    AssignmentKind, Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind, TargetKind,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
@@ -52,14 +51,18 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{
     TypeCheckDiagnostic, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder,
 };
+use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, ClassType, FunctionType, InstanceType, IterationOutcome,
     KnownClass, KnownFunction, KnownInstance, SliceLiteralType, StringLiteralType, Symbol,
     Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
 };
+use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
+
+use super::mro::MroErrorKind;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -159,6 +162,30 @@ pub(crate) fn infer_expression_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
+}
+
+/// Infer the types for an [`Unpack`] operation.
+///
+/// This infers the expression type and performs structural match against the target expression
+/// involved in an unpacking operation. It returns a result-like object that can be used to get the
+/// type of the variables involved in this unpacking along with any violations that are detected
+/// during this unpacking.
+#[salsa::tracked(return_ref)]
+fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
+    let file = unpack.file(db);
+    let _span =
+        tracing::trace_span!("infer_unpack_types", unpack=?unpack.as_id(), file=%file.path(db))
+            .entered();
+
+    let value = unpack.value(db);
+    let scope = unpack.scope(db);
+
+    let result = infer_expression_types(db, value);
+    let value_ty = result.expression_ty(value.node_ref(db).scoped_ast_id(db, scope));
+
+    let mut unpacker = Unpacker::new(db, file);
+    unpacker.unpack(unpack.target(db), value_ty, scope);
+    unpacker.finish()
 }
 
 /// A region within which we can infer types.
@@ -406,19 +433,83 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         if self.types.has_deferred {
-            let mut deferred_expression_types: FxHashMap<ScopedExpressionId, Type<'db>> =
-                FxHashMap::default();
             // invariant: only annotations and base classes are deferred, and both of these only
             // occur within a declaration (annotated assignment, function or class definition)
             for definition in self.types.declarations.keys() {
                 if infer_definition_types(self.db, *definition).has_deferred {
                     let deferred = infer_deferred_types(self.db, *definition);
-                    deferred_expression_types.extend(deferred.expressions.iter());
+                    self.types.expressions.extend(&deferred.expressions);
+                    self.diagnostics.extend(&deferred.diagnostics);
                 }
             }
-            self.types
-                .expressions
-                .extend(deferred_expression_types.iter());
+        }
+
+        self.check_class_definitions();
+    }
+
+    /// Iterate over all class definitions to check that Python will be able to create a
+    /// consistent "[method resolution order]" for each class at runtime. If not, issue a diagnostic.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    fn check_class_definitions(&mut self) {
+        let class_definitions = self
+            .types
+            .declarations
+            .values()
+            .filter_map(|ty| ty.into_class_literal_type());
+
+        let invalid_mros = class_definitions.filter_map(|class| {
+            class
+                .try_mro(self.db)
+                .as_ref()
+                .err()
+                .map(|mro_error| (class, mro_error))
+        });
+
+        for (class, mro_error) in invalid_mros {
+            match mro_error.reason() {
+                MroErrorKind::DuplicateBases(duplicates) => {
+                    let base_nodes = class.node(self.db).bases();
+                    for (index, duplicate) in duplicates {
+                        self.diagnostics.add(
+                            (&base_nodes[*index]).into(),
+                             "duplicate-base",
+                             format_args!("Duplicate base class `{}`", duplicate.name(self.db))
+                        );
+                    }
+                }
+                MroErrorKind::CyclicClassDefinition => self.diagnostics.add(
+                    class.node(self.db).into(),
+                    "cyclic-class-def",
+                    format_args!(
+                        "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
+                        class.name(self.db),
+                        class.name(self.db)
+                    )
+                ),
+                MroErrorKind::InvalidBases(bases) => {
+                    let base_nodes = class.node(self.db).bases();
+                    for (index, base_ty) in bases {
+                        self.diagnostics.add(
+                            (&base_nodes[*index]).into(),
+                            "invalid-base",
+                            format_args!(
+                                "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
+                                base_ty.display(self.db)
+                            )
+                        );
+                    }
+                },
+                MroErrorKind::UnresolvableMro{bases_list} => self.diagnostics.add(
+                    class.node(self.db).into(),
+                    "inconsistent-mro",
+                    format_args!(
+                        "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
+                        class.name(self.db),
+                        bases_list.iter().map(|base| base.display(self.db)).join(", ")
+                    )
+                )
+            }
         }
     }
 
@@ -443,7 +534,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     assignment.target(),
                     assignment.value(),
                     assignment.name(),
-                    assignment.kind(),
                     definition,
                 );
             }
@@ -766,7 +856,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
         let function_ty = Type::FunctionLiteral(FunctionType::new(
             self.db,
-            name.id.clone(),
+            &*name.id,
             function_kind,
             definition,
             decorator_tys,
@@ -869,13 +959,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class))
             .to_scope_id(self.db, self.file);
 
-        let maybe_known_class = file_to_module(self.db, body_scope.file(self.db))
+        let maybe_known_class = file_to_module(self.db, self.file)
             .as_ref()
             .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
 
         let class_ty = Type::ClassLiteral(ClassType::new(
             self.db,
-            name.id.clone(),
+            &*name.id,
             definition,
             body_scope,
             maybe_known_class,
@@ -1125,7 +1215,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if exit_ty
                             .call(
                                 self.db,
-                                &[context_manager_ty, Type::None, Type::None, Type::None],
+                                &[
+                                    context_manager_ty,
+                                    Type::none(self.db),
+                                    Type::none(self.db),
+                                    Type::none(self.db),
+                                ],
                             )
                             .return_ty_result(
                                 self.db,
@@ -1321,10 +1416,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
-        target: &ast::Expr,
+        target: TargetKind<'db>,
         value: &ast::Expr,
         name: &ast::ExprName,
-        kind: AssignmentKind,
         definition: Definition<'db>,
     ) {
         let expression = self.index.expression(value);
@@ -1332,132 +1426,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.extend(result);
 
         let value_ty = self.expression_ty(value);
+        let name_ast_id = name.scoped_ast_id(self.db, self.scope());
 
-        let target_ty = match kind {
-            AssignmentKind::Sequence => self.infer_sequence_unpacking(target, value_ty, name),
-            AssignmentKind::Name => value_ty,
+        let target_ty = match target {
+            TargetKind::Sequence(unpack) => {
+                let unpacked = infer_unpack_types(self.db, unpack);
+                self.diagnostics.extend(unpacked.diagnostics());
+                unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
+            }
+            TargetKind::Name => value_ty,
         };
 
         self.add_binding(name.into(), definition, target_ty);
-        self.types
-            .expressions
-            .insert(name.scoped_ast_id(self.db, self.scope()), target_ty);
-    }
-
-    fn infer_sequence_unpacking(
-        &mut self,
-        target: &ast::Expr,
-        value_ty: Type<'db>,
-        name: &ast::ExprName,
-    ) -> Type<'db> {
-        // The inner function is recursive and only differs in the return type which is an `Option`
-        // where if the variable is found, the corresponding type is returned otherwise `None`.
-        fn inner<'db>(
-            builder: &mut TypeInferenceBuilder<'db>,
-            target: &ast::Expr,
-            value_ty: Type<'db>,
-            name: &ast::ExprName,
-        ) -> Option<Type<'db>> {
-            match target {
-                ast::Expr::Name(target_name) if target_name == name => {
-                    return Some(value_ty);
-                }
-                ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                    return inner(builder, value, value_ty, name);
-                }
-                ast::Expr::List(ast::ExprList { elts, .. })
-                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
-                    Type::Tuple(tuple_ty) => {
-                        let starred_index = elts.iter().position(ast::Expr::is_starred_expr);
-
-                        let element_types = if let Some(starred_index) = starred_index {
-                            if tuple_ty.len(builder.db) >= elts.len() - 1 {
-                                let mut element_types = Vec::with_capacity(elts.len());
-                                element_types.extend_from_slice(
-                                    // SAFETY: Safe because of the length check above.
-                                    &tuple_ty.elements(builder.db)[..starred_index],
-                                );
-
-                                // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
-                                // is 1 and the remaining elements after that are 2.
-                                let remaining = elts.len() - (starred_index + 1);
-                                // This index represents the type of the last element that belongs
-                                // to the starred expression, in an exclusive manner.
-                                let starred_end_index = tuple_ty.len(builder.db) - remaining;
-                                // SAFETY: Safe because of the length check above.
-                                let _starred_element_types = &tuple_ty.elements(builder.db)
-                                    [starred_index..starred_end_index];
-                                // TODO: Combine the types into a list type. If the
-                                // starred_element_types is empty, then it should be `List[Any]`.
-                                // combine_types(starred_element_types);
-                                element_types.push(Type::Todo);
-
-                                element_types.extend_from_slice(
-                                    // SAFETY: Safe because of the length check above.
-                                    &tuple_ty.elements(builder.db)[starred_end_index..],
-                                );
-                                Cow::Owned(element_types)
-                            } else {
-                                let mut element_types = tuple_ty.elements(builder.db).to_vec();
-                                // Subtract 1 to insert the starred expression type at the correct
-                                // index.
-                                element_types.resize(elts.len() - 1, Type::Unknown);
-                                // TODO: This should be `list[Unknown]`
-                                element_types.insert(starred_index, Type::Todo);
-                                Cow::Owned(element_types)
-                            }
-                        } else {
-                            Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
-                        };
-
-                        for (index, element) in elts.iter().enumerate() {
-                            if let Some(ty) = inner(
-                                builder,
-                                element,
-                                element_types.get(index).copied().unwrap_or(Type::Unknown),
-                                name,
-                            ) {
-                                return Some(ty);
-                            }
-                        }
-                    }
-                    Type::StringLiteral(string_literal_ty) => {
-                        // Deconstruct the string literal to delegate the inference back to the
-                        // tuple type for correct handling of starred expressions. We could go
-                        // further and deconstruct to an array of `StringLiteral` with each
-                        // individual character, instead of just an array of `LiteralString`, but
-                        // there would be a cost and it's not clear that it's worth it.
-                        let value_ty = Type::Tuple(TupleType::new(
-                            builder.db,
-                            vec![Type::LiteralString; string_literal_ty.len(builder.db)]
-                                .into_boxed_slice(),
-                        ));
-                        if let Some(ty) = inner(builder, target, value_ty, name) {
-                            return Some(ty);
-                        }
-                    }
-                    _ => {
-                        let value_ty = if value_ty.is_literal_string() {
-                            Type::LiteralString
-                        } else {
-                            value_ty.iterate(builder.db).unwrap_with_diagnostic(
-                                AnyNodeRef::from(target),
-                                &mut builder.diagnostics,
-                            )
-                        };
-                        for element in elts {
-                            if let Some(ty) = inner(builder, element, value_ty, name) {
-                                return Some(ty);
-                            }
-                        }
-                    }
-                },
-                _ => {}
-            }
-            None
-        }
-
-        inner(self, target, value_ty, name).unwrap_or(Type::Unknown)
+        self.types.expressions.insert(name_ast_id, target_ty);
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -1498,7 +1479,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Type::Instance(InstanceType { class, .. }) = annotation_ty {
             if class.is_known(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
-                    let maybe_known_instance = file_to_module(self.db, definition.file(self.db))
+                    let maybe_known_instance = file_to_module(self.db, self.file)
                         .as_ref()
                         .and_then(|module| KnownInstance::maybe_from_module(module, &name_expr.id));
                     if let Some(known_instance) = maybe_known_instance {
@@ -1983,7 +1964,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let ty = match expression {
-            ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::None,
+            ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::none(self.db),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
             ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
             ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
@@ -3706,7 +3687,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::None) => SliceArg::Arg(None),
             Some(Type::Instance(InstanceType { class, .. }))
                 if class.is_known(self.db, KnownClass::NoneType) =>
             {
@@ -3781,7 +3761,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: parse the expression and check whether it is a string annotation, since they
             // can be annotation expressions distinct from type expressions.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_literal) => Type::Todo,
+            ast::Expr::StringLiteral(_literal) => {
+                self.store_expression_type(expression, Type::Todo);
+                Type::Todo
+            }
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
@@ -3810,7 +3793,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .to_instance(self.db)
             }
 
-            ast::Expr::NoneLiteral(_literal) => Type::None,
+            ast::Expr::NoneLiteral(_literal) => Type::none(self.db),
 
             // TODO: parse the expression and check whether it is a string annotation.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
@@ -4035,7 +4018,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
             _ => {
                 self.infer_type_expression(slice);
-                Type::Todo  // TODO: generics
+                Type::Todo // TODO: generics
             }
         }
     }
@@ -4106,7 +4089,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // TODO: Check that value type is enum otherwise return None
                 value_ty.member(self.db, &attr.id).unwrap_or_unknown()
             }
-            ruff_python_ast::Expr::NoneLiteral(_) => Type::None,
+            ruff_python_ast::Expr::NoneLiteral(_) => Type::none(self.db),
             // for negative and positive numbers
             ruff_python_ast::Expr::UnaryOp(ref u)
                 if matches!(u.op, UnaryOp::USub | UnaryOp::UAdd)
@@ -4376,9 +4359,7 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
-    use crate::types::{
-        check_types, global_symbol, infer_definition_types, symbol, TypeCheckDiagnostics,
-    };
+    use crate::types::check_types;
     use crate::{HasTy, ProgramSettings, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
@@ -4386,7 +4367,7 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
-    use super::TypeInferenceBuilder;
+    use super::*;
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -4495,36 +4476,6 @@ mod tests {
         let mut db = setup_db();
         db.write_file("src/foo.py", "from import bar")?;
         assert_public_ty(&db, "src/foo.py", "bar", "Unknown");
-        Ok(())
-    }
-
-    #[test]
-    fn resolve_base_class_by_name() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/mod.py",
-            "
-            class Base:
-                pass
-
-            class Sub(Base):
-                pass
-            ",
-        )?;
-
-        let mod_file = system_path_to_file(&db, "src/mod.py").expect("file to exist");
-        let ty = global_symbol(&db, mod_file, "Sub").expect_type();
-
-        let class = ty.expect_class_literal();
-
-        let base_names: Vec<_> = class
-            .bases(&db)
-            .map(|base_ty| format!("{}", base_ty.display(&db)))
-            .collect();
-
-        assert_eq!(base_names, vec!["Literal[Base]"]);
-
         Ok(())
     }
 
@@ -4756,13 +4707,13 @@ mod tests {
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol(&db, a, "C").expect_type();
         let c_class = c_ty.expect_class_literal();
-        let mut c_bases = c_class.bases(&db);
-        let b_ty = c_bases.next().unwrap();
-        let b_class = b_ty.expect_class_literal();
+        let mut c_mro = c_class.iter_mro(&db);
+        let b_ty = c_mro.nth(1).unwrap();
+        let b_class = b_ty.expect_class();
         assert_eq!(b_class.name(&db), "B");
-        let mut b_bases = b_class.bases(&db);
-        let a_ty = b_bases.next().unwrap();
-        let a_class = a_ty.expect_class_literal();
+        let mut b_mro = b_class.iter_mro(&db);
+        let a_ty = b_mro.nth(1).unwrap();
+        let a_class = a_ty.expect_class();
         assert_eq!(a_class.name(&db), "A");
 
         Ok(())
@@ -4911,15 +4862,8 @@ mod tests {
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
         let ty = global_symbol(&db, file, "C").expect_type();
-
-        let base = ty
-            .expect_class_literal()
-            .bases(&db)
-            .next()
-            .expect("there should be at least one base");
-
-        assert_eq!(base.display(&db).to_string(), "Literal[object]");
-
+        let base = ty.expect_class_literal().iter_mro(&db).nth(1).unwrap();
+        assert_eq!(base.display(&db).to_string(), "<class 'object'>");
         Ok(())
     }
 

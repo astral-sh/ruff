@@ -40,7 +40,8 @@ pub struct AssertFalse;
 impl AlwaysFixableViolation for AssertFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`")
+        "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
+            .to_string()
     }
 
     fn fix_title(&self) -> String {

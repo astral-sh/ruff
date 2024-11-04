@@ -53,7 +53,7 @@ impl Violation for CollapsibleElseIf {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `elif` instead of `else` then `if`, to reduce indentation")
+        "Use `elif` instead of `else` then `if`, to reduce indentation".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

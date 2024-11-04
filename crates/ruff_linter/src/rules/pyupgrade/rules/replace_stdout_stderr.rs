@@ -44,7 +44,7 @@ impl Violation for ReplaceStdoutStderr {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`")
+        "Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

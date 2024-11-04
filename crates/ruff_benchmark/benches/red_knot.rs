@@ -27,6 +27,7 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:7:29: Module `collections.abc` has no member `Iterable`",
     // We don't support terminal statements in control flow yet:
     "/src/tomllib/_parser.py:246:15: Method `__class_getitem__` of type `Literal[frozenset]` is possibly unbound",
+    "/src/tomllib/_parser.py:692:8354: Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
     "/src/tomllib/_parser.py:66:18: Name `s` used when possibly not defined",
     "/src/tomllib/_parser.py:98:12: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:101:12: Name `char` used when possibly not defined",

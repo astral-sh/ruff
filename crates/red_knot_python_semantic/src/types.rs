@@ -1,5 +1,8 @@
+use mro::{ClassBase, Mro, MroError, MroIterator};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+
+use itertools::Itertools;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -28,7 +31,9 @@ mod builder;
 mod diagnostic;
 mod display;
 mod infer;
+mod mro;
 mod narrow;
+mod unpacker;
 
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
@@ -309,8 +314,6 @@ pub enum Type<'db> {
     /// Unknown type (either no annotation, or some kind of type error).
     /// Equivalent to Any, or possibly to object in strict mode
     Unknown,
-    /// The None object -- TODO remove this in favor of Instance(types.NoneType)
-    None,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     /// Behaves equivalently to `Any`.
     ///
@@ -580,10 +583,21 @@ impl<'db> Type<'db> {
     }
 
     /// Return true if this type is equivalent to type `other`.
-    pub(crate) fn is_equivalent_to(self, _db: &'db dyn Db, other: Type<'db>) -> bool {
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
+
+        // TODO: The following is a workaround that is required to unify the two different
+        // versions of `NoneType` in typeshed. This should not be required anymore once we
+        // understand `sys.version_info` branches.
         self == other
+            || matches!((self, other),
+                (
+                    Type::Instance(InstanceType { class: self_class, .. }),
+                    Type::Instance(InstanceType { class: target_class, .. })
+                )
+                if self_class.is_known(db, KnownClass::NoneType) &&
+                target_class.is_known(db, KnownClass::NoneType))
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -619,8 +633,7 @@ impl<'db> Type<'db> {
             }
 
             (
-                left @ (Type::None
-                | Type::BooleanLiteral(..)
+                left @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
@@ -628,8 +641,7 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)),
-                right @ (Type::None
-                | Type::BooleanLiteral(..)
+                right @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
@@ -639,12 +651,37 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)),
             ) => left != right,
 
-            (Type::None, Type::Instance(InstanceType { class, .. }))
-            | (Type::Instance(InstanceType { class, .. }), Type::None) => !matches!(
-                class.known(db),
+            (
+                Type::Instance(InstanceType {
+                    class: class_none, ..
+                }),
+                Type::Instance(InstanceType {
+                    class: class_other, ..
+                }),
+            )
+            | (
+                Type::Instance(InstanceType {
+                    class: class_other, ..
+                }),
+                Type::Instance(InstanceType {
+                    class: class_none, ..
+                }),
+            ) if class_none.is_known(db, KnownClass::NoneType) => !matches!(
+                class_other.known(db),
                 Some(KnownClass::NoneType | KnownClass::Object)
             ),
-            (Type::None, _) | (_, Type::None) => true,
+            (
+                Type::Instance(InstanceType {
+                    class: class_none, ..
+                }),
+                _,
+            )
+            | (
+                _,
+                Type::Instance(InstanceType {
+                    class: class_none, ..
+                }),
+            ) if class_none.is_known(db, KnownClass::NoneType) => true,
 
             (Type::BooleanLiteral(..), Type::Instance(InstanceType { class, .. }))
             | (Type::Instance(InstanceType { class, .. }), Type::BooleanLiteral(..)) => !matches!(
@@ -699,8 +736,9 @@ impl<'db> Type<'db> {
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
-                // we can determine that two types are disjoint. For non-final classes, we
-                // return false (multiple inheritance).
+                // we can determine that two types are disjoint. Once we do this, some cases
+                // above (e.g. NoneType) can be removed. For non-final classes, we return
+                // false (multiple inheritance).
 
                 // TODO: is there anything specific to do for instances of KnownClass::Type?
 
@@ -738,13 +776,12 @@ impl<'db> Type<'db> {
     ///
     /// Note: This function aims to have no false positives, but might return `false`
     /// for more complicated types that are actually singletons.
-    pub(crate) fn is_singleton(self) -> bool {
+    pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Any
             | Type::Never
             | Type::Unknown
             | Type::Todo
-            | Type::Instance(..) // TODO some instance types can be singleton types (EllipsisType, NotImplementedType)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
@@ -755,7 +792,14 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
-            Type::None | Type::BooleanLiteral(_) | Type::FunctionLiteral(..) | Type::ClassLiteral(..) | Type::ModuleLiteral(..) => true,
+            Type::BooleanLiteral(_)
+            | Type::FunctionLiteral(..)
+            | Type::ClassLiteral(..)
+            | Type::ModuleLiteral(..) => true,
+            Type::Instance(InstanceType { class, .. }) => {
+                // TODO some more instance types can be singleton types (EllipsisType, NotImplementedType)
+                matches!(class.known(db), Some(KnownClass::NoneType))
+            }
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
                 // implementations such as GraalPy. Its *use* as a singleton is discouraged and
@@ -786,8 +830,7 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::None
-            | Type::FunctionLiteral(..)
+            Type::FunctionLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
             | Type::IntLiteral(..)
@@ -848,10 +891,6 @@ impl<'db> Type<'db> {
                 Type::Todo.into()
             }
             Type::Unknown => Type::Unknown.into(),
-            Type::None => {
-                // TODO: attribute lookup on None type
-                Type::Todo.into()
-            }
             Type::FunctionLiteral(_) => {
                 // TODO: attribute lookup on function type
                 Type::Todo.into()
@@ -976,7 +1015,6 @@ impl<'db> Type<'db> {
     fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
             Type::Any | Type::Todo | Type::Never | Type::Unknown => Truthiness::Ambiguous,
-            Type::None => Truthiness::AlwaysFalse,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(_) => {
@@ -984,10 +1022,15 @@ impl<'db> Type<'db> {
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
             }
-            Type::Instance(_) => {
+            Type::Instance(InstanceType { class, .. }) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the instance's class
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                Truthiness::Ambiguous
+                // For now, we only special-case some builtin classes
+                if class.is_known(db, KnownClass::NoneType) {
+                    Truthiness::AlwaysFalse
+                } else {
+                    Truthiness::Ambiguous
+                }
             }
             Type::Union(union) => {
                 let union_elements = union.elements(db);
@@ -1177,9 +1220,13 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
-            | Type::LiteralString
-            | Type::None => Type::Unknown,
+            | Type::LiteralString => Type::Unknown,
         }
+    }
+
+    /// The type `NoneType` / `None`
+    pub fn none(db: &'db dyn Db) -> Type<'db> {
+        KnownClass::NoneType.to_instance(db)
     }
 
     /// Given a type that is assumed to represent an instance of a class,
@@ -1197,7 +1244,6 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
-            Type::None => KnownClass::NoneType.to_class(db),
             // TODO not accurate if there's a custom metaclass...
             Type::ClassLiteral(_) => KnownClass::Type.to_class(db),
             // TODO can we do better here? `type[LiteralString]`?
@@ -1845,16 +1891,15 @@ pub struct ClassType<'db> {
     known: Option<KnownClass>,
 }
 
+#[salsa::tracked]
 impl<'db> ClassType<'db> {
     pub fn to_instance(self) -> Type<'db> {
         Type::Instance(InstanceType::anonymous(self))
     }
 
+    /// Return `true` if this class represents `known_class`
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        match self.known(db) {
-            Some(known) => known == known_class,
-            None => false,
-        }
+        self.known(db) == Some(known_class)
     }
 
     /// Return true if this class is a standard library type with given module name and name.
@@ -1865,70 +1910,122 @@ impl<'db> ClassType<'db> {
             })
     }
 
-    /// Return an iterator over the types of this class's bases.
+    /// Return an iterator over the inferred types of this class's *explicit* bases.
     ///
-    /// # Panics:
-    /// If `definition` is not a `DefinitionKind::Class`.
-    pub fn bases(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+    /// Note that any class (except for `object`) that has no explicit
+    /// bases will implicitly inherit from `object` at runtime. Nonetheless,
+    /// this method does *not* include `object` in the bases it iterates over.
+    fn explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         let definition = self.definition(db);
-        let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
-            panic!("Class type definition must have DefinitionKind::Class");
-        };
-        class_stmt_node
+        let class_stmt = self.node(db);
+        let has_type_params = class_stmt.type_params.is_some();
+
+        class_stmt
             .bases()
             .iter()
-            .map(move |base_expr: &ast::Expr| {
-                if class_stmt_node.type_params.is_some() {
-                    // when we have a specialized scope, we'll look up the inference
-                    // within that scope
-                    let model: SemanticModel<'db> = SemanticModel::new(db, definition.file(db));
-                    base_expr.ty(&model)
-                } else {
-                    // Otherwise, we can do the lookup based on the definition scope
-                    definition_expression_ty(db, definition, base_expr)
-                }
-            })
+            .map(move |base_node| infer_class_base_type(db, base_node, definition, has_type_params))
     }
 
+    /// Return the original [`ast::StmtClassDef`] node associated with this class
+    fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
+        match self.definition(db).kind(db) {
+            DefinitionKind::Class(class_stmt_node) => class_stmt_node,
+            _ => unreachable!("Class type definition should always have DefinitionKind::Class"),
+        }
+    }
+
+    /// Attempt to resolve the [method resolution order] ("MRO") for this class.
+    /// If the MRO is unresolvable, return an error indicating why the class's MRO
+    /// cannot be accurately determined. The error returned contains a fallback MRO
+    /// that will be used instead for the purposes of type inference.
+    ///
+    /// The MRO is the tuple of classes that can be retrieved as the `__mro__`
+    /// attribute on a class at runtime.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[salsa::tracked(return_ref)]
+    fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, MroError<'db>> {
+        Mro::of_class(db, self)
+    }
+
+    /// Iterate over the [method resolution order] ("MRO") of the class.
+    ///
+    /// If the MRO could not be accurately resolved, this method falls back to iterating
+    /// over an MRO that has the class directly inheriting from `Unknown`. Use
+    /// [`ClassType::try_mro`] if you need to distinguish between the success and failure
+    /// cases rather than simply iterating over the inferred resolution order for the class.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+        MroIterator::new(db, self)
+    }
+
+    /// Return `true` if `other` is present in this class's MRO.
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
-        // TODO: we need to iterate over the *MRO* here, not the bases
-        (other == self)
-            || self.bases(db).any(|base| match base {
-                Type::ClassLiteral(base_class) => base_class == other,
-                // `is_subclass_of` is checking the subtype relation, in which gradual types do not
-                // participate, so we should not return `True` if we find `Any/Unknown` in the
-                // bases.
-                _ => false,
-            })
+        // `is_subclass_of` is checking the subtype relation, in which gradual types do not
+        // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
+        self.iter_mro(db).contains(&ClassBase::Class(other))
     }
 
     /// Returns the class member of this class named `name`.
     ///
-    /// The member resolves to a member of the class itself or any of its bases.
+    /// The member resolves to a member on the class itself or any of its proper superclasses.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let member = self.own_class_member(db, name);
-        if !member.is_unbound() {
-            return member;
+        if name == "__mro__" {
+            let tuple_elements: Box<_> = self.iter_mro(db).map(Type::from).collect();
+            return Symbol::Type(
+                Type::Tuple(TupleType::new(db, tuple_elements)),
+                Boundness::Bound,
+            );
         }
 
-        self.inherited_class_member(db, name)
-    }
-
-    /// Returns the inferred type of the class member named `name`.
-    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let scope = self.body_scope(db);
-        symbol(db, scope, name)
-    }
-
-    pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        for base in self.bases(db) {
-            let member = base.member(db, name);
-            if !member.is_unbound() {
-                return member;
+        for superclass in self.iter_mro(db) {
+            match superclass {
+                // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
+                // the type found on the next "real" class.
+                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo => {
+                    return Type::from(superclass).member(db, name)
+                }
+                ClassBase::Class(class) => {
+                    let member = class.own_class_member(db, name);
+                    if !member.is_unbound() {
+                        return member;
+                    }
+                }
             }
         }
 
         Symbol::Unbound
+    }
+
+    /// Returns the inferred type of the class member named `name`.
+    ///
+    /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
+    /// directly. Use [`ClassType::class_member`] if you require a method that will
+    /// traverse through the MRO until it finds the member.
+    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let scope = self.body_scope(db);
+        symbol(db, scope, name)
+    }
+}
+
+/// Infer the type of a node representing an explicit class base.
+///
+/// For example, infer the type of `Foo` in the statement `class Bar(Foo, Baz): ...`.
+fn infer_class_base_type<'db>(
+    db: &'db dyn Db,
+    base_node: &'db ast::Expr,
+    class_definition: Definition<'db>,
+    class_has_type_params: bool,
+) -> Type<'db> {
+    if class_has_type_params {
+        // when we have a specialized scope, we'll look up the inference
+        // within that scope
+        let model = SemanticModel::new(db, class_definition.file(db));
+        base_node.ty(&model)
+    } else {
+        // Otherwise, we can do the lookup based on the definition scope
+        definition_expression_ty(db, class_definition, base_node)
     }
 }
 
@@ -2116,7 +2213,7 @@ mod tests {
             match self {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::Unknown,
-                Ty::None => Type::None,
+                Ty::None => Type::none(db),
                 Ty::Any => Type::Any,
                 Ty::Todo => Type::Todo,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
@@ -2202,6 +2299,10 @@ mod tests {
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::BuiltinInstance("str")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(
+        Ty::BuiltinInstance("FloatingPointError"),
+        Ty::BuiltinInstance("Exception")
+    )]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -2356,7 +2457,7 @@ mod tests {
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
-        assert!(from.into_type(&db).is_singleton());
+        assert!(from.into_type(&db).is_singleton(&db));
     }
 
     #[test_case(Ty::None)]
@@ -2394,7 +2495,7 @@ mod tests {
     fn is_not_singleton(from: Ty) {
         let db = setup_db();
 
-        assert!(!from.into_type(&db).is_singleton());
+        assert!(!from.into_type(&db).is_singleton(&db));
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]

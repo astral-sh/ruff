@@ -37,7 +37,7 @@ pub struct BlockingHttpCallInAsyncFunction;
 impl Violation for BlockingHttpCallInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not call blocking HTTP methods")
+        "Async functions should not call blocking HTTP methods".to_string()
     }
 }
 

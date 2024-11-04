@@ -49,7 +49,7 @@ pub struct RaiseVanillaArgs;
 impl Violation for RaiseVanillaArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid specifying long messages outside the exception class")
+        "Avoid specifying long messages outside the exception class".to_string()
     }
 }
 

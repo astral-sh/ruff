@@ -49,8 +49,7 @@ pub struct UnusedNOQA {
 impl AlwaysFixableViolation for UnusedNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedNOQA { codes } = self;
-        match codes {
+        match &self.codes {
             Some(codes) => {
                 let mut codes_by_reason = vec![];
                 if !codes.unmatched.is_empty() {
@@ -94,12 +93,12 @@ impl AlwaysFixableViolation for UnusedNOQA {
                     ));
                 }
                 if codes_by_reason.is_empty() {
-                    format!("Unused `noqa` directive")
+                    "Unused `noqa` directive".to_string()
                 } else {
                     format!("Unused `noqa` directive ({})", codes_by_reason.join("; "))
                 }
             }
-            None => format!("Unused blanket `noqa` directive"),
+            None => "Unused blanket `noqa` directive".to_string(),
         }
     }
 

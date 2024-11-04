@@ -61,11 +61,10 @@ pub struct FunctionCallInDataclassDefaultArgument {
 impl Violation for FunctionCallInDataclassDefaultArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionCallInDataclassDefaultArgument { name } = self;
-        if let Some(name) = name {
+        if let Some(name) = &self.name {
             format!("Do not perform function call `{name}` in dataclass defaults")
         } else {
-            format!("Do not perform function call in dataclass defaults")
+            "Do not perform function call in dataclass defaults".to_string()
         }
     }
 }

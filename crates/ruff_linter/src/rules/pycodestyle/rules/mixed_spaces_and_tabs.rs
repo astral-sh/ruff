@@ -31,7 +31,7 @@ pub struct MixedSpacesAndTabs;
 impl Violation for MixedSpacesAndTabs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Indentation contains mixed spaces and tabs")
+        "Indentation contains mixed spaces and tabs".to_string()
     }
 }
 

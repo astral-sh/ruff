@@ -46,7 +46,7 @@ pub struct MutableClassDefault;
 impl Violation for MutableClassDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Mutable class attributes should be annotated with `typing.ClassVar`")
+        "Mutable class attributes should be annotated with `typing.ClassVar`".to_string()
     }
 }
 

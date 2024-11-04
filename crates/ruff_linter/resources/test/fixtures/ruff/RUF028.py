@@ -87,3 +87,17 @@ def match_case_and_elif():
                 pass
             elif string == "Hello": # fmt: skip
                 pass
+
+
+# Regression test for decorators
+import pytest
+
+@pytest.mark.parametrize(
+    "test_input,expected",
+     [
+          ("3+5",  8 ),
+          ("17+2", 19),
+     ],
+)  # fmt: skip
+def test_eval(test_input, expected):
+    assert eval(test_input) == expected

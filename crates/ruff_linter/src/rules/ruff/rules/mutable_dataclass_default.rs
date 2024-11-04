@@ -60,7 +60,7 @@ pub struct MutableDataclassDefault;
 impl Violation for MutableDataclassDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use mutable default values for dataclass attributes")
+        "Do not use mutable default values for dataclass attributes".to_string()
     }
 }
 

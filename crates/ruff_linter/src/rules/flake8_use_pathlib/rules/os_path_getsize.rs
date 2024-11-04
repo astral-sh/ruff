@@ -42,6 +42,6 @@ pub struct OsPathGetsize;
 impl Violation for OsPathGetsize {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.getsize` should be replaced by `Path.stat().st_size`")
+        "`os.path.getsize` should be replaced by `Path.stat().st_size`".to_string()
     }
 }

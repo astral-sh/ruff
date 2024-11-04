@@ -41,7 +41,7 @@ pub struct TypeCheckWithoutTypeError;
 impl Violation for TypeCheckWithoutTypeError {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `TypeError` exception for invalid type")
+        "Prefer `TypeError` exception for invalid type".to_string()
     }
 }
 

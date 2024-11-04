@@ -37,7 +37,7 @@ pub struct UnnecessaryEscapedQuote;
 impl AlwaysFixableViolation for UnnecessaryEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary escape on inner quote character")
+        "Unnecessary escape on inner quote character".to_string()
     }
 
     fn fix_title(&self) -> String {

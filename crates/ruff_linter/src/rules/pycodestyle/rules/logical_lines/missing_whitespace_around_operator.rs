@@ -34,11 +34,11 @@ pub struct MissingWhitespaceAroundOperator;
 impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around operator")
+        "Missing whitespace around operator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 
@@ -67,11 +67,11 @@ pub struct MissingWhitespaceAroundArithmeticOperator;
 impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around arithmetic operator")
+        "Missing whitespace around arithmetic operator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 
@@ -100,11 +100,11 @@ pub struct MissingWhitespaceAroundBitwiseOrShiftOperator;
 impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around bitwise or shift operator")
+        "Missing whitespace around bitwise or shift operator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 
@@ -133,11 +133,11 @@ pub struct MissingWhitespaceAroundModuloOperator;
 impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around modulo operator")
+        "Missing whitespace around modulo operator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 

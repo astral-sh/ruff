@@ -56,18 +56,16 @@ impl Violation for OutdatedVersionBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OutdatedVersionBlock { reason } = self;
-        match reason {
+        match self.reason {
             Reason::AlwaysFalse | Reason::AlwaysTrue => {
-                format!("Version block is outdated for minimum Python version")
+                "Version block is outdated for minimum Python version".to_string()
             }
-            Reason::Invalid => format!("Version specifier is invalid"),
+            Reason::Invalid => "Version specifier is invalid".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let OutdatedVersionBlock { reason } = self;
-        match reason {
+        match self.reason {
             Reason::AlwaysFalse | Reason::AlwaysTrue => {
                 Some("Remove outdated version block".to_string())
             }

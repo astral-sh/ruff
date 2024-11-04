@@ -58,7 +58,7 @@ pub struct RaiseVanillaClass;
 impl Violation for RaiseVanillaClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Create your own exception")
+        "Create your own exception".to_string()
     }
 }
 

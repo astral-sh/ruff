@@ -58,19 +58,18 @@ pub struct IsLiteral {
 impl AlwaysFixableViolation for IsLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IsLiteral { cmp_op } = self;
-        match cmp_op {
-            IsCmpOp::Is => format!("Use `==` to compare constant literals"),
-            IsCmpOp::IsNot => format!("Use `!=` to compare constant literals"),
+        match self.cmp_op {
+            IsCmpOp::Is => "Use `==` to compare constant literals".to_string(),
+            IsCmpOp::IsNot => "Use `!=` to compare constant literals".to_string(),
         }
     }
 
     fn fix_title(&self) -> String {
-        let IsLiteral { cmp_op } = self;
-        match cmp_op {
-            IsCmpOp::Is => "Replace `is` with `==`".to_string(),
-            IsCmpOp::IsNot => "Replace `is not` with `!=`".to_string(),
-        }
+        let title = match self.cmp_op {
+            IsCmpOp::Is => "Replace `is` with `==`",
+            IsCmpOp::IsNot => "Replace `is not` with `!=`",
+        };
+        title.to_string()
     }
 }
 

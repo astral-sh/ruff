@@ -42,7 +42,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals on one line")
+        "Implicitly concatenated string literals on one line".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -88,7 +88,7 @@ pub struct MultiLineImplicitStringConcatenation;
 impl Violation for MultiLineImplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over multiple lines")
+        "Implicitly concatenated string literals over multiple lines".to_string()
     }
 }
 

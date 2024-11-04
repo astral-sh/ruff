@@ -52,7 +52,7 @@ pub struct SuperWithoutBrackets;
 impl AlwaysFixableViolation for SuperWithoutBrackets {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`super` call is missing parentheses")
+        "`super` call is missing parentheses".to_string()
     }
 
     fn fix_title(&self) -> String {

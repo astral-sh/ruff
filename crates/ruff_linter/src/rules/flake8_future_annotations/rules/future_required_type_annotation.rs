@@ -79,7 +79,7 @@ impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
     }
 
     fn fix_title(&self) -> String {
-        format!("Add `from __future__ import annotations`")
+        "Add `from __future__ import annotations`".to_string()
     }
 }
 

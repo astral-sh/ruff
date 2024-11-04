@@ -39,10 +39,9 @@ pub struct NanComparison {
 impl Violation for NanComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NanComparison { nan } = self;
-        match nan {
-            Nan::Math => format!("Comparing against a NaN value; use `math.isnan` instead"),
-            Nan::NumPy => format!("Comparing against a NaN value; use `np.isnan` instead"),
+        match self.nan {
+            Nan::Math => "Comparing against a NaN value; use `math.isnan` instead".to_string(),
+            Nan::NumPy => "Comparing against a NaN value; use `np.isnan` instead".to_string(),
         }
     }
 }

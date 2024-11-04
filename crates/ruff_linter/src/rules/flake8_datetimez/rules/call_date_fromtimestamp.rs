@@ -50,7 +50,7 @@ pub struct CallDateFromtimestamp;
 impl Violation for CallDateFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`datetime.date.fromtimestamp()` used")
+        "`datetime.date.fromtimestamp()` used".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

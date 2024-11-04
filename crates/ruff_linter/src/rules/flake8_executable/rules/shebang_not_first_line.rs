@@ -37,7 +37,7 @@ pub struct ShebangNotFirstLine;
 impl Violation for ShebangNotFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Shebang should be at the beginning of the file")
+        "Shebang should be at the beginning of the file".to_string()
     }
 }
 

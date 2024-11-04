@@ -40,7 +40,7 @@ pub struct ReturnInInit;
 impl Violation for ReturnInInit {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Explicit return in `__init__`")
+        "Explicit return in `__init__`".to_string()
     }
 }
 

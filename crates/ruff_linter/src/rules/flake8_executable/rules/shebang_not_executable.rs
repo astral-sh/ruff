@@ -46,7 +46,7 @@ pub struct ShebangNotExecutable;
 impl Violation for ShebangNotExecutable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Shebang is present but file is not executable")
+        "Shebang is present but file is not executable".to_string()
     }
 }
 

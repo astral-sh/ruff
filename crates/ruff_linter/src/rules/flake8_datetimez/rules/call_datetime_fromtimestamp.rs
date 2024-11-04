@@ -56,10 +56,10 @@ impl Violation for CallDatetimeFromtimestamp {
         let CallDatetimeFromtimestamp(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("`datetime.datetime.fromtimestamp()` called without a `tz` argument")
+                "`datetime.datetime.fromtimestamp()` called without a `tz` argument".to_string()
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("`tz=None` passed to `datetime.datetime.fromtimestamp()`")
+                "`tz=None` passed to `datetime.datetime.fromtimestamp()`".to_string()
             }
         }
     }

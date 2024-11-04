@@ -37,7 +37,7 @@ pub struct ExplicitStringConcatenation;
 impl Violation for ExplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Explicitly concatenated string should be implicitly concatenated")
+        "Explicitly concatenated string should be implicitly concatenated".to_string()
     }
 }
 

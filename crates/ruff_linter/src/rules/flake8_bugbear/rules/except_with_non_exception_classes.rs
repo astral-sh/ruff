@@ -40,7 +40,8 @@ pub struct ExceptWithNonExceptionClasses;
 impl Violation for ExceptWithNonExceptionClasses {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`except` handlers should only be exception classes or tuples of exception classes")
+        "`except` handlers should only be exception classes or tuples of exception classes"
+            .to_string()
     }
 }
 

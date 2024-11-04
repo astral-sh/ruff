@@ -54,10 +54,11 @@ pub struct BinaryOpException {
 impl Violation for BinaryOpException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BinaryOpException { op } = self;
-        match op {
-            BoolOp::And => format!("Exception to catch is the result of a binary `and` operation"),
-            BoolOp::Or => format!("Exception to catch is the result of a binary `or` operation"),
+        match self.op {
+            BoolOp::And => {
+                "Exception to catch is the result of a binary `and` operation".to_string()
+            }
+            BoolOp::Or => "Exception to catch is the result of a binary `or` operation".to_string(),
         }
     }
 }

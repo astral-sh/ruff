@@ -6,7 +6,7 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::{IntersectionType, Type, UnionType};
+use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
 use crate::Db;
 use rustc_hash::FxHashMap;
 
@@ -64,7 +64,11 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::None => f.write_str("None"),
+            Type::Instance(InstanceType { class, known })
+                if class.is_known(self.db, KnownClass::NoneType) =>
+            {
+                f.write_str("None")
+            }
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
             Type::Todo => f.write_str("@Todo"),
@@ -380,7 +384,7 @@ mod tests {
             global_symbol(&db, mod_file, "bar").expect_type(),
             global_symbol(&db, mod_file, "B").expect_type(),
             Type::BooleanLiteral(true),
-            Type::None,
+            Type::none(&db),
         ];
         let union = UnionType::from_elements(&db, union_elements).expect_union();
         let display = format!("{}", union.display(&db));

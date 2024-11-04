@@ -6,7 +6,12 @@ In type stubs, classes can reference themselves in their base class definitions.
 `typeshed`, we have `class str(Sequence[str]): ...`.
 
 ```py path=a.pyi
-class C(C): ...
+class Foo[T]: ...
 
-reveal_type(C)  # revealed: Literal[C]
+# TODO: actually is subscriptable
+# error: [non-subscriptable]
+class Bar(Foo[Bar]): ...
+
+reveal_type(Bar)  # revealed: Literal[Bar]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
 ```

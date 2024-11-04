@@ -65,7 +65,8 @@ pub struct MissingTodoAuthor;
 impl Violation for MissingTodoAuthor {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`")
+        "Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`"
+            .to_string()
     }
 }
 
@@ -99,7 +100,7 @@ pub struct MissingTodoLink;
 impl Violation for MissingTodoLink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing issue link on the line following this TODO")
+        "Missing issue link on the line following this TODO".to_string()
     }
 }
 
@@ -128,7 +129,7 @@ pub struct MissingTodoColon;
 impl Violation for MissingTodoColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing colon in TODO")
+        "Missing colon in TODO".to_string()
     }
 }
 
@@ -155,7 +156,7 @@ pub struct MissingTodoDescription;
 impl Violation for MissingTodoDescription {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing issue description after `TODO`")
+        "Missing issue description after `TODO`".to_string()
     }
 }
 
@@ -219,7 +220,7 @@ pub struct MissingSpaceAfterTodoColon;
 impl Violation for MissingSpaceAfterTodoColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing space after colon in TODO")
+        "Missing space after colon in TODO".to_string()
     }
 }
 

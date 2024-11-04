@@ -28,9 +28,8 @@ pub struct UnintentionalTypeAnnotation;
 impl Violation for UnintentionalTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-        )
+        "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+            .to_string()
     }
 }
 

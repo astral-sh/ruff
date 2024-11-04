@@ -42,6 +42,6 @@ pub struct ReraiseNoCause;
 impl Violation for ReraiseNoCause {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `raise from` to specify exception cause")
+        "Use `raise from` to specify exception cause".to_string()
     }
 }

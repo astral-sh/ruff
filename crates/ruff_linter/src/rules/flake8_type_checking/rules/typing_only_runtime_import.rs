@@ -67,6 +67,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
 ///
 /// ## References
@@ -141,6 +142,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
 ///
 /// ## References
@@ -215,6 +217,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
 ///
 /// ## References

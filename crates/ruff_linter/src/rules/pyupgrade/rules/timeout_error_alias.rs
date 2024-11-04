@@ -45,7 +45,7 @@ pub struct TimeoutErrorAlias {
 impl AlwaysFixableViolation for TimeoutErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace aliased errors with `TimeoutError`")
+        "Replace aliased errors with `TimeoutError`".to_string()
     }
 
     fn fix_title(&self) -> String {

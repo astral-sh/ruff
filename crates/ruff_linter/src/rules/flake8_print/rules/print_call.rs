@@ -40,7 +40,7 @@ impl Violation for Print {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`print` found")
+        "`print` found".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -87,7 +87,7 @@ impl Violation for PPrint {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pprint` found")
+        "`pprint` found".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

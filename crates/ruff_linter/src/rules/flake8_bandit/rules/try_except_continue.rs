@@ -47,7 +47,7 @@ pub struct TryExceptContinue;
 impl Violation for TryExceptContinue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`try`-`except`-`continue` detected, consider logging the exception")
+        "`try`-`except`-`continue` detected, consider logging the exception".to_string()
     }
 }
 

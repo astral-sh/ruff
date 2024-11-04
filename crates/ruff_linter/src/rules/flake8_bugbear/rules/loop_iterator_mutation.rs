@@ -44,12 +44,10 @@ pub struct LoopIteratorMutation {
 impl Violation for LoopIteratorMutation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LoopIteratorMutation { name } = self;
-
-        if let Some(name) = name.as_ref().and_then(SourceCodeSnippet::full_display) {
+        if let Some(name) = self.name.as_ref().and_then(SourceCodeSnippet::full_display) {
             format!("Mutation to loop iterable `{name}` during iteration")
         } else {
-            format!("Mutation to loop iterable during iteration")
+            "Mutation to loop iterable during iteration".to_string()
         }
     }
 }

@@ -52,7 +52,7 @@ pub struct InvalidPrintSyntax;
 impl Violation for InvalidPrintSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `>>` is invalid with `print` function")
+        "Use of `>>` is invalid with `print` function".to_string()
     }
 }
 

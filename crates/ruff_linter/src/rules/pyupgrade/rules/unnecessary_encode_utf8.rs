@@ -36,8 +36,10 @@ impl AlwaysFixableViolation for UnnecessaryEncodeUTF8 {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.reason {
-            Reason::BytesLiteral => format!("Unnecessary call to `encode` as UTF-8"),
-            Reason::DefaultArgument => format!("Unnecessary UTF-8 `encoding` argument to `encode`"),
+            Reason::BytesLiteral => "Unnecessary call to `encode` as UTF-8".to_string(),
+            Reason::DefaultArgument => {
+                "Unnecessary UTF-8 `encoding` argument to `encode`".to_string()
+            }
         }
     }
 

@@ -57,7 +57,7 @@ impl Violation for YodaConditions {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Yoda condition detected")
+        "Yoda condition detected".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

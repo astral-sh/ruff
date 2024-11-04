@@ -59,11 +59,11 @@ impl Violation for ErrorInsteadOfException {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `logging.exception` instead of `logging.error`")
+        "Use `logging.exception` instead of `logging.error`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `exception`"))
+        Some("Replace with `exception`".to_string())
     }
 }
 

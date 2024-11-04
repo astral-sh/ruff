@@ -46,7 +46,7 @@ impl Violation for VerboseDecimalConstructor {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Verbose expression in `Decimal` constructor")
+        "Verbose expression in `Decimal` constructor".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

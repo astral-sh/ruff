@@ -76,16 +76,21 @@ impl Violation for MutableArgumentDefault {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use mutable data structures for argument defaults")
+        "Do not use mutable data structures for argument defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `None`; initialize within function"))
+        Some("Replace with `None`; initialize within function".to_string())
     }
 }
 
 /// B006
 pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    // Skip stub files
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     for ParameterWithDefault {
         parameter,
         default,

@@ -154,6 +154,7 @@ B033.py:20:5: B033 [*] Sets should not contain duplicate item `1`
 20 |     1,
    |     ^ B033
 21 | }
+22 | incorrect_set = {False, 1, 0}
    |
    = help: Remove duplicate item
 
@@ -163,7 +164,26 @@ B033.py:20:5: B033 [*] Sets should not contain duplicate item `1`
 19 19 |     1,
 20    |-    1,
 21 20 | }
-22 21 | 
-23 22 | ###
+22 21 | incorrect_set = {False, 1, 0}
+23 22 | 
 
+B033.py:22:28: B033 [*] Sets should not contain duplicate items, but `False` and `0` has the same value
+   |
+20 |     1,
+21 | }
+22 | incorrect_set = {False, 1, 0}
+   |                            ^ B033
+23 | 
+24 | ###
+   |
+   = help: Remove duplicate item
 
+ℹ Safe fix
+19 19 |     1,
+20 20 |     1,
+21 21 | }
+22    |-incorrect_set = {False, 1, 0}
+   22 |+incorrect_set = {False, 1}
+23 23 | 
+24 24 | ###
+25 25 | # Non-errors.

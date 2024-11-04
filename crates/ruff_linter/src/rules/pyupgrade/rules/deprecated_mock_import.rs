@@ -55,7 +55,7 @@ pub struct DeprecatedMockImport {
 impl AlwaysFixableViolation for DeprecatedMockImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`mock` is deprecated, use `unittest.mock`")
+        "`mock` is deprecated, use `unittest.mock`".to_string()
     }
 
     fn fix_title(&self) -> String {

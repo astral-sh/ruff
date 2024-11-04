@@ -43,7 +43,7 @@ impl Violation for IfWithSameArms {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Combine `if` branches using logical `or` operator")
+        "Combine `if` branches using logical `or` operator".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

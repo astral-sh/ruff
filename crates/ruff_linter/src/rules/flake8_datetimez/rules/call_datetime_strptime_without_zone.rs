@@ -58,27 +58,28 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
     fn message(&self) -> String {
         let CallDatetimeStrptimeWithoutZone(antipattern) = self;
         match antipattern {
-            DatetimeModuleAntipattern::NoTzArgumentPassed => format!(
+            DatetimeModuleAntipattern::NoTzArgumentPassed => {
                 "Naive datetime constructed using `datetime.datetime.strptime()` without %z"
-            ),
+                    .to_string()
+            }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("`datetime.datetime.strptime(...).replace(tz=None)` used")
+                "`datetime.datetime.strptime(...).replace(tz=None)` used".to_string()
             }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         let CallDatetimeStrptimeWithoutZone(antipattern) = self;
-        match antipattern {
-            DatetimeModuleAntipattern::NoTzArgumentPassed => Some(
+        let title = match antipattern {
+            DatetimeModuleAntipattern::NoTzArgumentPassed => {
                 "Call `.replace(tzinfo=<timezone>)` or `.astimezone()` \
                 to convert to an aware datetime"
-                    .to_string(),
-            ),
-            DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                Some("Pass a `datetime.timezone` object to the `tzinfo` parameter".to_string())
             }
-        }
+            DatetimeModuleAntipattern::NonePassedToTzArgument => {
+                "Pass a `datetime.timezone` object to the `tzinfo` parameter"
+            }
+        };
+        Some(title.to_string())
     }
 }
 

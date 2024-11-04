@@ -32,7 +32,7 @@ pub struct DocstringInStub;
 impl Violation for DocstringInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstrings should not be included in stubs")
+        "Docstrings should not be included in stubs".to_string()
     }
 }
 

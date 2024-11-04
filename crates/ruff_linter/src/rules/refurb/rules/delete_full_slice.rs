@@ -51,7 +51,7 @@ impl Violation for DeleteFullSlice {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `clear` over deleting a full slice")
+        "Prefer `clear` over deleting a full slice".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

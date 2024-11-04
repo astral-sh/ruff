@@ -675,8 +675,8 @@ mod tests {
     fn build_intersection_self_negation() {
         let db = setup_db();
         let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::None)
-            .add_negative(Type::None)
+            .add_positive(Type::none(&db))
+            .add_negative(Type::none(&db))
             .build();
 
         assert_eq!(ty, Type::Never);
@@ -686,18 +686,18 @@ mod tests {
     fn build_intersection_simplify_negative_never() {
         let db = setup_db();
         let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::None)
+            .add_positive(Type::none(&db))
             .add_negative(Type::Never)
             .build();
 
-        assert_eq!(ty, Type::None);
+        assert_eq!(ty, Type::none(&db));
     }
 
     #[test]
     fn build_intersection_simplify_positive_never() {
         let db = setup_db();
         let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::None)
+            .add_positive(Type::none(&db))
             .add_positive(Type::Never)
             .build();
 
@@ -709,14 +709,14 @@ mod tests {
         let db = setup_db();
 
         let ty = IntersectionBuilder::new(&db)
-            .add_negative(Type::None)
+            .add_negative(Type::none(&db))
             .add_positive(Type::IntLiteral(1))
             .build();
         assert_eq!(ty, Type::IntLiteral(1));
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(Type::IntLiteral(1))
-            .add_negative(Type::None)
+            .add_negative(Type::none(&db))
             .build();
         assert_eq!(ty, Type::IntLiteral(1));
     }
@@ -875,7 +875,7 @@ mod tests {
         let db = setup_db();
 
         let t1 = Type::IntLiteral(1);
-        let t2 = Type::None;
+        let t2 = Type::none(&db);
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t1)
