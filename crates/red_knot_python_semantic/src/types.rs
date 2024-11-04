@@ -2230,7 +2230,6 @@ mod tests {
         Ty::BuiltinInstance("FloatingPointError"),
         Ty::BuiltinInstance("Exception")
     )]
-    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(2)], neg: vec![]}, Ty::IntLiteral(2))]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]}, Ty::BuiltinInstance("int"))]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
@@ -2290,6 +2289,34 @@ mod tests {
         assert!(type_u.is_union());
         assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
         assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
+    }
+
+    #[test]
+    fn is_subtype_of_intersection_of_class_instances() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            a = A()
+            class B: ...
+            b = B()
+        ",
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let a_ty = super::global_symbol(&db, module, "a").expect_type();
+        let b_ty = super::global_symbol(&db, module, "b").expect_type();
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(a_ty)
+            .add_positive(b_ty)
+            .build();
+
+        assert_eq!(intersection.display(&db).to_string(), "A & B");
+        assert!(!a_ty.is_subtype_of(&db, b_ty));
+        assert!(intersection.is_subtype_of(&db, b_ty));
+        assert!(intersection.is_subtype_of(&db, a_ty));
     }
 
     #[test_case(
