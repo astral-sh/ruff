@@ -51,6 +51,12 @@ invalid1: Literal[3 + 4]
 invalid2: Literal[4 + 3j]
 # error: [invalid-literal-parameter]
 invalid3: Literal[(3, 4)]
+invalid4: Literal[
+    1 + 2,  # error: [invalid-literal-parameter]
+    "foo",
+    hello,  # error: [invalid-literal-parameter]
+    (1, 2, 3),  # error: [invalid-literal-parameter]
+]
 ```
 
 ## Detecting Literal outside typing and typing_extensions

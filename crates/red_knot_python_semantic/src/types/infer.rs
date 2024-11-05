@@ -4029,29 +4029,30 @@ impl<'db> TypeInferenceBuilder<'db> {
         parameters: &ast::Expr,
     ) -> Type<'db> {
         match known_instance {
-            KnownInstance::Literal => {
-                let Some(slice_ty) = self.infer_literal_parameter_type(parameters) else {
-                    self.diagnostics.add(
-                        parameters.into(),
-                        "invalid-literal-parameter",
-                        format_args!(""),
-                    );
-                    return Type::Unknown;
-                };
-
-                match slice_ty {
-                    Type::Tuple(tuple) => {
-                        let elts = tuple.elements(self.db);
-                        UnionType::from_elements(self.db, elts)
+            KnownInstance::Literal => match self.infer_literal_parameter_type(parameters) {
+                Ok(ty) => ty,
+                Err(nodes) => {
+                    for node in nodes {
+                        self.diagnostics.add(
+                            node.into(),
+                            "invalid-literal-parameter",
+                            format_args!(
+                                "Type arguments for `Literal` must be `None`, \
+                                    a literal value (int, bool, str, or bytes), or an enum value"
+                            ),
+                        );
                     }
-                    ty => ty,
+                    Type::Unknown
                 }
-            }
+            },
         }
     }
 
-    fn infer_literal_parameter_type(&mut self, parameters: &ast::Expr) -> Option<Type<'db>> {
-        Some(match parameters {
+    fn infer_literal_parameter_type<'ast>(
+        &mut self,
+        parameters: &'ast ast::Expr,
+    ) -> Result<Type<'db>, Vec<&'ast ast::Expr>> {
+        Ok(match parameters {
             subscript @ ruff_python_ast::Expr::Subscript(_) => {
                 let inner_ty = self.infer_type_expression(subscript);
                 if !matches!(
@@ -4062,16 +4063,28 @@ impl<'db> TypeInferenceBuilder<'db> {
                         | Type::StringLiteral(_)
                         | Type::Union(_)
                 ) {
-                    return None;
+                    return Err(vec![parameters]);
                 }
                 inner_ty
             }
-            ruff_python_ast::Expr::Tuple(t) if !t.parenthesized => {
-                let elements = t
-                    .iter()
-                    .map(|elt| self.infer_literal_parameter_type(elt))
-                    .collect::<Option<Box<_>>>()?;
-                Type::Tuple(TupleType::new(self.db, elements))
+            ruff_python_ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
+                let mut errors = vec![];
+                let mut builder = UnionBuilder::new(self.db);
+                for elt in tuple {
+                    match self.infer_literal_parameter_type(elt) {
+                        Ok(ty) => {
+                            builder = builder.add(ty);
+                        }
+                        Err(nodes) => {
+                            errors.extend(nodes);
+                        }
+                    }
+                }
+                if errors.is_empty() {
+                    builder.build()
+                } else {
+                    return Err(errors);
+                }
             }
 
             ruff_python_ast::Expr::StringLiteral(literal) => {
@@ -4101,7 +4114,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_number_literal_expression(number)
             }
             _ => {
-                return None;
+                return Err(vec![parameters]);
             }
         })
     }
