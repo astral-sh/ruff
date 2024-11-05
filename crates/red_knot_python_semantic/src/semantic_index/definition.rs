@@ -167,6 +167,7 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
+    pub(crate) unpack: Option<Unpack<'a>>,
     pub(crate) value: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
 }
@@ -210,13 +211,9 @@ pub(crate) struct MatchPatternDefinitionNodeRef<'a> {
     pub(crate) index: u32,
 }
 
-impl DefinitionNodeRef<'_> {
+impl<'db> DefinitionNodeRef<'db> {
     #[allow(unsafe_code)]
-    pub(super) unsafe fn into_owned(
-        self,
-        parsed: ParsedModule,
-        unpack: Option<Unpack<'_>>,
-    ) -> DefinitionKind<'_> {
+    pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(alias) => {
                 DefinitionKind::Import(AstNodeRef::new(parsed, alias))
@@ -236,13 +233,15 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::NamedExpression(named) => {
                 DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
-            DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef { value, name }) => {
-                DefinitionKind::Assignment(AssignmentDefinitionKind {
-                    target: TargetKind::from(unpack),
-                    value: AstNodeRef::new(parsed.clone(), value),
-                    name: AstNodeRef::new(parsed, name),
-                })
-            }
+            DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef {
+                unpack,
+                value,
+                name,
+            }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
+                target: TargetKind::from(unpack),
+                value: AstNodeRef::new(parsed.clone(), value),
+                name: AstNodeRef::new(parsed, name),
+            }),
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
             }
@@ -314,7 +313,11 @@ impl DefinitionNodeRef<'_> {
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
             Self::NamedExpression(node) => node.into(),
-            Self::Assignment(AssignmentDefinitionNodeRef { value: _, name }) => name.into(),
+            Self::Assignment(AssignmentDefinitionNodeRef {
+                value: _,
+                unpack: _,
+                name,
+            }) => name.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
             Self::For(ForStmtDefinitionNodeRef {
