@@ -603,7 +603,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
-        self.infer_expression(expression.node_ref(self.db));
+        self.infer_expression_impl(expression.node_ref(self.db));
     }
 
     /// Raise a diagnostic if the given type cannot be divided by zero.
@@ -1018,7 +1018,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             elif_else_clauses,
         } = if_statement;
 
-        self.infer_expression(test);
+        self.infer_standalone_expression(test);
         self.infer_body(body);
 
         for clause in elif_else_clauses {
@@ -1028,7 +1028,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 body,
             } = clause;
 
-            self.infer_optional_expression(test.as_ref());
+            if let Some(test) = &test {
+                self.infer_standalone_expression(test);
+            }
 
             self.infer_body(body);
         }
@@ -1088,7 +1090,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 // Call into the context expression inference to validate that it evaluates
                 // to a valid context manager.
-                let context_expression_ty = self.infer_expression(&item.context_expr);
+                let context_expression_ty = if target.is_some() {
+                    self.infer_standalone_expression(&item.context_expr)
+                } else {
+                    self.infer_expression(&item.context_expr)
+                };
                 self.infer_context_expression(&item.context_expr, context_expression_ty, *is_async);
                 self.infer_optional_expression(target);
             }
@@ -1104,8 +1110,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         is_async: bool,
         definition: Definition<'db>,
     ) {
-        let context_expr = self.index.expression(&with_item.context_expr);
-        self.extend(infer_expression_types(self.db, context_expr));
+        self.infer_standalone_expression(&with_item.context_expr);
 
         let target_ty = self.infer_context_expression(
             &with_item.context_expr,
@@ -1305,9 +1310,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             cases,
         } = match_statement;
 
-        let expression = self.index.expression(subject.as_ref());
-        let result = infer_expression_types(self.db, expression);
-        self.extend(result);
+        self.infer_standalone_expression(subject);
 
         for case in cases {
             let ast::MatchCase {
@@ -1413,8 +1416,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => {
                 // TODO: Remove this once we handle all possible assignment targets.
-                let expression = self.index.expression(value);
-                self.extend(infer_expression_types(self.db, expression));
+                self.infer_standalone_expression(value);
                 self.infer_expression(target);
             }
         }
@@ -1427,9 +1429,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         name: &ast::ExprName,
         definition: Definition<'db>,
     ) {
-        let expression = self.index.expression(value);
-        let result = infer_expression_types(self.db, expression);
-        self.extend(result);
+        self.infer_standalone_expression(value);
 
         let value_ty = self.expression_ty(value);
         let name_ast_id = name.scoped_ast_id(self.db, self.scope());
@@ -1667,7 +1667,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        self.infer_expression(iter);
+        self.infer_standalone_expression(iter);
+
         // TODO more complex assignment targets
         if let ast::Expr::Name(name) = &**target {
             self.infer_definition(name);
@@ -1685,10 +1686,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         is_async: bool,
         definition: Definition<'db>,
     ) {
-        let expression = self.index.expression(iterable);
-        let result = infer_expression_types(self.db, expression);
-        self.extend(result);
-        let iterable_ty = self.expression_ty(iterable);
+        let iterable_ty = self.infer_standalone_expression(iterable);
 
         let loop_var_value_ty = if is_async {
             // TODO(Alex): async iterables/iterators!
@@ -1968,7 +1966,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         expr.map(|expr| self.infer_annotation_expression(expr))
     }
 
+    #[track_caller]
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        debug_assert_eq!(
+            self.index.try_expression(expression),
+            None,
+            "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
+        );
+
+        self.infer_expression_impl(expression)
+    }
+
+    fn infer_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let standalone_expression = self.index.expression(expression);
+        let types = infer_expression_types(self.db, standalone_expression);
+        self.extend(types);
+        self.expression_ty(expression)
+    }
+
+    fn infer_expression_impl(&mut self, expression: &ast::Expr) -> Type<'db> {
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::none(self.db),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
@@ -2171,7 +2187,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
-        self.infer_expression(&first_comprehension.iter);
+        self.infer_standalone_expression(&first_comprehension.iter);
     }
 
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
@@ -2296,7 +2312,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = comprehension;
 
         if !is_first {
-            self.infer_expression(iter);
+            self.infer_standalone_expression(iter);
         }
         // TODO more complex assignment targets
         if let ast::Expr::Name(name) = target {
@@ -2387,7 +2403,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             orelse,
         } = if_expression;
 
-        let test_ty = self.infer_expression(test);
+        let test_ty = self.infer_standalone_expression(test);
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
@@ -3007,7 +3023,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         Self::infer_chained_boolean_types(
             self.db,
             *op,
-            values.iter().map(|value| self.infer_expression(value)),
+            values.iter().enumerate().map(|(index, value)| {
+                if index == values.len() - 1 {
+                    self.infer_expression(value)
+                } else {
+                    self.infer_standalone_expression(value)
+                }
+            }),
             values.len(),
         )
     }
