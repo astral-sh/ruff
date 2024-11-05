@@ -11,11 +11,9 @@ use crate::Db;
 enum CoreStdlibModule {
     Builtins,
     Types,
-    // the Typing enum is currently only used in tests
-    #[allow(dead_code)]
-    Typing,
     Typeshed,
     TypingExtensions,
+    Typing,
 }
 
 impl CoreStdlibModule {

@@ -6,7 +6,7 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::{IntersectionType, KnownClass, Type, UnionType};
+use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
 use crate::Db;
 use rustc_hash::FxHashMap;
 
@@ -64,7 +64,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::Instance(class) if class.is_known(self.db, KnownClass::NoneType) => {
+            Type::Instance(InstanceType { class, .. })
+                if class.is_known(self.db, KnownClass::NoneType) =>
+            {
                 f.write_str("None")
             }
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
@@ -75,7 +77,10 @@ impl Display for DisplayRepresentation<'_> {
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
-            Type::Instance(class) => f.write_str(class.name(self.db)),
+            Type::Instance(InstanceType { class, known }) => f.write_str(match known {
+                Some(super::KnownInstance::Literal) => "Literal",
+                _ => class.name(self.db),
+            }),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),

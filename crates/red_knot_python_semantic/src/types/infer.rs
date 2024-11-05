@@ -54,9 +54,9 @@ use crate::types::diagnostic::{
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
-    Boundness, BytesLiteralType, ClassType, FunctionType, IterationOutcome, KnownClass,
-    KnownFunction, SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type,
-    TypeArrayDisplay, UnionBuilder, UnionType,
+    Boundness, BytesLiteralType, ClassType, FunctionType, InstanceType, IterationOutcome,
+    KnownClass, KnownFunction, KnownInstance, SliceLiteralType, StringLiteralType, Symbol,
+    Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -611,10 +611,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
-            Type::Instance(cls)
+            Type::Instance(InstanceType { class, .. })
                 if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
                     .iter()
-                    .any(|&k| cls.is_known(self.db, k)) => {}
+                    .any(|&k| class.is_known(self.db, k)) => {}
             _ => return,
         };
 
@@ -959,7 +959,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class))
             .to_scope_id(self.db, self.file);
 
-        let maybe_known_class = file_to_module(self.db, body_scope.file(self.db))
+        let maybe_known_class = file_to_module(self.db, self.file)
             .as_ref()
             .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
 
@@ -1273,12 +1273,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(class_ty) => Type::Instance(class_ty),
+                Type::ClassLiteral(class_ty) => class_ty.to_instance(),
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
                         ty.into_class_literal_type()
-                            .map_or(Type::Todo, Type::Instance)
+                            .map_or(Type::Todo, ClassType::to_instance)
                     }),
                 ),
                 _ => Type::Todo,
@@ -1472,7 +1472,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             simple: _,
         } = assignment;
 
-        let annotation_ty = self.infer_annotation_expression(annotation);
+        let mut annotation_ty = self.infer_annotation_expression(annotation);
+
+        // If the declared variable is annotated with _SpecialForm class then we treat it differently
+        // by assigning the known field to the instance.
+        if let Type::Instance(InstanceType { class, .. }) = annotation_ty {
+            if class.is_known(self.db, KnownClass::SpecialForm) {
+                if let Some(name_expr) = target.as_name_expr() {
+                    let maybe_known_instance = file_to_module(self.db, self.file)
+                        .as_ref()
+                        .and_then(|module| KnownInstance::maybe_from_module(module, &name_expr.id));
+                    if let Some(known_instance) = maybe_known_instance {
+                        annotation_ty = Type::Instance(InstanceType::known(class, known_instance));
+                    }
+                }
+            }
+        }
+
         if let Some(value) = value {
             let value_ty = self.infer_expression(value);
             self.add_declaration_with_binding(
@@ -1512,7 +1528,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_augmented_op(assignment, target_type, value_type)
                 })
             }
-            Type::Instance(class) => {
+            Type::Instance(InstanceType { class, .. }) => {
                 if let Symbol::Type(class_member, boundness) =
                     class.class_member(self.db, op.in_place_dunder())
                 {
@@ -2655,7 +2671,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
             (_, Type::Any) => Type::Any,
             (_, Type::Unknown) => Type::Unknown,
-            (op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert), Type::Instance(class)) => {
+            (
+                op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert),
+                Type::Instance(InstanceType { class, .. }),
+            ) => {
                 let unary_dunder_method = match op {
                     UnaryOp::Invert => "__invert__",
                     UnaryOp::UAdd => "__pos__",
@@ -2901,7 +2920,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (Type::Instance(left_class), Type::Instance(right_class), op) => {
+            (
+                Type::Instance(InstanceType {
+                    class: left_class, ..
+                }),
+                Type::Instance(InstanceType {
+                    class: right_class, ..
+                }),
+                op,
+            ) => {
                 if left_class != right_class && right_class.is_subclass_of(self.db, left_class) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.class_member(self.db, reflected_dunder);
@@ -2949,11 +2976,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
             }
 
-            (
-                Type::BooleanLiteral(b1),
-                Type::BooleanLiteral(b2),
-                ruff_python_ast::Operator::BitOr,
-            ) => Some(Type::BooleanLiteral(b1 | b2)),
+            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitOr) => {
+                Some(Type::BooleanLiteral(b1 | b2))
+            }
 
             (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
                 Type::IntLiteral(i64::from(bool_value)),
@@ -3312,7 +3337,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Lookup the rich comparison `__dunder__` methods on instances
-            (Type::Instance(left_class), Type::Instance(right_class)) => {
+            (
+                Type::Instance(InstanceType {
+                    class: left_class, ..
+                }),
+                Type::Instance(InstanceType {
+                    class: right_class, ..
+                }),
+            ) => {
                 let rich_comparison =
                     |op| perform_rich_comparison(self.db, left_class, right_class, op);
                 let membership_test_comparison =
@@ -3653,7 +3685,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
+            Some(Type::Instance(InstanceType { class, .. }))
+                if class.is_known(self.db, KnownClass::NoneType) =>
+            {
                 SliceArg::Arg(None)
             }
             None => SliceArg::Arg(None),
@@ -3744,8 +3778,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 impl<'db> TypeInferenceBuilder<'db> {
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-        // TODO: this does not include any of the special forms, and is only a
-        //   stub of the forms other than a standalone name in scope.
 
         let ty = match expression {
             ast::Expr::Name(name) => {
@@ -3792,9 +3824,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 {
                     self.infer_tuple_type_expression(slice)
                 } else {
-                    self.infer_type_expression(slice);
-                    // TODO: many other kinds of subscripts
-                    Type::Todo
+                    self.infer_subscript_type_expression(subscript, value_ty)
                 }
             }
 
@@ -3966,6 +3996,121 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
     }
+
+    fn infer_subscript_type_expression(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        let ast::ExprSubscript {
+            range: _,
+            value: _,
+            slice,
+            ctx: _,
+        } = subscript;
+
+        match value_ty {
+            Type::Instance(InstanceType {
+                class: _,
+                known: Some(known_instance),
+            }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
+            _ => {
+                self.infer_type_expression(slice);
+                Type::Todo // TODO: generics
+            }
+        }
+    }
+
+    fn infer_parameterized_known_instance_type_expression(
+        &mut self,
+        known_instance: KnownInstance,
+        parameters: &ast::Expr,
+    ) -> Type<'db> {
+        match known_instance {
+            KnownInstance::Literal => match self.infer_literal_parameter_type(parameters) {
+                Ok(ty) => ty,
+                Err(nodes) => {
+                    for node in nodes {
+                        self.diagnostics.add(
+                            node.into(),
+                            "invalid-literal-parameter",
+                            format_args!(
+                                "Type arguments for `Literal` must be `None`, \
+                                    a literal value (int, bool, str, or bytes), or an enum value"
+                            ),
+                        );
+                    }
+                    Type::Unknown
+                }
+            },
+        }
+    }
+
+    fn infer_literal_parameter_type<'ast>(
+        &mut self,
+        parameters: &'ast ast::Expr,
+    ) -> Result<Type<'db>, Vec<&'ast ast::Expr>> {
+        Ok(match parameters {
+            // TODO handle type aliases
+            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                let value_ty = self.infer_expression(value);
+                if matches!(
+                    value_ty,
+                    Type::Instance(InstanceType {
+                        known: Some(KnownInstance::Literal),
+                        ..
+                    })
+                ) {
+                    self.infer_literal_parameter_type(slice)?
+                } else {
+                    return Err(vec![parameters]);
+                }
+            }
+            ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
+                let mut errors = vec![];
+                let mut builder = UnionBuilder::new(self.db);
+                for elt in tuple {
+                    match self.infer_literal_parameter_type(elt) {
+                        Ok(ty) => {
+                            builder = builder.add(ty);
+                        }
+                        Err(nodes) => {
+                            errors.extend(nodes);
+                        }
+                    }
+                }
+                if errors.is_empty() {
+                    builder.build()
+                } else {
+                    return Err(errors);
+                }
+            }
+
+            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
+            ast::Expr::BytesLiteral(literal) => self.infer_bytes_literal_expression(literal),
+            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
+            // For enum values
+            ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                let value_ty = self.infer_expression(value);
+                // TODO: Check that value type is enum otherwise return None
+                value_ty.member(self.db, &attr.id).unwrap_or_unknown()
+            }
+            ast::Expr::NoneLiteral(_) => Type::none(self.db),
+            // for negative and positive numbers
+            ast::Expr::UnaryOp(ref u)
+                if matches!(u.op, UnaryOp::USub | UnaryOp::UAdd)
+                    && u.operand.is_number_literal_expr() =>
+            {
+                self.infer_unary_expression(u)
+            }
+            ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
+                self.infer_number_literal_expression(number)
+            }
+            _ => {
+                return Err(vec![parameters]);
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -4131,10 +4276,7 @@ fn perform_rich_comparison<'db>(
         |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
             match left_class.class_member(db, op.dunder()) {
                 Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .call(
-                        db,
-                        &[Type::Instance(left_class), Type::Instance(right_class)],
-                    )
+                    .call(db, &[left_class.to_instance(), right_class.to_instance()])
                     .return_ty(db),
                 _ => None,
             }
@@ -4160,8 +4302,8 @@ fn perform_rich_comparison<'db>(
     })
     .ok_or_else(|| CompareUnsupportedError {
         op: op.into(),
-        left_ty: Type::Instance(left_class),
-        right_ty: Type::Instance(right_class),
+        left_ty: left_class.to_instance(),
+        right_ty: right_class.to_instance(),
     })
 }
 
@@ -4175,7 +4317,7 @@ fn perform_membership_test_comparison<'db>(
     right_class: ClassType<'db>,
     op: MembershipTestCompareOperator,
 ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-    let (left_instance, right_instance) = (Type::Instance(left_class), Type::Instance(right_class));
+    let (left_instance, right_instance) = (left_class.to_instance(), right_class.to_instance());
 
     let contains_dunder = right_class.class_member(db, "__contains__");
     let compare_result_opt = match contains_dunder {
