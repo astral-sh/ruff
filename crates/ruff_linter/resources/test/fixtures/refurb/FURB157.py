@@ -22,22 +22,16 @@ decimal.Decimal(0)
 # Errors
 Decimal("1_000")
 Decimal("__1____000") 
-Decimal("2e4")
-Decimal("2e+4")
-Decimal("2E4")
 
 # Ok
 Decimal("2e-4")
 Decimal("2E-4")
 Decimal("_1.234__")
+Decimal("2e4")
+Decimal("2e+4")
+Decimal("2E4")
+Decimal("1.2") 
 # Ok: even though this is equal to `Decimal(123)`,
 # we assume that a developer would
 # only write it this way if they meant to.
 Decimal("١٢٣") 
-# Ok: due to floating point errors
-# this is not equal to `Decimal(1.2)`.
-Decimal("1.2") 
-# Ok: This is an error of type `decimal.InvalidOperation`,
-# whereas `Decimal(2e4e4)` is a SyntaxError, so
-# we leave it as is.
-Decimal("2e4e4")
