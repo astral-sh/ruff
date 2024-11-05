@@ -604,7 +604,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
-        self.infer_expression(expression.node_ref(self.db));
+        self.infer_expression_impl(expression.node_ref(self.db));
     }
 
     /// Raise a diagnostic if the given type cannot be divided by zero.
@@ -1019,7 +1019,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             elif_else_clauses,
         } = if_statement;
 
-        self.infer_expression(test);
+        self.infer_standalone_expression(test);
         self.infer_body(body);
 
         for clause in elif_else_clauses {
@@ -1029,7 +1029,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 body,
             } = clause;
 
-            self.infer_optional_expression(test.as_ref());
+            if let Some(test) = &test {
+                self.infer_standalone_expression(test);
+            }
 
             self.infer_body(body);
         }
@@ -1089,7 +1091,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 // Call into the context expression inference to validate that it evaluates
                 // to a valid context manager.
-                let context_expression_ty = self.infer_expression(&item.context_expr);
+                let context_expression_ty = if target.is_some() {
+                    self.infer_standalone_expression(&item.context_expr)
+                } else {
+                    self.infer_expression(&item.context_expr)
+                };
                 self.infer_context_expression(&item.context_expr, context_expression_ty, *is_async);
                 self.infer_optional_expression(target);
             }
@@ -1105,8 +1111,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         is_async: bool,
         definition: Definition<'db>,
     ) {
-        let context_expr = self.index.expression(&with_item.context_expr);
-        self.extend(infer_expression_types(self.db, context_expr));
+        self.infer_standalone_expression(&with_item.context_expr);
 
         let target_ty = self.infer_context_expression(
             &with_item.context_expr,
@@ -1308,9 +1313,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             cases,
         } = match_statement;
 
-        let expression = self.index.expression(subject.as_ref());
-        let result = infer_expression_types(self.db, expression);
-        self.extend(result);
+        self.infer_standalone_expression(subject);
 
         for case in cases {
             let ast::MatchCase {
@@ -1416,8 +1419,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => {
                 // TODO: Remove this once we handle all possible assignment targets.
-                let expression = self.index.expression(value);
-                self.extend(infer_expression_types(self.db, expression));
+                self.infer_standalone_expression(value);
                 self.infer_expression(target);
             }
         }
@@ -1430,9 +1432,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         name: &ast::ExprName,
         definition: Definition<'db>,
     ) {
-        let expression = self.index.expression(value);
-        let result = infer_expression_types(self.db, expression);
-        self.extend(result);
+        self.infer_standalone_expression(value);
 
         let value_ty = self.expression_ty(value);
         let name_ast_id = name.scoped_ast_id(self.db, self.scope());
@@ -1446,8 +1446,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             TargetKind::Name => value_ty,
         };
 
+        self.store_expression_type(name, target_ty);
         self.add_binding(name.into(), definition, target_ty);
-        self.types.expressions.insert(name_ast_id, target_ty);
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -1670,7 +1670,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        self.infer_expression(iter);
+        self.infer_standalone_expression(iter);
+
         // TODO more complex assignment targets
         if let ast::Expr::Name(name) = &**target {
             self.infer_definition(name);
@@ -1688,10 +1689,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         is_async: bool,
         definition: Definition<'db>,
     ) {
-        let expression = self.index.expression(iterable);
-        let result = infer_expression_types(self.db, expression);
-        self.extend(result);
-        let iterable_ty = self.expression_ty(iterable);
+        let iterable_ty = self.infer_standalone_expression(iterable);
 
         let loop_var_value_ty = if is_async {
             // TODO(Alex): async iterables/iterators!
@@ -1702,10 +1700,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .unwrap_with_diagnostic(iterable.into(), &mut self.diagnostics)
         };
 
-        self.types.expressions.insert(
-            target.scoped_ast_id(self.db, self.scope()),
-            loop_var_value_ty,
-        );
+        self.store_expression_type(target, loop_var_value_ty);
         self.add_binding(target.into(), definition, loop_var_value_ty);
     }
 
@@ -1971,7 +1966,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         expr.map(|expr| self.infer_annotation_expression(expr))
     }
 
+    #[track_caller]
     fn infer_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        debug_assert_eq!(
+            self.index.try_expression(expression),
+            None,
+            "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
+        );
+
+        self.infer_expression_impl(expression)
+    }
+
+    fn infer_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let standalone_expression = self.index.expression(expression);
+        let types = infer_expression_types(self.db, standalone_expression);
+        self.extend(types);
+        self.expression_ty(expression)
+    }
+
+    fn infer_expression_impl(&mut self, expression: &ast::Expr) -> Type<'db> {
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::none(self.db),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
@@ -2014,7 +2027,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
-    fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
+    fn store_expression_type(
+        &mut self,
+        expression: &impl HasScopedAstId<Id = ScopedExpressionId>,
+        ty: Type<'db>,
+    ) {
         let expr_id = expression.scoped_ast_id(self.db, self.scope());
         let previous = self.types.expressions.insert(expr_id, ty);
         assert_eq!(previous, None);
@@ -2174,7 +2191,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
-        self.infer_expression(&first_comprehension.iter);
+        self.infer_standalone_expression(&first_comprehension.iter);
     }
 
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
@@ -2299,7 +2316,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = comprehension;
 
         if !is_first {
-            self.infer_expression(iter);
+            self.infer_standalone_expression(iter);
         }
         // TODO more complex assignment targets
         if let ast::Expr::Name(name) = target {
@@ -2390,7 +2407,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             orelse,
         } = if_expression;
 
-        let test_ty = self.infer_expression(test);
+        let test_ty = self.infer_standalone_expression(test);
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
@@ -3010,7 +3027,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         Self::infer_chained_boolean_types(
             self.db,
             *op,
-            values.iter().map(|value| self.infer_expression(value)),
+            values.iter().enumerate().map(|(index, value)| {
+                if index == values.len() - 1 {
+                    self.infer_expression(value)
+                } else {
+                    self.infer_standalone_expression(value)
+                }
+            }),
             values.len(),
         )
     }
@@ -3346,10 +3369,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Lookup the rich comparison `__dunder__` methods on instances
-            (Type::Instance(left), Type::Instance(right)) => {
-                let rich_comparison = |op| perform_rich_comparison(self.db, left, right, op);
-                let membership_test_comparison =
-                    |op| perform_membership_test_comparison(self.db, left, right, op);
+            (Type::Instance(left_instance), Type::Instance(right_instance)) => {
+                let rich_comparison =
+                    |op| perform_rich_comparison(self.db, left_instance, right_instance, op);
+                let membership_test_comparison = |op| {
+                    perform_membership_test_comparison(self.db, left_instance, right_instance, op)
+                };
                 match op {
                     ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
                     ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
@@ -3361,8 +3386,28 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::NotIn => {
                         membership_test_comparison(MembershipTestCompareOperator::NotIn)
                     }
-                    ast::CmpOp::Is => Ok(KnownClass::Bool.to_instance(self.db)),
-                    ast::CmpOp::IsNot => Ok(KnownClass::Bool.to_instance(self.db)),
+                    ast::CmpOp::Is => {
+                        if left.is_disjoint_from(self.db, right) {
+                            Ok(Type::BooleanLiteral(false))
+                        } else if left.is_singleton(self.db)
+                            && left.is_equivalent_to(self.db, right)
+                        {
+                            Ok(Type::BooleanLiteral(true))
+                        } else {
+                            Ok(KnownClass::Bool.to_instance(self.db))
+                        }
+                    }
+                    ast::CmpOp::IsNot => {
+                        if left.is_disjoint_from(self.db, right) {
+                            Ok(Type::BooleanLiteral(true))
+                        } else if left.is_singleton(self.db)
+                            && left.is_equivalent_to(self.db, right)
+                        {
+                            Ok(Type::BooleanLiteral(false))
+                        } else {
+                            Ok(KnownClass::Bool.to_instance(self.db))
+                        }
+                    }
                 }
             }
             // TODO: handle more types
@@ -3756,28 +3801,28 @@ impl<'db> TypeInferenceBuilder<'db> {
 impl<'db> TypeInferenceBuilder<'db> {
     fn infer_annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
-        match expression {
+        let annotation_ty = match expression {
             // TODO: parse the expression and check whether it is a string annotation, since they
             // can be annotation expressions distinct from type expressions.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_literal) => {
-                self.store_expression_type(expression, Type::Todo);
-                Type::Todo
-            }
+            ast::Expr::StringLiteral(_literal) => Type::Todo,
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
 
             // All other annotation expressions are (possibly) valid type expressions, so handle
             // them there instead.
-            type_expr => self.infer_type_expression(type_expr),
-        }
+            type_expr => self.infer_type_expression_no_store(type_expr),
+        };
+
+        self.store_expression_type(expression, annotation_ty);
+        annotation_ty
     }
 }
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db> {
-    fn infer_type_expression_impl(&mut self, expression: &ast::Expr) -> Type<'db> {
+    fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
 
         match expression {
@@ -3942,10 +3987,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ty = self.infer_type_expression_impl(expression);
-        let expr_id = expression.scoped_ast_id(self.db, self.scope());
-        let previous = self.types.expressions.insert(expr_id, ty);
-        assert!(previous.is_none());
+        let ty = self.infer_type_expression_no_store(expression);
+        self.store_expression_type(expression, ty);
         ty
     }
 
