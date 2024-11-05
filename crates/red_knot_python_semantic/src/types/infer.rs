@@ -3773,7 +3773,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // All other annotation expressions are (possibly) valid type expressions, so handle
             // them there instead.
-            type_expr => self.infer_type_expression(type_expr),
+            type_expr => self.infer_expression_type_no_store(type_expr),
         };
 
         self.store_expression_type(expression, annotation_ty);
@@ -3783,7 +3783,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db> {
-    fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+    fn infer_expression_type_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
 
         match expression {
@@ -3839,8 +3839,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match binary.op {
                     // PEP-604 unions are okay, e.g., `int | str`
                     ast::Operator::BitOr => {
-                        let left_ty = self.infer_and_store_type_expression(&binary.left);
-                        let right_ty = self.infer_and_store_type_expression(&binary.right);
+                        let left_ty = self.infer_type_expression(&binary.left);
+                        let right_ty = self.infer_type_expression(&binary.right);
                         UnionType::from_elements(self.db, [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
@@ -3945,8 +3945,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_and_store_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ty = self.infer_type_expression(expression);
+    fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let ty = self.infer_expression_type_no_store(expression);
         self.store_expression_type(expression, ty);
         ty
     }
@@ -3982,7 +3982,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let mut return_todo = false;
 
                 for element in elements {
-                    let element_ty = self.infer_and_store_type_expression(element);
+                    let element_ty = self.infer_type_expression(element);
                     return_todo |= element_could_alter_type_of_whole_tuple(element, element_ty);
                     element_types.push(element_ty);
                 }
@@ -3994,7 +3994,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             single_element => {
-                let single_element_ty = self.infer_and_store_type_expression(single_element);
+                let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
                     Type::Todo
                 } else {
@@ -4022,7 +4022,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 known: Some(known_instance),
             }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
             _ => {
-                self.infer_and_store_type_expression(slice);
+                self.infer_type_expression(slice);
                 Type::Todo // TODO: generics
             }
         }
