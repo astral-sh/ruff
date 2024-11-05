@@ -3366,8 +3366,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::NotIn => {
                         membership_test_comparison(MembershipTestCompareOperator::NotIn)
                     }
-                    ast::CmpOp::Is => Ok(KnownClass::Bool.to_instance(self.db)),
-                    ast::CmpOp::IsNot => Ok(KnownClass::Bool.to_instance(self.db)),
+                    ast::CmpOp::Is => {
+                        // Ideally, we would like to use `!left.is_equivalent_to(…, right)` here,
+                        // instead of `left.is_disjoint_from(…, right)`. But `is_equivalent_to` can
+                        // return false negative answers, which would lead to false `Literal[True]`
+                        // results. `is_disjoint` can also return false negatives, but we only use
+                        // positive answers for narrowing the type.
+                        if left.is_disjoint_from(self.db, right) {
+                            Ok(Type::BooleanLiteral(false))
+                        } else {
+                            if left.is_singleton(self.db) && left.is_equivalent_to(self.db, right) {
+                                Ok(Type::BooleanLiteral(true))
+                            } else {
+                                Ok(KnownClass::Bool.to_instance(self.db))
+                            }
+                        }
+                    }
+                    ast::CmpOp::IsNot => {
+                        if left.is_disjoint_from(self.db, right) {
+                            Ok(Type::BooleanLiteral(true))
+                        } else {
+                            if left.is_singleton(self.db) && left.is_equivalent_to(self.db, right) {
+                                Ok(Type::BooleanLiteral(false))
+                            } else {
+                                Ok(KnownClass::Bool.to_instance(self.db))
+                            }
+                        }
+                    }
                 }
             }
             // TODO: handle more types
