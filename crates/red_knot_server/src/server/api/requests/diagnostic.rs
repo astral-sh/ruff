@@ -3,12 +3,15 @@ use std::borrow::Cow;
 use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult, FullDocumentDiagnosticReport, Position, Range,
+    DocumentDiagnosticReportResult, FullDocumentDiagnosticReport, NumberOrString, Range,
     RelatedFullDocumentDiagnosticReport, Url,
 };
 
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
+use ruff_db::diagnostic::{CompileDiagnostic, Diagnostic as _, Severity};
+use ruff_db::source::{line_index, source_text};
 
+use crate::edit::ToRangeExt as _;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
@@ -64,36 +67,37 @@ fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Di
     diagnostics
         .as_slice()
         .iter()
-        .map(|message| to_lsp_diagnostic(message))
+        .map(|message| to_lsp_diagnostic(db, message, snapshot.encoding()))
         .collect()
 }
 
-fn to_lsp_diagnostic(message: &str) -> Diagnostic {
-    let words = message.split(':').collect::<Vec<_>>();
+fn to_lsp_diagnostic(
+    db: &dyn Db,
+    diagnostic: &CompileDiagnostic,
+    encoding: crate::PositionEncoding,
+) -> Diagnostic {
+    let range = if let Some(range) = diagnostic.range() {
+        let index = line_index(db.upcast(), diagnostic.file());
+        let source = source_text(db.upcast(), diagnostic.file());
 
-    let (range, message) = match words.as_slice() {
-        [_, _, line, column, message] | [_, line, column, message] => {
-            let line = line.parse::<u32>().unwrap_or_default().saturating_sub(1);
-            let column = column.parse::<u32>().unwrap_or_default();
-            (
-                Range::new(
-                    Position::new(line, column.saturating_sub(1)),
-                    Position::new(line, column),
-                ),
-                message.trim(),
-            )
-        }
-        _ => (Range::default(), message),
+        range.to_range(&source, &index, encoding)
+    } else {
+        Range::default()
+    };
+
+    let severity = match diagnostic.severity() {
+        Severity::Info => DiagnosticSeverity::INFORMATION,
+        Severity::Error => DiagnosticSeverity::ERROR,
     };
 
     Diagnostic {
         range,
-        severity: Some(DiagnosticSeverity::ERROR),
+        severity: Some(severity),
         tags: None,
-        code: None,
+        code: Some(NumberOrString::String(diagnostic.rule().to_string())),
         code_description: None,
         source: Some("red-knot".into()),
-        message: message.to_string(),
+        message: diagnostic.message().into_owned(),
         related_information: None,
         data: None,
     }

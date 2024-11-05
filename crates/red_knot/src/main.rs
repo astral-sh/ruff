@@ -5,6 +5,7 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
+use ruff_db::diagnostic::CompileDiagnostic;
 use salsa::plumbing::ZalsaDatabase;
 
 use red_knot_python_semantic::SitePackages;
@@ -318,8 +319,9 @@ impl MainLoop {
                 } => {
                     let has_diagnostics = !result.is_empty();
                     if check_revision == revision {
+                        #[allow(clippy::print_stdout)]
                         for diagnostic in result {
-                            tracing::error!("{}", diagnostic);
+                            println!("{}", diagnostic.display(db));
                         }
                     } else {
                         tracing::debug!(
@@ -378,7 +380,10 @@ impl MainLoopCancellationToken {
 #[derive(Debug)]
 enum MainLoopMessage {
     CheckWorkspace,
-    CheckCompleted { result: Vec<String>, revision: u64 },
+    CheckCompleted {
+        result: Vec<CompileDiagnostic>,
+        revision: u64,
+    },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
 }

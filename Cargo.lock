@@ -2432,7 +2432,6 @@ dependencies = [
  "salsa",
  "serde",
  "tempfile",
- "thiserror",
  "tracing",
  "tracing-subscriber",
  "tracing-tree",

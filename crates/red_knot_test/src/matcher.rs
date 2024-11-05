@@ -1,17 +1,16 @@
-//! Match [`TypeCheckDiagnostic`]s against [`Assertion`]s and produce test failure messages for any
+//! Match [`Diagnostic`]s against [`Assertion`]s and produce test failure messages for any
 //! mismatches.
 use crate::assertion::{Assertion, ErrorAssertion, InlineFileAssertions};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 use colored::Colorize;
-use red_knot_python_semantic::types::TypeCheckDiagnostic;
 use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::Ranged;
+use ruff_text_size::{TextRange, TextSize};
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::Range;
-use std::sync::Arc;
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
@@ -126,19 +125,33 @@ where
     }
 }
 
-pub(super) trait Diagnostic: Ranged {
+pub(super) trait Diagnostic {
+    /// Returns the diagnostic's rule code.
     fn rule(&self) -> &str;
 
-    fn message(&self) -> &str;
+    fn message(&self) -> Cow<str>;
+
+    fn range(&self) -> TextRange;
+
+    fn start(&self) -> TextSize {
+        self.range().start()
+    }
 }
 
-impl Diagnostic for Arc<TypeCheckDiagnostic> {
+impl<T> Diagnostic for T
+where
+    T: ruff_db::diagnostic::Diagnostic,
+{
     fn rule(&self) -> &str {
-        self.as_ref().rule()
+        ruff_db::diagnostic::Diagnostic::rule(self)
     }
 
-    fn message(&self) -> &str {
-        self.as_ref().message()
+    fn message(&self) -> Cow<str> {
+        ruff_db::diagnostic::Diagnostic::message(self)
+    }
+
+    fn range(&self) -> TextRange {
+        ruff_db::diagnostic::Diagnostic::range(self).unwrap_or_default()
     }
 }
 
@@ -253,7 +266,7 @@ impl Matcher {
         }
     }
 
-    fn column<T: Ranged>(&self, ranged: &T) -> OneIndexed {
+    fn column<T: Diagnostic>(&self, ranged: &T) -> OneIndexed {
         self.line_index
             .source_location(ranged.start(), &self.source)
             .column
@@ -322,12 +335,14 @@ impl Matcher {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use super::FailuresByLine;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ruff_text_size::{Ranged, TextRange};
+    use ruff_text_size::TextRange;
 
     #[derive(Clone, Debug)]
     struct TestDiagnostic {
@@ -352,12 +367,10 @@ mod tests {
             self.rule
         }
 
-        fn message(&self) -> &str {
-            self.message
+        fn message(&self) -> Cow<str> {
+            Cow::Borrowed(self.message)
         }
-    }
 
-    impl Ranged for TestDiagnostic {
         fn range(&self) -> ruff_text_size::TextRange {
             self.range
         }
@@ -373,6 +386,7 @@ mod tests {
         super::match_file(&db, file, diagnostics)
     }
 
+    #[track_caller]
     fn assert_fail(result: Result<(), FailuresByLine>, messages: &[(usize, &[&str])]) {
         let Err(failures) = result else {
             panic!("expected a failure");
@@ -395,6 +409,7 @@ mod tests {
         assert_eq!(failures, expected);
     }
 
+    #[track_caller]
     fn assert_ok(result: &Result<(), FailuresByLine>) {
         assert!(result.is_ok(), "{result:?}");
     }

@@ -1,14 +1,13 @@
-use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use countme::Count;
-use salsa::Accumulator;
 
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
 
+use crate::diagnostic::{CompileDiagnostic, Diagnostic};
 use crate::files::{File, FilePath};
 use crate::Db;
 
@@ -25,8 +24,14 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
                 tracing::debug!("Failed to read notebook '{path}': {error}");
 
                 has_read_error = true;
-                SourceDiagnostic(Arc::new(SourceTextError::FailedToReadNotebook(error)))
-                    .accumulate(db);
+                CompileDiagnostic::report(
+                    db,
+                    SourceTextDiagnostic {
+                        error: SourceTextError::FailedToReadNotebook(error),
+                        file,
+                    },
+                );
+
                 Notebook::empty()
             })
             .into()
@@ -36,7 +41,14 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
                 tracing::debug!("Failed to read file '{path}': {error}");
 
                 has_read_error = true;
-                SourceDiagnostic(Arc::new(SourceTextError::FailedToReadFile(error))).accumulate(db);
+                CompileDiagnostic::report(
+                    db,
+                    SourceTextDiagnostic {
+                        error: SourceTextError::FailedToReadFile(error),
+                        file,
+                    },
+                );
+
                 String::new()
             })
             .into()
@@ -153,21 +165,45 @@ impl From<Notebook> for SourceTextKind {
     }
 }
 
-#[salsa::accumulator]
-pub struct SourceDiagnostic(Arc<SourceTextError>);
+#[derive(Debug)]
+pub struct SourceTextDiagnostic {
+    error: SourceTextError,
+    file: File,
+}
 
-impl std::fmt::Display for SourceDiagnostic {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
+impl Diagnostic for SourceTextDiagnostic {
+    fn message(&self) -> std::borrow::Cow<str> {
+        match &self.error {
+            SourceTextError::FailedToReadNotebook(notebook_error) => {
+                format!("Failed to read notebook: {notebook_error}").into()
+            }
+            SourceTextError::FailedToReadFile(error) => {
+                format!("Failed to read file: {error}").into()
+            }
+        }
+    }
+
+    fn rule(&self) -> &str {
+        "io-error"
+    }
+
+    fn file(&self) -> File {
+        self.file
+    }
+
+    fn severity(&self) -> crate::diagnostic::Severity {
+        crate::diagnostic::Severity::Error
+    }
+
+    fn range(&self) -> Option<ruff_text_size::TextRange> {
+        None
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum SourceTextError {
-    #[error("Failed to read notebook: {0}`")]
-    FailedToReadNotebook(#[from] ruff_notebook::NotebookError),
-    #[error("Failed to read file: {0}")]
-    FailedToReadFile(#[from] std::io::Error),
+    FailedToReadNotebook(ruff_notebook::NotebookError),
+    FailedToReadFile(std::io::Error),
 }
 
 /// Computes the [`LineIndex`] for `file`.

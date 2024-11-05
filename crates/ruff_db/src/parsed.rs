@@ -1,10 +1,13 @@
+use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_parser::{parse_unchecked_source, Parsed};
+use ruff_text_size::TextRange;
 
+use crate::diagnostic::{CompileDiagnostic, Diagnostic};
 use crate::files::{File, FilePath};
 use crate::source::source_text;
 use crate::Db;
@@ -37,7 +40,20 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
             .map_or(PySourceType::Python, PySourceType::from_extension),
     };
 
-    ParsedModule::new(parse_unchecked_source(&source, ty))
+    let parsed = parse_unchecked_source(&source, ty);
+
+    for error in parsed.errors() {
+        CompileDiagnostic::report(
+            db,
+            ParseDiagnostic {
+                error: error.error.to_string(),
+                range: error.location,
+                file,
+            },
+        );
+    }
+
+    ParsedModule::new(parsed)
 }
 
 /// Cheap cloneable wrapper around the parsed module.
@@ -70,6 +86,35 @@ impl Deref for ParsedModule {
 impl std::fmt::Debug for ParsedModule {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("ParsedModule").field(&self.inner).finish()
+    }
+}
+
+#[derive(Debug)]
+pub struct ParseDiagnostic {
+    error: String,
+    range: TextRange,
+    file: File,
+}
+
+impl Diagnostic for ParseDiagnostic {
+    fn rule(&self) -> &str {
+        "syntax-error"
+    }
+
+    fn message(&self) -> std::borrow::Cow<str> {
+        Cow::Borrowed(&self.error)
+    }
+
+    fn file(&self) -> File {
+        self.file
+    }
+
+    fn range(&self) -> Option<ruff_text_size::TextRange> {
+        Some(self.range)
+    }
+
+    fn severity(&self) -> crate::diagnostic::Severity {
+        crate::diagnostic::Severity::Error
     }
 }
 

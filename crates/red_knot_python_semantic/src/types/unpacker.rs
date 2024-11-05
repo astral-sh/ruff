@@ -6,14 +6,14 @@ use rustc_hash::FxHashMap;
 
 use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{TupleType, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
+use crate::types::{TupleType, Type};
 use crate::Db;
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db> {
     db: &'db dyn Db,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
-    diagnostics: TypeCheckDiagnosticsBuilder<'db>,
+    file: File,
 }
 
 impl<'db> Unpacker<'db> {
@@ -21,7 +21,7 @@ impl<'db> Unpacker<'db> {
         Self {
             db,
             targets: FxHashMap::default(),
-            diagnostics: TypeCheckDiagnosticsBuilder::new(db, file),
+            file,
         }
     }
 
@@ -104,9 +104,11 @@ impl<'db> Unpacker<'db> {
                     let value_ty = if value_ty.is_literal_string() {
                         Type::LiteralString
                     } else {
-                        value_ty
-                            .iterate(self.db)
-                            .unwrap_with_diagnostic(AnyNodeRef::from(target), &mut self.diagnostics)
+                        value_ty.iterate(self.db).unwrap_with_diagnostic(
+                            self.db,
+                            AnyNodeRef::from(target),
+                            self.file,
+                        )
                     };
                     for element in elts {
                         self.unpack(element, value_ty, scope);
@@ -120,7 +122,6 @@ impl<'db> Unpacker<'db> {
     pub(crate) fn finish(mut self) -> UnpackResult<'db> {
         self.targets.shrink_to_fit();
         UnpackResult {
-            diagnostics: self.diagnostics.finish(),
             targets: self.targets,
         }
     }
@@ -129,15 +130,10 @@ impl<'db> Unpacker<'db> {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct UnpackResult<'db> {
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
-    diagnostics: TypeCheckDiagnostics,
 }
 
 impl<'db> UnpackResult<'db> {
     pub(crate) fn get(&self, expr_id: ScopedExpressionId) -> Option<Type<'db>> {
         self.targets.get(&expr_id).copied()
-    }
-
-    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
     }
 }

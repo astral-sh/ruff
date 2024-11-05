@@ -1,8 +1,11 @@
+use diagnostic::{is_any_diagnostic_enabled, report_not_iterable, report_type_diagnostic};
 use mro::{ClassBase, Mro, MroError, MroIterator};
+use ruff_db::diagnostic::{CompileDiagnostic, Diagnostic, Severity};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
 use itertools::Itertools;
+use ruff_text_size::{Ranged as _, TextRange};
 
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::Definition;
@@ -15,12 +18,11 @@ use crate::stdlib::{
     builtins_symbol, types_symbol, typeshed_symbol, typing_extensions_symbol, typing_symbol,
 };
 use crate::symbol::{Boundness, Symbol};
-use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
+pub use self::diagnostic::TypeCheckDiagnostic;
 pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
@@ -34,18 +36,15 @@ mod mro;
 mod narrow;
 mod unpacker;
 
-pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
+#[salsa::tracked]
+pub fn check_types(db: &dyn Db, file: File) {
     let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
 
     let index = semantic_index(db, file);
-    let mut diagnostics = TypeCheckDiagnostics::new();
 
     for scope_id in index.scope_ids() {
-        let result = infer_scope_types(db, scope_id);
-        diagnostics.extend(result.diagnostics());
+        let _ = infer_scope_types(db, scope_id);
     }
-
-    diagnostics
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
@@ -1598,19 +1597,21 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call, emitting default diagnostics if needed.
-    fn unwrap_with_diagnostic<'a>(
+    fn unwrap_with_diagnostic(
         &self,
         db: &'db dyn Db,
         node: ast::AnyNodeRef,
-        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
+        file: File,
     ) -> Type<'db> {
-        match self.return_ty_result(db, node, diagnostics) {
+        match self.return_ty_result(db, node, file) {
             Ok(return_ty) => return_ty,
             Err(NotCallableError::Type {
                 not_callable_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                report_type_diagnostic(
+                    db,
+                    file,
                     node,
                     "call-non-callable",
                     format_args!(
@@ -1625,7 +1626,9 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                report_type_diagnostic(
+                    db,
+                    file,
                     node,
                     "call-non-callable",
                     format_args!(
@@ -1641,7 +1644,9 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                report_type_diagnostic(
+                    db,
+                    file,
                     node,
                     "call-non-callable",
                     format_args!(
@@ -1656,11 +1661,11 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call as a result.
-    fn return_ty_result<'a>(
+    fn return_ty_result(
         &self,
         db: &'db dyn Db,
         node: ast::AnyNodeRef,
-        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
+        file: File,
     ) -> Result<Type<'db>, NotCallableError<'db>> {
         match self {
             Self::Callable { return_ty } => Ok(*return_ty),
@@ -1668,11 +1673,17 @@ impl<'db> CallOutcome<'db> {
                 return_ty,
                 revealed_ty,
             } => {
-                diagnostics.add(
-                    node,
-                    "revealed-type",
-                    format_args!("Revealed type is `{}`", revealed_ty.display(db)),
-                );
+                if is_any_diagnostic_enabled(db, file) {
+                    CompileDiagnostic::report(
+                        db.upcast(),
+                        RevealTypeDiagnostic {
+                            file,
+                            range: node.range(),
+                            ty: revealed_ty.display(db).to_string(),
+                        },
+                    );
+                }
+
                 Ok(*return_ty)
             }
             Self::NotCallable { not_callable_ty } => Err(NotCallableError::Type {
@@ -1700,10 +1711,10 @@ impl<'db> CallOutcome<'db> {
                                 *return_ty
                             } else {
                                 revealed = true;
-                                outcome.unwrap_with_diagnostic(db, node, diagnostics)
+                                outcome.unwrap_with_diagnostic(db, node, file)
                             }
                         }
-                        _ => outcome.unwrap_with_diagnostic(db, node, diagnostics),
+                        _ => outcome.unwrap_with_diagnostic(db, node, file),
                     };
                     union_builder = union_builder.add(return_ty);
                 }
@@ -1785,13 +1796,14 @@ enum IterationOutcome<'db> {
 impl<'db> IterationOutcome<'db> {
     fn unwrap_with_diagnostic(
         self,
+        db: &dyn Db,
         iterable_node: ast::AnyNodeRef,
-        diagnostics: &mut TypeCheckDiagnosticsBuilder<'db>,
+        file: File,
     ) -> Type<'db> {
         match self {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
-                diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
+                report_not_iterable(db, file, iterable_node, not_iterable_ty);
                 Type::Unknown
             }
         }
@@ -2225,6 +2237,35 @@ impl<'db> TupleType<'db> {
 
     pub fn len(&self, db: &'db dyn Db) -> usize {
         self.elements(db).len()
+    }
+}
+
+#[derive(Debug)]
+pub struct RevealTypeDiagnostic {
+    range: TextRange,
+    ty: String,
+    file: File,
+}
+
+impl Diagnostic for RevealTypeDiagnostic {
+    fn rule(&self) -> &str {
+        "revealed-type"
+    }
+
+    fn message(&self) -> std::borrow::Cow<str> {
+        format!("Revealed type is `{}`", self.ty).into()
+    }
+
+    fn file(&self) -> File {
+        self.file
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        Some(self.range)
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Info
     }
 }
 

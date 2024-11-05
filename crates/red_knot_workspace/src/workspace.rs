@@ -1,19 +1,18 @@
 use std::{collections::BTreeMap, sync::Arc};
 
+use ruff_db::diagnostic::{CompileDiagnostic, Diagnostic};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::SearchPathSettings;
-use ruff_db::parsed::parsed_module;
-use ruff_db::source::{line_index, source_text, SourceDiagnostic};
+use ruff_db::source::source_text;
 use ruff_db::{
     files::{system_path_to_file, File},
     system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
 };
 use ruff_python_ast::{name::Name, PySourceType};
-use ruff_text_size::Ranged;
 
 use crate::db::Db;
 use crate::db::RootDatabase;
@@ -188,7 +187,7 @@ impl Workspace {
     }
 
     /// Checks all open files in the workspace and its dependencies.
-    pub fn check(self, db: &RootDatabase) -> Vec<String> {
+    pub fn check(self, db: &RootDatabase) -> Vec<CompileDiagnostic> {
         let workspace_span = tracing::debug_span!("check_workspace");
         let _span = workspace_span.enter();
 
@@ -200,6 +199,13 @@ impl Workspace {
         let db = db.snapshot();
         let workspace_span = workspace_span.clone();
 
+        // TODO: Checking per-file and then filtering out the diagnostics from other files
+        // isn't the ideal solution but doing it "properly" requires support for
+        // ["parallel Salsa"](https://github.com/salsa-rs/salsa/pull/568).
+        //
+        // The solution with parallel Salsa is:
+        // * Create a new `check_workspace_impl` query similar to `check_file_impl`
+        // * Collect the workspace diagnostics using `check_workspace_impl::accumulated::<CompileDiagnostic>(&db, file)`
         rayon::scope(move |scope| {
             for file in &files {
                 let result = inner_result.clone();
@@ -210,13 +216,36 @@ impl Workspace {
                     let check_file_span = tracing::debug_span!(parent: &workspace_span, "check_file", file=%file.path(&db));
                     let _entered = check_file_span.entered();
 
-                    let file_diagnostics = check_file(&db, file);
-                    result.lock().unwrap().extend(file_diagnostics);
+                    // Filter out the diagnostics from other files to avoid duplicates.
+                    // This should no longer be necessary with parallel-salsa where
+                    // it's possible to call the query for the entire workspace.
+                    let mut file_diagnostics =
+                        check_file_impl::accumulated::<CompileDiagnostic>(&db, file);
+
+                    file_diagnostics.sort_unstable_by_key(|a| {
+                        a.range().unwrap_or_default().start()
+                    });
+
+                    result.lock().unwrap().extend(file_diagnostics.into_iter().filter(|diagnostic| diagnostic.file() == file));
                 });
             }
         });
 
         Arc::into_inner(result).unwrap().into_inner().unwrap()
+    }
+
+    pub fn check_file(self, db: &dyn Db, file: File) -> Vec<CompileDiagnostic> {
+        let diagnostics = check_file_impl::accumulated::<CompileDiagnostic>(db, file);
+
+        let mut file_diagnostics: Vec<_> = diagnostics
+            .into_iter()
+            .filter(|diagnostic| diagnostic.file() == file)
+            .collect();
+
+        file_diagnostics
+            .sort_unstable_by_key(|diagnostic| diagnostic.range().unwrap_or_default().start());
+
+        file_diagnostics
     }
 
     /// Opens a file in the workspace.
@@ -378,49 +407,28 @@ impl Package {
     }
 }
 
+/// Checks a single file
+///
+/// This is a Salsa query so that [`Workspace::check_file`] can retrieve the accumulated diagnostics.
 #[salsa::tracked]
-pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
+pub(super) fn check_file_impl(db: &dyn Db, file: File) {
     tracing::debug!("Checking file '{path}'", path = file.path(db));
 
-    let mut diagnostics = Vec::new();
-
-    let source_diagnostics = source_text::accumulated::<SourceDiagnostic>(db.upcast(), file);
-    // TODO(micha): Consider using a single accumulator for all diagnostics
-    diagnostics.extend(
-        source_diagnostics
-            .iter()
-            .map(std::string::ToString::to_string),
-    );
-
     // Abort checking if there are IO errors.
-    let source = source_text(db.upcast(), file);
-
-    if source.has_read_error() {
-        return diagnostics;
+    if source_text(db.upcast(), file).has_read_error() {
+        return;
     }
 
-    let parsed = parsed_module(db.upcast(), file);
+    check_types(db.upcast(), file);
+}
 
-    if !parsed.errors().is_empty() {
-        let path = file.path(db);
-        let line_index = line_index(db.upcast(), file);
-        diagnostics.extend(parsed.errors().iter().map(|err| {
-            let source_location = line_index.source_location(err.location.start(), source.as_str());
-            format!("{path}:{source_location}: {message}", message = err.error)
-        }));
+#[salsa::tracked]
+fn check_workspace_sync(db: &dyn Db, workspace: Workspace) {
+    let files = WorkspaceFiles::new(db, workspace);
+
+    for file in &files {
+        check_file_impl(db, file);
     }
-
-    for diagnostic in check_types(db.upcast(), file) {
-        let index = line_index(db.upcast(), diagnostic.file());
-        let location = index.source_location(diagnostic.start(), source.as_str());
-        diagnostics.push(format!(
-            "{path}:{location}: {message}",
-            path = file.path(db),
-            message = diagnostic.message()
-        ));
-    }
-
-    diagnostics
 }
 
 fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
@@ -536,17 +544,43 @@ impl Iterator for WorkspaceFilesIter<'_> {
 #[cfg(test)]
 mod tests {
     use red_knot_python_semantic::types::check_types;
+    use red_knot_python_semantic::{
+        ProgramSettings, PythonVersion, SearchPathSettings, SitePackages,
+    };
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
-    use ruff_db::system::{DbWithTestSystem, SystemPath};
+    use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
 
     use crate::db::tests::TestDb;
-    use crate::workspace::check_file;
+
+    use crate::workspace::settings::WorkspaceSettings;
+    use crate::workspace::{Workspace, WorkspaceMetadata};
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let mut db = TestDb::new();
+        let root = SystemPathBuf::from("src");
+        let workspace = Workspace::from_metadata(
+            &db,
+            WorkspaceMetadata {
+                root: root.clone(),
+                packages: vec![],
+                settings: WorkspaceSettings {
+                    program: ProgramSettings {
+                        target_version: PythonVersion::default(),
+                        search_paths: SearchPathSettings {
+                            extra_paths: vec![],
+                            src_root: root,
+                            custom_typeshed: None,
+                            site_packages: SitePackages::Known(vec![]),
+                        },
+                    },
+                },
+            },
+        );
+
         let path = SystemPath::new("test.py");
 
         db.write_file(path, "x = 10")?;
@@ -556,9 +590,16 @@ mod tests {
         db.memory_file_system().remove_file(path)?;
         file.sync(&mut db);
 
+        let diagnostics: Vec<_> = workspace
+            .check_file(&db, file)
+            .into_iter()
+            .map(|diagnostic| diagnostic.message().to_string())
+            .collect();
+
         assert_eq!(source_text(&db, file).as_str(), "");
+
         assert_eq!(
-            check_file(&db, file),
+            diagnostics,
             vec!["Failed to read file: No such file or directory".to_string()]
         );
 
@@ -569,8 +610,14 @@ mod tests {
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
         db.write_file(path, "").unwrap();
 
+        let diagnostics: Vec<_> = workspace
+            .check_file(&db, file)
+            .into_iter()
+            .map(|diagnostic| diagnostic.message().to_string())
+            .collect();
+
         assert_eq!(source_text(&db, file).as_str(), "");
-        assert_eq!(check_file(&db, file), vec![] as Vec<String>);
+        assert_eq!(diagnostics, vec![] as Vec<String>);
 
         Ok(())
     }

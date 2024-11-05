@@ -1,6 +1,7 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
+use ruff_db::diagnostic::CompileDiagnostic;
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
 
@@ -10,7 +11,7 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 
-use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
+use crate::workspace::{Workspace, WorkspaceMetadata};
 
 mod changes;
 
@@ -51,14 +52,14 @@ impl RootDatabase {
     }
 
     /// Checks all open files in the workspace and its dependencies.
-    pub fn check(&self) -> Result<Vec<String>, Cancelled> {
+    pub fn check(&self) -> Result<Vec<CompileDiagnostic>, Cancelled> {
         self.with_db(|db| db.workspace().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Vec<String>, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<CompileDiagnostic>, Cancelled> {
         let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
 
-        self.with_db(|db| check_file(db, file))
+        self.with_db(|db| db.workspace().check_file(db, file))
     }
 
     /// Returns a mutable reference to the system.

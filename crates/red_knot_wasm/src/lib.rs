@@ -1,9 +1,10 @@
 use std::any::Any;
 
 use js_sys::Error;
+use ruff_db::diagnostic::CompileDiagnostic;
 use wasm_bindgen::prelude::*;
 
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
@@ -110,14 +111,14 @@ impl Workspace {
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
-        Ok(result)
+        Ok(map_diagnostics(&self.db, result))
     }
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<String>, Error> {
         let result = self.db.check().map_err(into_error)?;
 
-        Ok(result)
+        Ok(map_diagnostics(&self.db, result))
     }
 
     /// Returns the parsed AST for `path`
@@ -140,6 +141,13 @@ impl Workspace {
 
         Ok(source_text.to_string())
     }
+}
+
+fn map_diagnostics(db: &dyn Db, diagnostics: Vec<CompileDiagnostic>) -> Vec<String> {
+    diagnostics
+        .into_iter()
+        .map(|diagnostic| diagnostic.display(db.upcast()).to_string())
+        .collect()
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {

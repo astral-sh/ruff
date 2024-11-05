@@ -1,6 +1,7 @@
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
+use ruff_db::diagnostic::{CompileDiagnostic, Diagnostic as _};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -96,7 +97,15 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 parsed.errors()
             );
 
-            match matcher::match_file(db, test_file.file, check_types(db, test_file.file)) {
+            let diagnostics: Vec<_> =
+                // The accumulator returns all diagnostics from all files. We're only interested into
+                // diagnostics from this file.
+                check_types::accumulated::<CompileDiagnostic>(db, test_file.file)
+                    .into_iter()
+                    .filter(|diagnostic| diagnostic.file() == test_file.file)
+                    .collect();
+
+            match matcher::match_file(db, test_file.file, diagnostics) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offset: test_file.backtick_offset,
