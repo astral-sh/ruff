@@ -4,7 +4,6 @@ use ruff_python_ast as ast;
 
 use itertools::Itertools;
 
-use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
@@ -464,14 +463,6 @@ impl<'db> Type<'db> {
 
     pub const fn is_literal_string(&self) -> bool {
         matches!(self, Type::LiteralString)
-    }
-
-    pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
-        match self {
-            Type::ClassLiteral(class) => class.is_stdlib_symbol(db, module_name, name),
-            Type::FunctionLiteral(function) => function.is_stdlib_symbol(db, module_name, name),
-            _ => false,
-        }
     }
 
     /// Return true if this type is a [subtype of] type `target`.
@@ -1862,14 +1853,6 @@ pub struct FunctionType<'db> {
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
-    /// Return true if this is a standard library function with given module name and name.
-    pub(crate) fn is_stdlib_symbol(self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
-        name == self.name(db)
-            && file_to_module(db, self.body_scope(db).file(db)).is_some_and(|module| {
-                module.search_path().is_standard_library() && module.name() == module_name
-            })
-    }
-
     pub fn has_decorator(self, db: &dyn Db, decorator: Type<'_>) -> bool {
         self.decorators(db).contains(&decorator)
     }
@@ -1948,14 +1931,6 @@ impl<'db> ClassType<'db> {
     /// Return `true` if this class represents `known_class`
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
-    }
-
-    /// Return true if this class is a standard library type with given module name and name.
-    pub(crate) fn is_stdlib_symbol(self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
-        name == self.name(db)
-            && file_to_module(db, self.body_scope(db).file(db)).is_some_and(|module| {
-                module.search_path().is_standard_library() && module.name() == module_name
-            })
     }
 
     /// Return an iterator over the inferred types of this class's *explicit* bases.
