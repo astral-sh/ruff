@@ -337,7 +337,7 @@ mod tests {
         // `language` with bad casing
         assert!(comment_contains_code("# Language=C#", &[]));
         assert!(comment_contains_code("# lAngUAgE=inI", &[]));
-        
+
         // Unreasonable language IDs, possibly literals
         assert!(comment_contains_code("# language=\"pt\"", &[]));
         assert!(comment_contains_code("# language='en'", &[]));
