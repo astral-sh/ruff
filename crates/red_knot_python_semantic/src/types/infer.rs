@@ -868,6 +868,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             "isinstance" if definition.is_builtin_definition(self.db) => {
                 Some(KnownFunction::IsInstance)
             }
+            "issubclass" if definition.is_builtin_definition(self.db) => {
+                Some(KnownFunction::IsSubclass)
+            }
             _ => None,
         };
 

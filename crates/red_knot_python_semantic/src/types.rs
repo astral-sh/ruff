@@ -1915,6 +1915,8 @@ pub enum KnownFunction {
     RevealType,
     /// `builtins.isinstance`
     IsInstance,
+    /// `builtins.issubclass`
+    IsSubclass,
 }
 
 /// Representation of a runtime class object.

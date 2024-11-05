@@ -4,6 +4,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
+use crate::types::mro::ClassBase;
 use crate::types::{
     infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
     Truthiness, Type, UnionBuilder,
@@ -93,6 +94,69 @@ fn generate_isinstance_constraint<'db>(
             let mut builder = UnionBuilder::new(db);
             for element in tuple.elements(db) {
                 builder = builder.add(generate_isinstance_constraint(db, element)?);
+            }
+            Some(builder.build())
+        }
+        _ => None,
+    }
+}
+
+fn generate_issubclass_constraint_inner<'db>(
+    db: &'db dyn Db,
+    ty: &Type<'db>,
+    classinfo: &Type<'db>,
+) -> Option<Type<'db>> {
+    let classinfo_class_literal = classinfo.into_class_literal()?;
+
+    match ty {
+        Type::Union(union) => {
+            let mut builder = UnionBuilder::new(db);
+            for element in union.elements(db) {
+                let constraint = generate_issubclass_constraint_inner(db, element, classinfo)?;
+                builder = builder.add(constraint);
+            }
+            Some(builder.build())
+        }
+        Type::Intersection(..) => None, // TODO: intersections are not yet supported
+        Type::ClassLiteral(class_literal_type) => {
+            if class_literal_type
+                .class
+                .iter_mro(db)
+                .any(|superclass| superclass == ClassBase::Class(classinfo_class_literal.class))
+            {
+                Some(Type::ClassLiteral(*class_literal_type))
+            } else {
+                Some(*classinfo)
+            }
+        }
+        Type::Any
+        | Type::Unknown
+        | Type::Todo
+        | Type::Never
+        | Type::FunctionLiteral(..)
+        | Type::ModuleLiteral(..)
+        | Type::Instance(..)
+        | Type::IntLiteral(_)
+        | Type::BooleanLiteral(_)
+        | Type::StringLiteral(..)
+        | Type::LiteralString
+        | Type::BytesLiteral(..)
+        | Type::SliceLiteral(..)
+        | Type::Tuple(..) => None,
+    }
+}
+
+fn generate_issubclass_constraint<'db>(
+    db: &'db dyn Db,
+    ty: &Type<'db>,
+    classinfo: &Type<'db>,
+) -> Option<Type<'db>> {
+    match classinfo {
+        Type::ClassLiteral(..) => generate_issubclass_constraint_inner(db, ty, classinfo),
+        Type::Tuple(tuple) => {
+            let mut builder = UnionBuilder::new(db);
+            for element in tuple.elements(db) {
+                builder = builder.add(generate_issubclass_constraint(db, ty, element)?);
             }
             Some(builder.build())
         }
@@ -330,34 +394,71 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
-        if let Some(func_type) = inference
+        // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
+        // and `issubclass`, for example `isinstance(x, str | (int | float))`.
+        match inference
             .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
             .into_function_literal()
+            .and_then(|f| f.known(self.db))
         {
-            if func_type.is_known(self.db, KnownFunction::IsInstance)
-                && expr_call.arguments.keywords.is_empty()
-            {
+            Some(KnownFunction::IsInstance) if expr_call.arguments.keywords.is_empty() => {
                 if let [ast::Expr::Name(ast::ExprName { id, .. }), rhs] = &*expr_call.arguments.args
                 {
                     let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-                    let rhs_type = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
+                    let class_info_ty = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
 
-                    // TODO: add support for PEP 604 union types on the right hand side:
-                    // isinstance(x, str | (int | float))
-                    if let Some(mut constraint) = generate_isinstance_constraint(self.db, &rhs_type)
+                    if let Some(constraint) =
+                        generate_isinstance_constraint(self.db, &class_info_ty)
                     {
-                        if !is_positive {
-                            constraint = constraint.negate(self.db);
-                        }
                         let mut constraints = NarrowingConstraints::default();
-                        constraints.insert(symbol, constraint);
-                        return Some(constraints);
+                        constraints.insert(
+                            symbol,
+                            if is_positive {
+                                constraint
+                            } else {
+                                constraint.negate(self.db)
+                            },
+                        );
+                        Some(constraints)
+                    } else {
+                        None
                     }
+                } else {
+                    None
                 }
             }
+            Some(KnownFunction::IsSubclass) if expr_call.arguments.keywords.is_empty() => {
+                if let [name_expr @ ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
+                    &*expr_call.arguments.args
+                {
+                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+
+                    let identifier_ty =
+                        inference.expression_ty(name_expr.scoped_ast_id(self.db, scope));
+                    let class_info_ty =
+                        inference.expression_ty(class_info.scoped_ast_id(self.db, scope));
+
+                    generate_issubclass_constraint(self.db, &identifier_ty, &class_info_ty).map(
+                        |constraint| {
+                            let mut constraints = NarrowingConstraints::default();
+                            constraints.insert(
+                                symbol,
+                                if is_positive {
+                                    constraint
+                                } else {
+                                    constraint.negate(self.db)
+                                },
+                            );
+                            constraints
+                        },
+                    )
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
-        None
     }
 
     fn evaluate_match_pattern_singleton(
