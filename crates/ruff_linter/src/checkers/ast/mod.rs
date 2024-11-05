@@ -1461,13 +1461,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             _ => {}
         };
 
-        // Restore boolean test flag after examining subexpressions
-        if flags_snapshot.intersects(SemanticModelFlags::BOOLEAN_TEST) {
-            self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
-        }
-
         // Step 4: Analysis
-        analyze::expression(expr, self);
         match expr {
             Expr::StringLiteral(string_literal) => {
                 analyze::string_like(string_literal.into(), self);
@@ -1478,6 +1472,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         self.semantic.flags = flags_snapshot;
+        analyze::expression(expr, self);
         self.semantic.pop_node();
     }
 
