@@ -5,12 +5,12 @@ use indexmap::IndexSet;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
-use super::{ClassType, KnownClass, Type};
+use super::{Class, ClassLiteralType, KnownClass, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
-/// See [`ClassType::iter_mro`] for more details.
+/// See [`Class::iter_mro`] for more details.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
@@ -25,7 +25,7 @@ impl<'db> Mro<'db> {
     ///
     /// (We emit a diagnostic warning about the runtime `TypeError` in
     /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
-    pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Result<Self, MroError<'db>> {
+    pub(super) fn of_class(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroError<'db>> {
         Self::of_class_impl(db, class).map_err(|error_kind| {
             let fallback_mro = Self::from([
                 ClassBase::Class(class),
@@ -39,7 +39,7 @@ impl<'db> Mro<'db> {
         })
     }
 
-    fn of_class_impl(db: &'db dyn Db, class: ClassType<'db>) -> Result<Self, MroErrorKind<'db>> {
+    fn of_class_impl(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroErrorKind<'db>> {
         let class_bases = class.explicit_bases(db);
 
         match class_bases {
@@ -189,12 +189,12 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 ///
 /// Even for first-party code, where we will have to resolve the MRO for every class we encounter,
 /// loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
-/// Salsa-tracked [`ClassType::try_mro`] method unless it's absolutely necessary.
+/// Salsa-tracked [`Class::try_mro`] method unless it's absolutely necessary.
 pub(super) struct MroIterator<'db> {
     db: &'db dyn Db,
 
     /// The class whose MRO we're iterating over
-    class: ClassType<'db>,
+    class: Class<'db>,
 
     /// Whether or not we've already yielded the first element of the MRO
     first_element_yielded: bool,
@@ -208,7 +208,7 @@ pub(super) struct MroIterator<'db> {
 }
 
 impl<'db> MroIterator<'db> {
-    pub(super) fn new(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+    pub(super) fn new(db: &'db dyn Db, class: Class<'db>) -> Self {
         Self {
             db,
             class,
@@ -291,11 +291,11 @@ pub(super) enum MroErrorKind<'db> {
 
     /// The class has one or more duplicate bases.
     ///
-    /// This variant records the indices and [`ClassType`]s
+    /// This variant records the indices and [`Class`]es
     /// of the duplicate bases. The indices are the indices of nodes
     /// in the bases list of the class's [`StmtClassDef`](ruff_python_ast::StmtClassDef) node.
     /// Each index is the index of a node representing a duplicate base.
-    DuplicateBases(Box<[(usize, ClassType<'db>)]>),
+    DuplicateBases(Box<[(usize, Class<'db>)]>),
 
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
     ///
@@ -313,7 +313,7 @@ pub(super) enum ClassBase<'db> {
     Any,
     Unknown,
     Todo,
-    Class(ClassType<'db>),
+    Class(Class<'db>),
 }
 
 impl<'db> ClassBase<'db> {
@@ -339,7 +339,7 @@ impl<'db> ClassBase<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(super) fn expect_class(self) -> ClassType<'db> {
+    pub(super) fn expect_class_base(self) -> Class<'db> {
         match self {
             ClassBase::Class(class) => class,
             _ => panic!("Expected a `ClassBase::Class()` variant"),
@@ -351,7 +351,9 @@ impl<'db> ClassBase<'db> {
         KnownClass::Object
             .to_class(db)
             .into_class_literal_type()
-            .map_or(Self::Unknown, Self::Class)
+            .map_or(Self::Unknown, |ClassLiteralType { class }| {
+                Self::Class(class)
+            })
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -362,7 +364,7 @@ impl<'db> ClassBase<'db> {
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
             Type::Todo => Some(Self::Todo),
-            Type::ClassLiteral(class) => Some(Self::Class(class)),
+            Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
@@ -379,7 +381,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    fn into_class_literal_type(self) -> Option<ClassType<'db>> {
+    fn into_class_literal_type(self) -> Option<Class<'db>> {
         match self {
             Self::Class(class) => Some(class),
             _ => None,
@@ -408,7 +410,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
             ClassBase::Any => Type::Any,
             ClassBase::Todo => Type::Todo,
             ClassBase::Unknown => Type::Unknown,
-            ClassBase::Class(class) => Type::ClassLiteral(class),
+            ClassBase::Class(class) => Type::ClassLiteral(ClassLiteralType { class }),
         }
     }
 }
@@ -460,11 +462,11 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
 ///
 /// A class definition like this will fail at runtime,
 /// but we must be resilient to it or we could panic.
-fn class_is_cyclically_defined(db: &dyn Db, class: ClassType) -> bool {
+fn class_is_cyclically_defined(db: &dyn Db, class: Class) -> bool {
     fn is_cyclically_defined_recursive<'db>(
         db: &'db dyn Db,
-        class: ClassType<'db>,
-        classes_to_watch: &mut IndexSet<ClassType<'db>>,
+        class: Class<'db>,
+        classes_to_watch: &mut IndexSet<Class<'db>>,
     ) -> bool {
         if !classes_to_watch.insert(class) {
             return true;
@@ -474,6 +476,7 @@ fn class_is_cyclically_defined(db: &dyn Db, class: ClassType) -> bool {
             .iter()
             .copied()
             .filter_map(Type::into_class_literal_type)
+            .map(|ClassLiteralType { class }| class)
         {
             // Each base must be considered in isolation.
             // This is due to the fact that if a class uses multiple inheritance,
@@ -493,5 +496,6 @@ fn class_is_cyclically_defined(db: &dyn Db, class: ClassType) -> bool {
         .iter()
         .copied()
         .filter_map(Type::into_class_literal_type)
+        .map(|ClassLiteralType { class }| class)
         .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::default()))
 }

@@ -6,7 +6,7 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
+use crate::types::{ClassLiteralType, InstanceType, IntersectionType, KnownClass, Type, UnionType};
 use crate::Db;
 use rustc_hash::FxHashMap;
 
@@ -76,7 +76,7 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<module '{:?}'>", file.path(self.db))
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
+            Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),
             Type::Instance(InstanceType { class, known }) => f.write_str(match known {
                 Some(super::KnownInstance::Literal) => "Literal",
                 _ => class.name(self.db),

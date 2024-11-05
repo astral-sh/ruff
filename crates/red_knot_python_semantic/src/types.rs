@@ -129,7 +129,7 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
         return smallvec::SmallVec::default();
     };
 
-    let module_type_scope = module_type.body_scope(db);
+    let module_type_scope = module_type.class.body_scope(db);
     let module_type_symbol_table = symbol_table(db, module_type_scope);
 
     // `__dict__` and `__init__` are very special members that can be accessed as attributes
@@ -303,13 +303,11 @@ fn declarations_ty<'db>(
     }
 }
 
-/// Unique ID for a type.
+/// Representation of a type: a set of possible values at runtime.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type<'db> {
-    /// The dynamic type: a statically-unknown set of values
+    /// The dynamic type: a statically unknown set of values
     Any,
-    /// The empty set of values
-    Never,
     /// Unknown type (either no annotation, or some kind of type error).
     /// Equivalent to Any, or possibly to object in strict mode
     Unknown,
@@ -322,12 +320,14 @@ pub enum Type<'db> {
     /// output to be unknown. An output should only be `Todo` if fixing all `Todo` inputs to be not
     /// `Todo` would change the output type.
     Todo,
+    /// The empty set of values
+    Never,
     /// A specific function object
     FunctionLiteral(FunctionType<'db>),
     /// A specific module object
     ModuleLiteral(File),
     /// A specific class object
-    ClassLiteral(ClassType<'db>),
+    ClassLiteral(ClassLiteralType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
     /// The set of objects in any of the types in the union
@@ -338,7 +338,7 @@ pub enum Type<'db> {
     IntLiteral(i64),
     /// A boolean literal, either `True` or `False`.
     BooleanLiteral(bool),
-    /// A string literal
+    /// A string literal whose value is known
     StringLiteral(StringLiteralType<'db>),
     /// A string known to originate only from literal values, but whose value is not known (unlike
     /// `StringLiteral` above).
@@ -362,7 +362,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::Todo)
     }
 
-    pub const fn into_class_literal_type(self) -> Option<ClassType<'db>> {
+    pub const fn into_class_literal_type(self) -> Option<ClassLiteralType<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
             _ => None,
@@ -370,7 +370,7 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub fn expect_class_literal(self) -> ClassType<'db> {
+    pub fn expect_class_literal(self) -> ClassLiteralType<'db> {
         self.into_class_literal_type()
             .expect("Expected a Type::ClassLiteral variant")
     }
@@ -962,7 +962,7 @@ impl<'db> Type<'db> {
                     global_lookup
                 }
             }
-            Type::ClassLiteral(class) => class.class_member(db, name),
+            Type::ClassLiteral(class_ty) => class_ty.member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo.into()
@@ -1109,7 +1109,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
-            Type::ClassLiteral(class) => {
+            Type::ClassLiteral(ClassLiteralType { class }) => {
                 CallOutcome::callable(match class.known(db) {
                     // If the class is the builtin-bool class (for example `bool(1)`), we try to
                     // return the specific truthiness value of the input arg, `Literal[True]` for
@@ -1118,7 +1118,7 @@ impl<'db> Type<'db> {
                         .first()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
-                    _ => class.to_instance(),
+                    _ => Type::Instance(InstanceType::anonymous(class)),
                 })
             }
 
@@ -1236,7 +1236,9 @@ impl<'db> Type<'db> {
             Type::Todo => Type::Todo,
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
-            Type::ClassLiteral(class) => Type::Instance(InstanceType::anonymous(*class)),
+            Type::ClassLiteral(ClassLiteralType { class }) => {
+                Type::Instance(InstanceType::anonymous(*class))
+            }
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
@@ -1266,7 +1268,9 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            Type::Instance(InstanceType { class, .. }) => Type::ClassLiteral(*class),
+            Type::Instance(InstanceType { class, .. }) => {
+                Type::ClassLiteral(ClassLiteralType { class: *class })
+            }
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
@@ -1912,7 +1916,7 @@ pub enum KnownFunction {
 }
 
 #[salsa::interned]
-pub struct ClassType<'db> {
+pub struct Class<'db> {
     /// Name of the class at definition
     #[return_ref]
     pub name: ast::name::Name,
@@ -1923,11 +1927,7 @@ pub struct ClassType<'db> {
 }
 
 #[salsa::tracked]
-impl<'db> ClassType<'db> {
-    pub fn to_instance(self) -> Type<'db> {
-        Type::Instance(InstanceType::anonymous(self))
-    }
-
+impl<'db> Class<'db> {
     /// Return `true` if this class represents `known_class`
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -2007,7 +2007,7 @@ impl<'db> ClassType<'db> {
     ///
     /// If the MRO could not be accurately resolved, this method falls back to iterating
     /// over an MRO that has the class directly inheriting from `Unknown`. Use
-    /// [`ClassType::try_mro`] if you need to distinguish between the success and failure
+    /// [`Class::try_mro`] if you need to distinguish between the success and failure
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
@@ -2016,7 +2016,7 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
+    pub fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db).contains(&ClassBase::Class(other))
@@ -2056,7 +2056,7 @@ impl<'db> ClassType<'db> {
     /// Returns the inferred type of the class member named `name`.
     ///
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
-    /// directly. Use [`ClassType::class_member`] if you require a method that will
+    /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
@@ -2064,18 +2064,50 @@ impl<'db> ClassType<'db> {
     }
 }
 
+/// A singleton type representing a single class object at runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ClassLiteralType<'db> {
+    class: Class<'db>,
+}
+
+impl<'db> ClassLiteralType<'db> {
+    fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        self.class.class_member(db, name)
+    }
+
+    fn to_instance_type(self) -> InstanceType<'db> {
+        InstanceType::anonymous(self.class)
+    }
+}
+
+impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
+    fn from(value: ClassLiteralType<'db>) -> Self {
+        Self::ClassLiteral(value)
+    }
+}
+
+/// A type representing the set of runtime objects which are instances of a certain class.
+///
+/// Some specific instances are important enough that they really constitute their own type
+/// which should compare and hash differently to other instances of the same class.
+/// Whether or not you're dealing with one of these symbols can be determined using the
+/// `known` field on the `InstanceType` struct.
+///
+/// Note that, for example, `InstanceType { class: typing._SpecialForm, known: None }`
+/// is a supertype of `InstanceType { class: typing._SpecialForm, known: KnownInstance::Literal }`.
+/// The two types are not disjoint.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InstanceType<'db> {
-    class: ClassType<'db>,
+    class: Class<'db>,
     known: Option<KnownInstance>,
 }
 
 impl<'db> InstanceType<'db> {
-    pub fn anonymous(class: ClassType<'db>) -> Self {
+    pub fn anonymous(class: Class<'db>) -> Self {
         Self { class, known: None }
     }
 
-    pub fn known(class: ClassType<'db>, known: KnownInstance) -> Self {
+    pub fn known(class: Class<'db>, known: KnownInstance) -> Self {
         Self {
             class,
             known: Some(known),
@@ -2084,6 +2116,21 @@ impl<'db> InstanceType<'db> {
 
     pub fn is_known(&self, known_instance: KnownInstance) -> bool {
         self.known == Some(known_instance)
+    }
+
+    pub fn to_class_literal_type(self) -> ClassLiteralType<'db> {
+        ClassLiteralType { class: self.class }
+    }
+
+    /// Return `true` if members of this type are instances of the class `class` at runtime.
+    pub fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
+        self.class.is_subclass_of(db, class)
+    }
+}
+
+impl<'db> From<InstanceType<'db>> for Type<'db> {
+    fn from(value: InstanceType<'db>) -> Self {
+        Self::Instance(value)
     }
 }
 

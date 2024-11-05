@@ -88,7 +88,7 @@ fn generate_isinstance_constraint<'db>(
     classinfo: &Type<'db>,
 ) -> Option<Type<'db>> {
     match classinfo {
-        Type::ClassLiteral(class) => Some(class.to_instance()),
+        Type::ClassLiteral(class_ty) => Some(Type::Instance(class_ty.to_instance_type())),
         Type::Tuple(tuple) => {
             let mut builder = UnionBuilder::new(db);
             for element in tuple.elements(db) {
