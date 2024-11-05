@@ -1280,13 +1280,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(class_ty) => Type::Instance(class_ty.to_instance_type()),
+                Type::ClassLiteral(ClassLiteralType { class }) => Type::anonymous_instance(class),
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal().map_or(Type::Todo, |class_ty| {
-                            Type::Instance(class_ty.to_instance_type())
-                        })
+                        ty.into_class_literal()
+                            .map_or(Type::Todo, |ClassLiteralType { class }| {
+                                Type::anonymous_instance(class)
+                            })
                     }),
                 ),
                 _ => Type::Todo,

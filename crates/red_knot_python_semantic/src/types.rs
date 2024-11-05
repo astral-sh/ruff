@@ -1114,7 +1114,7 @@ impl<'db> Type<'db> {
                         .first()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
-                    _ => Type::Instance(InstanceType::anonymous(class)),
+                    _ => Type::anonymous_instance(class),
                 })
             }
 
@@ -1232,9 +1232,7 @@ impl<'db> Type<'db> {
             Type::Todo => Type::Todo,
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                Type::Instance(InstanceType::anonymous(*class))
-            }
+            Type::ClassLiteral(ClassLiteralType { class }) => Type::anonymous_instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
@@ -1251,6 +1249,10 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::LiteralString => Type::Unknown,
         }
+    }
+
+    pub fn anonymous_instance(class: Class<'db>) -> Self {
+        Self::Instance(InstanceType::anonymous(class))
     }
 
     /// The type `NoneType` / `None`
@@ -2070,10 +2072,6 @@ impl<'db> ClassLiteralType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         self.class.class_member(db, name)
     }
-
-    fn to_instance_type(self) -> InstanceType<'db> {
-        InstanceType::anonymous(self.class)
-    }
 }
 
 impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
@@ -2112,10 +2110,6 @@ impl<'db> InstanceType<'db> {
 
     pub fn is_known(&self, known_instance: KnownInstance) -> bool {
         self.known == Some(known_instance)
-    }
-
-    pub fn to_class_literal_type(self) -> ClassLiteralType<'db> {
-        ClassLiteralType { class: self.class }
     }
 
     /// Return `true` if members of this type are instances of the class `class` at runtime.
