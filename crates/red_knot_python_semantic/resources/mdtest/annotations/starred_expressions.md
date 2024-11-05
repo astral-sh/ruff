@@ -3,7 +3,7 @@
 Type annotations for `*args` can be starred expressions themselves:
 
 ```py
-from typing import TypeVarTuple
+from typing_extensions import TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 
