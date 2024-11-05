@@ -86,48 +86,19 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
                 trimmed = Cow::from(trimmed.replace('_', ""));
             }
             // Extract the unary sign, if any.
-            let (unary, mut rest) = if let Some(trimmed) = trimmed.strip_prefix('+') {
+            let (unary, rest) = if let Some(trimmed) = trimmed.strip_prefix('+') {
                 ("+", Cow::from(trimmed))
             } else if let Some(trimmed) = trimmed.strip_prefix('-') {
                 ("-", Cow::from(trimmed))
             } else {
                 ("", trimmed)
             };
-            // Extract the exponent, if any.
-            let mut e_indices = memchr::memrchr2_iter(b'e', b'E', rest.as_bytes());
-            if let Some(index) = e_indices.next() {
-                // More than one `e` is an error of type `decimal.InvalidOperation`
-                // when calling Decimal on a string. The suggested
-                // fix would turn this into a SyntaxError. To maintain
-                // the behavior of the code, we abort the check in this case.
-                if e_indices.next().is_some() {
-                    return;
-                }
-                // This range will not cause a panic: in the worst case,
-                // 'e' was the last character in `rest`, and then the right
-                // hand side will be `""`.
-                let exponent = rest[index + 1..]
-                    .strip_prefix('+')
-                    .unwrap_or(&rest[index + 1..]);
-                // Verify that the exponent is a nonnegative integer
-                if !exponent.bytes().all(|c| c.is_ascii_digit()) {
-                    return;
-                };
-                // NB: We need not convert, e.g., `2e3` to `2000`.
-                // However, `2e+3` is a syntax error, so we remove
-                // the sign on the exponent.
-                rest = Cow::from(rest.replace('+', ""));
-            }
 
             // Skip leading zeros.
             let rest = rest.trim_start_matches('0');
 
             // Verify that the rest of the string is a valid integer.
-            // NB: We have already checked that there is at most one 'e'.
-            if !rest
-                .bytes()
-                .all(|c| c.is_ascii_digit() || c == b'e' || c == b'E')
-            {
+            if !rest.bytes().all(|c| c.is_ascii_digit()) {
                 return;
             };
 
