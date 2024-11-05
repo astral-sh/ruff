@@ -25,6 +25,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         |   type:\s*ignore
         |   SPDX-License-Identifier:
         |   fmt:\s*(on|off|skip)
+        |   region|endregion
 
             # Case-insensitive
         |   (?i:
@@ -35,7 +36,6 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         |   (?i:
                 pylint
             |   nosec
-            |   region|endregion
             |   isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)
             |   (?:en)?coding[:=][\x20\t]*([-_.A-Z0-9]+)
             )
