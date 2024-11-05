@@ -1443,8 +1443,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             TargetKind::Name => value_ty,
         };
 
+        self.store_expression_type(name, target_ty);
         self.add_binding(name.into(), definition, target_ty);
-        self.types.expressions.insert(name_ast_id, target_ty);
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -1699,10 +1699,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .unwrap_with_diagnostic(iterable.into(), &mut self.diagnostics)
         };
 
-        self.types.expressions.insert(
-            target.scoped_ast_id(self.db, self.scope()),
-            loop_var_value_ty,
-        );
+        self.store_expression_type(target, loop_var_value_ty);
         self.add_binding(target.into(), definition, loop_var_value_ty);
     }
 
@@ -2011,7 +2008,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
-    fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
+    fn store_expression_type(
+        &mut self,
+        expression: &impl HasScopedAstId<Id = ScopedExpressionId>,
+        ty: Type<'db>,
+    ) {
         let expr_id = expression.scoped_ast_id(self.db, self.scope());
         let previous = self.types.expressions.insert(expr_id, ty);
         assert_eq!(previous, None);
@@ -3761,14 +3762,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 impl<'db> TypeInferenceBuilder<'db> {
     fn infer_annotation_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
-        match expression {
+        let annotation_ty = match expression {
             // TODO: parse the expression and check whether it is a string annotation, since they
             // can be annotation expressions distinct from type expressions.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_literal) => {
-                self.store_expression_type(expression, Type::Todo);
-                Type::Todo
-            }
+            ast::Expr::StringLiteral(_literal) => Type::Todo,
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
@@ -3776,7 +3774,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             // All other annotation expressions are (possibly) valid type expressions, so handle
             // them there instead.
             type_expr => self.infer_type_expression(type_expr),
-        }
+        };
+
+        self.store_expression_type(expression, annotation_ty);
+        annotation_ty
     }
 }
 
@@ -3785,7 +3786,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
 
-        let ty = match expression {
+        match expression {
             ast::Expr::Name(name) => {
                 debug_assert_eq!(name.ctx, ast::ExprContext::Load);
                 self.infer_name_expression(name).to_instance(self.db)
@@ -3838,8 +3839,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match binary.op {
                     // PEP-604 unions are okay, e.g., `int | str`
                     ast::Operator::BitOr => {
-                        let left_ty = self.infer_type_expression(&binary.left);
-                        let right_ty = self.infer_type_expression(&binary.right);
+                        let left_ty = self.infer_and_store_type_expression(&binary.left);
+                        let right_ty = self.infer_and_store_type_expression(&binary.right);
                         UnionType::from_elements(self.db, [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
@@ -3941,12 +3942,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
-        };
+        }
+    }
 
-        let expr_id = expression.scoped_ast_id(self.db, self.scope());
-        let previous = self.types.expressions.insert(expr_id, ty);
-        assert!(previous.is_none());
-
+    fn infer_and_store_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let ty = self.infer_type_expression(expression);
+        self.store_expression_type(expression, ty);
         ty
     }
 
@@ -3981,7 +3982,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let mut return_todo = false;
 
                 for element in elements {
-                    let element_ty = self.infer_type_expression(element);
+                    let element_ty = self.infer_and_store_type_expression(element);
                     return_todo |= element_could_alter_type_of_whole_tuple(element, element_ty);
                     element_types.push(element_ty);
                 }
@@ -3993,7 +3994,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             single_element => {
-                let single_element_ty = self.infer_type_expression(single_element);
+                let single_element_ty = self.infer_and_store_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
                     Type::Todo
                 } else {
@@ -4021,7 +4022,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 known: Some(known_instance),
             }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
             _ => {
-                self.infer_type_expression(slice);
+                self.infer_and_store_type_expression(slice);
                 Type::Todo // TODO: generics
             }
         }
