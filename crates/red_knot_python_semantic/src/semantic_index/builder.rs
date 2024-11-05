@@ -1088,10 +1088,13 @@ where
                 // AST inspection, so we can't simplify here, need to record test expression for
                 // later checking)
                 self.visit_expr(test);
+                let constraint = self.record_expression_constraint(test);
                 let pre_if = self.flow_snapshot();
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
+
+                self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
             }
