@@ -64,7 +64,7 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::Instance(InstanceType { class, known })
+            Type::Instance(InstanceType { class, .. })
                 if class.is_known(self.db, KnownClass::NoneType) =>
             {
                 f.write_str("None")
@@ -77,7 +77,10 @@ impl Display for DisplayRepresentation<'_> {
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
-            Type::Instance(instance) => f.write_str(instance.class.name(self.db)),
+            Type::Instance(InstanceType { class, known }) => f.write_str(match known {
+                Some(super::KnownInstance::Literal) => "Literal",
+                _ => class.name(self.db),
+            }),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
