@@ -350,7 +350,7 @@ impl<'db> ClassBase<'db> {
     fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
             .to_class(db)
-            .into_class_literal_type()
+            .into_class_literal()
             .map_or(Self::Unknown, |ClassLiteralType { class }| {
                 Self::Class(class)
             })
@@ -475,7 +475,7 @@ fn class_is_cyclically_defined(db: &dyn Db, class: Class) -> bool {
             .explicit_bases(db)
             .iter()
             .copied()
-            .filter_map(Type::into_class_literal_type)
+            .filter_map(Type::into_class_literal)
             .map(|ClassLiteralType { class }| class)
         {
             // Each base must be considered in isolation.
@@ -495,7 +495,7 @@ fn class_is_cyclically_defined(db: &dyn Db, class: Class) -> bool {
         .explicit_bases(db)
         .iter()
         .copied()
-        .filter_map(Type::into_class_literal_type)
+        .filter_map(Type::into_class_literal)
         .map(|ClassLiteralType { class }| class)
         .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::default()))
 }

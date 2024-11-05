@@ -120,10 +120,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
 /// so the cost of hashing the names is likely to be more expensive than it's worth.
 #[salsa::tracked(return_ref)]
 fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-    let Some(module_type) = KnownClass::ModuleType
-        .to_class(db)
-        .into_class_literal_type()
-    else {
+    let Some(module_type) = KnownClass::ModuleType.to_class(db).into_class_literal() else {
         // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
         // without a `types.pyi` stub in the `stdlib/` directory
         return smallvec::SmallVec::default();
@@ -362,7 +359,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::Todo)
     }
 
-    pub const fn into_class_literal_type(self) -> Option<ClassLiteralType<'db>> {
+    pub const fn into_class_literal(self) -> Option<ClassLiteralType<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
             _ => None,
@@ -371,7 +368,7 @@ impl<'db> Type<'db> {
 
     #[track_caller]
     pub fn expect_class_literal(self) -> ClassLiteralType<'db> {
-        self.into_class_literal_type()
+        self.into_class_literal()
             .expect("Expected a Type::ClassLiteral variant")
     }
 
@@ -379,7 +376,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub const fn into_module_literal_type(self) -> Option<File> {
+    pub const fn into_module_literal(self) -> Option<File> {
         match self {
             Type::ModuleLiteral(file) => Some(file),
             _ => None,
@@ -388,7 +385,7 @@ impl<'db> Type<'db> {
 
     #[track_caller]
     pub fn expect_module_literal(self) -> File {
-        self.into_module_literal_type()
+        self.into_module_literal()
             .expect("Expected a Type::ModuleLiteral variant")
     }
 
@@ -397,7 +394,7 @@ impl<'db> Type<'db> {
         IntersectionBuilder::new(db).add_negative(*self).build()
     }
 
-    pub const fn into_union_type(self) -> Option<UnionType<'db>> {
+    pub const fn into_union(self) -> Option<UnionType<'db>> {
         match self {
             Type::Union(union_type) => Some(union_type),
             _ => None,
@@ -406,15 +403,14 @@ impl<'db> Type<'db> {
 
     #[track_caller]
     pub fn expect_union(self) -> UnionType<'db> {
-        self.into_union_type()
-            .expect("Expected a Type::Union variant")
+        self.into_union().expect("Expected a Type::Union variant")
     }
 
     pub const fn is_union(&self) -> bool {
         matches!(self, Type::Union(..))
     }
 
-    pub const fn into_intersection_type(self) -> Option<IntersectionType<'db>> {
+    pub const fn into_intersection(self) -> Option<IntersectionType<'db>> {
         match self {
             Type::Intersection(intersection_type) => Some(intersection_type),
             _ => None,
@@ -423,11 +419,11 @@ impl<'db> Type<'db> {
 
     #[track_caller]
     pub fn expect_intersection(self) -> IntersectionType<'db> {
-        self.into_intersection_type()
+        self.into_intersection()
             .expect("Expected a Type::Intersection variant")
     }
 
-    pub const fn into_function_literal_type(self) -> Option<FunctionType<'db>> {
+    pub const fn into_function_literal(self) -> Option<FunctionType<'db>> {
         match self {
             Type::FunctionLiteral(function_type) => Some(function_type),
             _ => None,
@@ -436,7 +432,7 @@ impl<'db> Type<'db> {
 
     #[track_caller]
     pub fn expect_function_literal(self) -> FunctionType<'db> {
-        self.into_function_literal_type()
+        self.into_function_literal()
             .expect("Expected a Type::FunctionLiteral variant")
     }
 
@@ -444,7 +440,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
-    pub const fn into_int_literal_type(self) -> Option<i64> {
+    pub const fn into_int_literal(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),
             _ => None,
@@ -453,7 +449,7 @@ impl<'db> Type<'db> {
 
     #[track_caller]
     pub fn expect_int_literal(self) -> i64 {
-        self.into_int_literal_type()
+        self.into_int_literal()
             .expect("Expected a Type::IntLiteral variant")
     }
 

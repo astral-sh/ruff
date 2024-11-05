@@ -332,7 +332,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
         if let Some(func_type) = inference
             .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
-            .into_function_literal_type()
+            .into_function_literal()
         {
             if func_type.is_known(self.db, KnownFunction::IsInstance)
                 && expr_call.arguments.keywords.is_empty()

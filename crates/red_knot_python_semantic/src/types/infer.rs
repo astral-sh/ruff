@@ -457,7 +457,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .declarations
             .values()
-            .filter_map(|ty| ty.into_class_literal_type())
+            .filter_map(|ty| ty.into_class_literal())
             .map(|class_ty| class_ty.class);
 
         let invalid_mros = class_definitions.filter_map(|class| {
@@ -1284,7 +1284,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal_type().map_or(Type::Todo, |class_ty| {
+                        ty.into_class_literal().map_or(Type::Todo, |class_ty| {
                             Type::Instance(class_ty.to_instance_type())
                         })
                     }),
@@ -3819,7 +3819,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let value_ty = self.infer_expression(value);
 
                 if value_ty
-                    .into_class_literal_type()
+                    .into_class_literal()
                     .is_some_and(|ClassLiteralType { class }| {
                         class.is_known(self.db, KnownClass::Tuple)
                     })
