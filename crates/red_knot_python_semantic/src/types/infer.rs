@@ -2976,11 +2976,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
             }
 
-            (
-                Type::BooleanLiteral(b1),
-                Type::BooleanLiteral(b2),
-                ruff_python_ast::Operator::BitOr,
-            ) => Some(Type::BooleanLiteral(b1 | b2)),
+            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitOr) => {
+                Some(Type::BooleanLiteral(b1 | b2))
+            }
 
             (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
                 Type::IntLiteral(i64::from(bool_value)),
@@ -4001,7 +3999,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_subscript_type_expression(
         &mut self,
-        subscript: &ruff_python_ast::ExprSubscript,
+        subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
     ) -> Type<'db> {
         let ast::ExprSubscript {
@@ -4053,21 +4051,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         parameters: &'ast ast::Expr,
     ) -> Result<Type<'db>, Vec<&'ast ast::Expr>> {
         Ok(match parameters {
-            subscript @ ruff_python_ast::Expr::Subscript(_) => {
-                let inner_ty = self.infer_type_expression(subscript);
-                if !matches!(
-                    inner_ty,
-                    Type::IntLiteral(_)
-                        | Type::BooleanLiteral(_)
-                        | Type::BytesLiteral(_)
-                        | Type::StringLiteral(_)
-                        | Type::Union(_)
+            // TODO handle type aliases
+            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                let value_ty = self.infer_expression(value);
+                if matches!(
+                    value_ty,
+                    Type::Instance(InstanceType {
+                        known: Some(KnownInstance::Literal),
+                        ..
+                    })
                 ) {
+                    self.infer_literal_parameter_type(slice)?
+                } else {
                     return Err(vec![parameters]);
                 }
-                inner_ty
             }
-            ruff_python_ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
+            ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
                 let mut errors = vec![];
                 let mut builder = UnionBuilder::new(self.db);
                 for elt in tuple {
@@ -4087,30 +4086,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            ruff_python_ast::Expr::StringLiteral(literal) => {
-                self.infer_string_literal_expression(literal)
-            }
-            ruff_python_ast::Expr::BytesLiteral(literal) => {
-                self.infer_bytes_literal_expression(literal)
-            }
-            ruff_python_ast::Expr::BooleanLiteral(literal) => {
-                self.infer_boolean_literal_expression(literal)
-            }
+            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
+            ast::Expr::BytesLiteral(literal) => self.infer_bytes_literal_expression(literal),
+            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
             // For enum values
-            ruff_python_ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
                 // TODO: Check that value type is enum otherwise return None
                 value_ty.member(self.db, &attr.id).unwrap_or_unknown()
             }
-            ruff_python_ast::Expr::NoneLiteral(_) => Type::none(self.db),
+            ast::Expr::NoneLiteral(_) => Type::none(self.db),
             // for negative and positive numbers
-            ruff_python_ast::Expr::UnaryOp(ref u)
+            ast::Expr::UnaryOp(ref u)
                 if matches!(u.op, UnaryOp::USub | UnaryOp::UAdd)
                     && u.operand.is_number_literal_expr() =>
             {
                 self.infer_unary_expression(u)
             }
-            ruff_python_ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
+            ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
                 self.infer_number_literal_expression(number)
             }
             _ => {
