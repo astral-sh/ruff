@@ -11,10 +11,10 @@ use crate::Db;
 
 /// A definition of a symbol.
 ///
-/// ## Module local type
-/// This type should not be used as part of any cross module API because
-/// it holds a reference to the AST node and range offset changes
-/// then propagate through all usages and deserialization requires
+/// ## Module-local type
+/// This type should not be used as part of any cross-module API because
+/// it holds a reference to the AST node. Range-offset changes
+/// then propagate through all usages, and deserialization requires
 /// reparsing the entire module.
 ///
 /// E.g. don't use this type in:
