@@ -12,6 +12,18 @@ use crate::Db;
 /// involved. It allows us to:
 /// 1. Avoid doing structural match multiple times for each definition
 /// 2. Avoid highlighting the same error multiple times
+///
+/// ## Module-local type
+/// This type should not be used as part of any cross-module API because
+/// it holds a reference to the AST node. Range-offset changes
+/// then propagate through all usages, and deserialization requires
+/// reparsing the entire module.
+///
+/// E.g. don't use this type in:
+///
+/// * a return type of a cross-module query
+/// * a field of a type that is a return type of a cross-module query
+/// * an argument of a cross-module query
 #[salsa::tracked]
 pub(crate) struct Unpack<'db> {
     #[id]
