@@ -1,13 +1,13 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use anyhow::{anyhow, Result};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
 use ruff_python_trivia::PythonWhitespace;
-use ruff_source_file::LineRanges;
+// use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -50,10 +50,12 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct ManualListComprehension {
     is_async: bool,
-    comprehension_type: ComprehensionType,
+    comprehension_type: Option<ComprehensionType>,
 }
 
-impl AlwaysFixableViolation for ManualListComprehension {
+impl Violation for ManualListComprehension {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let ManualListComprehension {
@@ -61,8 +63,9 @@ impl AlwaysFixableViolation for ManualListComprehension {
             comprehension_type,
         } = self;
         let comprehension_str = match comprehension_type {
-            ComprehensionType::Extend => "extend",
-            ComprehensionType::ListComprehension => "comprehension",
+            Some(ComprehensionType::Extend) => "extend",
+            Some(ComprehensionType::ListComprehension) => "comprehension",
+            None => "comprehension",
         };
         match is_async {
             false => format!("Use a list {comprehension_str} to create a transformed list"),
@@ -70,12 +73,12 @@ impl AlwaysFixableViolation for ManualListComprehension {
         }
     }
 
-    fn fix_title(&self) -> String {
-        match self.comprehension_type {
+    fn fix_title(&self) -> Option<String> {
+        match self.comprehension_type? {
             ComprehensionType::ListComprehension => {
-                format!("Replace for loop with list comprehension")
+                Some(format!("Replace for loop with list comprehension"))
             }
-            ComprehensionType::Extend => format!("Replace for loop with list.extend"),
+            ComprehensionType::Extend => Some(format!("Replace for loop with list.extend")),
         }
     }
 }
@@ -251,12 +254,20 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
             is_async: for_stmt.is_async,
-            comprehension_type,
+            comprehension_type: None,
         },
         *range,
     );
 
+    // TODO: once this fix is stabilized, change the rule to completely fixable
     if checker.settings.preview.is_enabled() {
+        diagnostic = Diagnostic::new(
+            ManualListComprehension {
+                is_async: for_stmt.is_async,
+                comprehension_type: Some(comprehension_type),
+            },
+            *range,
+        );
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,

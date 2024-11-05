@@ -30,6 +30,7 @@ mod tests {
         Ok(())
     }
 
+    // TODO: remove this test case when the fix for `perf401` is stabilized
     #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
