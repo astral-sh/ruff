@@ -3369,23 +3369,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::Is => {
                         if left.is_disjoint_from(self.db, right) {
                             Ok(Type::BooleanLiteral(false))
+                        } else if left.is_singleton(self.db)
+                            && left.is_equivalent_to(self.db, right)
+                        {
+                            Ok(Type::BooleanLiteral(true))
                         } else {
-                            if left.is_singleton(self.db) && left.is_equivalent_to(self.db, right) {
-                                Ok(Type::BooleanLiteral(true))
-                            } else {
-                                Ok(KnownClass::Bool.to_instance(self.db))
-                            }
+                            Ok(KnownClass::Bool.to_instance(self.db))
                         }
                     }
                     ast::CmpOp::IsNot => {
                         if left.is_disjoint_from(self.db, right) {
                             Ok(Type::BooleanLiteral(true))
+                        } else if left.is_singleton(self.db)
+                            && left.is_equivalent_to(self.db, right)
+                        {
+                            Ok(Type::BooleanLiteral(false))
                         } else {
-                            if left.is_singleton(self.db) && left.is_equivalent_to(self.db, right) {
-                                Ok(Type::BooleanLiteral(false))
-                            } else {
-                                Ok(KnownClass::Bool.to_instance(self.db))
-                            }
+                            Ok(KnownClass::Bool.to_instance(self.db))
                         }
                     }
                 }
