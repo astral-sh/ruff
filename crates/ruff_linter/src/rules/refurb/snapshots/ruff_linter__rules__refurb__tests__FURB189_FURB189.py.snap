@@ -1,0 +1,134 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB189.py:17:9: FURB189 [*] Subclass of `dict`
+   |
+16 | # positives
+17 | class D(dict):
+   |         ^^^^ FURB189
+18 |     pass
+   |
+   = help: Replace subclass `dict` with `UserDict`
+
+ℹ Unsafe fix
+1  1  | # setup
+2  2  | from enum import Enum, EnumMeta
+3     |-from collections import UserList as UL
+   3  |+from collections import UserList as UL, UserDict
+4  4  | 
+5  5  | class SetOnceMappingMixin:
+6  6  |     __slots__ = ()
+--------------------------------------------------------------------------------
+14 14 |     pass
+15 15 | 
+16 16 | # positives
+17    |-class D(dict):
+   17 |+class D(UserDict):
+18 18 |     pass
+19 19 | 
+20 20 | class L(list):
+
+FURB189.py:20:9: FURB189 [*] Subclass of `list`
+   |
+18 |     pass
+19 | 
+20 | class L(list):
+   |         ^^^^ FURB189
+21 |     pass
+   |
+   = help: Replace subclass `list` with `UserList`
+
+ℹ Unsafe fix
+17 17 | class D(dict):
+18 18 |     pass
+19 19 | 
+20    |-class L(list):
+   20 |+class L(UL):
+21 21 |     pass
+22 22 | 
+23 23 | class S(str):
+
+FURB189.py:23:9: FURB189 [*] Subclass of `str`
+   |
+21 |     pass
+22 | 
+23 | class S(str):
+   |         ^^^ FURB189
+24 |     pass
+   |
+   = help: Replace subclass `str` with `UserStr`
+
+ℹ Unsafe fix
+1  1  | # setup
+2  2  | from enum import Enum, EnumMeta
+3     |-from collections import UserList as UL
+   3  |+from collections import UserList as UL, UserStr
+4  4  | 
+5  5  | class SetOnceMappingMixin:
+6  6  |     __slots__ = ()
+--------------------------------------------------------------------------------
+20 20 | class L(list):
+21 21 |     pass
+22 22 | 
+23    |-class S(str):
+   23 |+class S(UserStr):
+24 24 |     pass
+25 25 | 
+26 26 | class SetOnceDict(SetOnceMappingMixin, dict):
+
+FURB189.py:26:40: FURB189 [*] Subclass of `dict`
+   |
+24 |     pass
+25 | 
+26 | class SetOnceDict(SetOnceMappingMixin, dict):
+   |                                        ^^^^ FURB189
+27 |     pass
+   |
+   = help: Replace subclass `dict` with `UserDict`
+
+ℹ Unsafe fix
+1  1  | # setup
+2  2  | from enum import Enum, EnumMeta
+3     |-from collections import UserList as UL
+   3  |+from collections import UserList as UL, UserDict
+4  4  | 
+5  5  | class SetOnceMappingMixin:
+6  6  |     __slots__ = ()
+--------------------------------------------------------------------------------
+23 23 | class S(str):
+24 24 |     pass
+25 25 | 
+26    |-class SetOnceDict(SetOnceMappingMixin, dict):
+   26 |+class SetOnceDict(SetOnceMappingMixin, UserDict):
+27 27 |     pass
+28 28 | 
+29 29 | class ActivityState(str, Enum, metaclass=CaseInsensitiveEnumMeta):
+
+FURB189.py:29:21: FURB189 [*] Subclass of `str`
+   |
+27 |     pass
+28 | 
+29 | class ActivityState(str, Enum, metaclass=CaseInsensitiveEnumMeta):
+   |                     ^^^ FURB189
+30 |     """Activity state. This is an optional property and if not provided, the state will be Active by
+31 |     default.
+   |
+   = help: Replace subclass `str` with `UserStr`
+
+ℹ Unsafe fix
+1  1  | # setup
+2  2  | from enum import Enum, EnumMeta
+3     |-from collections import UserList as UL
+   3  |+from collections import UserList as UL, UserStr
+4  4  | 
+5  5  | class SetOnceMappingMixin:
+6  6  |     __slots__ = ()
+--------------------------------------------------------------------------------
+26 26 | class SetOnceDict(SetOnceMappingMixin, dict):
+27 27 |     pass
+28 28 | 
+29    |-class ActivityState(str, Enum, metaclass=CaseInsensitiveEnumMeta):
+   29 |+class ActivityState(UserStr, Enum, metaclass=CaseInsensitiveEnumMeta):
+30 30 |     """Activity state. This is an optional property and if not provided, the state will be Active by
+31 31 |     default.
+32 32 |     """
