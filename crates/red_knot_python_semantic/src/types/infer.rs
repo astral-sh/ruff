@@ -3773,7 +3773,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // All other annotation expressions are (possibly) valid type expressions, so handle
             // them there instead.
-            type_expr => self.infer_expression_type_no_store(type_expr),
+            type_expr => self.infer_type_expression_no_store(type_expr),
         };
 
         self.store_expression_type(expression, annotation_ty);
@@ -3783,7 +3783,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db> {
-    fn infer_expression_type_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
+    fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
 
         match expression {
@@ -3946,7 +3946,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ty = self.infer_expression_type_no_store(expression);
+        let ty = self.infer_type_expression_no_store(expression);
         self.store_expression_type(expression, ty);
         ty
     }
