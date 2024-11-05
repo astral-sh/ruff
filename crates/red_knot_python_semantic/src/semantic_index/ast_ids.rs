@@ -87,6 +87,14 @@ pub trait HasScopedAstId {
     fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id;
 }
 
+impl<T: HasScopedAstId> HasScopedAstId for Box<T> {
+    type Id = <T as HasScopedAstId>::Id;
+
+    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+        self.as_ref().scoped_ast_id(db, scope)
+    }
+}
+
 /// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::symbol::FileScopeId`].
 #[newtype_index]
 pub struct ScopedExpressionId;
