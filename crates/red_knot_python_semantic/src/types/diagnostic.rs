@@ -5,7 +5,7 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::types::Type;
+use crate::types::{ClassLiteralType, Type};
 use crate::Db;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -209,7 +209,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         assigned_ty: Type<'db>,
     ) {
         match declared_ty {
-            Type::ClassLiteral(class) => {
+            Type::ClassLiteral(ClassLiteralType { class }) => {
                 self.add(node, "invalid-assignment", format_args!(
                         "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                         class.name(self.db)));

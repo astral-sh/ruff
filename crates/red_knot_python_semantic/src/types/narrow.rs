@@ -5,8 +5,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
-    infer_expression_types, IntersectionBuilder, KnownClass, KnownFunction, Truthiness, Type,
-    UnionBuilder,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
+    Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -88,7 +88,7 @@ fn generate_isinstance_constraint<'db>(
     classinfo: &Type<'db>,
 ) -> Option<Type<'db>> {
     match classinfo {
-        Type::ClassLiteral(class) => Some(class.to_instance()),
+        Type::ClassLiteral(ClassLiteralType { class }) => Some(Type::anonymous_instance(*class)),
         Type::Tuple(tuple) => {
             let mut builder = UnionBuilder::new(db);
             for element in tuple.elements(db) {
@@ -332,7 +332,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
         if let Some(func_type) = inference
             .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
-            .into_function_literal_type()
+            .into_function_literal()
         {
             if func_type.is_known(self.db, KnownFunction::IsInstance)
                 && expr_call.arguments.keywords.is_empty()

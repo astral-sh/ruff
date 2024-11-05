@@ -51,18 +51,18 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{
     TypeCheckDiagnostic, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder,
 };
+use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
-    Boundness, BytesLiteralType, ClassType, FunctionType, InstanceType, IterationOutcome,
-    KnownClass, KnownFunction, KnownInstance, SliceLiteralType, StringLiteralType, Symbol,
-    Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
+    Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
+    IterationOutcome, KnownClass, KnownFunction, KnownInstance, SliceLiteralType,
+    StringLiteralType, Symbol, Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder,
+    UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
-
-use super::mro::MroErrorKind;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -457,7 +457,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .declarations
             .values()
-            .filter_map(|ty| ty.into_class_literal_type());
+            .filter_map(|ty| ty.into_class_literal())
+            .map(|class_ty| class_ty.class);
 
         let invalid_mros = class_definitions.filter_map(|class| {
             class
@@ -947,7 +948,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_definition(class);
     }
 
-    fn infer_class_definition(&mut self, class: &ast::StmtClassDef, definition: Definition<'db>) {
+    fn infer_class_definition(
+        &mut self,
+        class_node: &ast::StmtClassDef,
+        definition: Definition<'db>,
+    ) {
         let ast::StmtClassDef {
             range: _,
             name,
@@ -955,7 +960,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
             arguments: _,
             body: _,
-        } = class;
+        } = class_node;
 
         for decorator in decorator_list {
             self.infer_decorator(decorator);
@@ -963,26 +968,22 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let body_scope = self
             .index
-            .node_scope(NodeWithScopeRef::Class(class))
+            .node_scope(NodeWithScopeRef::Class(class_node))
             .to_scope_id(self.db, self.file);
 
         let maybe_known_class = file_to_module(self.db, self.file)
             .as_ref()
             .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
 
-        let class_ty = Type::ClassLiteral(ClassType::new(
-            self.db,
-            &*name.id,
-            body_scope,
-            maybe_known_class,
-        ));
+        let class = Class::new(self.db, &*name.id, body_scope, maybe_known_class);
+        let class_ty = Type::ClassLiteral(ClassLiteralType { class });
 
-        self.add_declaration_with_binding(class.into(), definition, class_ty, class_ty);
+        self.add_declaration_with_binding(class_node.into(), definition, class_ty, class_ty);
 
         // if there are type parameters, then the keywords and bases are within that scope
         // and we don't need to run inference here
         if type_params.is_none() {
-            for keyword in class.keywords() {
+            for keyword in class_node.keywords() {
                 self.infer_expression(&keyword.value);
             }
 
@@ -991,7 +992,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if self.are_all_types_deferred() {
                 self.types.has_deferred = true;
             } else {
-                for base in class.bases() {
+                for base in class_node.bases() {
                     self.infer_expression(base);
                 }
             }
@@ -1284,12 +1285,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(class_ty) => class_ty.to_instance(),
+                Type::ClassLiteral(ClassLiteralType { class }) => Type::anonymous_instance(class),
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal_type()
-                            .map_or(Type::Todo, ClassType::to_instance)
+                        ty.into_class_literal()
+                            .map_or(Type::Todo, |ClassLiteralType { class }| {
+                                Type::anonymous_instance(class)
+                            })
                     }),
                 ),
                 _ => Type::Todo,
@@ -3366,18 +3369,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Lookup the rich comparison `__dunder__` methods on instances
-            (
-                Type::Instance(InstanceType {
-                    class: left_class, ..
-                }),
-                Type::Instance(InstanceType {
-                    class: right_class, ..
-                }),
-            ) => {
+            (Type::Instance(left_instance), Type::Instance(right_instance)) => {
                 let rich_comparison =
-                    |op| perform_rich_comparison(self.db, left_class, right_class, op);
-                let membership_test_comparison =
-                    |op| perform_membership_test_comparison(self.db, left_class, right_class, op);
+                    |op| perform_rich_comparison(self.db, left_instance, right_instance, op);
+                let membership_test_comparison = |op| {
+                    perform_membership_test_comparison(self.db, left_instance, right_instance, op)
+                };
                 match op {
                     ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
                     ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
@@ -3688,7 +3685,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    if matches!(value_ty, Type::ClassLiteral(class) if class.is_known(self.db, KnownClass::Type))
+                    if matches!(value_ty, Type::ClassLiteral(ClassLiteralType { class }) if class.is_known(self.db, KnownClass::Type))
                     {
                         return KnownClass::GenericAlias.to_instance(self.db);
                     }
@@ -3868,8 +3865,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let value_ty = self.infer_expression(value);
 
                 if value_ty
-                    .into_class_literal_type()
-                    .is_some_and(|class| class.is_known(self.db, KnownClass::Tuple))
+                    .into_class_literal()
+                    .is_some_and(|ClassLiteralType { class }| {
+                        class.is_known(self.db, KnownClass::Tuple)
+                    })
                 {
                     self.infer_tuple_type_expression(slice)
                 } else {
@@ -4311,8 +4310,8 @@ impl StringPartsCollector {
 /// see `<https://docs.python.org/3/reference/datamodel.html#object.__lt__>`
 fn perform_rich_comparison<'db>(
     db: &'db dyn Db,
-    left_class: ClassType<'db>,
-    right_class: ClassType<'db>,
+    left: InstanceType<'db>,
+    right: InstanceType<'db>,
     op: RichCompareOperator,
 ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
     // The following resource has details about the rich comparison algorithm:
@@ -4321,23 +4320,22 @@ fn perform_rich_comparison<'db>(
     // TODO: this currently gives the return type even if the arg types are invalid
     // (e.g. int.__lt__ with string instance should be errored, currently bool)
 
-    let call_dunder =
-        |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
-            match left_class.class_member(db, op.dunder()) {
-                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .call(db, &[left_class.to_instance(), right_class.to_instance()])
-                    .return_ty(db),
-                _ => None,
-            }
-        };
+    let call_dunder = |op: RichCompareOperator,
+                       left: InstanceType<'db>,
+                       right: InstanceType<'db>| {
+        match left.class.class_member(db, op.dunder()) {
+            Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
+                .call(db, &[Type::Instance(left), Type::Instance(right)])
+                .return_ty(db),
+            _ => None,
+        }
+    };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-    if left_class != right_class && right_class.is_subclass_of(db, left_class) {
-        call_dunder(op.reflect(), right_class, left_class)
-            .or_else(|| call_dunder(op, left_class, right_class))
+    if left != right && right.is_instance_of(db, left.class) {
+        call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
     } else {
-        call_dunder(op, left_class, right_class)
-            .or_else(|| call_dunder(op.reflect(), right_class, left_class))
+        call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
     }
     .or_else(|| {
         // When no appropriate method returns any value other than NotImplemented,
@@ -4351,8 +4349,8 @@ fn perform_rich_comparison<'db>(
     })
     .ok_or_else(|| CompareUnsupportedError {
         op: op.into(),
-        left_ty: left_class.to_instance(),
-        right_ty: right_class.to_instance(),
+        left_ty: left.into(),
+        right_ty: right.into(),
     })
 }
 
@@ -4362,23 +4360,21 @@ fn perform_rich_comparison<'db>(
 /// and `<https://docs.python.org/3/reference/expressions.html#membership-test-details>`
 fn perform_membership_test_comparison<'db>(
     db: &'db dyn Db,
-    left_class: ClassType<'db>,
-    right_class: ClassType<'db>,
+    left: InstanceType<'db>,
+    right: InstanceType<'db>,
     op: MembershipTestCompareOperator,
 ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-    let (left_instance, right_instance) = (left_class.to_instance(), right_class.to_instance());
-
-    let contains_dunder = right_class.class_member(db, "__contains__");
+    let contains_dunder = right.class.class_member(db, "__contains__");
     let compare_result_opt = match contains_dunder {
         Symbol::Type(contains_dunder, Boundness::Bound) => {
             // If `__contains__` is available, it is used directly for the membership test.
             contains_dunder
-                .call(db, &[right_instance, left_instance])
+                .call(db, &[Type::Instance(right), Type::Instance(left)])
                 .return_ty(db)
         }
         _ => {
             // iteration-based membership test
-            match right_instance.iterate(db) {
+            match Type::Instance(right).iterate(db) {
                 IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
                 IterationOutcome::NotIterable { .. } => None,
             }
@@ -4398,8 +4394,8 @@ fn perform_membership_test_comparison<'db>(
         })
         .ok_or_else(|| CompareUnsupportedError {
             op: op.into(),
-            left_ty: left_instance,
-            right_ty: right_instance,
+            left_ty: left.into(),
+            right_ty: right.into(),
         })
 }
 
@@ -4420,7 +4416,6 @@ mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::name::Name;
 
     use super::*;
 
@@ -4547,11 +4542,10 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let ty = global_symbol(&db, mod_file, "C").expect_type();
-        let class_id = ty.expect_class_literal();
-        let member_ty = class_id
-            .class_member(&db, &Name::new_static("f"))
-            .expect_type();
+        let class_ty = global_symbol(&db, mod_file, "C")
+            .expect_type()
+            .expect_class_literal();
+        let member_ty = class_ty.member(&db, "f").expect_type();
         let func = member_ty.expect_function_literal();
 
         assert_eq!(func.name(&db), "f");
@@ -4761,14 +4755,14 @@ mod tests {
 
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol(&db, a, "C").expect_type();
-        let c_class = c_ty.expect_class_literal();
+        let c_class = c_ty.expect_class_literal().class;
         let mut c_mro = c_class.iter_mro(&db);
         let b_ty = c_mro.nth(1).unwrap();
-        let b_class = b_ty.expect_class();
+        let b_class = b_ty.expect_class_base();
         assert_eq!(b_class.name(&db), "B");
         let mut b_mro = b_class.iter_mro(&db);
         let a_ty = b_mro.nth(1).unwrap();
-        let a_class = a_ty.expect_class();
+        let a_class = a_ty.expect_class_base();
         assert_eq!(a_class.name(&db), "A");
 
         Ok(())
@@ -4917,7 +4911,12 @@ mod tests {
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
         let ty = global_symbol(&db, file, "C").expect_type();
-        let base = ty.expect_class_literal().iter_mro(&db).nth(1).unwrap();
+        let base = ty
+            .expect_class_literal()
+            .class
+            .iter_mro(&db)
+            .nth(1)
+            .unwrap();
         assert_eq!(base.display(&db).to_string(), "<class 'object'>");
         Ok(())
     }
