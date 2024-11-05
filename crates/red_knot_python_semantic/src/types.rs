@@ -2666,7 +2666,7 @@ mod tests {
     /// Inferring the result of a call-expression shouldn't need to re-run after
     /// a trivial change to the function's file (e.g. by adding a docstring to the function).
     #[test]
-    fn call_type_doesnt_rerun_when_onlyh_callee_changed() -> anyhow::Result<()> {
+    fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
