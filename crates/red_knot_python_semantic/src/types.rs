@@ -1266,6 +1266,8 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
+            // TODO: not really correct -- the meta-type of an `InstanceType { class: T }` should be `type[T]`
+            // (<https://docs.python.org/3/library/typing.html#the-type-of-class-objects>)
             Type::Instance(InstanceType { class, .. }) => {
                 Type::ClassLiteral(ClassLiteralType { class: *class })
             }
@@ -2086,10 +2088,10 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
 
 /// A type representing the set of runtime objects which are instances of a certain class.
 ///
-/// Some specific instances are important enough that they really constitute their own type
-/// which should compare and hash differently to other instances of the same class.
-/// Whether or not you're dealing with one of these symbols can be determined using the
-/// `known` field on the `InstanceType` struct.
+/// Some specific instances of some types need to be treated specially by the type system:
+/// for example, various special forms are instances of `typing._SpecialForm`,
+/// but need to be handled differently in annotations. These special instances are marked as such
+/// using the `known` field on this struct.
 ///
 /// Note that, for example, `InstanceType { class: typing._SpecialForm, known: None }`
 /// is a supertype of `InstanceType { class: typing._SpecialForm, known: KnownInstance::Literal }`.
