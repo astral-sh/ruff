@@ -1913,6 +1913,10 @@ pub enum KnownFunction {
     IsInstance,
 }
 
+/// Representation of a runtime class object.
+///
+/// Does not in itself represent a type,
+/// but is used as the inner data for several structs that *do* represent types.
 #[salsa::interned]
 pub struct Class<'db> {
     /// Name of the class at definition
