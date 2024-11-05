@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
@@ -1109,11 +1109,11 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_type) => {
                 if function_type.is_known(db, KnownFunction::RevealType) {
                     CallOutcome::revealed(
-                        function_type.return_type(db),
+                        function_type.return_ty(db),
                         *arg_types.first().unwrap_or(&Type::Unknown),
                     )
                 } else {
-                    CallOutcome::callable(function_type.return_type(db))
+                    CallOutcome::callable(function_type.return_ty(db))
                 }
             }
 
@@ -1854,17 +1854,18 @@ pub struct FunctionType<'db> {
     /// Is this a function that we special-case somehow? If so, which one?
     known: Option<KnownFunction>,
 
-    definition: Definition<'db>,
+    body_scope: ScopeId<'db>,
 
     /// types of all decorators on this function
     decorators: Box<[Type<'db>]>,
 }
 
+#[salsa::tracked]
 impl<'db> FunctionType<'db> {
     /// Return true if this is a standard library function with given module name and name.
     pub(crate) fn is_stdlib_symbol(self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         name == self.name(db)
-            && file_to_module(db, self.definition(db).file(db)).is_some_and(|module| {
+            && file_to_module(db, self.body_scope(db).file(db)).is_some_and(|module| {
                 module.search_path().is_standard_library() && module.name() == module_name
             })
     }
@@ -1874,11 +1875,18 @@ impl<'db> FunctionType<'db> {
     }
 
     /// inferred return type for this function
-    pub fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let definition = self.definition(db);
-        let DefinitionKind::Function(function_stmt_node) = definition.kind(db) else {
-            panic!("Function type definition must have `DefinitionKind::Function`")
-        };
+    ///
+    /// ## Why is this a salsa query?
+    ///
+    /// This is a salsa query to short-circuit the invalidation
+    /// when the function's AST node changes.
+    ///
+    /// Were this not a salsa query, then the calling query
+    /// would depend on the function's AST and rerun for every change in that file.
+    #[salsa::tracked]
+    pub fn return_ty(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.body_scope(db);
+        let function_stmt_node = scope.node(db).expect_function();
 
         // TODO if a function `bar` is decorated by `foo`,
         // where `foo` is annotated as returning a type `X` that is a subtype of `Callable`,
@@ -1897,6 +1905,8 @@ impl<'db> FunctionType<'db> {
                     // TODO: generic `types.CoroutineType`!
                     Type::Todo
                 } else {
+                    let definition =
+                        semantic_index(db, scope.file(db)).definition(function_stmt_node);
                     definition_expression_ty(db, definition, returns.as_ref())
                 }
             })
@@ -1923,8 +1933,6 @@ pub struct ClassType<'db> {
     /// Name of the class at definition
     #[return_ref]
     pub name: ast::name::Name,
-
-    definition: Definition<'db>,
 
     body_scope: ScopeId<'db>,
 
@@ -1955,23 +1963,55 @@ impl<'db> ClassType<'db> {
     /// Note that any class (except for `object`) that has no explicit
     /// bases will implicitly inherit from `object` at runtime. Nonetheless,
     /// this method does *not* include `object` in the bases it iterates over.
-    fn explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
-        let definition = self.definition(db);
-        let class_stmt = self.node(db);
-        let has_type_params = class_stmt.type_params.is_some();
+    ///
+    /// ## Why is this a salsa query?
+    ///
+    /// This is a salsa query to short-circuit the invalidation
+    /// when the class's AST node changes.
+    ///
+    /// Were this not a salsa query, then the calling query
+    /// would depend on the class's AST and rerun for every change in that file.
+    fn explicit_bases(self, db: &'db dyn Db) -> &[Type<'db>] {
+        self.explicit_bases_query(db)
+    }
 
-        class_stmt
-            .bases()
-            .iter()
-            .map(move |base_node| infer_class_base_type(db, base_node, definition, has_type_params))
+    #[salsa::tracked(return_ref)]
+    fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        let class_stmt = self.node(db);
+
+        if class_stmt.type_params.is_some() {
+            // when we have a specialized scope, we'll look up the inference
+            // within that scope
+            let model = SemanticModel::new(db, self.file(db));
+
+            class_stmt
+                .bases()
+                .iter()
+                .map(|base| base.ty(&model))
+                .collect()
+        } else {
+            // Otherwise, we can do the lookup based on the definition scope
+            let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+
+            class_stmt
+                .bases()
+                .iter()
+                .map(|base_node| definition_expression_ty(db, class_definition, base_node))
+                .collect()
+        }
+    }
+
+    fn file(self, db: &dyn Db) -> File {
+        self.body_scope(db).file(db)
     }
 
     /// Return the original [`ast::StmtClassDef`] node associated with this class
+    ///
+    /// ## Note
+    /// Only call this function from queries in the same file or your
+    /// query depends on the AST of another file (bad!).
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
-        match self.definition(db).kind(db) {
-            DefinitionKind::Class(class_stmt_node) => class_stmt_node,
-            _ => unreachable!("Class type definition should always have DefinitionKind::Class"),
-        }
+        self.body_scope(db).node(db).expect_class()
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
@@ -2046,26 +2086,6 @@ impl<'db> ClassType<'db> {
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
         symbol(db, scope, name)
-    }
-}
-
-/// Infer the type of a node representing an explicit class base.
-///
-/// For example, infer the type of `Foo` in the statement `class Bar(Foo, Baz): ...`.
-fn infer_class_base_type<'db>(
-    db: &'db dyn Db,
-    base_node: &'db ast::Expr,
-    class_definition: Definition<'db>,
-    class_has_type_params: bool,
-) -> Type<'db> {
-    if class_has_type_params {
-        // when we have a specialized scope, we'll look up the inference
-        // within that scope
-        let model = SemanticModel::new(db, class_definition.file(db));
-        base_node.ty(&model)
-    } else {
-        // Otherwise, we can do the lookup based on the definition scope
-        definition_expression_ty(db, class_definition, base_node)
     }
 }
 
@@ -2197,7 +2217,10 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::ProgramSettings;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast as ast;
     use test_case::test_case;
 
@@ -2638,5 +2661,60 @@ mod tests {
 
         let property_symbol_name = ast::name::Name::new_static("property");
         assert!(!symbol_names.contains(&property_symbol_name));
+    }
+
+    /// Inferring the result of a call-expression shouldn't need to re-run after
+    /// a trivial change to the function's file (e.g. by adding a docstring to the function).
+    #[test]
+    fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/foo.py",
+            r#"
+            def foo() -> int:
+                return 5
+        "#,
+        )?;
+        db.write_dedented(
+            "src/bar.py",
+            r#"
+            from foo import foo
+
+            a = foo()
+            "#,
+        )?;
+
+        let bar = system_path_to_file(&db, "src/bar.py")?;
+        let a = global_symbol(&db, bar, "a");
+
+        assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+
+        // Add a docstring to foo to trigger a re-run.
+        // The bar-call site of foo should not be re-run because of that
+        db.write_dedented(
+            "src/foo.py",
+            r#"
+            def foo() -> int:
+                "Computes a value"
+                return 5
+            "#,
+        )?;
+        db.clear_salsa_events();
+
+        let a = global_symbol(&db, bar, "a");
+
+        assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+        let events = db.take_salsa_events();
+
+        let call = &*parsed_module(&db, bar).syntax().body[1]
+            .as_assign_stmt()
+            .unwrap()
+            .value;
+        let foo_call = semantic_index(&db, bar).expression(call);
+
+        assert_function_query_was_not_run(&db, infer_expression_types, foo_call, &events);
+
+        Ok(())
     }
 }
