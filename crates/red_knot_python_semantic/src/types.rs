@@ -2217,7 +2217,10 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::ProgramSettings;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast as ast;
     use test_case::test_case;
 
@@ -2658,5 +2661,60 @@ mod tests {
 
         let property_symbol_name = ast::name::Name::new_static("property");
         assert!(!symbol_names.contains(&property_symbol_name));
+    }
+
+    /// Inferring the result of a call-expression shouldn't need to re-run after
+    /// a trivial change to the function's file (e.g. by adding a docstring to the function).
+    #[test]
+    fn call_type_doesnt_rerun_when_onlyh_callee_changed() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/foo.py",
+            r#"
+            def foo() -> int:
+                return 5
+        "#,
+        )?;
+        db.write_dedented(
+            "src/bar.py",
+            r#"
+            from foo import foo
+
+            a = foo()
+            "#,
+        )?;
+
+        let bar = system_path_to_file(&db, "src/bar.py")?;
+        let a = global_symbol(&db, bar, "a");
+
+        assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+
+        // Add a docstring to foo to trigger a re-run.
+        // The bar-call site of foo should not be re-run because of that
+        db.write_dedented(
+            "src/foo.py",
+            r#"
+            def foo() -> int:
+                "Computes a value"
+                return 5
+            "#,
+        )?;
+        db.clear_salsa_events();
+
+        let a = global_symbol(&db, bar, "a");
+
+        assert_eq!(a.expect_type(), KnownClass::Int.to_instance(&db));
+        let events = db.take_salsa_events();
+
+        let call = &*parsed_module(&db, bar).syntax().body[1]
+            .as_assign_stmt()
+            .unwrap()
+            .value;
+        let foo_call = semantic_index(&db, bar).expression(call);
+
+        assert_function_query_was_not_run(&db, infer_expression_types, foo_call, &events);
+
+        Ok(())
     }
 }
