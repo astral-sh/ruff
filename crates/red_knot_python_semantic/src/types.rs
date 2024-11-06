@@ -2123,8 +2123,8 @@ impl<'db> Class<'db> {
                 }
                 return Err(MetaclassError {
                     kind: MetaclassErrorKind::Conflict {
-                        metaclass1: candidate,
-                        metaclass2: metaclass,
+                        metaclass1: candidate.class,
+                        metaclass2: metaclass.class,
                     },
                 });
             }
@@ -2294,8 +2294,8 @@ pub(super) enum MetaclassErrorKind<'db> {
     /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
     /// its bases.
     Conflict {
-        metaclass1: ClassLiteralType<'db>,
-        metaclass2: ClassLiteralType<'db>,
+        metaclass1: Class<'db>,
+        metaclass2: Class<'db>,
     },
     /// The class inherits from itself!
     ///

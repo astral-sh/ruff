@@ -450,9 +450,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Iterate over all class definitions to check that Python will be able to create a
-    /// consistent "[method resolution order]" for each class at runtime. If not, issue a diagnostic.
+    /// consistent "[method resolution order]" and [metaclass] for each class at runtime. If not,
+    /// issue a diagnostic.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
     fn check_class_definitions(&mut self) {
         let class_definitions = self
             .types
@@ -461,92 +463,72 @@ impl<'db> TypeInferenceBuilder<'db> {
             .filter_map(|ty| ty.into_class_literal())
             .map(|class_ty| class_ty.class);
 
-        let invalid_mros = class_definitions.filter_map(|class| {
-            class
-                .try_mro(self.db)
-                .as_ref()
-                .err()
-                .map(|mro_error| (class, mro_error))
-        });
-
-        for (class, mro_error) in invalid_mros {
-            match mro_error.reason() {
-                MroErrorKind::DuplicateBases(duplicates) => {
-                    let base_nodes = class.node(self.db).bases();
-                    for (index, duplicate) in duplicates {
-                        self.diagnostics.add(
-                            (&base_nodes[*index]).into(),
-                            "duplicate-base",
-                            format_args!("Duplicate base class `{}`", duplicate.name(self.db)),
-                        );
+        for class in class_definitions {
+            if let Err(mro_error) = class.try_mro(self.db).as_ref() {
+                match mro_error.reason() {
+                    MroErrorKind::DuplicateBases(duplicates) => {
+                        let base_nodes = class.node(self.db).bases();
+                        for (index, duplicate) in duplicates {
+                            self.diagnostics.add(
+                                (&base_nodes[*index]).into(),
+                                "duplicate-base",
+                                format_args!("Duplicate base class `{}`", duplicate.name(self.db)),
+                            );
+                        }
                     }
-                }
-                MroErrorKind::CyclicClassDefinition => self.diagnostics.add(
-                    class.node(self.db).into(),
-                    "cyclic-class-def",
-                    format_args!(
-                        "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
-                        class.name(self.db),
-                        class.name(self.db)
+                    MroErrorKind::CyclicClassDefinition => self.diagnostics.add(
+                        class.node(self.db).into(),
+                        "cyclic-class-def",
+                        format_args!(
+                            "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
+                            class.name(self.db),
+                            class.name(self.db)
+                        ),
                     ),
-                ),
-                MroErrorKind::InvalidBases(bases) => {
-                    let base_nodes = class.node(self.db).bases();
-                    for (index, base_ty) in bases {
-                        self.diagnostics.add(
-                            (&base_nodes[*index]).into(),
-                            "invalid-base",
-                            format_args!(
-                                "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
-                                base_ty.display(self.db)
-                            ),
-                        );
+                    MroErrorKind::InvalidBases(bases) => {
+                        let base_nodes = class.node(self.db).bases();
+                        for (index, base_ty) in bases {
+                            self.diagnostics.add(
+                                (&base_nodes[*index]).into(),
+                                "invalid-base",
+                                format_args!(
+                                    "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
+                                    base_ty.display(self.db)
+                                ),
+                            );
+                        }
                     }
+                    MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
+                        class.node(self.db).into(),
+                        "inconsistent-mro",
+                        format_args!(
+                            "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
+                            class.name(self.db),
+                            bases_list.iter().map(|base| base.display(self.db)).join(", ")
+                        ),
+                    )
                 }
-                MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
-                    class.node(self.db).into(),
-                    "inconsistent-mro",
-                    format_args!(
-                        "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
-                        class.name(self.db),
-                        bases_list.iter().map(|base| base.display(self.db)).join(", ")
-                    ),
-                )
             }
-        }
 
-        let class_definitions = self
-            .types
-            .declarations
-            .values()
-            .filter_map(|ty| ty.into_class_literal())
-            .map(|class_ty| class_ty.class);
-
-        let invalid_metaclasses = class_definitions.filter_map(|class| {
-            class
-                .try_metaclass(self.db)
-                .err()
-                .map(|metaclass_error| (class, metaclass_error))
-        });
-
-        for (class, metaclass_error) in invalid_metaclasses {
-            match metaclass_error.reason() {
-                MetaclassErrorKind::Conflict {
-                    metaclass1,
-                    metaclass2
-                } => self.diagnostics.add(
-                    class.node(self.db).into(),
-                    "conflicting-metaclass",
-                    format_args!(
-                        "The metaclass of a derived class (`{}`) must be a subclass of the metaclasses of all its bases, but `{}` and `{}` have no subclass relationship",
-                        class.name(self.db),
-                        Type::ClassLiteral(*metaclass1).display(self.db),
-                        Type::ClassLiteral(*metaclass2).display(self.db),
+            if let Err(metaclass_error) = class.try_metaclass(self.db) {
+                match metaclass_error.reason() {
+                    MetaclassErrorKind::Conflict {
+                        metaclass1,
+                        metaclass2
+                    } => self.diagnostics.add(
+                        class.node(self.db).into(),
+                        "conflicting-metaclass",
+                        format_args!(
+                            "The metaclass of a derived class (`{}`) must be a subclass of the metaclasses of all its bases, but `{}` and `{}` have no subclass relationship",
+                            class.name(self.db),
+                            metaclass1.name(self.db),
+                            metaclass2.name(self.db),
+                        ),
                     ),
-                ),
-                MetaclassErrorKind::CyclicDefinition => {
-                    // Cyclic class definition diagnostic will already have been emitted above in
-                    // MRO calculation.
+                    MetaclassErrorKind::CyclicDefinition => {
+                        // Cyclic class definition diagnostic will already have been emitted above
+                        // in MRO calculation.
+                    }
                 }
             }
         }
