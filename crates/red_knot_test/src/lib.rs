@@ -1,14 +1,13 @@
-use crate::diagnostic::Diagnostic;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
+use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
 use std::path::Path;
-use std::sync::Arc;
 
 mod assertion;
 mod db;
@@ -94,14 +93,15 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
                 .iter()
                 .cloned()
                 .map(|error| {
-                    let diagnostic: Box<dyn Diagnostic> = Box::new(error);
+                    let diagnostic: Box<dyn Diagnostic> =
+                        Box::new(ParseDiagnostic::new(test_file.file, error));
                     diagnostic
                 })
                 .collect();
 
             let type_diagnostics = check_types(db, test_file.file);
             diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
-                let diagnostic: Box<dyn Diagnostic> = Box::new(Arc::unwrap_or_clone(diagnostic));
+                let diagnostic: Box<dyn Diagnostic> = Box::new((*diagnostic).clone());
                 diagnostic
             }));
 

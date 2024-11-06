@@ -1,12 +1,13 @@
+use crate::types::{ClassLiteralType, Type};
+use crate::Db;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
-
-use crate::types::{ClassLiteralType, Type};
-use crate::Db;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TypeCheckDiagnostic {
@@ -28,6 +29,28 @@ impl TypeCheckDiagnostic {
 
     pub fn file(&self) -> File {
         self.file
+    }
+}
+
+impl Diagnostic for TypeCheckDiagnostic {
+    fn rule(&self) -> &str {
+        TypeCheckDiagnostic::rule(self)
+    }
+
+    fn message(&self) -> Cow<str> {
+        TypeCheckDiagnostic::message(self).into()
+    }
+
+    fn file(&self) -> File {
+        TypeCheckDiagnostic::file(self)
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        Some(Ranged::range(self))
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
     }
 }
 

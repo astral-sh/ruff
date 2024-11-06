@@ -2,62 +2,9 @@
 //!
 //! We don't assume that we will get the diagnostics in source order.
 
-use red_knot_python_semantic::types::TypeCheckDiagnostic;
-use ruff_python_parser::ParseError;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::{Ranged, TextRange};
-use std::borrow::Cow;
 use std::ops::{Deref, Range};
-
-pub(super) trait Diagnostic: std::fmt::Debug {
-    fn rule(&self) -> &str;
-
-    fn message(&self) -> Cow<str>;
-
-    fn range(&self) -> TextRange;
-}
-
-impl Diagnostic for TypeCheckDiagnostic {
-    fn rule(&self) -> &str {
-        TypeCheckDiagnostic::rule(self)
-    }
-
-    fn message(&self) -> Cow<str> {
-        TypeCheckDiagnostic::message(self).into()
-    }
-
-    fn range(&self) -> TextRange {
-        Ranged::range(self)
-    }
-}
-
-impl Diagnostic for ParseError {
-    fn rule(&self) -> &str {
-        "invalid-syntax"
-    }
-
-    fn message(&self) -> Cow<str> {
-        self.error.to_string().into()
-    }
-
-    fn range(&self) -> TextRange {
-        self.location
-    }
-}
-
-impl Diagnostic for Box<dyn Diagnostic> {
-    fn rule(&self) -> &str {
-        (**self).rule()
-    }
-
-    fn message(&self) -> Cow<str> {
-        (**self).message()
-    }
-
-    fn range(&self) -> TextRange {
-        (**self).range()
-    }
-}
 
 /// All diagnostics for one embedded Python file, sorted and grouped by start line number.
 ///
@@ -78,7 +25,11 @@ where
         let mut diagnostics: Vec<_> = diagnostics
             .into_iter()
             .map(|diagnostic| DiagnosticWithLine {
-                line_number: line_index.line_index(diagnostic.range().start()),
+                line_number: diagnostic
+                    .range()
+                    .map_or(OneIndexed::from_zero_indexed(0), |range| {
+                        line_index.line_index(range.start())
+                    }),
                 diagnostic,
             })
             .collect();
@@ -193,7 +144,8 @@ struct DiagnosticWithLine<T> {
 mod tests {
     use crate::db::Db;
     use crate::diagnostic::Diagnostic;
-    use ruff_db::files::system_path_to_file;
+    use ruff_db::diagnostic::Severity;
+    use ruff_db::files::{system_path_to_file, File};
     use ruff_db::source::line_index;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_source_file::OneIndexed;
@@ -215,7 +167,7 @@ mod tests {
 
         let diagnostics: Vec<_> = ranges
             .into_iter()
-            .map(|range| DummyDiagnostic { range })
+            .map(|range| DummyDiagnostic { range, file })
             .collect();
 
         let sorted = super::SortedDiagnostics::new(diagnostics, &lines);
@@ -234,6 +186,7 @@ mod tests {
     #[derive(Debug)]
     struct DummyDiagnostic {
         range: TextRange,
+        file: File,
     }
 
     impl Diagnostic for DummyDiagnostic {
@@ -245,8 +198,16 @@ mod tests {
             "dummy".into()
         }
 
-        fn range(&self) -> TextRange {
-            self.range
+        fn file(&self) -> File {
+            self.file
+        }
+
+        fn range(&self) -> Option<TextRange> {
+            Some(self.range)
+        }
+
+        fn severity(&self) -> Severity {
+            Severity::Error
         }
     }
 }
