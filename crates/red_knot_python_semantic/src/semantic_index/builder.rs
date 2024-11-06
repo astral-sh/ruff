@@ -48,12 +48,6 @@ pub(super) struct SemanticIndexBuilder<'db> {
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
 
-    /// The [`Unpack`] ingredient for the current definition that belongs to an unpacking
-    /// assignment. This is used to correctly map multiple definitions to the *same* unpacking.
-    /// For example, in `a, b = 1, 2`, both `a` and `b` creates separate definitions but they both
-    /// belong to the same unpacking.
-    current_unpack: Option<Unpack<'db>>,
-
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
     /// Per-scope contexts regarding nested `try`/`except` statements
@@ -83,7 +77,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             scope_stack: Vec::new(),
             current_assignments: vec![],
             current_match_case: None,
-            current_unpack: None,
             loop_break_states: vec![],
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
@@ -206,15 +199,15 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_symbol_table().mark_symbol_used(id);
     }
 
-    fn add_definition<'a>(
+    fn add_definition(
         &mut self,
         symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'a>>,
+        definition_node: impl Into<DefinitionNodeRef<'db>>,
     ) -> Definition<'db> {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
-        let kind = unsafe { definition_node.into_owned(self.module.clone(), self.current_unpack) };
+        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category();
         let definition = Definition::new(
             self.db,
@@ -448,7 +441,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
     }
 
-    fn declare_parameter(&mut self, parameter: AnyParameterRef) {
+    fn declare_parameter(&mut self, parameter: AnyParameterRef<'db>) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
@@ -630,35 +623,38 @@ where
                     // We only handle assignments to names and unpackings here, other targets like
                     // attribute and subscript are handled separately as they don't create a new
                     // definition.
-                    let is_assignment_target = match target {
+                    let current_assignment = match target {
                         ast::Expr::List(_) | ast::Expr::Tuple(_) => {
-                            self.current_unpack = Some(Unpack::new(
-                                self.db,
-                                self.file,
-                                self.current_scope(),
-                                #[allow(unsafe_code)]
-                                unsafe {
-                                    AstNodeRef::new(self.module.clone(), target)
-                                },
-                                value,
-                                countme::Count::default(),
-                            ));
-                            true
+                            Some(CurrentAssignment::Assign {
+                                node,
+                                unpack: Some(Unpack::new(
+                                    self.db,
+                                    self.file,
+                                    self.current_scope(),
+                                    #[allow(unsafe_code)]
+                                    unsafe {
+                                        AstNodeRef::new(self.module.clone(), target)
+                                    },
+                                    value,
+                                    countme::Count::default(),
+                                )),
+                            })
                         }
-                        ast::Expr::Name(_) => true,
-                        _ => false,
+                        ast::Expr::Name(_) => {
+                            Some(CurrentAssignment::Assign { node, unpack: None })
+                        }
+                        _ => None,
                     };
 
-                    if is_assignment_target {
-                        self.push_assignment(CurrentAssignment::Assign(node));
+                    if let Some(current_assignment) = current_assignment {
+                        self.push_assignment(current_assignment);
                     }
 
                     self.visit_expr(target);
 
-                    if is_assignment_target {
+                    if current_assignment.is_some() {
                         // Only need to pop in the case where we pushed something
                         self.pop_assignment();
-                        self.current_unpack = None;
                     }
                 }
             }
@@ -992,11 +988,12 @@ where
 
                 if is_definition {
                     match self.current_assignment().copied() {
-                        Some(CurrentAssignment::Assign(assign)) => {
+                        Some(CurrentAssignment::Assign { node, unpack }) => {
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
-                                    value: &assign.value,
+                                    unpack,
+                                    value: &node.value,
                                     name: name_node,
                                 },
                             );
@@ -1246,7 +1243,10 @@ where
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CurrentAssignment<'a> {
-    Assign(&'a ast::StmtAssign),
+    Assign {
+        node: &'a ast::StmtAssign,
+        unpack: Option<Unpack<'a>>,
+    },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),
     For(&'a ast::StmtFor),
