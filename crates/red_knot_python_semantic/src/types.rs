@@ -1291,7 +1291,6 @@ impl<'db> Type<'db> {
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::LiteralString => Type::Unknown,
-            //
             Type::Type(..) => Type::Unknown,
         }
     }
