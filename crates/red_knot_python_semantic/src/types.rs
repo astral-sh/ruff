@@ -2100,8 +2100,10 @@ impl<'db> Class<'db> {
             };
 
             let Type::ClassLiteral(mut candidate) = metaclass else {
-                // If the metaclass is not a class, return it directly.
-                return Ok(metaclass);
+                // TODO: If the metaclass is not a class, we should verify that it's a callable
+                // which accepts the same arguments as `type.__new__` (otherwise error), and return
+                // the meta-type of its return type. (And validate that is a class type?)
+                return Ok(Type::Todo);
             };
 
             // Reconcile all base classes' metaclasses with the candidate metaclass.

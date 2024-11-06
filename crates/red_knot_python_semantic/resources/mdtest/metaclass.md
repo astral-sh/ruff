@@ -21,16 +21,16 @@ reveal_type(type.__class__)  # revealed: Literal[type]
 ## Basic
 
 ```py
-class A(type): ...
-class B(metaclass=A): ...
+class M(type): ...
+class B(metaclass=M): ...
 
-reveal_type(B.__class__)  # revealed: Literal[A]
+reveal_type(B.__class__)  # revealed: Literal[M]
 ```
 
 ## Invalid metaclass
 
-If a class is a subclass of a class with a custom metaclass, then the subclass will also have that
-metaclass.
+A class which doesn't inherit `type` (and/or doesn't implement a custom `__new__` accepting the same
+arguments as `type.__new__`) isn't a valid metaclass.
 
 ```py
 class M: ...
@@ -139,13 +139,14 @@ from nonexistent_module import UnknownClass  # error: [unresolved-import]
 
 class C(UnknownClass): ...
 
+# TODO: should be `type[type] & Unknown`
 reveal_type(C.__class__)  # revealed: Literal[type]
 
 class M(type): ...
 class A(metaclass=M): ...
 class B(A, UnknownClass): ...
 
-# TODO: This should resolve to `type[M] | Unknown` instead
+# TODO: should be `type[M] & Unknown`
 reveal_type(B.__class__)  # revealed: Literal[M]
 ```
 
@@ -161,12 +162,16 @@ reveal_type(B.__class__)  # revealed: Literal[M]
 
 ## Non-class
 
-When a class has an explicit `metaclass` that is not a class, the value should be returned as is.
+When a class has an explicit `metaclass` that is not a class, but is a callable that accepts
+`type.__new__` arguments, we should return the meta type of its return type.
 
 ```py
-class A(metaclass=1): ...
+def f(*args, **kwargs) -> int: ...
 
-reveal_type(A.__class__)  # revealed: Literal[1]
+class A(metaclass=f): ...
+
+# TODO should be `type[int]`
+reveal_type(A.__class__)  # revealed: @Todo
 ```
 
 ## Cyclic
