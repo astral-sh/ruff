@@ -218,6 +218,7 @@ fn check_single_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, range: Te
         return;
     };
 
+    // FIXME: Remove this once everything is done
     println!("Comment: {text:?}");
 
     if let Ok(Some(file_level_noqa)) = try_parse_file_level_noqa(text) {
@@ -245,7 +246,7 @@ fn check_single_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, range: Te
     add_diagnostic_if_applicable(diagnostics, comment, text, range);
 }
 
-/// RUF102
+/// RUF104
 pub(crate) fn unformatted_special_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
