@@ -538,6 +538,11 @@ impl<'db> Type<'db> {
             (Type::Type(self_class), Type::Type(target_class)) => {
                 self_class.class.is_subclass_of(db, target_class.class)
             }
+            (Type::Type(..), Type::Instance(InstanceType { class, .. }))
+                if class.is_known(db, KnownClass::Type) =>
+            {
+                true
+            }
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
@@ -840,11 +845,15 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..)
-            | Type::LiteralString
-            | Type::Type(..) => {
+            | Type::LiteralString => {
                 // Note: The literal types included in this pattern are not true singletons.
                 // There can be multiple Python objects (at different memory locations) that
                 // are both of type Literal[345], for example.
+                false
+            }
+            Type::Type(..) => {
+                // TODO once we have support for final classes, we can return `true` for some
+                // cases: type[C] is a singleton if C is final.
                 false
             }
             Type::BooleanLiteral(_)
@@ -894,6 +903,11 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..) => true,
 
+            Type::Type(..) => {
+                // TODO: Same comment as above for `is_singleton`
+                false
+            }
+
             Type::Tuple(tuple) => tuple
                 .elements(db)
                 .iter()
@@ -928,8 +942,7 @@ impl<'db> Type<'db> {
             | Type::Todo
             | Type::Union(..)
             | Type::Intersection(..)
-            | Type::LiteralString
-            | Type::Type(..) => false,
+            | Type::LiteralString => false,
         }
     }
 
@@ -1281,8 +1294,9 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
-            | Type::LiteralString
-            | Type::Type(..) => Type::Unknown,
+            | Type::LiteralString => Type::Unknown,
+            //
+            Type::Type(..) => Type::Unknown,
         }
     }
 
