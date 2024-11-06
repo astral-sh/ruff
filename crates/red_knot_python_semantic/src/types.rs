@@ -2069,6 +2069,21 @@ impl<'db> Class<'db> {
             class: Class<'db>,
             seen: &mut SeenSet<Class<'db>>,
         ) -> Result<Type<'db>, MetaclassError<'db>> {
+            // Recursively infer the metaclass of a class, ensuring that cyclic definitions are
+            // detected.
+            let mut safe_recurse = |class: Class<'db>| -> Result<Type<'db>, MetaclassError<'db>> {
+                // Each base must be considered in isolation.
+                let num_seen = seen.len();
+                if !seen.insert(class) {
+                    return Err(MetaclassError {
+                        kind: MetaclassErrorKind::CyclicDefinition,
+                    });
+                }
+                let metaclass = infer(db, class, seen)?;
+                seen.truncate(num_seen);
+                Ok(metaclass)
+            };
+
             let mut base_classes = class
                 .explicit_bases(db)
                 .iter()
@@ -2079,16 +2094,7 @@ impl<'db> Class<'db> {
             let metaclass = if let Some(metaclass) = class.explicit_metaclass(db) {
                 metaclass
             } else if let Some(base_class) = base_classes.next() {
-                // Each base must be considered in isolation.
-                let watcher_len = seen.len();
-                if !seen.insert(base_class.class) {
-                    return Err(MetaclassError {
-                        kind: MetaclassErrorKind::CyclicDefinition,
-                    });
-                }
-                let metaclass = infer(db, base_class.class, seen)?;
-                seen.truncate(watcher_len);
-                metaclass
+                safe_recurse(base_class.class)?
             } else {
                 KnownClass::Type.to_class(db)
             };
@@ -2104,18 +2110,7 @@ impl<'db> Class<'db> {
             // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
             // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
             for base_class in base_classes {
-                let metaclass = {
-                    // Each base must be considered in isolation.
-                    let watcher_len = seen.len();
-                    if !seen.insert(base_class.class) {
-                        return Err(MetaclassError {
-                            kind: MetaclassErrorKind::CyclicDefinition,
-                        });
-                    }
-                    let metaclass = infer(db, base_class.class, seen)?;
-                    seen.truncate(watcher_len);
-                    metaclass
-                };
+                let metaclass = safe_recurse(base_class.class)?;
                 let Type::ClassLiteral(metaclass) = metaclass else {
                     continue;
                 };

@@ -538,15 +538,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                     class.node(self.db).into(),
                     "conflicting-metaclass",
                     format_args!(
-                        "The metaclass of a derived class (`{}`) must be a subclass of the metaclasses of all its bases, but `{}` and `{}` are not compatible",
+                        "The metaclass of a derived class (`{}`) must be a subclass of the metaclasses of all its bases, but `{}` and `{}` have no subclass relationship",
                         class.name(self.db),
                         Type::ClassLiteral(*metaclass1).display(self.db),
                         Type::ClassLiteral(*metaclass2).display(self.db),
                     ),
                 ),
                 MetaclassErrorKind::CyclicDefinition => {
-                    // TODO(charlie): When diagnostics are deduplicated, add a `cyclic-class-def`
-                    // diagnostic, equivalent to the above.
+                    // Cyclic class definition diagnostic will already have been emitted above in
+                    // MRO calculation.
                 }
             }
         }
@@ -1223,9 +1223,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             context_expression.into(),
                             "invalid-context-manager",
                             format_args!("
-                                Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` of type `{enter_ty}` is not callable",
-                                         context_expression = context_expression_ty.display(self.db),
-                                         enter_ty = enter_ty.display(self.db)
+                                Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` of type `{enter_ty}` is not callable", context_expression = context_expression_ty.display(self.db), enter_ty = enter_ty.display(self.db)
                             ),
                         );
                         err.return_ty()
