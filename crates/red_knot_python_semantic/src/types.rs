@@ -399,6 +399,15 @@ impl<'db> Type<'db> {
         IntersectionBuilder::new(db).add_negative(*self).build()
     }
 
+    #[must_use]
+    pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
+        if yes {
+            self.negate(db)
+        } else {
+            *self
+        }
+    }
+
     pub const fn into_union(self) -> Option<UnionType<'db>> {
         match self {
             Type::Union(union_type) => Some(union_type),

@@ -78,41 +78,27 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), false).finish()
 }
 
-/// Generate a constraint from the *type* of the second argument of an `isinstance` call.
+/// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
 ///
-/// Example: for `isinstance(…, str)`, we would infer `Type::ClassLiteral(str)` from the
-/// second argument, but we need to generate a `Type::Instance(str)` constraint that can
-/// be used to narrow down the type of the first argument.
-fn generate_isinstance_constraint<'db>(
+/// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
+/// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
+fn generate_classinfo_constraint<'db, F>(
     db: &'db dyn Db,
     classinfo: &Type<'db>,
-) -> Option<Type<'db>> {
+    to_constraint: F,
+) -> Option<Type<'db>>
+where
+    F: Fn(ClassLiteralType<'db>) -> Type<'db> + Copy,
+{
     match classinfo {
-        Type::ClassLiteral(ClassLiteralType { class }) => Some(Type::anonymous_instance(*class)),
         Type::Tuple(tuple) => {
             let mut builder = UnionBuilder::new(db);
             for element in tuple.elements(db) {
-                builder = builder.add(generate_isinstance_constraint(db, element)?);
+                builder = builder.add(generate_classinfo_constraint(db, element, to_constraint)?);
             }
             Some(builder.build())
         }
-        _ => None,
-    }
-}
-
-fn generate_issubclass_constraint<'db>(
-    db: &'db dyn Db,
-    classinfo: &Type<'db>,
-) -> Option<Type<'db>> {
-    match classinfo {
-        Type::ClassLiteral(class_literal_type) => Some(Type::Type(*class_literal_type)),
-        Type::Tuple(tuple) => {
-            let mut builder = UnionBuilder::new(db);
-            for element in tuple.elements(db) {
-                builder = builder.add(generate_issubclass_constraint(db, element)?);
-            }
-            Some(builder.build())
-        }
+        Type::ClassLiteral(class_literal_type) => Some(to_constraint(*class_literal_type)),
         _ => None,
     }
 }
@@ -354,34 +340,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             .into_function_literal()
             .and_then(|f| f.known(self.db))
         {
-            Some(KnownFunction::IsInstance) if expr_call.arguments.keywords.is_empty() => {
-                if let [ast::Expr::Name(ast::ExprName { id, .. }), rhs] = &*expr_call.arguments.args
-                {
-                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-
-                    let class_info_ty = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
-
-                    if let Some(constraint) =
-                        generate_isinstance_constraint(self.db, &class_info_ty)
-                    {
-                        let mut constraints = NarrowingConstraints::default();
-                        constraints.insert(
-                            symbol,
-                            if is_positive {
-                                constraint
-                            } else {
-                                constraint.negate(self.db)
-                            },
-                        );
-                        Some(constraints)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
-            Some(KnownFunction::IsSubclass) if expr_call.arguments.keywords.is_empty() => {
+            Some(function @ (KnownFunction::IsInstance | KnownFunction::IsSubclass))
+                if expr_call.arguments.keywords.is_empty() =>
+            {
                 if let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
                     &*expr_call.arguments.args
                 {
@@ -390,18 +351,22 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     let class_info_ty =
                         inference.expression_ty(class_info.scoped_ast_id(self.db, scope));
 
-                    generate_issubclass_constraint(self.db, &class_info_ty).map(|constraint| {
-                        let mut constraints = NarrowingConstraints::default();
-                        constraints.insert(
-                            symbol,
-                            if is_positive {
-                                constraint
-                            } else {
-                                constraint.negate(self.db)
-                            },
-                        );
-                        constraints
-                    })
+                    #[allow(clippy::match_wildcard_for_single_variants)]
+                    let to_constraint = match function {
+                        KnownFunction::IsInstance => |class_literal: ClassLiteralType<'db>| {
+                            Type::anonymous_instance(class_literal.class)
+                        },
+                        KnownFunction::IsSubclass => Type::Type,
+                        _ => unreachable!(),
+                    };
+
+                    generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
+                        |constraint| {
+                            let mut constraints = NarrowingConstraints::default();
+                            constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
+                            constraints
+                        },
+                    )
                 } else {
                     None
                 }
