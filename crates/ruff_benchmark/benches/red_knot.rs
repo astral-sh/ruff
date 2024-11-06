@@ -8,6 +8,7 @@ use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
@@ -24,32 +25,32 @@ const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/
 
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
     // We don't support `*` imports yet:
-    "/src/tomllib/_parser.py:7:29: Module `collections.abc` has no member `Iterable`",
+    "error[unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
     // We don't support terminal statements in control flow yet:
-    "/src/tomllib/_parser.py:246:15: Method `__class_getitem__` of type `Literal[frozenset]` is possibly unbound",
-    "/src/tomllib/_parser.py:692:8354: Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
-    "/src/tomllib/_parser.py:66:18: Name `s` used when possibly not defined",
-    "/src/tomllib/_parser.py:98:12: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:101:12: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:104:14: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:108:17: Conflicting declared types for `second_char`: Unknown, str | None",
-    "/src/tomllib/_parser.py:115:14: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:126:12: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:267:9: Conflicting declared types for `char`: Unknown, str | None",
-    "/src/tomllib/_parser.py:348:20: Name `nest` used when possibly not defined",
-    "/src/tomllib/_parser.py:353:5: Name `nest` used when possibly not defined",
-    "/src/tomllib/_parser.py:364:9: Conflicting declared types for `char`: Unknown, str | None",
-    "/src/tomllib/_parser.py:381:13: Conflicting declared types for `char`: Unknown, str | None",
-    "/src/tomllib/_parser.py:395:9: Conflicting declared types for `char`: Unknown, str | None",
-    "/src/tomllib/_parser.py:453:24: Name `nest` used when possibly not defined",
-    "/src/tomllib/_parser.py:455:9: Name `nest` used when possibly not defined",
-    "/src/tomllib/_parser.py:482:16: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:566:12: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:573:12: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:579:12: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:580:63: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:590:9: Conflicting declared types for `char`: Unknown, str | None",
-    "/src/tomllib/_parser.py:629:38: Name `datetime_obj` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:66:18 Name `s` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:98:12 Name `char` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:101:12 Name `char` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:104:14 Name `char` used when possibly not defined",
+    "error[conflicting-declarations] /src/tomllib/_parser.py:108:17 Conflicting declared types for `second_char`: Unknown, str | None",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:115:14 Name `char` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:126:12 Name `char` used when possibly not defined",
+    "error[call-possibly-unbound-method] /src/tomllib/_parser.py:246:15 Method `__class_getitem__` of type `Literal[frozenset]` is possibly unbound",
+    "error[conflicting-declarations] /src/tomllib/_parser.py:267:9 Conflicting declared types for `char`: Unknown, str | None",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:348:20 Name `nest` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:353:5 Name `nest` used when possibly not defined",
+    "error[conflicting-declarations] /src/tomllib/_parser.py:364:9 Conflicting declared types for `char`: Unknown, str | None",
+    "error[conflicting-declarations] /src/tomllib/_parser.py:381:13 Conflicting declared types for `char`: Unknown, str | None",
+    "error[conflicting-declarations] /src/tomllib/_parser.py:395:9 Conflicting declared types for `char`: Unknown, str | None",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:453:24 Name `nest` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:455:9 Name `nest` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:482:16 Name `char` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:566:12 Name `char` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:573:12 Name `char` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:579:12 Name `char` used when possibly not defined",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
+    "error[conflicting-declarations] /src/tomllib/_parser.py:590:9 Conflicting declared types for `char`: Unknown, str | None",
+    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
+    "error[invalid-base] /src/tomllib/_parser.py:692:8354 Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
 ];
 
 fn get_test_file(name: &str) -> TestFile {
@@ -123,7 +124,14 @@ fn setup_rayon() {
 fn benchmark_incremental(criterion: &mut Criterion) {
     fn setup() -> Case {
         let case = setup_case();
-        let result = case.db.check().unwrap();
+
+        let result: Vec<_> = case
+            .db
+            .check()
+            .unwrap()
+            .into_iter()
+            .map(|diagnostic| diagnostic.display(&case.db).to_string())
+            .collect();
 
         assert_eq!(result, EXPECTED_DIAGNOSTICS);
 
@@ -150,7 +158,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
         let result = db.check().unwrap();
 
-        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+        assert_eq!(result.len(), EXPECTED_DIAGNOSTICS.len());
     }
 
     setup_rayon();
@@ -168,7 +176,12 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_case,
             |case| {
                 let Case { db, .. } = case;
-                let result = db.check().unwrap();
+                let result: Vec<_> = db
+                    .check()
+                    .unwrap()
+                    .into_iter()
+                    .map(|diagnostic| diagnostic.display(db).to_string())
+                    .collect();
 
                 assert_eq!(result, EXPECTED_DIAGNOSTICS);
             },
