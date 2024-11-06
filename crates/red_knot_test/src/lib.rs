@@ -3,7 +3,6 @@ use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::diagnostic::{CompileDiagnostic, Diagnostic as _};
 use ruff_db::files::{system_path_to_file, File, Files};
-use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
@@ -86,19 +85,8 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
     let failures: Failures = test_files
         .into_iter()
         .filter_map(|test_file| {
-            let parsed = parsed_module(db, test_file.file);
-
-            // TODO allow testing against code with syntax errors
-            assert!(
-                parsed.errors().is_empty(),
-                "Python syntax errors in {}, {}: {:?}",
-                test.name(),
-                test_file.file.path(db),
-                parsed.errors()
-            );
-
             let diagnostics: Vec<_> =
-                // The accumulator returns all diagnostics from all files. We're only interested into
+                // The accumulator returns all diagnostics from all files. We're only interested in
                 // diagnostics from this file.
                 check_types::accumulated::<CompileDiagnostic>(db, test_file.file)
                     .into_iter()

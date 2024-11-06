@@ -17,7 +17,6 @@ red_knot_python_semantic = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache"] }
 ruff_python_ast = { workspace = true }
-ruff_text_size = { workspace = true }
 red_knot_vendored = { workspace = true }
 
 anyhow = { workspace = true }

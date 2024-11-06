@@ -5106,34 +5106,6 @@ mod tests {
     }
 
     #[test]
-    fn exception_handler_with_invalid_syntax() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            from typing_extensions import reveal_type
-
-            try:
-                print
-            except as e:
-                reveal_type(e)
-            ",
-        )?;
-
-        assert_file_diagnostics(
-            &db,
-            "src/a.py",
-            &[
-                "Expected one or more exception types",
-                "Revealed type is `Unknown`",
-            ],
-        );
-
-        Ok(())
-    }
-
-    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 

@@ -51,6 +51,10 @@ repos:
       - id: blacken-docs
         args: ["--pyi", "--line-length", "130"]
         files: '^crates/.*/resources/mdtest/.*\.md'
+        exclude: |
+          (?x)^(
+            .*?invalid(_.+)_syntax.md
+          )$
         additional_dependencies:
           - black==24.10.0
 

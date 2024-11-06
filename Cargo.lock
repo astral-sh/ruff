@@ -2220,7 +2220,6 @@ dependencies = [
  "ruff_cache",
  "ruff_db",
  "ruff_python_ast",
- "ruff_text_size",
  "rustc-hash 2.0.0",
  "salsa",
  "tempfile",

@@ -2,10 +2,9 @@
 //!
 //! We don't assume that we will get the diagnostics in source order.
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::ops::{Deref, Range};
-
-use crate::matcher::Diagnostic;
 
 /// All diagnostics for one embedded Python file, sorted and grouped by start line number.
 ///
@@ -26,7 +25,10 @@ where
         let mut diagnostics: Vec<_> = diagnostics
             .into_iter()
             .map(|diagnostic| DiagnosticWithLine {
-                line_number: line_index.line_index(diagnostic.start()),
+                line_number: diagnostic
+                    .range()
+                    .map(|range| line_index.line_index(range.start()))
+                    .unwrap_or(OneIndexed::from_zero_indexed(0)),
                 diagnostic,
             })
             .collect();
@@ -140,12 +142,13 @@ struct DiagnosticWithLine<T> {
 #[cfg(test)]
 mod tests {
     use crate::db::Db;
-    use crate::matcher::Diagnostic;
-    use ruff_db::files::system_path_to_file;
+    use ruff_db::diagnostic::{Diagnostic, Severity};
+    use ruff_db::files::{system_path_to_file, File};
     use ruff_db::source::line_index;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{TextRange, TextSize};
+    use std::fmt::Debug;
 
     #[test]
     fn sort_and_group() {
@@ -162,7 +165,7 @@ mod tests {
 
         let diagnostics: Vec<_> = ranges
             .into_iter()
-            .map(|range| DummyDiagnostic { range })
+            .map(|range| DummyDiagnostic { file, range })
             .collect();
 
         let sorted = super::SortedDiagnostics::new(diagnostics, &lines);
@@ -178,7 +181,9 @@ mod tests {
         assert_eq!(line2.diagnostics.len(), 1);
     }
 
+    #[derive(Debug)]
     struct DummyDiagnostic {
+        file: File,
         range: TextRange,
     }
 
@@ -191,8 +196,16 @@ mod tests {
             "Dummy error".into()
         }
 
-        fn range(&self) -> TextRange {
-            self.range
+        fn file(&self) -> File {
+            self.file
+        }
+
+        fn range(&self) -> Option<TextRange> {
+            Some(self.range)
+        }
+
+        fn severity(&self) -> Severity {
+            Severity::Error
         }
     }
 }

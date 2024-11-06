@@ -98,7 +98,7 @@ pub struct ParseDiagnostic {
 
 impl Diagnostic for ParseDiagnostic {
     fn rule(&self) -> &str {
-        "syntax-error"
+        "invalid-syntax"
     }
 
     fn message(&self) -> std::borrow::Cow<str> {
