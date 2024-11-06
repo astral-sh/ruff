@@ -77,6 +77,9 @@ impl Display for DisplayRepresentation<'_> {
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),
+            Type::Type(ClassLiteralType { class }) => {
+                write!(f, "type[{}]", class.name(self.db))
+            }
             Type::Instance(InstanceType { class, known }) => f.write_str(match known {
                 Some(super::KnownInstance::Literal) => "Literal",
                 _ => class.name(self.db),

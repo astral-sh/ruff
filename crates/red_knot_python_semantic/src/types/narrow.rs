@@ -4,7 +4,6 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
-use crate::types::mro::ClassBase;
 use crate::types::{
     infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
     Truthiness, Type, UnionBuilder,
@@ -101,62 +100,16 @@ fn generate_isinstance_constraint<'db>(
     }
 }
 
-fn generate_issubclass_constraint_inner<'db>(
-    db: &'db dyn Db,
-    ty: &Type<'db>,
-    classinfo: &Type<'db>,
-) -> Option<Type<'db>> {
-    let classinfo_class_literal = classinfo.into_class_literal()?;
-
-    match ty {
-        Type::Union(union) => {
-            let mut builder = UnionBuilder::new(db);
-            for element in union.elements(db) {
-                let constraint = generate_issubclass_constraint_inner(db, element, classinfo)?;
-                builder = builder.add(constraint);
-            }
-            Some(builder.build())
-        }
-        Type::Intersection(..) => None, // TODO: intersections are not yet supported
-        Type::ClassLiteral(class_literal_type) => {
-            if class_literal_type
-                .class
-                .iter_mro(db)
-                .any(|superclass| superclass == ClassBase::Class(classinfo_class_literal.class))
-            {
-                Some(Type::ClassLiteral(*class_literal_type))
-            } else {
-                Some(*classinfo)
-            }
-        }
-        Type::Any
-        | Type::Unknown
-        | Type::Todo
-        | Type::Never
-        | Type::FunctionLiteral(..)
-        | Type::ModuleLiteral(..)
-        | Type::Instance(..)
-        | Type::IntLiteral(_)
-        | Type::BooleanLiteral(_)
-        | Type::StringLiteral(..)
-        | Type::LiteralString
-        | Type::BytesLiteral(..)
-        | Type::SliceLiteral(..)
-        | Type::Tuple(..) => None,
-    }
-}
-
 fn generate_issubclass_constraint<'db>(
     db: &'db dyn Db,
-    ty: &Type<'db>,
     classinfo: &Type<'db>,
 ) -> Option<Type<'db>> {
     match classinfo {
-        Type::ClassLiteral(..) => generate_issubclass_constraint_inner(db, ty, classinfo),
+        Type::ClassLiteral(class_literal_type) => Some(Type::Type(*class_literal_type)),
         Type::Tuple(tuple) => {
             let mut builder = UnionBuilder::new(db);
             for element in tuple.elements(db) {
-                builder = builder.add(generate_issubclass_constraint(db, ty, element)?);
+                builder = builder.add(generate_issubclass_constraint(db, element)?);
             }
             Some(builder.build())
         }
@@ -429,30 +382,26 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 }
             }
             Some(KnownFunction::IsSubclass) if expr_call.arguments.keywords.is_empty() => {
-                if let [name_expr @ ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
+                if let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
                     &*expr_call.arguments.args
                 {
                     let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-                    let identifier_ty =
-                        inference.expression_ty(name_expr.scoped_ast_id(self.db, scope));
                     let class_info_ty =
                         inference.expression_ty(class_info.scoped_ast_id(self.db, scope));
 
-                    generate_issubclass_constraint(self.db, &identifier_ty, &class_info_ty).map(
-                        |constraint| {
-                            let mut constraints = NarrowingConstraints::default();
-                            constraints.insert(
-                                symbol,
-                                if is_positive {
-                                    constraint
-                                } else {
-                                    constraint.negate(self.db)
-                                },
-                            );
-                            constraints
-                        },
-                    )
+                    generate_issubclass_constraint(self.db, &class_info_ty).map(|constraint| {
+                        let mut constraints = NarrowingConstraints::default();
+                        constraints.insert(
+                            symbol,
+                            if is_positive {
+                                constraint
+                            } else {
+                                constraint.negate(self.db)
+                            },
+                        );
+                        constraints
+                    })
                 } else {
                     None
                 }

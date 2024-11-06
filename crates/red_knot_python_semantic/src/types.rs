@@ -328,6 +328,8 @@ pub enum Type<'db> {
     ModuleLiteral(File),
     /// A specific class object
     ClassLiteral(ClassLiteralType<'db>),
+    // The set of all class objects that are subclasses of the given class.
+    Type(ClassLiteralType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
     /// The set of objects in any of the types in the union
@@ -521,6 +523,9 @@ impl<'db> Type<'db> {
             {
                 true
             }
+            (Type::ClassLiteral(self_class), Type::Type(target_class)) => {
+                self_class.class.is_subclass_of(db, target_class.class)
+            }
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
@@ -681,6 +686,14 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)),
             ) => left != right,
 
+            (Type::Type(type_class), Type::ClassLiteral(class_literal))
+            | (Type::ClassLiteral(class_literal), Type::Type(type_class)) => {
+                !class_literal.class.is_subclass_of(db, type_class.class)
+            }
+            (Type::Type(_), Type::Type(_)) => false,
+            (Type::Type(_), Type::Instance(_)) | (Type::Instance(_), Type::Type(_)) => false,
+            (Type::Type(_), _) | (_, Type::Type(_)) => true,
+
             (
                 Type::Instance(InstanceType {
                     class: class_none, ..
@@ -816,7 +829,8 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..)
-            | Type::LiteralString => {
+            | Type::LiteralString
+            | Type::Type(..) => {
                 // Note: The literal types included in this pattern are not true singletons.
                 // There can be multiple Python objects (at different memory locations) that
                 // are both of type Literal[345], for example.
@@ -903,7 +917,8 @@ impl<'db> Type<'db> {
             | Type::Todo
             | Type::Union(..)
             | Type::Intersection(..)
-            | Type::LiteralString => false,
+            | Type::LiteralString
+            | Type::Type(..) => false,
         }
     }
 
@@ -962,6 +977,10 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_ty) => class_ty.member(db, name),
+            Type::Type(..) => {
+                // TODO: attribute lookup on Type[..] type
+                Type::Todo.into()
+            }
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo.into()
@@ -1052,6 +1071,7 @@ impl<'db> Type<'db> {
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
             }
+            Type::Type(_) => Truthiness::Ambiguous,
             Type::Instance(InstanceType { class, .. }) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the instance's class
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
@@ -1250,7 +1270,8 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
-            | Type::LiteralString => Type::Unknown,
+            | Type::LiteralString
+            | Type::Type(..) => Type::Unknown,
         }
     }
 
@@ -1283,6 +1304,7 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
+            Type::Type(_) => Type::Type(KnownClass::Type.to_class(db).expect_class_literal()),
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
@@ -2462,7 +2484,10 @@ mod tests {
         StringLiteral(&'static str),
         LiteralString,
         BytesLiteral(&'static str),
+        // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
         BuiltinInstance(&'static str),
+        // BuiltinClassLiteral("str") corresponds to the builtin `str` class itself
+        BuiltinClassLiteral(&'static str),
         Union(Vec<Ty>),
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
@@ -2482,6 +2507,7 @@ mod tests {
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
                 Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
+                Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -2568,6 +2594,8 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("str")], neg: vec![Ty::StringLiteral("foo")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
+    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("int"))]
+    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinInstance("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -2593,6 +2621,8 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]})]
     #[test_case(Ty::BuiltinInstance("int"), Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(3)]})]
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(1)]})]
+    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinClassLiteral("int"))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -2605,6 +2635,7 @@ mod tests {
             "/src/module.py",
             "
             class A: ...
+            class DerivedFromA(A): ...
             class B: ...
             U = A if flag else B
         ",
@@ -2613,11 +2644,18 @@ mod tests {
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
         let type_a = super::global_symbol(&db, module, "A").expect_type();
+        let type_derived_from_a = super::global_symbol(&db, module, "DerivedFromA").expect_type();
         let type_u = super::global_symbol(&db, module, "U").expect_type();
 
         assert!(type_a.is_class_literal());
         assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
         assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
+
+        assert!(type_derived_from_a.is_class_literal());
+        // Construct the type `type[A]` from the class literal `A`:
+        let type_type_a = Type::Type(type_a.expect_class_literal());
+        assert!(type_a.is_subtype_of(&db, type_type_a));
+        assert!(type_derived_from_a.is_subtype_of(&db, type_type_a));
 
         assert!(type_u.is_union());
         assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));

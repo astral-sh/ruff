@@ -88,19 +88,16 @@ class A: ...
 class B: ...
 
 def flag() -> bool: ...
-def get_class() -> type: ...
+def get_class() -> object: ...
 
 t = get_class()
 
 if issubclass(t, A):
-    # TODO: this should be `type[A]`
-    reveal_type(t)  # revealed: type
+    reveal_type(t)  # revealed: type[A]
     if issubclass(t, B):
-        # TODO: this should be `type[A] & type[B]`
-        reveal_type(t)  # revealed: type
+        reveal_type(t)  # revealed: type[A] & type[B]
 else:
-    # TODO: this should be `~type[A]`
-    reveal_type(t)  # revealed: type
+    reveal_type(t)  # revealed: object & ~type[A]
 ```
 
 ### Handling of `None`
