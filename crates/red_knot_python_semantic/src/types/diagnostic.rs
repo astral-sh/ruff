@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::types::{ClassLiteralType, Type};
 use crate::Db;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TypeCheckDiagnostic {
     // TODO: Don't use string keys for rules
     pub(super) rule: String,

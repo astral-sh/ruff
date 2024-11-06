@@ -2,9 +2,62 @@
 //!
 //! We don't assume that we will get the diagnostics in source order.
 
+use red_knot_python_semantic::types::TypeCheckDiagnostic;
+use ruff_python_parser::ParseError;
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 use std::ops::{Deref, Range};
+
+pub(super) trait Diagnostic: std::fmt::Debug {
+    fn rule(&self) -> &str;
+
+    fn message(&self) -> Cow<str>;
+
+    fn range(&self) -> TextRange;
+}
+
+impl Diagnostic for TypeCheckDiagnostic {
+    fn rule(&self) -> &str {
+        TypeCheckDiagnostic::rule(self)
+    }
+
+    fn message(&self) -> Cow<str> {
+        TypeCheckDiagnostic::message(self).into()
+    }
+
+    fn range(&self) -> TextRange {
+        Ranged::range(self)
+    }
+}
+
+impl Diagnostic for ParseError {
+    fn rule(&self) -> &str {
+        "invalid-syntax"
+    }
+
+    fn message(&self) -> Cow<str> {
+        self.error.to_string().into()
+    }
+
+    fn range(&self) -> TextRange {
+        self.location
+    }
+}
+
+impl Diagnostic for Box<dyn Diagnostic> {
+    fn rule(&self) -> &str {
+        (**self).rule()
+    }
+
+    fn message(&self) -> Cow<str> {
+        (**self).message()
+    }
+
+    fn range(&self) -> TextRange {
+        (**self).range()
+    }
+}
 
 /// All diagnostics for one embedded Python file, sorted and grouped by start line number.
 ///
@@ -19,13 +72,13 @@ pub(crate) struct SortedDiagnostics<T> {
 
 impl<T> SortedDiagnostics<T>
 where
-    T: Ranged + Clone,
+    T: Diagnostic,
 {
     pub(crate) fn new(diagnostics: impl IntoIterator<Item = T>, line_index: &LineIndex) -> Self {
         let mut diagnostics: Vec<_> = diagnostics
             .into_iter()
             .map(|diagnostic| DiagnosticWithLine {
-                line_number: line_index.line_index(diagnostic.start()),
+                line_number: line_index.line_index(diagnostic.range().start()),
                 diagnostic,
             })
             .collect();
@@ -94,7 +147,7 @@ pub(crate) struct LineDiagnosticsIterator<'a, T> {
 
 impl<'a, T> Iterator for LineDiagnosticsIterator<'a, T>
 where
-    T: Ranged + Clone,
+    T: Diagnostic,
 {
     type Item = LineDiagnostics<'a, T>;
 
@@ -110,7 +163,7 @@ where
     }
 }
 
-impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: Clone + Ranged {}
+impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: Diagnostic {}
 
 /// All diagnostics that start on a single line of source code in one embedded Python file.
 #[derive(Debug)]
@@ -139,11 +192,13 @@ struct DiagnosticWithLine<T> {
 #[cfg(test)]
 mod tests {
     use crate::db::Db;
+    use crate::diagnostic::Diagnostic;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::line_index;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{TextRange, TextSize};
+    use std::borrow::Cow;
 
     #[test]
     fn sort_and_group() {
@@ -152,13 +207,18 @@ mod tests {
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let lines = line_index(&db, file);
 
-        let ranges = vec![
+        let ranges = [
             TextRange::new(TextSize::new(0), TextSize::new(1)),
             TextRange::new(TextSize::new(5), TextSize::new(10)),
             TextRange::new(TextSize::new(1), TextSize::new(7)),
         ];
 
-        let sorted = super::SortedDiagnostics::new(&ranges, &lines);
+        let diagnostics: Vec<_> = ranges
+            .into_iter()
+            .map(|range| DummyDiagnostic { range })
+            .collect();
+
+        let sorted = super::SortedDiagnostics::new(diagnostics, &lines);
         let grouped = sorted.iter_lines().collect::<Vec<_>>();
 
         let [line1, line2] = &grouped[..] else {
@@ -169,5 +229,24 @@ mod tests {
         assert_eq!(line1.diagnostics.len(), 2);
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(1));
         assert_eq!(line2.diagnostics.len(), 1);
+    }
+
+    #[derive(Debug)]
+    struct DummyDiagnostic {
+        range: TextRange,
+    }
+
+    impl Diagnostic for DummyDiagnostic {
+        fn rule(&self) -> &str {
+            "dummy"
+        }
+
+        fn message(&self) -> Cow<str> {
+            "dummy".into()
+        }
+
+        fn range(&self) -> TextRange {
+            self.range
+        }
     }
 }
