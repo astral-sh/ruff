@@ -183,4 +183,40 @@ B007.py:98:5: B007 Loop control variable `line_` not used within loop body
 99 |     fp.readline()
    |
 
+B007.py:110:5: B007 [*] Loop control variable `x` not used within loop body
+    |
+108 | # https://github.com/astral-sh/ruff/issues/14113
+109 | # Loop variable unused in its scope
+110 | for x in ls:
+    |     ^ B007
+111 |     print([x for x in otherls])
+    |
+    = help: Rename unused `x` to `_x`
 
+ℹ Unsafe fix
+107 107 | 
+108 108 | # https://github.com/astral-sh/ruff/issues/14113
+109 109 | # Loop variable unused in its scope
+110     |-for x in ls:
+    110 |+for _x in ls:
+111 111 |     print([x for x in otherls])
+112 112 | 
+113 113 | # Loop variable shadowed
+
+B007.py:114:5: B007 [*] Loop control variable `y` not used within loop body
+    |
+113 | # Loop variable shadowed
+114 | for y in ls:
+    |     ^ B007
+115 |     y=2
+    |
+    = help: Rename unused `y` to `_y`
+
+ℹ Unsafe fix
+111 111 |     print([x for x in otherls])
+112 112 | 
+113 113 | # Loop variable shadowed
+114     |-for y in ls:
+    114 |+for _y in ls:
+115 115 |     y=2
+116 116 |
