@@ -145,7 +145,6 @@ reveal_type(f)  # revealed: Unknown
 
 ### Non-iterable unpacking
 
-
 ```py
 # error: "Object of type `Literal[1]` is not iterable"
 a, b = 1
