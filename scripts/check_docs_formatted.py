@@ -81,6 +81,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "under-indentation",
     "unexpected-indentation-comment",
     "unexpected-spaces-around-keyword-parameter-equals",
+    "unformatted-special-comment",
     "unicode-kind-prefix",
     "unnecessary-class-parentheses",
     "unnecessary-escaped-quote",
