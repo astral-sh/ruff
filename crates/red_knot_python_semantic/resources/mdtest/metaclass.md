@@ -118,3 +118,13 @@ class D(C): ...
 
 reveal_type(D.__class__)  # revealed: Literal[B]
 ```
+
+## Duplicate
+
+```py
+class A(type): ...
+class B(metaclass=A): ...
+class C(B, B): ...  # error: [duplicate-base] "Duplicate base class `B`"
+
+reveal_type(C.__class__)  # revealed: Literal[A]
+```

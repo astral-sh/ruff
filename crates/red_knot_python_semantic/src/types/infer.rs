@@ -476,8 +476,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     for (index, duplicate) in duplicates {
                         self.diagnostics.add(
                             (&base_nodes[*index]).into(),
-                             "duplicate-base",
-                             format_args!("Duplicate base class `{}`", duplicate.name(self.db))
+                            "duplicate-base",
+                            format_args!("Duplicate base class `{}`", duplicate.name(self.db)),
                         );
                     }
                 }
@@ -488,7 +488,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
                         class.name(self.db),
                         class.name(self.db)
-                    )
+                    ),
                 ),
                 MroErrorKind::InvalidBases(bases) => {
                     let base_nodes = class.node(self.db).bases();
@@ -499,18 +499,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                             format_args!(
                                 "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
                                 base_ty.display(self.db)
-                            )
+                            ),
                         );
                     }
-                },
-                MroErrorKind::UnresolvableMro{bases_list} => self.diagnostics.add(
+                }
+                MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
                     class.node(self.db).into(),
                     "inconsistent-mro",
                     format_args!(
                         "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
                         class.name(self.db),
                         bases_list.iter().map(|base| base.display(self.db)).join(", ")
-                    )
+                    ),
                 )
             }
         }
@@ -531,7 +531,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for (class, metaclass_error) in invalid_metaclasses {
             match metaclass_error.reason() {
-                MetaclassErrorKind::IncompatibleMetaclass {
+                MetaclassErrorKind::Conflict {
                     metaclass1,
                     metaclass2
                 } => self.diagnostics.add(
@@ -544,6 +544,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::ClassLiteral(*metaclass2).display(self.db),
                     ),
                 ),
+                MetaclassErrorKind::CyclicDefinition => {
+                    // TODO(charlie): When diagnostics are deduplicated, add a `cyclic-class-def`
+                    // diagnostic, equivalent to the above.
+                }
             }
         }
     }
@@ -1220,8 +1224,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             "invalid-context-manager",
                             format_args!("
                                 Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` of type `{enter_ty}` is not callable",
-                                context_expression = context_expression_ty.display(self.db),
-                                enter_ty = enter_ty.display(self.db)
+                                         context_expression = context_expression_ty.display(self.db),
+                                         enter_ty = enter_ty.display(self.db)
                             ),
                         );
                         err.return_ty()
@@ -3658,20 +3662,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
 
                         return dunder_getitem_method
-                        .call(self.db, &[slice_ty])
-                        .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
-                        .unwrap_or_else(|err| {
-                            self.diagnostics.add(
-                                value_node.into(),
-                                "call-non-callable",
-                                format_args!(
-                                    "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
-                                    err.called_ty().display(self.db),
-                                    value_ty.display(self.db),
-                                ),
-                            );
-                            err.return_ty()
-                        });
+                            .call(self.db, &[slice_ty])
+                            .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
+                            .unwrap_or_else(|err| {
+                                self.diagnostics.add(
+                                    value_node.into(),
+                                    "call-non-callable",
+                                    format_args!(
+                                        "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
+                                        err.called_ty().display(self.db),
+                                        value_ty.display(self.db),
+                                    ),
+                                );
+                                err.return_ty()
+                            });
                     }
                 }
 
@@ -4435,7 +4439,6 @@ fn perform_membership_test_comparison<'db>(
 
 #[cfg(test)]
 mod tests {
-
     use anyhow::Context;
 
     use crate::db::tests::TestDb;

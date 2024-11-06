@@ -1,8 +1,10 @@
-use mro::{ClassBase, Mro, MroError, MroIterator};
+use std::hash::Hash;
+
+use indexmap::IndexSet;
+use itertools::Itertools;
+
 use ruff_db::files::File;
 use ruff_python_ast as ast;
-
-use itertools::Itertools;
 
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::Definition;
@@ -16,6 +18,7 @@ use crate::stdlib::{
 };
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
+use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
 
@@ -1279,7 +1282,6 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
-            // Type::ClassLiteral(_) => KnownClass::Type.to_class(db),
             Type::ClassLiteral(ClassLiteralType { class }) => {
                 class.metaclass(db).unwrap_or(Type::Unknown)
             }
@@ -2029,6 +2031,10 @@ impl<'db> Class<'db> {
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
+    ///
+    /// ## Note
+    /// Only call this function from queries in the same file or your
+    /// query depends on the AST of another file (bad!).
     fn explicit_metaclass(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let class_stmt = self.node(db);
         let metaclass = class_stmt
@@ -2049,57 +2055,82 @@ impl<'db> Class<'db> {
     }
 
     /// Return the metaclass of this class.
-    ///
-    /// ## Note
-    /// Only call this function from queries in the same file or your
-    /// query depends on the AST of another file (bad!).
     #[salsa::tracked]
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
-        let mut base_classes = self
-            .explicit_bases(db)
-            .iter()
-            .filter_map(|base| match base {
-                Type::ClassLiteral(class) => Some(class),
-                _ => None,
-            });
+        /// Infer the metaclass of a class, tracking the classes that have been visited to detect
+        /// cyclic definitions.
+        fn infer<'db>(
+            db: &'db dyn Db,
+            class: Class<'db>,
+            watcher: &mut Watcher<Class<'db>>,
+        ) -> Result<Type<'db>, MetaclassError<'db>> {
+            let mut base_classes = class
+                .explicit_bases(db)
+                .iter()
+                .copied()
+                .filter_map(Type::into_class_literal);
 
-        // Identify the class's own metaclass (or take the first base class's metaclass).
-        let metaclass = if let Some(metaclass) = self.explicit_metaclass(db) {
-            metaclass
-        } else if let Some(base_class) = base_classes.next() {
-            base_class.class.metaclass(db)?
-        } else {
-            KnownClass::Type.to_class(db)
-        };
-
-        let Type::ClassLiteral(mut candidate) = metaclass else {
-            // If the metaclass is not a class, return it directly.
-            return Ok(metaclass);
-        };
-
-        // Reconcile all base classes' metaclasses with the candidate metaclass.
-        //
-        // See: https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
-        for base_class in base_classes {
-            let Type::ClassLiteral(metaclass) = base_class.class.metaclass(db)? else {
-                continue;
+            // Identify the class's own metaclass (or take the first base class's metaclass).
+            let metaclass = if let Some(metaclass) = class.explicit_metaclass(db) {
+                metaclass
+            } else if let Some(base_class) = base_classes.next() {
+                // Each base must be considered in isolation.
+                let watcher_len = watcher.len();
+                if !watcher.insert(base_class.class) {
+                    return Err(MetaclassError {
+                        kind: MetaclassErrorKind::CyclicDefinition,
+                    });
+                }
+                let metaclass = infer(db, base_class.class, watcher)?;
+                watcher.truncate(watcher_len);
+                metaclass
+            } else {
+                KnownClass::Type.to_class(db)
             };
-            if metaclass.class.is_subclass_of(db, candidate.class) {
-                candidate = metaclass;
-                continue;
+
+            let Type::ClassLiteral(mut candidate) = metaclass else {
+                // If the metaclass is not a class, return it directly.
+                return Ok(metaclass);
+            };
+
+            // Reconcile all base classes' metaclasses with the candidate metaclass.
+            //
+            // See: https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
+            for base_class in base_classes {
+                let metaclass = {
+                    // Each base must be considered in isolation.
+                    let watcher_len = watcher.len();
+                    if !watcher.insert(base_class.class) {
+                        return Err(MetaclassError {
+                            kind: MetaclassErrorKind::CyclicDefinition,
+                        });
+                    }
+                    let metaclass = infer(db, base_class.class, watcher)?;
+                    watcher.truncate(watcher_len);
+                    metaclass
+                };
+                let Type::ClassLiteral(metaclass) = metaclass else {
+                    continue;
+                };
+                if metaclass.class.is_subclass_of(db, candidate.class) {
+                    candidate = metaclass;
+                    continue;
+                }
+                if candidate.class.is_subclass_of(db, metaclass.class) {
+                    continue;
+                }
+                return Err(MetaclassError {
+                    kind: MetaclassErrorKind::Conflict {
+                        metaclass1: candidate,
+                        metaclass2: metaclass,
+                    },
+                });
             }
-            if candidate.class.is_subclass_of(db, metaclass.class) {
-                continue;
-            }
-            return Err(MetaclassError {
-                kind: MetaclassErrorKind::IncompatibleMetaclass {
-                    metaclass1: candidate,
-                    metaclass2: metaclass,
-                },
-            });
+
+            Ok(Type::ClassLiteral(candidate))
         }
 
-        Ok(Type::ClassLiteral(candidate))
+        infer(db, self, &mut Watcher::new(self))
     }
 
     /// Returns the class member of this class named `name`.
@@ -2145,6 +2176,38 @@ impl<'db> Class<'db> {
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
         symbol(db, scope, name)
+    }
+}
+
+/// A utility struct for detecting duplicates in class hierarchies while storing the initial
+/// entry on the stack.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Watcher<T: Hash + Eq> {
+    initial: T,
+    visited: IndexSet<T>,
+}
+
+impl<T: Hash + Eq> Watcher<T> {
+    fn new(initial: T) -> Watcher<T> {
+        Self {
+            initial,
+            visited: IndexSet::new(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.visited.len()
+    }
+
+    fn truncate(&mut self, len: usize) {
+        self.visited.truncate(len);
+    }
+
+    fn insert(&mut self, value: T) -> bool {
+        if value == self.initial {
+            return false;
+        }
+        self.visited.insert(value)
     }
 }
 
@@ -2224,10 +2287,20 @@ impl<'db> MetaclassError<'db> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum MetaclassErrorKind<'db> {
-    IncompatibleMetaclass {
+    /// The class has incompatible metaclasses in its inheritance hierarchy.
+    ///
+    /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
+    /// its bases.
+    Conflict {
         metaclass1: ClassLiteralType<'db>,
         metaclass2: ClassLiteralType<'db>,
     },
+    /// The class inherits from itself!
+    ///
+    /// This is very unlikely to happen in working real-world code,
+    /// but it's important to explicitly account for it.
+    /// If we don't, there's a possibility of an infinite loop and a panic.
+    CyclicDefinition,
 }
 
 #[salsa::interned]
