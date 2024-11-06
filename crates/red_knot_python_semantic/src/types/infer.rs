@@ -2965,15 +2965,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         && rhs_reflected != left.class.class_member(self.db, reflected_dunder)
                     {
                         return rhs_reflected
-                            .unwrap_or(Type::Never)
-                            .call(self.db, &[right_ty, left_ty])
-                            .return_ty(self.db)
+                            .get_return_type_if_callable(self.db, &[right_ty, left_ty])
                             .or_else(|| {
                                 left.class
                                     .class_member(self.db, op.dunder())
-                                    .unwrap_or(Type::Never)
-                                    .call(self.db, &[left_ty, right_ty])
-                                    .return_ty(self.db)
+                                    .get_return_type_if_callable(self.db, &[left_ty, right_ty])
                             });
                     }
                 }
@@ -4398,7 +4394,8 @@ fn perform_membership_test_comparison<'db>(
             // iteration-based membership test
             match Type::Instance(right).iterate(db) {
                 IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
-                IterationOutcome::NotIterable { .. } => None,
+                IterationOutcome::NotIterable { .. }
+                | IterationOutcome::PossiblyUnboundIterable { .. } => None,
             }
         }
     };

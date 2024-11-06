@@ -3,7 +3,7 @@ use crate::{
     Db,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Boundness {
     Bound,
     MayBeUnbound,
@@ -44,15 +44,25 @@ impl<'db> Symbol<'db> {
         }
     }
 
-    pub(crate) fn unwrap_or(&self, other: Type<'db>) -> Type<'db> {
+    pub(crate) fn unwrap_or_unknown(&self) -> Type<'db> {
         match self {
             Symbol::Type(ty, _) => *ty,
-            Symbol::Unbound => other,
+            Symbol::Unbound => Type::Unknown,
         }
     }
 
-    pub(crate) fn unwrap_or_unknown(&self) -> Type<'db> {
-        self.unwrap_or(Type::Unknown)
+    /// Get the return type of a call to a symbol if it is definitely bound and callable.
+    ///
+    /// Returns `None` if the symbol is (possibly) unbound or if the type is not callable.
+    pub(crate) fn get_return_type_if_callable(
+        self,
+        db: &'db dyn Db,
+        arg_types: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        match self {
+            Symbol::Type(ty, Boundness::Bound) => ty.call(db, arg_types).return_ty(db),
+            Symbol::Type(_, Boundness::MayBeUnbound) | Symbol::Unbound => None,
+        }
     }
 
     pub(crate) fn as_type(&self) -> Option<Type<'db>> {

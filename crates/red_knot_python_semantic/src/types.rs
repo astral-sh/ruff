@@ -1180,7 +1180,7 @@ impl<'db> Type<'db> {
 
     /// Return the outcome of calling an object of this type.
     #[must_use]
-    fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
+    pub(crate) fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
             Type::FunctionLiteral(function_type) => {
@@ -1270,29 +1270,31 @@ impl<'db> Type<'db> {
         let iterable_meta_type = self.to_meta_type(db);
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
-        if let Symbol::Type(dunder_iter_method, _) = dunder_iter_method {
+        if let Symbol::Type(dunder_iter_method, boundness) = dunder_iter_method {
             let Some(iterator_ty) = dunder_iter_method.call(db, &[self]).return_ty(db) else {
                 return IterationOutcome::NotIterable {
                     not_iterable_ty: self,
                 };
             };
 
-            match iterator_ty.to_meta_type(db).member(db, "__next__") {
-                Symbol::Type(dunder_next_method, Boundness::Bound) => {
-                    return dunder_next_method
-                        .call(db, &[iterator_ty])
-                        .return_ty(db)
-                        .map(|element_ty| IterationOutcome::Iterable { element_ty })
-                        .unwrap_or(IterationOutcome::NotIterable {
-                            not_iterable_ty: self,
-                        });
+            return if let Some(element_ty) = iterator_ty
+                .to_meta_type(db)
+                .member(db, "__next__")
+                .get_return_type_if_callable(db, &[iterator_ty])
+            {
+                if boundness == Boundness::MayBeUnbound {
+                    IterationOutcome::PossiblyUnboundIterable {
+                        iterable_ty: self,
+                        element_ty,
+                    }
+                } else {
+                    IterationOutcome::Iterable { element_ty }
                 }
-                _ => {
-                    return IterationOutcome::NotIterable {
-                        not_iterable_ty: self,
-                    };
+            } else {
+                IterationOutcome::NotIterable {
+                    not_iterable_ty: self,
                 }
-            }
+            };
         }
 
         // Although it's not considered great practice,
@@ -1617,7 +1619,7 @@ impl KnownInstance {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum CallOutcome<'db> {
+pub(crate) enum CallOutcome<'db> {
     Callable {
         return_ty: Type<'db>,
     },
@@ -1665,7 +1667,7 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call, or `None` if not callable.
-    fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::Callable { return_ty } => Some(*return_ty),
             Self::RevealType {
@@ -1873,8 +1875,16 @@ impl<'db> NotCallableError<'db> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IterationOutcome<'db> {
-    Iterable { element_ty: Type<'db> },
-    NotIterable { not_iterable_ty: Type<'db> },
+    Iterable {
+        element_ty: Type<'db>,
+    },
+    NotIterable {
+        not_iterable_ty: Type<'db>,
+    },
+    PossiblyUnboundIterable {
+        iterable_ty: Type<'db>,
+        element_ty: Type<'db>,
+    },
 }
 
 impl<'db> IterationOutcome<'db> {
@@ -1888,6 +1898,13 @@ impl<'db> IterationOutcome<'db> {
             Self::NotIterable { not_iterable_ty } => {
                 diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
                 Type::Unknown
+            }
+            Self::PossiblyUnboundIterable {
+                iterable_ty,
+                element_ty,
+            } => {
+                diagnostics.add_not_iterable_possibly_unbound(iterable_node, iterable_ty);
+                element_ty
             }
         }
     }
