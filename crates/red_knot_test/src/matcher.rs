@@ -1,17 +1,14 @@
-//! Match [`TypeCheckDiagnostic`]s against [`Assertion`]s and produce test failure messages for any
+//! Match [`Diagnostic`]s against [`Assertion`]s and produce test failure messages for any
 //! mismatches.
 use crate::assertion::{Assertion, ErrorAssertion, InlineFileAssertions};
 use crate::db::Db;
-use crate::diagnostic::SortedDiagnostics;
+use crate::diagnostic::{Diagnostic, SortedDiagnostics};
 use colored::Colorize;
-use red_knot_python_semantic::types::TypeCheckDiagnostic;
 use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::Ranged;
 use std::cmp::Ordering;
 use std::ops::Range;
-use std::sync::Arc;
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
@@ -55,7 +52,7 @@ pub(super) fn match_file<T>(
     diagnostics: impl IntoIterator<Item = T>,
 ) -> Result<(), FailuresByLine>
 where
-    T: Diagnostic + Clone,
+    T: Diagnostic,
 {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
@@ -123,22 +120,6 @@ where
         Ok(())
     } else {
         Err(failures)
-    }
-}
-
-pub(super) trait Diagnostic: Ranged {
-    fn rule(&self) -> &str;
-
-    fn message(&self) -> &str;
-}
-
-impl Diagnostic for Arc<TypeCheckDiagnostic> {
-    fn rule(&self) -> &str {
-        self.as_ref().rule()
-    }
-
-    fn message(&self) -> &str {
-        self.as_ref().message()
     }
 }
 
@@ -253,9 +234,9 @@ impl Matcher {
         }
     }
 
-    fn column<T: Ranged>(&self, ranged: &T) -> OneIndexed {
+    fn column<T: Diagnostic>(&self, diagnostic: &T) -> OneIndexed {
         self.line_index
-            .source_location(ranged.start(), &self.source)
+            .source_location(diagnostic.range().start(), &self.source)
             .column
     }
 
@@ -323,11 +304,13 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
+    use crate::diagnostic::Diagnostic;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ruff_text_size::{Ranged, TextRange};
+    use ruff_text_size::TextRange;
+    use std::borrow::Cow;
 
     #[derive(Clone, Debug)]
     struct TestDiagnostic {
@@ -347,18 +330,16 @@ mod tests {
         }
     }
 
-    impl super::Diagnostic for TestDiagnostic {
+    impl Diagnostic for TestDiagnostic {
         fn rule(&self) -> &str {
             self.rule
         }
 
-        fn message(&self) -> &str {
-            self.message
+        fn message(&self) -> Cow<str> {
+            self.message.into()
         }
-    }
 
-    impl Ranged for TestDiagnostic {
-        fn range(&self) -> ruff_text_size::TextRange {
+        fn range(&self) -> TextRange {
             self.range
         }
     }
