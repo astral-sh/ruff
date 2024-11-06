@@ -1282,9 +1282,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                class.metaclass(db).unwrap_or(Type::Unknown)
-            }
+            Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
@@ -2038,9 +2036,9 @@ impl<'db> Class<'db> {
     fn explicit_metaclass(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let class_stmt = self.node(db);
         let metaclass = class_stmt
-            .keywords()
-            .iter()
-            .find(|keyword| keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass"))
+            .arguments
+            .as_ref()?
+            .find_keyword("metaclass")
             .map(|keyword| &keyword.value);
         if class_stmt.type_params.is_some() {
             // when we have a specialized scope, we'll look up the inference
@@ -2054,15 +2052,22 @@ impl<'db> Class<'db> {
         }
     }
 
-    /// Return the metaclass of this class.
+    /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        // TODO: `type[Unknown]` would be a more precise fallback
+        // (needs support for <https://docs.python.org/3/library/typing.html#the-type-of-class-objects>)
+        self.try_metaclass(db).unwrap_or(Type::Unknown)
+    }
+
+    /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
-    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
+    pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
         /// Infer the metaclass of a class, tracking the classes that have been visited to detect
         /// cyclic definitions.
         fn infer<'db>(
             db: &'db dyn Db,
             class: Class<'db>,
-            watcher: &mut Watcher<Class<'db>>,
+            seen: &mut SeenSet<Class<'db>>,
         ) -> Result<Type<'db>, MetaclassError<'db>> {
             let mut base_classes = class
                 .explicit_bases(db)
@@ -2075,14 +2080,14 @@ impl<'db> Class<'db> {
                 metaclass
             } else if let Some(base_class) = base_classes.next() {
                 // Each base must be considered in isolation.
-                let watcher_len = watcher.len();
-                if !watcher.insert(base_class.class) {
+                let watcher_len = seen.len();
+                if !seen.insert(base_class.class) {
                     return Err(MetaclassError {
                         kind: MetaclassErrorKind::CyclicDefinition,
                     });
                 }
-                let metaclass = infer(db, base_class.class, watcher)?;
-                watcher.truncate(watcher_len);
+                let metaclass = infer(db, base_class.class, seen)?;
+                seen.truncate(watcher_len);
                 metaclass
             } else {
                 KnownClass::Type.to_class(db)
@@ -2095,18 +2100,20 @@ impl<'db> Class<'db> {
 
             // Reconcile all base classes' metaclasses with the candidate metaclass.
             //
-            // See: https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
+            // See:
+            // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
+            // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
             for base_class in base_classes {
                 let metaclass = {
                     // Each base must be considered in isolation.
-                    let watcher_len = watcher.len();
-                    if !watcher.insert(base_class.class) {
+                    let watcher_len = seen.len();
+                    if !seen.insert(base_class.class) {
                         return Err(MetaclassError {
                             kind: MetaclassErrorKind::CyclicDefinition,
                         });
                     }
-                    let metaclass = infer(db, base_class.class, watcher)?;
-                    watcher.truncate(watcher_len);
+                    let metaclass = infer(db, base_class.class, seen)?;
+                    seen.truncate(watcher_len);
                     metaclass
                 };
                 let Type::ClassLiteral(metaclass) = metaclass else {
@@ -2130,7 +2137,7 @@ impl<'db> Class<'db> {
             Ok(Type::ClassLiteral(candidate))
         }
 
-        infer(db, self, &mut Watcher::new(self))
+        infer(db, self, &mut SeenSet::new(self))
     }
 
     /// Returns the class member of this class named `name`.
@@ -2146,7 +2153,7 @@ impl<'db> Class<'db> {
         }
 
         if name == "__class__" {
-            return self.metaclass(db).unwrap_or(Type::Unknown).into();
+            return self.metaclass(db).into();
         }
 
         for superclass in self.iter_mro(db) {
@@ -2182,13 +2189,13 @@ impl<'db> Class<'db> {
 /// A utility struct for detecting duplicates in class hierarchies while storing the initial
 /// entry on the stack.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Watcher<T: Hash + Eq> {
+struct SeenSet<T: Hash + Eq> {
     initial: T,
     visited: IndexSet<T>,
 }
 
-impl<T: Hash + Eq> Watcher<T> {
-    fn new(initial: T) -> Watcher<T> {
+impl<T: Hash + Eq> SeenSet<T> {
+    fn new(initial: T) -> SeenSet<T> {
         Self {
             initial,
             visited: IndexSet::new(),

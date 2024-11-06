@@ -524,7 +524,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let invalid_metaclasses = class_definitions.filter_map(|class| {
             class
-                .metaclass(self.db)
+                .try_metaclass(self.db)
                 .err()
                 .map(|metaclass_error| (class, metaclass_error))
         });
