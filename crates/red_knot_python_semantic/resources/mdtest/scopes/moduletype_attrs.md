@@ -60,8 +60,7 @@ reveal_type(typing.__init__)  # revealed: Literal[__init__]
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: Literal[__eq__]
 
-# TODO: understand properties
-reveal_type(typing.__class__)  # revealed: Literal[__class__]
+reveal_type(typing.__class__)  # revealed: Literal[type]
 
 # TODO: needs support for attribute access on instances, properties and generics;
 # should be `dict[str, Any]`

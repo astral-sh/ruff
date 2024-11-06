@@ -57,9 +57,9 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
-    IterationOutcome, KnownClass, KnownFunction, KnownInstance, SliceLiteralType,
-    StringLiteralType, Symbol, Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder,
-    UnionType,
+    IterationOutcome, KnownClass, KnownFunction, KnownInstance, MetaclassErrorKind,
+    SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type, TypeArrayDisplay,
+    UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -512,6 +512,38 @@ impl<'db> TypeInferenceBuilder<'db> {
                         bases_list.iter().map(|base| base.display(self.db)).join(", ")
                     )
                 )
+            }
+        }
+
+        let class_definitions = self
+            .types
+            .declarations
+            .values()
+            .filter_map(|ty| ty.into_class_literal())
+            .map(|class_ty| class_ty.class);
+
+        let invalid_metaclasses = class_definitions.filter_map(|class| {
+            class
+                .metaclass(self.db)
+                .err()
+                .map(|metaclass_error| (class, metaclass_error))
+        });
+
+        for (class, metaclass_error) in invalid_metaclasses {
+            match metaclass_error.reason() {
+                MetaclassErrorKind::IncompatibleMetaclass {
+                    metaclass1,
+                    metaclass2
+                } => self.diagnostics.add(
+                    class.node(self.db).into(),
+                    "conflicting-metaclass",
+                    format_args!(
+                        "The metaclass of a derived class (`{}`) must be a subclass of the metaclasses of all its bases, but `{}` and `{}` are not compatible",
+                        class.name(self.db),
+                        Type::ClassLiteral(*metaclass1).display(self.db),
+                        Type::ClassLiteral(*metaclass2).display(self.db),
+                    ),
+                ),
             }
         }
     }

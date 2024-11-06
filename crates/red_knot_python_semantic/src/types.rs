@@ -1279,8 +1279,10 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
-            // TODO not accurate if there's a custom metaclass...
-            Type::ClassLiteral(_) => KnownClass::Type.to_class(db),
+            // Type::ClassLiteral(_) => KnownClass::Type.to_class(db),
+            Type::ClassLiteral(ClassLiteralType { class }) => {
+                class.metaclass(db).unwrap_or(Type::Unknown)
+            }
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
@@ -2026,6 +2028,80 @@ impl<'db> Class<'db> {
         self.iter_mro(db).contains(&ClassBase::Class(other))
     }
 
+    /// Return the explicit `metaclass` of this class, if one is defined.
+    fn explicit_metaclass(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let class_stmt = self.node(db);
+        let metaclass = class_stmt
+            .keywords()
+            .iter()
+            .find(|keyword| keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass"))
+            .map(|keyword| &keyword.value);
+        if class_stmt.type_params.is_some() {
+            // when we have a specialized scope, we'll look up the inference
+            // within that scope
+            let model = SemanticModel::new(db, self.file(db));
+            metaclass.map(|base| base.ty(&model))
+        } else {
+            // Otherwise, we can do the lookup based on the definition scope
+            let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+            metaclass.map(|base_node| definition_expression_ty(db, class_definition, base_node))
+        }
+    }
+
+    /// Return the metaclass of this class.
+    ///
+    /// ## Note
+    /// Only call this function from queries in the same file or your
+    /// query depends on the AST of another file (bad!).
+    #[salsa::tracked]
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
+        let mut base_classes = self
+            .explicit_bases(db)
+            .iter()
+            .filter_map(|base| match base {
+                Type::ClassLiteral(class) => Some(class),
+                _ => None,
+            });
+
+        // Identify the class's own metaclass (or take the first base class's metaclass).
+        let metaclass = if let Some(metaclass) = self.explicit_metaclass(db) {
+            metaclass
+        } else if let Some(base_class) = base_classes.next() {
+            base_class.class.metaclass(db)?
+        } else {
+            KnownClass::Type.to_class(db)
+        };
+
+        let Type::ClassLiteral(mut candidate) = metaclass else {
+            // If the metaclass is not a class, return it directly.
+            return Ok(metaclass);
+        };
+
+        // Reconcile all base classes' metaclasses with the candidate metaclass.
+        //
+        // See: https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
+        for base_class in base_classes {
+            let Type::ClassLiteral(metaclass) = base_class.class.metaclass(db)? else {
+                continue;
+            };
+            if metaclass.class.is_subclass_of(db, candidate.class) {
+                candidate = metaclass;
+                continue;
+            }
+            if candidate.class.is_subclass_of(db, metaclass.class) {
+                continue;
+            }
+            return Err(MetaclassError {
+                kind: MetaclassErrorKind::IncompatibleMetaclass {
+                    metaclass1: candidate,
+                    metaclass2: metaclass,
+                },
+            });
+        }
+
+        Ok(Type::ClassLiteral(candidate))
+    }
+
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member on the class itself or any of its proper superclasses.
@@ -2036,6 +2112,10 @@ impl<'db> Class<'db> {
                 Type::Tuple(TupleType::new(db, tuple_elements)),
                 Boundness::Bound,
             );
+        }
+
+        if name == "__class__" {
+            return self.metaclass(db).unwrap_or(Type::Unknown).into();
         }
 
         for superclass in self.iter_mro(db) {
@@ -2128,6 +2208,26 @@ impl<'db> From<InstanceType<'db>> for Type<'db> {
     fn from(value: InstanceType<'db>) -> Self {
         Self::Instance(value)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MetaclassError<'db> {
+    kind: MetaclassErrorKind<'db>,
+}
+
+impl<'db> MetaclassError<'db> {
+    /// Return an [`MetaclassErrorKind`] variant describing why we could not resolve the metaclass for this class.
+    pub(super) fn reason(&self) -> &MetaclassErrorKind<'db> {
+        &self.kind
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum MetaclassErrorKind<'db> {
+    IncompatibleMetaclass {
+        metaclass1: ClassLiteralType<'db>,
+        metaclass2: ClassLiteralType<'db>,
+    },
 }
 
 #[salsa::interned]
