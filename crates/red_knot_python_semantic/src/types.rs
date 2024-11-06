@@ -1000,11 +1000,7 @@ impl<'db> Type<'db> {
                     global_lookup
                 }
             }
-            Type::ClassLiteral(class_ty) => class_ty.member(db, name),
-            Type::Type(..) => {
-                // TODO: attribute lookup on Type[..] type
-                Type::Todo.into()
-            }
+            Type::ClassLiteral(class_ty) | Type::Type(class_ty) => class_ty.member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo.into()
@@ -1315,10 +1311,8 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            // TODO: not really correct -- the meta-type of an `InstanceType { class: T }` should be `type[T]`
-            // (<https://docs.python.org/3/library/typing.html#the-type-of-class-objects>)
             Type::Instance(InstanceType { class, .. }) => {
-                Type::ClassLiteral(ClassLiteralType { class: *class })
+                Type::Type(ClassLiteralType { class: *class })
             }
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
