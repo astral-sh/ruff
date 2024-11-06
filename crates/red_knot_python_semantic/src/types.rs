@@ -1,8 +1,10 @@
-use mro::{ClassBase, Mro, MroError, MroIterator};
+use std::hash::Hash;
+
+use indexmap::IndexSet;
+use itertools::Itertools;
+
 use ruff_db::files::File;
 use ruff_python_ast as ast;
-
-use itertools::Itertools;
 
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::Definition;
@@ -16,6 +18,7 @@ use crate::stdlib::{
 };
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
+use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
 
@@ -1279,8 +1282,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
-            // TODO not accurate if there's a custom metaclass...
-            Type::ClassLiteral(_) => KnownClass::Type.to_class(db),
+            Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
@@ -2026,6 +2028,113 @@ impl<'db> Class<'db> {
         self.iter_mro(db).contains(&ClassBase::Class(other))
     }
 
+    /// Return the explicit `metaclass` of this class, if one is defined.
+    ///
+    /// ## Note
+    /// Only call this function from queries in the same file or your
+    /// query depends on the AST of another file (bad!).
+    fn explicit_metaclass(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let class_stmt = self.node(db);
+        let metaclass_node = &class_stmt
+            .arguments
+            .as_ref()?
+            .find_keyword("metaclass")?
+            .value;
+        Some(if class_stmt.type_params.is_some() {
+            // when we have a specialized scope, we'll look up the inference
+            // within that scope
+            let model = SemanticModel::new(db, self.file(db));
+            metaclass_node.ty(&model)
+        } else {
+            // Otherwise, we can do the lookup based on the definition scope
+            let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+            definition_expression_ty(db, class_definition, metaclass_node)
+        })
+    }
+
+    /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        // TODO: `type[Unknown]` would be a more precise fallback
+        // (needs support for <https://docs.python.org/3/library/typing.html#the-type-of-class-objects>)
+        self.try_metaclass(db).unwrap_or(Type::Unknown)
+    }
+
+    /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
+    #[salsa::tracked]
+    pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
+        /// Infer the metaclass of a class, tracking the classes that have been visited to detect
+        /// cyclic definitions.
+        fn infer<'db>(
+            db: &'db dyn Db,
+            class: Class<'db>,
+            seen: &mut SeenSet<Class<'db>>,
+        ) -> Result<Type<'db>, MetaclassError<'db>> {
+            // Recursively infer the metaclass of a class, ensuring that cyclic definitions are
+            // detected.
+            let mut safe_recurse = |class: Class<'db>| -> Result<Type<'db>, MetaclassError<'db>> {
+                // Each base must be considered in isolation.
+                let num_seen = seen.len();
+                if !seen.insert(class) {
+                    return Err(MetaclassError {
+                        kind: MetaclassErrorKind::CyclicDefinition,
+                    });
+                }
+                let metaclass = infer(db, class, seen)?;
+                seen.truncate(num_seen);
+                Ok(metaclass)
+            };
+
+            let mut base_classes = class
+                .explicit_bases(db)
+                .iter()
+                .copied()
+                .filter_map(Type::into_class_literal);
+
+            // Identify the class's own metaclass (or take the first base class's metaclass).
+            let metaclass = if let Some(metaclass) = class.explicit_metaclass(db) {
+                metaclass
+            } else if let Some(base_class) = base_classes.next() {
+                safe_recurse(base_class.class)?
+            } else {
+                KnownClass::Type.to_class(db)
+            };
+
+            let Type::ClassLiteral(mut candidate) = metaclass else {
+                // If the metaclass is not a class, return it directly.
+                return Ok(metaclass);
+            };
+
+            // Reconcile all base classes' metaclasses with the candidate metaclass.
+            //
+            // See:
+            // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
+            // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
+            for base_class in base_classes {
+                let metaclass = safe_recurse(base_class.class)?;
+                let Type::ClassLiteral(metaclass) = metaclass else {
+                    continue;
+                };
+                if metaclass.class.is_subclass_of(db, candidate.class) {
+                    candidate = metaclass;
+                    continue;
+                }
+                if candidate.class.is_subclass_of(db, metaclass.class) {
+                    continue;
+                }
+                return Err(MetaclassError {
+                    kind: MetaclassErrorKind::Conflict {
+                        metaclass1: candidate.class,
+                        metaclass2: metaclass.class,
+                    },
+                });
+            }
+
+            Ok(Type::ClassLiteral(candidate))
+        }
+
+        infer(db, self, &mut SeenSet::new(self))
+    }
+
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member on the class itself or any of its proper superclasses.
@@ -2036,6 +2145,10 @@ impl<'db> Class<'db> {
                 Type::Tuple(TupleType::new(db, tuple_elements)),
                 Boundness::Bound,
             );
+        }
+
+        if name == "__class__" {
+            return self.metaclass(db).into();
         }
 
         for superclass in self.iter_mro(db) {
@@ -2065,6 +2178,38 @@ impl<'db> Class<'db> {
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
         symbol(db, scope, name)
+    }
+}
+
+/// A utility struct for detecting duplicates in class hierarchies while storing the initial
+/// entry on the stack.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SeenSet<T: Hash + Eq> {
+    initial: T,
+    visited: IndexSet<T>,
+}
+
+impl<T: Hash + Eq> SeenSet<T> {
+    fn new(initial: T) -> SeenSet<T> {
+        Self {
+            initial,
+            visited: IndexSet::new(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.visited.len()
+    }
+
+    fn truncate(&mut self, len: usize) {
+        self.visited.truncate(len);
+    }
+
+    fn insert(&mut self, value: T) -> bool {
+        if value == self.initial {
+            return false;
+        }
+        self.visited.insert(value)
     }
 }
 
@@ -2128,6 +2273,36 @@ impl<'db> From<InstanceType<'db>> for Type<'db> {
     fn from(value: InstanceType<'db>) -> Self {
         Self::Instance(value)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MetaclassError<'db> {
+    kind: MetaclassErrorKind<'db>,
+}
+
+impl<'db> MetaclassError<'db> {
+    /// Return an [`MetaclassErrorKind`] variant describing why we could not resolve the metaclass for this class.
+    pub(super) fn reason(&self) -> &MetaclassErrorKind<'db> {
+        &self.kind
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum MetaclassErrorKind<'db> {
+    /// The class has incompatible metaclasses in its inheritance hierarchy.
+    ///
+    /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
+    /// its bases.
+    Conflict {
+        metaclass1: Class<'db>,
+        metaclass2: Class<'db>,
+    },
+    /// The class inherits from itself!
+    ///
+    /// This is very unlikely to happen in working real-world code,
+    /// but it's important to explicitly account for it.
+    /// If we don't, there's a possibility of an infinite loop and a panic.
+    CyclicDefinition,
 }
 
 #[salsa::interned]
