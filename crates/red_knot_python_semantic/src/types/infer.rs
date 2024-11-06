@@ -41,7 +41,8 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind, TargetKind,
+    AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
+    ExceptHandlerDefinitionKind, TargetKind,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
@@ -532,12 +533,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
             }
             DefinitionKind::Assignment(assignment) => {
-                self.infer_assignment_definition(
-                    assignment.target(),
-                    assignment.value(),
-                    assignment.name(),
-                    definition,
-                );
+                self.infer_assignment_definition(assignment, definition);
             }
             DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
                 self.infer_annotated_assignment_definition(annotated_assignment.node(), definition);
@@ -1427,20 +1423,26 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
-        target: TargetKind<'db>,
-        value: &ast::Expr,
-        name: &ast::ExprName,
+        assignment: &AssignmentDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
+        let value = assignment.value();
+        let name = assignment.name();
+
         self.infer_standalone_expression(value);
 
         let value_ty = self.expression_ty(value);
         let name_ast_id = name.scoped_ast_id(self.db, self.scope());
 
-        let target_ty = match target {
+        let target_ty = match assignment.target() {
             TargetKind::Sequence(unpack) => {
                 let unpacked = infer_unpack_types(self.db, unpack);
-                self.diagnostics.extend(unpacked.diagnostics());
+                // Only copy the diagnostics if this is the first assignment to avoid duplicating the
+                // unpack assignments.
+                if assignment.is_first() {
+                    self.diagnostics.extend(unpacked.diagnostics());
+                }
+
                 unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
             }
             TargetKind::Name => value_ty,

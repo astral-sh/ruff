@@ -281,8 +281,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         debug_assert!(popped_assignment.is_some());
     }
 
-    fn current_assignment(&self) -> Option<&CurrentAssignment<'db>> {
-        self.current_assignments.last()
+    fn current_assignment(&self) -> Option<CurrentAssignment<'db>> {
+        self.current_assignments.last().copied()
+    }
+
+    fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'db>> {
+        self.current_assignments.last_mut()
     }
 
     fn add_pattern_constraint(
@@ -627,6 +631,7 @@ where
                         ast::Expr::List(_) | ast::Expr::Tuple(_) => {
                             Some(CurrentAssignment::Assign {
                                 node,
+                                first: true,
                                 unpack: Some(Unpack::new(
                                     self.db,
                                     self.file,
@@ -640,9 +645,11 @@ where
                                 )),
                             })
                         }
-                        ast::Expr::Name(_) => {
-                            Some(CurrentAssignment::Assign { node, unpack: None })
-                        }
+                        ast::Expr::Name(_) => Some(CurrentAssignment::Assign {
+                            node,
+                            unpack: None,
+                            first: false,
+                        }),
                         _ => None,
                     };
 
@@ -987,14 +994,19 @@ where
                 }
 
                 if is_definition {
-                    match self.current_assignment().copied() {
-                        Some(CurrentAssignment::Assign { node, unpack }) => {
+                    match self.current_assignment() {
+                        Some(CurrentAssignment::Assign {
+                            node,
+                            first,
+                            unpack,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
                                     unpack,
                                     value: &node.value,
                                     name: name_node,
+                                    first,
                                 },
                             );
                         }
@@ -1043,6 +1055,11 @@ where
                         }
                         None => {}
                     }
+                }
+
+                if let Some(CurrentAssignment::Assign { first, .. }) = self.current_assignment_mut()
+                {
+                    *first = false;
                 }
 
                 walk_expr(self, expr);
@@ -1245,6 +1262,7 @@ where
 enum CurrentAssignment<'a> {
     Assign {
         node: &'a ast::StmtAssign,
+        first: bool,
         unpack: Option<Unpack<'a>>,
     },
     AnnAssign(&'a ast::StmtAnnAssign),

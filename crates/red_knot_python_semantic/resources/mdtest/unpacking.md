@@ -145,12 +145,7 @@ reveal_type(f)  # revealed: Unknown
 
 ### Non-iterable unpacking
 
-TODO: Remove duplicate diagnostics. This is happening because for a sequence-like assignment target,
-multiple definitions are created and the inference engine runs on each of them which results in
-duplicate diagnostics.
-
 ```py
-# error: "Object of type `Literal[1]` is not iterable"
 # error: "Object of type `Literal[1]` is not iterable"
 a, b = 1
 reveal_type(a)  # revealed: Unknown
