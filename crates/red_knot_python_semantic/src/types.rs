@@ -2661,6 +2661,7 @@ mod tests {
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
+        // `literal_a` represents `Literal[A]`.
         let literal_a = super::global_symbol(&db, module, "A").expect_type();
         let literal_derived_from_a =
             super::global_symbol(&db, module, "DerivedFromA").expect_type();
@@ -2671,15 +2672,18 @@ mod tests {
         assert!(literal_a.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
 
         assert!(literal_derived_from_a.is_class_literal());
-        // Construct the type `type[A]` from the class literal `A`:
+
+        // `type_a` represents `Type[A]`.
         let type_a = Type::Type(literal_a.expect_class_literal());
         assert!(literal_a.is_subtype_of(&db, type_a));
         assert!(literal_derived_from_a.is_subtype_of(&db, type_a));
 
         let type_derived_from_a = Type::Type(literal_derived_from_a.expect_class_literal());
         assert!(literal_derived_from_a.is_subtype_of(&db, type_derived_from_a));
-        assert!(type_derived_from_a.is_subtype_of(&db, type_a));
         assert!(!literal_a.is_subtype_of(&db, type_derived_from_a));
+
+        // Type[DerivedFromA] <: Type[A]
+        assert!(type_derived_from_a.is_subtype_of(&db, type_a));
 
         assert!(literal_u.is_union());
         assert!(literal_u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
