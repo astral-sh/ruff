@@ -1,10 +1,13 @@
+use crate::noqa::{Directive, ParseError, ParsedFileExemption};
 use crate::Locator;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextRange;
 
-use crate::noqa::{Directive, ParseError, ParsedFileExemption};
+type EndIndex = usize;
 
 const KNOWN_COMMON_HINT: [&str; 6] = ["fmt", "isort", "mypy", "nopycln", "pyright", "type"];
 
@@ -59,7 +62,6 @@ impl SpecialComment {
 /// Checks special comments' formatting.
 ///
 /// ## Why is this bad?
-///
 /// Special comments are often written in the following format
 /// (hash, space, directive, colon, space, directive body):
 ///
@@ -99,12 +101,12 @@ impl AlwaysFixableViolation for UnformattedSpecialComment {
 fn add_diagnostic_if_applicable(
     diagnostics: &mut Vec<Diagnostic>,
     comment: SpecialComment,
-    original_text: &str,
+    original_comment_text: &str,
     range: TextRange,
 ) {
     let formatted_comment = comment.formatted();
 
-    if original_text == formatted_comment {
+    if original_comment_text == formatted_comment {
         return;
     }
 
@@ -117,133 +119,144 @@ fn add_diagnostic_if_applicable(
     diagnostics.push(diagnostic);
 }
 
-#[inline]
-fn all_to_owned(codes: Vec<&str>) -> Vec<String> {
-    codes
-        .iter()
-        .map(|code| code.to_string())
-        .collect::<Vec<_>>()
+fn parse_code_list(code_list: &str) -> Vec<String> {
+    static PATTERN: Regex = Lazy::new(Regex::new(r"[A-Z]+[A-Za-z0-9]+"));
+
+    PATTERN
+        .find_iter(list)
+        .map(|code| code.as_str().to_owned())
+        .collect()
 }
 
-#[inline]
-fn remove_comment_start_and_leading_whitespace(text: &str) -> Option<&str> {
-    text.strip_prefix("#").map(|text| text.trim_ascii_start())
-}
+fn try_parse_file_level_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    static PATTERN: Regex = Lazy::new(
+        Regex::new(
+            r"(?x)
+            ^
+            \#\s*
+            (?<hint>flake8|ruff)\s*:\s*
+            (?i:noqa)\s*
+            (?:
+                :\s*
+                (?<code_list>
+                    [A-Z]+[A-Za-z0-9]+
+                    (?:[\s,]\s*[A-Z]+[A-Za-z0-9]+)*
+                )?
+                \s*
+            )?
+            $
+            ",
+        )
+        .unwrap(),
+    );
 
-#[inline]
-fn try_parse_file_level_noqa(text: &str) -> Result<Option<ParsedFileExemption>, ParseError> {
-    ParsedFileExemption::try_extract(text)
-}
-
-#[inline]
-fn file_level_noqa_special_comment(
-    hint: String,
-    file_level_noqa: ParsedFileExemption,
-) -> SpecialComment {
-    let codes = match file_level_noqa {
-        ParsedFileExemption::All => None,
-        ParsedFileExemption::Codes(codes) => Some(all_to_owned(codes)),
+    let Some(result) = PATTERN.captures(text) else {
+        return None;
     };
 
-    SpecialComment::FileLevelNoqa { hint, codes }
+    let end_index = result.get(0).unwrap().end();
+    let hint = result.name("hint").unwrap().as_str().to_owned();
+    let codes = result
+        .name("code_list")
+        .map(|it| parse_code_list(it.as_str()));
+
+    Some((end_index, SpecialComment::FileLevelNoqa { hint, codes }))
 }
 
-#[inline]
-fn try_parse_noqa(text: &str) -> Result<Option<Directive>, ParseError> {
-    Directive::try_extract(text, 0.into())
+fn try_parse_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    static PATTERN: Regex = Lazy::new(
+        Regex::new(
+            r"(?x)
+            ^
+            \#\s*
+            (?i:noqa)
+            (?:
+                :\s*
+                (?<code_list>
+                    [A-Z]+[A-Za-z0-9]+
+                    (?:[\h,]+[A-Z]+[A-Za-z0-9]+)*
+                )?
+            )?
+            $
+            ",
+        )
+        .unwrap(),
+    );
+
+    let Some(result) = PATTERN.captures(text) else {
+        return None;
+    };
+
+    let end_index = result.get(0).unwrap().end();
+    let codes = result
+        .name("code_list")
+        .map(|it| parse_code_list(it.as_str()));
+
+    Some((end_index, SpecialComment::Noqa(codes)))
 }
 
-#[inline]
-fn noqa_special_comment(noqa: Directive) -> SpecialComment {
-    let codes = match noqa {
-        Directive::All(..) => None,
-        Directive::Codes(codes) => {
-            let as_vec = codes.iter().map(|code| code.as_str()).collect::<Vec<_>>();
+fn try_parse_ruff_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    static PATTERN: Regex = Lazy::new(
+        Regex::new(
+            r"(?x)
+            ^
+            \#\s*
+            ruff\s*:\s*
+            isort\s*:\s*
+            (?<rest>.+)
+            ",
+        )
+        .unwrap(),
+    );
 
-            Some(all_to_owned(as_vec))
+    let Some(result) = PATTERN.captures(text) else {
+        return None;
+    };
+
+    let end_index = result.get(0).unwrap().end();
+    let rest = result.name("rest").unwrap().as_str().to_owned();
+
+    Some((end_index, SpecialComment::RuffIsort(rest)))
+}
+
+fn try_parse_common(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    static PATTERN: Lazy<Regex> = Lazy::new(
+        Regex::new(
+            r"(?x)
+            ^
+            \#\s*
+            (?<hint>type|mypy|pyright|fmt|isort|nopycln):\s*
+            (?<rest>.+)
+            "
+        )
+        .unwrap()
+    );
+
+    let Some(result) = PATTERN.captures(text);
+
+    let end_index = result.get(0).unwrap().end();
+    let hint = result.name("hint").unwrap().as_str().to_owned();
+    let rest = result.name("rest").unwrap().as_str().to_owned();
+
+    Some((end_index, SpecialComment::Common(hint, rest)))
+}
+
+macro_rules! parse_and_handle_comment {
+    ($parse:ident, $text:ident, $diagnostics:ident, $range:ident) => {
+        if let Some((end_index, comment)) = $parse($text) {
+            let comment_text = &$text[..end_index];
+
+            add_diagnostic_if_applicable($diagnostics, comment, comment_text, $range);
+            return;
         }
     };
-
-    SpecialComment::Noqa(codes)
-}
-
-#[inline]
-fn consume_hint(text: &str) -> Option<(&str, &str)> {
-    let hint_end = text.chars().take_while(char::is_ascii_alphanumeric).count();
-    let hint = &text[..hint_end];
-
-    if hint.len() == 0 {
-        return None;
-    }
-
-    let before_colon = text.strip_prefix(hint).unwrap().trim_ascii_start();
-
-    let Some(rest) = before_colon
-        .strip_prefix(':')
-        .map(|text| text.trim_ascii_start())
-    else {
-        return None;
-    };
-
-    return Some((hint, rest));
-}
-
-fn try_parse_generic_hint_comment(comment_body: &str) -> Option<SpecialComment> {
-    let Some((hint, rest)) = consume_hint(comment_body) else {
-        return None;
-    };
-
-    match &hint.to_lowercase() {
-        hint if KNOWN_COMMON_HINT.contains(&hint.as_str()) => Some(SpecialComment::Common {
-            hint: hint.to_lowercase(),
-            rest: rest.to_owned(),
-        }),
-        hint if hint == "ruff" => {
-            let Some((second_hint, rest)) = consume_hint(rest) else {
-                return None;
-            };
-
-            if second_hint != "isort" {
-                return None;
-            }
-
-            Some(SpecialComment::RuffIsort(rest.to_owned()))
-        }
-        _ => None,
-    }
 }
 
 fn check_single_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, range: TextRange) {
-    let Some(comment_body) = remove_comment_start_and_leading_whitespace(text) else {
-        return;
-    };
-
-    // FIXME: Remove this once everything is done
-    println!("Comment: {text:?}");
-
-    if let Ok(Some(file_level_noqa)) = try_parse_file_level_noqa(text) {
-        let hint = match comment_body.chars().into_iter().next() {
-            Some('f') => "flake8",
-            Some('r') => "ruff",
-            _ => panic!("Unexpected parsed file exemption hint"),
-        };
-
-        let comment = file_level_noqa_special_comment(hint.to_owned(), file_level_noqa);
-        add_diagnostic_if_applicable(diagnostics, comment, text, range);
-        return;
-    }
-
-    if let Ok(Some(noqa)) = try_parse_noqa(text) {
-        let comment = noqa_special_comment(noqa);
-        add_diagnostic_if_applicable(diagnostics, comment, text, range);
-        return;
-    }
-
-    let Some(comment) = try_parse_generic_hint_comment(comment_body) else {
-        return;
-    };
-
-    add_diagnostic_if_applicable(diagnostics, comment, text, range);
+    parse_and_handle_comment!(try_parse_file_level_noqa, text, diagnostics, range);
+    parse_and_handle_comment!(try_parse_noqa, text, diagnostics, range);
+    parse_and_handle_comment!(try_parse_ruff_isort, text, diagnostics, range);
+    parse_and_handle_comment!(try_parse_common, text, diagnostics, range);
 }
 
 /// RUF104
@@ -255,6 +268,12 @@ pub(crate) fn unformatted_special_comment(
     for range in comment_ranges {
         let text = locator.slice(range);
 
-        check_single_comment(diagnostics, text, range);
+        for (index, char) in text.char_indices() {
+            if !matches!(char, '#') {
+                continue;
+            }
+
+            check_single_comment(diagnostics, text, range);
+        }
     }
 }
