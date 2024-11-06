@@ -2035,21 +2035,21 @@ impl<'db> Class<'db> {
     /// query depends on the AST of another file (bad!).
     fn explicit_metaclass(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let class_stmt = self.node(db);
-        let metaclass = class_stmt
+        let metaclass_node = &class_stmt
             .arguments
             .as_ref()?
-            .find_keyword("metaclass")
-            .map(|keyword| &keyword.value);
-        if class_stmt.type_params.is_some() {
+            .find_keyword("metaclass")?
+            .value;
+        Some(if class_stmt.type_params.is_some() {
             // when we have a specialized scope, we'll look up the inference
             // within that scope
             let model = SemanticModel::new(db, self.file(db));
-            metaclass.map(|base| base.ty(&model))
+            metaclass_node.ty(&model)
         } else {
             // Otherwise, we can do the lookup based on the definition scope
             let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
-            metaclass.map(|base_node| definition_expression_ty(db, class_definition, base_node))
-        }
+            definition_expression_ty(db, class_definition, metaclass_node)
+        })
     }
 
     /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
