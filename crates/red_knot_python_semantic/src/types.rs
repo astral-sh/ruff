@@ -328,7 +328,7 @@ pub enum Type<'db> {
     ModuleLiteral(File),
     /// A specific class object
     ClassLiteral(ClassLiteralType<'db>),
-    // The set of all class objects that are subclasses of the given class.
+    // The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     Type(ClassLiteralType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
@@ -535,6 +535,9 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(self_class), Type::Type(target_class)) => {
                 self_class.class.is_subclass_of(db, target_class.class)
             }
+            (Type::Type(self_class), Type::Type(target_class)) => {
+                self_class.class.is_subclass_of(db, target_class.class)
+            }
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
@@ -701,8 +704,7 @@ impl<'db> Type<'db> {
             }
             (Type::Type(_), Type::Type(_)) => false,
             (Type::Type(_), Type::Instance(_)) | (Type::Instance(_), Type::Type(_)) => false,
-            (Type::Type(_), _) | (_, Type::Type(_)) => true,
-
+            (Type::Type(_), _) | (_, Type::Type(_)) => false,
             (
                 Type::Instance(InstanceType {
                     class: class_none, ..
@@ -2652,23 +2654,29 @@ mod tests {
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
-        let type_a = super::global_symbol(&db, module, "A").expect_type();
-        let type_derived_from_a = super::global_symbol(&db, module, "DerivedFromA").expect_type();
-        let type_u = super::global_symbol(&db, module, "U").expect_type();
+        let literal_a = super::global_symbol(&db, module, "A").expect_type();
+        let literal_derived_from_a =
+            super::global_symbol(&db, module, "DerivedFromA").expect_type();
+        let literal_u = super::global_symbol(&db, module, "U").expect_type();
 
-        assert!(type_a.is_class_literal());
-        assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
-        assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
+        assert!(literal_a.is_class_literal());
+        assert!(literal_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
+        assert!(literal_a.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
 
-        assert!(type_derived_from_a.is_class_literal());
+        assert!(literal_derived_from_a.is_class_literal());
         // Construct the type `type[A]` from the class literal `A`:
-        let type_type_a = Type::Type(type_a.expect_class_literal());
-        assert!(type_a.is_subtype_of(&db, type_type_a));
-        assert!(type_derived_from_a.is_subtype_of(&db, type_type_a));
+        let type_a = Type::Type(literal_a.expect_class_literal());
+        assert!(literal_a.is_subtype_of(&db, type_a));
+        assert!(literal_derived_from_a.is_subtype_of(&db, type_a));
 
-        assert!(type_u.is_union());
-        assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
-        assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
+        let type_derived_from_a = Type::Type(literal_derived_from_a.expect_class_literal());
+        assert!(literal_derived_from_a.is_subtype_of(&db, type_derived_from_a));
+        assert!(type_derived_from_a.is_subtype_of(&db, type_a));
+        assert!(!literal_a.is_subtype_of(&db, type_derived_from_a));
+
+        assert!(literal_u.is_union());
+        assert!(literal_u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
+        assert!(literal_u.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
     }
 
     #[test]
@@ -2794,6 +2802,40 @@ mod tests {
         assert!(type_u.is_union());
 
         assert!(!type_a.is_disjoint_from(&db, type_u));
+    }
+
+    #[test]
+    fn is_disjoint_type_type() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+        ",
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let literal_a = super::global_symbol(&db, module, "A").expect_type();
+        let literal_b = super::global_symbol(&db, module, "B").expect_type();
+
+        let type_a = Type::Type(literal_a.expect_class_literal());
+        let type_b = Type::Type(literal_b.expect_class_literal());
+
+        // Class literals are always disjoint. They are singleton types
+        assert!(literal_a.is_disjoint_from(&db, literal_b));
+
+        // The class A is a subclass of A, so A is not disjoint from type[A]
+        assert!(!literal_a.is_disjoint_from(&db, type_a));
+
+        // The class A is disjoint from type[B] because it's not a subclass
+        // of B:
+        assert!(literal_a.is_disjoint_from(&db, type_b));
+
+        // However, type[A] is not distjoint from type[B], as there could be
+        // classes that inherit from both A and B:
+        assert!(!type_a.is_disjoint_from(&db, type_b));
     }
 
     #[test_case(Ty::None)]
