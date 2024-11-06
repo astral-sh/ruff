@@ -104,3 +104,13 @@ for key, value in current_crawler_tags.items():
         pass
     elif wanted_tag_value != value:
         pass
+
+# https://github.com/astral-sh/ruff/issues/14113
+# Loop variable unused in its scope
+for x in ls:
+    print([x for x in otherls])
+
+# Loop variable shadowed
+for y in ls:
+    y=2
+
