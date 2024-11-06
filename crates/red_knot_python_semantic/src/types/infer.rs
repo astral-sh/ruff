@@ -822,8 +822,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_deref()
             .expect("function type params scope without type params");
 
-        // TODO: defer annotation resolution in stubs, with __future__.annotations, or stringified
-        self.infer_optional_expression(function.returns.as_deref());
+        self.infer_optional_annotation_expression(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
     }
@@ -915,13 +914,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
         if type_params.is_none() {
-            self.infer_parameters(parameters);
-
-            // TODO: this should also be applied to parameter annotations.
             if self.are_all_types_deferred() {
                 self.types.has_deferred = true;
             } else {
                 self.infer_optional_annotation_expression(returns.as_deref());
+                self.infer_parameters(parameters);
             }
         }
 
@@ -971,7 +968,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default: _,
         } = parameter_with_default;
 
-        self.infer_optional_expression(parameter.annotation.as_deref());
+        self.infer_optional_annotation_expression(parameter.annotation.as_deref());
     }
 
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
@@ -981,7 +978,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             annotation,
         } = parameter;
 
-        self.infer_optional_expression(annotation.as_deref());
+        self.infer_optional_annotation_expression(annotation.as_deref());
     }
 
     fn infer_parameter_with_default_definition(
@@ -1069,6 +1066,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
         self.infer_optional_annotation_expression(function.returns.as_deref());
+        self.infer_parameters(function.parameters.as_ref());
     }
 
     fn infer_class_deferred(&mut self, class: &ast::StmtClassDef) {
@@ -4099,7 +4097,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match expression {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => self.infer_name_expression(name).to_instance(self.db),
+                ast::ExprContext::Load => {
+                    self.infer_name_expression(name).in_type_expression(self.db)
+                }
                 ast::ExprContext::Invalid => Type::Unknown,
                 ast::ExprContext::Store | ast::ExprContext::Del => Type::Todo,
             },
@@ -4107,7 +4107,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
-                    .to_instance(self.db),
+                    .in_type_expression(self.db),
                 ast::ExprContext::Invalid => Type::Unknown,
                 ast::ExprContext::Store | ast::ExprContext::Del => Type::Todo,
             },
@@ -5019,24 +5019,8 @@ mod tests {
             ",
         )?;
 
-        // TODO: sys.version_info, and need to understand @final and @type_check_only
-        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | Unknown");
-
-        Ok(())
-    }
-
-    #[test]
-    fn function_return_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("src/a.py", "def example() -> int: return 42")?;
-
-        let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
-        let function = global_symbol(&db, mod_file, "example")
-            .expect_type()
-            .expect_function_literal();
-        let returns = function.return_ty(&db);
-        assert_eq!(returns.display(&db).to_string(), "int");
+        // TODO: sys.version_info
+        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | ellipsis");
 
         Ok(())
     }
@@ -5251,7 +5235,7 @@ mod tests {
     fn deferred_annotations_regular_source_fails() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        // In (regular) source files, deferred annotations are *not* resolved
+        // In (regular) source files, annotations are *not* deferred
         // Also tests imports from `__future__` that are not annotations
         db.write_dedented(
             "/src/source.py",
