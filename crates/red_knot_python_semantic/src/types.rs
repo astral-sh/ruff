@@ -2102,7 +2102,7 @@ impl<'db> Class<'db> {
             let Type::ClassLiteral(mut candidate) = metaclass else {
                 // TODO: If the metaclass is not a class, we should verify that it's a callable
                 // which accepts the same arguments as `type.__new__` (otherwise error), and return
-                // its return type.
+                // the meta-type of its return type. (And validate that is a class type?)
                 return Ok(Type::Todo);
             };
 
