@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Arguments;
+use ruff_python_ast::{Arguments, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
@@ -49,70 +49,89 @@ pub struct SubclassBuiltin {
 impl AlwaysFixableViolation for SubclassBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SubclassBuiltin { subclass, .. } = self;
-        format!("Subclass of `{subclass}`")
-    }
-
-    fn fix_title(&self) -> String {
         let SubclassBuiltin {
             subclass,
             replacement,
         } = self;
-        format!("Replace subclass `{subclass}` with `{replacement}`")
+        format!(
+            "Subclassing `{subclass}` can be error prone, use `collections.{replacement}` instead"
+        )
+    }
+
+    fn fix_title(&self) -> String {
+        let SubclassBuiltin { replacement, .. } = self;
+        format!("Replace with `collections.{replacement}`")
     }
 }
 
-enum Builtins {
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum SupportedBuiltins {
     Str,
     List,
     Dict,
 }
 
+impl TryFrom<&str> for SupportedBuiltins {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "str" => Ok(Self::Str),
+            "dict" => Ok(Self::Dict),
+            "list" => Ok(Self::List),
+            _ => Err("Unsupported builtin for `subclass-builtin`"),
+        }
+    }
+}
+
+impl SupportedBuiltins {
+    fn user_symbol(self) -> String {
+        let user_symbol = match self {
+            SupportedBuiltins::Dict => "UserDict",
+            SupportedBuiltins::List => "UserList",
+            SupportedBuiltins::Str => "UserStr",
+        };
+        user_symbol.to_string()
+    }
+}
+
 /// FURB189
-pub(crate) fn subclass_builtin(checker: &mut Checker, arguments: Option<&Arguments>) {
-    let Some(Arguments { args, .. }) = arguments else {
+pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
+    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
 
-    if args.len() == 0 {
+    if bases.len() == 0 {
         return;
     }
 
-    for base in args {
-        for symbol_type in [Builtins::Dict, Builtins::Str, Builtins::List] {
-            let symbol = match symbol_type {
-                Builtins::Dict => "dict",
-                Builtins::List => "list",
-                Builtins::Str => "str",
-            };
-            if checker.semantic().match_builtin_expr(base, symbol) {
-                let replacement_symbol = match symbol_type {
-                    Builtins::Dict => "UserDict",
-                    Builtins::List => "UserList",
-                    Builtins::Str => "UserStr",
-                };
+    for base in bases {
+        let Some(symbol) = checker.semantic().resolve_builtin_symbol(base) else {
+            continue;
+        };
 
-                let mut diagnostic = Diagnostic::new(
-                    SubclassBuiltin {
-                        subclass: symbol.to_string(),
-                        replacement: replacement_symbol.to_string(),
-                    },
-                    base.range(),
-                );
-                diagnostic.try_set_fix(|| {
-                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                        &ImportRequest::import_from("collections", replacement_symbol),
-                        base.start(),
-                        checker.semantic(),
-                    )?;
-                    let other_edit = Edit::range_replacement(binding, base.range());
-                    Ok(Fix::unsafe_edits(import_edit, [other_edit]))
-                });
-                checker.diagnostics.push(diagnostic);
+        let Ok(supported_builtin) = SupportedBuiltins::try_from(symbol) else {
+            continue;
+        };
 
-                // inheritance of these builtins is mutually exclusive
-                continue;
-            }
-        }
+        let user_symbol = supported_builtin.user_symbol();
+
+        let mut diagnostic = Diagnostic::new(
+            SubclassBuiltin {
+                subclass: symbol.to_string(),
+                replacement: user_symbol.clone(),
+            },
+            base.range(),
+        );
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from("collections", &user_symbol),
+                base.start(),
+                checker.semantic(),
+            )?;
+            let other_edit = Edit::range_replacement(binding, base.range());
+            Ok(Fix::unsafe_edits(import_edit, [other_edit]))
+        });
+        checker.diagnostics.push(diagnostic);
     }
 }

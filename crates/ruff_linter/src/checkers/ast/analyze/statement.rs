@@ -550,7 +550,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
             }
             if checker.enabled(Rule::SubclassBuiltin) {
-                refurb::rules::subclass_builtin(checker, arguments.as_deref());
+                refurb::rules::subclass_builtin(checker, class_def);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
