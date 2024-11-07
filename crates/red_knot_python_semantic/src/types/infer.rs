@@ -4396,7 +4396,7 @@ fn perform_membership_test_comparison<'db>(
             match Type::Instance(right).iterate(db) {
                 IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
                 IterationOutcome::NotIterable { .. }
-                | IterationOutcome::PossiblyUnboundIterable { .. } => None,
+                | IterationOutcome::PossiblyUnboundDunderIter { .. } => None,
             }
         }
     };

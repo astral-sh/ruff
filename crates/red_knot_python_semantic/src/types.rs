@@ -1209,9 +1209,6 @@ impl<'db> Type<'db> {
             }
 
             instance_ty @ Type::Instance(InstanceType { .. }) => {
-                // Since `__call__` is a dunder, we need to access it as an attribute on the class
-                // rather than the instance (matching runtime semantics).
-
                 let args = std::iter::once(self)
                     .chain(arg_types.iter().copied())
                     .collect::<Vec<_>>();
@@ -1319,7 +1316,7 @@ impl<'db> Type<'db> {
                 .return_ty(db)
             {
                 if boundness == Boundness::MayBeUnbound {
-                    IterationOutcome::PossiblyUnboundIterable {
+                    IterationOutcome::PossiblyUnboundDunderIter {
                         iterable_ty: self,
                         element_ty,
                     }
@@ -1968,7 +1965,7 @@ enum IterationOutcome<'db> {
     NotIterable {
         not_iterable_ty: Type<'db>,
     },
-    PossiblyUnboundIterable {
+    PossiblyUnboundDunderIter {
         iterable_ty: Type<'db>,
         element_ty: Type<'db>,
     },
@@ -1986,7 +1983,7 @@ impl<'db> IterationOutcome<'db> {
                 diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
                 Type::Unknown
             }
-            Self::PossiblyUnboundIterable {
+            Self::PossiblyUnboundDunderIter {
                 iterable_ty,
                 element_ty,
             } => {
