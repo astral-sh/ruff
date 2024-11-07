@@ -335,6 +335,8 @@ pub enum Type<'db> {
     SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
+    /// A single Python object that requires special treatment in the type system
+    KnownInstance(KnownInstanceType),
     /// The set of objects in any of the types in the union
     Union(UnionType<'db>),
     /// The set of objects in all of the types in the intersection
@@ -490,22 +492,22 @@ impl<'db> Type<'db> {
             (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
-            (_, Type::Instance(InstanceType { class, .. }))
+            (_, Type::Instance(InstanceType { class }))
                 if class.is_known(db, KnownClass::Object) =>
             {
                 true
             }
-            (Type::Instance(InstanceType { class, .. }), _)
+            (Type::Instance(InstanceType { class }), _)
                 if class.is_known(db, KnownClass::Object) =>
             {
                 false
             }
-            (Type::BooleanLiteral(_), Type::Instance(InstanceType { class, .. }))
+            (Type::BooleanLiteral(_), Type::Instance(InstanceType { class }))
                 if class.is_known(db, KnownClass::Bool) =>
             {
                 true
             }
-            (Type::IntLiteral(_), Type::Instance(InstanceType { class, .. }))
+            (Type::IntLiteral(_), Type::Instance(InstanceType { class }))
                 if class.is_known(db, KnownClass::Int) =>
             {
                 true
@@ -513,9 +515,9 @@ impl<'db> Type<'db> {
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (
                 Type::StringLiteral(_) | Type::LiteralString,
-                Type::Instance(InstanceType { class, .. }),
+                Type::Instance(InstanceType { class }),
             ) if class.is_known(db, KnownClass::Str) => true,
-            (Type::BytesLiteral(_), Type::Instance(InstanceType { class, .. }))
+            (Type::BytesLiteral(_), Type::Instance(InstanceType { class }))
                 if class.is_known(db, KnownClass::Bytes) =>
             {
                 true
@@ -530,7 +532,7 @@ impl<'db> Type<'db> {
                         },
                     )
             }
-            (Type::ClassLiteral(..), Type::Instance(InstanceType { class, .. }))
+            (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
                 if class.is_known(db, KnownClass::Type) =>
             {
                 true
@@ -545,7 +547,6 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(SubclassOfType { class: self_class }),
                 Type::Instance(InstanceType {
                     class: target_class,
-                    ..
                 }),
             ) if self_class
                 .metaclass(db)
@@ -603,15 +604,13 @@ impl<'db> Type<'db> {
                         .iter()
                         .all(|&neg_ty| neg_ty.is_disjoint_from(db, ty))
             }
-            (
-                Type::Instance(InstanceType {
-                    class: self_class, ..
-                }),
-                Type::Instance(InstanceType {
-                    class: target_class,
-                    ..
-                }),
-            ) => self_class.is_subclass_of(db, target_class),
+            (Type::KnownInstance(left), right) => {
+                left.instance_fallback(db).is_subtype_of(db, right)
+            }
+            (left, Type::KnownInstance(right)) => {
+                left.is_subtype_of(db, right.instance_fallback(db))
+            }
+            (Type::Instance(left), Type::Instance(right)) => left.is_instance_of(db, right.class),
             // TODO
             _ => false,
         }
@@ -660,8 +659,8 @@ impl<'db> Type<'db> {
         self == other
             || matches!((self, other),
                 (
-                    Type::Instance(InstanceType { class: self_class, .. }),
-                    Type::Instance(InstanceType { class: target_class, .. })
+                    Type::Instance(InstanceType { class: self_class }),
+                    Type::Instance(InstanceType { class: target_class })
                 )
                 if self_class.is_known(db, KnownClass::NoneType) &&
                 target_class.is_known(db, KnownClass::NoneType))
@@ -753,75 +752,68 @@ impl<'db> Type<'db> {
                 // final classes inside `Type::SubclassOf` everywhere.
                 false
             }
+            (Type::KnownInstance(left), Type::KnownInstance(right)) => left != right,
+            (Type::KnownInstance(left), right) => {
+                left.instance_fallback(db).is_disjoint_from(db, right)
+            }
+            (left, Type::KnownInstance(right)) => {
+                left.is_disjoint_from(db, right.instance_fallback(db))
+            }
             (
-                Type::Instance(InstanceType {
-                    class: class_none, ..
-                }),
-                Type::Instance(InstanceType {
-                    class: class_other, ..
-                }),
+                Type::Instance(InstanceType { class: class_none }),
+                Type::Instance(InstanceType { class: class_other }),
             )
             | (
-                Type::Instance(InstanceType {
-                    class: class_other, ..
-                }),
-                Type::Instance(InstanceType {
-                    class: class_none, ..
-                }),
+                Type::Instance(InstanceType { class: class_other }),
+                Type::Instance(InstanceType { class: class_none }),
             ) if class_none.is_known(db, KnownClass::NoneType) => !matches!(
                 class_other.known(db),
                 Some(KnownClass::NoneType | KnownClass::Object)
             ),
-            (
-                Type::Instance(InstanceType {
-                    class: class_none, ..
-                }),
-                _,
-            )
-            | (
-                _,
-                Type::Instance(InstanceType {
-                    class: class_none, ..
-                }),
-            ) if class_none.is_known(db, KnownClass::NoneType) => true,
+            (Type::Instance(InstanceType { class: class_none }), _)
+            | (_, Type::Instance(InstanceType { class: class_none }))
+                if class_none.is_known(db, KnownClass::NoneType) =>
+            {
+                true
+            }
 
-            (Type::BooleanLiteral(..), Type::Instance(InstanceType { class, .. }))
-            | (Type::Instance(InstanceType { class, .. }), Type::BooleanLiteral(..)) => !matches!(
+            (Type::BooleanLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::BooleanLiteral(..)) => !matches!(
                 class.known(db),
                 Some(KnownClass::Bool | KnownClass::Int | KnownClass::Object)
             ),
             (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
 
-            (Type::IntLiteral(..), Type::Instance(InstanceType { class, .. }))
-            | (Type::Instance(InstanceType { class, .. }), Type::IntLiteral(..)) => {
+            (Type::IntLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::IntLiteral(..)) => {
                 !matches!(class.known(db), Some(KnownClass::Int | KnownClass::Object))
             }
             (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => true,
 
             (Type::StringLiteral(..), Type::LiteralString)
             | (Type::LiteralString, Type::StringLiteral(..)) => false,
-            (Type::StringLiteral(..), Type::Instance(InstanceType { class, .. }))
-            | (Type::Instance(InstanceType { class, .. }), Type::StringLiteral(..)) => {
+            (Type::StringLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::StringLiteral(..)) => {
                 !matches!(class.known(db), Some(KnownClass::Str | KnownClass::Object))
             }
             (Type::StringLiteral(..), _) | (_, Type::StringLiteral(..)) => true,
 
             (Type::LiteralString, Type::LiteralString) => false,
-            (Type::LiteralString, Type::Instance(InstanceType { class, .. }))
-            | (Type::Instance(InstanceType { class, .. }), Type::LiteralString) => {
+            (Type::LiteralString, Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::LiteralString) => {
                 !matches!(class.known(db), Some(KnownClass::Str | KnownClass::Object))
             }
             (Type::LiteralString, _) | (_, Type::LiteralString) => true,
 
-            (Type::BytesLiteral(..), Type::Instance(InstanceType { class, .. }))
-            | (Type::Instance(InstanceType { class, .. }), Type::BytesLiteral(..)) => !matches!(
+            (Type::BytesLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::BytesLiteral(..)) => !matches!(
                 class.known(db),
                 Some(KnownClass::Bytes | KnownClass::Object)
             ),
             (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
 
-            (Type::SliceLiteral(..), Type::Instance(InstanceType { class, .. }))
-            | (Type::Instance(InstanceType { class, .. }), Type::SliceLiteral(..)) => !matches!(
+            (Type::SliceLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::SliceLiteral(..)) => !matches!(
                 class.known(db),
                 Some(KnownClass::Slice | KnownClass::Object)
             ),
@@ -829,10 +821,10 @@ impl<'db> Type<'db> {
 
             (
                 Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
-                Type::Instance(InstanceType { class, .. }),
+                Type::Instance(InstanceType { class }),
             )
             | (
-                Type::Instance(InstanceType { class, .. }),
+                Type::Instance(InstanceType { class }),
                 Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
             ) => !class.is_known(db, KnownClass::Object),
 
@@ -902,8 +894,9 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_)
             | Type::FunctionLiteral(..)
             | Type::ClassLiteral(..)
-            | Type::ModuleLiteral(..) => true,
-            Type::Instance(InstanceType { class, .. }) => {
+            | Type::ModuleLiteral(..)
+            | Type::KnownInstance(..) => true,
+            Type::Instance(InstanceType { class }) => {
                 // TODO some more instance types can be singleton types (EllipsisType, NotImplementedType)
                 matches!(class.known(db), Some(KnownClass::NoneType))
             }
@@ -944,7 +937,8 @@ impl<'db> Type<'db> {
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
-            | Type::SliceLiteral(..) => true,
+            | Type::SliceLiteral(..)
+            | Type::KnownInstance(..) => true,
 
             Type::SubclassOf(..) => {
                 // TODO: Same comment as above for `is_singleton`
@@ -956,7 +950,7 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|elem| elem.is_single_valued(db)),
 
-            Type::Instance(InstanceType { class, .. }) => match class.known(db) {
+            Type::Instance(InstanceType { class }) => match class.known(db) {
                 Some(KnownClass::NoneType) => true,
                 Some(
                     KnownClass::Bool
@@ -1045,6 +1039,9 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class_ty) => class_ty.member(db, name),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.member(db, name),
+            Type::KnownInstance(known_instance) => {
+                known_instance.instance_fallback(db).member(db, name)
+            }
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo.into()
@@ -1139,7 +1136,7 @@ impl<'db> Type<'db> {
                 // TODO: see above
                 Truthiness::Ambiguous
             }
-            Type::Instance(InstanceType { class, .. }) => {
+            Type::Instance(InstanceType { class }) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the instance's class
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 // For now, we only special-case some builtin classes
@@ -1149,6 +1146,7 @@ impl<'db> Type<'db> {
                     Truthiness::Ambiguous
                 }
             }
+            Type::KnownInstance(known_instance) => known_instance.bool(),
             Type::Union(union) => {
                 let union_elements = union.elements(db);
                 let first_element_truthiness = union_elements[0].bool(db);
@@ -1204,11 +1202,11 @@ impl<'db> Type<'db> {
                         .first()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
-                    _ => Type::anonymous_instance(class),
+                    _ => Type::Instance(InstanceType { class }),
                 })
             }
 
-            instance_ty @ Type::Instance(InstanceType { .. }) => {
+            instance_ty @ Type::Instance(_) => {
                 let args = std::iter::once(self)
                     .chain(arg_types.iter().copied())
                     .collect::<Vec<_>>();
@@ -1355,8 +1353,12 @@ impl<'db> Type<'db> {
             Type::Todo => Type::Todo,
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
-            Type::ClassLiteral(ClassLiteralType { class }) => Type::anonymous_instance(*class),
-            Type::SubclassOf(SubclassOfType { class }) => Type::anonymous_instance(*class),
+            Type::ClassLiteral(ClassLiteralType { class }) => {
+                Type::Instance(InstanceType { class: *class })
+            }
+            Type::SubclassOf(SubclassOfType { class }) => {
+                Type::Instance(InstanceType { class: *class })
+            }
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
@@ -1366,6 +1368,7 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Instance(_)
+            | Type::KnownInstance(_)
             | Type::ModuleLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
@@ -1373,10 +1376,6 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::LiteralString => Type::Unknown,
         }
-    }
-
-    pub fn anonymous_instance(class: Class<'db>) -> Self {
-        Self::Instance(InstanceType::anonymous(class))
     }
 
     /// The type `NoneType` / `None`
@@ -1390,9 +1389,10 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            Type::Instance(InstanceType { class, .. }) => {
+            Type::Instance(InstanceType { class }) => {
                 Type::SubclassOf(SubclassOfType { class: *class })
             }
+            Type::KnownInstance(known_instance) => known_instance.class().to_class(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
@@ -1431,6 +1431,9 @@ impl<'db> Type<'db> {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
+            Type::KnownInstance(known_instance) => {
+                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr()))
+            }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -1450,6 +1453,9 @@ impl<'db> Type<'db> {
                 format!("'{}'", literal.value(db).escape_default()).into_boxed_str()
             })),
             Type::LiteralString => Type::LiteralString,
+            Type::KnownInstance(known_instance) => {
+                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr()))
+            }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -1612,39 +1618,58 @@ impl<'db> KnownClass {
     }
 }
 
+/// Enumeration of specific runtime that are special enough to be considered their own type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KnownInstance {
+pub enum KnownInstanceType {
+    /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
     // TODO: fill this enum out with more special forms, etc.
 }
 
-impl KnownInstance {
-    pub const fn as_str(&self) -> &'static str {
+impl KnownInstanceType {
+    pub const fn as_str(self) -> &'static str {
         match self {
-            KnownInstance::Literal => "Literal",
+            KnownInstanceType::Literal => "Literal",
         }
     }
 
-    pub fn maybe_from_module(module: &Module, instance_name: &str) -> Option<Self> {
-        let candidate = Self::from_name(instance_name)?;
-        candidate.check_module(module).then_some(candidate)
-    }
-
-    fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "Literal" => Some(Self::Literal),
-            _ => None,
+    /// Evaluate the known instance in boolean context
+    pub const fn bool(self) -> Truthiness {
+        match self {
+            Self::Literal => Truthiness::AlwaysTrue,
         }
     }
 
-    fn check_module(self, module: &Module) -> bool {
+    /// Return the repr of the symbol at runtime
+    pub const fn repr(self) -> &'static str {
+        match self {
+            Self::Literal => "typing.Literal",
+        }
+    }
+
+    /// Return the [`KnownClass`] which this symbol is an instance of
+    pub const fn class(self) -> KnownClass {
+        match self {
+            Self::Literal => KnownClass::SpecialForm,
+        }
+    }
+
+    /// Return the instance type which this type is a subtype of.
+    ///
+    /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
+    /// so `KnownInstanceType::Literal.instance_fallback(db)`
+    /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
+    pub fn instance_fallback(self, db: &dyn Db) -> Type {
+        self.class().to_instance(db)
+    }
+
+    pub fn try_from_module_and_symbol(module: &Module, instance_name: &str) -> Option<Self> {
         if !module.search_path().is_standard_library() {
-            return false;
+            return None;
         }
-        match self {
-            Self::Literal => {
-                matches!(module.name().as_str(), "typing" | "typing_extensions")
-            }
+        match (module.name().as_str(), instance_name) {
+            ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
+            _ => None,
         }
     }
 }
@@ -1993,7 +2018,7 @@ impl<'db> IterationOutcome<'db> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum Truthiness {
+pub enum Truthiness {
     /// For an object `x`, `bool(x)` will always return `True`
     AlwaysTrue,
     /// For an object `x`, `bool(x)` will always return `False`
@@ -2475,37 +2500,12 @@ impl<'db> SubclassOfType<'db> {
 }
 
 /// A type representing the set of runtime objects which are instances of a certain class.
-///
-/// Some specific instances of some types need to be treated specially by the type system:
-/// for example, various special forms are instances of `typing._SpecialForm`,
-/// but need to be handled differently in annotations. These special instances are marked as such
-/// using the `known` field on this struct.
-///
-/// Note that, for example, `InstanceType { class: typing._SpecialForm, known: None }`
-/// is a supertype of `InstanceType { class: typing._SpecialForm, known: KnownInstance::Literal }`.
-/// The two types are not disjoint.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InstanceType<'db> {
     class: Class<'db>,
-    known: Option<KnownInstance>,
 }
 
 impl<'db> InstanceType<'db> {
-    pub fn anonymous(class: Class<'db>) -> Self {
-        Self { class, known: None }
-    }
-
-    pub fn known(class: Class<'db>, known: KnownInstance) -> Self {
-        Self {
-            class,
-            known: Some(known),
-        }
-    }
-
-    pub fn is_known(&self, known_instance: KnownInstance) -> bool {
-        self.known == Some(known_instance)
-    }
-
     /// Return `true` if members of this type are instances of the class `class` at runtime.
     pub fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
         self.class.is_subclass_of(db, class)
@@ -2703,6 +2703,8 @@ mod tests {
         BytesLiteral(&'static str),
         // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
         BuiltinInstance(&'static str),
+        TypingInstance(&'static str),
+        KnownInstance(KnownInstanceType),
         // BuiltinClassLiteral("str") corresponds to the builtin `str` class object itself
         BuiltinClassLiteral(&'static str),
         Union(Vec<Ty>),
@@ -2724,6 +2726,8 @@ mod tests {
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
                 Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
+                Ty::TypingInstance(s) => typing_symbol(db, s).expect_type().to_instance(db),
+                Ty::KnownInstance(known_instance) => Type::KnownInstance(known_instance),
                 Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
@@ -2813,6 +2817,14 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("str")], neg: vec![Ty::StringLiteral("foo")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("int"))]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinInstance("object"))]
+    #[test_case(
+        Ty::KnownInstance(KnownInstanceType::Literal),
+        Ty::TypingInstance("_SpecialForm")
+    )]
+    #[test_case(
+        Ty::KnownInstance(KnownInstanceType::Literal),
+        Ty::BuiltinInstance("object")
+    )]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));

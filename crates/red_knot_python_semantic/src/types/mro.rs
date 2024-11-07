@@ -5,7 +5,7 @@ use indexmap::IndexSet;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
-use super::{Class, ClassLiteralType, KnownClass, Type};
+use super::{Class, ClassLiteralType, KnownClass, KnownInstanceType, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
@@ -379,6 +379,9 @@ impl<'db> ClassBase<'db> {
             | Type::SliceLiteral(_)
             | Type::ModuleLiteral(_)
             | Type::SubclassOf(_) => None,
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::Literal => None,
+            },
         }
     }
 
