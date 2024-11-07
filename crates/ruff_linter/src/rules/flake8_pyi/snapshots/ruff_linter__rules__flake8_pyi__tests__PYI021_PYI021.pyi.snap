@@ -33,7 +33,7 @@ PYI021.pyi:4:5: PYI021 [*] Docstrings should not be included in stubs
 2 2 | 
 3 3 | def foo():
 4   |-    """foo"""  # ERROR PYI021
-  4 |+    pass  # ERROR PYI021
+  4 |+    ...  # ERROR PYI021
 5 5 | 
 6 6 | class Bar:
 7 7 |     """bar"""  # ERROR PYI021
