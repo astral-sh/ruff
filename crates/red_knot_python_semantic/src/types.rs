@@ -1322,7 +1322,13 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
-            Type::Type(_) => Type::Type(KnownClass::Type.to_class(db).expect_class_literal()),
+            Type::Type(ClassLiteralType { class }) => Type::Type(
+                class
+                    .try_metaclass(db)
+                    .ok()
+                    .and_then(Type::into_class_literal)
+                    .unwrap_or(KnownClass::Type.to_class(db).expect_class_literal()),
+            ),
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
             Type::Any => Type::Any,
