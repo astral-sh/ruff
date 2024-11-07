@@ -86,7 +86,7 @@ impl Violation for ManualListComprehension {
             ComprehensionType::ListComprehension => {
                 Some(format!("Replace for loop with list comprehension"))
             }
-            ComprehensionType::Extend => Some(format!("Replace for loop with list.extend"))
+            ComprehensionType::Extend => Some(format!("Replace for loop with list.extend")),
         }
     }
 }
