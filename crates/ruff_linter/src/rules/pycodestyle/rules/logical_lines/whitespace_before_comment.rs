@@ -2,11 +2,12 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::Locator;
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.
@@ -35,11 +36,11 @@ pub struct TooFewSpacesBeforeInlineComment;
 impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Insert at least two spaces before an inline comment")
+        "Insert at least two spaces before an inline comment".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Insert spaces")
+        "Insert spaces".to_string()
     }
 }
 
@@ -71,11 +72,11 @@ pub struct NoSpaceAfterInlineComment;
 impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Inline comment should start with `# `")
+        "Inline comment should start with `# `".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Format space")
+        "Format space".to_string()
     }
 }
 
@@ -108,11 +109,11 @@ pub struct NoSpaceAfterBlockComment;
 impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Block comment should start with `# `")
+        "Block comment should start with `# `".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Format space")
+        "Format space".to_string()
     }
 }
 
@@ -154,11 +155,11 @@ pub struct MultipleLeadingHashesForBlockComment;
 impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many leading `#` before block comment")
+        "Too many leading `#` before block comment".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove leading `#`")
+        "Remove leading `#`".to_string()
     }
 }
 

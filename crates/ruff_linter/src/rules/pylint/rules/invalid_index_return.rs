@@ -46,7 +46,7 @@ pub struct InvalidIndexReturnType;
 impl Violation for InvalidIndexReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__index__` does not return an integer")
+        "`__index__` does not return an integer".to_string()
     }
 }
 

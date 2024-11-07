@@ -59,51 +59,51 @@ reveal_type(c >= d)  # revealed: Literal[True]
 
 ```py
 def bool_instance() -> bool: ...
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
 a = (bool_instance(),)
 b = (int_instance(),)
 
-# TODO: All @Todo should be `bool`
-reveal_type(a == a)  # revealed: @Todo
-reveal_type(a != a)  # revealed: @Todo
-reveal_type(a < a)  # revealed: @Todo
-reveal_type(a <= a)  # revealed: @Todo
-reveal_type(a > a)  # revealed: @Todo
-reveal_type(a >= a)  # revealed: @Todo
+reveal_type(a == a)  # revealed: bool
+reveal_type(a != a)  # revealed: bool
+reveal_type(a < a)  # revealed: bool
+reveal_type(a <= a)  # revealed: bool
+reveal_type(a > a)  # revealed: bool
+reveal_type(a >= a)  # revealed: bool
 
-reveal_type(a == b)  # revealed: @Todo
-reveal_type(a != b)  # revealed: @Todo
-reveal_type(a < b)  # revealed: @Todo
-reveal_type(a <= b)  # revealed: @Todo
-reveal_type(a > b)  # revealed: @Todo
-reveal_type(a >= b)  # revealed: @Todo
+reveal_type(a == b)  # revealed: bool
+reveal_type(a != b)  # revealed: bool
+reveal_type(a < b)  # revealed: bool
+reveal_type(a <= b)  # revealed: bool
+reveal_type(a > b)  # revealed: bool
+reveal_type(a >= b)  # revealed: bool
 ```
 
 #### Comparison Unsupported
 
-If two tuples contain types that do not support comparison, the result may be `Unknown`.
-However, `==` and `!=` are exceptions and can still provide definite results.
+If two tuples contain types that do not support comparison, the result may be `Unknown`. However,
+`==` and `!=` are exceptions and can still provide definite results.
 
 ```py
 a = (1, 2)
 b = (1, "hello")
 
-# TODO: should be Literal[False]
-reveal_type(a == b)  # revealed: @Todo
+# TODO: should be Literal[False], once we implement (in)equality for mismatched literals
+reveal_type(a == b)  # revealed: bool
 
-# TODO: should be Literal[True]
-reveal_type(a != b)  # revealed: @Todo
+# TODO: should be Literal[True], once we implement (in)equality for mismatched literals
+reveal_type(a != b)  # revealed: bool
 
 # TODO: should be Unknown and add more informative diagnostics
-reveal_type(a < b)  # revealed: @Todo
-reveal_type(a <= b)  # revealed: @Todo
-reveal_type(a > b)  # revealed: @Todo
-reveal_type(a >= b)  # revealed: @Todo
+reveal_type(a < b)  # revealed: bool
+reveal_type(a <= b)  # revealed: bool
+reveal_type(a > b)  # revealed: bool
+reveal_type(a >= b)  # revealed: bool
 ```
 
-However, if the lexicographic comparison completes without reaching a point where str and int are compared,
-Python will still produce a result based on the prior elements.
+However, if the lexicographic comparison completes without reaching a point where str and int are
+compared, Python will still produce a result based on the prior elements.
 
 ```py path=short_circuit.py
 a = (1, 2)
@@ -145,13 +145,12 @@ class A:
 
 a = (A(), A())
 
-# TODO: All @Todo should be bool
-reveal_type(a == a)  # revealed: @Todo
-reveal_type(a != a)  # revealed: @Todo
-reveal_type(a < a)  # revealed: @Todo
-reveal_type(a <= a)  # revealed: @Todo
-reveal_type(a > a)  # revealed: @Todo
-reveal_type(a >= a)  # revealed: @Todo
+reveal_type(a == a)  # revealed: bool
+reveal_type(a != a)  # revealed: bool
+reveal_type(a < a)  # revealed: bool
+reveal_type(a <= a)  # revealed: bool
+reveal_type(a > a)  # revealed: bool
+reveal_type(a >= a)  # revealed: bool
 ```
 
 ### Membership Test Comparisons
@@ -159,7 +158,8 @@ reveal_type(a >= a)  # revealed: @Todo
 "Membership Test Comparisons" refers to the operators `in` and `not in`.
 
 ```py
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
 a = (1, 2)
 b = ((3, 4), (1, 2))
@@ -172,9 +172,8 @@ reveal_type(a not in b)  # revealed: Literal[False]
 reveal_type(a in c)  # revealed: Literal[False]
 reveal_type(a not in c)  # revealed: Literal[True]
 
-# TODO: All @Todo should be bool
-reveal_type(a in d)  # revealed: @Todo
-reveal_type(a not in d)  # revealed: @Todo
+reveal_type(a in d)  # revealed: bool
+reveal_type(a not in d)  # revealed: bool
 ```
 
 ### Identity Comparisons
@@ -189,10 +188,10 @@ c = (1, 2, 3)
 reveal_type(a is (1, 2))  # revealed: bool
 reveal_type(a is not (1, 2))  # revealed: bool
 
-# TODO: Update to Literal[False] once str == int comparison is implemented
-reveal_type(a is b)  # revealed: @Todo
-# TODO: Update to Literal[True] once str == int comparison is implemented
-reveal_type(a is not b)  # revealed: @Todo
+# TODO should be Literal[False] once we implement comparison of mismatched literal types
+reveal_type(a is b)  # revealed: bool
+# TODO should be Literal[True] once we implement comparison of mismatched literal types
+reveal_type(a is not b)  # revealed: bool
 
 reveal_type(a is c)  # revealed: Literal[False]
 reveal_type(a is not c)  # revealed: Literal[True]

@@ -30,6 +30,8 @@ pub struct IOError {
 
 /// E902
 impl Violation for IOError {
+    // The format message is used by the `derive_message_formats` macro.
+    #![allow(clippy::useless_format)]
     #[derive_message_formats]
     fn message(&self) -> String {
         let IOError { message } = self;

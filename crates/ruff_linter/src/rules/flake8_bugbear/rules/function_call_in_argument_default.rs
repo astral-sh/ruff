@@ -72,11 +72,10 @@ pub struct FunctionCallInDefaultArgument {
 impl Violation for FunctionCallInDefaultArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionCallInDefaultArgument { name } = self;
-        if let Some(name) = name {
+        if let Some(name) = &self.name {
             format!("Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable")
         } else {
-            format!("Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable")
+            "Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable".to_string()
         }
     }
 }

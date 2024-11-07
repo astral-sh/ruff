@@ -46,14 +46,10 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         match (self.safety, self.is_exact) {
-            (Safety::SeemsSafe, true) => format!(
-                "`subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`"
-            ),
-            (Safety::Unknown, true) => format!("`subprocess` call with `shell=True` identified, security issue"),
-            (Safety::SeemsSafe, false) => format!(
-                "`subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`"
-            ),
-            (Safety::Unknown, false) => format!("`subprocess` call with truthy `shell` identified, security issue"),
+            (Safety::SeemsSafe, true) => "`subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
+            (Safety::Unknown, true) => "`subprocess` call with `shell=True` identified, security issue".to_string(),
+            (Safety::SeemsSafe, false) => "`subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
+            (Safety::Unknown, false) => "`subprocess` call with truthy `shell` identified, security issue".to_string(),
         }
     }
 }
@@ -88,7 +84,7 @@ pub struct SubprocessWithoutShellEqualsTrue;
 impl Violation for SubprocessWithoutShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`subprocess` call: check for execution of untrusted input")
+        "`subprocess` call: check for execution of untrusted input".to_string()
     }
 }
 
@@ -129,9 +125,9 @@ impl Violation for CallWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.is_exact {
-            format!("Function call with `shell=True` parameter identified, security issue")
+            "Function call with `shell=True` parameter identified, security issue".to_string()
         } else {
-            format!("Function call with truthy `shell` parameter identified, security issue")
+            "Function call with truthy `shell` parameter identified, security issue".to_string()
         }
     }
 }
@@ -181,8 +177,8 @@ impl Violation for StartProcessWithAShell {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.safety {
-            Safety::SeemsSafe => format!("Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`"),
-            Safety::Unknown => format!("Starting a process with a shell, possible injection detected"),
+            Safety::SeemsSafe => "Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
+            Safety::Unknown => "Starting a process with a shell, possible injection detected".to_string(),
         }
     }
 }
@@ -219,7 +215,7 @@ pub struct StartProcessWithNoShell;
 impl Violation for StartProcessWithNoShell {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Starting a process without a shell")
+        "Starting a process without a shell".to_string()
     }
 }
 
@@ -254,7 +250,7 @@ pub struct StartProcessWithPartialPath;
 impl Violation for StartProcessWithPartialPath {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Starting a process with a partial executable path")
+        "Starting a process with a partial executable path".to_string()
     }
 }
 
@@ -287,7 +283,7 @@ pub struct UnixCommandWildcardInjection;
 impl Violation for UnixCommandWildcardInjection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible wildcard injection in call due to `*` usage")
+        "Possible wildcard injection in call due to `*` usage".to_string()
     }
 }
 

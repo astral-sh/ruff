@@ -53,7 +53,7 @@ pub struct DictIndexMissingItems;
 impl Violation for DictIndexMissingItems {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Extracting value from dictionary without calling `.items()`")
+        "Extracting value from dictionary without calling `.items()`".to_string()
     }
 }
 

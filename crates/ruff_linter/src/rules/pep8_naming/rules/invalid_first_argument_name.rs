@@ -69,7 +69,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("First argument of a method should be named `self`")
+        "First argument of a method should be named `self`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -135,7 +135,7 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("First argument of a class method should be named `cls`")
+        "First argument of a class method should be named `cls`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

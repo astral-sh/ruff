@@ -35,7 +35,7 @@ pub struct UnnecessaryListComprehensionDict;
 impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary `list` comprehension (rewrite as a `dict` comprehension)")
+        "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)".to_string()
     }
 
     fn fix_title(&self) -> String {

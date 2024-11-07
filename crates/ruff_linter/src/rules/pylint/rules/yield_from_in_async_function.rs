@@ -33,7 +33,7 @@ pub struct YieldFromInAsyncFunction;
 impl Violation for YieldFromInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`yield from` statement in async function; use `async for` instead")
+        "`yield from` statement in async function; use `async for` instead".to_string()
     }
 }
 

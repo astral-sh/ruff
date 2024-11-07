@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `if statements that use non-empty tuples as test conditions.
+/// Checks for `if` statements that use non-empty tuples as test conditions.
 ///
 /// ## Why is this bad?
 /// Non-empty tuples are always `True`, so an `if` statement with a non-empty
@@ -34,7 +34,7 @@ pub struct IfTuple;
 impl Violation for IfTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("If test is a tuple, which is always `True`")
+        "If test is a tuple, which is always `True`".to_string()
     }
 }
 

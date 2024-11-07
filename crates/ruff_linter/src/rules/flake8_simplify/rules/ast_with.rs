@@ -55,10 +55,9 @@ impl Violation for MultipleWithStatements {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use a single `with` statement with multiple contexts instead of nested `with` \
-             statements"
-        )
+        "Use a single `with` statement with multiple contexts instead of nested `with` \
+            statements"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

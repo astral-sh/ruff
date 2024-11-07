@@ -56,7 +56,7 @@ impl Violation for MutableFromkeysValue {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not pass mutable objects as values to `dict.fromkeys`")
+        "Do not pass mutable objects as values to `dict.fromkeys`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

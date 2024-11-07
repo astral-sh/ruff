@@ -33,6 +33,8 @@ use crate::registry::Rule;
 /// False
 /// ```
 ///
+/// In [preview], this rule will also flag non-stub files.
+///
 /// ## Example
 /// ```pyi
 /// import sys
@@ -46,13 +48,15 @@ use crate::registry::Rule;
 ///
 /// if sys.version_info >= (3, 9): ...
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct BadVersionInfoComparison;
 
 impl Violation for BadVersionInfoComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `<` or `>=` for `sys.version_info` comparisons")
+        "Use `<` or `>=` for `sys.version_info` comparisons".to_string()
     }
 }
 
@@ -65,6 +69,8 @@ impl Violation for BadVersionInfoComparison {
 /// come first when using `sys.version_info` comparisons. This makes it easier
 /// to understand the desired behavior, which typically corresponds to the
 /// latest Python versions.
+///
+/// In [preview], this rule will also flag non-stub files.
 ///
 /// ## Example
 ///
@@ -87,13 +93,15 @@ impl Violation for BadVersionInfoComparison {
 /// else:
 ///     def read_data(x, *, preserve_order=True): ...
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct BadVersionInfoOrder;
 
 impl Violation for BadVersionInfoOrder {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `>=` when using `if`-`else` with `sys.version_info` comparisons")
+        "Use `>=` when using `if`-`else` with `sys.version_info` comparisons".to_string()
     }
 }
 

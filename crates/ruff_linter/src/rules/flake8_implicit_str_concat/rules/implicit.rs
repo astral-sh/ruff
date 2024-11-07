@@ -7,10 +7,11 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for implicitly concatenated strings on a single line.
@@ -41,7 +42,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals on one line")
+        "Implicitly concatenated string literals on one line".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -87,7 +88,7 @@ pub struct MultiLineImplicitStringConcatenation;
 impl Violation for MultiLineImplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over multiple lines")
+        "Implicitly concatenated string literals over multiple lines".to_string()
     }
 }
 

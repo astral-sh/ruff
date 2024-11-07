@@ -56,24 +56,24 @@ impl Violation for NeedlessBool {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NeedlessBool { condition, negate } = self;
-
         if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
             format!("Return the condition `{condition}` directly")
         } else if *negate {
-            format!("Return the negated condition directly")
+            "Return the negated condition directly".to_string()
         } else {
-            format!("Return the condition directly")
+            "Return the condition directly".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         let NeedlessBool { condition, .. } = self;
-
-        if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
-            Some(format!("Replace with `return {condition}`"))
-        } else {
-            Some(format!("Inline condition"))
-        }
+        Some(
+            if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
+                format!("Replace with `return {condition}`")
+            } else {
+                "Inline condition".to_string()
+            },
+        )
     }
 }
 
@@ -200,7 +200,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     // Generate the replacement condition.
     let condition = if checker
         .comment_ranges()
-        .has_comments(&range, checker.locator())
+        .has_comments(&range, checker.source())
     {
         None
     } else {

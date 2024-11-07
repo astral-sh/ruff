@@ -549,6 +549,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::WhitespaceAfterDecorator) {
                 pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
             }
+            if checker.enabled(Rule::SubclassBuiltin) {
+                refurb::rules::subclass_builtin(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {
@@ -1213,8 +1216,18 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         flake8_pyi::rules::unrecognized_platform(checker, test);
                     }
                 }
-                if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder])
-                {
+                if checker.enabled(Rule::ComplexIfStatementInStub) {
+                    if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                        for value in values {
+                            flake8_pyi::rules::complex_if_statement_in_stub(checker, value);
+                        }
+                    } else {
+                        flake8_pyi::rules::complex_if_statement_in_stub(checker, test);
+                    }
+                }
+            }
+            if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder]) {
+                if checker.source_type.is_stub() || checker.settings.preview.is_enabled() {
                     fn bad_version_info_comparison(
                         checker: &mut Checker,
                         test: &Expr,
@@ -1245,15 +1258,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         if let Some(test) = clause.test.as_ref() {
                             bad_version_info_comparison(checker, test, has_else_clause);
                         }
-                    }
-                }
-                if checker.enabled(Rule::ComplexIfStatementInStub) {
-                    if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
-                        for value in values {
-                            flake8_pyi::rules::complex_if_statement_in_stub(checker, value);
-                        }
-                    } else {
-                        flake8_pyi::rules::complex_if_statement_in_stub(checker, test);
                     }
                 }
             }

@@ -228,6 +228,7 @@ use self::symbol_state::{
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::symbol::Boundness;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -274,8 +275,12 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    pub(crate) fn use_may_be_unbound(&self, use_id: ScopedUseId) -> bool {
-        self.bindings_by_use[use_id].may_be_unbound()
+    pub(crate) fn use_boundness(&self, use_id: ScopedUseId) -> Boundness {
+        if self.bindings_by_use[use_id].may_be_unbound() {
+            Boundness::MayBeUnbound
+        } else {
+            Boundness::Bound
+        }
     }
 
     pub(crate) fn public_bindings(
@@ -285,8 +290,12 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
     }
 
-    pub(crate) fn public_may_be_unbound(&self, symbol: ScopedSymbolId) -> bool {
-        self.public_symbols[symbol].may_be_unbound()
+    pub(crate) fn public_boundness(&self, symbol: ScopedSymbolId) -> Boundness {
+        if self.public_symbols[symbol].may_be_unbound() {
+            Boundness::MayBeUnbound
+        } else {
+            Boundness::Bound
+        }
     }
 
     pub(crate) fn bindings_at_declaration(

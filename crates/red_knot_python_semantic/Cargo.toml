@@ -13,7 +13,7 @@ license = { workspace = true }
 [dependencies]
 ruff_db = { workspace = true }
 ruff_index = { workspace = true }
-ruff_python_ast = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["salsa"] }
 ruff_python_stdlib = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
@@ -24,7 +24,8 @@ bitflags = { workspace = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
 countme = { workspace = true }
-itertools = { workspace = true}
+indexmap = { workspace = true }
+itertools = { workspace = true }
 ordermap = { workspace = true }
 salsa = { workspace = true }
 thiserror = { workspace = true }
@@ -43,10 +44,9 @@ red_knot_test = { workspace = true }
 red_knot_vendored = { workspace = true }
 
 anyhow = { workspace = true }
-dir-test = {workspace = true}
+dir-test = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]
 workspace = true
-

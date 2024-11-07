@@ -1,6 +1,6 @@
 import _tkinter
 import tkinter
-from _typeshed import Incomplete
+from _typeshed import Incomplete, MaybeNone
 from collections.abc import Callable
 from tkinter.font import _FontDescription
 from typing import Any, Literal, TypedDict, overload
@@ -1156,7 +1156,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         background: str = ...,
         font: _FontDescription = ...,
         image: tkinter._ImageSpec = ...,
-    ) -> _TreeviewTagDict | Any: ...  # can be None but annoying to check
+    ) -> _TreeviewTagDict | MaybeNone: ...  # can be None but annoying to check
     @overload
     def tag_has(self, tagname: str, item: None = None) -> tuple[str, ...]: ...
     @overload

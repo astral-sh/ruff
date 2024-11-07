@@ -55,7 +55,7 @@ impl Violation for GenericNotLastBaseClass {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`Generic[]` should always be the last base class")
+        "`Generic[]` should always be the last base class".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

@@ -33,7 +33,7 @@ pub struct PandasDfVariableName;
 impl Violation for PandasDfVariableName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid using the generic variable name `df` for DataFrames")
+        "Avoid using the generic variable name `df` for DataFrames".to_string()
     }
 }
 

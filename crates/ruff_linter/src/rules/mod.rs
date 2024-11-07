@@ -1,4 +1,3 @@
-#![allow(clippy::useless_format)]
 pub mod airflow;
 pub mod eradicate;
 pub mod fastapi;

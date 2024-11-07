@@ -1,16 +1,15 @@
+use flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
+use flake8_quotes::settings::Quote;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{walk_f_string, Visitor};
 use ruff_python_ast::{self as ast, AnyStringFlags, StringFlags, StringLike};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_quotes;
 use crate::settings::LinterSettings;
-
-use flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
-use flake8_quotes::settings::Quote;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for strings that include escaped quotes, and suggests changing
@@ -42,7 +41,7 @@ pub struct AvoidableEscapedQuote;
 impl AlwaysFixableViolation for AvoidableEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Change outer quotes to avoid escaping inner quotes")
+        "Change outer quotes to avoid escaping inner quotes".to_string()
     }
 
     fn fix_title(&self) -> String {

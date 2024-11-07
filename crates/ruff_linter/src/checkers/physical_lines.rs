@@ -3,7 +3,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_source_file::UniversalNewlines;
 use ruff_text_size::TextSize;
 
 use crate::registry::Rule;
@@ -14,6 +14,7 @@ use crate::rules::pycodestyle::rules::{
 };
 use crate::rules::pylint;
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 pub(crate) fn check_physical_lines(
     locator: &Locator,
@@ -92,12 +93,12 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
-    use ruff_source_file::Locator;
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;
     use crate::rules::pycodestyle;
     use crate::settings::LinterSettings;
+    use crate::Locator;
 
     use super::check_physical_lines;
 
@@ -106,8 +107,8 @@ mod tests {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
         let parsed = parse_module(line).unwrap();
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
+        let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
         let check_with_max_line_length = |line_length: LineLength| {
             check_physical_lines(

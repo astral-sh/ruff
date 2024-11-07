@@ -36,10 +36,9 @@ pub struct SetAttrWithConstant;
 impl AlwaysFixableViolation for SetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Do not call `setattr` with a constant attribute value. It is not any safer than \
+        "Do not call `setattr` with a constant attribute value. It is not any safer than \
              normal property access."
-        )
+            .to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -52,7 +52,7 @@ pub struct SuspiciousPickleUsage;
 impl Violation for SuspiciousPickleUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue")
+        "`pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue".to_string()
     }
 }
 
@@ -97,7 +97,7 @@ pub struct SuspiciousMarshalUsage;
 impl Violation for SuspiciousMarshalUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Deserialization with the `marshal` module is possibly dangerous")
+        "Deserialization with the `marshal` module is possibly dangerous".to_string()
     }
 }
 
@@ -143,7 +143,7 @@ pub struct SuspiciousInsecureHashUsage;
 impl Violation for SuspiciousInsecureHashUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of insecure MD2, MD4, MD5, or SHA1 hash function")
+        "Use of insecure MD2, MD4, MD5, or SHA1 hash function".to_string()
     }
 }
 
@@ -181,7 +181,7 @@ pub struct SuspiciousInsecureCipherUsage;
 impl Violation for SuspiciousInsecureCipherUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of insecure cipher, replace with a known secure cipher such as AES")
+        "Use of insecure cipher, replace with a known secure cipher such as AES".to_string()
     }
 }
 
@@ -221,7 +221,8 @@ pub struct SuspiciousInsecureCipherModeUsage;
 impl Violation for SuspiciousInsecureCipherModeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of insecure block cipher mode, replace with a known secure mode such as CBC or CTR")
+        "Use of insecure block cipher mode, replace with a known secure mode such as CBC or CTR"
+            .to_string()
     }
 }
 
@@ -265,7 +266,7 @@ pub struct SuspiciousMktempUsage;
 impl Violation for SuspiciousMktempUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of insecure and deprecated function (`mktemp`)")
+        "Use of insecure and deprecated function (`mktemp`)".to_string()
     }
 }
 
@@ -301,7 +302,7 @@ pub struct SuspiciousEvalUsage;
 impl Violation for SuspiciousEvalUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of possibly insecure function; consider using `ast.literal_eval`")
+        "Use of possibly insecure function; consider using `ast.literal_eval`".to_string()
     }
 }
 
@@ -340,7 +341,7 @@ pub struct SuspiciousMarkSafeUsage;
 impl Violation for SuspiciousMarkSafeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `mark_safe` may expose cross-site scripting vulnerabilities")
+        "Use of `mark_safe` may expose cross-site scripting vulnerabilities".to_string()
     }
 }
 
@@ -388,7 +389,7 @@ pub struct SuspiciousURLOpenUsage;
 impl Violation for SuspiciousURLOpenUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.")
+        "Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.".to_string()
     }
 }
 
@@ -426,7 +427,7 @@ pub struct SuspiciousNonCryptographicRandomUsage;
 impl Violation for SuspiciousNonCryptographicRandomUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Standard pseudo-random generators are not suitable for cryptographic purposes")
+        "Standard pseudo-random generators are not suitable for cryptographic purposes".to_string()
     }
 }
 
@@ -466,7 +467,7 @@ pub struct SuspiciousXMLCElementTreeUsage;
 impl Violation for SuspiciousXMLCElementTreeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents")
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
     }
 }
 
@@ -506,7 +507,7 @@ pub struct SuspiciousXMLElementTreeUsage;
 impl Violation for SuspiciousXMLElementTreeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents")
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
     }
 }
 
@@ -546,7 +547,7 @@ pub struct SuspiciousXMLExpatReaderUsage;
 impl Violation for SuspiciousXMLExpatReaderUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents")
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
     }
 }
 
@@ -586,7 +587,7 @@ pub struct SuspiciousXMLExpatBuilderUsage;
 impl Violation for SuspiciousXMLExpatBuilderUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents")
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
     }
 }
 
@@ -626,7 +627,7 @@ pub struct SuspiciousXMLSaxUsage;
 impl Violation for SuspiciousXMLSaxUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents")
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
     }
 }
 
@@ -666,7 +667,7 @@ pub struct SuspiciousXMLMiniDOMUsage;
 impl Violation for SuspiciousXMLMiniDOMUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents")
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
     }
 }
 
@@ -706,7 +707,7 @@ pub struct SuspiciousXMLPullDOMUsage;
 impl Violation for SuspiciousXMLPullDOMUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents")
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
     }
 }
 
@@ -735,7 +736,7 @@ pub struct SuspiciousXMLETreeUsage;
 impl Violation for SuspiciousXMLETreeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `lxml` to parse untrusted data is known to be vulnerable to XML attacks")
+        "Using `lxml` to parse untrusted data is known to be vulnerable to XML attacks".to_string()
     }
 }
 
@@ -778,7 +779,7 @@ pub struct SuspiciousUnverifiedContextUsage;
 impl Violation for SuspiciousUnverifiedContextUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Python allows using an insecure context via the `_create_unverified_context` that reverts to the previous behavior that does not validate certificates or perform hostname checks.")
+        "Python allows using an insecure context via the `_create_unverified_context` that reverts to the previous behavior that does not validate certificates or perform hostname checks.".to_string()
     }
 }
 
@@ -799,7 +800,7 @@ pub struct SuspiciousTelnetUsage;
 impl Violation for SuspiciousTelnetUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol.")
+        "Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol.".to_string()
     }
 }
 
@@ -820,7 +821,7 @@ pub struct SuspiciousFTPLibUsage;
 impl Violation for SuspiciousFTPLibUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("FTP-related functions are being called. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.")
+        "FTP-related functions are being called. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.".to_string()
     }
 }
 

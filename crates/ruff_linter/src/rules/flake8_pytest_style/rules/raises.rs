@@ -51,7 +51,7 @@ pub struct PytestRaisesWithMultipleStatements;
 impl Violation for PytestRaisesWithMultipleStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pytest.raises()` block should contain a single simple statement")
+        "`pytest.raises()` block should contain a single simple statement".to_string()
     }
 }
 
@@ -147,7 +147,7 @@ pub struct PytestRaisesWithoutException;
 impl Violation for PytestRaisesWithoutException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("set the expected exception in `pytest.raises()`")
+        "set the expected exception in `pytest.raises()`".to_string()
     }
 }
 

@@ -72,11 +72,11 @@ impl Violation for ReimplementedStarmap {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `itertools.starmap` instead of the generator")
+        "Use `itertools.starmap` instead of the generator".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `itertools.starmap`"))
+        Some("Replace with `itertools.starmap`".to_string())
     }
 }
 

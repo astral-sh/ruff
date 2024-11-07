@@ -41,6 +41,9 @@ use crate::rules::pylint::settings::ConstantType;
 ///         return price
 /// ```
 ///
+/// ## Options
+/// - `lint.pylint.allow-magic-value-types`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[violation]
 pub struct MagicValueComparison {

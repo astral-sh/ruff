@@ -3,11 +3,11 @@ use memchr::memchr_iter;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad_start;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -52,8 +52,8 @@ impl AlwaysFixableViolation for InvalidEscapeSequence {
 
     fn fix_title(&self) -> String {
         match self.fix_title {
-            FixTitle::AddBackslash => format!("Add backslash to escape sequence"),
-            FixTitle::UseRawStringLiteral => format!("Use a raw string literal"),
+            FixTitle::AddBackslash => "Add backslash to escape sequence".to_string(),
+            FixTitle::UseRawStringLiteral => "Use a raw string literal".to_string(),
         }
     }
 }

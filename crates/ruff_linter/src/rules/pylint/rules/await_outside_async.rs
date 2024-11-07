@@ -39,7 +39,7 @@ pub struct AwaitOutsideAsync;
 impl Violation for AwaitOutsideAsync {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`await` should be used within an async function")
+        "`await` should be used within an async function".to_string()
     }
 }
 

@@ -1,10 +1,11 @@
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::SemanticModel;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
+
+use crate::Locator;
+use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 
 /// ## What it does
 /// Checks for the removal of a prefix or suffix from a string by assigning
@@ -46,10 +47,10 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
     fn message(&self) -> String {
         match self.affix_kind {
             AffixKind::StartsWith => {
-                format!("Prefer `removeprefix` over conditionally replacing with slice.")
+                "Prefer `removeprefix` over conditionally replacing with slice.".to_string()
             }
             AffixKind::EndsWith => {
-                format!("Prefer `removesuffix` over conditionally replacing with slice.")
+                "Prefer `removesuffix` over conditionally replacing with slice.".to_string()
             }
         }
     }

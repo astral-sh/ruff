@@ -1,15 +1,16 @@
 //! Insert statements into Python code.
 use std::ops::Add;
 
-use ruff_python_ast::Stmt;
-use ruff_python_parser::{TokenKind, Tokens};
-use ruff_text_size::{Ranged, TextSize};
-
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::Stmt;
 use ruff_python_codegen::Stylist;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::{textwrap::indent, PythonWhitespace};
-use ruff_source_file::{Locator, UniversalNewlineIterator};
+use ruff_source_file::{LineRanges, UniversalNewlineIterator};
+use ruff_text_size::{Ranged, TextSize};
+
+use crate::Locator;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Placement<'a> {
@@ -64,7 +65,7 @@ impl<'a> Insertion<'a> {
             // Otherwise, advance to the next row.
             locator.full_line_end(location)
         } else {
-            locator.contents_start()
+            locator.bom_start_offset()
         };
 
         // Skip over commented lines, with whitespace separation.
@@ -319,8 +320,10 @@ mod tests {
 
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::parse_module;
-    use ruff_source_file::{LineEnding, Locator};
+    use ruff_source_file::LineEnding;
     use ruff_text_size::TextSize;
+
+    use crate::Locator;
 
     use super::Insertion;
 
@@ -329,7 +332,7 @@ mod tests {
         fn insert(contents: &str) -> Result<Insertion> {
             let parsed = parse_module(contents)?;
             let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             Ok(Insertion::start_of_file(parsed.suite(), &locator, &stylist))
         }
 
@@ -440,7 +443,7 @@ x = 1
         fn insert(contents: &str, offset: TextSize) -> Insertion {
             let parsed = parse_module(contents).unwrap();
             let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             Insertion::start_of_block(offset, &locator, &stylist, parsed.tokens())
         }
 

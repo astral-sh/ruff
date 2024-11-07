@@ -48,9 +48,9 @@ impl Violation for ModuleImportNotAtTopOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.source_type.is_ipynb() {
-            format!("Module level import not at top of cell")
+            "Module level import not at top of cell".to_string()
         } else {
-            format!("Module level import not at top of file")
+            "Module level import not at top of file".to_string()
         }
     }
 }

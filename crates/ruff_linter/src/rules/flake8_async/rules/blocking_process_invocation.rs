@@ -36,7 +36,7 @@ pub struct CreateSubprocessInAsyncFunction;
 impl Violation for CreateSubprocessInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not create subprocesses with blocking methods")
+        "Async functions should not create subprocesses with blocking methods".to_string()
     }
 }
 
@@ -68,7 +68,7 @@ pub struct RunProcessInAsyncFunction;
 impl Violation for RunProcessInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not run processes with blocking methods")
+        "Async functions should not run processes with blocking methods".to_string()
     }
 }
 
@@ -104,7 +104,7 @@ pub struct WaitForProcessInAsyncFunction;
 impl Violation for WaitForProcessInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not wait on processes with blocking methods")
+        "Async functions should not wait on processes with blocking methods".to_string()
     }
 }
 

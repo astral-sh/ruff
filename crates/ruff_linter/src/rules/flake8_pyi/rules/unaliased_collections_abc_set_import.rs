@@ -48,13 +48,11 @@ impl Violation for UnaliasedCollectionsAbcSetImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin"
-        )
+        "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Alias `Set` to `AbstractSet`"))
+        Some("Alias `Set` to `AbstractSet`".to_string())
     }
 }
 
@@ -73,7 +71,7 @@ pub(crate) fn unaliased_collections_abc_set_import(
         return None;
     }
 
-    let name = binding.name(checker.locator());
+    let name = binding.name(checker.source());
     if name == "AbstractSet" {
         return None;
     }

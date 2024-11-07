@@ -25,7 +25,7 @@ pub struct BreakOutsideLoop;
 impl Violation for BreakOutsideLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`break` outside loop")
+        "`break` outside loop".to_string()
     }
 }
 

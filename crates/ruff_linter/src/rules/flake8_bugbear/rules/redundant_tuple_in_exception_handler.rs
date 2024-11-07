@@ -43,7 +43,7 @@ pub struct RedundantTupleInExceptionHandler {
 impl AlwaysFixableViolation for RedundantTupleInExceptionHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("A length-one tuple literal is redundant in exception handlers")
+        "A length-one tuple literal is redundant in exception handlers".to_string()
     }
 
     fn fix_title(&self) -> String {

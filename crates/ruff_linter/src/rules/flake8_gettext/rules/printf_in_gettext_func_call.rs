@@ -45,7 +45,8 @@ pub struct PrintfInGetTextFuncCall;
 impl Violation for PrintfInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("printf-style format is resolved before function call; consider `_(\"string %s\") % arg`")
+        "printf-style format is resolved before function call; consider `_(\"string %s\") % arg`"
+            .to_string()
     }
 }
 

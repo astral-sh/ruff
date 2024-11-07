@@ -39,9 +39,7 @@ pub struct ParenthesizeChainedOperators;
 impl AlwaysFixableViolation for ParenthesizeChainedOperators {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear"
-        )
+        "Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear".to_string()
     }
 
     fn fix_title(&self) -> String {

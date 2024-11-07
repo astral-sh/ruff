@@ -47,7 +47,7 @@ pub struct RuntimeStringUnion;
 impl Violation for RuntimeStringUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid string member in `X | Y`-style union type")
+        "Invalid string member in `X | Y`-style union type".to_string()
     }
 }
 

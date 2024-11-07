@@ -1,12 +1,11 @@
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for unnecessary dictionary unpacking operators (`**`).
@@ -37,11 +36,11 @@ impl Violation for UnnecessarySpread {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary spread `**`")
+        "Unnecessary spread `**`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove unnecessary dict"))
+        Some("Remove unnecessary dict".to_string())
     }
 }
 

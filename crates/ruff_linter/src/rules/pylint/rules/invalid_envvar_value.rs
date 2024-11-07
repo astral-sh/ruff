@@ -31,7 +31,7 @@ pub struct InvalidEnvvarValue;
 impl Violation for InvalidEnvvarValue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid type for initial `os.getenv` argument; expected `str`")
+        "Invalid type for initial `os.getenv` argument; expected `str`".to_string()
     }
 }
 

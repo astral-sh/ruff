@@ -1,9 +1,11 @@
-use crate::settings::LinterSettings;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{Locator, UniversalNewlineIterator};
+use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::TextRange;
+
+use crate::settings::LinterSettings;
+use crate::Locator;
 
 use super::super::detection::comment_contains_code;
 
@@ -35,11 +37,11 @@ impl Violation for CommentedOutCode {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Found commented-out code")
+        "Found commented-out code".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove commented-out code"))
+        Some("Remove commented-out code".to_string())
     }
 }
 
@@ -53,7 +55,7 @@ pub(crate) fn commented_out_code(
     let mut comments = comment_ranges.into_iter().peekable();
     // Iterate over all comments in the document.
     while let Some(range) = comments.next() {
-        let line = locator.line(range.start());
+        let line = locator.line_str(range.start());
 
         if is_script_tag_start(line) {
             if skip_script_comments(range, &mut comments, locator) {
@@ -88,7 +90,7 @@ where
     let line_end = locator.full_line_end(script_start.end());
     let rest = locator.after(line_end);
     let mut end_offset = None;
-    let mut lines = UniversalNewlineIterator::with_offset(rest, line_end).peekable();
+    let mut lines = UniversalNewlineIterator::with_offset(rest, line_end);
 
     while let Some(line) = lines.next() {
         let Some(content) = script_line_content(&line) else {
@@ -176,11 +178,14 @@ fn is_script_tag_start(line: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::rules::eradicate::rules::commented_out_code::skip_script_comments;
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
-    use ruff_source_file::Locator;
+    use ruff_source_file::LineRanges;
     use ruff_text_size::TextSize;
+
+    use crate::rules::eradicate::rules::commented_out_code::skip_script_comments;
+    use crate::Locator;
+
     #[test]
     fn script_comment() {
         let code = r#"

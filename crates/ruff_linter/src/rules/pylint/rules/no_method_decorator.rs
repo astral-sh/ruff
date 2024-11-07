@@ -38,11 +38,11 @@ pub struct NoClassmethodDecorator;
 impl AlwaysFixableViolation for NoClassmethodDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Class method defined without decorator")
+        "Class method defined without decorator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add @classmethod decorator")
+        "Add @classmethod decorator".to_string()
     }
 }
 
@@ -74,11 +74,11 @@ pub struct NoStaticmethodDecorator;
 impl AlwaysFixableViolation for NoStaticmethodDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Static method defined without decorator")
+        "Static method defined without decorator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add @staticmethod decorator")
+        "Add @staticmethod decorator".to_string()
     }
 }
 
@@ -175,7 +175,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
                 TextRange::new(stmt.range().start(), stmt.range().start()),
             );
 
-            let indentation = indentation_at_offset(stmt.range().start(), checker.locator());
+            let indentation = indentation_at_offset(stmt.range().start(), checker.source());
 
             match indentation {
                 Some(indentation) => {

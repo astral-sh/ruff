@@ -32,7 +32,7 @@ pub struct HardcodedBindAllInterfaces;
 impl Violation for HardcodedBindAllInterfaces {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible binding to all interfaces")
+        "Possible binding to all interfaces".to_string()
     }
 }
 

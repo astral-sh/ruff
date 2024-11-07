@@ -1,28 +1,30 @@
-use itertools::Itertools;
-use ruff_notebook::CellOffsets;
-use ruff_python_parser::TokenIterWithContext;
-use ruff_python_parser::Tokens;
 use std::cmp::Ordering;
 use std::iter::Peekable;
 use std::num::NonZeroU32;
 use std::slice::Iter;
+
+use itertools::Itertools;
 
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
+use ruff_python_parser::TokenIterWithContext;
 use ruff_python_parser::TokenKind;
+use ruff_python_parser::Tokens;
 use ruff_python_trivia::PythonWhitespace;
-use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
+use crate::Locator;
 
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
@@ -339,7 +341,7 @@ pub struct BlankLinesBeforeNestedDefinition;
 impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected 1 blank line before a nested definition, found 0")
+        "Expected 1 blank line before a nested definition, found 0".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -31,7 +31,7 @@ pub struct SslWithNoVersion;
 impl Violation for SslWithNoVersion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`ssl.wrap_socket` called without an `ssl_version``")
+        "`ssl.wrap_socket` called without an `ssl_version``".to_string()
     }
 }
 

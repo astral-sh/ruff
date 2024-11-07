@@ -2,13 +2,14 @@ use std::path::{Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::script::ScriptTag;
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for packages that are missing an `__init__.py` file.
@@ -65,6 +66,8 @@ pub(crate) fn implicit_namespace_package(
         && !comment_ranges
             .first().filter(|range| range.start() == TextSize::from(0))
             .is_some_and(|range| ShebangDirective::try_extract(locator.slice(*range)).is_some())
+        // Ignore PEP 723 scripts.
+        && ScriptTag::parse(locator.contents().as_bytes()).is_none()
     {
         #[cfg(all(test, windows))]
         let path = path

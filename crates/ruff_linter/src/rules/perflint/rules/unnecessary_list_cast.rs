@@ -41,11 +41,11 @@ pub struct UnnecessaryListCast;
 impl AlwaysFixableViolation for UnnecessaryListCast {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not cast an iterable to `list` before iterating over it")
+        "Do not cast an iterable to `list` before iterating over it".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove `list()` cast")
+        "Remove `list()` cast".to_string()
     }
 }
 

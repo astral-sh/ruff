@@ -34,7 +34,9 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 /// directions = {(0, 1): "North", (1, 0): "East", (0, -1): "South", (-1, 0): "West"}
 /// directions[0, 1]
 /// ```
-
+///
+/// ## Options
+/// - `lint.ruff.parenthesize-tuple-in-subscript`
 #[violation]
 pub struct IncorrectlyParenthesizedTupleInSubscript {
     prefer_parentheses: bool,
@@ -44,17 +46,17 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.prefer_parentheses {
-            format!("Use parentheses for tuples in subscripts.")
+            "Use parentheses for tuples in subscripts".to_string()
         } else {
-            format!("Avoid parentheses for tuples in subscripts.")
+            "Avoid parentheses for tuples in subscripts".to_string()
         }
     }
 
     fn fix_title(&self) -> String {
         if self.prefer_parentheses {
-            "Parenthesize the tuple.".to_string()
+            "Parenthesize tuple".to_string()
         } else {
-            "Remove the parentheses.".to_string()
+            "Remove parentheses".to_string()
         }
     }
 }

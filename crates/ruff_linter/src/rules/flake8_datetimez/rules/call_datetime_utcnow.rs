@@ -51,7 +51,7 @@ pub struct CallDatetimeUtcnow;
 impl Violation for CallDatetimeUtcnow {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`datetime.datetime.utcnow()` used")
+        "`datetime.datetime.utcnow()` used".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

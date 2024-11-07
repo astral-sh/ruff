@@ -256,3 +256,11 @@ dbm.sqlite3.open("foo.db").close()
 # SIM115
 f = dbm.sqlite3.open("foo.db")
 f.close()
+
+# OK
+def func(filepath, encoding):
+    return open(filepath, mode="rt", encoding=encoding)
+
+# OK
+def func(filepath, encoding):
+    return f(open(filepath, mode="rt", encoding=encoding))

@@ -17,7 +17,7 @@ use ruff_python_ast::{
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -26,6 +26,7 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
+use crate::Locator;
 
 use super::unittest_assert::UnittestAssert;
 
@@ -65,7 +66,7 @@ impl Violation for PytestCompositeAssertion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assertion should be broken down into multiple parts")
+        "Assertion should be broken down into multiple parts".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -151,7 +152,7 @@ pub struct PytestAssertAlwaysFalse;
 impl Violation for PytestAssertAlwaysFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assertion always fails, replace with `pytest.fail()`")
+        "Assertion always fails, replace with `pytest.fail()`".to_string()
     }
 }
 
@@ -386,7 +387,7 @@ pub(crate) fn unittest_raises_assertion(
     );
     if !checker
         .comment_ranges()
-        .has_comments(call, checker.locator())
+        .has_comments(call, checker.source())
     {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
@@ -622,11 +623,11 @@ fn parenthesize<'a>(expression: &Expression<'a>, parent: &Expression<'a>) -> Exp
 /// `assert a == "hello"` and `assert b == "world"`.
 fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let outer_indent =
-        whitespace::indentation(locator, stmt).context("Unable to fix multiline statement")?;
+    let outer_indent = whitespace::indentation(locator.contents(), stmt)
+        .context("Unable to fix multiline statement")?;
 
     // Extract the module text.
-    let contents = locator.lines(stmt.range());
+    let contents = locator.lines_str(stmt.range());
 
     // If the block is indented, "embed" it in a function definition, to preserve
     // indentation while retaining valid source code. (We'll strip the prefix later
@@ -747,7 +748,7 @@ pub(crate) fn composite_condition(
             && !checker.comment_ranges().intersects(stmt.range())
             && !checker
                 .indexer()
-                .in_multi_statement_line(stmt, checker.locator())
+                .in_multi_statement_line(stmt, checker.source())
         {
             diagnostic.try_set_fix(|| {
                 fix_composite_condition(stmt, checker.locator(), checker.stylist())

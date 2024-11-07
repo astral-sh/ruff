@@ -16,13 +16,13 @@ use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
 };
 use ruff_python_trivia::textwrap::indent;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::insertion::Insertion;
+use crate::Locator;
 
 mod insertion;
 

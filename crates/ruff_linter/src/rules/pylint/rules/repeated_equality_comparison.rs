@@ -5,15 +5,14 @@ use ast::ExprContext;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::hashable::HashableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
-use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for repeated equality comparisons that can rewritten as a membership
@@ -51,27 +50,25 @@ pub struct RepeatedEqualityComparison {
 impl AlwaysFixableViolation for RepeatedEqualityComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedEqualityComparison { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!(
                 "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
             )
         } else {
-            format!(
-                "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
-            )
+            "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
+                .to_string()
         }
     }
 
     fn fix_title(&self) -> String {
-        format!("Merge multiple comparisons")
+        "Merge multiple comparisons".to_string()
     }
 }
 
 /// PLR1714
 pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast::ExprBoolOp) {
     // Map from expression hash to (starting offset, number of comparisons, list
-    let mut value_to_comparators: FxHashMap<HashableExpr, (TextSize, Vec<&Expr>, Vec<usize>)> =
+    let mut value_to_comparators: FxHashMap<ComparableExpr, (&Expr, Vec<&Expr>, Vec<usize>)> =
         FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
 
     for (i, value) in bool_op.values.iter().enumerate() {
@@ -82,7 +79,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         if matches!(left, Expr::Name(_) | Expr::Attribute(_)) {
             let (_, left_matches, index_matches) = value_to_comparators
                 .entry(left.into())
-                .or_insert_with(|| (left.start(), Vec::new(), Vec::new()));
+                .or_insert_with(|| (left, Vec::new(), Vec::new()));
             left_matches.push(right);
             index_matches.push(i);
         }
@@ -90,15 +87,15 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         if matches!(right, Expr::Name(_) | Expr::Attribute(_)) {
             let (_, right_matches, index_matches) = value_to_comparators
                 .entry(right.into())
-                .or_insert_with(|| (right.start(), Vec::new(), Vec::new()));
+                .or_insert_with(|| (right, Vec::new(), Vec::new()));
             right_matches.push(left);
             index_matches.push(i);
         }
     }
 
-    for (value, (_, comparators, indices)) in value_to_comparators
-        .iter()
-        .sorted_by_key(|(_, (start, _, _))| *start)
+    for (expr, comparators, indices) in value_to_comparators
+        .into_values()
+        .sorted_by_key(|(expr, _, _)| expr.start())
     {
         // If there's only one comparison, there's nothing to merge.
         if comparators.len() == 1 {
@@ -112,9 +109,9 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
             if last.is_some_and(|last| last + 1 == *index) {
                 let (indices, comparators) = sequences.last_mut().unwrap();
                 indices.push(*index);
-                comparators.push(*comparator);
+                comparators.push(comparator);
             } else {
-                sequences.push((vec![*index], vec![*comparator]));
+                sequences.push((vec![*index], vec![comparator]));
             }
             last = Some(*index);
         }
@@ -127,7 +124,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
             let mut diagnostic = Diagnostic::new(
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
-                        value.as_expr(),
+                        expr,
                         bool_op.op,
                         &comparators,
                         checker.locator(),
@@ -148,7 +145,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                     op: bool_op.op,
                     values: before
                         .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
-                            left: Box::new(value.as_expr().clone()),
+                            left: Box::new(expr.clone()),
                             ops: match bool_op.op {
                                 BoolOp::Or => Box::from([CmpOp::In]),
                                 BoolOp::And => Box::from([CmpOp::NotIn]),

@@ -16,8 +16,43 @@ static CODE_INDICATORS: LazyLock<AhoCorasick> = LazyLock::new(|| {
 
 static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:|(?:en)?coding[:=][ \t]*([-_.a-zA-Z0-9]+))",
-    ).unwrap()
+        r"(?x)
+        ^
+        (?:
+            # Case-sensitive
+            pyright
+        |   mypy:
+        |   type:\s*ignore
+        |   SPDX-License-Identifier:
+        |   fmt:\s*(on|off|skip)
+        |   region|endregion
+
+            # Case-insensitive
+        |   (?i:
+                noqa
+            )
+
+            # Unknown case sensitivity
+        |   (?i:
+                pylint
+            |   nosec
+            |   isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)
+            |   (?:en)?coding[:=][\x20\t]*([-_.A-Z0-9]+)
+            )
+
+            # IntelliJ language injection comments:
+            # * `language` must be lowercase.
+            # * No spaces around `=`.
+            # * Language IDs as used in comments must have no spaces,
+            #   though to IntelliJ they can be anything.
+            # * May optionally contain `prefix=` and/or `suffix=`,
+            #   not declared here since we use `.is_match()`.
+        |   language=[-_.a-zA-Z0-9]+
+
+        )
+        ",
+    )
+    .unwrap()
 });
 
 static HASH_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"#\d").unwrap());
@@ -294,6 +329,48 @@ mod tests {
         assert!(!comment_contains_code(
             "# XXX: What ever",
             &["XXX".to_string()]
+        ));
+    }
+
+    #[test]
+    fn comment_contains_language_injection() {
+        // `language` with bad casing
+        assert!(comment_contains_code("# Language=C#", &[]));
+        assert!(comment_contains_code("# lAngUAgE=inI", &[]));
+
+        // Unreasonable language IDs, possibly literals
+        assert!(comment_contains_code("# language=\"pt\"", &[]));
+        assert!(comment_contains_code("# language='en'", &[]));
+
+        // Spaces around equal sign
+        assert!(comment_contains_code("# language =xml", &[]));
+        assert!(comment_contains_code("# language= html", &[]));
+        assert!(comment_contains_code("# language = RegExp", &[]));
+
+        // Leading whitespace
+        assert!(!comment_contains_code("#language=CSS", &[]));
+        assert!(!comment_contains_code("#   \t language=C++", &[]));
+
+        // Human language false negatives
+        assert!(!comment_contains_code("# language=en", &[]));
+        assert!(!comment_contains_code("# language=en-US", &[]));
+
+        // Casing (fine because such IDs cannot be validated)
+        assert!(!comment_contains_code("# language=PytHoN", &[]));
+        assert!(!comment_contains_code("# language=jaVaScrIpt", &[]));
+
+        // Space within ID (fine because `Shell` is considered the ID)
+        assert!(!comment_contains_code("#    language=Shell Script", &[]));
+
+        // With prefix and/or suffix
+        assert!(!comment_contains_code("# language=HTML prefix=<body>", &[]));
+        assert!(!comment_contains_code(
+            r"# language=Requirements suffix=\n",
+            &[]
+        ));
+        assert!(!comment_contains_code(
+            "language=javascript prefix=(function(){ suffix=})()",
+            &[]
         ));
     }
 

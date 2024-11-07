@@ -339,7 +339,7 @@ pub struct Options {
     /// 1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the "project root").
     /// 2. The `"src"` subdirectory of the project root.
     ///
-    /// These defaults ensure that uv supports both flat layouts and `src` layouts out-of-the-box.
+    /// These defaults ensure that Ruff supports both flat layouts and `src` layouts out-of-the-box.
     /// (If a configuration file is explicitly provided (e.g., via the `--config` command-line
     /// flag), the current working directory will be considered the project root.)
     ///

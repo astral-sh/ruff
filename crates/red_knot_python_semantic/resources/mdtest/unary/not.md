@@ -37,6 +37,11 @@ y = 1
 ## Union
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 if flag:
     p = 1
     q = 3.3

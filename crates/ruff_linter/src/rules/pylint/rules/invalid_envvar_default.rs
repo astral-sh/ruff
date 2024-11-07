@@ -38,7 +38,7 @@ pub struct InvalidEnvvarDefault;
 impl Violation for InvalidEnvvarDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid type for environment variable default; expected `str` or `None`")
+        "Invalid type for environment variable default; expected `str` or `None`".to_string()
     }
 }
 

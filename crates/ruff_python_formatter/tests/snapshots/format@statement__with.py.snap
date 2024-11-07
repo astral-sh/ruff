@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/with.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -334,6 +335,45 @@ with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 if True:
     with anyio.CancelScope(shield=True) if get_running_loop() else contextlib.nullcontext() as b:
         pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14001
+with (
+    open(
+        "some/path.txt",
+        "rb",
+    )
+    if True
+    else open("other/path.txt")
+    # Bar
+):
+    pass
+
+
+with (  # trailing comment
+    open(
+        "some/path.txt",
+        "rb",
+    )
+    if True
+    else open("other/path.txt")
+    # Bar
+):
+    pass
+
+
+with (
+    (
+        open(
+            "some/path.txt",
+            "rb",
+        )
+        if True
+        else open("other/path.txt")
+    )
+    # Bar
+):
+    pass
 ```
 
 ## Outputs
@@ -710,6 +750,49 @@ if True:
         shield=True
     ) if get_running_loop() else contextlib.nullcontext() as b:
         pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14001
+with (
+    (
+        open(
+            "some/path.txt",
+            "rb",
+        )
+        if True
+        else open("other/path.txt")
+    )
+    # Bar
+):
+    pass
+
+
+with (  # trailing comment
+    (
+        open(
+            "some/path.txt",
+            "rb",
+        )
+        if True
+        else open("other/path.txt")
+    )
+    # Bar
+):
+    pass
+
+
+with (
+    (
+        open(
+            "some/path.txt",
+            "rb",
+        )
+        if True
+        else open("other/path.txt")
+    )
+    # Bar
+):
+    pass
 ```
 
 
@@ -787,7 +870,7 @@ if True:
          pass
  
  with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(
-@@ -344,14 +356,20 @@
+@@ -344,57 +356,57 @@
  ):
      pass
  
@@ -813,6 +896,64 @@ if True:
 +        else contextlib.nullcontext()
 +    ) as b:
          pass
+ 
+ 
+ # Regression test for https://github.com/astral-sh/ruff/issues/14001
+ with (
+-    (
+-        open(
+-            "some/path.txt",
+-            "rb",
+-        )
+-        if True
+-        else open("other/path.txt")
++    open(
++        "some/path.txt",
++        "rb",
+     )
++    if True
++    else open("other/path.txt")
+     # Bar
+ ):
+     pass
+ 
+ 
+ with (  # trailing comment
+-    (
+-        open(
+-            "some/path.txt",
+-            "rb",
+-        )
+-        if True
+-        else open("other/path.txt")
++    open(
++        "some/path.txt",
++        "rb",
+     )
++    if True
++    else open("other/path.txt")
+     # Bar
+ ):
+     pass
+ 
+ 
+ with (
+-    (
+-        open(
+-            "some/path.txt",
+-            "rb",
+-        )
+-        if True
+-        else open("other/path.txt")
++    open(
++        "some/path.txt",
++        "rb",
+     )
++    if True
++    else open("other/path.txt")
+     # Bar
+ ):
+     pass
 ```
 
 
@@ -1237,4 +1378,41 @@ if True:
         else contextlib.nullcontext() as b
     ):
         pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14001
+with (
+    open(
+        "some/path.txt",
+        "rb",
+    )
+    if True
+    else open("other/path.txt")
+    # Bar
+):
+    pass
+
+
+with (  # trailing comment
+    open(
+        "some/path.txt",
+        "rb",
+    )
+    if True
+    else open("other/path.txt")
+    # Bar
+):
+    pass
+
+
+with (
+    open(
+        "some/path.txt",
+        "rb",
+    )
+    if True
+    else open("other/path.txt")
+    # Bar
+):
+    pass
 ```

@@ -51,14 +51,14 @@ use crate::checkers::ast::Checker;
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 ///
 /// ## References
-/// - [Python documentation: [`contextvars` — Context Variables](https://docs.python.org/3/library/contextvars.html)
+/// - [Python documentation: `contextvars` — Context Variables](https://docs.python.org/3/library/contextvars.html)
 #[violation]
 pub struct MutableContextvarDefault;
 
 impl Violation for MutableContextvarDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use mutable data structures for `ContextVar` defaults")
+        "Do not use mutable data structures for `ContextVar` defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

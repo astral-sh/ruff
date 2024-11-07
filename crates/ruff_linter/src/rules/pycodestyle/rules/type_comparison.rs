@@ -54,9 +54,8 @@ pub struct TypeComparison;
 impl Violation for TypeComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks"
-        )
+        "Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks"
+            .to_string()
     }
 }
 

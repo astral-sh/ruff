@@ -50,10 +50,10 @@ impl Violation for CallDatetimeWithoutTzinfo {
         let CallDatetimeWithoutTzinfo(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("`datetime.datetime()` called without a `tzinfo` argument")
+                "`datetime.datetime()` called without a `tzinfo` argument".to_string()
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("`tzinfo=None` passed to `datetime.datetime()`")
+                "`tzinfo=None` passed to `datetime.datetime()`".to_string()
             }
         }
     }

@@ -47,10 +47,9 @@ pub struct PandasUseOfPdMerge;
 impl Violation for PandasUseOfPdMerge {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use `.merge` method instead of `pd.merge` function. They have equivalent \
+        "Use `.merge` method instead of `pd.merge` function. They have equivalent \
              functionality."
-        )
+            .to_string()
     }
 }
 

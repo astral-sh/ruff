@@ -2029,11 +2029,11 @@ mod tests {
         assert_override(
             vec![
                 RuleSelection {
-                    select: Some(vec![d417.clone()]),
+                    select: Some(vec![d417]),
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    extend_select: vec![d41.clone()],
+                    extend_select: vec![d41],
                     ..RuleSelection::default()
                 },
             ],

@@ -64,7 +64,7 @@ impl Violation for FastApiNonAnnotatedDependency {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("FastAPI dependency without `Annotated`")
+        "FastAPI dependency without `Annotated`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

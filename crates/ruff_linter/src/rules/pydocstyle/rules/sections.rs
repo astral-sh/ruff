@@ -1464,7 +1464,7 @@ fn blanks_and_section_underline(
                         // Otherwise, documentation generators will not recognize the directive.
                         let is_sphinx = checker
                             .locator()
-                            .line(blank_lines_after_dashes_end)
+                            .line_str(blank_lines_after_dashes_end)
                             .trim_start()
                             .starts_with(".. ");
 
@@ -1569,7 +1569,7 @@ fn blanks_and_section_underline(
                     // Otherwise, documentation generators will not recognize the directive.
                     let is_sphinx = checker
                         .locator()
-                        .line(blank_lines_end)
+                        .line_str(blank_lines_end)
                         .trim_start()
                         .starts_with(".. ");
 
@@ -1850,7 +1850,7 @@ static GOOGLE_ARGS_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
 
 fn args_section(context: &SectionContext) -> FxHashSet<String> {
-    let mut following_lines = context.following_lines().peekable();
+    let mut following_lines = context.following_lines();
     let Some(first_line) = following_lines.next() else {
         return FxHashSet::default();
     };

@@ -21,7 +21,9 @@ match 0:
     case 2:
         y = 3
 
-reveal_type(y)  # revealed: Unbound | Literal[2, 3]
+# revealed: Literal[2, 3]
+# error: [possibly-unresolved-reference]
+reveal_type(y)
 ```
 
 ## Basic match

@@ -59,7 +59,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{python_builtins, MAGIC_GLOBALS};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{Locator, OneIndexed, SourceRow};
+use ruff_source_file::{OneIndexed, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -69,7 +69,7 @@ use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
-use crate::{docstrings, noqa};
+use crate::{docstrings, noqa, Locator};
 
 mod analyze;
 mod annotation;
@@ -350,6 +350,10 @@ impl<'a> Checker<'a> {
     /// offsets.
     pub(crate) const fn locator(&self) -> &'a Locator<'a> {
         self.locator
+    }
+
+    pub(crate) const fn source(&self) -> &'a str {
+        self.locator.contents()
     }
 
     /// The [`Stylist`] for the current file, which detects the current line ending, quote, and
@@ -764,15 +768,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
                 if let Some(expr) = returns {
-                    match annotation {
-                        AnnotationContext::RuntimeRequired => {
-                            self.visit_runtime_required_annotation(expr);
-                        }
-                        AnnotationContext::RuntimeEvaluated => {
-                            self.visit_runtime_evaluated_annotation(expr);
-                        }
-                        AnnotationContext::TypingOnly => {
-                            self.visit_annotation(expr);
+                    if singledispatch {
+                        self.visit_runtime_required_annotation(expr);
+                    } else {
+                        match annotation {
+                            AnnotationContext::RuntimeRequired => {
+                                self.visit_runtime_required_annotation(expr);
+                            }
+                            AnnotationContext::RuntimeEvaluated => {
+                                self.visit_runtime_evaluated_annotation(expr);
+                            }
+                            AnnotationContext::TypingOnly => {
+                                self.visit_annotation(expr);
+                            }
                         }
                     }
                 }
@@ -1527,7 +1535,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         };
 
         // Step 4: Analysis
-        analyze::expression(expr, self);
         match expr {
             Expr::StringLiteral(string_literal) => {
                 analyze::string_like(string_literal.into(), self);
@@ -1538,6 +1545,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         self.semantic.flags = flags_snapshot;
+        analyze::expression(expr, self);
         self.semantic.pop_node();
     }
 

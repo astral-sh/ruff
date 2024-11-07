@@ -1,7 +1,7 @@
 import ssl
 import sys
 from _typeshed import ReadableBuffer, StrPath
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence, Sized
+from collections.abc import Awaitable, Callable, Iterable, Sequence, Sized
 from types import ModuleType
 from typing import Any, Protocol, SupportsIndex
 from typing_extensions import Self, TypeAlias
@@ -137,7 +137,7 @@ class StreamWriter:
     elif sys.version_info >= (3, 11):
         def __del__(self) -> None: ...
 
-class StreamReader(AsyncIterator[bytes]):
+class StreamReader:
     def __init__(self, limit: int = 65536, loop: events.AbstractEventLoop | None = None) -> None: ...
     def exception(self) -> Exception: ...
     def set_exception(self, exc: Exception) -> None: ...

@@ -81,7 +81,7 @@ pub struct PercentFormatExpectedMapping;
 impl Violation for PercentFormatExpectedMapping {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`%`-format string expected mapping but got sequence")
+        "`%`-format string expected mapping but got sequence".to_string()
     }
 }
 
@@ -117,7 +117,7 @@ pub struct PercentFormatExpectedSequence;
 impl Violation for PercentFormatExpectedSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`%`-format string expected sequence but got mapping")
+        "`%`-format string expected sequence but got mapping".to_string()
     }
 }
 
@@ -226,7 +226,7 @@ pub struct PercentFormatMixedPositionalAndNamed;
 impl Violation for PercentFormatMixedPositionalAndNamed {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`%`-format string has mixed positional and named placeholders")
+        "`%`-format string has mixed positional and named placeholders".to_string()
     }
 }
 
@@ -294,7 +294,7 @@ pub struct PercentFormatStarRequiresSequence;
 impl Violation for PercentFormatStarRequiresSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`%`-format string `*` specifier requires sequence")
+        "`%`-format string `*` specifier requires sequence".to_string()
     }
 }
 
@@ -509,7 +509,7 @@ pub struct StringDotFormatMixingAutomatic;
 impl Violation for StringDotFormatMixingAutomatic {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`.format` string mixes automatic and manual numbering")
+        "`.format` string mixes automatic and manual numbering".to_string()
     }
 }
 

@@ -34,7 +34,7 @@ pub struct QuotedAnnotationInStub;
 impl AlwaysFixableViolation for QuotedAnnotationInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Quoted annotations should not be included in stubs")
+        "Quoted annotations should not be included in stubs".to_string()
     }
 
     fn fix_title(&self) -> String {

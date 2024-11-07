@@ -37,11 +37,11 @@ pub struct UnexpectedSpacesAroundKeywordParameterEquals;
 impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unexpected spaces around keyword / parameter equals")
+        "Unexpected spaces around keyword / parameter equals".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove whitespace")
+        "Remove whitespace".to_string()
     }
 }
 
@@ -76,11 +76,11 @@ pub struct MissingWhitespaceAroundParameterEquals;
 impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around parameter equals")
+        "Missing whitespace around parameter equals".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 

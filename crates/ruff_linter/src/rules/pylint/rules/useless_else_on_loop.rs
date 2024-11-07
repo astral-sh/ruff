@@ -7,11 +7,12 @@ use ruff_python_ast::identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::adjust_indentation;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `else` clauses on loops without a `break` statement.
@@ -50,11 +51,10 @@ pub struct UselessElseOnLoop;
 
 impl Violation for UselessElseOnLoop {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents"
-        )
+        "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -146,7 +146,7 @@ fn remove_else(
         return Err(anyhow::anyhow!("Empty `else` clause"));
     };
 
-    let start_indentation = indentation(locator, start);
+    let start_indentation = indentation(locator.contents(), start);
     if start_indentation.is_none() {
         // Inline `else` block (e.g., `else: x = 1`).
         Ok(Fix::safe_edit(Edit::deletion(
@@ -155,7 +155,7 @@ fn remove_else(
         )))
     } else {
         // Identify the indentation of the loop itself (e.g., the `while` or `for`).
-        let Some(desired_indentation) = indentation(locator, stmt) else {
+        let Some(desired_indentation) = indentation(locator.contents(), stmt) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 

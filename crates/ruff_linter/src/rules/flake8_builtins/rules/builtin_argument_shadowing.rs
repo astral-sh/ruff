@@ -1,7 +1,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Parameter;
+use ruff_python_ast::{Expr, Parameter};
 use ruff_python_semantic::analyze::visibility::{is_overload, is_override};
 use ruff_text_size::Ranged;
 
@@ -58,7 +58,7 @@ impl Violation for BuiltinArgumentShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BuiltinArgumentShadowing { name } = self;
-        format!("Argument `{name}` is shadowing a Python builtin")
+        format!("Function argument `{name}` is shadowing a Python builtin")
     }
 }
 
@@ -70,6 +70,15 @@ pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Para
         &checker.settings.flake8_builtins.builtins_ignorelist,
         checker.settings.target_version,
     ) {
+        // Ignore parameters in lambda expressions.
+        // (That is the domain of A006.)
+        if checker
+            .semantic()
+            .current_expression()
+            .is_some_and(Expr::is_lambda_expr)
+        {
+            return;
+        }
         // Ignore `@override` and `@overload` decorated functions.
         if checker
             .semantic()

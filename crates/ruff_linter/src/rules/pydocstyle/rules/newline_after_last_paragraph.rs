@@ -49,7 +49,7 @@ pub struct NewLineAfterLastParagraph;
 impl AlwaysFixableViolation for NewLineAfterLastParagraph {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multi-line docstring closing quotes should be on a separate line")
+        "Multi-line docstring closing quotes should be on a separate line".to_string()
     }
 
     fn fix_title(&self) -> String {

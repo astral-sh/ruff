@@ -42,7 +42,7 @@ pub struct OSErrorAlias {
 impl AlwaysFixableViolation for OSErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace aliased errors with `OSError`")
+        "Replace aliased errors with `OSError`".to_string()
     }
 
     fn fix_title(&self) -> String {

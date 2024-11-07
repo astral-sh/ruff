@@ -1294,7 +1294,7 @@ mod tests {
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_root: src.clone(),
-                    custom_typeshed: Some(custom_typeshed.clone()),
+                    custom_typeshed: Some(custom_typeshed),
                     site_packages: SitePackages::Known(vec![site_packages]),
                 },
             },
@@ -1445,7 +1445,7 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             resolve_module_query,
-            ModuleNameIngredient::new(&db, functools_module_name.clone()),
+            ModuleNameIngredient::new(&db, functools_module_name),
             &events,
         );
         assert_eq!(functools_module.search_path(), &stdlib);

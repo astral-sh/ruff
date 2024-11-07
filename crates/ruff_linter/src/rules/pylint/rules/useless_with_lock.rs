@@ -53,7 +53,7 @@ pub struct UselessWithLock;
 impl Violation for UselessWithLock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Threading lock directly created in `with` statement has no effect")
+        "Threading lock directly created in `with` statement has no effect".to_string()
     }
 }
 

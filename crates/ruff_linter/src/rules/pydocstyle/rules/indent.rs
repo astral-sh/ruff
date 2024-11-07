@@ -56,7 +56,7 @@ pub struct IndentWithSpaces;
 impl Violation for IndentWithSpaces {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring should be indented with spaces, not tabs")
+        "Docstring should be indented with spaces, not tabs".to_string()
     }
 }
 
@@ -104,7 +104,7 @@ pub struct UnderIndentation;
 impl AlwaysFixableViolation for UnderIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring is under-indented")
+        "Docstring is under-indented".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -156,7 +156,7 @@ pub struct OverIndentation;
 impl AlwaysFixableViolation for OverIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring is over-indented")
+        "Docstring is over-indented".to_string()
     }
 
     fn fix_title(&self) -> String {

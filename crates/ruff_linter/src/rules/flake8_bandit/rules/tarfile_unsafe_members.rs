@@ -43,7 +43,7 @@ pub struct TarfileUnsafeMembers;
 impl Violation for TarfileUnsafeMembers {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Uses of `tarfile.extractall()`")
+        "Uses of `tarfile.extractall()`".to_string()
     }
 }
 

@@ -9,6 +9,7 @@ use ruff_python_ast::Decorator;
 use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -158,7 +159,7 @@ pub struct PytestExtraneousScopeFunction;
 impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`scope='function'` is implied in `@pytest.fixture()`")
+        "`scope='function'` is implied in `@pytest.fixture()`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -389,7 +390,7 @@ pub struct PytestDeprecatedYieldFixture;
 impl Violation for PytestDeprecatedYieldFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`")
+        "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`".to_string()
     }
 }
 
@@ -448,7 +449,7 @@ pub struct PytestFixtureFinalizerCallback;
 impl Violation for PytestFixtureFinalizerCallback {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `yield` instead of `request.addfinalizer`")
+        "Use `yield` instead of `request.addfinalizer`".to_string()
     }
 }
 /// ## What it does
@@ -553,7 +554,7 @@ pub struct PytestErroneousUseFixturesOnFixture;
 impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pytest.mark.usefixtures` has no effect on fixtures")
+        "`pytest.mark.usefixtures` has no effect on fixtures".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -596,7 +597,7 @@ pub struct PytestUnnecessaryAsyncioMarkOnFixture;
 impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pytest.mark.asyncio` is unnecessary for fixtures")
+        "`pytest.mark.asyncio` is unnecessary for fixtures".to_string()
     }
 
     fn fix_title(&self) -> String {

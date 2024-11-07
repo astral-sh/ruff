@@ -9,10 +9,11 @@ use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `if` branches with identical arm bodies.
@@ -42,7 +43,7 @@ impl Violation for IfWithSameArms {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Combine `if` branches using logical `or` operator")
+        "Combine `if` branches using logical `or` operator".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

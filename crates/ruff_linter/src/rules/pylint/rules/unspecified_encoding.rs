@@ -67,7 +67,7 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
     }
 
     fn fix_title(&self) -> String {
-        format!("Add explicit `encoding` argument")
+        "Add explicit `encoding` argument".to_string()
     }
 }
 

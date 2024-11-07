@@ -85,7 +85,8 @@ pub struct ReturnInGenerator;
 impl Violation for ReturnInGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `yield` and `return {{value}}` in a generator function can lead to confusing behavior")
+        "Using `yield` and `return {value}` in a generator function can lead to confusing behavior"
+            .to_string()
     }
 }
 

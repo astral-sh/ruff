@@ -1,8 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for indentation that uses tabs.
@@ -26,7 +28,7 @@ pub struct TabIndentation;
 impl Violation for TabIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Indentation contains tabs")
+        "Indentation contains tabs".to_string()
     }
 }
 

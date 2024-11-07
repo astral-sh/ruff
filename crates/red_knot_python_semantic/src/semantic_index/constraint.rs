@@ -7,7 +7,13 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Constraint<'db> {
+pub(crate) struct Constraint<'db> {
+    pub(crate) node: ConstraintNode<'db>,
+    pub(crate) is_positive: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ConstraintNode<'db> {
     Expression(Expression<'db>),
     Pattern(PatternConstraint<'db>),
 }

@@ -27,7 +27,7 @@ pub struct PytestIncorrectPytestImport;
 impl Violation for PytestIncorrectPytestImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Incorrect import of `pytest`; use `import pytest` instead")
+        "Incorrect import of `pytest`; use `import pytest` instead".to_string()
     }
 }
 

@@ -57,20 +57,18 @@ pub struct RepeatedIsinstanceCalls {
 impl AlwaysFixableViolation for RepeatedIsinstanceCalls {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedIsinstanceCalls { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!("Merge `isinstance` calls: `{expression}`")
         } else {
-            format!("Merge `isinstance` calls")
+            "Merge `isinstance` calls".to_string()
         }
     }
 
     fn fix_title(&self) -> String {
-        let RepeatedIsinstanceCalls { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!("Replace with `{expression}`")
         } else {
-            format!("Replace with merged `isinstance` call")
+            "Replace with merged `isinstance` call".to_string()
         }
     }
 }

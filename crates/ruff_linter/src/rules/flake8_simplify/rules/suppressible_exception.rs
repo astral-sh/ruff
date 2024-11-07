@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -127,7 +128,7 @@ pub(crate) fn suppressible_exception(
     );
     if !checker
         .comment_ranges()
-        .has_comments(stmt, checker.locator())
+        .has_comments(stmt, checker.source())
     {
         diagnostic.try_set_fix(|| {
             // let range = statement_range(stmt, checker.locator(), checker.indexer());

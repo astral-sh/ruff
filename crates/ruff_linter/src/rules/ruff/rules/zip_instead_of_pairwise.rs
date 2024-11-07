@@ -36,9 +36,11 @@ pub struct ZipInsteadOfPairwise;
 
 impl Violation for ZipInsteadOfPairwise {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs")
+        "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

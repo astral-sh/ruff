@@ -42,7 +42,7 @@ impl Violation for HashlibDigestHex {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of hashlib's `.digest().hex()`")
+        "Use of hashlib's `.digest().hex()`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

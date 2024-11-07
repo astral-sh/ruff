@@ -36,6 +36,6 @@ pub struct Eval;
 impl Violation for Eval {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No builtin `eval()` allowed")
+        "No builtin `eval()` allowed".to_string()
     }
 }

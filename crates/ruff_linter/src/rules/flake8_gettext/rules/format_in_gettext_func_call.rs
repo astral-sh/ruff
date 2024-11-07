@@ -46,7 +46,7 @@ pub struct FormatInGetTextFuncCall;
 impl Violation for FormatInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`")
+        "`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
     }
 }
 

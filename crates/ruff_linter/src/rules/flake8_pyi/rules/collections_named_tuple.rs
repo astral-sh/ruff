@@ -41,11 +41,11 @@ pub struct CollectionsNamedTuple;
 impl Violation for CollectionsNamedTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `typing.NamedTuple` instead of `collections.namedtuple`")
+        "Use `typing.NamedTuple` instead of `collections.namedtuple`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `typing.NamedTuple`"))
+        Some("Replace with `typing.NamedTuple`".to_string())
     }
 }
 

@@ -150,6 +150,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::subscript_with_parenthesized_tuple(checker, subscript);
             }
 
+            if checker.enabled(Rule::NonPEP646Unpack) {
+                pyupgrade::rules::use_pep646_unpack(checker, subscript);
+            }
+
             pandas_vet::rules::subscript(checker, value, expr);
         }
         Expr::Tuple(ast::ExprTuple {
@@ -384,6 +388,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::StaticJoinToFString,
                 // refurb
                 Rule::HashlibDigestHex,
+                // flake8-simplify
+                Rule::SplitStaticString,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
@@ -398,6 +404,16 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 flynt::rules::static_join_to_fstring(
                                     checker,
                                     expr,
+                                    string_value.to_str(),
+                                );
+                            }
+                        } else if matches!(attr, "split" | "rsplit") {
+                            // "...".split(...) call
+                            if checker.enabled(Rule::SplitStaticString) {
+                                flake8_simplify::rules::split_static_string(
+                                    checker,
+                                    attr,
+                                    call,
                                     string_value.to_str(),
                                 );
                             }

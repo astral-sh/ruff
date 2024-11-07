@@ -53,7 +53,7 @@ pub struct SingleStringSlots;
 impl Violation for SingleStringSlots {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Class `__slots__` should be a non-string iterable")
+        "Class `__slots__` should be a non-string iterable".to_string()
     }
 }
 

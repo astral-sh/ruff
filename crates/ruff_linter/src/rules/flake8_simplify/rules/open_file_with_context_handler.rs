@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 ///
-/// # References
+/// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct OpenFileWithContextHandler;
@@ -39,7 +39,7 @@ pub struct OpenFileWithContextHandler;
 impl Violation for OpenFileWithContextHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a context manager for opening files")
+        "Use a context manager for opening files".to_string()
     }
 }
 
@@ -211,6 +211,11 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::
 
     // Ex) `with open("foo.txt") as f: ...`
     if semantic.current_statement().is_with_stmt() {
+        return;
+    }
+
+    // Ex) `return open("foo.txt")`
+    if semantic.current_statement().is_return_stmt() {
         return;
     }
 

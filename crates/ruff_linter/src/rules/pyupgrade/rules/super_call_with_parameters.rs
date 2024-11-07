@@ -49,7 +49,7 @@ pub struct SuperCallWithParameters;
 impl AlwaysFixableViolation for SuperCallWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `super()` instead of `super(__class__, self)`")
+        "Use `super()` instead of `super(__class__, self)`".to_string()
     }
 
     fn fix_title(&self) -> String {

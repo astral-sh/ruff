@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Key
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;

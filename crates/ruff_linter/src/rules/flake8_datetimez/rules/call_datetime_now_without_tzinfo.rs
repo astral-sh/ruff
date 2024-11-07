@@ -54,10 +54,10 @@ impl Violation for CallDatetimeNowWithoutTzinfo {
         let CallDatetimeNowWithoutTzinfo(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("`datetime.datetime.now()` called without a `tz` argument")
+                "`datetime.datetime.now()` called without a `tz` argument".to_string()
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("`tz=None` passed to `datetime.datetime.now()`")
+                "`tz=None` passed to `datetime.datetime.now()`".to_string()
             }
         }
     }

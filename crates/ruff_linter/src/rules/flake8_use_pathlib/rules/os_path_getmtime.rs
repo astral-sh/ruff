@@ -42,6 +42,6 @@ pub struct OsPathGetmtime;
 impl Violation for OsPathGetmtime {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.getmtime` should be replaced by `Path.stat().st_mtime`")
+        "`os.path.getmtime` should be replaced by `Path.stat().st_mtime`".to_string()
     }
 }

@@ -1,26 +1,23 @@
-use std::{collections::BTreeMap, sync::Arc};
-
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::{Durability, Setter as _};
+use std::borrow::Cow;
+use std::{collections::BTreeMap, sync::Arc};
 
+use crate::db::Db;
+use crate::db::RootDatabase;
+use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::SearchPathSettings;
+use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic, Severity};
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{line_index, source_text, SourceDiagnostic};
+use ruff_db::source::{source_text, SourceTextError};
 use ruff_db::{
     files::{system_path_to_file, File},
     system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
 };
 use ruff_python_ast::{name::Name, PySourceType};
-use ruff_text_size::Ranged;
-
-use crate::db::RootDatabase;
-use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};
-use crate::{
-    db::Db,
-    lint::{lint_semantic, lint_syntax},
-};
+use ruff_text_size::TextRange;
 
 mod files;
 mod metadata;
@@ -191,7 +188,7 @@ impl Workspace {
     }
 
     /// Checks all open files in the workspace and its dependencies.
-    pub fn check(self, db: &RootDatabase) -> Vec<String> {
+    pub fn check(self, db: &RootDatabase) -> Vec<Box<dyn Diagnostic>> {
         let workspace_span = tracing::debug_span!("check_workspace");
         let _span = workspace_span.enter();
 
@@ -381,50 +378,32 @@ impl Package {
     }
 }
 
-#[salsa::tracked]
-pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
-    tracing::debug!("Checking file '{path}'", path = file.path(db));
-
-    let mut diagnostics = Vec::new();
-
-    let source_diagnostics = source_text::accumulated::<SourceDiagnostic>(db.upcast(), file);
-    // TODO(micha): Consider using a single accumulator for all diagnostics
-    diagnostics.extend(
-        source_diagnostics
-            .iter()
-            .map(std::string::ToString::to_string),
-    );
-
+pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
+    let mut diagnostics: Vec<Box<dyn Diagnostic>> = Vec::new();
     // Abort checking if there are IO errors.
     let source = source_text(db.upcast(), file);
 
-    if source.has_read_error() {
+    if let Some(read_error) = source.read_error() {
+        diagnostics.push(Box::new(IOErrorDiagnostic {
+            file,
+            error: read_error.clone(),
+        }));
         return diagnostics;
     }
 
     let parsed = parsed_module(db.upcast(), file);
+    diagnostics.extend(parsed.errors().iter().map(|error| {
+        let diagnostic: Box<dyn Diagnostic> = Box::new(ParseDiagnostic::new(file, error.clone()));
+        diagnostic
+    }));
 
-    if !parsed.errors().is_empty() {
-        let path = file.path(db);
-        let line_index = line_index(db.upcast(), file);
-        diagnostics.extend(parsed.errors().iter().map(|err| {
-            let source_location = line_index.source_location(err.location.start(), source.as_str());
-            format!("{path}:{source_location}: {message}", message = err.error)
-        }));
-    }
+    diagnostics.extend(check_types(db.upcast(), file).iter().map(|diagnostic| {
+        let boxed: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+        boxed
+    }));
 
-    for diagnostic in check_types(db.upcast(), file) {
-        let index = line_index(db.upcast(), diagnostic.file());
-        let location = index.source_location(diagnostic.start(), source.as_str());
-        diagnostics.push(format!(
-            "{path}:{location}: {message}",
-            path = file.path(db),
-            message = diagnostic.message()
-        ));
-    }
+    diagnostics.sort_unstable_by_key(|diagnostic| diagnostic.range().unwrap_or_default().start());
 
-    diagnostics.extend_from_slice(lint_syntax(db, file));
-    diagnostics.extend_from_slice(lint_semantic(db, file));
     diagnostics
 }
 
@@ -538,19 +517,47 @@ impl Iterator for WorkspaceFilesIter<'_> {
     }
 }
 
+#[derive(Debug)]
+pub struct IOErrorDiagnostic {
+    file: File,
+    error: SourceTextError,
+}
+
+impl Diagnostic for IOErrorDiagnostic {
+    fn rule(&self) -> &str {
+        "io"
+    }
+
+    fn message(&self) -> Cow<str> {
+        self.error.to_string().into()
+    }
+
+    fn file(&self) -> File {
+        self.file
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        None
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::db::tests::TestDb;
+    use crate::workspace::check_file;
+    use red_knot_python_semantic::types::check_types;
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, SystemPath};
     use ruff_db::testing::assert_function_query_was_not_run;
 
-    use crate::db::tests::TestDb;
-    use crate::lint::lint_syntax;
-    use crate::workspace::check_file;
-
     #[test]
-    fn check_file_skips_linting_when_file_cant_be_read() -> ruff_db::system::Result<()> {
+    fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
@@ -563,19 +570,28 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file(&db, file),
+            check_file(&db, file)
+                .into_iter()
+                .map(|diagnostic| diagnostic.message().into_owned())
+                .collect::<Vec<_>>(),
             vec!["Failed to read file: No such file or directory".to_string()]
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, lint_syntax, file, &events);
+        assert_function_query_was_not_run(&db, check_types, file, &events);
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
         db.write_file(path, "").unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "");
-        assert_eq!(check_file(&db, file), vec![] as Vec<String>);
+        assert_eq!(
+            check_file(&db, file)
+                .into_iter()
+                .map(|diagnostic| diagnostic.message().into_owned())
+                .collect::<Vec<_>>(),
+            vec![] as Vec<String>
+        );
 
         Ok(())
     }

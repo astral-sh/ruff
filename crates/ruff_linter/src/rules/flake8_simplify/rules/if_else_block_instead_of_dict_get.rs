@@ -211,7 +211,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     );
     if !checker
         .comment_ranges()
-        .has_comments(stmt_if, checker.locator())
+        .has_comments(stmt_if, checker.source())
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
@@ -300,7 +300,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
     );
     if !checker
         .comment_ranges()
-        .has_comments(expr, checker.locator())
+        .has_comments(expr, checker.source())
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,

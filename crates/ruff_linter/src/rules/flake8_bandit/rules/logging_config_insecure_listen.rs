@@ -30,7 +30,7 @@ pub struct LoggingConfigInsecureListen;
 impl Violation for LoggingConfigInsecureListen {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of insecure `logging.config.listen` detected")
+        "Use of insecure `logging.config.listen` detected".to_string()
     }
 }
 

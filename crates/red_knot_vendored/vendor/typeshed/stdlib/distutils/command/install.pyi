@@ -1,4 +1,5 @@
 import sys
+from _typeshed import Incomplete
 from collections.abc import Callable
 from typing import Any, ClassVar, Final, Literal
 
@@ -18,33 +19,33 @@ class install(Command):
     boolean_options: ClassVar[list[str]]
     negative_opt: ClassVar[dict[str, str]]
     prefix: str | None
-    exec_prefix: Any
+    exec_prefix: Incomplete
     home: str | None
     user: bool
-    install_base: Any
-    install_platbase: Any
+    install_base: Incomplete
+    install_platbase: Incomplete
     root: str | None
-    install_purelib: Any
-    install_platlib: Any
-    install_headers: Any
+    install_purelib: Incomplete
+    install_platlib: Incomplete
+    install_headers: Incomplete
     install_lib: str | None
-    install_scripts: Any
-    install_data: Any
-    install_userbase: Any
-    install_usersite: Any
-    compile: Any
-    optimize: Any
-    extra_path: Any
+    install_scripts: Incomplete
+    install_data: Incomplete
+    install_userbase: Incomplete
+    install_usersite: Incomplete
+    compile: Incomplete
+    optimize: Incomplete
+    extra_path: Incomplete
     install_path_file: int
     force: int
     skip_build: int
     warn_dir: int
-    build_base: Any
-    build_lib: Any
-    record: Any
+    build_base: Incomplete
+    build_lib: Incomplete
+    record: Incomplete
     def initialize_options(self) -> None: ...
-    config_vars: Any
-    install_libbase: Any
+    config_vars: Incomplete
+    install_libbase: Incomplete
     def finalize_options(self) -> None: ...
     def dump_dirs(self, msg) -> None: ...
     def finalize_unix(self) -> None: ...
@@ -53,8 +54,8 @@ class install(Command):
     def expand_basedirs(self) -> None: ...
     def expand_dirs(self) -> None: ...
     def convert_paths(self, *names) -> None: ...
-    path_file: Any
-    extra_dirs: Any
+    path_file: Incomplete
+    extra_dirs: Incomplete
     def handle_extra_path(self) -> None: ...
     def change_roots(self, *names) -> None: ...
     def create_home_path(self) -> None: ...

@@ -47,7 +47,7 @@ pub struct BidirectionalUnicode;
 impl Violation for BidirectionalUnicode {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Contains control characters that can permit obfuscated code")
+        "Contains control characters that can permit obfuscated code".to_string()
     }
 }
 

@@ -46,7 +46,7 @@ pub struct LRUCacheWithMaxsizeNone;
 impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`")
+        "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`".to_string()
     }
 
     fn fix_title(&self) -> String {
