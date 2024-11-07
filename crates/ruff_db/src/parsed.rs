@@ -2,7 +2,7 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_python_ast::{ModModule, PySourceType};
+use ruff_python_ast::{ModExpression, ModModule, PySourceType};
 use ruff_python_parser::{parse_unchecked_source, Parsed};
 
 use crate::files::{File, FilePath};
@@ -70,6 +70,41 @@ impl Deref for ParsedModule {
 impl std::fmt::Debug for ParsedModule {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("ParsedModule").field(&self.inner).finish()
+    }
+}
+
+/// Cheap cloneable wrapper around the parsed expression.
+#[derive(Clone)]
+pub struct ParsedExpression {
+    inner: Arc<Parsed<ModExpression>>,
+}
+
+impl ParsedExpression {
+    pub fn new(parsed: Parsed<ModExpression>) -> Self {
+        Self {
+            inner: Arc::new(parsed),
+        }
+    }
+
+    /// Consumes `self` and returns the Arc storing the parsed expression.
+    pub fn into_arc(self) -> Arc<Parsed<ModExpression>> {
+        self.inner
+    }
+}
+
+impl Deref for ParsedExpression {
+    type Target = Parsed<ModExpression>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl std::fmt::Debug for ParsedExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ParsedExpression")
+            .field(&self.inner)
+            .finish()
     }
 }
 
