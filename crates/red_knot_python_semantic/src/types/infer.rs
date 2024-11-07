@@ -628,9 +628,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::Instance(InstanceType { class, .. })
-                if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
-                    .iter()
-                    .any(|&k| class.is_known(self.db, k)) => {}
+                if matches!(
+                    class.known(self.db),
+                    Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
+                ) => {}
             _ => return,
         };
 
@@ -2956,27 +2957,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (
-                Type::Instance(InstanceType {
-                    class: left_class, ..
-                }),
-                Type::Instance(InstanceType {
-                    class: right_class, ..
-                }),
-                op,
-            ) => {
-                if left_class != right_class && right_class.is_subclass_of(self.db, left_class) {
+            (Type::Instance(left), Type::Instance(right), op) => {
+                if left != right && right.is_instance_of(self.db, left.class) {
                     let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right_class.class_member(self.db, reflected_dunder);
+                    let rhs_reflected = right.class.class_member(self.db, reflected_dunder);
                     if !rhs_reflected.is_unbound()
-                        && rhs_reflected != left_class.class_member(self.db, reflected_dunder)
+                        && rhs_reflected != left.class.class_member(self.db, reflected_dunder)
                     {
                         return rhs_reflected
                             .unwrap_or(Type::Never)
                             .call(self.db, &[right_ty, left_ty])
                             .return_ty(self.db)
                             .or_else(|| {
-                                left_class
+                                left.class
                                     .class_member(self.db, op.dunder())
                                     .unwrap_or(Type::Never)
                                     .call(self.db, &[left_ty, right_ty])
@@ -2986,7 +2979,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let call_on_left_instance = if let Symbol::Type(class_member, _) =
-                    left_class.class_member(self.db, op.dunder())
+                    left.class.class_member(self.db, op.dunder())
                 {
                     class_member
                         .call(self.db, &[left_ty, right_ty])
@@ -2996,11 +2989,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 call_on_left_instance.or_else(|| {
-                    if left_class == right_class {
+                    if left == right {
                         None
                     } else {
                         if let Symbol::Type(class_member, _) =
-                            right_class.class_member(self.db, op.reflected_dunder())
+                            right.class.class_member(self.db, op.reflected_dunder())
                         {
                             class_member
                                 .call(self.db, &[right_ty, left_ty])
