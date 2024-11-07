@@ -2021,6 +2021,23 @@ impl KnownFunction {
             Self::RevealType => None,
         }
     }
+
+    fn from_definition<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+        name: &str,
+    ) -> Option<Self> {
+        match name {
+            "reveal_type" if definition.is_typing_definition(db) => Some(KnownFunction::RevealType),
+            "isinstance" if definition.is_builtin_definition(db) => Some(
+                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsInstance),
+            ),
+            "issubclass" if definition.is_builtin_definition(db) => Some(
+                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
+            ),
+            _ => None,
+        }
+    }
 }
 
 /// Representation of a runtime class object.

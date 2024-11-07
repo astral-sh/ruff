@@ -57,9 +57,9 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
-    IterationOutcome, KnownClass, KnownConstraintFunction, KnownFunction, KnownInstance,
-    MetaclassErrorKind, SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type,
-    TypeArrayDisplay, UnionBuilder, UnionType,
+    IterationOutcome, KnownClass, KnownFunction, KnownInstance, MetaclassErrorKind,
+    SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type, TypeArrayDisplay,
+    UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -861,18 +861,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let function_kind = match &**name {
-            "reveal_type" if definition.is_typing_definition(self.db) => {
-                Some(KnownFunction::RevealType)
-            }
-            "isinstance" if definition.is_builtin_definition(self.db) => Some(
-                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsInstance),
-            ),
-            "issubclass" if definition.is_builtin_definition(self.db) => Some(
-                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
-            ),
-            _ => None,
-        };
+        let function_kind = KnownFunction::from_definition(self.db, definition, name);
 
         let body_scope = self
             .index
