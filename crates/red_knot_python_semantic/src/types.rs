@@ -1091,7 +1091,10 @@ impl<'db> Type<'db> {
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
             }
-            Type::Type(_) => Truthiness::Ambiguous,
+            Type::Type(_) => {
+                // TODO: see above
+                Truthiness::Ambiguous
+            }
             Type::Instance(InstanceType { class, .. }) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the instance's class
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
