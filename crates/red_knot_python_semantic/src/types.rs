@@ -648,6 +648,9 @@ impl<'db> Type<'db> {
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
 
+        // TODO: Once we have support for final classes, we can establish that
+        // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
+
         // TODO: The following is a workaround that is required to unify the two different
         // versions of `NoneType` in typeshed. This should not be required anymore once we
         // understand `sys.version_info` branches.
@@ -2702,7 +2705,7 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]})]
     #[test_case(Ty::BuiltinInstance("int"), Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(3)]})]
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(1)]})]
-    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinClassLiteral("int"))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
