@@ -87,8 +87,7 @@ else:
 class A: ...
 class B: ...
 
-def flag() -> bool: ...
-def get_class() -> object: ...
+def get_class() -> type[object]: ...
 
 t = get_class()
 
@@ -97,7 +96,7 @@ if issubclass(t, A):
     if issubclass(t, B):
         reveal_type(t)  # revealed: type[A] & type[B]
 else:
-    reveal_type(t)  # revealed: object & ~type[A]
+    reveal_type(t)  # revealed: type[object] & ~type[A]
 ```
 
 ### Handling of `None`
@@ -135,6 +134,35 @@ else:
 ```
 
 ## Special cases
+
+### Emit a diagnostic if the first argument is of wrong type
+
+#### Too wide
+
+`type[object]` is a subtype of `object`, but not every `object` can be passed as the first argument
+to `issubclass`:
+
+```py
+class A: ...
+
+def get_object() -> object: ...
+
+t = get_object()
+
+# TODO: we should emit a diagnostic here
+if issubclass(t, A):
+    reveal_type(t)  # revealed: type[A]
+```
+
+#### Wrong
+
+```py
+t = 1
+
+# TODO: we should emit a diagnostic here
+if issubclass(t, int):
+    reveal_type(t)  # revealed: Never
+```
 
 ### Do not use custom `issubclass` for narrowing
 

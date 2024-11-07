@@ -3874,15 +3874,18 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let value_ty = self.infer_expression(value);
 
-                if value_ty
-                    .into_class_literal()
-                    .is_some_and(|ClassLiteralType { class }| {
-                        class.is_known(self.db, KnownClass::Tuple)
-                    })
-                {
-                    self.infer_tuple_type_expression(slice)
-                } else {
-                    self.infer_subscript_type_expression(subscript, value_ty)
+                match value_ty.into_class_literal() {
+                    Some(ClassLiteralType { class })
+                        if class.is_known(self.db, KnownClass::Tuple) =>
+                    {
+                        self.infer_tuple_type_expression(slice)
+                    }
+                    Some(ClassLiteralType { class })
+                        if class.is_known(self.db, KnownClass::Type) =>
+                    {
+                        self.infer_subclass_of_type_expression(slice)
+                    }
+                    _ => self.infer_subscript_type_expression(subscript, value_ty),
                 }
             }
 
@@ -4051,6 +4054,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else {
                     Type::Tuple(TupleType::new(self.db, Box::from([single_element_ty])))
                 }
+            }
+        }
+    }
+
+    /// Given the slice of a `type[]` annotation, return the type that the annotation represents
+    fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
+        match slice {
+            ast::Expr::Name(name) => {
+                let name_ty = self.infer_name_expression(name);
+                if let Some(class_literal) = name_ty.into_class_literal() {
+                    Type::SubclassOf(class_literal.to_subclass_of_type())
+                } else {
+                    Type::Todo
+                }
+            }
+            _ => {
+                self.infer_type_expression(slice);
+                Type::Todo
             }
         }
     }
