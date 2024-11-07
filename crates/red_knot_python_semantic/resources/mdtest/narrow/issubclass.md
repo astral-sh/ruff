@@ -156,6 +156,8 @@ if issubclass(t, A):
 
 #### Wrong
 
+`Literal[1]` and `type` are entirely disjoint, so the inferred type of `Literal[1] & type[int]` is eagerly simplified to `Never` as a result of the type narrowing in the `if issubclass(t, int)` branch:
+
 ```py
 t = 1
 
