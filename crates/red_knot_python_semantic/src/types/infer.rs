@@ -3874,16 +3874,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let value_ty = self.infer_expression(value);
 
-                match value_ty.into_class_literal() {
-                    Some(ClassLiteralType { class })
-                        if class.is_known(self.db, KnownClass::Tuple) =>
-                    {
-                        self.infer_tuple_type_expression(slice)
-                    }
-                    Some(ClassLiteralType { class })
-                        if class.is_known(self.db, KnownClass::Type) =>
-                    {
-                        self.infer_subclass_of_type_expression(slice)
+                match value_ty {
+                    Type::ClassLiteral(class_literal_ty) => {
+                        match class_literal_ty.class.known(self.db) {
+                            Some(KnownClass::Tuple) => self.infer_tuple_type_expression(slice),
+                            Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
+                            _ => self.infer_subscript_type_expression(subscript, value_ty),
+                        }
                     }
                     _ => self.infer_subscript_type_expression(subscript, value_ty),
                 }
