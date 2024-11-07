@@ -70,11 +70,9 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
         return;
     };
 
-    if bases.len() != 1 {
+    let [base] = &**bases else {
         return;
     }
-
-    let base = &bases[0];
 
     let Some(symbol) = checker.semantic().resolve_builtin_symbol(base) else {
         return;
