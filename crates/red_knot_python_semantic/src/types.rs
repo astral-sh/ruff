@@ -1706,7 +1706,7 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
-    /// Get the return type of the call, or `None` if not callable
+    /// Get the return type of the call, or `None` if not callable.
     fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::Callable { return_ty } => Some(*return_ty),
