@@ -51,7 +51,7 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// - `lint.flake8-type-checking.quote-annotations`
 ///
 /// ## References
-/// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {
     qualified_name: String,

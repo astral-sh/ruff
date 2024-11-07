@@ -26,6 +26,9 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// warnings.warn("This is a warning", stacklevel=2)
 /// ```
+///
+/// ## References
+/// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
 #[violation]
 pub struct NoExplicitStacklevel;
 

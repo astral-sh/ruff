@@ -30,6 +30,9 @@ use crate::checkers::ast::Checker;
 /// dict.fromkeys(iterable)
 /// dict.fromkeys(iterable, 1)
 /// ```
+///
+/// ## References
+/// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[violation]
 pub struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
@@ -53,7 +56,7 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
     }
 }
 
-/// RUF025
+/// C420
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     checker: &mut Checker,
     dict_comp: &ast::ExprDictComp,

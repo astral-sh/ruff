@@ -55,7 +55,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 563](https://peps.python.org/pep-0563/)
+/// - [PEP 563 – Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
 /// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html#module-__future__)
 #[violation]
 pub struct QuotedAnnotation;

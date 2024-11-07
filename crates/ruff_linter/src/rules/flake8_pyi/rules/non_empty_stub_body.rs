@@ -26,8 +26,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [The recommended style for stub functions and methods](https://typing.readthedocs.io/en/latest/source/stubs.html#id6)
-///   in the typing docs.
+/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
 #[violation]
 pub struct NonEmptyStubBody;
 

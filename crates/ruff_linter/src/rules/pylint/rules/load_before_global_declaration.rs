@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// The `global` declaration applies to the entire scope. Using a name that's
 /// declared as `global` in a given scope prior to the relevant `global`
-/// declaration is a syntax error.
+/// declaration is a `SyntaxError`.
 ///
 /// ## Example
 /// ```python

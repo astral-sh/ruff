@@ -13,7 +13,7 @@ const BIDI_UNICODE: [char; 10] = [
     '\u{2068}', //{FIRST STRONG ISOLATE}
     '\u{2069}', //{POP DIRECTIONAL ISOLATE}
     // The following was part of PEP 672:
-    // https://www.python.org/dev/peps/pep-0672/
+    // https://peps.python.org/pep-0672/
     // so the list above might not be complete
     '\u{200F}', //{RIGHT-TO-LEFT MARK}
                 // We don't use
@@ -40,7 +40,7 @@ const BIDI_UNICODE: [char; 10] = [
 /// ```
 ///
 /// ## References
-/// - [PEP 672](https://peps.python.org/pep-0672/#bidirectional-text)
+/// - [PEP 672: Bidirectional Text](https://peps.python.org/pep-0672/#bidirectional-text)
 #[violation]
 pub struct BidirectionalUnicode;
 

@@ -32,7 +32,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Await expression](https://docs.python.org/3/reference/expressions.html#await)
-/// - [PEP 492](https://peps.python.org/pep-0492/#await-expression)
+/// - [PEP 492: Await Expression](https://peps.python.org/pep-0492/#await-expression)
 #[violation]
 pub struct AwaitOutsideAsync;
 

@@ -37,8 +37,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 535](https://peps.python.org/pep-0563/)
-/// - [PEP 604](https://peps.python.org/pep-0604/)
+/// - [PEP 563 - Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
+/// - [PEP 604 – Allow writing union types as `X | Y`](https://peps.python.org/pep-0604/)
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]

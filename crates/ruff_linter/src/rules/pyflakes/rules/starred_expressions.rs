@@ -13,6 +13,9 @@ use ruff_macros::{derive_message_formats, violation};
 /// In Python 3, no more than 1 << 8 assignments are allowed before a starred
 /// expression, and no more than 1 << 24 expressions are allowed after a starred
 /// expression.
+///
+/// ## References
+/// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
 #[violation]
 pub struct ExpressionsInStarAssignment;
 
@@ -38,7 +41,7 @@ impl Violation for ExpressionsInStarAssignment {
 /// ```
 ///
 /// ## References
-/// - [PEP 3132](https://peps.python.org/pep-3132/)
+/// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
 #[violation]
 pub struct MultipleStarredExpressions;
 

@@ -10,16 +10,21 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for imports of the`telnetlib` module.
+/// Checks for imports of the `telnetlib` module.
 ///
 /// ## Why is this bad?
-/// Telnet is considered insecure. Instead, use SSH or another encrypted
+/// Telnet is considered insecure. It is deprecated since version 3.11, and
+/// will be removed in version 3.13. Instead, use SSH or another encrypted
 /// protocol.
 ///
 /// ## Example
 /// ```python
 /// import telnetlib
 /// ```
+///
+/// ## References
+/// - [Python documentation: `telnetlib` - Telnet client](https://docs.python.org/3.12/library/telnetlib.html#module-telnetlib)
+/// - [PEP 594: `telnetlib`](https://peps.python.org/pep-0594/#telnetlib)
 #[violation]
 pub struct SuspiciousTelnetlibImport;
 
@@ -41,6 +46,9 @@ impl Violation for SuspiciousTelnetlibImport {
 /// ```python
 /// import ftplib
 /// ```
+///
+/// ## References
+/// - [Python documentation: `ftplib` - FTP protocol client](https://docs.python.org/3/library/ftplib.html)
 #[violation]
 pub struct SuspiciousFtplibImport;
 
@@ -63,8 +71,9 @@ impl Violation for SuspiciousFtplibImport {
 /// ```python
 /// import pickle
 /// ```
+///
 /// ## References
-/// - [Python Docs](https://docs.python.org/3/library/pickle.html)
+/// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
 #[violation]
 pub struct SuspiciousPickleImport;
 

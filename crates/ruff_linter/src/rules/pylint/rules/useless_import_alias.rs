@@ -21,6 +21,12 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import numpy as np
 /// ```
+///
+/// or
+///
+/// ```python
+/// import numpy
+/// ```
 #[violation]
 pub struct UselessImportAlias;
 
