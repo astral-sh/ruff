@@ -265,6 +265,7 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
             | "__reduce__"
             | "__reduce_ex__"
             | "__release_buffer__"
+            | "__replace__"
             | "__repr__"
             | "__reversed__"
             | "__rfloordiv__"
@@ -297,11 +298,13 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
             | "__xor__"
             // Overridable sunder names from the `Enum` class.
             // See: https://docs.python.org/3/library/enum.html#supported-sunder-names
+            | "_add_alias_"
+            | "_add_value_alias_"
             | "_name_"
             | "_value_"
             | "_missing_"
             | "_ignore_"
             | "_order_"
             | "_generate_next_value_"
-    )
+    ) || method.starts_with("_repr_")
 }
