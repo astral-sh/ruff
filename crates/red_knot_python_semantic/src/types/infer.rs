@@ -2957,20 +2957,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (Type::Instance(left), Type::Instance(right), op) => {
+            (left_ty @ Type::Instance(left), right_ty @ Type::Instance(right), op) => {
                 if left != right && right.is_instance_of(self.db, left.class) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right.class.class_member(self.db, reflected_dunder);
                     if !rhs_reflected.is_unbound()
                         && rhs_reflected != left.class.class_member(self.db, reflected_dunder)
                     {
-                        return rhs_reflected
-                            .call(self.db, &[right_ty, left_ty])
+                        return right_ty
+                            .to_meta_type(self.db)
+                            .call_dunder(self.db, reflected_dunder, &[right_ty, left_ty])
                             .return_ty(self.db)
                             .or_else(|| {
-                                left.class
-                                    .class_member(self.db, op.dunder())
-                                    .call(self.db, &[left_ty, right_ty])
+                                left_ty
+                                    .to_meta_type(self.db)
+                                    .call_dunder(self.db, op.dunder(), &[left_ty, right_ty])
                                     .return_ty(self.db)
                             });
                     }

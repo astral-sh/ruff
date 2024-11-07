@@ -1,5 +1,5 @@
 use crate::{
-    types::{CallOutcome, Type, UnionType},
+    types::{Type, UnionType},
     Db,
 };
 
@@ -48,20 +48,6 @@ impl<'db> Symbol<'db> {
         match self {
             Symbol::Type(ty, _) => *ty,
             Symbol::Unbound => Type::Unknown,
-        }
-    }
-
-    pub(crate) fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
-        match self {
-            Symbol::Type(callable_ty, Boundness::Bound) => callable_ty.call(db, arg_types),
-            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
-                let return_ty = callable_ty.call(db, arg_types).return_ty(db);
-                CallOutcome::PossiblyUnbound {
-                    callable_ty,
-                    return_ty,
-                }
-            }
-            Symbol::Unbound => CallOutcome::Unbound,
         }
     }
 

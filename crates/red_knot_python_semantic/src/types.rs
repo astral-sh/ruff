@@ -1208,14 +1208,17 @@ impl<'db> Type<'db> {
                 })
             }
 
-            Type::Instance(InstanceType { class, .. }) => {
+            instance_ty @ Type::Instance(InstanceType { .. }) => {
                 // Since `__call__` is a dunder, we need to access it as an attribute on the class
                 // rather than the instance (matching runtime semantics).
 
                 let args = std::iter::once(self)
                     .chain(arg_types.iter().copied())
                     .collect::<Vec<_>>();
-                match class.class_member(db, "__call__").call(db, &args) {
+                match instance_ty
+                    .to_meta_type(db)
+                    .call_dunder(db, "__call__", &args)
+                {
                     CallOutcome::NotCallable { .. } => {
                         // Turn "`<type of illegal '__call__'>` not callable" into
                         // "`X` not callable"
@@ -1263,6 +1266,27 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn call_dunder(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        arg_types: &[Type<'db>],
+    ) -> CallOutcome<'db> {
+        // self.into
+
+        match self.member(db, name) {
+            Symbol::Type(callable_ty, Boundness::Bound) => callable_ty.call(db, arg_types),
+            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
+                let return_ty = callable_ty.call(db, arg_types).return_ty(db);
+                CallOutcome::PossiblyUnbound {
+                    callable_ty,
+                    return_ty,
+                }
+            }
+            Symbol::Unbound => CallOutcome::Unbound,
+        }
+    }
+
     /// Given the type of an object that is iterated over in some way,
     /// return the type of objects that are yielded by that iteration.
     ///
@@ -1298,8 +1322,7 @@ impl<'db> Type<'db> {
 
             return if let Some(element_ty) = iterator_ty
                 .to_meta_type(db)
-                .member(db, "__next__")
-                .call(db, &[iterator_ty])
+                .call_dunder(db, "__next__", &[iterator_ty])
                 .return_ty(db)
             {
                 if boundness == Boundness::MayBeUnbound {
