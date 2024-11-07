@@ -4069,6 +4069,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Todo
                 }
             }
+            // TODO: attributes, unions, subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);
                 Type::Todo
