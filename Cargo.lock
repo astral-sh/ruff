@@ -2555,7 +2555,6 @@ dependencies = [
  "log",
  "memchr",
  "natord",
- "once_cell",
  "path-absolutize",
  "pathdiff",
  "pep440_rs 0.7.2",

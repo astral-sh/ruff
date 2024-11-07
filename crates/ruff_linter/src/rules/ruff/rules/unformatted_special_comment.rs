@@ -1,5 +1,5 @@
 use crate::Locator;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use regex::Regex;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -116,7 +116,7 @@ fn add_diagnostic_if_applicable(
 }
 
 fn parse_code_list(code_list: &str) -> Vec<String> {
-    static PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"[A-Z]+[A-Za-z0-9]+").unwrap());
+    static PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[A-Z]+[A-Za-z0-9]+").unwrap());
 
     PATTERN
         .find_iter(code_list)
@@ -125,7 +125,7 @@ fn parse_code_list(code_list: &str) -> Vec<String> {
 }
 
 fn try_parse_file_level_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
-    static PATTERN: Lazy<Regex> = Lazy::new(|| {
+    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r"(?x)
             ^
@@ -158,7 +158,7 @@ fn try_parse_file_level_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
 }
 
 fn try_parse_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
-    static PATTERN: Lazy<Regex> = Lazy::new(|| {
+    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r"(?x)
             ^
@@ -188,7 +188,7 @@ fn try_parse_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
 }
 
 fn try_parse_ruff_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
-    static PATTERN: Lazy<Regex> = Lazy::new(|| {
+    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r"(?x)
             ^
@@ -210,7 +210,7 @@ fn try_parse_ruff_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
 }
 
 fn try_parse_common(text: &str) -> Option<(EndIndex, SpecialComment)> {
-    static PATTERN: Lazy<Regex> = Lazy::new(|| {
+    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r"(?x)
             ^
