@@ -2965,11 +2965,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         && rhs_reflected != left.class.class_member(self.db, reflected_dunder)
                     {
                         return rhs_reflected
-                            .get_return_type_if_callable(self.db, &[right_ty, left_ty])
+                            .call(self.db, &[right_ty, left_ty])
+                            .return_ty(self.db)
                             .or_else(|| {
                                 left.class
                                     .class_member(self.db, op.dunder())
-                                    .get_return_type_if_callable(self.db, &[left_ty, right_ty])
+                                    .call(self.db, &[left_ty, right_ty])
+                                    .return_ty(self.db)
                             });
                     }
                 }

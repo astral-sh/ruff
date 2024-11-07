@@ -1,5 +1,5 @@
 use crate::{
-    types::{Type, UnionType},
+    types::{CallOutcome, Type, UnionType},
     Db,
 };
 
@@ -51,17 +51,17 @@ impl<'db> Symbol<'db> {
         }
     }
 
-    /// Get the return type of a call to a symbol if it is definitely bound and callable.
-    ///
-    /// Returns `None` if the symbol is (possibly) unbound or if the type is not callable.
-    pub(crate) fn get_return_type_if_callable(
-        self,
-        db: &'db dyn Db,
-        arg_types: &[Type<'db>],
-    ) -> Option<Type<'db>> {
+    pub(crate) fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
-            Symbol::Type(ty, Boundness::Bound) => ty.call(db, arg_types).return_ty(db),
-            Symbol::Type(_, Boundness::MayBeUnbound) | Symbol::Unbound => None,
+            Symbol::Type(callable_ty, Boundness::Bound) => callable_ty.call(db, arg_types),
+            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
+                let return_ty = callable_ty.call(db, arg_types).return_ty(db);
+                CallOutcome::PossiblyUnbound {
+                    callable_ty,
+                    return_ty,
+                }
+            }
+            Symbol::Unbound => CallOutcome::Unbound,
         }
     }
 
