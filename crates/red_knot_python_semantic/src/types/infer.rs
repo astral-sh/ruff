@@ -3204,18 +3204,32 @@ impl<'db> TypeInferenceBuilder<'db> {
         //   f(T_inter) = f(P1) & f(P2) & ... & f(Pn)
         //
         // The reason for this is the following: In general, for any function 'f', the
-        // set f(A) & f(B) can be *larger than* the set f(A & B). This means that we
-        // will return a type that is too wide, which is not necessarily problematic.
+        // set f(A) & f(B) is *larger than or equal to* the set f(A & B). This means
+        // that we will return a type that is possibly wider than it could be, but
+        // never wrong.
         //
         // However, we do have to leave out the negative contributions. If we were to
         // add a contribution like ~f(N1), we would potentially infer result types
-        // that are too narrow, since ~f(A) can be larger than f(~A).
+        // that are too narrow.
         //
         // As an example for this, consider the intersection type `int & ~Literal[1]`.
         // If 'f' would be the `==`-comparison with 2, we obviously can't tell if that
-        // answer would be true or false, so we need to return `bool`. However, if we
-        // compute f(int) & ~f(Literal[1]), we get `bool & ~Literal[False]`, which can
-        // be simplified to `Literal[True]` -- a type that is too narrow.
+        // answer would be true or false, so we need to return `bool`. And indeed, we
+        // we have (glossing over notational details):
+        //
+        //   f(int & ~1)
+        //       = f({..., -1, 0, 2, 3, ...})
+        //       = {..., False, False, True, False, ...}
+        //       = bool
+        //
+        // On the other hand, if we were to compute
+        //
+        //   f(int) & ~f(1)
+        //       = bool & ~False
+        //       = True
+        //
+        // we would get a result type `Literal[True]` which is too narrow.
+        //
         let mut builder = IntersectionBuilder::new(self.db);
         for pos in intersection.positive(self.db) {
             let result = match intersection_on {
