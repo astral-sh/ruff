@@ -111,4 +111,3 @@
 #noqa: D101    undocumented-public-class
 
    # noqa :RUF001,RUF002   # type:ignore
-

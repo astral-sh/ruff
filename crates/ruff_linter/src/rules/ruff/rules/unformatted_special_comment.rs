@@ -1,11 +1,11 @@
 use crate::Locator;
-use std::sync::LazyLock;
 use regex::Regex;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
+use std::sync::LazyLock;
 
 type EndIndex = usize;
 
@@ -29,26 +29,34 @@ enum SpecialComment {
 }
 
 impl SpecialComment {
-    fn formatted(&self) -> String {
+    fn formatted(&self) -> Option<String> {
         match self {
             SpecialComment::Common { hint, rest } => {
-                format!("# {}: {}", hint.to_lowercase(), rest)
+                Some(format!("# {}: {}", hint.to_lowercase(), rest))
             }
-            SpecialComment::RuffIsort(rest) => {
-                format!("# ruff: isort: {rest}")
-            }
-            SpecialComment::Noqa(None) => "# noqa".to_string(),
+            SpecialComment::RuffIsort(rest) => Some(format!("# ruff: isort: {rest}")),
+            SpecialComment::Noqa(None) => Some("# noqa".to_string()),
             SpecialComment::Noqa(Some(codes)) => {
-                format!("# noqa: {}", codes.join(", "))
+                if codes.is_empty() {
+                    // Avoid suggesting the unsafe fix
+                    // `# noqa:` (ignore nothing) -> `# noqa` (ignore everything).
+                    None
+                } else {
+                    Some(format!("# noqa: {}", codes.join(", ")))
+                }
             }
-            SpecialComment::FileLevelNoqa { hint, codes: None } => {
-                format!("# {hint}: noqa")
-            }
+            SpecialComment::FileLevelNoqa { hint, codes: None } => Some(format!("# {hint}: noqa")),
             SpecialComment::FileLevelNoqa {
                 hint,
                 codes: Some(codes),
             } => {
-                format!("# {hint}: noqa: {}", codes.join(", "))
+                if codes.is_empty() {
+                    // Avoid suggesting the unsafe fix
+                    // `# ruff: noqa:` (ignore nothing) -> `# ruff: noqa` (ignore everything).
+                    None
+                } else {
+                    Some(format!("# {hint}: noqa: {}", codes.join(", ")))
+                }
             }
         }
     }
@@ -100,7 +108,9 @@ fn add_diagnostic_if_applicable(
     original_comment_text: &str,
     original_comment_text_range: TextRange,
 ) {
-    let formatted_comment_text = comment.formatted();
+    let Some(formatted_comment_text) = comment.formatted() else {
+        return;
+    };
 
     if original_comment_text == formatted_comment_text {
         return;
@@ -216,7 +226,7 @@ fn try_parse_common(text: &str) -> Option<(EndIndex, SpecialComment)> {
             ^
             \#\s*
             (?<hint>type|mypy|pyright|fmt|isort|nopycln):\s*
-            (?<rest>.+)
+            (?<rest>\S.*)
             ",
         )
         .unwrap()
@@ -274,5 +284,120 @@ pub(crate) fn unformatted_special_comment(
 
             check_single_comment(diagnostics, &text[index..], index);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_diagnostics::Diagnostic;
+
+    use super::check_single_comment;
+
+    fn test(text: &str) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+        let start_index = 0;
+
+        check_single_comment(&mut diagnostics, text, start_index);
+
+        return diagnostics;
+    }
+
+    fn has_unformatted(text: &str) {
+        let diagnostics = test(text);
+
+        assert!(!diagnostics.is_empty());
+    }
+
+    fn no_unformatted(text: &str) {
+        let diagnostics = test(text);
+
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn unknown() {
+        no_unformatted("#foo");
+        no_unformatted("# foo");
+
+        no_unformatted("#ruff: foo-bar");
+        no_unformatted("# flake8:foo-bar");
+
+        no_unformatted("#  black:skip");
+    }
+
+    #[test]
+    fn casing() {
+        no_unformatted("# Mypy: disallow-subclassing-any");
+        no_unformatted("# Type: ignore");
+        no_unformatted("# FMT:OFF");
+    }
+
+    #[test]
+    fn already_formatted_noqa() {
+        no_unformatted("# noqa");
+        no_unformatted("# noqa: A123");
+        no_unformatted("# noqa: A123, B456");
+
+        no_unformatted("# ruff: noqa");
+        no_unformatted("# ruff: noqa: A123");
+        no_unformatted("# ruff: noqa: A123, B456");
+
+        no_unformatted("# flake8: noqa");
+        no_unformatted("# flake8: noqa: A123");
+        no_unformatted("# flake8: noqa: A123, B456");
+
+        no_unformatted("# ruff: isort: on");
+        no_unformatted("# ruff: isort: skip_file");
+    }
+
+    #[test]
+    fn whitespace() {
+        has_unformatted("# noqa:A123");
+        has_unformatted("#noqa:   A123");
+
+        has_unformatted("#    type:ignore");
+        has_unformatted("#type:\tint");
+
+        has_unformatted("# fmt:off");
+        has_unformatted("#fmt: on");
+        has_unformatted("#fmt: skip");
+    }
+
+    #[test]
+    fn rule_code_separators() {
+        has_unformatted("# noqa: A123 B456");
+        has_unformatted("# ruff: noqa: A123 B456");
+        has_unformatted("# flake8: noqa: A123 B456");
+
+        has_unformatted("# noqa: A123,B456");
+        has_unformatted("# ruff: noqa: A123,B456");
+        has_unformatted("# flake8: noqa: A123,B456");
+
+        has_unformatted("# noqa: A123,,B456");
+        has_unformatted("# noqa: A123 , \t,\t \tB456");
+        has_unformatted("# noqa: A123\tB456");
+        has_unformatted("# noqa: A123\t\t\tB456");
+        has_unformatted("# noqa: A123\t\t\t\tB456");
+
+        has_unformatted("# noqa: A123 ,B456");
+        has_unformatted("# ruff: noqa: A123\tB456");
+        has_unformatted("# flake8: noqa: A123   B456");
+    }
+
+    #[test]
+    fn common() {
+        has_unformatted("#type:ignore");
+        has_unformatted("#pyright:strict");
+        has_unformatted("#isort:skip_file");
+        has_unformatted("#nopycln:import");
+        has_unformatted("#fmt:off");
+        has_unformatted("#fmt:on");
+        has_unformatted("#fmt:skip");
+
+        has_unformatted("#\t mypy: ignore-errors");
+        has_unformatted("#\t type:ignore");
+        has_unformatted("# \tpyright: \t strict");
+        has_unformatted("# \t pyright:ignore[reportFoo]");
+        has_unformatted("# \t\t\tisort:skip_file");
     }
 }
