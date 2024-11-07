@@ -64,37 +64,6 @@ impl AlwaysFixableViolation for SubclassBuiltin {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum SupportedBuiltins {
-    Str,
-    List,
-    Dict,
-}
-
-impl TryFrom<&str> for SupportedBuiltins {
-    type Error = &'static str;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "str" => Ok(Self::Str),
-            "dict" => Ok(Self::Dict),
-            "list" => Ok(Self::List),
-            _ => Err("Unsupported builtin for `subclass-builtin`"),
-        }
-    }
-}
-
-impl SupportedBuiltins {
-    fn user_symbol(self) -> String {
-        let user_symbol = match self {
-            SupportedBuiltins::Dict => "UserDict",
-            SupportedBuiltins::List => "UserList",
-            SupportedBuiltins::Str => "UserStr",
-        };
-        user_symbol.to_string()
-    }
-}
-
 /// FURB189
 pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
@@ -110,7 +79,7 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
             continue;
         };
 
-        let Ok(supported_builtin) = SupportedBuiltins::try_from(symbol) else {
+        let Some(supported_builtin) = SupportedBuiltins::from_symbol(symbol) else {
             continue;
         };
 
@@ -119,13 +88,13 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
         let mut diagnostic = Diagnostic::new(
             SubclassBuiltin {
                 subclass: symbol.to_string(),
-                replacement: user_symbol.clone(),
+                replacement: user_symbol.to_string(),
             },
             base.range(),
         );
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from("collections", &user_symbol),
+                &ImportRequest::import_from("collections", user_symbol),
                 base.start(),
                 checker.semantic(),
             )?;
@@ -133,5 +102,31 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
             Ok(Fix::unsafe_edits(import_edit, [other_edit]))
         });
         checker.diagnostics.push(diagnostic);
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum SupportedBuiltins {
+    Str,
+    List,
+    Dict,
+}
+
+impl SupportedBuiltins {
+    fn from_symbol(value: &str) -> Option<SupportedBuiltins> {
+        match value {
+            "str" => Some(Self::Str),
+            "dict" => Some(Self::Dict),
+            "list" => Some(Self::List),
+            _ => None,
+        }
+    }
+
+    const fn user_symbol(self) -> &'static str {
+        match self {
+            SupportedBuiltins::Dict => "UserDict",
+            SupportedBuiltins::List => "UserList",
+            SupportedBuiltins::Str => "UserStr",
+        }
     }
 }
