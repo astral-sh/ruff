@@ -3195,7 +3195,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        // If non of the simplifications above apply, we still need to return *some*
+        // If none of the simplifications above apply, we still need to return *some*
         // result type for the comparison 'T_inter `op` T_other' (or reversed), where
         //
         //    T_inter = P1 & P2 & ... & Pn & ~N1 & ~N2 & ... & ~Nm
