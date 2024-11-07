@@ -55,5 +55,21 @@ class NonCallable:
 
 a = NonCallable()
 # error: "Object of type `NonCallable` is not callable"
-result = a()
+reveal_type(a())  # revealed: Unknown
+```
+
+## Possibly non-callable `__call__`
+
+```py
+def flag() -> bool: ...
+
+class NonCallable:
+    if flag():
+        __call__ = 1
+    else:
+        def __call__(self) -> int: ...
+
+a = NonCallable()
+# error: "Object of type `Literal[1] | Literal[__call__]` is not callable (due to union element `Literal[1]`)"
+reveal_type(a())  # revealed: Unknown | int
 ```
