@@ -5,8 +5,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
-    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
-    Truthiness, Type, UnionBuilder,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass,
+    KnownConstraintFunction, KnownFunction, Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -78,24 +78,27 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), false).finish()
 }
 
-/// Generate a constraint from the *type* of the second argument of an `isinstance` call.
+/// Generate a constraint from the type of a `classinfo` argument to `isinstance` or `issubclass`.
 ///
-/// Example: for `isinstance(…, str)`, we would infer `Type::ClassLiteral(str)` from the
-/// second argument, but we need to generate a `Type::Instance(str)` constraint that can
-/// be used to narrow down the type of the first argument.
-fn generate_isinstance_constraint<'db>(
+/// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
+/// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
+fn generate_classinfo_constraint<'db, F>(
     db: &'db dyn Db,
     classinfo: &Type<'db>,
-) -> Option<Type<'db>> {
+    to_constraint: F,
+) -> Option<Type<'db>>
+where
+    F: Fn(ClassLiteralType<'db>) -> Type<'db> + Copy,
+{
     match classinfo {
-        Type::ClassLiteral(ClassLiteralType { class }) => Some(Type::anonymous_instance(*class)),
         Type::Tuple(tuple) => {
             let mut builder = UnionBuilder::new(db);
             for element in tuple.elements(db) {
-                builder = builder.add(generate_isinstance_constraint(db, element)?);
+                builder = builder.add(generate_classinfo_constraint(db, element, to_constraint)?);
             }
             Some(builder.build())
         }
+        Type::ClassLiteral(class_literal_type) => Some(to_constraint(*class_literal_type)),
         _ => None,
     }
 }
@@ -330,34 +333,49 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
-        if let Some(func_type) = inference
+        // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
+        // and `issubclass`, for example `isinstance(x, str | (int | float))`.
+        match inference
             .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
             .into_function_literal()
+            .and_then(|f| f.known(self.db))
+            .and_then(KnownFunction::constraint_function)
         {
-            if func_type.is_known(self.db, KnownFunction::IsInstance)
-                && expr_call.arguments.keywords.is_empty()
-            {
-                if let [ast::Expr::Name(ast::ExprName { id, .. }), rhs] = &*expr_call.arguments.args
+            Some(function) if expr_call.arguments.keywords.is_empty() => {
+                if let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
+                    &*expr_call.arguments.args
                 {
                     let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-                    let rhs_type = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
+                    let class_info_ty =
+                        inference.expression_ty(class_info.scoped_ast_id(self.db, scope));
 
-                    // TODO: add support for PEP 604 union types on the right hand side:
-                    // isinstance(x, str | (int | float))
-                    if let Some(mut constraint) = generate_isinstance_constraint(self.db, &rhs_type)
-                    {
-                        if !is_positive {
-                            constraint = constraint.negate(self.db);
+                    let to_constraint = match function {
+                        KnownConstraintFunction::IsInstance => {
+                            |class_literal: ClassLiteralType<'db>| {
+                                Type::anonymous_instance(class_literal.class)
+                            }
                         }
-                        let mut constraints = NarrowingConstraints::default();
-                        constraints.insert(symbol, constraint);
-                        return Some(constraints);
-                    }
+                        KnownConstraintFunction::IsSubclass => {
+                            |class_literal: ClassLiteralType<'db>| {
+                                Type::SubclassOf(class_literal.to_subclass_of_type())
+                            }
+                        }
+                    };
+
+                    generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
+                        |constraint| {
+                            let mut constraints = NarrowingConstraints::default();
+                            constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
+                            constraints
+                        },
+                    )
+                } else {
+                    None
                 }
             }
+            _ => None,
         }
-        None
     }
 
     fn evaluate_match_pattern_singleton(

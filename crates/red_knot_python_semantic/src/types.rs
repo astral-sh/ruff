@@ -331,6 +331,8 @@ pub enum Type<'db> {
     ModuleLiteral(File),
     /// A specific class object
     ClassLiteral(ClassLiteralType<'db>),
+    // The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
+    SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
     /// The set of objects in any of the types in the union
@@ -398,6 +400,15 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         IntersectionBuilder::new(db).add_negative(*self).build()
+    }
+
+    #[must_use]
+    pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
+        if yes {
+            self.negate(db)
+        } else {
+            *self
+        }
     }
 
     pub const fn into_union(self) -> Option<UnionType<'db>> {
@@ -524,6 +535,26 @@ impl<'db> Type<'db> {
             {
                 true
             }
+            (Type::ClassLiteral(self_class), Type::SubclassOf(target_class)) => {
+                self_class.class.is_subclass_of(db, target_class.class)
+            }
+            (Type::SubclassOf(self_class), Type::SubclassOf(target_class)) => {
+                self_class.class.is_subclass_of(db, target_class.class)
+            }
+            (
+                Type::SubclassOf(SubclassOfType { class: self_class }),
+                Type::Instance(InstanceType {
+                    class: target_class,
+                    ..
+                }),
+            ) if self_class
+                .metaclass(db)
+                .into_class_literal()
+                .map(|meta| meta.class.is_subclass_of(db, target_class))
+                .unwrap_or(false) =>
+            {
+                true
+            }
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
@@ -620,6 +651,9 @@ impl<'db> Type<'db> {
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
 
+        // TODO: Once we have support for final classes, we can establish that
+        // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
+
         // TODO: The following is a workaround that is required to unify the two different
         // versions of `NoneType` in typeshed. This should not be required anymore once we
         // understand `sys.version_info` branches.
@@ -684,6 +718,41 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)),
             ) => left != right,
 
+            (Type::SubclassOf(type_class), Type::ClassLiteral(class_literal))
+            | (Type::ClassLiteral(class_literal), Type::SubclassOf(type_class)) => {
+                !class_literal.class.is_subclass_of(db, type_class.class)
+            }
+            (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
+            (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
+                false
+            }
+            (
+                Type::SubclassOf(_),
+                Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..),
+            )
+            | (
+                Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..),
+                Type::SubclassOf(_),
+            ) => true,
+            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
+                // TODO: Once we have support for final classes, we can determine disjointness in some cases
+                // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
+                // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
+                // final classes inside `Type::SubclassOf` everywhere.
+                false
+            }
             (
                 Type::Instance(InstanceType {
                     class: class_none, ..
@@ -825,6 +894,11 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
+            Type::SubclassOf(..) => {
+                // TODO once we have support for final classes, we can return `true` for some
+                // cases: type[C] is a singleton if C is final.
+                false
+            }
             Type::BooleanLiteral(_)
             | Type::FunctionLiteral(..)
             | Type::ClassLiteral(..)
@@ -871,6 +945,11 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..) => true,
+
+            Type::SubclassOf(..) => {
+                // TODO: Same comment as above for `is_singleton`
+                false
+            }
 
             Type::Tuple(tuple) => tuple
                 .elements(db)
@@ -965,6 +1044,7 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_ty) => class_ty.member(db, name),
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo.into()
@@ -1053,6 +1133,10 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(_) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
+                Truthiness::Ambiguous
+            }
+            Type::SubclassOf(_) => {
+                // TODO: see above
                 Truthiness::Ambiguous
             }
             Type::Instance(InstanceType { class, .. }) => {
@@ -1239,6 +1323,7 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::anonymous_instance(*class),
+            Type::SubclassOf(SubclassOfType { class }) => Type::anonymous_instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
@@ -1272,10 +1357,8 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            // TODO: not really correct -- the meta-type of an `InstanceType { class: T }` should be `type[T]`
-            // (<https://docs.python.org/3/library/typing.html#the-type-of-class-objects>)
             Type::Instance(InstanceType { class, .. }) => {
-                Type::ClassLiteral(ClassLiteralType { class: *class })
+                Type::SubclassOf(SubclassOfType { class: *class })
             }
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
@@ -1286,7 +1369,14 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
-            // TODO can we do better here? `type[LiteralString]`?
+            Type::SubclassOf(SubclassOfType { class }) => Type::SubclassOf(
+                class
+                    .try_metaclass(db)
+                    .ok()
+                    .and_then(Type::into_class_literal)
+                    .unwrap_or(KnownClass::Type.to_class(db).expect_class_literal())
+                    .to_subclass_of_type(),
+            ),
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
             Type::Any => Type::Any,
@@ -1910,14 +2000,47 @@ impl<'db> FunctionType<'db> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KnownConstraintFunction {
+    /// `builtins.isinstance`
+    IsInstance,
+    /// `builtins.issubclass`
+    IsSubclass,
+}
+
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KnownFunction {
+    ConstraintFunction(KnownConstraintFunction),
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
-    /// `builtins.isinstance`
-    IsInstance,
+}
+
+impl KnownFunction {
+    pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
+        match self {
+            Self::ConstraintFunction(f) => Some(f),
+            Self::RevealType => None,
+        }
+    }
+
+    fn from_definition<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+        name: &str,
+    ) -> Option<Self> {
+        match name {
+            "reveal_type" if definition.is_typing_definition(db) => Some(KnownFunction::RevealType),
+            "isinstance" if definition.is_builtin_definition(db) => Some(
+                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsInstance),
+            ),
+            "issubclass" if definition.is_builtin_definition(db) => Some(
+                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
+            ),
+            _ => None,
+        }
+    }
 }
 
 /// Representation of a runtime class object.
@@ -2228,11 +2351,27 @@ impl<'db> ClassLiteralType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         self.class.class_member(db, name)
     }
+
+    fn to_subclass_of_type(self) -> SubclassOfType<'db> {
+        SubclassOfType { class: self.class }
+    }
 }
 
 impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
     fn from(value: ClassLiteralType<'db>) -> Self {
         Self::ClassLiteral(value)
+    }
+}
+
+/// A type that represents `type[C]`, i.e. the class literal `C` and class literals that are subclasses of `C`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SubclassOfType<'db> {
+    class: Class<'db>,
+}
+
+impl<'db> SubclassOfType<'db> {
+    fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        self.class.class_member(db, name)
     }
 }
 
@@ -2463,7 +2602,10 @@ mod tests {
         StringLiteral(&'static str),
         LiteralString,
         BytesLiteral(&'static str),
+        // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
         BuiltinInstance(&'static str),
+        // BuiltinClassLiteral("str") corresponds to the builtin `str` class object itself
+        BuiltinClassLiteral(&'static str),
         Union(Vec<Ty>),
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
@@ -2483,6 +2625,7 @@ mod tests {
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
                 Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
+                Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -2569,6 +2712,8 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("str")], neg: vec![Ty::StringLiteral("foo")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
+    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("int"))]
+    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinInstance("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -2594,6 +2739,8 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]}, Ty::Intersection{pos: vec![], neg: vec![Ty::BuiltinInstance("int")]})]
     #[test_case(Ty::BuiltinInstance("int"), Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(3)]})]
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(1)]})]
+    #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("object"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinClassLiteral("int"))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -2605,24 +2752,43 @@ mod tests {
         db.write_dedented(
             "/src/module.py",
             "
-            class A: ...
-            class B: ...
-            U = A if flag else B
+            class Base: ...
+            class Derived(Base): ...
+            class Unrelated: ...
+            U = Base if flag else Unrelated
         ",
         )
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
-        let type_a = super::global_symbol(&db, module, "A").expect_type();
-        let type_u = super::global_symbol(&db, module, "U").expect_type();
+        // `literal_base` represents `Literal[Base]`.
+        let literal_base = super::global_symbol(&db, module, "Base").expect_type();
+        let literal_derived = super::global_symbol(&db, module, "Derived").expect_type();
+        let u = super::global_symbol(&db, module, "U").expect_type();
 
-        assert!(type_a.is_class_literal());
-        assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
-        assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
+        assert!(literal_base.is_class_literal());
+        assert!(literal_base.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
+        assert!(literal_base.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
 
-        assert!(type_u.is_union());
-        assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
-        assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
+        assert!(literal_derived.is_class_literal());
+
+        // `subclass_of_base` represents `Type[Base]`.
+        let subclass_of_base =
+            Type::SubclassOf(literal_base.expect_class_literal().to_subclass_of_type());
+        assert!(literal_base.is_subtype_of(&db, subclass_of_base));
+        assert!(literal_derived.is_subtype_of(&db, subclass_of_base));
+
+        let subclass_of_derived =
+            Type::SubclassOf(literal_derived.expect_class_literal().to_subclass_of_type());
+        assert!(literal_derived.is_subtype_of(&db, subclass_of_derived));
+        assert!(!literal_base.is_subtype_of(&db, subclass_of_derived));
+
+        // Type[Derived] <: Type[Base]
+        assert!(subclass_of_derived.is_subtype_of(&db, subclass_of_base));
+
+        assert!(u.is_union());
+        assert!(u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
+        assert!(u.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
     }
 
     #[test]
@@ -2748,6 +2914,42 @@ mod tests {
         assert!(type_u.is_union());
 
         assert!(!type_a.is_disjoint_from(&db, type_u));
+    }
+
+    #[test]
+    fn is_disjoint_type_type() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+        ",
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let literal_a = super::global_symbol(&db, module, "A").expect_type();
+        let literal_b = super::global_symbol(&db, module, "B").expect_type();
+
+        let subclass_of_a =
+            Type::SubclassOf(literal_a.expect_class_literal().to_subclass_of_type());
+        let subclass_of_b =
+            Type::SubclassOf(literal_b.expect_class_literal().to_subclass_of_type());
+
+        // Class literals are always disjoint. They are singleton types
+        assert!(literal_a.is_disjoint_from(&db, literal_b));
+
+        // The class A is a subclass of A, so A is not disjoint from type[A]
+        assert!(!literal_a.is_disjoint_from(&db, subclass_of_a));
+
+        // The class A is disjoint from type[B] because it's not a subclass
+        // of B:
+        assert!(literal_a.is_disjoint_from(&db, subclass_of_b));
+
+        // However, type[A] is not disjoint from type[B], as there could be
+        // classes that inherit from both A and B:
+        assert!(!subclass_of_a.is_disjoint_from(&db, subclass_of_b));
     }
 
     #[test_case(Ty::None)]
