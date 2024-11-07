@@ -2570,7 +2570,7 @@ mod tests {
         BytesLiteral(&'static str),
         // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
         BuiltinInstance(&'static str),
-        // BuiltinClassLiteral("str") corresponds to the builtin `str` class itself
+        // BuiltinClassLiteral("str") corresponds to the builtin `str` class object itself
         BuiltinClassLiteral(&'static str),
         Union(Vec<Ty>),
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
