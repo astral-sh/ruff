@@ -53,7 +53,7 @@ PYI021.pyi:7:5: PYI021 [*] Docstrings should not be included in stubs
 5 5 | 
 6 6 | class Bar:
 7   |-    """bar"""  # ERROR PYI021
-  7 |+    pass  # ERROR PYI021
+  7 |+    ...  # ERROR PYI021
 8 8 | 
 9 9 | class Qux:
 10 10 |     """qux"""  # ERROR PYI021
