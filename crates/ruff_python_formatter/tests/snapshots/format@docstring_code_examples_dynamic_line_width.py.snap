@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_code_examples_dynamic_line_width.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -2831,6 +2832,19 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
+@@ -676,9 +676,9 @@
+ 	...         def __init__(self, df: pl.DataFrame):
+ 	...                 self._df = df
+ 	...
+-	...         def by_first_letter_of_column_values(
+-	...                 self, col: str
+-	...         ) -> list[pl.DataFrame]:
++	...         def by_first_letter_of_column_values(self, col: str) -> list[
++	...                 pl.DataFrame
++	...         ]:
+ 	...                 return [
+ 	...                         self._df.filter(pl.col(col).str.starts_with(c))
+ 	...                         for c in sorted(
 @@ -700,9 +700,11 @@
  
  		Examples

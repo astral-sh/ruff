@@ -1,0 +1,73 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/typed_params_trailing_comma.py
+snapshot_kind: text
+---
+## Input
+
+```python
+def long_function_name_goes_here(
+    x: Callable[List[int]]
+) -> Union[List[int], float, str, bytes, Tuple[int]]:
+    pass
+
+
+def long_function_name_goes_here(
+    x: Callable[[str, Any], int]
+) -> Union[List[int], float, str, bytes, Tuple[int]]:
+    pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,10 +1,10 @@
+-def long_function_name_goes_here(
+-    x: Callable[List[int]],
+-) -> Union[List[int], float, str, bytes, Tuple[int]]:
++def long_function_name_goes_here(x: Callable[List[int]]) -> Union[
++    List[int], float, str, bytes, Tuple[int]
++]:
+     pass
+ 
+ 
+-def long_function_name_goes_here(
+-    x: Callable[[str, Any], int],
+-) -> Union[List[int], float, str, bytes, Tuple[int]]:
++def long_function_name_goes_here(x: Callable[[str, Any], int]) -> Union[
++    List[int], float, str, bytes, Tuple[int]
++]:
+     pass
+```
+
+## Ruff Output
+
+```python
+def long_function_name_goes_here(x: Callable[List[int]]) -> Union[
+    List[int], float, str, bytes, Tuple[int]
+]:
+    pass
+
+
+def long_function_name_goes_here(x: Callable[[str, Any], int]) -> Union[
+    List[int], float, str, bytes, Tuple[int]
+]:
+    pass
+```
+
+## Black Output
+
+```python
+def long_function_name_goes_here(
+    x: Callable[List[int]],
+) -> Union[List[int], float, str, bytes, Tuple[int]]:
+    pass
+
+
+def long_function_name_goes_here(
+    x: Callable[[str, Any], int],
+) -> Union[List[int], float, str, bytes, Tuple[int]]:
+    pass
+```

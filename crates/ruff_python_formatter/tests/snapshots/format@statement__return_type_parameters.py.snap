@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return_type_parameters.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -418,7 +419,27 @@ def test_return_multiline_string_binary_expression_return_type_annotation(
 ```diff
 --- Stable
 +++ Preview
-@@ -82,13 +82,13 @@
+@@ -58,17 +58,13 @@
+ #########################################################################################
+ 
+ 
+-def test_return_multiline_string_type_annotation(
+-    a,
+-) -> """str
++def test_return_multiline_string_type_annotation(a) -> """str
+     | list[str]
+ """:
+     pass
+ 
+ 
+-def test_return_multiline_string_binary_expression_return_type_annotation(
+-    a,
+-) -> (
++def test_return_multiline_string_binary_expression_return_type_annotation(a) -> (
+     """str
+     | list[str]
+ """
+@@ -82,13 +78,13 @@
  #########################################################################################
  
  
@@ -434,4 +455,63 @@ def test_return_multiline_string_binary_expression_return_type_annotation(
      pass
  
  
+@@ -110,40 +106,32 @@
+ 
+ 
+ # Unlike with no-parameters, the return type gets never parenthesized.
+-def parameters_overlong_subscript_return_type_with_single_element(
+-    a,
+-) -> list[xxxxxxxxxxxxxxxxxxxxx]:
++def parameters_overlong_subscript_return_type_with_single_element(a) -> list[
++    xxxxxxxxxxxxxxxxxxxxx
++]:
+     pass
+ 
+ 
+-def parameters_subscript_return_type_multiple_elements(
+-    a,
+-) -> list[
++def parameters_subscript_return_type_multiple_elements(a) -> list[
+     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ ]:
+     pass
+ 
+ 
+-def parameters_subscript_return_type_multiple_overlong_elements(
+-    a,
+-) -> list[
++def parameters_subscript_return_type_multiple_overlong_elements(a) -> list[
+     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+ ]:
+     pass
+ 
+ 
+-def parameters_subscriptreturn_type_with_overlong_value_(
+-    a,
+-) -> liiiiiiiiiiiiiiiiiiiiist[
++def parameters_subscriptreturn_type_with_overlong_value_(a) -> liiiiiiiiiiiiiiiiiiiiist[
+     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ ]:
+     pass
+ 
+ 
+-def parameters_overlong_subscript_return_type_with_overlong_single_element(
+-    a,
+-) -> list[
++def parameters_overlong_subscript_return_type_with_overlong_single_element(a) -> list[
+     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ ]:
+     pass
+@@ -185,9 +173,7 @@
+ 
+ 
+ # Black only splits the return type. Ruff also breaks the parameters. This is probably a bug.
+-def parameters_subscriptreturn_type_with_overlong_value_(
+-    a,
+-) -> liiiiiiiiiiiiiiiiiiiiist[
++def parameters_subscriptreturn_type_with_overlong_value_(a) -> liiiiiiiiiiiiiiiiiiiiist[
+     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+ ]:
 ```

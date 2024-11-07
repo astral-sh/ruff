@@ -9,8 +9,9 @@ use crate::comments::{
     trailing_comments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::parentheses::empty_parenthesized;
+use crate::expression::parentheses::{empty_parenthesized, parenthesized};
 use crate::prelude::*;
+use crate::preview::is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum ParametersParentheses {
@@ -249,30 +250,46 @@ impl FormatNodeRule<Parameters> for FormatParameters {
         } else if num_parameters == 1 && posonlyargs.is_empty() && kwonlyargs.is_empty() {
             // If we have a single argument, avoid the inner group, to ensure that we insert a
             // trailing comma if the outer group breaks.
-            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-            write!(
-                f,
-                [
-                    token("("),
-                    dangling_open_parenthesis_comments(parenthesis_dangling),
-                    soft_block_indent(&format_inner),
-                    token(")")
-                ]
-            )
+            if is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
+                f.context(),
+            ) {
+                parenthesized("(", &format_inner, ")")
+                    .with_dangling_comments(parenthesis_dangling)
+                    .fmt(f)
+            } else {
+                let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+                write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_block_indent(&format_inner),
+                        token(")")
+                    ]
+                )
+            }
         } else {
-            // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
-            // We want parameters to be grouped alongside return types, one level up, so we
-            // format them "inline" here.
-            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-            write!(
-                f,
-                [
-                    token("("),
-                    dangling_open_parenthesis_comments(parenthesis_dangling),
-                    soft_block_indent(&group(&format_inner)),
-                    token(")")
-                ]
-            )
+            if is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
+                f.context(),
+            ) {
+                parenthesized("(", &group(&format_inner), ")")
+                    .with_dangling_comments(parenthesis_dangling)
+                    .fmt(f)
+            } else {
+                // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
+                // We want parameters to be grouped alongside return types, one level up, so we
+                // format them "inline" here.
+                let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+                write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_block_indent(&group(&format_inner)),
+                        token(")")
+                    ]
+                )
+            }
         }
     }
 }

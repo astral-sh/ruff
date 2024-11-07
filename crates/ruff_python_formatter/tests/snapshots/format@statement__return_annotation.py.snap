@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return_annotation.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -525,7 +526,27 @@ def process_board_action(
 ```diff
 --- Stable
 +++ Preview
-@@ -131,32 +131,24 @@
+@@ -70,17 +70,13 @@
+     return 2 * a
+ 
+ 
+-def double(
+-    a: int,
+-) -> (  # Hello
++def double(a: int) -> (  # Hello
+     int
+ ):
+     return 2 * a
+ 
+ 
+-def double(
+-    a: int,
+-) -> (  # Hello
++def double(a: int) -> (  # Hello
+ ):
+     return 2 * a
+ 
+@@ -131,51 +127,37 @@
  
  # Breaking return type annotations. Black adds parentheses if the parameters are
  # empty; otherwise, it leverages the expressions own parentheses if possible.
@@ -569,8 +590,77 @@ def process_board_action(
 +]: ...
  
  
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-@@ -257,11 +249,8 @@
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+-    x,
+-) -> Set[
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> Set[
+     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ ]: ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+-    x,
+-) -> Set[
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> Set[
+     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ ]: ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+-    *args,
+-) -> Set[
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(*args) -> Set[
+     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ ]: ...
+ 
+@@ -220,9 +202,9 @@
+ ): ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+-    x,
+-) -> X + Y + foooooooooooooooooooooooooooooooooooo(): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
++    X + Y + foooooooooooooooooooooooooooooooooooo()
++): ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+@@ -230,9 +212,9 @@
+ ): ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+-    x,
+-) -> X and Y and foooooooooooooooooooooooooooooooooooo(): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
++    X and Y and foooooooooooooooooooooooooooooooooooo()
++): ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+@@ -240,9 +222,9 @@
+ ): ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+-    x,
+-) -> X | Y | foooooooooooooooooooooooooooooooooooo(): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
++    X | Y | foooooooooooooooooooooooooooooooooooo()
++): ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+@@ -250,58 +232,43 @@
+ ): ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+-    x,
+-) -> (
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
+     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
  ): ...
  
  
@@ -584,4 +674,60 @@ def process_board_action(
  ):
      return 2 * a
  
+ 
+ # Dangling comments on return annotations.
+-def double(
+-    a: int,
+-) -> (
++def double(a: int) -> (
+     int  # Hello
+ ):
+     return 2 * a
+ 
+ 
+-def double(
+-    a: int,
+-) -> (
++def double(a: int) -> (
+     foo.bar  # Hello
+ ):
+     return 2 * a
+ 
+ 
+-def double(
+-    a: int,
+-) -> (
++def double(a: int) -> (
+     [int]  # Hello
+ ):
+     return 2 * a
+ 
+ 
+-def double(
+-    a: int,
+-) -> (
++def double(a: int) -> (
+     int | list[int]  # Hello
+ ):
+     pass
+ 
+ 
+-def double(
+-    a: int,
+-) -> (
++def double(a: int) -> (
+     int
+     | list[
+         int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int
+@@ -310,7 +277,7 @@
+     pass
+ 
+ 
+-def process_board_action(
+-    payload: WildValue, action_type: Optional[str]
+-) -> Optional[Tuple[str, str]]:
++def process_board_action(payload: WildValue, action_type: Optional[str]) -> Optional[
++    Tuple[str, str]
++]:
+     pass
 ```
