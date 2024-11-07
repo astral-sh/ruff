@@ -61,7 +61,7 @@ pub(crate) fn docstring_in_stubs(
     let edit = if statements.len() == 1 {
         Edit::range_replacement("...".to_string(), range)
     } else {
-        Edit::deletion(range.start(), range.end())
+        Edit::range_deletion(range)
     };
 
     let fix = Fix::unsafe_edit(edit);
