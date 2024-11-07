@@ -42,11 +42,3 @@ A002.py:5:17: A002 Argument `bytes` is shadowing a Python builtin
   |                 ^^^^^ A002
 6 |     pass
   |
-
-A002.py:13:16: A002 Argument `float` is shadowing a Python builtin
-   |
-13 | map([], lambda float: ...)
-   |                ^^^^^ A002
-14 | 
-15 | from typing import override, overload
-   |

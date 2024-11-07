@@ -56,11 +56,3 @@ A002.py:9:21: A002 Argument `dir` is shadowing a Python builtin
    |                     ^^^ A002
 10 |     pass
    |
-
-A002.py:13:16: A002 Argument `float` is shadowing a Python builtin
-   |
-13 | map([], lambda float: ...)
-   |                ^^^^^ A002
-14 | 
-15 | from typing import override, overload
-   |
