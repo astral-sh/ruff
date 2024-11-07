@@ -335,7 +335,7 @@ pub enum Type<'db> {
     SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
-    /// A specific symbol that is special enough at runtime to be treated as its own type
+    /// A single Python object that requires special treatment in the type system
     KnownInstance(KnownInstanceType),
     /// The set of objects in any of the types in the union
     Union(UnionType<'db>),
