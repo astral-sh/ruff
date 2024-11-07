@@ -1618,8 +1618,10 @@ impl<'db> KnownClass {
     }
 }
 
+/// Enumeration of specific runtime that are special enough to be considered their own type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KnownInstanceType {
+    /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
     // TODO: fill this enum out with more special forms, etc.
 }
@@ -1638,18 +1640,25 @@ impl KnownInstanceType {
         }
     }
 
+    /// Return the repr of the symbol at runtime
     pub const fn repr(self) -> &'static str {
         match self {
             Self::Literal => "typing.Literal",
         }
     }
 
+    /// Return the [`KnownClass`] which this symbol is an instance of
     pub const fn class(self) -> KnownClass {
         match self {
             Self::Literal => KnownClass::SpecialForm,
         }
     }
 
+    /// Return the instance type which this type is a subtype of.
+    ///
+    /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
+    /// so `KnownInstanceType::Literal.instance_fallback(db)`
+    /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
     pub fn instance_fallback(self, db: &dyn Db) -> Type {
         self.class().to_instance(db)
     }
@@ -2491,15 +2500,6 @@ impl<'db> SubclassOfType<'db> {
 }
 
 /// A type representing the set of runtime objects which are instances of a certain class.
-///
-/// Some specific instances of some types need to be treated specially by the type system:
-/// for example, various special forms are instances of `typing._SpecialForm`,
-/// but need to be handled differently in annotations. These special instances are marked as such
-/// using the `known` field on this struct.
-///
-/// Note that, for example, `InstanceType { class: typing._SpecialForm, known: None }`
-/// is a supertype of `InstanceType { class: typing._SpecialForm, known: KnownInstance::Literal }`.
-/// The two types are not disjoint.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InstanceType<'db> {
     class: Class<'db>,
