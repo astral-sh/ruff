@@ -70,39 +70,39 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
         return;
     };
 
-    if bases.len() == 0 {
+    if bases.len() != 1 {
         return;
     }
 
-    for base in bases {
-        let Some(symbol) = checker.semantic().resolve_builtin_symbol(base) else {
-            continue;
-        };
+    let base = &bases[0];
 
-        let Some(supported_builtin) = SupportedBuiltins::from_symbol(symbol) else {
-            continue;
-        };
+    let Some(symbol) = checker.semantic().resolve_builtin_symbol(base) else {
+        return;
+    };
 
-        let user_symbol = supported_builtin.user_symbol();
+    let Some(supported_builtin) = SupportedBuiltins::from_symbol(symbol) else {
+        return;
+    };
 
-        let mut diagnostic = Diagnostic::new(
-            SubclassBuiltin {
-                subclass: symbol.to_string(),
-                replacement: user_symbol.to_string(),
-            },
-            base.range(),
-        );
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from("collections", user_symbol),
-                base.start(),
-                checker.semantic(),
-            )?;
-            let other_edit = Edit::range_replacement(binding, base.range());
-            Ok(Fix::unsafe_edits(import_edit, [other_edit]))
-        });
-        checker.diagnostics.push(diagnostic);
-    }
+    let user_symbol = supported_builtin.user_symbol();
+
+    let mut diagnostic = Diagnostic::new(
+        SubclassBuiltin {
+            subclass: symbol.to_string(),
+            replacement: user_symbol.to_string(),
+        },
+        base.range(),
+    );
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import_from("collections", user_symbol),
+            base.start(),
+            checker.semantic(),
+        )?;
+        let other_edit = Edit::range_replacement(binding, base.range());
+        Ok(Fix::unsafe_edits(import_edit, [other_edit]))
+    });
+    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

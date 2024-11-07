@@ -23,7 +23,15 @@ class L(list):
 class S(str):
     pass
 
+# currently not detected
 class SetOnceDict(SetOnceMappingMixin, dict):
+    pass
+
+# negatives
+class C:
+    pass
+
+class I(int):
     pass
 
 class ActivityState(str, Enum, metaclass=CaseInsensitiveEnumMeta):
@@ -32,10 +40,3 @@ class ActivityState(str, Enum, metaclass=CaseInsensitiveEnumMeta):
     """
     ACTIVE = "Active"
     INACTIVE = "Inactive"
-
-# negatives
-class C:
-    pass
-
-class I(int):
-    pass
