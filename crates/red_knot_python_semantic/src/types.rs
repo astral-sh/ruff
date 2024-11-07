@@ -1944,7 +1944,7 @@ impl<'db> NotCallableError<'db> {
     /// The resolved type that was not callable.
     ///
     /// For unions, returns the union type itself, which may contain a mix of callable and
-    /// non-callable types. Return `Unknown` if the callable was an unbound symbol.
+    /// non-callable types.
     fn called_ty(&self) -> Type<'db> {
         match self {
             Self::Type {
