@@ -58,8 +58,8 @@ use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassErrorKind, SliceLiteralType, StringLiteralType, Symbol, Truthiness,
-    TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
+    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, StringLiteralType,
+    Symbol, Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -520,18 +520,50 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Err(metaclass_error) = class.try_metaclass(self.db) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Conflict {
-                        metaclass1,
-                        metaclass2
-                    } => self.diagnostics.add(
-                        class.node(self.db).into(),
-                        "conflicting-metaclass",
-                        format_args!(
-                            "The metaclass of a derived class (`{}`) must be a subclass of the metaclasses of all its bases, but `{}` and `{}` have no subclass relationship",
-                            class.name(self.db),
-                            metaclass1.name(self.db),
-                            metaclass2.name(self.db),
-                        ),
-                    ),
+                        candidate1:
+                            MetaclassCandidate {
+                                metaclass: metaclass1,
+                                explicit_metaclass_of: class1,
+                            },
+                        candidate2:
+                            MetaclassCandidate {
+                                metaclass: metaclass2,
+                                explicit_metaclass_of: class2,
+                            },
+                        candidate1_is_base_class,
+                    } => {
+                        let node = class.node(self.db).into();
+                        if *candidate1_is_base_class {
+                            self.diagnostics.add(
+                                node,
+                                "conflicting-metaclass",
+                                format_args!(
+                                    "The metaclass of a derived class (`{class}`) must be a subclass of the metaclasses of all its bases, \
+                                    but `{metaclass1}` (metaclass of base class `{base1}`) and `{metaclass2}` (metaclass of base class `{base2}`) \
+                                    have no subclass relationship",
+                                    class = class.name(self.db),
+                                    metaclass1 = metaclass1.name(self.db),
+                                    base1 = class1.name(self.db),
+                                    metaclass2 = metaclass2.name(self.db),
+                                    base2 = class2.name(self.db),
+                                )
+                            );
+                        } else {
+                            self.diagnostics.add(
+                                node,
+                                "conflicting-metaclass",
+                                format_args!(
+                                    "The metaclass of a derived class (`{class}`) must be a subclass of the metaclasses of all its bases, \
+                                    but `{metaclass_of_class}` (metaclass of `{class}`) and `{metaclass_of_base}` (metaclass of base class `{base}`) \
+                                    have no subclass relationship",
+                                    class = class.name(self.db),
+                                    metaclass_of_class = metaclass1.name(self.db),
+                                    metaclass_of_base = metaclass2.name(self.db),
+                                    base = class2.name(self.db),
+                                )
+                            );
+                        }
+                    }
                     MetaclassErrorKind::CyclicDefinition => {
                         // Cyclic class definition diagnostic will already have been emitted above
                         // in MRO calculation.

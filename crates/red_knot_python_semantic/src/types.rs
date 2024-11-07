@@ -2345,15 +2345,22 @@ impl<'db> Class<'db> {
                 .filter_map(Type::into_class_literal);
 
             // Identify the class's own metaclass (or take the first base class's metaclass).
-            let metaclass = if let Some(metaclass) = class.explicit_metaclass(db) {
-                metaclass
+            let explicit_metaclass = class.explicit_metaclass(db);
+            let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass
+            {
+                (metaclass, class)
             } else if let Some(base_class) = base_classes.next() {
-                safe_recurse(base_class.class)?
+                (safe_recurse(base_class.class)?, base_class.class)
             } else {
-                KnownClass::Type.to_class(db)
+                (KnownClass::Type.to_class(db), class)
             };
 
-            let Type::ClassLiteral(mut candidate) = metaclass else {
+            let mut candidate = if let Type::ClassLiteral(metaclass_ty) = metaclass {
+                MetaclassCandidate {
+                    metaclass: metaclass_ty.class,
+                    explicit_metaclass_of: class_metaclass_was_from,
+                }
+            } else {
                 // TODO: If the metaclass is not a class, we should verify that it's a callable
                 // which accepts the same arguments as `type.__new__` (otherwise error), and return
                 // the meta-type of its return type. (And validate that is a class type?)
@@ -2370,22 +2377,31 @@ impl<'db> Class<'db> {
                 let Type::ClassLiteral(metaclass) = metaclass else {
                     continue;
                 };
-                if metaclass.class.is_subclass_of(db, candidate.class) {
-                    candidate = metaclass;
+                if metaclass.class.is_subclass_of(db, candidate.metaclass) {
+                    candidate = MetaclassCandidate {
+                        metaclass: metaclass.class,
+                        explicit_metaclass_of: base_class.class,
+                    };
                     continue;
                 }
-                if candidate.class.is_subclass_of(db, metaclass.class) {
+                if candidate.metaclass.is_subclass_of(db, metaclass.class) {
                     continue;
                 }
                 return Err(MetaclassError {
                     kind: MetaclassErrorKind::Conflict {
-                        metaclass1: candidate.class,
-                        metaclass2: metaclass.class,
+                        candidate1: candidate,
+                        candidate2: MetaclassCandidate {
+                            metaclass: metaclass.class,
+                            explicit_metaclass_of: base_class.class,
+                        },
+                        candidate1_is_base_class: explicit_metaclass.is_none(),
                     },
                 });
             }
 
-            Ok(Type::ClassLiteral(candidate))
+            Ok(Type::ClassLiteral(ClassLiteralType {
+                class: candidate.metaclass,
+            }))
         }
 
         infer(db, self, &mut SeenSet::new(self))
@@ -2435,6 +2451,12 @@ impl<'db> Class<'db> {
         let scope = self.body_scope(db);
         symbol(db, scope, name)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MetaclassCandidate<'db> {
+    metaclass: Class<'db>,
+    explicit_metaclass_of: Class<'db>,
 }
 
 /// A utility struct for detecting duplicates in class hierarchies while storing the initial
@@ -2541,8 +2563,9 @@ pub(super) enum MetaclassErrorKind<'db> {
     /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
     /// its bases.
     Conflict {
-        metaclass1: Class<'db>,
-        metaclass2: Class<'db>,
+        candidate1: MetaclassCandidate<'db>,
+        candidate2: MetaclassCandidate<'db>,
+        candidate1_is_base_class: bool,
     },
     /// The class inherits from itself!
     ///
