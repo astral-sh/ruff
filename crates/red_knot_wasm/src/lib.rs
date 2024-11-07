@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
@@ -110,14 +111,20 @@ impl Workspace {
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
-        Ok(result)
+        Ok(result
+            .into_iter()
+            .map(|diagnostic| diagnostic.display(&self.db).to_string())
+            .collect())
     }
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<String>, Error> {
         let result = self.db.check().map_err(into_error)?;
 
-        Ok(result)
+        Ok(result
+            .into_iter()
+            .map(|diagnostic| diagnostic.display(&self.db).to_string())
+            .collect())
     }
 
     /// Returns the parsed AST for `path`
