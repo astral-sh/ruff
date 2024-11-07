@@ -1279,6 +1279,7 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::anonymous_instance(*class),
+            Type::Type(ClassLiteralType { class }) => Type::anonymous_instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
@@ -1294,7 +1295,6 @@ impl<'db> Type<'db> {
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::LiteralString => Type::Unknown,
-            Type::Type(..) => Type::Unknown,
         }
     }
 
