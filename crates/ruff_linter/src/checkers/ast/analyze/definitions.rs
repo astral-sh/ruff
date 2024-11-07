@@ -155,7 +155,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
 
         // flake8-pyi
         if enforce_stubs {
-            flake8_pyi::rules::docstring_in_stubs(checker, docstring);
+            flake8_pyi::rules::docstring_in_stubs(checker, definition, docstring);
         }
         if enforce_stubs_and_runtime {
             flake8_pyi::rules::iter_method_return_iterable(checker, definition);
