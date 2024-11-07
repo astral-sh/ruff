@@ -306,5 +306,5 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
             | "_ignore_"
             | "_order_"
             | "_generate_next_value_"
-    ) || method.starts_with("_repr_")
+    )
 }
