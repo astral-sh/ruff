@@ -1180,7 +1180,7 @@ impl<'db> Type<'db> {
 
     /// Return the outcome of calling an object of this type.
     #[must_use]
-    pub(crate) fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
+    fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
             Type::FunctionLiteral(function_type) => {
@@ -1264,7 +1264,7 @@ impl<'db> Type<'db> {
     }
 
     /// Look up a dunder method on the meta type of `self` and call it.
-    pub(crate) fn call_dunder(
+    fn call_dunder(
         self,
         db: &'db dyn Db,
         name: &str,
@@ -1655,7 +1655,7 @@ impl KnownInstance {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum CallOutcome<'db> {
+enum CallOutcome<'db> {
     Callable {
         return_ty: Type<'db>,
     },
@@ -1706,8 +1706,8 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
-    /// Get the return type of the call, or `None` if not callable or (possibly) unbound.
-    pub(crate) fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    /// Get the return type of the call, or `None` if not callable
+    fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::Callable { return_ty } => Some(*return_ty),
             Self::RevealType {
@@ -1889,7 +1889,7 @@ impl<'db> CallOutcome<'db> {
     }
 }
 
-pub(crate) enum CallDunderResult<'db> {
+enum CallDunderResult<'db> {
     CallOutcome(CallOutcome<'db>),
     PossiblyUnbound(CallOutcome<'db>),
     MethodNotAvailable,
