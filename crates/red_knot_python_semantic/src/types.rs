@@ -538,8 +538,17 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(self_class), Type::SubclassOf(target_class)) => {
                 self_class.class.is_subclass_of(db, target_class.class)
             }
-            (Type::SubclassOf(..), Type::Instance(InstanceType { class, .. }))
-                if class.is_known(db, KnownClass::Type) =>
+            (
+                Type::SubclassOf(SubclassOfType { class: self_class }),
+                Type::Instance(InstanceType {
+                    class: target_class,
+                    ..
+                }),
+            ) if self_class
+                .metaclass(db)
+                .into_class_literal()
+                .map(|meta| meta.class.is_subclass_of(db, target_class))
+                .unwrap_or(false) =>
             {
                 true
             }
@@ -711,7 +720,33 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
                 false
             }
-            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => false,
+            (
+                Type::SubclassOf(_),
+                Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..),
+            )
+            | (
+                Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..),
+                Type::SubclassOf(_),
+            ) => true,
+            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
+                // TODO: Once we have support for final classes, we can determine disjointness in some cases
+                // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
+                // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
+                // final classes inside `Type::SubclassOf` everywhere.
+                false
+            }
             (
                 Type::Instance(InstanceType {
                     class: class_none, ..
