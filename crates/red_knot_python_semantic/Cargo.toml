@@ -49,6 +49,11 @@ anyhow = { workspace = true }
 dir-test = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
+quickcheck = { version = "1.0.3" }
+quickcheck_macros = { version = "1.0.0" }
 
 [lints]
 workspace = true
+
+[features]
+property_tests = []
