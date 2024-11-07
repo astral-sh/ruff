@@ -72,7 +72,7 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
 
     let [base] = &**bases else {
         return;
-    }
+    };
 
     let Some(symbol) = checker.semantic().resolve_builtin_symbol(base) else {
         return;
