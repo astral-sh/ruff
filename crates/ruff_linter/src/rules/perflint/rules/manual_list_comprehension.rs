@@ -84,9 +84,9 @@ impl Violation for ManualListComprehension {
     fn fix_title(&self) -> Option<String> {
         match self.comprehension_type? {
             ComprehensionType::ListComprehension => {
-                Some(format!("Replace for loop with list comprehension"))
+                Some("Replace for loop with list comprehension".to_string())
             }
-            ComprehensionType::Extend => Some(format!("Replace for loop with list.extend")),
+            ComprehensionType::Extend => Some("Replace for loop with list.extend".to_string()),
         }
     }
 }
