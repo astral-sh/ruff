@@ -1219,28 +1219,28 @@ impl<'db> Type<'db> {
                     .to_meta_type(db)
                     .call_dunder(db, "__call__", &args)
                 {
-                    CallOutcome::NotCallable { .. } => {
+                    CallDunderResult::CallOutcome(CallOutcome::NotCallable { .. }) => {
                         // Turn "`<type of illegal '__call__'>` not callable" into
                         // "`X` not callable"
                         CallOutcome::NotCallable {
                             not_callable_ty: self,
                         }
                     }
-                    CallOutcome::PossiblyUnbound { return_ty, .. } => {
+                    CallDunderResult::CallOutcome(outcome) => outcome,
+                    CallDunderResult::PossiblyUnbound(call_outcome) => {
                         // Turn "possibly unbound object of type `Literal['__call__']`"
                         // into "`X` not callable (possibly unbound `__call__` method)"
                         CallOutcome::PossiblyUnboundDunderCall {
-                            callable_ty: self,
-                            return_ty,
+                            called_ty: self,
+                            call_outcome: Box::new(call_outcome),
                         }
                     }
-                    CallOutcome::Unbound => {
+                    CallDunderResult::MethodNotAvailable => {
                         // Turn "`X.__call__` unbound" into "`X` not callable"
                         CallOutcome::NotCallable {
                             not_callable_ty: self,
                         }
                     }
-                    other => other,
                 }
             }
 
@@ -1271,19 +1271,15 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: &str,
         arg_types: &[Type<'db>],
-    ) -> CallOutcome<'db> {
-        // self.into
-
+    ) -> CallDunderResult<'db> {
         match self.member(db, name) {
-            Symbol::Type(callable_ty, Boundness::Bound) => callable_ty.call(db, arg_types),
-            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
-                let return_ty = callable_ty.call(db, arg_types).return_ty(db);
-                CallOutcome::PossiblyUnbound {
-                    callable_ty,
-                    return_ty,
-                }
+            Symbol::Type(callable_ty, Boundness::Bound) => {
+                CallDunderResult::CallOutcome(callable_ty.call(db, arg_types))
             }
-            Symbol::Unbound => CallOutcome::Unbound,
+            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
+                CallDunderResult::PossiblyUnbound(callable_ty.call(db, arg_types))
+            }
+            Symbol::Unbound => CallDunderResult::MethodNotAvailable,
         }
     }
 
@@ -1673,18 +1669,13 @@ pub(crate) enum CallOutcome<'db> {
     NotCallable {
         not_callable_ty: Type<'db>,
     },
-    PossiblyUnbound {
-        callable_ty: Type<'db>,
-        return_ty: Option<Type<'db>>,
-    },
-    PossiblyUnboundDunderCall {
-        callable_ty: Type<'db>,
-        return_ty: Option<Type<'db>>,
-    },
-    Unbound,
     Union {
         called_ty: Type<'db>,
         outcomes: Box<[CallOutcome<'db>]>,
+    },
+    PossiblyUnboundDunderCall {
+        called_ty: Type<'db>,
+        call_outcome: Box<CallOutcome<'db>>,
     },
 }
 
@@ -1727,9 +1718,6 @@ impl<'db> CallOutcome<'db> {
                 revealed_ty: _,
             } => Some(*return_ty),
             Self::NotCallable { not_callable_ty: _ } => None,
-            Self::PossiblyUnbound { .. } => None,
-            Self::PossiblyUnboundDunderCall { .. } => None,
-            Self::Unbound => None,
             Self::Union {
                 outcomes,
                 called_ty: _,
@@ -1746,6 +1734,7 @@ impl<'db> CallOutcome<'db> {
                     }
                 })
                 .map(UnionBuilder::build),
+            Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
         }
     }
 
@@ -1804,37 +1793,19 @@ impl<'db> CallOutcome<'db> {
                 );
                 return_ty
             }
-            Err(NotCallableError::PossiblyUnbound {
-                called_ty: callable_ty,
-                return_ty,
-            }) => {
-                diagnostics.add(
-                    node,
-                    "call-possibly-unbound",
-                    format_args!(
-                        "Object of type `{}` is possibly unbound",
-                        callable_ty.display(db)
-                    ),
-                );
-                return_ty.unwrap_or(Type::Unknown)
-            }
             Err(NotCallableError::PossiblyUnboundDunderCall {
-                called_ty: callable_ty,
+                callable_ty: called_ty,
                 return_ty,
             }) => {
                 diagnostics.add(
                     node,
-                    "call-possibly-unbound",
+                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                        callable_ty.display(db)
+                        called_ty.display(db)
                     ),
                 );
-                return_ty.unwrap_or(Type::Unknown)
-            }
-            Err(NotCallableError::Unbound) => {
-                diagnostics.add(node, "call-unbound", format_args!("Object is not callable"));
-                Type::Unknown
+                return_ty
             }
         }
     }
@@ -1863,21 +1834,13 @@ impl<'db> CallOutcome<'db> {
                 not_callable_ty: *not_callable_ty,
                 return_ty: Type::Unknown,
             }),
-            Self::PossiblyUnbound {
-                callable_ty,
-                return_ty,
-            } => Err(NotCallableError::PossiblyUnbound {
-                called_ty: *callable_ty,
-                return_ty: *return_ty,
-            }),
             Self::PossiblyUnboundDunderCall {
-                callable_ty,
-                return_ty,
+                called_ty,
+                call_outcome,
             } => Err(NotCallableError::PossiblyUnboundDunderCall {
-                called_ty: *callable_ty,
-                return_ty: *return_ty,
+                callable_ty: *called_ty,
+                return_ty: call_outcome.return_ty(db).unwrap_or(Type::Unknown),
             }),
-            Self::Unbound => Err(NotCallableError::Unbound),
             Self::Union {
                 outcomes,
                 called_ty,
@@ -1929,6 +1892,22 @@ impl<'db> CallOutcome<'db> {
     }
 }
 
+pub(crate) enum CallDunderResult<'db> {
+    CallOutcome(CallOutcome<'db>),
+    PossiblyUnbound(CallOutcome<'db>),
+    MethodNotAvailable,
+}
+
+impl<'db> CallDunderResult<'db> {
+    fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::CallOutcome(outcome) => outcome.return_ty(db),
+            Self::PossiblyUnbound { .. } => None,
+            Self::MethodNotAvailable => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum NotCallableError<'db> {
     /// The type is not callable.
@@ -1948,15 +1927,10 @@ enum NotCallableError<'db> {
         called_ty: Type<'db>,
         return_ty: Type<'db>,
     },
-    PossiblyUnbound {
-        called_ty: Type<'db>,
-        return_ty: Option<Type<'db>>,
-    },
     PossiblyUnboundDunderCall {
-        called_ty: Type<'db>,
-        return_ty: Option<Type<'db>>,
+        callable_ty: Type<'db>,
+        return_ty: Type<'db>,
     },
-    Unbound,
 }
 
 impl<'db> NotCallableError<'db> {
@@ -1966,9 +1940,7 @@ impl<'db> NotCallableError<'db> {
             Self::Type { return_ty, .. } => *return_ty,
             Self::UnionElement { return_ty, .. } => *return_ty,
             Self::UnionElements { return_ty, .. } => *return_ty,
-            Self::PossiblyUnbound { return_ty, .. } => return_ty.unwrap_or(Type::Unknown),
-            Self::PossiblyUnboundDunderCall { return_ty, .. } => return_ty.unwrap_or(Type::Unknown),
-            Self::Unbound => Type::Unknown,
+            Self::PossiblyUnboundDunderCall { return_ty, .. } => *return_ty,
         }
     }
 
@@ -1983,9 +1955,10 @@ impl<'db> NotCallableError<'db> {
             } => *not_callable_ty,
             Self::UnionElement { called_ty, .. } => *called_ty,
             Self::UnionElements { called_ty, .. } => *called_ty,
-            Self::PossiblyUnbound { called_ty, .. } => *called_ty,
-            Self::PossiblyUnboundDunderCall { called_ty, .. } => *called_ty,
-            Self::Unbound => Type::Unknown,
+            Self::PossiblyUnboundDunderCall {
+                callable_ty: called_ty,
+                ..
+            } => *called_ty,
         }
     }
 }
