@@ -1,15 +1,24 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
-PYI021.pyi:1:1: PYI021 Docstrings should not be included in stubs
+PYI021.pyi:1:1: PYI021 [*] Docstrings should not be included in stubs
   |
 1 | """foo"""  # ERROR PYI021
   | ^^^^^^^^^ PYI021
 2 | 
 3 | def foo():
   |
+  = help: Remove docstring
 
-PYI021.pyi:4:5: PYI021 Docstrings should not be included in stubs
+ℹ Unsafe fix
+1   |-"""foo"""  # ERROR PYI021
+  1 |+  # ERROR PYI021
+2 2 | 
+3 3 | def foo():
+4 4 |     """foo"""  # ERROR PYI021
+
+PYI021.pyi:4:5: PYI021 [*] Docstrings should not be included in stubs
   |
 3 | def foo():
 4 |     """foo"""  # ERROR PYI021
@@ -17,14 +26,81 @@ PYI021.pyi:4:5: PYI021 Docstrings should not be included in stubs
 5 | 
 6 | class Bar:
   |
+  = help: Remove docstring
 
-PYI021.pyi:7:5: PYI021 Docstrings should not be included in stubs
+ℹ Unsafe fix
+1 1 | """foo"""  # ERROR PYI021
+2 2 | 
+3 3 | def foo():
+4   |-    """foo"""  # ERROR PYI021
+  4 |+    pass  # ERROR PYI021
+5 5 | 
+6 6 | class Bar:
+7 7 |     """bar"""  # ERROR PYI021
+
+PYI021.pyi:7:5: PYI021 [*] Docstrings should not be included in stubs
   |
 6 | class Bar:
 7 |     """bar"""  # ERROR PYI021
   |     ^^^^^^^^^ PYI021
 8 | 
-9 | def bar():
+9 | class Qux:
   |
+  = help: Remove docstring
 
+ℹ Unsafe fix
+4 4 |     """foo"""  # ERROR PYI021
+5 5 | 
+6 6 | class Bar:
+7   |-    """bar"""  # ERROR PYI021
+  7 |+    pass  # ERROR PYI021
+8 8 | 
+9 9 | class Qux:
+10 10 |     """qux"""  # ERROR PYI021
 
+PYI021.pyi:10:5: PYI021 [*] Docstrings should not be included in stubs
+   |
+ 9 | class Qux:
+10 |     """qux"""  # ERROR PYI021
+   |     ^^^^^^^^^ PYI021
+11 | 
+12 |     def __init__(self) -> None: ...
+   |
+   = help: Remove docstring
+
+ℹ Unsafe fix
+7  7  |     """bar"""  # ERROR PYI021
+8  8  | 
+9  9  | class Qux:
+10    |-    """qux"""  # ERROR PYI021
+   10 |+      # ERROR PYI021
+11 11 | 
+12 12 |     def __init__(self) -> None: ...
+13 13 | 
+
+PYI021.pyi:15:5: PYI021 [*] Docstrings should not be included in stubs
+   |
+14 |   class Baz:
+15 |       """Multiline docstring
+   |  _____^
+16 | | 
+17 | |     Lorem ipsum dolor sit amet
+18 | |     """
+   | |_______^ PYI021
+19 |   
+20 |       def __init__(self) -> None: ...
+   |
+   = help: Remove docstring
+
+ℹ Unsafe fix
+12 12 |     def __init__(self) -> None: ...
+13 13 | 
+14 14 | class Baz:
+15    |-    """Multiline docstring
+16    |-
+17    |-    Lorem ipsum dolor sit amet
+18    |-    """
+   15 |+    
+19 16 | 
+20 17 |     def __init__(self) -> None: ...
+21 18 |
