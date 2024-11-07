@@ -299,7 +299,7 @@ mod tests {
 
         check_single_comment(&mut diagnostics, text, start_index);
 
-        return diagnostics;
+        diagnostics
     }
 
     fn has_unformatted(text: &str) {
