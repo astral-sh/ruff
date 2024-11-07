@@ -1299,35 +1299,35 @@ impl<'db> Type<'db> {
             return IterationOutcome::Iterable { element_ty: self };
         }
 
-        // `self` represents the type of the iterable;
-        // `__iter__` and `__next__` are both looked up on the class of the iterable:
-        let iterable_meta_type = self.to_meta_type(db);
-
-        let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
-        if let Symbol::Type(dunder_iter_method, boundness) = dunder_iter_method {
-            let Some(iterator_ty) = dunder_iter_method.call(db, &[self]).return_ty(db) else {
-                return IterationOutcome::NotIterable {
-                    not_iterable_ty: self,
+        let dunder_iter_result = self.call_dunder(db, "__iter__", &[self]);
+        match dunder_iter_result {
+            CallDunderResult::CallOutcome(ref call_outcome)
+            | CallDunderResult::PossiblyUnbound(ref call_outcome) => {
+                let Some(iterator_ty) = call_outcome.return_ty(db) else {
+                    return IterationOutcome::NotIterable {
+                        not_iterable_ty: self,
+                    };
                 };
-            };
 
-            return if let Some(element_ty) = iterator_ty
-                .call_dunder(db, "__next__", &[iterator_ty])
-                .return_ty(db)
-            {
-                if boundness == Boundness::MayBeUnbound {
-                    IterationOutcome::PossiblyUnboundDunderIter {
-                        iterable_ty: self,
-                        element_ty,
+                return if let Some(element_ty) = iterator_ty
+                    .call_dunder(db, "__next__", &[iterator_ty])
+                    .return_ty(db)
+                {
+                    if matches!(dunder_iter_result, CallDunderResult::PossiblyUnbound(..)) {
+                        IterationOutcome::PossiblyUnboundDunderIter {
+                            iterable_ty: self,
+                            element_ty,
+                        }
+                    } else {
+                        IterationOutcome::Iterable { element_ty }
                     }
                 } else {
-                    IterationOutcome::Iterable { element_ty }
-                }
-            } else {
-                IterationOutcome::NotIterable {
-                    not_iterable_ty: self,
-                }
-            };
+                    IterationOutcome::NotIterable {
+                        not_iterable_ty: self,
+                    }
+                };
+            }
+            CallDunderResult::MethodNotAvailable => {}
         }
 
         // Although it's not considered great practice,
@@ -1336,17 +1336,15 @@ impl<'db> Type<'db> {
         //
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
-        match iterable_meta_type.member(db, "__getitem__") {
-            Symbol::Type(dunder_get_item_method, Boundness::Bound) => dunder_get_item_method
-                .call(db, &[self, KnownClass::Int.to_instance(db)])
-                .return_ty(db)
-                .map(|element_ty| IterationOutcome::Iterable { element_ty })
-                .unwrap_or(IterationOutcome::NotIterable {
-                    not_iterable_ty: self,
-                }),
-            _ => IterationOutcome::NotIterable {
+        if let Some(element_ty) = self
+            .call_dunder(db, "__getitem__", &[self, KnownClass::Int.to_instance(db)])
+            .return_ty(db)
+        {
+            IterationOutcome::Iterable { element_ty }
+        } else {
+            IterationOutcome::NotIterable {
                 not_iterable_ty: self,
-            },
+            }
         }
     }
 
