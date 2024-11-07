@@ -46,26 +46,25 @@ impl AlwaysFixableViolation for DocstringInStub {
 pub(crate) fn docstring_in_stubs(
     checker: &mut Checker,
     definition: &Definition,
-    maybe_docstring: Option<&ExprStringLiteral>,
+    docstring: Option<&ExprStringLiteral>,
 ) {
-    let Some(docstring) = maybe_docstring else {
+    let Some(docstring_range) = docstring.map(ExprStringLiteral::range) else {
         return;
     };
+
     let statements = match definition {
         Definition::Module(module) => module.python_ast,
         Definition::Member(member) => member.body(),
     };
 
-    let range = docstring.range();
-
     let edit = if statements.len() == 1 {
-        Edit::range_replacement("...".to_string(), range)
+        Edit::range_replacement("...".to_string(), docstring_range)
     } else {
-        Edit::range_deletion(range)
+        Edit::range_deletion(docstring_range)
     };
 
     let fix = Fix::unsafe_edit(edit);
-    let diagnostic = Diagnostic::new(DocstringInStub, range).with_fix(fix);
+    let diagnostic = Diagnostic::new(DocstringInStub, docstring_range).with_fix(fix);
 
     checker.diagnostics.push(diagnostic);
 }
