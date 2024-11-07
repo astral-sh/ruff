@@ -6,13 +6,9 @@ Basic PEP 695 generics
 
 ```py
 class MyBox[T]:
-    # TODO: `T` is defined here
-    # error: [unresolved-reference] "Name `T` used when not defined"
     data: T
     box_model_number = 695
 
-    # TODO: `T` is defined here
-    # error: [unresolved-reference] "Name `T` used when not defined"
     def __init__(self, data: T):
         self.data = data
 
@@ -31,17 +27,12 @@ reveal_type(MyBox.box_model_number)  # revealed: Literal[695]
 
 ```py
 class MyBox[T]:
-    # TODO: `T` is defined here
-    # error: [unresolved-reference] "Name `T` used when not defined"
     data: T
 
-    # TODO: `T` is defined here
-    # error: [unresolved-reference] "Name `T` used when not defined"
     def __init__(self, data: T):
         self.data = data
 
-# TODO not error on the subscripting or the use of type param
-# error: [unresolved-reference] "Name `T` used when not defined"
+# TODO not error on the subscripting
 # error: [non-subscriptable]
 class MySecureBox[T](MyBox[T]): ...
 
@@ -65,4 +56,51 @@ class Seq[T]: ...
 class S[T](Seq[S]): ...  # error: [non-subscriptable]
 
 reveal_type(S)  # revealed: Literal[S]
+```
+
+## Type params
+
+A PEP695 type variable defines a value of type `typing.TypeVar` with attributes `__name__`,
+`__bounds__`, `__constraints__`, and `__default__` (the latter three all lazily evaluated):
+
+```py
+def f[T, U: A, V: (A, B), W = A, X: A = A1]():
+    reveal_type(T)  # revealed: TypeVar
+    reveal_type(T.__name__)  # revealed: Literal["T"]
+    reveal_type(T.__bound__)  # revealed: None
+    reveal_type(T.__constraints__)  # revealed: tuple[()]
+    reveal_type(T.__default__)  # revealed: NoDefault
+
+    reveal_type(U)  # revealed: TypeVar
+    reveal_type(U.__name__)  # revealed: Literal["U"]
+    reveal_type(U.__bound__)  # revealed: type[A]
+    reveal_type(U.__constraints__)  # revealed: tuple[()]
+    reveal_type(U.__default__)  # revealed: NoDefault
+
+    reveal_type(V)  # revealed: TypeVar
+    reveal_type(V.__name__)  # revealed: Literal["V"]
+    reveal_type(V.__bound__)  # revealed: None
+    reveal_type(V.__constraints__)  # revealed: tuple[type[A], type[B]]
+    reveal_type(V.__default__)  # revealed: NoDefault
+
+    reveal_type(W)  # revealed: TypeVar
+    reveal_type(W.__name__)  # revealed: Literal["W"]
+    reveal_type(W.__bound__)  # revealed: None
+    reveal_type(W.__constraints__)  # revealed: tuple[()]
+    reveal_type(W.__default__)  # revealed: type[A]
+
+    reveal_type(X)  # revealed: TypeVar
+    reveal_type(X.__name__)  # revealed: Literal["X"]
+    reveal_type(X.__bound__)  # revealed: type[A]
+    reveal_type(X.__constraints__)  # revealed: tuple[()]
+    reveal_type(X.__default__)  # revealed: type[A1]
+
+class A:
+    pass
+
+class B:
+    pass
+
+class A1(A):
+    pass
 ```
