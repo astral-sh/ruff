@@ -378,7 +378,7 @@ impl<'db> ClassBase<'db> {
             | Type::Tuple(_)
             | Type::SliceLiteral(_)
             | Type::ModuleLiteral(_)
-            | Type::Type(_) => None,
+            | Type::SubclassOf(_) => None,
         }
     }
 

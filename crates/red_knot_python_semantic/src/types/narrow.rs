@@ -356,7 +356,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         KnownFunction::IsInstance => |class_literal: ClassLiteralType<'db>| {
                             Type::anonymous_instance(class_literal.class)
                         },
-                        KnownFunction::IsSubclass => Type::Type,
+                        KnownFunction::IsSubclass => |class_literal: ClassLiteralType<'db>| {
+                            Type::SubclassOf(class_literal.to_subclass_of_type())
+                        },
                         _ => unreachable!(),
                     };
 
