@@ -58,7 +58,7 @@ use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstance, MetaclassErrorKind, SliceLiteralType, StringLiteralType, Symbol, Truthiness,
+    KnownInstanceType, MetaclassErrorKind, SliceLiteralType, StringLiteralType, Symbol, Truthiness,
     TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
@@ -634,7 +634,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
-            Type::Instance(InstanceType { class, .. })
+            Type::Instance(InstanceType { class })
                 if matches!(
                     class.known(self.db),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
@@ -1297,13 +1297,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(ClassLiteralType { class }) => Type::anonymous_instance(class),
+                Type::ClassLiteral(ClassLiteralType { class }) => {
+                    Type::Instance(InstanceType { class })
+                }
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
                         ty.into_class_literal()
                             .map_or(Type::Todo, |ClassLiteralType { class }| {
-                                Type::anonymous_instance(class)
+                                Type::Instance(InstanceType { class })
                             })
                     }),
                 ),
@@ -1503,14 +1505,16 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If the declared variable is annotated with _SpecialForm class then we treat it differently
         // by assigning the known field to the instance.
-        if let Type::Instance(InstanceType { class, .. }) = annotation_ty {
+        if let Type::Instance(InstanceType { class }) = annotation_ty {
             if class.is_known(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
-                    let maybe_known_instance = file_to_module(self.db, self.file)
+                    if let Some(known_instance) = file_to_module(self.db, self.file)
                         .as_ref()
-                        .and_then(|module| KnownInstance::maybe_from_module(module, &name_expr.id));
-                    if let Some(known_instance) = maybe_known_instance {
-                        annotation_ty = Type::Instance(InstanceType::known(class, known_instance));
+                        .and_then(|module| {
+                            KnownInstanceType::try_from_module_and_symbol(module, &name_expr.id)
+                        })
+                    {
+                        annotation_ty = Type::KnownInstance(known_instance);
                     }
                 }
             }
@@ -1555,7 +1559,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_augmented_op(assignment, target_type, value_type)
                 })
             }
-            Type::Instance(InstanceType { class, .. }) => {
+            Type::Instance(InstanceType { class }) => {
                 if let Symbol::Type(class_member, boundness) =
                     class.class_member(self.db, op.in_place_dunder())
                 {
@@ -2717,7 +2721,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (_, Type::Unknown) => Type::Unknown,
             (
                 op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert),
-                Type::Instance(InstanceType { class, .. }),
+                Type::Instance(InstanceType { class }),
             ) => {
                 let unary_dunder_method = match op {
                     UnaryOp::Invert => "__invert__",
@@ -3848,7 +3852,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::Instance(InstanceType { class, .. }))
+            Some(Type::Instance(InstanceType { class }))
                 if class.is_known(self.db, KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
@@ -4194,10 +4198,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         match value_ty {
-            Type::Instance(InstanceType {
-                class: _,
-                known: Some(known_instance),
-            }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
+            Type::KnownInstance(known_instance) => {
+                self.infer_parameterized_known_instance_type_expression(known_instance, slice)
+            }
             _ => {
                 self.infer_type_expression(slice);
                 Type::Todo // TODO: generics
@@ -4207,11 +4210,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_parameterized_known_instance_type_expression(
         &mut self,
-        known_instance: KnownInstance,
+        known_instance: KnownInstanceType,
         parameters: &ast::Expr,
     ) -> Type<'db> {
         match known_instance {
-            KnownInstance::Literal => match self.infer_literal_parameter_type(parameters) {
+            KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
                 Ok(ty) => ty,
                 Err(nodes) => {
                     for node in nodes {
@@ -4238,13 +4241,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO handle type aliases
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value);
-                if matches!(
-                    value_ty,
-                    Type::Instance(InstanceType {
-                        known: Some(KnownInstance::Literal),
-                        ..
-                    })
-                ) {
+                if matches!(value_ty, Type::KnownInstance(KnownInstanceType::Literal)) {
                     self.infer_literal_parameter_type(slice)?
                 } else {
                     return Err(vec![parameters]);
