@@ -1997,16 +1997,30 @@ impl<'db> FunctionType<'db> {
     }
 }
 
-/// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
-/// have special behavior.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum KnownFunction {
-    /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
-    RevealType,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KnownConstraintFunction {
     /// `builtins.isinstance`
     IsInstance,
     /// `builtins.issubclass`
     IsSubclass,
+}
+
+/// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
+/// have special behavior.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum KnownFunction {
+    ConstraintFunction(KnownConstraintFunction),
+    /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
+    RevealType,
+}
+
+impl KnownFunction {
+    pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
+        match self {
+            Self::ConstraintFunction(f) => Some(f),
+            Self::RevealType => None,
+        }
+    }
 }
 
 /// Representation of a runtime class object.

@@ -57,9 +57,9 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
-    IterationOutcome, KnownClass, KnownFunction, KnownInstance, MetaclassErrorKind,
-    SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type, TypeArrayDisplay,
-    UnionBuilder, UnionType,
+    IterationOutcome, KnownClass, KnownConstraintFunction, KnownFunction, KnownInstance,
+    MetaclassErrorKind, SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type,
+    TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -865,12 +865,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             "reveal_type" if definition.is_typing_definition(self.db) => {
                 Some(KnownFunction::RevealType)
             }
-            "isinstance" if definition.is_builtin_definition(self.db) => {
-                Some(KnownFunction::IsInstance)
-            }
-            "issubclass" if definition.is_builtin_definition(self.db) => {
-                Some(KnownFunction::IsSubclass)
-            }
+            "isinstance" if definition.is_builtin_definition(self.db) => Some(
+                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsInstance),
+            ),
+            "issubclass" if definition.is_builtin_definition(self.db) => Some(
+                KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
+            ),
             _ => None,
         };
 

@@ -5,8 +5,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
-    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
-    Truthiness, Type, UnionBuilder,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass,
+    KnownConstraintFunction, KnownFunction, Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -339,10 +339,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
             .into_function_literal()
             .and_then(|f| f.known(self.db))
+            .and_then(KnownFunction::constraint_function)
         {
-            Some(function @ (KnownFunction::IsInstance | KnownFunction::IsSubclass))
-                if expr_call.arguments.keywords.is_empty() =>
-            {
+            Some(function) if expr_call.arguments.keywords.is_empty() => {
                 if let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
                     &*expr_call.arguments.args
                 {
@@ -351,15 +350,17 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     let class_info_ty =
                         inference.expression_ty(class_info.scoped_ast_id(self.db, scope));
 
-                    #[allow(clippy::match_wildcard_for_single_variants)]
                     let to_constraint = match function {
-                        KnownFunction::IsInstance => |class_literal: ClassLiteralType<'db>| {
-                            Type::anonymous_instance(class_literal.class)
-                        },
-                        KnownFunction::IsSubclass => |class_literal: ClassLiteralType<'db>| {
-                            Type::SubclassOf(class_literal.to_subclass_of_type())
-                        },
-                        _ => unreachable!(),
+                        KnownConstraintFunction::IsInstance => {
+                            |class_literal: ClassLiteralType<'db>| {
+                                Type::anonymous_instance(class_literal.class)
+                            }
+                        }
+                        KnownConstraintFunction::IsSubclass => {
+                            |class_literal: ClassLiteralType<'db>| {
+                                Type::SubclassOf(class_literal.to_subclass_of_type())
+                            }
+                        }
                     };
 
                     generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
