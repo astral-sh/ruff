@@ -62,15 +62,23 @@ impl Violation for ManualListComprehension {
             is_async,
             comprehension_type,
         } = self;
-        let comprehension_str = match comprehension_type {
-            Some(ComprehensionType::Extend) => "extend",
-            Some(ComprehensionType::ListComprehension) => "comprehension",
-            None => "comprehension",
+        let message_str = match comprehension_type {
+            Some(ComprehensionType::Extend) => {
+                if *is_async {
+                    "list.extend with an async comprehension"
+                } else {
+                    "list.extend"
+                }
+            }
+            Some(ComprehensionType::ListComprehension) | None => {
+                if *is_async {
+                    "an async list comprehension"
+                } else {
+                    "a list comprehension"
+                }
+            }
         };
-        match is_async {
-            false => format!("Use a list {comprehension_str} to create a transformed list"),
-            true => format!("Use an async list {comprehension_str} to create a transformed list"),
-        }
+        format!("Use {message_str} to create a transformed list")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -226,9 +234,8 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     // If the for loop does not have the same parent element as the binding, then it cannot always be
     // deleted and replaced with a list comprehension. This does not apply when using an extend.
     let assignment_in_same_statement = {
-        let for_loop_parent = checker.semantic().current_statement_parent_id();
-
         binding.source.is_some_and(|binding_source| {
+            let for_loop_parent = checker.semantic().current_statement_parent_id();
             let binding_parent = checker.semantic().parent_statement_id(binding_source);
             for_loop_parent == binding_parent
         })
@@ -259,7 +266,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         *range,
     );
 
-    // TODO: once this fix is stabilized, change the rule to completely fixable
+    // TODO: once this fix is stabilized, change the rule to always fixable
     if checker.settings.preview.is_enabled() {
         diagnostic = Diagnostic::new(
             ManualListComprehension {
@@ -291,8 +298,6 @@ fn convert_to_list_extend(
     checker: &Checker,
 ) -> Result<Fix> {
     let locator = checker.locator();
-    let for_stmt_end = for_stmt.range.end();
-
     let if_str = match if_test {
         Some(test) => format!(" if {}", locator.slice(test.range())),
         None => String::new(),
@@ -304,7 +309,7 @@ fn convert_to_list_extend(
         "for"
     };
     let target_str = locator.slice(for_stmt.target.range());
-    let elt_str = locator.slice(to_append.range());
+    let elt_str = locator.slice(to_append);
     let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
 
     let comment_strings_in_range = |range| {
@@ -315,6 +320,7 @@ fn convert_to_list_extend(
             .map(|range| locator.slice(range).trim_whitespace_start())
             .collect()
     };
+    let for_stmt_end = for_stmt.range.end();
     let for_loop_inline_comments: Vec<&str> = comment_strings_in_range(for_stmt.range);
     let for_loop_trailing_comment =
         comment_strings_in_range(TextRange::new(for_stmt_end, locator.line_end(for_stmt_end)));
