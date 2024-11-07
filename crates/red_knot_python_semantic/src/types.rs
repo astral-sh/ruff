@@ -1323,7 +1323,6 @@ impl<'db> Type<'db> {
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
             Type::Type(_) => Type::Type(KnownClass::Type.to_class(db).expect_class_literal()),
-            // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
             Type::Any => Type::Any,
