@@ -3,7 +3,7 @@ use crate::{
     Db,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Boundness {
     Bound,
     MayBeUnbound,
@@ -44,15 +44,11 @@ impl<'db> Symbol<'db> {
         }
     }
 
-    pub(crate) fn unwrap_or(&self, other: Type<'db>) -> Type<'db> {
+    pub(crate) fn unwrap_or_unknown(&self) -> Type<'db> {
         match self {
             Symbol::Type(ty, _) => *ty,
-            Symbol::Unbound => other,
+            Symbol::Unbound => Type::Unknown,
         }
-    }
-
-    pub(crate) fn unwrap_or_unknown(&self) -> Type<'db> {
-        self.unwrap_or(Type::Unknown)
     }
 
     pub(crate) fn as_type(&self) -> Option<Type<'db>> {

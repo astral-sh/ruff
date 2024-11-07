@@ -2957,22 +2957,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (Type::Instance(left), Type::Instance(right), op) => {
+            (left_ty @ Type::Instance(left), right_ty @ Type::Instance(right), op) => {
                 if left != right && right.is_instance_of(self.db, left.class) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right.class.class_member(self.db, reflected_dunder);
                     if !rhs_reflected.is_unbound()
                         && rhs_reflected != left.class.class_member(self.db, reflected_dunder)
                     {
-                        return rhs_reflected
-                            .unwrap_or(Type::Never)
-                            .call(self.db, &[right_ty, left_ty])
+                        return right_ty
+                            .call_dunder(self.db, reflected_dunder, &[right_ty, left_ty])
                             .return_ty(self.db)
                             .or_else(|| {
-                                left.class
-                                    .class_member(self.db, op.dunder())
-                                    .unwrap_or(Type::Never)
-                                    .call(self.db, &[left_ty, right_ty])
+                                left_ty
+                                    .call_dunder(self.db, op.dunder(), &[left_ty, right_ty])
                                     .return_ty(self.db)
                             });
                     }
@@ -4398,7 +4395,8 @@ fn perform_membership_test_comparison<'db>(
             // iteration-based membership test
             match Type::Instance(right).iterate(db) {
                 IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
-                IterationOutcome::NotIterable { .. } => None,
+                IterationOutcome::NotIterable { .. }
+                | IterationOutcome::PossiblyUnboundDunderIter { .. } => None,
             }
         }
     };

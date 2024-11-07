@@ -44,3 +44,16 @@ reveal_type(bar())  # revealed: @Todo
 nonsense = 123
 x = nonsense()  # error: "Object of type `Literal[123]` is not callable"
 ```
+
+## Potentially unbound function
+
+```py
+def flag() -> bool: ...
+
+if flag():
+    def foo() -> int:
+        return 42
+
+# error: [possibly-unresolved-reference]
+reveal_type(foo())  # revealed: int
+```

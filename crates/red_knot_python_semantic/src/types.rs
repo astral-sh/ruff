@@ -1208,17 +1208,33 @@ impl<'db> Type<'db> {
                 })
             }
 
-            Type::Instance(InstanceType { class, .. }) => {
-                // Since `__call__` is a dunder, we need to access it as an attribute on the class
-                // rather than the instance (matching runtime semantics).
-                match class.class_member(db, "__call__") {
-                    Symbol::Type(dunder_call_method, Boundness::Bound) => {
-                        let args = std::iter::once(self)
-                            .chain(arg_types.iter().copied())
-                            .collect::<Vec<_>>();
-                        dunder_call_method.call(db, &args)
+            instance_ty @ Type::Instance(InstanceType { .. }) => {
+                let args = std::iter::once(self)
+                    .chain(arg_types.iter().copied())
+                    .collect::<Vec<_>>();
+                match instance_ty.call_dunder(db, "__call__", &args) {
+                    CallDunderResult::CallOutcome(CallOutcome::NotCallable { .. }) => {
+                        // Turn "`<type of illegal '__call__'>` not callable" into
+                        // "`X` not callable"
+                        CallOutcome::NotCallable {
+                            not_callable_ty: self,
+                        }
                     }
-                    _ => CallOutcome::not_callable(self),
+                    CallDunderResult::CallOutcome(outcome) => outcome,
+                    CallDunderResult::PossiblyUnbound(call_outcome) => {
+                        // Turn "possibly unbound object of type `Literal['__call__']`"
+                        // into "`X` not callable (possibly unbound `__call__` method)"
+                        CallOutcome::PossiblyUnboundDunderCall {
+                            called_ty: self,
+                            call_outcome: Box::new(call_outcome),
+                        }
+                    }
+                    CallDunderResult::MethodNotAvailable => {
+                        // Turn "`X.__call__` unbound" into "`X` not callable"
+                        CallOutcome::NotCallable {
+                            not_callable_ty: self,
+                        }
+                    }
                 }
             }
 
@@ -1244,6 +1260,24 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Look up a dunder method on the meta type of `self` and call it.
+    fn call_dunder(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        arg_types: &[Type<'db>],
+    ) -> CallDunderResult<'db> {
+        match self.to_meta_type(db).member(db, name) {
+            Symbol::Type(callable_ty, Boundness::Bound) => {
+                CallDunderResult::CallOutcome(callable_ty.call(db, arg_types))
+            }
+            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
+                CallDunderResult::PossiblyUnbound(callable_ty.call(db, arg_types))
+            }
+            Symbol::Unbound => CallDunderResult::MethodNotAvailable,
+        }
+    }
+
     /// Given the type of an object that is iterated over in some way,
     /// return the type of objects that are yielded by that iteration.
     ///
@@ -1265,34 +1299,35 @@ impl<'db> Type<'db> {
             return IterationOutcome::Iterable { element_ty: self };
         }
 
-        // `self` represents the type of the iterable;
-        // `__iter__` and `__next__` are both looked up on the class of the iterable:
-        let iterable_meta_type = self.to_meta_type(db);
-
-        let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
-        if let Symbol::Type(dunder_iter_method, _) = dunder_iter_method {
-            let Some(iterator_ty) = dunder_iter_method.call(db, &[self]).return_ty(db) else {
-                return IterationOutcome::NotIterable {
-                    not_iterable_ty: self,
-                };
-            };
-
-            match iterator_ty.to_meta_type(db).member(db, "__next__") {
-                Symbol::Type(dunder_next_method, Boundness::Bound) => {
-                    return dunder_next_method
-                        .call(db, &[iterator_ty])
-                        .return_ty(db)
-                        .map(|element_ty| IterationOutcome::Iterable { element_ty })
-                        .unwrap_or(IterationOutcome::NotIterable {
-                            not_iterable_ty: self,
-                        });
-                }
-                _ => {
+        let dunder_iter_result = self.call_dunder(db, "__iter__", &[self]);
+        match dunder_iter_result {
+            CallDunderResult::CallOutcome(ref call_outcome)
+            | CallDunderResult::PossiblyUnbound(ref call_outcome) => {
+                let Some(iterator_ty) = call_outcome.return_ty(db) else {
                     return IterationOutcome::NotIterable {
                         not_iterable_ty: self,
                     };
-                }
+                };
+
+                return if let Some(element_ty) = iterator_ty
+                    .call_dunder(db, "__next__", &[iterator_ty])
+                    .return_ty(db)
+                {
+                    if matches!(dunder_iter_result, CallDunderResult::PossiblyUnbound(..)) {
+                        IterationOutcome::PossiblyUnboundDunderIter {
+                            iterable_ty: self,
+                            element_ty,
+                        }
+                    } else {
+                        IterationOutcome::Iterable { element_ty }
+                    }
+                } else {
+                    IterationOutcome::NotIterable {
+                        not_iterable_ty: self,
+                    }
+                };
             }
+            CallDunderResult::MethodNotAvailable => {}
         }
 
         // Although it's not considered great practice,
@@ -1301,17 +1336,15 @@ impl<'db> Type<'db> {
         //
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
-        match iterable_meta_type.member(db, "__getitem__") {
-            Symbol::Type(dunder_get_item_method, Boundness::Bound) => dunder_get_item_method
-                .call(db, &[self, KnownClass::Int.to_instance(db)])
-                .return_ty(db)
-                .map(|element_ty| IterationOutcome::Iterable { element_ty })
-                .unwrap_or(IterationOutcome::NotIterable {
-                    not_iterable_ty: self,
-                }),
-            _ => IterationOutcome::NotIterable {
+        if let Some(element_ty) = self
+            .call_dunder(db, "__getitem__", &[self, KnownClass::Int.to_instance(db)])
+            .return_ty(db)
+        {
+            IterationOutcome::Iterable { element_ty }
+        } else {
+            IterationOutcome::NotIterable {
                 not_iterable_ty: self,
-            },
+            }
         }
     }
 
@@ -1632,6 +1665,10 @@ enum CallOutcome<'db> {
         called_ty: Type<'db>,
         outcomes: Box<[CallOutcome<'db>]>,
     },
+    PossiblyUnboundDunderCall {
+        called_ty: Type<'db>,
+        call_outcome: Box<CallOutcome<'db>>,
+    },
 }
 
 impl<'db> CallOutcome<'db> {
@@ -1689,6 +1726,7 @@ impl<'db> CallOutcome<'db> {
                     }
                 })
                 .map(UnionBuilder::build),
+            Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
         }
     }
 
@@ -1747,6 +1785,20 @@ impl<'db> CallOutcome<'db> {
                 );
                 return_ty
             }
+            Err(NotCallableError::PossiblyUnboundDunderCall {
+                callable_ty: called_ty,
+                return_ty,
+            }) => {
+                diagnostics.add(
+                    node,
+                    "call-non-callable",
+                    format_args!(
+                        "Object of type `{}` is not callable (possibly unbound `__call__` method)",
+                        called_ty.display(db)
+                    ),
+                );
+                return_ty
+            }
         }
     }
 
@@ -1773,6 +1825,13 @@ impl<'db> CallOutcome<'db> {
             Self::NotCallable { not_callable_ty } => Err(NotCallableError::Type {
                 not_callable_ty: *not_callable_ty,
                 return_ty: Type::Unknown,
+            }),
+            Self::PossiblyUnboundDunderCall {
+                called_ty,
+                call_outcome,
+            } => Err(NotCallableError::PossiblyUnboundDunderCall {
+                callable_ty: *called_ty,
+                return_ty: call_outcome.return_ty(db).unwrap_or(Type::Unknown),
             }),
             Self::Union {
                 outcomes,
@@ -1825,6 +1884,22 @@ impl<'db> CallOutcome<'db> {
     }
 }
 
+enum CallDunderResult<'db> {
+    CallOutcome(CallOutcome<'db>),
+    PossiblyUnbound(CallOutcome<'db>),
+    MethodNotAvailable,
+}
+
+impl<'db> CallDunderResult<'db> {
+    fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::CallOutcome(outcome) => outcome.return_ty(db),
+            Self::PossiblyUnbound { .. } => None,
+            Self::MethodNotAvailable => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum NotCallableError<'db> {
     /// The type is not callable.
@@ -1844,6 +1919,10 @@ enum NotCallableError<'db> {
         called_ty: Type<'db>,
         return_ty: Type<'db>,
     },
+    PossiblyUnboundDunderCall {
+        callable_ty: Type<'db>,
+        return_ty: Type<'db>,
+    },
 }
 
 impl<'db> NotCallableError<'db> {
@@ -1853,6 +1932,7 @@ impl<'db> NotCallableError<'db> {
             Self::Type { return_ty, .. } => *return_ty,
             Self::UnionElement { return_ty, .. } => *return_ty,
             Self::UnionElements { return_ty, .. } => *return_ty,
+            Self::PossiblyUnboundDunderCall { return_ty, .. } => *return_ty,
         }
     }
 
@@ -1867,14 +1947,26 @@ impl<'db> NotCallableError<'db> {
             } => *not_callable_ty,
             Self::UnionElement { called_ty, .. } => *called_ty,
             Self::UnionElements { called_ty, .. } => *called_ty,
+            Self::PossiblyUnboundDunderCall {
+                callable_ty: called_ty,
+                ..
+            } => *called_ty,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IterationOutcome<'db> {
-    Iterable { element_ty: Type<'db> },
-    NotIterable { not_iterable_ty: Type<'db> },
+    Iterable {
+        element_ty: Type<'db>,
+    },
+    NotIterable {
+        not_iterable_ty: Type<'db>,
+    },
+    PossiblyUnboundDunderIter {
+        iterable_ty: Type<'db>,
+        element_ty: Type<'db>,
+    },
 }
 
 impl<'db> IterationOutcome<'db> {
@@ -1888,6 +1980,13 @@ impl<'db> IterationOutcome<'db> {
             Self::NotIterable { not_iterable_ty } => {
                 diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
                 Type::Unknown
+            }
+            Self::PossiblyUnboundDunderIter {
+                iterable_ty,
+                element_ty,
+            } => {
+                diagnostics.add_not_iterable_possibly_unbound(iterable_node, iterable_ty);
+                element_ty
             }
         }
     }

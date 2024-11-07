@@ -164,6 +164,23 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         );
     }
 
+    /// Emit a diagnostic declaring that the object represented by `node` is not iterable
+    /// because its `__iter__` method is possibly unbound.
+    pub(super) fn add_not_iterable_possibly_unbound(
+        &mut self,
+        node: AnyNodeRef,
+        element_ty: Type<'db>,
+    ) {
+        self.add(
+            node,
+            "not-iterable",
+            format_args!(
+                "Object of type `{}` is not iterable because its `__iter__` method is possibly unbound",
+                element_ty.display(self.db)
+            ),
+        );
+    }
+
     /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
     pub(super) fn add_index_out_of_bounds(
         &mut self,
