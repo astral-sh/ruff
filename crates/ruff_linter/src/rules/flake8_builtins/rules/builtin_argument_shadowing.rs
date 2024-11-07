@@ -58,7 +58,7 @@ impl Violation for BuiltinArgumentShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BuiltinArgumentShadowing { name } = self;
-        format!("Argument `{name}` is shadowing a Python builtin")
+        format!("Function argument `{name}` is shadowing a Python builtin")
     }
 }
 
