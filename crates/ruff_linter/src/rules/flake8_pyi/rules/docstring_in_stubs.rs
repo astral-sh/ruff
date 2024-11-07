@@ -59,7 +59,7 @@ pub(crate) fn docstring_in_stubs(
     let range = docstring.range();
 
     let edit = if statements.len() == 1 {
-        Edit::range_replacement("pass".to_string(), range)
+        Edit::range_replacement("...".to_string(), range)
     } else {
         Edit::deletion(range.start(), range.end())
     };
