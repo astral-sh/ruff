@@ -1215,10 +1215,7 @@ impl<'db> Type<'db> {
                 let args = std::iter::once(self)
                     .chain(arg_types.iter().copied())
                     .collect::<Vec<_>>();
-                match instance_ty
-                    .to_meta_type(db)
-                    .call_dunder(db, "__call__", &args)
-                {
+                match instance_ty.call_dunder(db, "__call__", &args) {
                     CallDunderResult::CallOutcome(CallOutcome::NotCallable { .. }) => {
                         // Turn "`<type of illegal '__call__'>` not callable" into
                         // "`X` not callable"
@@ -1266,13 +1263,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Look up a dunder method on the meta type of `self` and call it.
     pub(crate) fn call_dunder(
         self,
         db: &'db dyn Db,
         name: &str,
         arg_types: &[Type<'db>],
     ) -> CallDunderResult<'db> {
-        match self.member(db, name) {
+        match self.to_meta_type(db).member(db, name) {
             Symbol::Type(callable_ty, Boundness::Bound) => {
                 CallDunderResult::CallOutcome(callable_ty.call(db, arg_types))
             }
@@ -1317,7 +1315,6 @@ impl<'db> Type<'db> {
             };
 
             return if let Some(element_ty) = iterator_ty
-                .to_meta_type(db)
                 .call_dunder(db, "__next__", &[iterator_ty])
                 .return_ty(db)
             {
