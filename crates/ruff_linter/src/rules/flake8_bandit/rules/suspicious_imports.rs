@@ -63,7 +63,7 @@ impl Violation for SuspiciousFtplibImport {
 /// ```python
 /// import pickle
 /// ```
-/// /// ## References
+/// ## References
 /// - [Python Docs](https://docs.python.org/3/library/pickle.html)
 #[violation]
 pub struct SuspiciousPickleImport;
