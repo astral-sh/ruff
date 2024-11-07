@@ -503,7 +503,7 @@ impl<'db> Type<'db> {
                 false
             }
             (Type::BooleanLiteral(_), Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Bool) =>
+                if matches!(class.known(db), Some(KnownClass::Bool | KnownClass::Int)) =>
             {
                 true
             }
@@ -2789,6 +2789,7 @@ mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("bool"))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("object"))]
