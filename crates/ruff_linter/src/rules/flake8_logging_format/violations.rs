@@ -432,7 +432,7 @@ impl AlwaysFixableViolation for LoggingWarn {
 ///
 /// username = "Maria"
 ///
-/// logging.info("Something happened", extra=dict(user=username))
+/// logging.info("Something happened", extra=dict(user_id=username))
 /// ```
 ///
 /// ## Options
