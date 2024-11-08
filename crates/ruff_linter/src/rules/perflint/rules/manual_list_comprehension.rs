@@ -65,9 +65,9 @@ impl Violation for ManualListComprehension {
         let message_str = match comprehension_type {
             Some(ComprehensionType::Extend) => {
                 if *is_async {
-                    "list.extend with an async comprehension"
+                    "`list.extend` with an async comprehension"
                 } else {
-                    "list.extend"
+                    "`list.extend`"
                 }
             }
             Some(ComprehensionType::ListComprehension) | None => {
@@ -261,20 +261,13 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
             is_async: for_stmt.is_async,
-            comprehension_type: None,
+            comprehension_type: Some(comprehension_type),
         },
         *range,
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable
     if checker.settings.preview.is_enabled() {
-        diagnostic = Diagnostic::new(
-            ManualListComprehension {
-                is_async: for_stmt.is_async,
-                comprehension_type: Some(comprehension_type),
-            },
-            *range,
-        );
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,
@@ -286,6 +279,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
             )
         });
     }
+
     checker.diagnostics.push(diagnostic);
 }
 
