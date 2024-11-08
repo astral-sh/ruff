@@ -95,12 +95,7 @@ def f[T, U: A, V: (A, B), W = A, X: A = A1]():
     reveal_type(X.__constraints__)  # revealed: tuple[()]
     reveal_type(X.__default__)  # revealed: type[A1]
 
-class A:
-    pass
-
-class B:
-    pass
-
-class A1(A):
-    pass
+class A: ...
+class B: ...
+class A1(A): ...
 ```
