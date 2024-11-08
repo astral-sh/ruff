@@ -1713,10 +1713,14 @@ impl<'db> KnownInstanceType<'db> {
                     db,
                     typevar
                         .constraints(db)
-                        .iter()
-                        .map(|ty| ty.to_meta_type(db))
-                        .collect::<Vec<_>>()
-                        .into_boxed_slice(),
+                        .map(|constraints| {
+                            constraints
+                                .iter()
+                                .map(|ty| ty.to_meta_type(db))
+                                .collect::<Vec<_>>()
+                                .into_boxed_slice()
+                        })
+                        .unwrap_or_else(|| std::iter::empty().collect::<Box<_>>()),
                 )),
                 Boundness::Bound,
             ),
@@ -1736,14 +1740,14 @@ impl<'db> KnownInstanceType<'db> {
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
     #[return_ref]
-    pub name: ast::name::Name,
+    name: ast::name::Name,
 
     /// The upper bound or constraint on the type of this TypeVar
     #[return_ref]
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
     /// The default type for this TypeVar
-    pub(crate) default_ty: Option<Type<'db>>,
+    default_ty: Option<Type<'db>>,
 }
 
 impl<'db> TypeVarInstance<'db> {
@@ -1755,11 +1759,11 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
-    pub(crate) fn constraints(self, db: &'db dyn Db) -> &[Type<'db>] {
+    pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
         if let Some(TypeVarBoundOrConstraints::Constraints(tys)) = self.bound_or_constraints(db) {
-            tys
+            Some(tys)
         } else {
-            &[]
+            None
         }
     }
 }
