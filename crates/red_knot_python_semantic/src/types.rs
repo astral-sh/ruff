@@ -1581,7 +1581,7 @@ impl<'db> KnownClass {
         }
     }
 
-    fn is_singleton(self) -> bool {
+    const fn is_singleton(self) -> bool {
         // TODO there are other singleton types (EllipsisType, NotImplementedType)
         match self {
             Self::NoneType | Self::NoDefaultType => true,
