@@ -1042,7 +1042,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
 
         let class = Class::new(self.db, &*name.id, body_scope, maybe_known_class);
-        let class_ty = Type::ClassLiteral(ClassLiteralType { class });
+        let class_ty = Type::class_literal(class);
 
         self.add_declaration_with_binding(class_node.into(), definition, class_ty, class_ty);
 
@@ -1349,15 +1349,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(ClassLiteralType { class }) => {
-                    Type::Instance(InstanceType { class })
-                }
+                Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(class),
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
                         ty.into_class_literal()
                             .map_or(Type::Todo, |ClassLiteralType { class }| {
-                                Type::Instance(InstanceType { class })
+                                Type::instance(class)
                             })
                     }),
                 ),
@@ -4283,8 +4281,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         match slice {
             ast::Expr::Name(name) => {
                 let name_ty = self.infer_name_expression(name);
-                if let Some(class_literal) = name_ty.into_class_literal() {
-                    Type::SubclassOf(class_literal.to_subclass_of_type())
+                if let Some(ClassLiteralType { class }) = name_ty.into_class_literal() {
+                    Type::subclass_of(class)
                 } else {
                     Type::Todo
                 }

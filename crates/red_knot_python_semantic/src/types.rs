@@ -369,6 +369,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::Todo)
     }
 
+    pub const fn class_literal(class: Class<'db>) -> Self {
+        Self::ClassLiteral(ClassLiteralType { class })
+    }
+
     pub const fn into_class_literal(self) -> Option<ClassLiteralType<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
@@ -397,20 +401,6 @@ impl<'db> Type<'db> {
     pub fn expect_module_literal(self) -> File {
         self.into_module_literal()
             .expect("Expected a Type::ModuleLiteral variant")
-    }
-
-    #[must_use]
-    pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
-        IntersectionBuilder::new(db).add_negative(*self).build()
-    }
-
-    #[must_use]
-    pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
-        if yes {
-            self.negate(db)
-        } else {
-            *self
-        }
     }
 
     pub const fn into_union(self) -> Option<UnionType<'db>> {
@@ -478,6 +468,28 @@ impl<'db> Type<'db> {
 
     pub const fn is_literal_string(&self) -> bool {
         matches!(self, Type::LiteralString)
+    }
+
+    pub const fn instance(class: Class<'db>) -> Self {
+        Self::Instance(InstanceType { class })
+    }
+
+    pub const fn subclass_of(class: Class<'db>) -> Self {
+        Self::SubclassOf(SubclassOfType { class })
+    }
+
+    #[must_use]
+    pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
+        IntersectionBuilder::new(db).add_negative(*self).build()
+    }
+
+    #[must_use]
+    pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
+        if yes {
+            self.negate(db)
+        } else {
+            *self
+        }
     }
 
     /// Return true if this type is a [subtype of] type `target`.
@@ -1371,12 +1383,8 @@ impl<'db> Type<'db> {
             Type::Todo => Type::Todo,
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                Type::Instance(InstanceType { class: *class })
-            }
-            Type::SubclassOf(SubclassOfType { class }) => {
-                Type::Instance(InstanceType { class: *class })
-            }
+            Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
+            Type::SubclassOf(SubclassOfType { class }) => Type::instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
@@ -1420,13 +1428,13 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
-            Type::SubclassOf(SubclassOfType { class }) => Type::SubclassOf(
+            Type::SubclassOf(SubclassOfType { class }) => Type::subclass_of(
                 class
                     .try_metaclass(db)
                     .ok()
                     .and_then(Type::into_class_literal)
-                    .unwrap_or(KnownClass::Type.to_class(db).expect_class_literal())
-                    .to_subclass_of_type(),
+                    .unwrap_or_else(|| KnownClass::Type.to_class(db).expect_class_literal())
+                    .class,
             ),
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
@@ -2528,9 +2536,7 @@ impl<'db> Class<'db> {
             });
         }
 
-        Ok(Type::ClassLiteral(ClassLiteralType {
-            class: candidate.metaclass,
-        }))
+        Ok(Type::class_literal(candidate.metaclass))
     }
 
     /// Returns the class member of this class named `name`.
@@ -2628,10 +2634,6 @@ pub struct ClassLiteralType<'db> {
 impl<'db> ClassLiteralType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         self.class.class_member(db, name)
-    }
-
-    fn to_subclass_of_type(self) -> SubclassOfType<'db> {
-        SubclassOfType { class: self.class }
     }
 }
 
@@ -3053,13 +3055,11 @@ mod tests {
         assert!(literal_derived.is_class_literal());
 
         // `subclass_of_base` represents `Type[Base]`.
-        let subclass_of_base =
-            Type::SubclassOf(literal_base.expect_class_literal().to_subclass_of_type());
+        let subclass_of_base = Type::subclass_of(literal_base.expect_class_literal().class);
         assert!(literal_base.is_subtype_of(&db, subclass_of_base));
         assert!(literal_derived.is_subtype_of(&db, subclass_of_base));
 
-        let subclass_of_derived =
-            Type::SubclassOf(literal_derived.expect_class_literal().to_subclass_of_type());
+        let subclass_of_derived = Type::subclass_of(literal_derived.expect_class_literal().class);
         assert!(literal_derived.is_subtype_of(&db, subclass_of_derived));
         assert!(!literal_base.is_subtype_of(&db, subclass_of_derived));
 
@@ -3213,10 +3213,8 @@ mod tests {
         let literal_a = super::global_symbol(&db, module, "A").expect_type();
         let literal_b = super::global_symbol(&db, module, "B").expect_type();
 
-        let subclass_of_a =
-            Type::SubclassOf(literal_a.expect_class_literal().to_subclass_of_type());
-        let subclass_of_b =
-            Type::SubclassOf(literal_b.expect_class_literal().to_subclass_of_type());
+        let subclass_of_a = Type::subclass_of(literal_a.expect_class_literal().class);
+        let subclass_of_b = Type::subclass_of(literal_b.expect_class_literal().class);
 
         // Class literals are always disjoint. They are singleton types
         assert!(literal_a.is_disjoint_from(&db, literal_b));
