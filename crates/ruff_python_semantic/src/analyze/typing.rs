@@ -407,6 +407,10 @@ where
                         .for_each(|elem| inner(func, semantic, elem, Some(expr)));
                     return;
                 }
+
+                // Ex) Union[Union[a, b]] and Union[a | b | c]
+                inner(func, semantic, slice, Some(expr));
+                return;
             }
         }
 

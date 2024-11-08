@@ -1402,6 +1402,15 @@ impl<'a> SemanticModel<'a> {
             return true;
         }
 
+        // Ex) `Union[Union[int, int]]` or `Union[int | int]`
+        if self
+            .current_expression_parent()
+            .and_then(Expr::as_subscript_expr)
+            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Union"))
+        {
+            return true;
+        }
+
         false
     }
 
