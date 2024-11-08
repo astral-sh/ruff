@@ -1409,9 +1409,10 @@ impl<'db> Type<'db> {
             Type::SubclassOf(SubclassOfType { class }) => Type::SubclassOf(
                 class
                     .try_metaclass(db)
+                    .as_ref()
                     .ok()
-                    .and_then(Type::into_class_literal)
-                    .unwrap_or(KnownClass::Type.to_class(db).expect_class_literal())
+                    .and_then(|ty| ty.into_class_literal())
+                    .unwrap_or_else(|| KnownClass::Type.to_class(db).expect_class_literal())
                     .to_subclass_of_type(),
             ),
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
@@ -2309,12 +2310,13 @@ impl<'db> Class<'db> {
     /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         // TODO: `type[Unknown]` would be a more precise fallback
-        // (needs support for <https://docs.python.org/3/library/typing.html#the-type-of-class-objects>)
-        self.try_metaclass(db).unwrap_or(Type::Unknown)
+        self.try_metaclass(db)
+            .as_ref()
+            .map_or(Type::Unknown, |ty| *ty)
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
-    #[salsa::tracked]
+    #[salsa::tracked(return_ref)]
     pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
         /// Infer the metaclass of a class, tracking the classes that have been visited to detect
         /// cyclic definitions.
