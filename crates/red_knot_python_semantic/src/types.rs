@@ -2453,6 +2453,7 @@ impl<'db> Class<'db> {
     }
 }
 
+/// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: Class<'db>,
@@ -2563,10 +2564,18 @@ pub(super) enum MetaclassErrorKind<'db> {
     /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
     /// its bases.
     Conflict {
+        /// `candidate1` will either be the explicit `metaclass=` keyword in the class definition,
+        /// or the inferred metaclass of a base class
         candidate1: MetaclassCandidate<'db>,
+
+        /// `candidate2` will always be the inferred metaclass of a base class
         candidate2: MetaclassCandidate<'db>,
+
+        /// Flag to indicate whether `candidate1` is the explicit `metaclass=` keyword or the
+        /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
         candidate1_is_base_class: bool,
     },
+
     /// The class inherits from itself!
     ///
     /// This is very unlikely to happen in working real-world code,
