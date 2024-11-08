@@ -2210,6 +2210,15 @@ impl<'db> Class<'db> {
         self.explicit_bases_query(db)
     }
 
+    /// Iterate over this class's explicit bases, filtering out any bases that are not class objects.
+    fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = Class<'db>> {
+        self.explicit_bases(db)
+            .iter()
+            .copied()
+            .filter_map(Type::into_class_literal)
+            .map(|ClassLiteralType { class }| class)
+    }
+
     #[salsa::tracked(return_ref)]
     fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let class_stmt = self.node(db);
@@ -2309,102 +2318,80 @@ impl<'db> Class<'db> {
     /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         // TODO: `type[Unknown]` would be a more precise fallback
-        // (needs support for <https://docs.python.org/3/library/typing.html#the-type-of-class-objects>)
         self.try_metaclass(db).unwrap_or(Type::Unknown)
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
     pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
-        /// Infer the metaclass of a class, tracking the classes that have been visited to detect
-        /// cyclic definitions.
-        fn infer<'db>(
-            db: &'db dyn Db,
-            class: Class<'db>,
-            seen: &mut SeenSet<Class<'db>>,
-        ) -> Result<Type<'db>, MetaclassError<'db>> {
-            // Recursively infer the metaclass of a class, ensuring that cyclic definitions are
-            // detected.
-            let mut safe_recurse = |class: Class<'db>| -> Result<Type<'db>, MetaclassError<'db>> {
-                // Each base must be considered in isolation.
-                let num_seen = seen.len();
-                if !seen.insert(class) {
-                    return Err(MetaclassError {
-                        kind: MetaclassErrorKind::CyclicDefinition,
-                    });
-                }
-                let metaclass = infer(db, class, seen)?;
-                seen.truncate(num_seen);
-                Ok(metaclass)
-            };
+        // Identify the class's own metaclass (or take the first base class's metaclass).
+        let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
-            let mut base_classes = class
-                .explicit_bases(db)
-                .iter()
-                .copied()
-                .filter_map(Type::into_class_literal);
-
-            // Identify the class's own metaclass (or take the first base class's metaclass).
-            let explicit_metaclass = class.explicit_metaclass(db);
-            let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass
-            {
-                (metaclass, class)
-            } else if let Some(base_class) = base_classes.next() {
-                (safe_recurse(base_class.class)?, base_class.class)
-            } else {
-                (KnownClass::Type.to_class(db), class)
-            };
-
-            let mut candidate = if let Type::ClassLiteral(metaclass_ty) = metaclass {
-                MetaclassCandidate {
-                    metaclass: metaclass_ty.class,
-                    explicit_metaclass_of: class_metaclass_was_from,
-                }
-            } else {
-                // TODO: If the metaclass is not a class, we should verify that it's a callable
-                // which accepts the same arguments as `type.__new__` (otherwise error), and return
-                // the meta-type of its return type. (And validate that is a class type?)
-                return Ok(Type::Todo);
-            };
-
-            // Reconcile all base classes' metaclasses with the candidate metaclass.
+        if base_classes.peek().is_some() && self.is_cyclically_defined(db) {
+            // We emit diagnostics for cyclic class definitions elsewhere.
+            // Don't even try to infer the metaclass if the class is cyclically defined:
+            // it's impossible to do so without entering an infinite loop.
             //
-            // See:
-            // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
-            // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
-            for base_class in base_classes {
-                let metaclass = safe_recurse(base_class.class)?;
-                let Type::ClassLiteral(metaclass) = metaclass else {
-                    continue;
-                };
-                if metaclass.class.is_subclass_of(db, candidate.metaclass) {
-                    candidate = MetaclassCandidate {
-                        metaclass: metaclass.class,
-                        explicit_metaclass_of: base_class.class,
-                    };
-                    continue;
-                }
-                if candidate.metaclass.is_subclass_of(db, metaclass.class) {
-                    continue;
-                }
-                return Err(MetaclassError {
-                    kind: MetaclassErrorKind::Conflict {
-                        candidate1: candidate,
-                        candidate2: MetaclassCandidate {
-                            metaclass: metaclass.class,
-                            explicit_metaclass_of: base_class.class,
-                        },
-                        candidate1_is_base_class: explicit_metaclass.is_none(),
-                    },
-                });
-            }
-
-            Ok(Type::ClassLiteral(ClassLiteralType {
-                class: candidate.metaclass,
-            }))
+            // TODO: `type[Unknown]` might be better here?
+            return Ok(Type::Unknown);
         }
 
-        infer(db, self, &mut SeenSet::new(self))
+        let explicit_metaclass = self.explicit_metaclass(db);
+        let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
+            (metaclass, self)
+        } else if let Some(base_class) = base_classes.next() {
+            (base_class.metaclass(db), base_class)
+        } else {
+            (KnownClass::Type.to_class(db), self)
+        };
+
+        let mut candidate = if let Type::ClassLiteral(metaclass_ty) = metaclass {
+            MetaclassCandidate {
+                metaclass: metaclass_ty.class,
+                explicit_metaclass_of: class_metaclass_was_from,
+            }
+        } else {
+            // TODO: If the metaclass is not a class, we should verify that it's a callable
+            // which accepts the same arguments as `type.__new__` (otherwise error), and return
+            // the meta-type of its return type. (And validate that is a class type?)
+            return Ok(Type::Todo);
+        };
+
+        // Reconcile all base classes' metaclasses with the candidate metaclass.
+        //
+        // See:
+        // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
+        // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
+        for base_class in base_classes {
+            let metaclass = base_class.metaclass(db);
+            let Type::ClassLiteral(metaclass) = metaclass else {
+                continue;
+            };
+            if metaclass.class.is_subclass_of(db, candidate.metaclass) {
+                candidate = MetaclassCandidate {
+                    metaclass: metaclass.class,
+                    explicit_metaclass_of: base_class,
+                };
+                continue;
+            }
+            if candidate.metaclass.is_subclass_of(db, metaclass.class) {
+                continue;
+            }
+            return Err(MetaclassError {
+                kind: MetaclassErrorKind::Conflict {
+                    candidate1: candidate,
+                    candidate2: MetaclassCandidate {
+                        metaclass: metaclass.class,
+                        explicit_metaclass_of: base_class,
+                    },
+                    candidate1_is_base_class: explicit_metaclass.is_none(),
+                },
+            });
+        }
+
+        Ok(Type::ClassLiteral(ClassLiteralType {
+            class: candidate.metaclass,
+        }))
     }
 
     /// Returns the class member of this class named `name`.
@@ -2451,6 +2438,39 @@ impl<'db> Class<'db> {
         let scope = self.body_scope(db);
         symbol(db, scope, name)
     }
+
+    /// Return `true` if this class appears to be a cyclic definition,
+    /// i.e., it inherits either directly or indirectly from itself.
+    ///
+    /// A class definition like this will fail at runtime,
+    /// but we must be resilient to it or we could panic.
+    #[salsa::tracked]
+    fn is_cyclically_defined(self, db: &'db dyn Db) -> bool {
+        fn is_cyclically_defined_recursive<'db>(
+            db: &'db dyn Db,
+            class: Class<'db>,
+            classes_to_watch: &mut IndexSet<Class<'db>>,
+        ) -> bool {
+            if !classes_to_watch.insert(class) {
+                return true;
+            }
+            for explicit_base_class in class.fully_static_explicit_bases(db) {
+                // Each base must be considered in isolation.
+                // This is due to the fact that if a class uses multiple inheritance,
+                // there could easily be a situation where two bases have the same class in their MROs;
+                // that isn't enough to constitute the class being cyclically defined.
+                let classes_to_watch_len = classes_to_watch.len();
+                if is_cyclically_defined_recursive(db, explicit_base_class, classes_to_watch) {
+                    return true;
+                }
+                classes_to_watch.truncate(classes_to_watch_len);
+            }
+            false
+        }
+
+        self.fully_static_explicit_bases(db)
+            .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::new()))
+    }
 }
 
 /// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
@@ -2458,38 +2478,6 @@ impl<'db> Class<'db> {
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: Class<'db>,
     explicit_metaclass_of: Class<'db>,
-}
-
-/// A utility struct for detecting duplicates in class hierarchies while storing the initial
-/// entry on the stack.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct SeenSet<T: Hash + Eq> {
-    initial: T,
-    visited: IndexSet<T>,
-}
-
-impl<T: Hash + Eq> SeenSet<T> {
-    fn new(initial: T) -> SeenSet<T> {
-        Self {
-            initial,
-            visited: IndexSet::new(),
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.visited.len()
-    }
-
-    fn truncate(&mut self, len: usize) {
-        self.visited.truncate(len);
-    }
-
-    fn insert(&mut self, value: T) -> bool {
-        if value == self.initial {
-            return false;
-        }
-        self.visited.insert(value)
-    }
 }
 
 /// A singleton type representing a single class object at runtime.
@@ -2575,13 +2563,6 @@ pub(super) enum MetaclassErrorKind<'db> {
         /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
         candidate1_is_base_class: bool,
     },
-
-    /// The class inherits from itself!
-    ///
-    /// This is very unlikely to happen in working real-world code,
-    /// but it's important to explicitly account for it.
-    /// If we don't, there's a possibility of an infinite loop and a panic.
-    CyclicDefinition,
 }
 
 #[salsa::interned]

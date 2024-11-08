@@ -456,9 +456,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.check_class_definitions();
     }
 
-    /// Iterate over all class definitions to check that Python will be able to create a
-    /// consistent "[method resolution order]" and [metaclass] for each class at runtime. If not,
-    /// issue a diagnostic.
+    /// Iterate over all class definitions to check that the definition will not cause an exception
+    /// to be raised at runtime. This needs to be done after most other types in the scope have been
+    /// inferred, due to the fact that base classes can be deferred. If it looks like a class
+    /// definition is invalid in some way, issue a diagnostic.
+    ///
+    /// Among the things we check for in this method are whether Python will be able to determine a
+    /// consistent "[method resolution order]" and [metaclass] for each class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
@@ -470,7 +474,25 @@ impl<'db> TypeInferenceBuilder<'db> {
             .filter_map(|ty| ty.into_class_literal())
             .map(|class_ty| class_ty.class);
 
+        // Iterate through all class definitions in this scope.
         for class in class_definitions {
+            // (1) Check that the class does not have a cyclic definition
+            if class.is_cyclically_defined(self.db) {
+                self.diagnostics.add(
+                    class.node(self.db).into(),
+                    "cyclic-class-def",
+                    format_args!(
+                        "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
+                        class.name(self.db),
+                        class.name(self.db)
+                    ),
+                );
+                // Attempting to determine the MRO of a class or if the class has a metaclass conflict
+                // is impossible if the class is cyclically defined; there's nothing more to do here.
+                continue;
+            }
+
+            // (2) Check that the class's MRO is resolvable
             if let Err(mro_error) = class.try_mro(self.db).as_ref() {
                 match mro_error.reason() {
                     MroErrorKind::DuplicateBases(duplicates) => {
@@ -483,15 +505,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                         }
                     }
-                    MroErrorKind::CyclicClassDefinition => self.diagnostics.add(
-                        class.node(self.db).into(),
-                        "cyclic-class-def",
-                        format_args!(
-                            "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
-                            class.name(self.db),
-                            class.name(self.db)
-                        ),
-                    ),
                     MroErrorKind::InvalidBases(bases) => {
                         let base_nodes = class.node(self.db).bases();
                         for (index, base_ty) in bases {
@@ -517,6 +530,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
+            // (3) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Conflict {
@@ -563,10 +577,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 )
                             );
                         }
-                    }
-                    MetaclassErrorKind::CyclicDefinition => {
-                        // Cyclic class definition diagnostic will already have been emitted above
-                        // in MRO calculation.
                     }
                 }
             }
