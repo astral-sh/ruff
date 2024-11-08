@@ -823,14 +823,20 @@ impl<'db> Type<'db> {
             ),
             (Type::SliceLiteral(..), _) | (_, Type::SliceLiteral(..)) => true,
 
-            (
-                Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
-                Type::Instance(InstanceType { class }),
-            )
-            | (
-                Type::Instance(InstanceType { class }),
-                Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
-            ) => !class.is_known(db, KnownClass::Object),
+            (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::ClassLiteral(..)) => {
+                !matches!(class.known(db), Some(KnownClass::Type | KnownClass::Object))
+            }
+            (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => !matches!(
+                class.known(db),
+                Some(KnownClass::FunctionType | KnownClass::Object)
+            ),
+            (Type::ModuleLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::ModuleLiteral(..)) => !matches!(
+                class.known(db),
+                Some(KnownClass::ModuleType | KnownClass::Object)
+            ),
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
@@ -3048,6 +3054,7 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(2)], neg: vec![]}, Ty::IntLiteral(2))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::BuiltinInstance("int")]))]
+    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
