@@ -1391,16 +1391,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             None => None,
         };
         let default_ty = self.infer_optional_type_expression(default.as_deref());
-        self.add_binding(
-            node.into(),
-            definition,
-            Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-                self.db,
-                name.id.clone(),
-                bound_or_constraint,
-                default_ty,
-            ))),
-        );
+        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            self.db,
+            name.id.clone(),
+            bound_or_constraint,
+            default_ty,
+        )));
+        self.add_declaration_with_binding(node.into(), definition, ty, ty);
     }
 
     fn infer_paramspec_definition(
@@ -4294,9 +4291,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match value_ty {
             Type::KnownInstance(known_instance) => {
-                // TODO diagnostics on invalid type expressions
                 self.infer_parameterized_known_instance_type_expression(known_instance, slice)
-                    .unwrap_or(Type::Unknown)
             }
             _ => {
                 self.infer_type_expression(slice);
@@ -4309,28 +4304,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         known_instance: KnownInstanceType,
         parameters: &ast::Expr,
-    ) -> Option<Type<'db>> {
+    ) -> Type<'db> {
         match known_instance {
-            KnownInstanceType::Literal => {
-                Some(match self.infer_literal_parameter_type(parameters) {
-                    Ok(ty) => ty,
-                    Err(nodes) => {
-                        for node in nodes {
-                            self.diagnostics.add(
-                                node.into(),
-                                "invalid-literal-parameter",
-                                format_args!(
-                                    "Type arguments for `Literal` must be `None`, \
+            KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
+                Ok(ty) => ty,
+                Err(nodes) => {
+                    for node in nodes {
+                        self.diagnostics.add(
+                            node.into(),
+                            "invalid-literal-parameter",
+                            format_args!(
+                                "Type arguments for `Literal` must be `None`, \
                                     a literal value (int, bool, str, or bytes), or an enum value"
-                                ),
-                            );
-                        }
-                        Type::Unknown
+                            ),
+                        );
                     }
-                })
-            }
-            KnownInstanceType::TypeVar(_) => Some(Type::Todo),
-            KnownInstanceType::NoDefault => None,
+                    Type::Unknown
+                }
+            },
+            KnownInstanceType::TypeVar(_) => Type::Todo,
         }
     }
 

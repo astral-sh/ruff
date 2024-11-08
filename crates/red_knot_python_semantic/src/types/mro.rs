@@ -382,7 +382,6 @@ impl<'db> ClassBase<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::Literal => None,
                 KnownInstanceType::TypeVar(_) => None,
-                KnownInstanceType::NoDefault => None,
             },
         }
     }

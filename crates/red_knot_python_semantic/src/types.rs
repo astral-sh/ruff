@@ -657,17 +657,23 @@ impl<'db> Type<'db> {
         // TODO: Once we have support for final classes, we can establish that
         // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
 
-        // TODO: The following is a workaround that is required to unify the two different
-        // versions of `NoneType` in typeshed. This should not be required anymore once we
-        // understand `sys.version_info` branches.
+        // TODO: The following is a workaround that is required to unify the two different versions
+        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
+        // we understand `sys.version_info` branches.
         self == other
             || matches!((self, other),
                 (
                     Type::Instance(InstanceType { class: self_class }),
                     Type::Instance(InstanceType { class: target_class })
                 )
-                if self_class.is_known(db, KnownClass::NoneType) &&
-                target_class.is_known(db, KnownClass::NoneType))
+                if (
+                    self_class.is_known(db, KnownClass::NoneType) &&
+                    target_class.is_known(db, KnownClass::NoneType)
+                ) || (
+                    self_class.is_known(db, KnownClass::NoDefaultType) &&
+                    target_class.is_known(db, KnownClass::NoDefaultType)
+                )
+            )
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -1597,6 +1603,7 @@ impl<'db> KnownClass {
             "ModuleType" => Some(Self::ModuleType),
             "FunctionType" => Some(Self::FunctionType),
             "_SpecialForm" => Some(Self::SpecialForm),
+            "_NoDefaultType" => Some(Self::NoDefaultType),
             _ => None,
         }
     }
@@ -1635,8 +1642,6 @@ pub enum KnownInstanceType<'db> {
     Literal,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
-    /// The symbol `typing.NoDefault` (or `typing_extensions.NoDefault`)
-    NoDefault,
     // TODO: fill this enum out with more special forms, etc.
 }
 
@@ -1645,7 +1650,6 @@ impl<'db> KnownInstanceType<'db> {
         match self {
             KnownInstanceType::Literal => "Literal",
             KnownInstanceType::TypeVar(_) => "TypeVar",
-            KnownInstanceType::NoDefault => "NoDefault",
         }
     }
 
@@ -1654,7 +1658,6 @@ impl<'db> KnownInstanceType<'db> {
         match self {
             Self::Literal => Truthiness::AlwaysTrue,
             Self::TypeVar(_) => Truthiness::AlwaysTrue,
-            Self::NoDefault => Truthiness::AlwaysTrue,
         }
     }
 
@@ -1663,7 +1666,6 @@ impl<'db> KnownInstanceType<'db> {
         match self {
             Self::Literal => "typing.Literal",
             Self::TypeVar(typevar) => typevar.name(db),
-            Self::NoDefault => "typing.NoDefault",
         }
     }
 
@@ -1672,7 +1674,6 @@ impl<'db> KnownInstanceType<'db> {
         match self {
             Self::Literal => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
-            Self::NoDefault => KnownClass::NoDefaultType,
         }
     }
 
@@ -1727,7 +1728,7 @@ impl<'db> KnownInstanceType<'db> {
                 typevar
                     .default_ty(db)
                     .map(|ty| ty.to_meta_type(db))
-                    .unwrap_or(Type::KnownInstance(KnownInstanceType::NoDefault)),
+                    .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
                 Boundness::Bound,
             ),
             _ => self.instance_fallback(db).member(db, name),
@@ -1739,9 +1740,9 @@ impl<'db> KnownInstanceType<'db> {
 ///
 /// This is referenced by `KnownInstanceType::TypeVar` (to represent the singleton type of the
 /// runtime `typing.TypeVar` object itself). In the future, it will also be referenced also by a
-/// new `Type` variant to represent the type that this typevar represents as an annotation (that
+/// new `Type` variant to represent the type that this typevar represents as an annotation: that
 /// is, an unknown set of objects, constrained by the upper-bound/constraints on this type var,
-/// defaulting to the default type of this type var when not otherwise bound to a type.)
+/// defaulting to the default type of this type var when not otherwise bound to a type.
 ///
 /// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
 /// not by value. Two typevars that have the same name, bound/constraints, and default, are still

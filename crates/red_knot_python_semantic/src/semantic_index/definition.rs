@@ -457,7 +457,10 @@ impl DefinitionKind<'_> {
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
             | DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_) => DefinitionCategory::DeclarationAndBinding,
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::TypeVar(_)
+            | DefinitionKind::ParamSpec(_)
+            | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
             // a parameter always binds a value, but is only a declaration if annotated
             DefinitionKind::Parameter(parameter) => {
                 if parameter.annotation.is_some() {
@@ -490,10 +493,7 @@ impl DefinitionKind<'_> {
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
-            | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::TypeVar(_)
-            | DefinitionKind::ParamSpec(_)
-            | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::Binding,
+            | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
         }
     }
 }
