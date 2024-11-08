@@ -307,7 +307,7 @@ fn declarations_ty<'db>(
 }
 
 /// Representation of a type: a set of possible values at runtime.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Any,
@@ -1629,7 +1629,7 @@ impl<'db> KnownClass {
 }
 
 /// Enumeration of specific runtime that are special enough to be considered their own type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
@@ -1749,11 +1749,9 @@ pub struct TypeVarInstance<'db> {
     name: ast::name::Name,
 
     /// The upper bound or constraint on the type of this TypeVar
-    #[no_eq] // TODO track down why this is required to avoid lifetime error
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
     /// The default type for this TypeVar
-    #[no_eq] // TODO track down why this is required to avoid lifetime error
     default_ty: Option<Type<'db>>,
 }
 
@@ -1775,7 +1773,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(TupleType<'db>),
@@ -2596,7 +2594,7 @@ impl<T: Hash + Eq> SeenSet<T> {
 }
 
 /// A singleton type representing a single class object at runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct ClassLiteralType<'db> {
     class: Class<'db>,
 }
@@ -2618,7 +2616,7 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
 }
 
 /// A type that represents `type[C]`, i.e. the class literal `C` and class literals that are subclasses of `C`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
     class: Class<'db>,
 }
@@ -2630,7 +2628,7 @@ impl<'db> SubclassOfType<'db> {
 }
 
 /// A type representing the set of runtime objects which are instances of a certain class.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub struct InstanceType<'db> {
     class: Class<'db>,
 }
