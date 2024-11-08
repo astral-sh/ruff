@@ -1735,13 +1735,17 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
-/// Metadata about a single type variable.
+/// Data regarding a single type variable.
 ///
 /// This is referenced by `KnownInstanceType::TypeVar` (to represent the singleton type of the
-/// runtime `typing.TypeVar` object itself), and in future will also be referenced also by a new
-/// `Type` variant to represent the type that this typevar represents as an annotation (that is, an
-/// unknown set of objects, constrained by the upper-bound/constraints on this type var, defaulting
-/// to the default type of this type var when not otherwise bound.)
+/// runtime `typing.TypeVar` object itself). In the future, it will also be referenced also by a
+/// new `Type` variant to represent the type that this typevar represents as an annotation (that
+/// is, an unknown set of objects, constrained by the upper-bound/constraints on this type var,
+/// defaulting to the default type of this type var when not otherwise bound to a type.)
+///
+/// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
+/// not by value. Two typevars that have the same name, bound/constraints, and default, are still
+/// different typevars: if used in the same scope, they may be bound to different types.
 #[salsa::tracked]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
