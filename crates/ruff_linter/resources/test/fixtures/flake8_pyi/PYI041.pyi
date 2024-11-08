@@ -39,6 +39,12 @@ def f4(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
 def f5(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
 
 
+def f6(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
+
+
+def f7(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: ...  # PYI041
+
+
 class Foo:
     def good(self, arg: int) -> None: ...
 
