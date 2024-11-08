@@ -229,7 +229,7 @@ fn try_parse_fmt(text: &str) -> Option<(EndIndex, SpecialComment)> {
 
 fn try_parse_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^# isort:(?<rest>skip|skip_file)").unwrap());
+        LazyLock::new(|| Regex::new(r"^# isort:(?<rest>skip_file|skip)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Isort)
 }
@@ -237,7 +237,7 @@ fn try_parse_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
 fn try_parse_mypy(text: &str) -> Option<(EndIndex, SpecialComment)> {
     // https://github.com/python/mypy/blob/3b00002acd/mypy/util.py#L228
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^# mypy:\s*(?<rest>\S)").unwrap());
+        LazyLock::new(|| Regex::new(r"^# mypy:\s*(?<rest>\S+)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Mypy)
 }
@@ -256,7 +256,7 @@ fn try_parse_pyright(text: &str) -> Option<(EndIndex, SpecialComment)> {
     // https://github.com/microsoft/pyright/blob/9d60c434c4/packages/pyright-internal/src/parser/tokenizer.ts#L1314
     // https://github.com/microsoft/pyright/blob/9d60c434c4/packages/pyright-internal/src/analyzer/commentUtils.ts#L138
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^#\s*pyright:\s*(?<rest>\S)").unwrap());
+        LazyLock::new(|| Regex::new(r"^#\s*pyright:\s*(?<rest>\S+)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Pyright)
 }
@@ -264,7 +264,7 @@ fn try_parse_pyright(text: &str) -> Option<(EndIndex, SpecialComment)> {
 fn try_parse_ruff_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
     // ruff_linter::directives::extract_isort_directives
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^# ruff: isort: ?(?<rest>skip|skip_file)").unwrap());
+        LazyLock::new(|| Regex::new(r"^# ruff: isort: ?(?<rest>skip_file|skip)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::RuffIsort)
 }
@@ -272,7 +272,7 @@ fn try_parse_ruff_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
 fn try_parse_type(text: &str) -> Option<(EndIndex, SpecialComment)> {
     // https://github.com/python/cpython/blob/c222441fa7/Parser/lexer/lexer.c#L45-L47
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^#\s*type:\s*(?<rest>\S)").unwrap());
+        LazyLock::new(|| Regex::new(r"^#\s*type:\s*(?<rest>\S+)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Type)
 }
@@ -317,13 +317,18 @@ pub(crate) fn unformatted_special_comment(
 ) {
     for range in comment_ranges {
         let text = locator.slice(range);
+        let range_start: usize = range.start().into();
 
-        for (index, char) in text.char_indices() {
-            if !matches!(char, '#') {
+        for (char_index, char) in text.char_indices() {
+            let next_char = text[char_index..].chars().next();
+
+            if char != '#' || matches!(next_char, Some('#')) {
                 continue;
             }
 
-            check_single_comment(diagnostics, &text[index..], index);
+            let absolute_start_index = range_start + char_index;
+
+            check_single_comment(diagnostics, &text[char_index..], absolute_start_index);
         }
     }
 }
