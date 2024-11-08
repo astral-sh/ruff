@@ -1742,24 +1742,25 @@ impl<'db> KnownInstanceType<'db> {
 /// `Type` variant to represent the type that this typevar represents as an annotation (that is, an
 /// unknown set of objects, constrained by the upper-bound/constraints on this type var, defaulting
 /// to the default type of this type var when not otherwise bound.)
-#[salsa::interned]
+#[salsa::tracked]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
     #[return_ref]
     name: ast::name::Name,
 
     /// The upper bound or constraint on the type of this TypeVar
-    #[return_ref]
+    #[no_eq] // TODO track down why this is required to avoid lifetime error
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
     /// The default type for this TypeVar
+    #[no_eq] // TODO track down why this is required to avoid lifetime error
     default_ty: Option<Type<'db>>,
 }
 
 impl<'db> TypeVarInstance<'db> {
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
-            Some(*ty)
+            Some(ty)
         } else {
             None
         }
