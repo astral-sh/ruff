@@ -1411,7 +1411,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
         } = node;
         self.infer_optional_expression(default.as_deref());
-        self.add_binding(node.into(), definition, Type::Todo);
+        self.add_declaration_with_binding(node.into(), definition, Type::Todo, Type::Todo);
     }
 
     fn infer_typevartuple_definition(
@@ -1425,7 +1425,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
         } = node;
         self.infer_optional_expression(default.as_deref());
-        self.add_binding(node.into(), definition, Type::Todo);
+        self.add_declaration_with_binding(node.into(), definition, Type::Todo, Type::Todo);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
