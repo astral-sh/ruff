@@ -71,7 +71,7 @@ use crate::checkers::ast::Checker;
 ///     def __iadd__(self, other: Foo) -> Self: ...
 /// ```
 /// ## References
-/// - [`typing.Self` documentation](https://docs.python.org/3/library/typing.html#typing.Self)
+/// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
 #[violation]
 pub struct NonSelfReturnType {
     class_name: String,

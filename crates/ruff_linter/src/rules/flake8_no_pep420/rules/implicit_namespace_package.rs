@@ -22,7 +22,7 @@ use crate::Locator;
 ///
 /// Directories that lack an `__init__.py` file can still be imported, but
 /// they're indicative of a special kind of package, known as a "namespace
-/// package" (see: [PEP 420](https://www.python.org/dev/peps/pep-0420/)).
+/// package" (see: [PEP 420](https://peps.python.org/pep-0420/)).
 /// Namespace packages are less widely used, so a package that lacks an
 /// `__init__.py` file is typically meant to be a regular package, and
 /// the absence of the `__init__.py` file is probably an oversight.

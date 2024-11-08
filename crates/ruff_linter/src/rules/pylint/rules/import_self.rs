@@ -9,7 +9,8 @@ use ruff_text_size::Ranged;
 /// Checks for import statements that import the current module.
 ///
 /// ## Why is this bad?
-/// Importing a module from itself is a circular dependency.
+/// Importing a module from itself is a circular dependency and results
+/// in an `ImportError` exception.
 ///
 /// ## Example
 ///

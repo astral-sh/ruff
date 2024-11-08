@@ -30,8 +30,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: max function](https://docs.python.org/3/library/functions.html#max)
-/// - [Python documentation: min function](https://docs.python.org/3/library/functions.html#min)
+/// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
+/// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 #[violation]
 pub struct IfStmtMinMax {
     min_max: MinMax,

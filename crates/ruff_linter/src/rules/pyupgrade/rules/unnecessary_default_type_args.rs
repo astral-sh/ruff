@@ -45,11 +45,10 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-///
 /// - [PEP 696 – Type Defaults for Type Parameters](https://peps.python.org/pep-0696/)
-/// - [Annotating generators and coroutines](https://docs.python.org/3.13/library/typing.html#annotating-generators-and-coroutines)
-/// - [typing.Generator](https://docs.python.org/3.13/library/typing.html#typing.Generator)
-/// - [typing.AsyncGenerator](https://docs.python.org/3.13/library/typing.html#typing.AsyncGenerator)
+/// - [Annotating generators and coroutines](https://docs.python.org/3/library/typing.html#annotating-generators-and-coroutines)
+/// - [Python documentation: `typing.Generator`](https://docs.python.org/3/library/typing.html#typing.Generator)
+/// - [Python documentation: `typing.AsyncGenerator`](https://docs.python.org/3/library/typing.html#typing.AsyncGenerator)
 #[violation]
 pub struct UnnecessaryDefaultTypeArgs;
 

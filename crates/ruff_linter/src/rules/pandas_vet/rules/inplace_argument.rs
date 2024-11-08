@@ -33,7 +33,7 @@ use crate::Locator;
 /// ```
 ///
 /// ## References
-/// - [_Why You Should Probably Never Use pandas inplace=True_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
+/// - [_Why You Should Probably Never Use pandas `inplace=True`_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[violation]
 pub struct PandasUseOfInplaceArgument;
 
