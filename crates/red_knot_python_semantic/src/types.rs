@@ -908,7 +908,10 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(..) => true,
             Type::Instance(InstanceType { class }) => {
                 // TODO some more instance types can be singleton types (EllipsisType, NotImplementedType)
-                matches!(class.known(db), Some(KnownClass::NoneType))
+                matches!(
+                    class.known(db),
+                    Some(KnownClass::NoneType | KnownClass::NoDefaultType)
+                )
             }
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
@@ -2849,6 +2852,7 @@ mod tests {
         TypingLiteral,
         // BuiltinClassLiteral("str") corresponds to the builtin `str` class object itself
         BuiltinClassLiteral(&'static str),
+        KnownClassInstance(KnownClass),
         Union(Vec<Ty>),
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
@@ -2871,6 +2875,7 @@ mod tests {
                 Ty::TypingInstance(s) => typing_symbol(db, s).expect_type().to_instance(db),
                 Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
                 Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
+                Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -3219,6 +3224,7 @@ mod tests {
     #[test_case(Ty::None)]
     #[test_case(Ty::BooleanLiteral(true))]
     #[test_case(Ty::BooleanLiteral(false))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::NoDefaultType))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
