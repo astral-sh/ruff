@@ -827,15 +827,16 @@ impl<'db> Type<'db> {
             | (Type::Instance(InstanceType { class }), Type::ClassLiteral(..)) => {
                 !matches!(class.known(db), Some(KnownClass::Type | KnownClass::Object))
             }
-            // TODO: function literals are instances of <class 'function'>. Similar for modules
-            (
-                Type::FunctionLiteral(..) | Type::ModuleLiteral(..),
-                Type::Instance(InstanceType { class }),
-            )
-            | (
-                Type::Instance(InstanceType { class }),
-                Type::FunctionLiteral(..) | Type::ModuleLiteral(..),
-            ) => !class.is_known(db, KnownClass::Object),
+            (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => !matches!(
+                class.known(db),
+                Some(KnownClass::FunctionType | KnownClass::Object)
+            ),
+            (Type::ModuleLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::ModuleLiteral(..)) => !matches!(
+                class.known(db),
+                Some(KnownClass::ModuleType | KnownClass::Object)
+            ),
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
