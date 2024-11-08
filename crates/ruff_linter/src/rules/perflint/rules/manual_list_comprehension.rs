@@ -372,19 +372,20 @@ fn convert_to_list_extend(
                 format!("{newline}{}", locator.slice(indent_range))
             };
             let leading_comments = format!("{}{indentation}", for_loop_comments.join(&indentation));
-            // if comments are empty, trying to insert them panics
-            let leading_comments =
-                Some(leading_comments).filter(|leading_comments| !leading_comments.is_empty());
-            let comments_fix = leading_comments
-                .map(|comments| Edit::insertion(comments, binding_stmt.range.start()));
 
+            let mut additional_fixes = vec![Edit::range_deletion(
+                locator.full_lines_range(for_stmt.range),
+            )];
+            // if comments are empty, trying to insert them panics
+            if !leading_comments.is_empty() {
+                additional_fixes.push(Edit::insertion(
+                    leading_comments,
+                    binding_stmt.range.start(),
+                ));
+            }
             Ok(Fix::unsafe_edits(
                 Edit::range_replacement(comprehension_body, empty_list_to_replace.range),
-                [Edit::range_deletion(
-                    locator.full_lines_range(for_stmt.range),
-                )]
-                .into_iter()
-                .chain(comments_fix),
+                additional_fixes,
             ))
         }
     }
