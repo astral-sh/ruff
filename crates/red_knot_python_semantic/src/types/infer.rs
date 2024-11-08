@@ -1378,13 +1378,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let tys = elts
                     .iter()
                     .map(|expr| self.infer_type_expression(expr))
-                    .collect::<Vec<_>>();
-                let constraints =
-                    TypeVarBoundOrConstraints::Constraints(tys.clone().into_boxed_slice());
-                self.store_expression_type(
-                    expr,
-                    Type::Tuple(TupleType::new(self.db, tys.into_boxed_slice())),
-                );
+                    .collect::<Box<_>>();
+                let constraints = TypeVarBoundOrConstraints::Constraints(tys.clone());
+                self.store_expression_type(expr, Type::Tuple(TupleType::new(self.db, tys)));
                 Some(constraints)
             }
             Some(expr) => Some(TypeVarBoundOrConstraints::UpperBound(
