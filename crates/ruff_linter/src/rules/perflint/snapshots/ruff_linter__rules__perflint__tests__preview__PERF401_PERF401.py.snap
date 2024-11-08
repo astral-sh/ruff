@@ -161,3 +161,21 @@ PERF401.py:112:13: PERF401 [*] Use a list comprehension to create a transformed 
 113 113 | 
 114 114 | 
 115 115 | def f():
+
+PERF401.py:127:13: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+125 |         new_layers = []
+126 |         for value in param:
+127 |             new_layers.append(value * 3)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+122 122 |     # PERF401
+123 123 |     # make sure the fix does not panic if there is no comments
+124 124 |     if param:
+125     |-        new_layers = []
+126     |-        for value in param:
+127     |-            new_layers.append(value * 3)
+    125 |+        new_layers = [value * 3 for value in param]

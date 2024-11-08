@@ -56,3 +56,11 @@ PERF401.py:112:13: PERF401 Use a list comprehension to create a transformed list
 112 |             result.append(i) # PERF401
     |             ^^^^^^^^^^^^^^^^ PERF401
     |
+
+PERF401.py:127:13: PERF401 Use a list comprehension to create a transformed list
+    |
+125 |         new_layers = []
+126 |         for value in param:
+127 |             new_layers.append(value * 3)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF401
+    |

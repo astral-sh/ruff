@@ -117,3 +117,11 @@ def f():
     for i in range(10):
         """block comment stops the fix"""
         result.append(i*2)  # Ok
+
+def f(param):
+    # PERF401
+    # make sure the fix does not panic if there is no comments
+    if param:
+        new_layers = []
+        for value in param:
+            new_layers.append(value * 3)
