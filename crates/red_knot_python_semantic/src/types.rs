@@ -626,6 +626,10 @@ impl<'db> Type<'db> {
         match (self, target) {
             (Type::Unknown | Type::Any | Type::Todo, _) => true,
             (_, Type::Unknown | Type::Any | Type::Todo) => true,
+            (Type::Union(union), ty) => union
+                .elements(db)
+                .iter()
+                .all(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
             (ty, Type::Union(union)) => union
                 .elements(db)
                 .iter()
@@ -2765,6 +2769,14 @@ mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
+        Ty::BuiltinInstance("int")
+    )]
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
+        Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::None])
+    )]
     #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
     fn is_assignable_to(from: Ty, to: Ty) {
@@ -2776,6 +2788,14 @@ mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
+        Ty::BuiltinInstance("int")
+    )]
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
+        Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::None])
+    )]
     fn is_not_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
