@@ -14,7 +14,7 @@ use crate::registry::AsRule;
 ///
 /// ## Why is this bad?
 /// Telnet is considered insecure. It is deprecated since version 3.11, and
-/// will be removed in version 3.13. Instead, use SSH or another encrypted
+/// was removed in version 3.13. Instead, use SSH or another encrypted
 /// protocol.
 ///
 /// ## Example
