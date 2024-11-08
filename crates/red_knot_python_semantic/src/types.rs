@@ -1735,6 +1735,13 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
+/// Metadata about a single type variable.
+///
+/// This is referenced by `KnownInstanceType::TypeVar` (to represent the singleton type of the
+/// runtime `typing.TypeVar` object itself), and in future will also be referenced also by a new
+/// `Type` variant to represent the type that this typevar represents as an annotation (that is, an
+/// unknown set of objects, constrained by the upper-bound/constraints on this type var, defaulting
+/// to the default type of this type var when not otherwise bound.)
 #[salsa::interned]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
