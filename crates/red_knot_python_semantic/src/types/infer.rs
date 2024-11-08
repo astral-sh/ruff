@@ -1398,7 +1398,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             definition,
             Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
                 self.db,
-                name.id.clone(),
+                &*name.id,
                 bound_or_constraint,
                 default_ty,
             ))),
