@@ -234,7 +234,7 @@ fn annotation_is_bare_optional(checker: &Checker, annotation: &Expr) -> bool {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(annotation) else {
         return false;
     };
-    
+
     matches!(qualified_name.segments(), ["typing", "Optional"])
 }
 
@@ -265,11 +265,11 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
             if target.contains_none(checker, minor_version) {
                 return None;
             }
-            
+
             if annotation_is_bare_optional(checker, annotation) {
                 return None;
             }
-            
+
             Some(annotation)
         }
     }
