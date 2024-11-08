@@ -33,7 +33,21 @@ def f3(arg1: int, *args: Union[int | int | float]) -> None: ...  # PYI041
 async def f4(**kwargs: int | int | float) -> None: ...  # PYI041
 
 
+def f4(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
+
+
+def f5(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
+
+
 class Foo:
     def good(self, arg: int) -> None: ...
 
     def bad(self, arg: int | float | complex) -> None: ...  # PYI041
+
+    def bad2(self, arg: int | Union[float, complex]) -> None: ...  # PYI041
+
+    def bad3(self, arg: Union[Union[float, complex], int]) -> None: ...  # PYI041
+
+    def bad4(self, arg: Union[float | complex, int]) -> None: ...  # PYI041
+
+    def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041

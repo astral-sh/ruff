@@ -1,35 +1,97 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI041.py:22:14: PYI041 Use `float` instead of `int | float`
+PYI041.py:22:14: PYI041 [*] Use `float` instead of `int | float`
    |
 22 | def f0(arg1: float | int) -> None:
    |              ^^^^^^^^^^^ PYI041
 23 |     ...
    |
+   = help: Remove duplicates
 
-PYI041.py:26:30: PYI041 Use `complex` instead of `float | complex`
+ℹ Safe fix
+19 19 |     ...
+20 20 | 
+21 21 | 
+22    |-def f0(arg1: float | int) -> None:
+   22 |+def f0(arg1: float) -> None:
+23 23 |     ...
+24 24 | 
+25 25 | 
+
+PYI041.py:26:30: PYI041 [*] Use `complex` instead of `float | complex`
    |
 26 | def f1(arg1: float, *, arg2: float | list[str] | type[bool] | complex) -> None:
    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 27 |     ...
    |
+   = help: Remove duplicates
 
-PYI041.py:30:28: PYI041 Use `float` instead of `int | float`
+ℹ Safe fix
+23 23 |     ...
+24 24 | 
+25 25 | 
+26    |-def f1(arg1: float, *, arg2: float | list[str] | type[bool] | complex) -> None:
+   26 |+def f1(arg1: float, *, arg2: list[str] | type[bool] | complex) -> None:
+27 27 |     ...
+28 28 | 
+29 29 | 
+
+PYI041.py:30:28: PYI041 [*] Use `float` instead of `int | float`
    |
 30 | def f2(arg1: int, /, arg2: int | int | float) -> None:
    |                            ^^^^^^^^^^^^^^^^^ PYI041
 31 |     ...
    |
+   = help: Remove duplicates
 
-PYI041.py:38:24: PYI041 Use `float` instead of `int | float`
+ℹ Safe fix
+27 27 |     ...
+28 28 | 
+29 29 | 
+30    |-def f2(arg1: int, /, arg2: int | int | float) -> None:
+   30 |+def f2(arg1: int, /, arg2: float) -> None:
+31 31 |     ...
+32 32 | 
+33 33 | 
+
+PYI041.py:34:26: PYI041 [*] Use `float` instead of `int | float`
+   |
+34 | def f3(arg1: int, *args: Union[int | int | float]) -> None:
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+35 |     ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+31 31 |     ...
+32 32 | 
+33 33 | 
+34    |-def f3(arg1: int, *args: Union[int | int | float]) -> None:
+   34 |+def f3(arg1: int, *args: float) -> None:
+35 35 |     ...
+36 36 | 
+37 37 | 
+
+PYI041.py:38:24: PYI041 [*] Use `float` instead of `int | float`
    |
 38 | async def f4(**kwargs: int | int | float) -> None:
    |                        ^^^^^^^^^^^^^^^^^ PYI041
 39 |     ...
    |
+   = help: Remove duplicates
 
-PYI041.py:46:24: PYI041 Use `complex` instead of `float | complex`
+ℹ Safe fix
+35 35 |     ...
+36 36 | 
+37 37 | 
+38    |-async def f4(**kwargs: int | int | float) -> None:
+   38 |+async def f4(**kwargs: float) -> None:
+39 39 |     ...
+40 40 | 
+41 41 | 
+
+PYI041.py:46:24: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
 44 |         ...
 45 | 
@@ -37,14 +99,12 @@ PYI041.py:46:24: PYI041 Use `complex` instead of `float | complex`
    |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
 47 |         ...
    |
+   = help: Remove duplicates
 
-PYI041.py:46:24: PYI041 Use `complex` instead of `int | complex`
-   |
-44 |         ...
-45 | 
-46 |     def bad(self, arg: int | float | complex) -> None:
-   |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
-47 |         ...
-   |
-
-
+ℹ Safe fix
+43 43 |     def good(self, arg: int) -> None:
+44 44 |         ...
+45 45 | 
+46    |-    def bad(self, arg: int | float | complex) -> None:
+   46 |+    def bad(self, arg: complex) -> None:
+47 47 |         ...
