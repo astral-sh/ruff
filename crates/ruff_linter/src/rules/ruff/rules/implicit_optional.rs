@@ -120,17 +120,6 @@ impl From<PythonVersion> for ConversionType {
     }
 }
 
-/// Whether `annotation` is `typing.Optional` with no type arguments.
-///
-/// See [#13833](https://github.com/astral-sh/ruff/issues/13833).
-fn annotation_is_bare_optional(checker: &Checker, annotation: &Expr) -> bool {
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(annotation) else {
-        return false;
-    };
-
-    matches!(qualified_name.segments(), ["typing", "Optional"])
-}
-
 /// Generate a [`Fix`] for the given [`Expr`] as per the [`ConversionType`].
 fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr) -> Result<Fix> {
     match conversion_type {
@@ -200,10 +189,6 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
                 };
                 let conversion_type = checker.settings.target_version.into();
 
-                if annotation_is_bare_optional(checker, parsed_annotation.expression()) {
-                    continue;
-                }
-
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
                 if parsed_annotation.kind().is_simple() {
@@ -221,10 +206,6 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
                 continue;
             };
             let conversion_type = checker.settings.target_version.into();
-
-            if annotation_is_bare_optional(checker, annotation) {
-                continue;
-            }
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());

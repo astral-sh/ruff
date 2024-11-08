@@ -227,6 +227,17 @@ impl<'a> TypingTarget<'a> {
     }
 }
 
+/// Whether `annotation` is `typing.Optional` with no type arguments.
+///
+/// See [#13833](https://github.com/astral-sh/ruff/issues/13833).
+fn annotation_is_bare_optional(checker: &Checker, annotation: &Expr) -> bool {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(annotation) else {
+        return false;
+    };
+    
+    matches!(qualified_name.segments(), ["typing", "Optional"])
+}
+
 /// Check if the given annotation [`Expr`] explicitly allows `None`.
 ///
 /// This function will return `None` if the annotation explicitly allows `None`
@@ -252,10 +263,14 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
         }
         Some(target) => {
             if target.contains_none(checker, minor_version) {
-                None
-            } else {
-                Some(annotation)
+                return None;
             }
+            
+            if annotation_is_bare_optional(checker, annotation) {
+                return None;
+            }
+            
+            Some(annotation)
         }
     }
 }
