@@ -1766,8 +1766,8 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
-        if let Some(TypeVarBoundOrConstraints::Constraints(tys)) = self.bound_or_constraints(db) {
-            Some(tys)
+        if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
+            Some(tuple.elements(db))
         } else {
             None
         }
@@ -1777,7 +1777,7 @@ impl<'db> TypeVarInstance<'db> {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
-    Constraints(Box<[Type<'db>]>),
+    Constraints(TupleType<'db>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1375,12 +1375,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = node;
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
-                let tys = elts
-                    .iter()
-                    .map(|expr| self.infer_type_expression(expr))
-                    .collect::<Box<_>>();
-                let constraints = TypeVarBoundOrConstraints::Constraints(tys.clone());
-                self.store_expression_type(expr, Type::Tuple(TupleType::new(self.db, tys)));
+                let tuple = TupleType::new(
+                    self.db,
+                    elts.iter()
+                        .map(|expr| self.infer_type_expression(expr))
+                        .collect::<Box<_>>(),
+                );
+                let constraints = TypeVarBoundOrConstraints::Constraints(tuple);
+                self.store_expression_type(expr, Type::Tuple(tuple));
                 Some(constraints)
             }
             Some(expr) => Some(TypeVarBoundOrConstraints::UpperBound(
