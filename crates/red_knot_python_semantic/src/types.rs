@@ -2329,8 +2329,8 @@ impl<'db> Class<'db> {
 
         if base_classes.peek().is_some() && self.is_cyclically_defined(db) {
             // We emit diagnostics for cyclic class definitions elsewhere.
-            // Don't even try to infer the metaclass if the class is cyclically defined:
-            // it's impossible to do so without entering an infinite loop.
+            // Avoid attempting to infer the metaclass if the class is cyclically defined:
+            // it would be easy to enter an infinite loop.
             //
             // TODO: `type[Unknown]` might be better here?
             return Ok(Type::Unknown);
