@@ -1375,15 +1375,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = node;
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
-                let tuple = TupleType::new(
-                    self.db,
-                    elts.iter()
-                        .map(|expr| self.infer_type_expression(expr))
-                        .collect::<Box<_>>(),
-                );
-                let constraints = TypeVarBoundOrConstraints::Constraints(tuple);
-                self.store_expression_type(expr, Type::Tuple(tuple));
-                Some(constraints)
+                if elts.len() < 2 {
+                    self.diagnostics.add(
+                        expr.into(),
+                        "invalid-typevar-constraints",
+                        format_args!("TypeVar must have at least two constrained types"),
+                    );
+                    self.infer_expression(expr);
+                    None
+                } else {
+                    let tuple = TupleType::new(
+                        self.db,
+                        elts.iter()
+                            .map(|expr| self.infer_type_expression(expr))
+                            .collect::<Box<_>>(),
+                    );
+                    let constraints = TypeVarBoundOrConstraints::Constraints(tuple);
+                    self.store_expression_type(expr, Type::Tuple(tuple));
+                    Some(constraints)
+                }
             }
             Some(expr) => Some(TypeVarBoundOrConstraints::UpperBound(
                 self.infer_type_expression(expr),

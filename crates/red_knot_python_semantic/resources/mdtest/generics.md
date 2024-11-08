@@ -99,3 +99,13 @@ class A: ...
 class B: ...
 class A1(A): ...
 ```
+
+## Minimum two constraints
+
+A typevar with less than two constraints emits a diagnostic and is treated as unconstrained:
+
+```py
+# error: [invalid-typevar-constraints] "TypeVar must have at least two constrained types"
+def f[T: (int,)]():
+    reveal_type(T.__constraints__)  # revealed: tuple[()]
+```
