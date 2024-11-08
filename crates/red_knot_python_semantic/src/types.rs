@@ -307,7 +307,7 @@ fn declarations_ty<'db>(
 }
 
 /// Representation of a type: a set of possible values at runtime.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Any,
@@ -336,7 +336,7 @@ pub enum Type<'db> {
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
-    KnownInstance(KnownInstanceType),
+    KnownInstance(KnownInstanceType<'db>),
     /// The set of objects in any of the types in the union
     Union(UnionType<'db>),
     /// The set of objects in all of the types in the intersection
@@ -657,17 +657,23 @@ impl<'db> Type<'db> {
         // TODO: Once we have support for final classes, we can establish that
         // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
 
-        // TODO: The following is a workaround that is required to unify the two different
-        // versions of `NoneType` in typeshed. This should not be required anymore once we
-        // understand `sys.version_info` branches.
+        // TODO: The following is a workaround that is required to unify the two different versions
+        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
+        // we understand `sys.version_info` branches.
         self == other
             || matches!((self, other),
                 (
                     Type::Instance(InstanceType { class: self_class }),
                     Type::Instance(InstanceType { class: target_class })
                 )
-                if self_class.is_known(db, KnownClass::NoneType) &&
-                target_class.is_known(db, KnownClass::NoneType))
+                if (
+                    self_class.is_known(db, KnownClass::NoneType) &&
+                    target_class.is_known(db, KnownClass::NoneType)
+                ) || (
+                    self_class.is_known(db, KnownClass::NoDefaultType) &&
+                    target_class.is_known(db, KnownClass::NoDefaultType)
+                )
+            )
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -907,8 +913,11 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
             Type::Instance(InstanceType { class }) => {
-                // TODO some more instance types can be singleton types (EllipsisType, NotImplementedType)
-                matches!(class.known(db), Some(KnownClass::NoneType))
+                if let Some(known_class) = class.known(db) {
+                    known_class.is_singleton()
+                } else {
+                    false
+                }
             }
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
@@ -961,7 +970,7 @@ impl<'db> Type<'db> {
                 .all(|elem| elem.is_single_valued(db)),
 
             Type::Instance(InstanceType { class }) => match class.known(db) {
-                Some(KnownClass::NoneType) => true,
+                Some(KnownClass::NoneType | KnownClass::NoDefaultType) => true,
                 Some(
                     KnownClass::Bool
                     | KnownClass::Object
@@ -978,7 +987,8 @@ impl<'db> Type<'db> {
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
-                    | KnownClass::SpecialForm,
+                    | KnownClass::SpecialForm
+                    | KnownClass::TypeVar,
                 ) => false,
                 None => false,
             },
@@ -1049,9 +1059,7 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class_ty) => class_ty.member(db, name),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.member(db, name),
-            Type::KnownInstance(known_instance) => {
-                known_instance.instance_fallback(db).member(db, name)
-            }
+            Type::KnownInstance(known_instance) => known_instance.member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo.into()
@@ -1442,7 +1450,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
             Type::KnownInstance(known_instance) => {
-                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr()))
+                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr(db)))
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -1464,7 +1472,7 @@ impl<'db> Type<'db> {
             })),
             Type::LiteralString => Type::LiteralString,
             Type::KnownInstance(known_instance) => {
-                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr()))
+                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr(db)))
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -1514,7 +1522,10 @@ pub enum KnownClass {
     FunctionType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
+    // Typing
     SpecialForm,
+    TypeVar,
+    NoDefaultType,
 }
 
 impl<'db> KnownClass {
@@ -1537,6 +1548,8 @@ impl<'db> KnownClass {
             Self::FunctionType => "FunctionType",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
+            Self::TypeVar => "TypeVar",
+            Self::NoDefaultType => "_NoDefaultType",
         }
     }
 
@@ -1561,8 +1574,34 @@ impl<'db> KnownClass {
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
                 types_symbol(db, self.as_str()).unwrap_or_unknown()
             }
-            Self::SpecialForm => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
             Self::NoneType => typeshed_symbol(db, self.as_str()).unwrap_or_unknown(),
+            Self::SpecialForm => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
+            Self::TypeVar => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
+            Self::NoDefaultType => typing_extensions_symbol(db, self.as_str()).unwrap_or_unknown(),
+        }
+    }
+
+    fn is_singleton(self) -> bool {
+        // TODO there are other singleton types (EllipsisType, NotImplementedType)
+        match self {
+            Self::NoneType | Self::NoDefaultType => true,
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Tuple
+            | Self::Int
+            | Self::Float
+            | Self::Str
+            | Self::Set
+            | Self::Dict
+            | Self::List
+            | Self::Type
+            | Self::Slice
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::SpecialForm
+            | Self::TypeVar => false,
         }
     }
 
@@ -1597,6 +1636,7 @@ impl<'db> KnownClass {
             "ModuleType" => Some(Self::ModuleType),
             "FunctionType" => Some(Self::FunctionType),
             "_SpecialForm" => Some(Self::SpecialForm),
+            "_NoDefaultType" => Some(Self::NoDefaultType),
             _ => None,
         }
     }
@@ -1621,7 +1661,7 @@ impl<'db> KnownClass {
             | Self::Slice => module.name() == "builtins",
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
-            Self::SpecialForm => {
+            Self::SpecialForm | Self::TypeVar | Self::NoDefaultType => {
                 matches!(module.name().as_str(), "typing" | "typing_extensions")
             }
         }
@@ -1629,17 +1669,20 @@ impl<'db> KnownClass {
 }
 
 /// Enumeration of specific runtime that are special enough to be considered their own type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KnownInstanceType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
+    /// A single instance of `typing.TypeVar`
+    TypeVar(TypeVarInstance<'db>),
     // TODO: fill this enum out with more special forms, etc.
 }
 
-impl KnownInstanceType {
+impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
             KnownInstanceType::Literal => "Literal",
+            KnownInstanceType::TypeVar(_) => "TypeVar",
         }
     }
 
@@ -1647,13 +1690,15 @@ impl KnownInstanceType {
     pub const fn bool(self) -> Truthiness {
         match self {
             Self::Literal => Truthiness::AlwaysTrue,
+            Self::TypeVar(_) => Truthiness::AlwaysTrue,
         }
     }
 
     /// Return the repr of the symbol at runtime
-    pub const fn repr(self) -> &'static str {
+    pub fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
             Self::Literal => "typing.Literal",
+            Self::TypeVar(typevar) => typevar.name(db),
         }
     }
 
@@ -1661,6 +1706,7 @@ impl KnownInstanceType {
     pub const fn class(self) -> KnownClass {
         match self {
             Self::Literal => KnownClass::SpecialForm,
+            Self::TypeVar(_) => KnownClass::TypeVar,
         }
     }
 
@@ -1682,6 +1728,93 @@ impl KnownInstanceType {
             _ => None,
         }
     }
+
+    fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        match (self, name) {
+            (Self::TypeVar(typevar), "__name__") => Symbol::Type(
+                Type::StringLiteral(StringLiteralType::new(db, typevar.name(db).as_str())),
+                Boundness::Bound,
+            ),
+            (Self::TypeVar(typevar), "__bound__") => Symbol::Type(
+                typevar
+                    .upper_bound(db)
+                    .map(|ty| ty.to_meta_type(db))
+                    .unwrap_or(KnownClass::NoneType.to_instance(db)),
+                Boundness::Bound,
+            ),
+            (Self::TypeVar(typevar), "__constraints__") => Symbol::Type(
+                Type::Tuple(TupleType::new(
+                    db,
+                    typevar
+                        .constraints(db)
+                        .map(|constraints| {
+                            constraints
+                                .iter()
+                                .map(|ty| ty.to_meta_type(db))
+                                .collect::<Box<_>>()
+                        })
+                        .unwrap_or_else(|| std::iter::empty().collect::<Box<_>>()),
+                )),
+                Boundness::Bound,
+            ),
+            (Self::TypeVar(typevar), "__default__") => Symbol::Type(
+                typevar
+                    .default_ty(db)
+                    .map(|ty| ty.to_meta_type(db))
+                    .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
+                Boundness::Bound,
+            ),
+            _ => self.instance_fallback(db).member(db, name),
+        }
+    }
+}
+
+/// Data regarding a single type variable.
+///
+/// This is referenced by `KnownInstanceType::TypeVar` (to represent the singleton type of the
+/// runtime `typing.TypeVar` object itself). In the future, it will also be referenced also by a
+/// new `Type` variant to represent the type that this typevar represents as an annotation: that
+/// is, an unknown set of objects, constrained by the upper-bound/constraints on this type var,
+/// defaulting to the default type of this type var when not otherwise bound to a type.
+///
+/// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
+/// not by value. Two typevars that have the same name, bound/constraints, and default, are still
+/// different typevars: if used in the same scope, they may be bound to different types.
+#[salsa::tracked]
+pub struct TypeVarInstance<'db> {
+    /// The name of this TypeVar (e.g. `T`)
+    #[return_ref]
+    name: ast::name::Name,
+
+    /// The upper bound or constraint on the type of this TypeVar
+    bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
+
+    /// The default type for this TypeVar
+    default_ty: Option<Type<'db>>,
+}
+
+impl<'db> TypeVarInstance<'db> {
+    pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
+            Some(ty)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
+        if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
+            Some(tuple.elements(db))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
+pub enum TypeVarBoundOrConstraints<'db> {
+    UpperBound(Type<'db>),
+    Constraints(TupleType<'db>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2499,7 +2632,7 @@ impl<T: Hash + Eq> SeenSet<T> {
 }
 
 /// A singleton type representing a single class object at runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct ClassLiteralType<'db> {
     class: Class<'db>,
 }
@@ -2521,7 +2654,7 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
 }
 
 /// A type that represents `type[C]`, i.e. the class literal `C` and class literals that are subclasses of `C`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
     class: Class<'db>,
 }
@@ -2533,7 +2666,7 @@ impl<'db> SubclassOfType<'db> {
 }
 
 /// A type representing the set of runtime objects which are instances of a certain class.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub struct InstanceType<'db> {
     class: Class<'db>,
 }
@@ -2746,9 +2879,10 @@ mod tests {
         // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
         BuiltinInstance(&'static str),
         TypingInstance(&'static str),
-        KnownInstance(KnownInstanceType),
+        TypingLiteral,
         // BuiltinClassLiteral("str") corresponds to the builtin `str` class object itself
         BuiltinClassLiteral(&'static str),
+        KnownClassInstance(KnownClass),
         Union(Vec<Ty>),
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
@@ -2769,8 +2903,9 @@ mod tests {
                 Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
                 Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
                 Ty::TypingInstance(s) => typing_symbol(db, s).expect_type().to_instance(db),
-                Ty::KnownInstance(known_instance) => Type::KnownInstance(known_instance),
+                Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
                 Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
+                Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -2876,14 +3011,8 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("str")], neg: vec![Ty::StringLiteral("foo")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("int"))]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinInstance("object"))]
-    #[test_case(
-        Ty::KnownInstance(KnownInstanceType::Literal),
-        Ty::TypingInstance("_SpecialForm")
-    )]
-    #[test_case(
-        Ty::KnownInstance(KnownInstanceType::Literal),
-        Ty::BuiltinInstance("object")
-    )]
+    #[test_case(Ty::TypingLiteral, Ty::TypingInstance("_SpecialForm"))]
+    #[test_case(Ty::TypingLiteral, Ty::BuiltinInstance("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3126,6 +3255,7 @@ mod tests {
     #[test_case(Ty::None)]
     #[test_case(Ty::BooleanLiteral(true))]
     #[test_case(Ty::BooleanLiteral(false))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::NoDefaultType))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 

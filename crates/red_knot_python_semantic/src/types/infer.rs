@@ -59,7 +59,8 @@ use crate::types::{
     Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
     KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, StringLiteralType,
-    Symbol, Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
+    Symbol, Truthiness, TupleType, Type, TypeArrayDisplay, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -641,6 +642,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             DefinitionKind::ExceptHandler(except_handler_definition) => {
                 self.infer_except_handler_definition(except_handler_definition, definition);
+            }
+            DefinitionKind::TypeVar(node) => {
+                self.infer_typevar_definition(node, definition);
+            }
+            DefinitionKind::ParamSpec(node) => {
+                self.infer_paramspec_definition(node, definition);
+            }
+            DefinitionKind::TypeVarTuple(node) => {
+                self.infer_typevartuple_definition(node, definition);
             }
         }
     }
@@ -1352,6 +1362,82 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
+    fn infer_typevar_definition(
+        &mut self,
+        node: &ast::TypeParamTypeVar,
+        definition: Definition<'db>,
+    ) {
+        let ast::TypeParamTypeVar {
+            range: _,
+            name,
+            bound,
+            default,
+        } = node;
+        let bound_or_constraint = match bound.as_deref() {
+            Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
+                if elts.len() < 2 {
+                    self.diagnostics.add(
+                        expr.into(),
+                        "invalid-typevar-constraints",
+                        format_args!("TypeVar must have at least two constrained types"),
+                    );
+                    self.infer_expression(expr);
+                    None
+                } else {
+                    let tuple = TupleType::new(
+                        self.db,
+                        elts.iter()
+                            .map(|expr| self.infer_type_expression(expr))
+                            .collect::<Box<_>>(),
+                    );
+                    let constraints = TypeVarBoundOrConstraints::Constraints(tuple);
+                    self.store_expression_type(expr, Type::Tuple(tuple));
+                    Some(constraints)
+                }
+            }
+            Some(expr) => Some(TypeVarBoundOrConstraints::UpperBound(
+                self.infer_type_expression(expr),
+            )),
+            None => None,
+        };
+        let default_ty = self.infer_optional_type_expression(default.as_deref());
+        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            self.db,
+            name.id.clone(),
+            bound_or_constraint,
+            default_ty,
+        )));
+        self.add_declaration_with_binding(node.into(), definition, ty, ty);
+    }
+
+    fn infer_paramspec_definition(
+        &mut self,
+        node: &ast::TypeParamParamSpec,
+        definition: Definition<'db>,
+    ) {
+        let ast::TypeParamParamSpec {
+            range: _,
+            name: _,
+            default,
+        } = node;
+        self.infer_optional_expression(default.as_deref());
+        self.add_declaration_with_binding(node.into(), definition, Type::Todo, Type::Todo);
+    }
+
+    fn infer_typevartuple_definition(
+        &mut self,
+        node: &ast::TypeParamTypeVarTuple,
+        definition: Definition<'db>,
+    ) {
+        let ast::TypeParamTypeVarTuple {
+            range: _,
+            name: _,
+            default,
+        } = node;
+        self.infer_optional_expression(default.as_deref());
+        self.add_declaration_with_binding(node.into(), definition, Type::Todo, Type::Todo);
+    }
+
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
         let ast::StmtMatch {
             range: _,
@@ -2011,13 +2097,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {
         expression.map(|expr| self.infer_expression(expr))
-    }
-
-    fn infer_optional_annotation_expression(
-        &mut self,
-        expr: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
-        expr.map(|expr| self.infer_annotation_expression(expr))
     }
 
     #[track_caller]
@@ -3912,32 +3991,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = type_parameters;
         for type_param in type_params {
             match type_param {
-                ast::TypeParam::TypeVar(typevar) => {
-                    let ast::TypeParamTypeVar {
-                        range: _,
-                        name: _,
-                        bound,
-                        default,
-                    } = typevar;
-                    self.infer_optional_expression(bound.as_deref());
-                    self.infer_optional_expression(default.as_deref());
-                }
-                ast::TypeParam::ParamSpec(param_spec) => {
-                    let ast::TypeParamParamSpec {
-                        range: _,
-                        name: _,
-                        default,
-                    } = param_spec;
-                    self.infer_optional_expression(default.as_deref());
-                }
-                ast::TypeParam::TypeVarTuple(typevar_tuple) => {
-                    let ast::TypeParamTypeVarTuple {
-                        range: _,
-                        name: _,
-                        default,
-                    } = typevar_tuple;
-                    self.infer_optional_expression(default.as_deref());
-                }
+                ast::TypeParam::TypeVar(node) => self.infer_definition(node),
+                ast::TypeParam::ParamSpec(node) => self.infer_definition(node),
+                ast::TypeParam::TypeVarTuple(node) => self.infer_definition(node),
             }
         }
     }
@@ -3970,6 +4026,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.store_expression_type(expression, annotation_ty);
         annotation_ty
+    }
+
+    fn infer_optional_annotation_expression(
+        &mut self,
+        expr: Option<&ast::Expr>,
+    ) -> Option<Type<'db>> {
+        expr.map(|expr| self.infer_annotation_expression(expr))
     }
 }
 
@@ -4145,6 +4208,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
+    fn infer_optional_type_expression(
+        &mut self,
+        opt_expression: Option<&ast::Expr>,
+    ) -> Option<Type<'db>> {
+        opt_expression.map(|expr| self.infer_type_expression(expr))
+    }
+
     /// Given the slice of a `tuple[]` annotation, return the type that the annotation represents
     fn infer_tuple_type_expression(&mut self, tuple_slice: &ast::Expr) -> Type<'db> {
         /// In most cases, if a subelement of the tuple is inferred as `Todo`,
@@ -4262,6 +4332,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Unknown
                 }
             },
+            KnownInstanceType::TypeVar(_) => Type::Todo,
         }
     }
 

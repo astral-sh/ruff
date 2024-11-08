@@ -381,6 +381,7 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_) => None,
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::Literal => None,
+                KnownInstanceType::TypeVar(_) => None,
             },
         }
     }
