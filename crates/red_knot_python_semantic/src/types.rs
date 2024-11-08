@@ -907,11 +907,11 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
             Type::Instance(InstanceType { class }) => {
-                // TODO some more instance types can be singleton types (EllipsisType, NotImplementedType)
-                matches!(
-                    class.known(db),
-                    Some(KnownClass::NoneType | KnownClass::NoDefaultType)
-                )
+                if let Some(known_class) = class.known(db) {
+                    known_class.is_singleton()
+                } else {
+                    false
+                }
             }
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
@@ -1572,6 +1572,30 @@ impl<'db> KnownClass {
             Self::SpecialForm => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
             Self::TypeVar => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
             Self::NoDefaultType => typing_extensions_symbol(db, self.as_str()).unwrap_or_unknown(),
+        }
+    }
+
+    fn is_singleton(self) -> bool {
+        // TODO there are other singleton types (EllipsisType, NotImplementedType)
+        match self {
+            Self::NoneType | Self::NoDefaultType => true,
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Tuple
+            | Self::Int
+            | Self::Float
+            | Self::Str
+            | Self::Set
+            | Self::Dict
+            | Self::List
+            | Self::Type
+            | Self::Slice
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::SpecialForm
+            | Self::TypeVar => false,
         }
     }
 
