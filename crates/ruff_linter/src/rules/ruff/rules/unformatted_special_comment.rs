@@ -19,45 +19,55 @@ enum SpecialComment {
         hint: String,
         codes: Option<Vec<String>>,
     },
+
+    /// `# fmt: on`, `# fmt: off`, `fmt: skip`
+    Fmt(String),
+    /// `# isort: skip_file`
+    Isort(String),
+    /// `# mypy: ignore-errors`
+    Mypy(String),
+    /// `# nopycln: import`
+    Nopycln(String),
+    /// `# pyright: strict`, `# pyright: ignore[reportFoo]`
+    Pyright(String),
     /// `# ruff: isort: skip_file`
     RuffIsort(String),
-    /// `# mypy: ignore-errors`, `# type: ignore`/`# type: int`,
-    /// `# pyright: strict`/`# pyright: ignore[reportFoo]`,
-    /// `# isort: skip_file`, `# nopycln: import`,
-    /// `# fmt: on`/`# fmt: off`/`fmt: skip`.
-    Common { hint: String, rest: String },
+    /// `# type: int`, `# type: ignore`
+    Type(String),
 }
 
 impl SpecialComment {
     fn formatted(&self) -> Option<String> {
         match self {
-            SpecialComment::Common { hint, rest } => {
-                Some(format!("# {}: {}", hint.to_lowercase(), rest))
-            }
-            SpecialComment::RuffIsort(rest) => Some(format!("# ruff: isort: {rest}")),
             SpecialComment::Noqa(None) => Some("# noqa".to_string()),
-            SpecialComment::Noqa(Some(codes)) => {
-                if codes.is_empty() {
-                    // Avoid suggesting the unsafe fix
-                    // `# noqa:` (ignore nothing) -> `# noqa` (ignore everything).
-                    None
-                } else {
-                    Some(format!("# noqa: {}", codes.join(", ")))
-                }
-            }
+
+            // Avoid suggesting the unsafe fix
+            // `# noqa:` (ignore nothing) -> `# noqa` (ignore everything).
+            SpecialComment::Noqa(Some(codes)) if codes.is_empty() => None,
+
+            SpecialComment::Noqa(Some(codes)) => Some(format!("# noqa: {}", codes.join(", "))),
+
             SpecialComment::FileLevelNoqa { hint, codes: None } => Some(format!("# {hint}: noqa")),
+
+            // Avoid suggesting the unsafe fix
+            // `# ruff: noqa:` (ignore nothing) -> `# ruff: noqa` (ignore everything).
+            SpecialComment::FileLevelNoqa {
+                codes: Some(codes), ..
+            } if codes.is_empty() => None,
+
             SpecialComment::FileLevelNoqa {
                 hint,
                 codes: Some(codes),
-            } => {
-                if codes.is_empty() {
-                    // Avoid suggesting the unsafe fix
-                    // `# ruff: noqa:` (ignore nothing) -> `# ruff: noqa` (ignore everything).
-                    None
-                } else {
-                    Some(format!("# {hint}: noqa: {}", codes.join(", ")))
-                }
-            }
+            } => Some(format!("# {hint}: noqa: {}", codes.join(", "))),
+
+            SpecialComment::Nopycln(rest) => Some(format!("# nopycln: {}", rest.to_lowercase())),
+
+            SpecialComment::Fmt(rest) => Some(format!("# fmt: {rest}")),
+            SpecialComment::Isort(rest) => Some(format!("# isort: {rest}")),
+            SpecialComment::Mypy(rest) => Some(format!("# mypy: {rest}")),
+            SpecialComment::Pyright(rest) => Some(format!("# pyright: {rest}")),
+            SpecialComment::RuffIsort(rest) => Some(format!("# ruff: isort: {rest}")),
+            SpecialComment::Type(rest) => Some(format!("# type: {rest}")),
         }
     }
 }
@@ -134,7 +144,50 @@ fn parse_code_list(code_list: &str) -> Vec<String> {
         .collect()
 }
 
+macro_rules! try_parse_common {
+    ($pattern:ident, $text:ident, $special_comment:expr) => {{
+        let result = $pattern.captures($text)?;
+
+        let end_index = result.get(0).unwrap().end();
+        let rest = result.name("rest").unwrap().as_str().to_owned();
+
+        Some((end_index, $special_comment(rest)))
+    }};
+}
+
+fn try_parse_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    // ruff_linter::noqa::Directive::try_extract
+    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?x)
+            ^
+            \#\s*
+            (?i:noqa)
+            (?:
+                :\s*
+                (?<code_list>
+                    [A-Z]+[A-Za-z0-9]+
+                    (?:[\s,]+[A-Z]+[A-Za-z0-9]+)*
+                )?
+            )?
+            $
+            ",
+        )
+        .unwrap()
+    });
+
+    let result = PATTERN.captures(text)?;
+
+    let end_index = result.get(0).unwrap().end();
+    let codes = result
+        .name("code_list")
+        .map(|it| parse_code_list(it.as_str()));
+
+    Some((end_index, SpecialComment::Noqa(codes)))
+}
+
 fn try_parse_file_level_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    // ruff_linter::noqa::ParsedFileExemption::try_extract
     static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r"(?x)
@@ -167,78 +220,61 @@ fn try_parse_file_level_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
     Some((end_index, SpecialComment::FileLevelNoqa { hint, codes }))
 }
 
-fn try_parse_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
-    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(
-            r"(?x)
-            ^
-            \#\s*
-            (?i:noqa)
-            (?:
-                :\s*
-                (?<code_list>
-                    [A-Z]+[A-Za-z0-9]+
-                    (?:[\s,]+[A-Z]+[A-Za-z0-9]+)*
-                )?
-            )?
-            $
-            ",
-        )
-        .unwrap()
-    });
+fn try_parse_fmt(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^#\s*fmt:\s*(?<rest>on|off|skip)").unwrap());
 
-    let result = PATTERN.captures(text)?;
+    try_parse_common!(PATTERN, text, SpecialComment::Fmt)
+}
 
-    let end_index = result.get(0).unwrap().end();
-    let codes = result
-        .name("code_list")
-        .map(|it| parse_code_list(it.as_str()));
+fn try_parse_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^# isort:(?<rest>skip|skip_file)").unwrap());
 
-    Some((end_index, SpecialComment::Noqa(codes)))
+    try_parse_common!(PATTERN, text, SpecialComment::Isort)
+}
+
+fn try_parse_mypy(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    // https://github.com/python/mypy/blob/3b00002acd/mypy/util.py#L228
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^# mypy:\s*(?<rest>\S)").unwrap());
+
+    try_parse_common!(PATTERN, text, SpecialComment::Mypy)
+}
+
+fn try_parse_nopycln(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L18-L19
+    // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L127
+    // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L136
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^#\s*nopycln\s*:\s*(?<rest>file|import)").unwrap());
+
+    try_parse_common!(PATTERN, text, SpecialComment::Nopycln)
+}
+
+fn try_parse_pyright(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    // https://github.com/microsoft/pyright/blob/9d60c434c4/packages/pyright-internal/src/parser/tokenizer.ts#L1314
+    // https://github.com/microsoft/pyright/blob/9d60c434c4/packages/pyright-internal/src/analyzer/commentUtils.ts#L138
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^#\s*pyright:\s*(?<rest>\S)").unwrap());
+
+    try_parse_common!(PATTERN, text, SpecialComment::Pyright)
 }
 
 fn try_parse_ruff_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
-    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(
-            r"(?x)
-            ^
-            \#\s*
-            ruff\s*:\s*
-            isort\s*:\s*
-            (?<rest>.+)
-            ",
-        )
-        .unwrap()
-    });
+    // ruff_linter::directives::extract_isort_directives
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^# ruff: isort: ?(?<rest>skip|skip_file)").unwrap());
 
-    let result = PATTERN.captures(text)?;
-
-    let end_index = result.get(0).unwrap().end();
-    let rest = result.name("rest").unwrap().as_str().to_owned();
-
-    Some((end_index, SpecialComment::RuffIsort(rest)))
+    try_parse_common!(PATTERN, text, SpecialComment::RuffIsort)
 }
 
-fn try_parse_common(text: &str) -> Option<(EndIndex, SpecialComment)> {
-    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(
-            r"(?x)
-            ^
-            \#\s*
-            (?<hint>type|mypy|pyright|fmt|isort|nopycln):\s*
-            (?<rest>\S.*)
-            ",
-        )
-        .unwrap()
-    });
+fn try_parse_type(text: &str) -> Option<(EndIndex, SpecialComment)> {
+    // https://github.com/python/cpython/blob/c222441fa7/Parser/lexer/lexer.c#L45-L47
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^#\s*type:\s*(?<rest>\S)").unwrap());
 
-    let result = PATTERN.captures(text)?;
-
-    let end_index = result.get(0).unwrap().end();
-    let hint = result.name("hint").unwrap().as_str().to_owned();
-    let rest = result.name("rest").unwrap().as_str().to_owned();
-
-    Some((end_index, SpecialComment::Common { hint, rest }))
+    try_parse_common!(PATTERN, text, SpecialComment::Type)
 }
 
 macro_rules! parse_and_handle_comment {
@@ -262,10 +298,15 @@ macro_rules! parse_and_handle_comment {
 }
 
 fn check_single_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, start_index: usize) {
-    parse_and_handle_comment!(try_parse_file_level_noqa, text, diagnostics, start_index);
     parse_and_handle_comment!(try_parse_noqa, text, diagnostics, start_index);
+    parse_and_handle_comment!(try_parse_file_level_noqa, text, diagnostics, start_index);
+    parse_and_handle_comment!(try_parse_fmt, text, diagnostics, start_index);
+    parse_and_handle_comment!(try_parse_isort, text, diagnostics, start_index);
+    parse_and_handle_comment!(try_parse_mypy, text, diagnostics, start_index);
+    parse_and_handle_comment!(try_parse_nopycln, text, diagnostics, start_index);
+    parse_and_handle_comment!(try_parse_pyright, text, diagnostics, start_index);
     parse_and_handle_comment!(try_parse_ruff_isort, text, diagnostics, start_index);
-    parse_and_handle_comment!(try_parse_common, text, diagnostics, start_index);
+    parse_and_handle_comment!(try_parse_type, text, diagnostics, start_index);
 }
 
 /// RUF104
@@ -326,14 +367,16 @@ mod tests {
     }
 
     #[test]
-    fn casing() {
-        no_unformatted("# Mypy: disallow-subclassing-any");
-        no_unformatted("# Type: ignore");
+    fn incorrect_casing() {
         no_unformatted("# FMT:OFF");
+        no_unformatted("# isort: On");
+        no_unformatted("# Mypy: disallow-subclassing-any");
+        no_unformatted("# PyRight: basic");
+        no_unformatted("# Type: ignore");
     }
 
     #[test]
-    fn already_formatted_noqa() {
+    fn already_formatted() {
         no_unformatted("# noqa");
         no_unformatted("# noqa: A123");
         no_unformatted("# noqa: A123, B456");
@@ -346,8 +389,33 @@ mod tests {
         no_unformatted("# flake8: noqa: A123");
         no_unformatted("# flake8: noqa: A123, B456");
 
+        no_unformatted("# fmt: on");
+        no_unformatted("# fmt: off");
+        no_unformatted("# fmt: skip");
+
+        no_unformatted("# isort: on");
+        no_unformatted("# isort: off");
+        no_unformatted("# isort: split");
+        no_unformatted("# isort: skip");
+        no_unformatted("# isort: skip_file");
+
+        no_unformatted("# mypy: enable-error-codes=");
+
+        no_unformatted("# nopycln: file");
+        no_unformatted("# nopycln: import");
+
+        no_unformatted("# pyright: basic");
+        no_unformatted("# pyright: standard");
+        no_unformatted("# pyright: strict");
+        no_unformatted("# pyright: ignore");
+        no_unformatted("# pyright: ignore [reportFoo]");
+
         no_unformatted("# ruff: isort: on");
         no_unformatted("# ruff: isort: skip_file");
+
+        no_unformatted("# type: ignore");
+        no_unformatted("# type: int");
+        no_unformatted("# type: list[str]");
     }
 
     #[test]
@@ -360,7 +428,35 @@ mod tests {
 
         has_unformatted("# fmt:off");
         has_unformatted("#fmt: on");
-        has_unformatted("#fmt: skip");
+        has_unformatted("# \t fmt:\t skip");
+
+        has_unformatted("# isort:skip");
+        has_unformatted("# isort:skip_file");
+
+        has_unformatted("# mypy:  disallow-subclassing-any");
+
+        has_unformatted("#   nopycln: \t \t\tfile");
+        has_unformatted("# \tnopycln:\t   import");
+
+        has_unformatted("#pyright:ignore[]");
+        has_unformatted("#\t\t\tpyright:    ignore[]");
+
+        has_unformatted("# ruff: isort:skip");
+        has_unformatted("# ruff: isort:skip_file");
+
+        has_unformatted("#    type:\t\t\tignore");
+        has_unformatted("#\t \t \ttype:\t\t \tint");
+    }
+
+    #[test]
+    fn casing() {
+        has_unformatted("# NoQA: A123, B456");
+        has_unformatted("# ruff: NoQA: A123, B456");
+        has_unformatted("# flake8: NoQA: A123, B456");
+
+        has_unformatted("# NoPyCLN: File");
+        has_unformatted("# NoPycln: Import");
+        has_unformatted("# nOpYcLn: iMpOrT");
     }
 
     #[test]
@@ -382,22 +478,5 @@ mod tests {
         has_unformatted("# noqa: A123 ,B456");
         has_unformatted("# ruff: noqa: A123\tB456");
         has_unformatted("# flake8: noqa: A123   B456");
-    }
-
-    #[test]
-    fn common() {
-        has_unformatted("#type:ignore");
-        has_unformatted("#pyright:strict");
-        has_unformatted("#isort:skip_file");
-        has_unformatted("#nopycln:import");
-        has_unformatted("#fmt:off");
-        has_unformatted("#fmt:on");
-        has_unformatted("#fmt:skip");
-
-        has_unformatted("#\t mypy: ignore-errors");
-        has_unformatted("#\t type:ignore");
-        has_unformatted("# \tpyright: \t strict");
-        has_unformatted("# \t pyright:ignore[reportFoo]");
-        has_unformatted("# \t\t\tisort:skip_file");
     }
 }
