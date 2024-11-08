@@ -1717,8 +1717,7 @@ impl<'db> KnownInstanceType<'db> {
                             constraints
                                 .iter()
                                 .map(|ty| ty.to_meta_type(db))
-                                .collect::<Vec<_>>()
-                                .into_boxed_slice()
+                                .collect::<Box<_>>()
                         })
                         .unwrap_or_else(|| std::iter::empty().collect::<Box<_>>()),
                 )),
