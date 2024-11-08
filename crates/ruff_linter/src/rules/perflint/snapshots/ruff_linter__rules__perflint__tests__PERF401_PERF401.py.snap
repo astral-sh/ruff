@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
+snapshot_kind: text
 ---
 PERF401.py:6:13: PERF401 Use a list comprehension to create a transformed list
   |
@@ -8,6 +9,7 @@ PERF401.py:6:13: PERF401 Use a list comprehension to create a transformed list
 6 |             result.append(i)  # PERF401
   |             ^^^^^^^^^^^^^^^^ PERF401
   |
+  = help: Replace for loop with list comprehension
 
 PERF401.py:13:9: PERF401 Use a list comprehension to create a transformed list
    |
@@ -16,6 +18,7 @@ PERF401.py:13:9: PERF401 Use a list comprehension to create a transformed list
 13 |         result.append(i * i)  # PERF401
    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
    |
+   = help: Replace for loop with list comprehension
 
 PERF401.py:82:13: PERF401 Use an async list comprehension to create a transformed list
    |
@@ -24,6 +27,7 @@ PERF401.py:82:13: PERF401 Use an async list comprehension to create a transforme
 82 |             result.append(i)  # PERF401
    |             ^^^^^^^^^^^^^^^^ PERF401
    |
+   = help: Replace for loop with list comprehension
 
 PERF401.py:89:9: PERF401 Use an async list comprehension to create a transformed list
    |
@@ -32,22 +36,25 @@ PERF401.py:89:9: PERF401 Use an async list comprehension to create a transformed
 89 |         result.append(i)  # PERF401
    |         ^^^^^^^^^^^^^^^^ PERF401
    |
+   = help: Replace for loop with list comprehension
 
-PERF401.py:95:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:95:9: PERF401 Use `list.extend` to create a transformed list
    |
 93 |     result, _ = [1,2,3,4], ...
 94 |     for i in range(10):
 95 |         result.append(i*2)  # PERF401
    |         ^^^^^^^^^^^^^^^^^^ PERF401
    |
+   = help: Replace for loop with list.extend
 
-PERF401.py:104:17: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:104:17: PERF401 Use `list.extend` to create a transformed list
     |
 102 |             # single-line comment 2 should be protected
 103 |             if i % 2: # single-line comment 3 should be protected 
 104 |                 result.append(i) # PERF401
     |                 ^^^^^^^^^^^^^^^^ PERF401
     |
+    = help: Replace for loop with list.extend
 
 PERF401.py:112:13: PERF401 Use a list comprehension to create a transformed list
     |
@@ -56,3 +63,4 @@ PERF401.py:112:13: PERF401 Use a list comprehension to create a transformed list
 112 |             result.append(i) # PERF401
     |             ^^^^^^^^^^^^^^^^ PERF401
     |
+    = help: Replace for loop with list comprehension
