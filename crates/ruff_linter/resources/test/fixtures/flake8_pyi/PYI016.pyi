@@ -84,3 +84,18 @@ field24: typing.Union[int, typing.Union[int, int]]  # PYI016: Duplicate union me
 # duplicates of the outer `int`), but not three times (which would indicate that
 # we incorrectly re-checked the nested union).
 field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
+
+# Should emit in cases with nested `typing.Union`
+field26: typing.Union[typing.Union[int, int]]  # PYI016: Duplicate union member `int`
+
+# Should emit in cases with nested `typing.Union`
+field27: typing.Union[typing.Union[typing.Union[int, int]]]  # PYI016: Duplicate union member `int`
+
+# Should emit in cases with mixed `typing.Union` and `|`
+field28: typing.Union[int | int]  # Error
+
+# Should emit twice in cases with multiple nested `typing.Union`
+field29: typing.Union[int, typing.Union[typing.Union[int, int]]]  # Error
+
+# Should emit once in cases with multiple nested `typing.Union`
+field30: typing.Union[int, typing.Union[typing.Union[int, str]]]  # Error
