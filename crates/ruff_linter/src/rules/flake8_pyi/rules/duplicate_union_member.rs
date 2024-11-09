@@ -28,9 +28,13 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe; however, for duplicate members
-/// in non-PEP604 unions (i.e. `typing.Union`), the fix will flatten
-/// nested unions type expressions into a single top-level union.
+/// This rule's fix is marked as safe unless the union contains comments.
+///
+/// For duplicate members in non-PEP604 unions (i.e. `typing.Union`),
+/// the fix will flatten nested unions type expressions into a single
+/// top-level union.
+///
+///
 ///
 /// ## References
 /// - [Python documentation: `typing.Union`](https://docs.python.org/3/library/typing.html#typing.Union)
@@ -106,10 +110,18 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
                 range: TextRange::default(),
                 ctx: ExprContext::Load,
             });
-            let fix = Fix::safe_edit(Edit::range_replacement(
-                checker.generator().expr(&subscript),
-                expr.range(),
-            ));
+
+            // typing.Union[set[int]]
+            // Mark [`Fix`] as unsafe when comments are in range
+            let edit = Edit::range_replacement(checker.generator().expr(&subscript), expr.range());
+            let fix = if checker
+                .comment_ranges()
+                .has_comments(expr, checker.source())
+            {
+                Fix::unsafe_edit(edit)
+            } else {
+                Fix::safe_edit(edit)
+            };
             for diagnostic in &mut diagnostics {
                 if diagnostic.fix.is_none() {
                     diagnostic.set_fix(fix.clone());
