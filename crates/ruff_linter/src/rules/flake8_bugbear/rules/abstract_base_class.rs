@@ -88,7 +88,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 /// ```
 ///
 /// ## References
-/// - [Python documentation: abc](https://docs.python.org/3/library/abc.html)
+/// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
     name: String,

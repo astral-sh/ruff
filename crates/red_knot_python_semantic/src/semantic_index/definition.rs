@@ -92,6 +92,9 @@ pub(crate) enum DefinitionNodeRef<'a> {
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'a>),
+    TypeVar(&'a ast::TypeParamTypeVar),
+    ParamSpec(&'a ast::TypeParamParamSpec),
+    TypeVarTuple(&'a ast::TypeParamTypeVarTuple),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -127,6 +130,24 @@ impl<'a> From<&'a ast::StmtAugAssign> for DefinitionNodeRef<'a> {
 impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
     fn from(node_ref: &'a ast::Alias) -> Self {
         Self::Import(node_ref)
+    }
+}
+
+impl<'a> From<&'a ast::TypeParamTypeVar> for DefinitionNodeRef<'a> {
+    fn from(value: &'a ast::TypeParamTypeVar) -> Self {
+        Self::TypeVar(value)
+    }
+}
+
+impl<'a> From<&'a ast::TypeParamParamSpec> for DefinitionNodeRef<'a> {
+    fn from(value: &'a ast::TypeParamParamSpec) -> Self {
+        Self::ParamSpec(value)
+    }
+}
+
+impl<'a> From<&'a ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'a> {
+    fn from(value: &'a ast::TypeParamTypeVarTuple) -> Self {
+        Self::TypeVarTuple(value)
     }
 }
 
@@ -317,6 +338,15 @@ impl<'db> DefinitionNodeRef<'db> {
                 handler: AstNodeRef::new(parsed, handler),
                 is_star,
             }),
+            DefinitionNodeRef::TypeVar(node) => {
+                DefinitionKind::TypeVar(AstNodeRef::new(parsed, node))
+            }
+            DefinitionNodeRef::ParamSpec(node) => {
+                DefinitionKind::ParamSpec(AstNodeRef::new(parsed, node))
+            }
+            DefinitionNodeRef::TypeVarTuple(node) => {
+                DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
+            }
         }
     }
 
@@ -356,6 +386,9 @@ impl<'db> DefinitionNodeRef<'db> {
                 identifier.into()
             }
             Self::ExceptHandler(ExceptHandlerDefinitionNodeRef { handler, .. }) => handler.into(),
+            Self::TypeVar(node) => node.into(),
+            Self::ParamSpec(node) => node.into(),
+            Self::TypeVarTuple(node) => node.into(),
         }
     }
 }
@@ -412,6 +445,9 @@ pub enum DefinitionKind<'db> {
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
     ExceptHandler(ExceptHandlerDefinitionKind),
+    TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
+    ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
+    TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
 }
 
 impl DefinitionKind<'_> {
@@ -421,7 +457,10 @@ impl DefinitionKind<'_> {
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
             | DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_) => DefinitionCategory::DeclarationAndBinding,
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::TypeVar(_)
+            | DefinitionKind::ParamSpec(_)
+            | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
             // a parameter always binds a value, but is only a declaration if annotated
             DefinitionKind::Parameter(parameter) => {
                 if parameter.annotation.is_some() {
@@ -694,5 +733,23 @@ impl From<&ast::Identifier> for DefinitionNodeKey {
 impl From<&ast::ExceptHandlerExceptHandler> for DefinitionNodeKey {
     fn from(handler: &ast::ExceptHandlerExceptHandler) -> Self {
         Self(NodeKey::from_node(handler))
+    }
+}
+
+impl From<&ast::TypeParamTypeVar> for DefinitionNodeKey {
+    fn from(value: &ast::TypeParamTypeVar) -> Self {
+        Self(NodeKey::from_node(value))
+    }
+}
+
+impl From<&ast::TypeParamParamSpec> for DefinitionNodeKey {
+    fn from(value: &ast::TypeParamParamSpec) -> Self {
+        Self(NodeKey::from_node(value))
+    }
+}
+
+impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
+    fn from(value: &ast::TypeParamTypeVarTuple) -> Self {
+        Self(NodeKey::from_node(value))
     }
 }

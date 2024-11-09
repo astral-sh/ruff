@@ -246,7 +246,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
         } else {
             // ~Literal[True] & bool = Literal[False]
-            if let Type::Instance(InstanceType { class, .. }) = new_positive {
+            if let Type::Instance(InstanceType { class }) = new_positive {
                 if class.is_known(db, KnownClass::Bool) {
                     if let Some(&Type::BooleanLiteral(value)) = self
                         .negative
@@ -317,7 +317,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
                 // simplify the representation.
-                self.positive.insert(ty);
+                self.add_positive(db, ty);
             }
             // ~Literal[True] & bool = Literal[False]
             Type::BooleanLiteral(bool)
@@ -590,6 +590,22 @@ mod tests {
             .build();
 
         assert_eq!(ta_not_i0.display(&db).to_string(), "int & Any | Literal[1]");
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_any() {
+        let db = setup_db();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::Any)
+            .build();
+        assert_eq!(ty, Type::Any);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Never)
+            .add_negative(Type::Any)
+            .build();
+        assert_eq!(ty, Type::Never);
     }
 
     #[test]

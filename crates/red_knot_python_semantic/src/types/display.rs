@@ -66,10 +66,15 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::Instance(InstanceType { class, .. })
+            Type::Instance(InstanceType { class })
                 if class.is_known(self.db, KnownClass::NoneType) =>
             {
                 f.write_str("None")
+            }
+            Type::Instance(InstanceType { class })
+                if class.is_known(self.db, KnownClass::NoDefaultType) =>
+            {
+                f.write_str("NoDefault")
             }
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
@@ -82,10 +87,8 @@ impl Display for DisplayRepresentation<'_> {
             Type::SubclassOf(SubclassOfType { class }) => {
                 write!(f, "type[{}]", class.name(self.db))
             }
-            Type::Instance(InstanceType { class, known }) => f.write_str(match known {
-                Some(super::KnownInstance::Literal) => "Literal",
-                _ => class.name(self.db),
-            }),
+            Type::Instance(InstanceType { class }) => f.write_str(class.name(self.db)),
+            Type::KnownInstance(known_instance) => f.write_str(known_instance.as_str()),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),

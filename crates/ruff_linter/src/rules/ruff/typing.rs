@@ -286,6 +286,8 @@ pub(crate) fn type_hint_resolves_to_any(
     match TypingTarget::try_from_expr(annotation, checker, minor_version) {
         // Short circuit on top level `Any`
         None | Some(TypingTarget::Any) => true,
+        // `Optional` is `Optional[Any]` which is `Any | None`.
+        Some(TypingTarget::Optional(None)) => true,
         // Top-level `Annotated` node should check if the inner type resolves
         // to `Any`.
         Some(TypingTarget::Annotated(expr)) => {

@@ -94,6 +94,12 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
                 ("", trimmed)
             };
 
+            // Early return if we now have an empty string
+            // or a very long string:
+            if (rest.len() > PYTHONINTMAXSTRDIGITS) || (rest.len() == 0) {
+                return;
+            }
+
             // Skip leading zeros.
             let rest = rest.trim_start_matches('0');
 
@@ -103,7 +109,15 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             };
 
             // If all the characters are zeros, then the value is zero.
-            let rest = if rest.is_empty() { "0" } else { rest };
+            let rest = match (unary, rest.is_empty()) {
+                // `Decimal("-0")` is not the same as `Decimal("0")`
+                // so we return early.
+                ("-", true) => {
+                    return;
+                }
+                (_, true) => "0",
+                _ => rest,
+            };
 
             let replacement = format!("{unary}{rest}");
             let mut diagnostic = Diagnostic::new(
@@ -168,25 +182,10 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
     checker.diagnostics.push(diagnostic);
 }
 
-// // Slightly modified from [CPython regex] to ignore  https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
-// static DECIMAL_PARSER_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-//     Regex::new(
-//         r"(?x)                   # Verbose mode for comments
-// ^                                             # Start of string
-// (?P<sign>[-+])?                               # Optional sign
-// (?:
-//     (?P<int>\d*)                              # Integer part (can be empty)
-//     (\.(?P<frac>\d+))?                        # Optional fractional part
-//     (E(?P<exp>[-+]?\d+))?                     # Optional exponent
-// |
-//     Inf(inity)?                               # Infinity
-// |
-//     (?P<signal>s)?                            # Optional signal
-//     NaN                                       # NaN
-//     (?P<diag>\d*)                             # Optional diagnostic info
-// )
-// $                                             # End of string
-// ",
-//     )
-//     .unwrap()
-// });
+// ```console
+// $ python
+// >>> import sys
+// >>> sys.int_info.str_digits_check_threshold
+// 640
+// ```
+const PYTHONINTMAXSTRDIGITS: usize = 640;

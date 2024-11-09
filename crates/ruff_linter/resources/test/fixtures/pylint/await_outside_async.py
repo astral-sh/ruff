@@ -32,3 +32,43 @@ async def func2():
 def outer_func():
     async def inner_func():
         await asyncio.sleep(1)
+
+
+def async_for_loop():
+    async for x in foo():
+        pass
+
+
+def async_with():
+    async with foo():
+        pass
+
+
+# See: https://github.com/astral-sh/ruff/issues/14167
+def async_for_generator_elt():
+    (await x for x in foo())
+
+
+# See: https://github.com/astral-sh/ruff/issues/14167
+def async_for_list_comprehension_elt():
+    [await x for x in foo()]
+
+
+# See: https://github.com/astral-sh/ruff/issues/14167
+def async_for_list_comprehension():
+    [x async for x in foo()]
+
+
+# See: https://github.com/astral-sh/ruff/issues/14167
+def await_generator_iter():
+    (x for x in await foo())
+
+
+# See: https://github.com/astral-sh/ruff/issues/14167
+def await_generator_target():
+    (x async for x in foo())
+
+
+# See: https://github.com/astral-sh/ruff/issues/14167
+def async_for_list_comprehension_target():
+    [x for x in await foo()]

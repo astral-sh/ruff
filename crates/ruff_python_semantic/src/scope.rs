@@ -170,11 +170,19 @@ bitflags! {
 pub enum ScopeKind<'a> {
     Class(&'a ast::StmtClassDef),
     Function(&'a ast::StmtFunctionDef),
-    Generator,
+    Generator(GeneratorKind),
     Module,
     /// A Python 3.12+ [annotation scope](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,
     Lambda(&'a ast::ExprLambda),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeneratorKind {
+    Generator,
+    ListComprehension,
+    DictComprehension,
+    SetComprehension,
 }
 
 /// Id uniquely identifying a scope in a program.

@@ -71,7 +71,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// - `lint.typing-modules`
 ///
 /// ## References
-/// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyFirstPartyImport {
     qualified_name: String,
@@ -146,7 +146,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - `lint.typing-modules`
 ///
 /// ## References
-/// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyThirdPartyImport {
     qualified_name: String,
@@ -221,7 +221,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - `lint.typing-modules`
 ///
 /// ## References
-/// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyStandardLibraryImport {
     qualified_name: String,

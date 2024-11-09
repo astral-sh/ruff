@@ -46,8 +46,8 @@ use crate::checkers::ast::Checker;
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 /// - [Semantic Versioning](https://semver.org/)
 ///
-/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/
-/// [PEP 420]: https://www.python.org/dev/peps/pep-0420/
+/// [PEP 8]: https://peps.python.org/pep-0008/
+/// [PEP 420]: https://peps.python.org/pep-0420/
 #[violation]
 pub struct ImportPrivateName {
     name: String,

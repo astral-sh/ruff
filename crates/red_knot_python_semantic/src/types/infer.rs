@@ -58,8 +58,9 @@ use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstance, MetaclassErrorKind, SliceLiteralType, StringLiteralType, Symbol, Truthiness,
-    TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
+    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, StringLiteralType,
+    Symbol, Truthiness, TupleType, Type, TypeArrayDisplay, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -456,9 +457,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.check_class_definitions();
     }
 
-    /// Iterate over all class definitions to check that Python will be able to create a
-    /// consistent "[method resolution order]" and [metaclass] for each class at runtime. If not,
-    /// issue a diagnostic.
+    /// Iterate over all class definitions to check that the definition will not cause an exception
+    /// to be raised at runtime. This needs to be done after most other types in the scope have been
+    /// inferred, due to the fact that base classes can be deferred. If it looks like a class
+    /// definition is invalid in some way, issue a diagnostic.
+    ///
+    /// Among the things we check for in this method are whether Python will be able to determine a
+    /// consistent "[method resolution order]" and [metaclass] for each class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
@@ -470,7 +475,25 @@ impl<'db> TypeInferenceBuilder<'db> {
             .filter_map(|ty| ty.into_class_literal())
             .map(|class_ty| class_ty.class);
 
+        // Iterate through all class definitions in this scope.
         for class in class_definitions {
+            // (1) Check that the class does not have a cyclic definition
+            if class.is_cyclically_defined(self.db) {
+                self.diagnostics.add(
+                    class.node(self.db).into(),
+                    "cyclic-class-def",
+                    format_args!(
+                        "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
+                        class.name(self.db),
+                        class.name(self.db)
+                    ),
+                );
+                // Attempting to determine the MRO of a class or if the class has a metaclass conflict
+                // is impossible if the class is cyclically defined; there's nothing more to do here.
+                continue;
+            }
+
+            // (2) Check that the class's MRO is resolvable
             if let Err(mro_error) = class.try_mro(self.db).as_ref() {
                 match mro_error.reason() {
                     MroErrorKind::DuplicateBases(duplicates) => {
@@ -483,15 +506,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                         }
                     }
-                    MroErrorKind::CyclicClassDefinition => self.diagnostics.add(
-                        class.node(self.db).into(),
-                        "cyclic-class-def",
-                        format_args!(
-                            "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
-                            class.name(self.db),
-                            class.name(self.db)
-                        ),
-                    ),
                     MroErrorKind::InvalidBases(bases) => {
                         let base_nodes = class.node(self.db).bases();
                         for (index, base_ty) in bases {
@@ -517,24 +531,53 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
+            // (3) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Conflict {
-                        metaclass1,
-                        metaclass2
-                    } => self.diagnostics.add(
-                        class.node(self.db).into(),
-                        "conflicting-metaclass",
-                        format_args!(
-                            "The metaclass of a derived class (`{}`) must be a subclass of the metaclasses of all its bases, but `{}` and `{}` have no subclass relationship",
-                            class.name(self.db),
-                            metaclass1.name(self.db),
-                            metaclass2.name(self.db),
-                        ),
-                    ),
-                    MetaclassErrorKind::CyclicDefinition => {
-                        // Cyclic class definition diagnostic will already have been emitted above
-                        // in MRO calculation.
+                        candidate1:
+                            MetaclassCandidate {
+                                metaclass: metaclass1,
+                                explicit_metaclass_of: class1,
+                            },
+                        candidate2:
+                            MetaclassCandidate {
+                                metaclass: metaclass2,
+                                explicit_metaclass_of: class2,
+                            },
+                        candidate1_is_base_class,
+                    } => {
+                        let node = class.node(self.db).into();
+                        if *candidate1_is_base_class {
+                            self.diagnostics.add(
+                                node,
+                                "conflicting-metaclass",
+                                format_args!(
+                                    "The metaclass of a derived class (`{class}`) must be a subclass of the metaclasses of all its bases, \
+                                    but `{metaclass1}` (metaclass of base class `{base1}`) and `{metaclass2}` (metaclass of base class `{base2}`) \
+                                    have no subclass relationship",
+                                    class = class.name(self.db),
+                                    metaclass1 = metaclass1.name(self.db),
+                                    base1 = class1.name(self.db),
+                                    metaclass2 = metaclass2.name(self.db),
+                                    base2 = class2.name(self.db),
+                                )
+                            );
+                        } else {
+                            self.diagnostics.add(
+                                node,
+                                "conflicting-metaclass",
+                                format_args!(
+                                    "The metaclass of a derived class (`{class}`) must be a subclass of the metaclasses of all its bases, \
+                                    but `{metaclass_of_class}` (metaclass of `{class}`) and `{metaclass_of_base}` (metaclass of base class `{base}`) \
+                                    have no subclass relationship",
+                                    class = class.name(self.db),
+                                    metaclass_of_class = metaclass1.name(self.db),
+                                    metaclass_of_base = metaclass2.name(self.db),
+                                    base = class2.name(self.db),
+                                )
+                            );
+                        }
                     }
                 }
             }
@@ -610,6 +653,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::ExceptHandler(except_handler_definition) => {
                 self.infer_except_handler_definition(except_handler_definition, definition);
             }
+            DefinitionKind::TypeVar(node) => {
+                self.infer_typevar_definition(node, definition);
+            }
+            DefinitionKind::ParamSpec(node) => {
+                self.infer_paramspec_definition(node, definition);
+            }
+            DefinitionKind::TypeVarTuple(node) => {
+                self.infer_typevartuple_definition(node, definition);
+            }
         }
     }
 
@@ -634,7 +686,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
-            Type::Instance(InstanceType { class, .. })
+            Type::Instance(InstanceType { class })
                 if matches!(
                     class.known(self.db),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
@@ -1297,13 +1349,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(ClassLiteralType { class }) => Type::anonymous_instance(class),
+                Type::ClassLiteral(ClassLiteralType { class }) => {
+                    Type::Instance(InstanceType { class })
+                }
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
                         ty.into_class_literal()
                             .map_or(Type::Todo, |ClassLiteralType { class }| {
-                                Type::anonymous_instance(class)
+                                Type::Instance(InstanceType { class })
                             })
                     }),
                 ),
@@ -1316,6 +1370,82 @@ impl<'db> TypeInferenceBuilder<'db> {
             definition,
             symbol_ty,
         );
+    }
+
+    fn infer_typevar_definition(
+        &mut self,
+        node: &ast::TypeParamTypeVar,
+        definition: Definition<'db>,
+    ) {
+        let ast::TypeParamTypeVar {
+            range: _,
+            name,
+            bound,
+            default,
+        } = node;
+        let bound_or_constraint = match bound.as_deref() {
+            Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
+                if elts.len() < 2 {
+                    self.diagnostics.add(
+                        expr.into(),
+                        "invalid-typevar-constraints",
+                        format_args!("TypeVar must have at least two constrained types"),
+                    );
+                    self.infer_expression(expr);
+                    None
+                } else {
+                    let tuple = TupleType::new(
+                        self.db,
+                        elts.iter()
+                            .map(|expr| self.infer_type_expression(expr))
+                            .collect::<Box<_>>(),
+                    );
+                    let constraints = TypeVarBoundOrConstraints::Constraints(tuple);
+                    self.store_expression_type(expr, Type::Tuple(tuple));
+                    Some(constraints)
+                }
+            }
+            Some(expr) => Some(TypeVarBoundOrConstraints::UpperBound(
+                self.infer_type_expression(expr),
+            )),
+            None => None,
+        };
+        let default_ty = self.infer_optional_type_expression(default.as_deref());
+        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            self.db,
+            name.id.clone(),
+            bound_or_constraint,
+            default_ty,
+        )));
+        self.add_declaration_with_binding(node.into(), definition, ty, ty);
+    }
+
+    fn infer_paramspec_definition(
+        &mut self,
+        node: &ast::TypeParamParamSpec,
+        definition: Definition<'db>,
+    ) {
+        let ast::TypeParamParamSpec {
+            range: _,
+            name: _,
+            default,
+        } = node;
+        self.infer_optional_expression(default.as_deref());
+        self.add_declaration_with_binding(node.into(), definition, Type::Todo, Type::Todo);
+    }
+
+    fn infer_typevartuple_definition(
+        &mut self,
+        node: &ast::TypeParamTypeVarTuple,
+        definition: Definition<'db>,
+    ) {
+        let ast::TypeParamTypeVarTuple {
+            range: _,
+            name: _,
+            default,
+        } = node;
+        self.infer_optional_expression(default.as_deref());
+        self.add_declaration_with_binding(node.into(), definition, Type::Todo, Type::Todo);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -1503,14 +1633,16 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If the declared variable is annotated with _SpecialForm class then we treat it differently
         // by assigning the known field to the instance.
-        if let Type::Instance(InstanceType { class, .. }) = annotation_ty {
+        if let Type::Instance(InstanceType { class }) = annotation_ty {
             if class.is_known(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
-                    let maybe_known_instance = file_to_module(self.db, self.file)
+                    if let Some(known_instance) = file_to_module(self.db, self.file)
                         .as_ref()
-                        .and_then(|module| KnownInstance::maybe_from_module(module, &name_expr.id));
-                    if let Some(known_instance) = maybe_known_instance {
-                        annotation_ty = Type::Instance(InstanceType::known(class, known_instance));
+                        .and_then(|module| {
+                            KnownInstanceType::try_from_module_and_symbol(module, &name_expr.id)
+                        })
+                    {
+                        annotation_ty = Type::KnownInstance(known_instance);
                     }
                 }
             }
@@ -1555,7 +1687,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_augmented_op(assignment, target_type, value_type)
                 })
             }
-            Type::Instance(InstanceType { class, .. }) => {
+            Type::Instance(InstanceType { class }) => {
                 if let Symbol::Type(class_member, boundness) =
                     class.class_member(self.db, op.in_place_dunder())
                 {
@@ -1975,13 +2107,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {
         expression.map(|expr| self.infer_expression(expr))
-    }
-
-    fn infer_optional_annotation_expression(
-        &mut self,
-        expr: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
-        expr.map(|expr| self.infer_annotation_expression(expr))
     }
 
     #[track_caller]
@@ -2717,7 +2842,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (_, Type::Unknown) => Type::Unknown,
             (
                 op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert),
-                Type::Instance(InstanceType { class, .. }),
+                Type::Instance(InstanceType { class }),
             ) => {
                 let unary_dunder_method = match op {
                     UnaryOp::Invert => "__invert__",
@@ -3204,18 +3329,32 @@ impl<'db> TypeInferenceBuilder<'db> {
         //   f(T_inter) = f(P1) & f(P2) & ... & f(Pn)
         //
         // The reason for this is the following: In general, for any function 'f', the
-        // set f(A) & f(B) can be *larger than* the set f(A & B). This means that we
-        // will return a type that is too wide, which is not necessarily problematic.
+        // set f(A) & f(B) is *larger than or equal to* the set f(A & B). This means
+        // that we will return a type that is possibly wider than it could be, but
+        // never wrong.
         //
         // However, we do have to leave out the negative contributions. If we were to
         // add a contribution like ~f(N1), we would potentially infer result types
-        // that are too narrow, since ~f(A) can be larger than f(~A).
+        // that are too narrow.
         //
         // As an example for this, consider the intersection type `int & ~Literal[1]`.
         // If 'f' would be the `==`-comparison with 2, we obviously can't tell if that
-        // answer would be true or false, so we need to return `bool`. However, if we
-        // compute f(int) & ~f(Literal[1]), we get `bool & ~Literal[False]`, which can
-        // be simplified to `Literal[True]` -- a type that is too narrow.
+        // answer would be true or false, so we need to return `bool`. And indeed, we
+        // we have (glossing over notational details):
+        //
+        //   f(int & ~1)
+        //       = f({..., -1, 0, 2, 3, ...})
+        //       = {..., False, False, True, False, ...}
+        //       = bool
+        //
+        // On the other hand, if we were to compute
+        //
+        //   f(int) & ~f(1)
+        //       = bool & ~False
+        //       = True
+        //
+        // we would get a result type `Literal[True]` which is too narrow.
+        //
         let mut builder = IntersectionBuilder::new(self.db);
         for pos in intersection.positive(self.db) {
             let result = match intersection_on {
@@ -3834,7 +3973,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::Instance(InstanceType { class, .. }))
+            Some(Type::Instance(InstanceType { class }))
                 if class.is_known(self.db, KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
@@ -3862,32 +4001,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = type_parameters;
         for type_param in type_params {
             match type_param {
-                ast::TypeParam::TypeVar(typevar) => {
-                    let ast::TypeParamTypeVar {
-                        range: _,
-                        name: _,
-                        bound,
-                        default,
-                    } = typevar;
-                    self.infer_optional_expression(bound.as_deref());
-                    self.infer_optional_expression(default.as_deref());
-                }
-                ast::TypeParam::ParamSpec(param_spec) => {
-                    let ast::TypeParamParamSpec {
-                        range: _,
-                        name: _,
-                        default,
-                    } = param_spec;
-                    self.infer_optional_expression(default.as_deref());
-                }
-                ast::TypeParam::TypeVarTuple(typevar_tuple) => {
-                    let ast::TypeParamTypeVarTuple {
-                        range: _,
-                        name: _,
-                        default,
-                    } = typevar_tuple;
-                    self.infer_optional_expression(default.as_deref());
-                }
+                ast::TypeParam::TypeVar(node) => self.infer_definition(node),
+                ast::TypeParam::ParamSpec(node) => self.infer_definition(node),
+                ast::TypeParam::TypeVarTuple(node) => self.infer_definition(node),
             }
         }
     }
@@ -3920,6 +4036,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.store_expression_type(expression, annotation_ty);
         annotation_ty
+    }
+
+    fn infer_optional_annotation_expression(
+        &mut self,
+        expr: Option<&ast::Expr>,
+    ) -> Option<Type<'db>> {
+        expr.map(|expr| self.infer_annotation_expression(expr))
     }
 }
 
@@ -4095,6 +4218,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
+    fn infer_optional_type_expression(
+        &mut self,
+        opt_expression: Option<&ast::Expr>,
+    ) -> Option<Type<'db>> {
+        opt_expression.map(|expr| self.infer_type_expression(expr))
+    }
+
     /// Given the slice of a `tuple[]` annotation, return the type that the annotation represents
     fn infer_tuple_type_expression(&mut self, tuple_slice: &ast::Expr) -> Type<'db> {
         /// In most cases, if a subelement of the tuple is inferred as `Todo`,
@@ -4180,10 +4310,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         match value_ty {
-            Type::Instance(InstanceType {
-                class: _,
-                known: Some(known_instance),
-            }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
+            Type::KnownInstance(known_instance) => {
+                self.infer_parameterized_known_instance_type_expression(known_instance, slice)
+            }
             _ => {
                 self.infer_type_expression(slice);
                 Type::Todo // TODO: generics
@@ -4193,11 +4322,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_parameterized_known_instance_type_expression(
         &mut self,
-        known_instance: KnownInstance,
+        known_instance: KnownInstanceType,
         parameters: &ast::Expr,
     ) -> Type<'db> {
         match known_instance {
-            KnownInstance::Literal => match self.infer_literal_parameter_type(parameters) {
+            KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
                 Ok(ty) => ty,
                 Err(nodes) => {
                     for node in nodes {
@@ -4213,6 +4342,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Unknown
                 }
             },
+            KnownInstanceType::TypeVar(_) => Type::Todo,
         }
     }
 
@@ -4224,13 +4354,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO handle type aliases
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value);
-                if matches!(
-                    value_ty,
-                    Type::Instance(InstanceType {
-                        known: Some(KnownInstance::Literal),
-                        ..
-                    })
-                ) {
+                if matches!(value_ty, Type::KnownInstance(KnownInstanceType::Literal)) {
                     self.infer_literal_parameter_type(slice)?
                 } else {
                     return Err(vec![parameters]);

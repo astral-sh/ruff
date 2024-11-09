@@ -36,7 +36,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `yield` statement](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
-/// - [PEP 380](https://peps.python.org/pep-0380/)
+/// - [PEP 380 – Syntax for Delegating to a Subgenerator](https://peps.python.org/pep-0380/)
 #[violation]
 pub struct YieldInForLoop;
 
