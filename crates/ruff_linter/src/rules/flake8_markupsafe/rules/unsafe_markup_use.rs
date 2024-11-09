@@ -35,6 +35,8 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// content = "<script>alert('Hello, world!')</script>"
 /// html = Markup("<b>{}</b>").format(content)  # Safe
 /// ```
+/// ## Options
+/// - `lint.flake8-markupsafe.extend-markup-names`
 ///
 /// ## References
 /// - [MarkupSafe](https://pypi.org/project/MarkupSafe/)
