@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct UnnecessaryTypeUnion {
     members: Vec<Name>,
-    is_pep604_union: bool,
+    union_kind: UnionKind,
 }
 
 impl Violation for UnnecessaryTypeUnion {
@@ -41,10 +41,9 @@ impl Violation for UnnecessaryTypeUnion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let union_str = if self.is_pep604_union {
-            self.members.join(" | ")
-        } else {
-            format!("Union[{}]", self.members.join(", "))
+        let union_str = match self.union_kind {
+            UnionKind::PEP604 => self.members.join(" | "),
+            UnionKind::TypingUnion => format!("Union[{}]", self.members.join(", ")),
         };
 
         format!(
@@ -75,10 +74,10 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     let mut type_exprs: Vec<&Expr> = Vec::new();
     let mut other_exprs: Vec<&Expr> = Vec::new();
 
-    let mut has_pep604_union = false;
+    let mut union_kind = UnionKind::TypingUnion;
     let mut collect_type_exprs = |expr: &'a Expr, parent: &'a Expr| {
         if matches!(parent, Expr::BinOp(_)) {
-            has_pep604_union = true;
+            union_kind = UnionKind::PEP604;
         }
         match expr {
             Expr::Subscript(ast::ExprSubscript { slice, value, .. }) => {
@@ -108,91 +107,92 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     let mut diagnostic = Diagnostic::new(
         UnnecessaryTypeUnion {
             members: type_members.clone(),
-            is_pep604_union: subscript.is_none(),
+            union_kind,
         },
         union.range(),
     );
 
     if semantic.has_builtin_binding("type") {
         // Construct the content for the [`Fix`] based on if we encountered a PEP604 union.
-        #[allow(clippy::if_not_else)]
-        let content = if !has_pep604_union {
-            // `typing.Union`
-            let Some(subscript) = subscript else {
-                return;
-            };
-            let types = &Expr::Subscript(ast::ExprSubscript {
-                value: Box::new(Expr::Name(ast::ExprName {
-                    id: Name::new_static("type"),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                })),
-                slice: Box::new(Expr::Subscript(ast::ExprSubscript {
-                    value: subscript.value.clone(),
-                    slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                        elts: type_members
-                            .into_iter()
-                            .map(|type_member| {
-                                Expr::Name(ast::ExprName {
-                                    id: type_member,
-                                    ctx: ExprContext::Load,
-                                    range: TextRange::default(),
-                                })
-                            })
-                            .collect(),
+        let content = match union_kind {
+            UnionKind::PEP604 => {
+                let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
+                let types = Expr::Subscript(ast::ExprSubscript {
+                    value: Box::new(Expr::Name(ast::ExprName {
+                        id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        parenthesized: true,
                     })),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                })),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            });
-
-            if other_exprs.is_empty() {
-                checker.generator().expr(types)
-            } else {
-                let mut exprs = Vec::new();
-                exprs.push(types);
-                exprs.extend(other_exprs);
-
-                let union = Expr::Subscript(ast::ExprSubscript {
-                    value: subscript.value.clone(),
-                    slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                        elts: exprs.into_iter().cloned().collect(),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                        parenthesized: true,
-                    })),
+                    slice: Box::new(pep_604_union(&elts)),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 });
 
-                checker.generator().expr(&union)
+                if other_exprs.is_empty() {
+                    checker.generator().expr(&types)
+                } else {
+                    let elts: Vec<Expr> = std::iter::once(types)
+                        .chain(other_exprs.into_iter().cloned())
+                        .collect();
+                    checker.generator().expr(&pep_604_union(&elts))
+                }
             }
-        } else {
-            // PEP604 union
-            let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
-            let types = Expr::Subscript(ast::ExprSubscript {
-                value: Box::new(Expr::Name(ast::ExprName {
-                    id: Name::new_static("type"),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                })),
-                slice: Box::new(pep_604_union(&elts)),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            });
+            UnionKind::TypingUnion => {
+                if let Some(subscript) = subscript {
+                    let types = &Expr::Subscript(ast::ExprSubscript {
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            id: Name::new_static("type"),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        })),
+                        slice: Box::new(Expr::Subscript(ast::ExprSubscript {
+                            value: subscript.value.clone(),
+                            slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                                elts: type_members
+                                    .into_iter()
+                                    .map(|type_member| {
+                                        Expr::Name(ast::ExprName {
+                                            id: type_member,
+                                            ctx: ExprContext::Load,
+                                            range: TextRange::default(),
+                                        })
+                                    })
+                                    .collect(),
+                                ctx: ExprContext::Load,
+                                range: TextRange::default(),
+                                parenthesized: true,
+                            })),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        })),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    });
 
-            if other_exprs.is_empty() {
-                checker.generator().expr(&types)
-            } else {
-                let elts: Vec<Expr> = std::iter::once(types)
-                    .chain(other_exprs.into_iter().cloned())
-                    .collect();
-                checker.generator().expr(&pep_604_union(&elts))
+                    if other_exprs.is_empty() {
+                        checker.generator().expr(types)
+                    } else {
+                        let mut exprs = Vec::new();
+                        exprs.push(types);
+                        exprs.extend(other_exprs);
+
+                        let union = Expr::Subscript(ast::ExprSubscript {
+                            value: subscript.value.clone(),
+                            slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                                elts: exprs.into_iter().cloned().collect(),
+                                ctx: ExprContext::Load,
+                                range: TextRange::default(),
+                                parenthesized: true,
+                            })),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        });
+
+                        checker.generator().expr(&union)
+                    }
+                } else {
+                    return;
+                }
             }
         };
 
@@ -203,4 +203,12 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     }
 
     checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnionKind {
+    /// E.g., `typing.Union[int, str]`
+    TypingUnion,
+    /// E.g., `int | str`
+    PEP604,
 }
