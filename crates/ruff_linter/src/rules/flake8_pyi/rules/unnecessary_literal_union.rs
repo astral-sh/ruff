@@ -53,6 +53,16 @@ impl Violation for UnnecessaryLiteralUnion {
 
 /// PYI030
 pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Expr) {
+    // Check if `union` is a PEP604 union (e.g. `float | int`) or a `typing.Union[float, int]`
+    let union_subscript = expr.as_subscript_expr();
+    if union_subscript.is_some_and(|subscript| {
+        !checker
+            .semantic()
+            .match_typing_expr(&subscript.value, "Union")
+    }) {
+        return;
+    }
+
     let mut literal_exprs = Vec::new();
     let mut other_exprs = Vec::new();
 
@@ -90,15 +100,6 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
 
     // Traverse the union, collect all members, split out the literals from the rest.
     traverse_union(&mut collect_literal_expr, checker.semantic(), expr);
-
-    let union_subscript = expr.as_subscript_expr();
-    if union_subscript.is_some_and(|subscript| {
-        !checker
-            .semantic()
-            .match_typing_expr(&subscript.value, "Union")
-    }) {
-        return;
-    }
 
     // If there are no literal members, we don't need to do anything.
     let Some(literal_subscript) = literal_subscript else {
