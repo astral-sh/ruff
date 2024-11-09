@@ -21,7 +21,6 @@ use crate::checkers::ast::Checker;
 ///
 /// def foo():
 ///     await asyncio.sleep(1)
-///
 /// ```
 ///
 /// Use instead:
