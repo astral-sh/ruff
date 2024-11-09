@@ -62,7 +62,7 @@ pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
         .semantic()
         .resolve_qualified_name(&call.func)
         .and_then(|qualified_name| {
-            if is_markup_call(&qualified_name, checker.settings) && is_unsafe_call(&call) {
+            if is_markup_call(&qualified_name, checker.settings) && is_unsafe_call(call) {
                 Some(qualified_name.to_string())
             } else {
                 None
@@ -78,7 +78,7 @@ pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
 fn is_markup_call(qualified_name: &QualifiedName, settings: &LinterSettings) -> bool {
     matches!(
         qualified_name.segments(),
-        ["markupsafe", "Markup"] | ["flask", "Markup"]
+        ["markupsafe" | "flask", "Markup"]
     ) || settings
         .flake8_markupsafe
         .extend_markup_names
@@ -94,7 +94,7 @@ fn is_unsafe_call(call: &ExprCall) -> bool {
     // unlikely that someone will actually use a keyword argument here
     // TODO: Eventually we may want to allow dynamic values, as long as they
     //       have a __html__ attribute, since that is part of the API
-    !call.arguments.args.is_empty()
-        && !(call.arguments.args[0].is_string_literal_expr()
-            || call.arguments.args[0].is_bytes_literal_expr())
+    !(call.arguments.args.is_empty()
+        || call.arguments.args[0].is_string_literal_expr()
+        || call.arguments.args[0].is_bytes_literal_expr())
 }
