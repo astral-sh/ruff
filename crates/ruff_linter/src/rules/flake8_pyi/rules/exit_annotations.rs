@@ -421,7 +421,7 @@ fn check_positional_args_for_overloaded_method(
     ));
 }
 
-/// Return the non-`None` annotation element of a PEP 604-style union or `Optional` annotation.
+/// Return the non-`None` annotation element of a PEP 604-style `Union` or `Optional` annotation.
 fn non_none_annotation_element<'a>(
     annotation: &'a Expr,
     semantic: &SemanticModel,
