@@ -11,6 +11,9 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// Using `await` outside an `async` function is a syntax error.
 ///
+/// As an exception, `await` is allowed at the top level of a Jupyter notebook
+/// (see: [autoawait]).
+///
 /// ## Example
 /// ```python
 /// import asyncio
@@ -18,6 +21,7 @@ use crate::checkers::ast::Checker;
 ///
 /// def foo():
 ///     await asyncio.sleep(1)
+///
 /// ```
 ///
 /// Use instead:
@@ -32,6 +36,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Await expression](https://docs.python.org/3/reference/expressions.html#await)
 /// - [PEP 492: Await Expression](https://peps.python.org/pep-0492/#await-expression)
+///
+/// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
 #[violation]
 pub struct AwaitOutsideAsync;
 
@@ -46,6 +52,12 @@ impl Violation for AwaitOutsideAsync {
 pub(crate) fn await_outside_async<T: Ranged>(checker: &mut Checker, node: T) {
     // If we're in an `async` function, we're good.
     if checker.semantic().in_async_context() {
+        return;
+    }
+
+    // `await` is allowed at the top level of a Jupyter notebook.
+    // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
+    if checker.semantic().current_scope().kind.is_module() && checker.source_type.is_ipynb() {
         return;
     }
 
