@@ -3,6 +3,7 @@ use ruff_python_ast::ExprCall;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, settings::LinterSettings};
@@ -16,6 +17,9 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// lead to XSS vulnerabilities.
 ///
 /// Instead you should interpolate the [`markupsafe.Markup`] object.
+///
+/// In contrast to the original rule, we do not make an exception for i18n calls
+/// within [`markupsafe.Markup`].
 ///
 /// Using [`lint.flake8-markupsafe.extend-markup-names`] additional objects
 /// can be treated like [`markupsafe.Markup`].
@@ -60,11 +64,24 @@ impl Violation for UnsafeMarkupUse {
 ///
 /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
+    if checker
+        .settings
+        .flake8_markupsafe
+        .extend_markup_names
+        .is_empty()
+        && !(checker.semantic().seen_module(Modules::MARKUPSAFE)
+            || checker.semantic().seen_module(Modules::FLASK))
+    {
+        return;
+    }
+    if !is_unsafe_call(call) {
+        return;
+    }
     if let Some(name) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
         .and_then(|qualified_name| {
-            if is_markup_call(&qualified_name, checker.settings) && is_unsafe_call(call) {
+            if is_markup_call(&qualified_name, checker.settings) {
                 Some(qualified_name.to_string())
             } else {
                 None

@@ -1271,7 +1271,9 @@ impl<'a> SemanticModel<'a> {
             "datetime" => self.seen.insert(Modules::DATETIME),
             "django" => self.seen.insert(Modules::DJANGO),
             "fastapi" => self.seen.insert(Modules::FASTAPI),
+            "flask" => self.seen.insert(Modules::FLASK),
             "logging" => self.seen.insert(Modules::LOGGING),
+            "markupsafe" => self.seen.insert(Modules::MARKUPSAFE),
             "mock" => self.seen.insert(Modules::MOCK),
             "numpy" => self.seen.insert(Modules::NUMPY),
             "os" => self.seen.insert(Modules::OS),
@@ -1856,6 +1858,8 @@ bitflags! {
         const CONTEXTVARS = 1 << 19;
         const ANYIO = 1 << 20;
         const FASTAPI = 1 << 21;
+        const MARKUPSAFE = 1 << 22;
+        const FLASK = 1 << 23;
     }
 }
 

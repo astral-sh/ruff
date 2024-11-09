@@ -26,4 +26,16 @@ MS001.py:10:1: MS001 Unsafe use of `markupsafe.Markup` detected
  9 | escape(content)
 10 | Markup(content)  # MS001
    | ^^^^^^^^^^^^^^^ MS001
+11 | flask.Markup("unsafe %s" % content)  # MS001
+12 | Markup(object="safe")
+   |
+
+MS001.py:11:1: MS001 Unsafe use of `flask.Markup` detected
+   |
+ 9 | escape(content)
+10 | Markup(content)  # MS001
+11 | flask.Markup("unsafe %s" % content)  # MS001
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MS001
+12 | Markup(object="safe")
+13 | Markup(object="unsafe {}".format(content))  # Not currently detected
    |

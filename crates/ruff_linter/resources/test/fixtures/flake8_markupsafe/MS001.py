@@ -8,3 +8,6 @@ Markup("safe {}").format(content)
 flask.Markup(b"safe {}", encoding='utf-8').format(content)
 escape(content)
 Markup(content)  # MS001
+flask.Markup("unsafe %s" % content)  # MS001
+Markup(object="safe")
+Markup(object="unsafe {}".format(content))  # Not currently detected
