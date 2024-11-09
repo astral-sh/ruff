@@ -37,7 +37,7 @@ use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 /// ```
 ///
 /// ## References
-/// - [PEP 613](https://peps.python.org/pep-0613/)
+/// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
 ///
 /// [PEP 613]: https://peps.python.org/pep-0613/
 #[violation]
@@ -93,9 +93,9 @@ impl Violation for UnquotedTypeAlias {
 /// ```
 ///
 /// ## References
-/// - [PEP 613](https://peps.python.org/pep-0613/)
-/// - [PEP 695](https://peps.python.org/pep-0695/#generic-type-alias)
-/// - [PEP 604](https://peps.python.org/pep-0604/)
+/// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
+/// - [PEP 695: Generic Type Alias](https://peps.python.org/pep-0695/#generic-type-alias)
+/// - [PEP 604 – Allow writing union types as `X | Y`](https://peps.python.org/pep-0604/)
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [PEP 613]: https://peps.python.org/pep-0613/
