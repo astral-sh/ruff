@@ -152,7 +152,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
         diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
         diagnostics.push(diagnostic);
     }
-    return Some(diagnostics);
+    Some(diagnostics)
 }
 
 /// Traverses the type expression and collects `[Expr::Name]` nodes that are
