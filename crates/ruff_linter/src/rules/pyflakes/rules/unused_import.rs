@@ -88,6 +88,7 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 ///
 /// ## Options
 /// - `lint.ignore-init-module-imports`
+/// - `lint.pyflakes.allowed-unused-imports`
 ///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
@@ -295,7 +296,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         };
 
-        let name = binding.name(checker.locator());
+        let name = binding.name(checker.source());
 
         // If an import is marked as required, avoid treating it as unused, regardless of whether
         // it was _actually_ used.

@@ -6,7 +6,9 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::{IntersectionType, Type, UnionType};
+use crate::types::{
+    ClassLiteralType, InstanceType, IntersectionType, KnownClass, SubclassOfType, Type, UnionType,
+};
 use crate::Db;
 use rustc_hash::FxHashMap;
 
@@ -64,8 +66,16 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::Unbound => f.write_str("Unbound"),
-            Type::None => f.write_str("None"),
+            Type::Instance(InstanceType { class })
+                if class.is_known(self.db, KnownClass::NoneType) =>
+            {
+                f.write_str("None")
+            }
+            Type::Instance(InstanceType { class })
+                if class.is_known(self.db, KnownClass::NoDefaultType) =>
+            {
+                f.write_str("NoDefault")
+            }
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
             Type::Todo => f.write_str("@Todo"),
@@ -73,8 +83,12 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<module '{:?}'>", file.path(self.db))
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
-            Type::Instance(class) => f.write_str(class.name(self.db)),
+            Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),
+            Type::SubclassOf(SubclassOfType { class }) => {
+                write!(f, "type[{}]", class.name(self.db))
+            }
+            Type::Instance(InstanceType { class }) => f.write_str(class.name(self.db)),
+            Type::KnownInstance(known_instance) => f.write_str(known_instance.as_str()),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
@@ -89,6 +103,28 @@ impl Display for DisplayRepresentation<'_> {
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
 
                 escape.bytes_repr().write(f)
+            }
+            Type::SliceLiteral(slice) => {
+                f.write_str("slice[")?;
+                if let Some(start) = slice.start(self.db) {
+                    write!(f, "Literal[{start}]")?;
+                } else {
+                    f.write_str("None")?;
+                }
+
+                f.write_str(", ")?;
+
+                if let Some(stop) = slice.stop(self.db) {
+                    write!(f, "Literal[{stop}]")?;
+                } else {
+                    f.write_str("None")?;
+                }
+
+                if let Some(step) = slice.step(self.db) {
+                    write!(f, ", Literal[{step}]")?;
+                }
+
+                f.write_str("]")
             }
             Type::Tuple(tuple) => {
                 f.write_str("tuple[")?;
@@ -301,7 +337,9 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{global_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
+    use crate::types::{
+        global_symbol, BytesLiteralType, SliceLiteralType, StringLiteralType, Type, UnionType,
+    };
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -346,18 +384,18 @@ mod tests {
         let union_elements = &[
             Type::Unknown,
             Type::IntLiteral(-1),
-            global_symbol_ty(&db, mod_file, "A"),
+            global_symbol(&db, mod_file, "A").expect_type(),
             Type::StringLiteral(StringLiteralType::new(&db, "A")),
             Type::BytesLiteral(BytesLiteralType::new(&db, [0u8].as_slice())),
             Type::BytesLiteral(BytesLiteralType::new(&db, [7u8].as_slice())),
             Type::IntLiteral(0),
             Type::IntLiteral(1),
             Type::StringLiteral(StringLiteralType::new(&db, "B")),
-            global_symbol_ty(&db, mod_file, "foo"),
-            global_symbol_ty(&db, mod_file, "bar"),
-            global_symbol_ty(&db, mod_file, "B"),
+            global_symbol(&db, mod_file, "foo").expect_type(),
+            global_symbol(&db, mod_file, "bar").expect_type(),
+            global_symbol(&db, mod_file, "B").expect_type(),
             Type::BooleanLiteral(true),
-            Type::None,
+            Type::none(&db),
         ];
         let union = UnionType::from_elements(&db, union_elements).expect_union();
         let display = format!("{}", union.display(&db));
@@ -375,5 +413,47 @@ mod tests {
             )
         );
         Ok(())
+    }
+
+    #[test]
+    fn test_slice_literal_display() {
+        let db = setup_db();
+
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, None, None, None))
+                .display(&db)
+                .to_string(),
+            "slice[None, None]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), None, None))
+                .display(&db)
+                .to_string(),
+            "slice[Literal[1], None]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, None, Some(2), None))
+                .display(&db)
+                .to_string(),
+            "slice[None, Literal[2]]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), Some(5), None))
+                .display(&db)
+                .to_string(),
+            "slice[Literal[1], Literal[5]]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), Some(5), Some(2)))
+                .display(&db)
+                .to_string(),
+            "slice[Literal[1], Literal[5], Literal[2]]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, None, None, Some(2)))
+                .display(&db)
+                .to_string(),
+            "slice[None, None, Literal[2]]"
+        );
     }
 }

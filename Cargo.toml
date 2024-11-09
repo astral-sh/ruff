@@ -81,6 +81,7 @@ hashbrown = { version = "0.15.0", default-features = false, features = [
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
+indexmap = {version = "2.6.0" }
 indicatif = { version = "0.17.8" }
 indoc = { version = "2.0.4" }
 insta = { version = "1.35.1" }
@@ -101,7 +102,7 @@ matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
-notify = { version = "6.1.1" }
+notify = { version = "7.0.0" }
 ordermap = { version = "0.5.0" }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
@@ -188,8 +189,9 @@ missing_panics_doc = "allow"
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
 similar_names = "allow"
+single_match_else = "allow"
 too_many_lines = "allow"
-# To allow `#[allow(clippy::all)]` in `crates/ruff_python_parser/src/python.rs`.
+# Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
 print_stdout = "warn"
@@ -202,6 +204,10 @@ get_unwrap = "warn"
 rc_buffer = "warn"
 rc_mutex = "warn"
 rest_pat_in_fully_bound_structs = "warn"
+# nursery rules
+redundant_clone = "warn"
+debug_assert_with_mut_call = "warn"
+unused_peekable = "warn"
 
 [profile.release]
 # Note that we set these explicitly, and these values

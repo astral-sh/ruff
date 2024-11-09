@@ -50,7 +50,7 @@ impl Violation for SingledispatchMethod {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`@singledispatch` decorator should not be used on methods")
+        "`@singledispatch` decorator should not be used on methods".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

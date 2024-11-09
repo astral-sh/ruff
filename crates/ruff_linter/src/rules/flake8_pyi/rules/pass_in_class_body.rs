@@ -32,11 +32,11 @@ pub struct PassInClassBody;
 impl AlwaysFixableViolation for PassInClassBody {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Class body must not contain `pass`")
+        "Class body must not contain `pass`".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary `pass`")
+        "Remove unnecessary `pass`".to_string()
     }
 }
 

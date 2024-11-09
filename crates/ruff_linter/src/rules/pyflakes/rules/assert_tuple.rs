@@ -33,7 +33,7 @@ pub struct AssertTuple;
 impl Violation for AssertTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assert test is a non-empty tuple, which is always `True`")
+        "Assert test is a non-empty tuple, which is always `True`".to_string()
     }
 }
 

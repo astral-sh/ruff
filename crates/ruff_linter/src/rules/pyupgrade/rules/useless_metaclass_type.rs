@@ -27,14 +27,14 @@ use crate::fix;
 /// ```
 ///
 /// ## References
-/// - [PEP 3115](https://www.python.org/dev/peps/pep-3115/)
+/// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
 #[violation]
 pub struct UselessMetaclassType;
 
 impl AlwaysFixableViolation for UselessMetaclassType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__metaclass__ = type` is implied")
+        "`__metaclass__ = type` is implied".to_string()
     }
 
     fn fix_title(&self) -> String {

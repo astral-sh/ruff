@@ -1,26 +1,25 @@
+use std::fmt::{Debug, Formatter};
+use std::iter::FusedIterator;
+
+use bitflags::bitflags;
+
 pub(crate) use extraneous_whitespace::*;
 pub(crate) use indentation::*;
 pub(crate) use missing_whitespace::*;
 pub(crate) use missing_whitespace_after_keyword::*;
 pub(crate) use missing_whitespace_around_operator::*;
 pub(crate) use redundant_backslash::*;
+use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_trivia::is_python_whitespace;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub(crate) use space_around_operator::*;
 pub(crate) use whitespace_around_keywords::*;
 pub(crate) use whitespace_around_named_parameter_equals::*;
 pub(crate) use whitespace_before_comment::*;
 pub(crate) use whitespace_before_parameters::*;
 
-use std::fmt::{Debug, Formatter};
-use std::iter::FusedIterator;
-
-use bitflags::bitflags;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-
-use ruff_python_parser::{TokenKind, Tokens};
-use ruff_python_trivia::is_python_whitespace;
-use ruff_source_file::Locator;
-
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
+use crate::Locator;
 
 mod extraneous_whitespace;
 mod indentation;
@@ -579,7 +578,8 @@ impl TypeParamsState {
 #[cfg(test)]
 mod tests {
     use ruff_python_parser::parse_module;
-    use ruff_source_file::Locator;
+
+    use crate::Locator;
 
     use super::LogicalLines;
 

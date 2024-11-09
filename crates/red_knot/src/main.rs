@@ -5,8 +5,6 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
-use salsa::plumbing::ZalsaDatabase;
-
 use red_knot_python_semantic::SitePackages;
 use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
@@ -14,7 +12,9 @@ use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
+use salsa::plumbing::ZalsaDatabase;
 use target_version::TargetVersion;
 
 use crate::logging::{setup_tracing, Verbosity};
@@ -144,7 +144,7 @@ pub fn main() -> ExitStatus {
 }
 
 fn run() -> anyhow::Result<ExitStatus> {
-    let args = Args::parse_from(std::env::args().collect::<Vec<_>>());
+    let args = Args::parse_from(std::env::args());
 
     if matches!(args.command, Some(Command::Server)) {
         return run_server().map(|()| ExitStatus::Success);
@@ -318,8 +318,9 @@ impl MainLoop {
                 } => {
                     let has_diagnostics = !result.is_empty();
                     if check_revision == revision {
+                        #[allow(clippy::print_stdout)]
                         for diagnostic in result {
-                            tracing::error!("{}", diagnostic);
+                            println!("{}", diagnostic.display(db));
                         }
                     } else {
                         tracing::debug!(
@@ -378,7 +379,10 @@ impl MainLoopCancellationToken {
 #[derive(Debug)]
 enum MainLoopMessage {
     CheckWorkspace,
-    CheckCompleted { result: Vec<String>, revision: u64 },
+    CheckCompleted {
+        result: Vec<Box<dyn Diagnostic>>,
+        revision: u64,
+    },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
 }

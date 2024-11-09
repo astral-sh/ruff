@@ -1,12 +1,13 @@
-use std::borrow::Cow;
-
+use itertools::Itertools;
 use ruff_formatter::{format_args, write, FormatContext};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
@@ -40,12 +41,20 @@ impl<'a> FormatImplicitConcatenatedString<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let expanded = FormatImplicitConcatenatedStringExpanded::new(self.string);
+        let flat = FormatImplicitConcatenatedStringFlat::new(self.string, f.context());
+        let expanded = FormatImplicitConcatenatedStringExpanded::new(
+            self.string,
+            if flat.is_some() {
+                ImplicitConcatenatedLayout::MaybeFlat
+            } else {
+                ImplicitConcatenatedLayout::Multipart
+            },
+        );
 
         // If the string can be joined, try joining the implicit concatenated string into a single string
         // if it fits on the line. Otherwise, parenthesize the string parts and format each part on its
         // own line.
-        if let Some(flat) = FormatImplicitConcatenatedStringFlat::new(self.string, f.context()) {
+        if let Some(flat) = flat {
             write!(
                 f,
                 [if_group_fits_on_line(&flat), if_group_breaks(&expanded)]
@@ -59,23 +68,37 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
 /// Formats an implicit concatenated string where parts are separated by a space or line break.
 pub(crate) struct FormatImplicitConcatenatedStringExpanded<'a> {
     string: StringLike<'a>,
+    layout: ImplicitConcatenatedLayout,
 }
 
 impl<'a> FormatImplicitConcatenatedStringExpanded<'a> {
-    pub(crate) fn new(string: StringLike<'a>) -> Self {
+    pub(crate) fn new(string: StringLike<'a>, layout: ImplicitConcatenatedLayout) -> Self {
         assert!(string.is_implicit_concatenated());
 
-        Self { string }
+        Self { string, layout }
     }
 }
 
 impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let quoting = self.string.quoting(&f.context().locator());
+        let quoting = self.string.quoting(f.context().source());
 
         let join_implicit_concatenated_string_enabled =
             is_join_implicit_concatenated_string_enabled(f.context());
+
+        // Keep implicit concatenated strings expanded unless they're already written on a single line.
+        if matches!(self.layout, ImplicitConcatenatedLayout::Multipart)
+            && join_implicit_concatenated_string_enabled
+            && self.string.parts().tuple_windows().any(|(a, b)| {
+                f.context()
+                    .source()
+                    .contains_line_break(TextRange::new(a.end(), b.start()))
+            })
+        {
+            expand_parent().fmt(f)?;
+        }
+
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for part in self.string.parts() {
@@ -105,6 +128,14 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 
         joiner.finish()
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum ImplicitConcatenatedLayout {
+    /// The string might get joined into a single string if it fits on a single line.
+    MaybeFlat,
+    /// The string will remain a multipart string.
+    Multipart,
 }
 
 /// Formats an implicit concatenated string where parts are joined into a single string if possible.
@@ -158,10 +189,9 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 if let StringLikePart::FString(fstring) = part {
                     if fstring.elements.iter().any(|element| match element {
                         // Same as for other literals. Multiline literals can't fit on a single line.
-                        FStringElement::Literal(literal) => context
-                            .locator()
-                            .slice(literal.range())
-                            .contains(['\n', '\r']),
+                        FStringElement::Literal(literal) => {
+                            context.source().contains_line_break(literal.range())
+                        }
                         FStringElement::Expression(expression) => {
                             if is_f_string_formatting_enabled(context) {
                                 // Expressions containing comments can't be joined.
@@ -169,7 +199,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             } else {
                                 // Multiline f-string expressions can't be joined if the f-string formatting is disabled because
                                 // the string gets inserted in verbatim preserving the newlines.
-                                context.locator().slice(expression).contains(['\n', '\r'])
+                                context.source().contains_line_break(expression.range())
                             }
                         }
                     }) {
@@ -269,12 +299,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
             for part in self.string.parts().rev() {
                 assert!(part.is_string_literal());
 
-                if f.context()
-                    .locator()
-                    .slice(part.content_range())
-                    .trim()
-                    .is_empty()
-                {
+                if f.context().source()[part.content_range()].trim().is_empty() {
                     // Don't format the part.
                     parts.next_back();
                 } else {
@@ -298,10 +323,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                     .fmt(f)?;
 
                     if first_non_empty {
-                        first_non_empty = f
-                            .context()
-                            .locator()
-                            .slice(part.content_range())
+                        first_non_empty = f.context().source()[part.content_range()]
                             .trim_start()
                             .is_empty();
                     }
@@ -328,7 +350,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                                         self.flags,
                                         FStringLayout::from_f_string(
                                             f_string,
-                                            &f.context().locator(),
+                                            f.context().source(),
                                         ),
                                     );
 
@@ -365,14 +387,15 @@ struct FormatLiteralContent {
 
 impl Format<PyFormatContext<'_>> for FormatLiteralContent {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let content = f.context().locator().slice(self.range);
+        let content = &f.context().source()[self.range];
         let mut normalized = normalize_string(
             content,
             0,
             self.flags,
             self.flags.is_f_string() && !self.is_fstring,
-            true,
-            false,
+            // TODO: Remove the argument from `normalize_string` when promoting the `is_f_string_formatting_enabled` preview style.
+            self.flags.is_f_string() && !is_f_string_formatting_enabled(f.context()),
+            is_f_string_formatting_enabled(f.context()),
         );
 
         // Trim the start and end of the string if it's the first or last part of a docstring.

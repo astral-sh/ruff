@@ -1076,6 +1076,14 @@ if sys.platform != "win32":
 
 def cpu_count() -> int | None: ...
 
+if sys.version_info >= (3, 13):
+    # Documented to return `int | None`, but falls back to `len(sched_getaffinity(0))` when
+    # available. See https://github.com/python/cpython/blob/417c130/Lib/os.py#L1175-L1186.
+    if sys.platform != "win32" and sys.platform != "darwin":
+        def process_cpu_count() -> int: ...
+    else:
+        def process_cpu_count() -> int | None: ...
+
 if sys.platform != "win32":
     # Unix only
     def confstr(name: str | int, /) -> str | None: ...

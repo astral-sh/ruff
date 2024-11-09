@@ -39,7 +39,7 @@ pub struct SSHNoHostKeyVerification;
 impl Violation for SSHNoHostKeyVerification {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Paramiko call with policy set to automatically trust the unknown host key")
+        "Paramiko call with policy set to automatically trust the unknown host key".to_string()
     }
 }
 

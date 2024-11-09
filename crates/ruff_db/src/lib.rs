@@ -6,6 +6,7 @@ use crate::files::Files;
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
 
+pub mod diagnostic;
 pub mod display;
 pub mod file_revision;
 pub mod files;

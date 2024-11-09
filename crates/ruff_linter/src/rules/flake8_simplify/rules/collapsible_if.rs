@@ -11,7 +11,7 @@ use ruff_python_ast::{self as ast, whitespace, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -19,6 +19,7 @@ use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for nested `if` statements that can be collapsed into a single `if`
@@ -53,7 +54,7 @@ impl Violation for CollapsibleIf {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a single `if` statement instead of nested `if` statements")
+        "Use a single `if` statement instead of nested `if` statements".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -292,12 +293,12 @@ pub(super) fn collapse_nested_if(
     nested_if: NestedIf,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, &nested_if) else {
+    let Some(outer_indent) = whitespace::indentation(locator.contents(), &nested_if) else {
         bail!("Unable to fix multiline statement");
     };
 
     // Extract the module text.
-    let contents = locator.lines(nested_if.range());
+    let contents = locator.lines_str(nested_if.range());
 
     // If this is an `elif`, we have to remove the `elif` keyword for now. (We'll
     // restore the `el` later on.)

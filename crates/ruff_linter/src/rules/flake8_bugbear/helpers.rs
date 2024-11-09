@@ -1,8 +1,9 @@
 use ruff_notebook::CellOffsets;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::Locator;
 
 /// Return `true` if the statement containing the current expression is the last
 /// top-level expression in the cell. This assumes that the source is a Jupyter

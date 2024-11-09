@@ -49,9 +49,9 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.short_circuit {
-            format!("Unnecessary generator (rewrite using `list()`)")
+            "Unnecessary generator (rewrite using `list()`)".to_string()
         } else {
-            format!("Unnecessary generator (rewrite as a `list` comprehension)")
+            "Unnecessary generator (rewrite as a `list` comprehension)".to_string()
         }
     }
 

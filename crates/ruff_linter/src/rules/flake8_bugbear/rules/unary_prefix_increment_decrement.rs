@@ -38,13 +38,12 @@ pub struct UnaryPrefixIncrementDecrement {
 impl Violation for UnaryPrefixIncrementDecrement {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnaryPrefixIncrementDecrement { operator } = self;
-        match operator {
+        match self.operator {
             UnaryPrefixOperatorType::Increment => {
-                format!("Python does not support the unary prefix increment operator (`++`)")
+                "Python does not support the unary prefix increment operator (`++`)".to_string()
             }
             UnaryPrefixOperatorType::Decrement => {
-                format!("Python does not support the unary prefix decrement operator (`--`)")
+                "Python does not support the unary prefix decrement operator (`--`)".to_string()
             }
         }
     }

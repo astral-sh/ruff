@@ -575,7 +575,7 @@ class Collection(Iterable[_T_co], Container[_T_co], Protocol[_T_co]):
     @abstractmethod
     def __len__(self) -> int: ...
 
-class Sequence(Collection[_T_co], Reversible[_T_co]):
+class Sequence(Reversible[_T_co], Collection[_T_co]):
     @overload
     @abstractmethod
     def __getitem__(self, index: int) -> _T_co: ...
@@ -760,7 +760,7 @@ TYPE_CHECKING: bool
 # In stubs, the arguments of the IO class are marked as positional-only.
 # This differs from runtime, but better reflects the fact that in reality
 # classes deriving from IO use different names for the arguments.
-class IO(Iterator[AnyStr]):
+class IO(Generic[AnyStr]):
     # At runtime these are all abstract properties,
     # but making them abstract in the stub is hugely disruptive, for not much gain.
     # See #8726

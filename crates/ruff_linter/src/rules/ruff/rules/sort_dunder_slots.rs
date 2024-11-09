@@ -1,10 +1,12 @@
 use std::borrow::Cow;
 
+use itertools::izip;
+
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Binding;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -12,8 +14,7 @@ use crate::rules::ruff::rules::sequence_sorting::{
     sort_single_line_elements_sequence, MultilineStringSequenceValue, SequenceKind,
     SortClassification, SortingStyle,
 };
-
-use itertools::izip;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `__slots__` definitions that are not ordered according to a

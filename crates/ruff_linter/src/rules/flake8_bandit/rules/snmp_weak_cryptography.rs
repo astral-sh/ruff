@@ -34,9 +34,8 @@ pub struct SnmpWeakCryptography;
 impl Violation for SnmpWeakCryptography {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
-        )
+        "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
+            .to_string()
     }
 }
 

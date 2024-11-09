@@ -40,7 +40,7 @@ pub struct InvalidStrReturnType;
 impl Violation for InvalidStrReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__str__` does not return `str`")
+        "`__str__` does not return `str`".to_string()
     }
 }
 

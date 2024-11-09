@@ -2,29 +2,30 @@
 // "reStructuredText."
 #![allow(clippy::doc_markdown)]
 
-use itertools::Itertools;
 use std::cmp::Ordering;
 use std::sync::LazyLock;
 use std::{borrow::Cow, collections::VecDeque};
 
+use itertools::Itertools;
 use regex::Regex;
+
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
 use ruff_python_trivia::CommentRanges;
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
     ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
-    ruff_source_file::Locator,
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
-use super::NormalizedString;
 use crate::preview::{
     is_docstring_code_block_in_docstring_indent_enabled,
     is_join_implicit_concatenated_string_enabled,
 };
 use crate::string::StringQuotes;
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
+
+use super::NormalizedString;
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
@@ -1592,9 +1593,8 @@ fn docstring_format_source(
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
-    let locator = Locator::new(source);
 
-    let ctx = PyFormatContext::new(options, locator.contents(), comments, parsed.tokens())
+    let ctx = PyFormatContext::new(options, source, comments, parsed.tokens())
         .in_docstring(docstring_quote_style);
     let formatted = crate::format!(ctx, [parsed.syntax().format()])?;
     formatted

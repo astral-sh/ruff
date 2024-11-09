@@ -44,6 +44,10 @@ mod tests {
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("singledispatchmethod.py")
+    )]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("singledispatch.py"))]

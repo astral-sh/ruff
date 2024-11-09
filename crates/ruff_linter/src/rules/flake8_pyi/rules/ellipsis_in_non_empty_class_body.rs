@@ -34,7 +34,7 @@ impl Violation for EllipsisInNonEmptyClassBody {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Non-empty class body must not contain `...`")
+        "Non-empty class body must not contain `...`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

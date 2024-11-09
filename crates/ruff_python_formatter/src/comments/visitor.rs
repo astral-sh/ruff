@@ -9,7 +9,6 @@ use ruff_python_ast::{Mod, Stmt};
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::source_order::*;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
@@ -531,12 +530,12 @@ pub(super) struct CommentsMapBuilder<'a> {
     comments: CommentsMap<'a>,
     /// We need those for backwards lexing
     comment_ranges: &'a CommentRanges,
-    locator: Locator<'a>,
+    source: &'a str,
 }
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
     fn push_comment(&mut self, placement: DecoratedComment<'a>) {
-        let placement = place_comment(placement, self.comment_ranges, &self.locator);
+        let placement = place_comment(placement, self.comment_ranges, self.source);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -598,11 +597,11 @@ impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
 }
 
 impl<'a> CommentsMapBuilder<'a> {
-    pub(crate) fn new(locator: Locator<'a>, comment_ranges: &'a CommentRanges) -> Self {
+    pub(crate) fn new(source: &'a str, comment_ranges: &'a CommentRanges) -> Self {
         Self {
             comments: CommentsMap::default(),
             comment_ranges,
-            locator,
+            source,
         }
     }
 

@@ -44,7 +44,7 @@ impl Violation for LambdaAssignment {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not assign a `lambda` expression, use a `def`")
+        "Do not assign a `lambda` expression, use a `def`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -79,10 +79,10 @@ pub(crate) fn lambda_assignment(
         stmt.range(),
     );
 
-    if !has_leading_content(stmt.start(), checker.locator())
-        && !has_trailing_content(stmt.end(), checker.locator())
+    if !has_leading_content(stmt.start(), checker.source())
+        && !has_trailing_content(stmt.end(), checker.source())
     {
-        let first_line = checker.locator().line(stmt.start());
+        let first_line = checker.locator().line_str(stmt.start());
         let indentation = leading_indentation(first_line);
         let mut indented = String::new();
         for (idx, line) in function(

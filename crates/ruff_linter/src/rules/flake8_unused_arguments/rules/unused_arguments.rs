@@ -19,6 +19,10 @@ use crate::registry::Rule;
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// def foo(bar, baz):
@@ -30,6 +34,9 @@ use crate::registry::Rule;
 /// def foo(bar):
 ///     return bar * 2
 /// ```
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
 #[violation]
 pub struct UnusedFunctionArgument {
     name: String,
@@ -50,6 +57,10 @@ impl Violation for UnusedFunctionArgument {
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -63,6 +74,9 @@ impl Violation for UnusedFunctionArgument {
 ///     def foo(self, arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
 #[violation]
 pub struct UnusedMethodArgument {
     name: String,
@@ -83,6 +97,10 @@ impl Violation for UnusedMethodArgument {
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -98,6 +116,9 @@ impl Violation for UnusedMethodArgument {
 ///     def foo(cls, arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
 #[violation]
 pub struct UnusedClassMethodArgument {
     name: String,
@@ -118,6 +139,10 @@ impl Violation for UnusedClassMethodArgument {
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -129,10 +154,13 @@ impl Violation for UnusedClassMethodArgument {
 /// Use instead:
 /// ```python
 /// class Class:
-///     @static
+///     @staticmethod
 ///     def foo(arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
 #[violation]
 pub struct UnusedStaticMethodArgument {
     name: String,
@@ -154,6 +182,10 @@ impl Violation for UnusedStaticMethodArgument {
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// my_list = [1, 2, 3, 4, 5]
@@ -165,6 +197,9 @@ impl Violation for UnusedStaticMethodArgument {
 /// my_list = [1, 2, 3, 4, 5]
 /// squares = map(lambda x: x**2, my_list)
 /// ```
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
 #[violation]
 pub struct UnusedLambdaArgument {
     name: String,

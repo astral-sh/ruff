@@ -58,11 +58,11 @@ pub struct QuadraticListSummation;
 impl AlwaysFixableViolation for QuadraticListSummation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid quadratic list summation")
+        "Avoid quadratic list summation".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `functools.reduce`")
+        "Replace with `functools.reduce`".to_string()
     }
 }
 

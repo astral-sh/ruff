@@ -52,7 +52,7 @@ pub struct TryConsiderElse;
 impl Violation for TryConsiderElse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Consider moving this statement to an `else` block")
+        "Consider moving this statement to an `else` block".to_string()
     }
 }
 

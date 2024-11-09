@@ -14,7 +14,9 @@ class IntIterable:
 for x in IntIterable():
     pass
 
-reveal_type(x)  # revealed: Unbound | int
+# revealed: int
+# error: [possibly-unresolved-reference]
+reveal_type(x)
 ```
 
 ## With previous definition
@@ -85,7 +87,9 @@ class OldStyleIterable:
 for x in OldStyleIterable():
     pass
 
-reveal_type(x)  # revealed: Unbound | int
+# revealed: int
+# error: [possibly-unresolved-reference]
+reveal_type(x)
 ```
 
 ## With heterogeneous tuple
@@ -94,12 +98,19 @@ reveal_type(x)  # revealed: Unbound | int
 for x in (1, "a", b"foo"):
     pass
 
-reveal_type(x)  # revealed: Unbound | Literal[1] | Literal["a"] | Literal[b"foo"]
+# revealed: Literal[1] | Literal["a"] | Literal[b"foo"]
+# error: [possibly-unresolved-reference]
+reveal_type(x)
 ```
 
 ## With non-callable iterator
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 class NotIterable:
     if flag:
         __iter__ = 1
@@ -109,7 +120,9 @@ class NotIterable:
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 
-reveal_type(x)  # revealed: Unbound | Unknown
+# revealed: Unknown
+# error: [possibly-unresolved-reference]
+reveal_type(x)
 ```
 
 ## Invalid iterable
@@ -130,4 +143,141 @@ class NotIterable:
 
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
+```
+
+## Union type as iterable
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+class Test2:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
+for x in Test() if flag else Test2():
+    reveal_type(x)  # revealed: int
+```
+
+## Union type as iterator
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class TestIter2:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter | TestIter2:
+        return TestIter()
+
+for x in Test():
+    reveal_type(x)  # revealed: int
+```
+
+## Union type as iterable and union type as iterator
+
+```py
+class TestIter:
+    def __next__(self) -> int | Exception:
+        return 42
+
+class TestIter2:
+    def __next__(self) -> str | tuple[int, int]:
+        return "42"
+
+class TestIter3:
+    def __next__(self) -> bytes:
+        return b"42"
+
+class TestIter4:
+    def __next__(self) -> memoryview:
+        return memoryview(b"42")
+
+class Test:
+    def __iter__(self) -> TestIter | TestIter2:
+        return TestIter()
+
+class Test2:
+    def __iter__(self) -> TestIter3 | TestIter4:
+        return TestIter3()
+
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
+for x in Test() if flag else Test2():
+    reveal_type(x)  # revealed: int | Exception | str | tuple[int, int] | bytes | memoryview
+```
+
+## Union type as iterable where one union element has no `__iter__` method
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+def coinflip() -> bool:
+    return True
+
+# error: [not-iterable] "Object of type `Test | Literal[42]` is not iterable because its `__iter__` method is possibly unbound"
+for x in Test() if coinflip() else 42:
+    reveal_type(x)  # revealed: int
+```
+
+## Union type as iterable where one union element has invalid `__iter__` method
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+class Test2:
+    def __iter__(self) -> int:
+        return 42
+
+def coinflip() -> bool:
+    return True
+
+# error: "Object of type `Test | Test2` is not iterable"
+for x in Test() if coinflip() else Test2():
+    reveal_type(x)  # revealed: Unknown
+```
+
+## Union type as iterator where one union element has no `__next__` method
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter | int:
+        return TestIter()
+
+# error: [not-iterable] "Object of type `Test` is not iterable"
+for x in Test():
+    reveal_type(x)  # revealed: Unknown
 ```

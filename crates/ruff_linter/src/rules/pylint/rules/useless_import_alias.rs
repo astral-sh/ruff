@@ -21,13 +21,19 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import numpy as np
 /// ```
+///
+/// or
+///
+/// ```python
+/// import numpy
+/// ```
 #[violation]
 pub struct UselessImportAlias;
 
 impl AlwaysFixableViolation for UselessImportAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Import alias does not rename original package")
+        "Import alias does not rename original package".to_string()
     }
 
     fn fix_title(&self) -> String {

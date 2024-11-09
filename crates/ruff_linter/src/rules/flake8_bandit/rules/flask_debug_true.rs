@@ -42,7 +42,7 @@ pub struct FlaskDebugTrue;
 impl Violation for FlaskDebugTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `debug=True` in Flask app detected")
+        "Use of `debug=True` in Flask app detected".to_string()
     }
 }
 

@@ -1,6 +1,5 @@
 //! Access to the Ruff linting API for the LSP
 
-use ruff_python_parser::ParseError;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -13,11 +12,13 @@ use ruff_linter::{
     registry::AsRule,
     settings::flags,
     source_kind::SourceKind,
+    Locator,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_source_file::{LineIndex, Locator};
+use ruff_python_parser::ParseError;
+use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
@@ -97,16 +98,14 @@ pub(crate) fn check(
     // Parse once.
     let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
-    let index = LineIndex::from_source_text(source_kind.source_code());
-
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::with_index(source_kind.source_code(), index.clone());
+    let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
@@ -154,14 +153,25 @@ pub(crate) fn check(
         .into_iter()
         .zip(noqa_edits)
         .map(|(diagnostic, noqa_edit)| {
-            to_lsp_diagnostic(diagnostic, &noqa_edit, &source_kind, &index, encoding)
+            to_lsp_diagnostic(
+                diagnostic,
+                &noqa_edit,
+                &source_kind,
+                locator.to_index(),
+                encoding,
+            )
         });
 
     let lsp_diagnostics = lsp_diagnostics.chain(
         show_syntax_errors
             .then(|| {
                 parsed.errors().iter().map(|parse_error| {
-                    parse_error_to_lsp_diagnostic(parse_error, &source_kind, &index, encoding)
+                    parse_error_to_lsp_diagnostic(
+                        parse_error,
+                        &source_kind,
+                        locator.to_index(),
+                        encoding,
+                    )
                 })
             })
             .into_iter()

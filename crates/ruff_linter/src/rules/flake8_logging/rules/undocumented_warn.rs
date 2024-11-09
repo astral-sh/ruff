@@ -37,13 +37,14 @@ pub struct UndocumentedWarn;
 
 impl Violation for UndocumentedWarn {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of undocumented `logging.WARN` constant")
+        "Use of undocumented `logging.WARN` constant".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace `logging.WARN` with `logging.WARNING`"))
+        Some("Replace `logging.WARN` with `logging.WARNING`".to_string())
     }
 }
 

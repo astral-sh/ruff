@@ -5,13 +5,13 @@ use ruff_python_ast::{
     self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
 use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticModel};
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::settings::types::PythonVersion;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.
@@ -49,7 +49,7 @@ pub struct TypedArgumentDefaultInStub;
 impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for typed arguments")
+        "Only simple default values allowed for typed arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -95,7 +95,7 @@ pub struct ArgumentDefaultInStub;
 impl AlwaysFixableViolation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for arguments")
+        "Only simple default values allowed for arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -139,7 +139,7 @@ pub struct AssignmentDefaultInStub;
 impl AlwaysFixableViolation for AssignmentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Only simple default values allowed for assignments")
+        "Only simple default values allowed for assignments".to_string()
     }
 
     fn fix_title(&self) -> String {

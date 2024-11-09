@@ -4,7 +4,6 @@ use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::ExprContext;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::scope::ScopeId;
@@ -163,8 +162,8 @@ pub struct UnresolvedReference {
 
 impl UnresolvedReference {
     /// Returns the name of the reference.
-    pub fn name<'a>(&self, locator: &Locator<'a>) -> &'a str {
-        locator.slice(self.range)
+    pub fn name<'a>(&self, source: &'a str) -> &'a str {
+        &source[self.range]
     }
 
     /// The range of the reference in the source code.

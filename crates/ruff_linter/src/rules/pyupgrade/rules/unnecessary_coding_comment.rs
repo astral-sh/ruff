@@ -1,12 +1,15 @@
-use regex::Regex;
 use std::sync::LazyLock;
+
+use regex::Regex;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for unnecessary UTF-8 encoding declarations.
@@ -33,7 +36,7 @@ pub struct UTF8EncodingDeclaration;
 impl AlwaysFixableViolation for UTF8EncodingDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("UTF-8 encoding declaration is unnecessary")
+        "UTF-8 encoding declaration is unnecessary".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -75,7 +78,7 @@ pub(crate) fn unnecessary_coding_comment(
         // x = 2
         // ```
         if indexer
-            .preceded_by_continuations(line_range.start(), locator)
+            .preceded_by_continuations(line_range.start(), locator.contents())
             .is_some()
         {
             continue;

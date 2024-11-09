@@ -4,7 +4,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -12,6 +11,7 @@ use crate::cst::matchers::{
     match_call_mut, match_formatted_string, match_formatted_string_expression, match_name,
     transform_expression,
 };
+use crate::Locator;
 
 /// ## What it does
 /// Checks for uses of `str()`, `repr()`, and `ascii()` as explicit type
@@ -43,7 +43,7 @@ pub struct ExplicitFStringTypeConversion;
 impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use explicit conversion flag")
+        "Use explicit conversion flag".to_string()
     }
 
     fn fix_title(&self) -> String {

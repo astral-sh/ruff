@@ -45,11 +45,11 @@ impl Violation for DirectLoggerInstantiation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `logging.getLogger()` to instantiate loggers")
+        "Use `logging.getLogger()` to instantiate loggers".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `logging.getLogger()`"))
+        Some("Replace with `logging.getLogger()`".to_string())
     }
 }
 

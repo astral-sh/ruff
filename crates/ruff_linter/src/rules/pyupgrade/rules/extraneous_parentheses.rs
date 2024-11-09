@@ -1,11 +1,11 @@
 use std::slice::Iter;
 
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::Locator;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for extraneous parentheses.
@@ -29,7 +29,7 @@ pub struct ExtraneousParentheses;
 impl AlwaysFixableViolation for ExtraneousParentheses {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid extraneous parentheses")
+        "Avoid extraneous parentheses".to_string()
     }
 
     fn fix_title(&self) -> String {

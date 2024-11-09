@@ -65,7 +65,7 @@ pub struct FastApiRedundantResponseModel;
 impl AlwaysFixableViolation for FastApiRedundantResponseModel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("FastAPI route with redundant `response_model` argument")
+        "FastAPI route with redundant `response_model` argument".to_string()
     }
 
     fn fix_title(&self) -> String {

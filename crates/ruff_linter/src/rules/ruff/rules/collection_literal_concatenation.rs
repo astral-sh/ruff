@@ -46,21 +46,19 @@ impl Violation for CollectionLiteralConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CollectionLiteralConcatenation { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!("Consider `{expression}` instead of concatenation")
         } else {
-            format!("Consider iterable unpacking instead of concatenation")
+            "Consider iterable unpacking instead of concatenation".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let CollectionLiteralConcatenation { expression } = self;
-        if let Some(expression) = expression.full_display() {
-            Some(format!("Replace with `{expression}`"))
-        } else {
-            Some(format!("Replace with iterable unpacking"))
-        }
+        let title = match self.expression.full_display() {
+            Some(expression) => format!("Replace with `{expression}`"),
+            None => "Replace with iterable unpacking".to_string(),
+        };
+        Some(title)
     }
 }
 
@@ -200,7 +198,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
     );
     if !checker
         .comment_ranges()
-        .has_comments(expr, checker.locator())
+        .has_comments(expr, checker.source())
     {
         // This suggestion could be unsafe if the non-literal expression in the
         // expression has overridden the `__add__` (or `__radd__`) magic methods.

@@ -17,8 +17,10 @@ async def foo():
     async for x in Iterator():
         pass
 
-    # TODO
-    reveal_type(x)  # revealed: Unbound | @Todo
+    # TODO: should reveal `Unknown` because `__aiter__` is not defined
+    # revealed: @Todo
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ## Basic async for loop
@@ -37,5 +39,7 @@ async def foo():
     async for x in IntAsyncIterable():
         pass
 
-    reveal_type(x)  # revealed: Unbound | @Todo
+    # error: [possibly-unresolved-reference]
+    # revealed: @Todo
+    reveal_type(x)
 ```

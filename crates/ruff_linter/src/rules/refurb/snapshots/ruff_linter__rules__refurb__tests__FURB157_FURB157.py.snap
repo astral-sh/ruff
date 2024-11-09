@@ -166,3 +166,43 @@ FURB157.py:12:17: FURB157 [*] Verbose expression in `Decimal` constructor
 13 13 | 
 14 14 | # OK
 15 15 | Decimal(0)
+
+FURB157.py:23:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+22 | # Errors
+23 | Decimal("1_000")
+   |         ^^^^^^^ FURB157
+24 | Decimal("__1____000") 
+   |
+   = help: Replace with `1000`
+
+ℹ Safe fix
+20 20 | # See https://github.com/astral-sh/ruff/issues/13807
+21 21 | 
+22 22 | # Errors
+23    |-Decimal("1_000")
+   23 |+Decimal(1000)
+24 24 | Decimal("__1____000") 
+25 25 | 
+26 26 | # Ok
+
+FURB157.py:24:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+22 | # Errors
+23 | Decimal("1_000")
+24 | Decimal("__1____000") 
+   |         ^^^^^^^^^^^^ FURB157
+25 | 
+26 | # Ok
+   |
+   = help: Replace with `1000`
+
+ℹ Safe fix
+21 21 | 
+22 22 | # Errors
+23 23 | Decimal("1_000")
+24    |-Decimal("__1____000") 
+   24 |+Decimal(1000) 
+25 25 | 
+26 26 | # Ok
+27 27 | Decimal("2e-4")

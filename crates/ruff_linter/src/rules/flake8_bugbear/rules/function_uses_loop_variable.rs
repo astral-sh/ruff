@@ -40,7 +40,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
-/// - [Python documentation: functools.partial](https://docs.python.org/3/library/functools.html#functools.partial)
+/// - [Python documentation: `functools.partial`](https://docs.python.org/3/library/functools.html#functools.partial)
 #[violation]
 pub struct FunctionUsesLoopVariable {
     name: String,

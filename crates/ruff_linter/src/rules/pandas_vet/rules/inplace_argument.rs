@@ -4,11 +4,11 @@ use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Keyword, Stmt};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method
@@ -33,7 +33,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ```
 ///
 /// ## References
-/// - [_Why You Should Probably Never Use pandas inplace=True_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
+/// - [_Why You Should Probably Never Use pandas `inplace=True`_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[violation]
 pub struct PandasUseOfInplaceArgument;
 
@@ -42,7 +42,7 @@ impl Violation for PandasUseOfInplaceArgument {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`inplace=True` should be avoided; it has inconsistent behavior")
+        "`inplace=True` should be avoided; it has inconsistent behavior".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

@@ -34,7 +34,7 @@ pub struct PathConstructorCurrentDirectory;
 impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not pass the current directory explicitly to `Path`")
+        "Do not pass the current directory explicitly to `Path`".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -26,7 +26,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ```
 ///
 /// ## References
-/// - [PEP 3115](https://www.python.org/dev/peps/pep-3115/)
+/// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
 #[violation]
 pub struct UselessObjectInheritance {
     name: String,

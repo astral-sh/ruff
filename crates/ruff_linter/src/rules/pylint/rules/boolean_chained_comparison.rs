@@ -43,7 +43,7 @@ impl Violation for BooleanChainedComparison {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Contains chained boolean comparison that can be simplified")
+        "Contains chained boolean comparison that can be simplified".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

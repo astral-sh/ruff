@@ -6,7 +6,7 @@
 import re
 
 try:
-    x
+    help()
 except NameError as e:
     reveal_type(e)  # revealed: NameError
 except re.error as f:
@@ -19,7 +19,7 @@ except re.error as f:
 from nonexistent_module import foo  # error: [unresolved-import]
 
 try:
-    x
+    help()
 except foo as e:
     reveal_type(foo)  # revealed: Unknown
     reveal_type(e)  # revealed: Unknown
@@ -31,7 +31,7 @@ except foo as e:
 EXCEPTIONS = (AttributeError, TypeError)
 
 try:
-    x
+    help()
 except (RuntimeError, OSError) as e:
     reveal_type(e)  # revealed: RuntimeError | OSError
 except EXCEPTIONS as f:
@@ -41,9 +41,14 @@ except EXCEPTIONS as f:
 ## Dynamic exception types
 
 ```py
-def foo(x: type[AttributeError], y: tuple[type[OSError], type[RuntimeError]], z: tuple[type[BaseException], ...]):
+# TODO: we should not emit these `call-possibly-unbound-method` errors for `tuple.__class_getitem__`
+def foo(
+    x: type[AttributeError],
+    y: tuple[type[OSError], type[RuntimeError]],  # error: [call-possibly-unbound-method]
+    z: tuple[type[BaseException], ...],  # error: [call-possibly-unbound-method]
+):
     try:
-        w
+        help()
     except x as e:
         # TODO: should be `AttributeError`
         reveal_type(e)  # revealed: @Todo

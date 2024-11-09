@@ -44,11 +44,11 @@ pub struct UnnecessaryParenOnRaiseException;
 impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parentheses on raised exception")
+        "Unnecessary parentheses on raised exception".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary parentheses")
+        "Remove unnecessary parentheses".to_string()
     }
 }
 

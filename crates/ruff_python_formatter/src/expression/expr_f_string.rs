@@ -1,6 +1,5 @@
 use ruff_python_ast::{AnyNodeRef, ExprFString, StringLike};
-use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::TextSlice;
 
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
@@ -18,11 +17,8 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
         let ExprFString { value, .. } = item;
 
         if let [f_string_part] = value.as_slice() {
-            FormatFStringPart::new(
-                f_string_part,
-                f_string_quoting(item, &f.context().locator()),
-            )
-            .fmt(f)
+            FormatFStringPart::new(f_string_part, f_string_quoting(item, f.context().source()))
+                .fmt(f)
         } else {
             // Always join fstrings that aren't parenthesized and thus, are always on a single line.
             if !f.context().node_level().is_parenthesized() {
@@ -73,9 +69,9 @@ impl NeedsParentheses for ExprFString {
     }
 }
 
-pub(crate) fn f_string_quoting(f_string: &ExprFString, locator: &Locator) -> Quoting {
-    let unprefixed = locator
-        .slice(f_string.range())
+pub(crate) fn f_string_quoting(f_string: &ExprFString, source: &str) -> Quoting {
+    let unprefixed = source
+        .slice(f_string)
         .trim_start_matches(|c| c != '"' && c != '\'');
     let triple_quoted = unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r"'''");
 
@@ -84,7 +80,7 @@ pub(crate) fn f_string_quoting(f_string: &ExprFString, locator: &Locator) -> Quo
         .elements()
         .filter_map(|element| element.as_expression())
         .any(|expression| {
-            let string_content = locator.slice(expression.range());
+            let string_content = source.slice(expression);
             if triple_quoted {
                 string_content.contains(r#"""""#) || string_content.contains("'''")
             } else {

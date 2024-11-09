@@ -39,7 +39,7 @@ pub struct DjangoExtra;
 impl Violation for DjangoExtra {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of Django `extra` can lead to SQL injection vulnerabilities")
+        "Use of Django `extra` can lead to SQL injection vulnerabilities".to_string()
     }
 }
 

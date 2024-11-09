@@ -43,7 +43,7 @@ pub struct TryExceptPass;
 impl Violation for TryExceptPass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`try`-`except`-`pass` detected, consider logging the exception")
+        "`try`-`except`-`pass` detected, consider logging the exception".to_string()
     }
 }
 

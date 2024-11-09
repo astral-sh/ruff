@@ -31,14 +31,14 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## References
-/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
 #[violation]
 pub struct UnrecognizedVersionInfoCheck;
 
 impl Violation for UnrecognizedVersionInfoCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unrecognized `sys.version_info` check")
+        "Unrecognized `sys.version_info` check".to_string()
     }
 }
 
@@ -70,14 +70,14 @@ impl Violation for UnrecognizedVersionInfoCheck {
 /// ```
 ///
 /// ## References
-/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
 #[violation]
 pub struct PatchVersionComparison;
 
 impl Violation for PatchVersionComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Version comparison must use only major and minor version")
+        "Version comparison must use only major and minor version".to_string()
     }
 }
 
@@ -106,7 +106,7 @@ impl Violation for PatchVersionComparison {
 /// ```
 ///
 /// ## References
-/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
 #[violation]
 pub struct WrongTupleLengthVersionComparison {
     expected_length: usize,

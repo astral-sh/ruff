@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{ExprNumberLiteral, Number};
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextSize, TextSlice};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -14,28 +14,26 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
     fn fmt_fields(&self, item: &ExprNumberLiteral, f: &mut PyFormatter) -> FormatResult<()> {
         match item.value {
             Number::Int(_) => {
-                let range = item.range();
-                let content = f.context().locator().slice(range);
+                let content = f.context().source().slice(item);
                 let normalized = normalize_integer(content);
 
                 match normalized {
-                    Cow::Borrowed(_) => source_text_slice(range).fmt(f),
+                    Cow::Borrowed(_) => source_text_slice(item.range()).fmt(f),
                     Cow::Owned(normalized) => text(&normalized).fmt(f),
                 }
             }
             Number::Float(_) => {
-                let range = item.range();
-                let content = f.context().locator().slice(range);
+                let content = f.context().source().slice(item);
                 let normalized = normalize_floating_number(content);
 
                 match normalized {
-                    Cow::Borrowed(_) => source_text_slice(range).fmt(f),
+                    Cow::Borrowed(_) => source_text_slice(item.range()).fmt(f),
                     Cow::Owned(normalized) => text(&normalized).fmt(f),
                 }
             }
             Number::Complex { .. } => {
                 let range = item.range();
-                let content = f.context().locator().slice(range);
+                let content = f.context().source().slice(item);
                 let normalized = normalize_floating_number(content.trim_end_matches(['j', 'J']));
 
                 match normalized {

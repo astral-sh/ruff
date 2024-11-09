@@ -33,7 +33,7 @@ impl Violation for ImplicitCwd {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups")
+        "Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

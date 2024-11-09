@@ -48,7 +48,7 @@ pub struct CallDatetimeToday;
 impl Violation for CallDatetimeToday {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`datetime.datetime.today()` used")
+        "`datetime.datetime.today()` used".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

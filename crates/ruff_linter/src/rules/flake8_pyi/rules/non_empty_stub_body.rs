@@ -26,19 +26,18 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [The recommended style for stub functions and methods](https://typing.readthedocs.io/en/latest/source/stubs.html#id6)
-///   in the typing docs.
+/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
 #[violation]
 pub struct NonEmptyStubBody;
 
 impl AlwaysFixableViolation for NonEmptyStubBody {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function body must contain only `...`")
+        "Function body must contain only `...`".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace function body with `...`")
+        "Replace function body with `...`".to_string()
     }
 }
 
@@ -68,7 +67,7 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
 
     let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        format!("..."),
+        "...".to_string(),
         stmt.range(),
     )));
     checker.diagnostics.push(diagnostic);

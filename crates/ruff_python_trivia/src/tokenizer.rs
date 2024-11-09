@@ -30,7 +30,10 @@ pub fn find_only_token_in_range(
     let token = tokens.next().expect("Expected a token");
     debug_assert_eq!(token.kind(), token_kind);
     let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
-    debug_assert_eq!(tokens.next(), None);
+    #[allow(clippy::debug_assert_with_mut_call)]
+    {
+        debug_assert_eq!(tokens.next(), None);
+    }
     token
 }
 

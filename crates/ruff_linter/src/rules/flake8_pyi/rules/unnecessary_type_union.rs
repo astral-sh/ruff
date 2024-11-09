@@ -37,7 +37,7 @@ impl Violation for UnnecessaryTypeUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
         let union_str = if self.is_pep604_union {
-            format!("{}", self.members.join(" | "))
+            self.members.join(" | ")
         } else {
             format!("Union[{}]", self.members.join(", "))
         };
@@ -48,7 +48,7 @@ impl Violation for UnnecessaryTypeUnion {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Combine multiple `type` members"))
+        Some("Combine multiple `type` members".to_string())
     }
 }
 

@@ -41,7 +41,7 @@ use crate::rules::pylint::helpers::type_param_name;
 /// - [PEP 483 – The Theory of Type Hints: Covariance and Contravariance](https://peps.python.org/pep-0483/#covariance-and-contravariance)
 /// - [PEP 484 – Type Hints: Covariance and contravariance](https://peps.python.org/pep-0484/#covariance-and-contravariance)
 ///
-/// [PEP 484]: https://www.python.org/dev/peps/pep-0484/
+/// [PEP 484]: https://peps.python.org/pep-0484/
 #[violation]
 pub struct TypeNameIncorrectVariance {
     kind: VarKind,

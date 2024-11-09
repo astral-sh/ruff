@@ -46,7 +46,7 @@ pub struct ReturnInTryExceptFinally;
 impl Violation for ReturnInTryExceptFinally {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Don't use `return` in `try`-`except` and `finally`")
+        "Don't use `return` in `try`-`except` and `finally`".to_string()
     }
 }
 

@@ -38,7 +38,7 @@ pub struct PandasUseOfDotValues;
 impl Violation for PandasUseOfDotValues {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `.to_numpy()` instead of `.values`")
+        "Use `.to_numpy()` instead of `.values`".to_string()
     }
 }
 

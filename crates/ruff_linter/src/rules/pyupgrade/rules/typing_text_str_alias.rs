@@ -37,7 +37,7 @@ impl Violation for TypingTextStrAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`typing.Text` is deprecated, use `str`")
+        "`typing.Text` is deprecated, use `str`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

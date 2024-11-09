@@ -44,7 +44,7 @@ impl Violation for SliceCopy {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `copy` method over slicing")
+        "Prefer `copy` method over slicing".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

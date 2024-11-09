@@ -30,7 +30,7 @@ pub struct UnnecessaryClassParentheses;
 impl AlwaysFixableViolation for UnnecessaryClassParentheses {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parentheses after class definition")
+        "Unnecessary parentheses after class definition".to_string()
     }
 
     fn fix_title(&self) -> String {

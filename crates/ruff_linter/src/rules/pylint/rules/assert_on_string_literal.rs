@@ -33,11 +33,14 @@ pub struct AssertOnStringLiteral {
 impl Violation for AssertOnStringLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AssertOnStringLiteral { kind } = self;
-        match kind {
-            Kind::Empty => format!("Asserting on an empty string literal will never pass"),
-            Kind::NonEmpty => format!("Asserting on a non-empty string literal will always pass"),
-            Kind::Unknown => format!("Asserting on a string literal may have unintended results"),
+        match self.kind {
+            Kind::Empty => "Asserting on an empty string literal will never pass".to_string(),
+            Kind::NonEmpty => {
+                "Asserting on a non-empty string literal will always pass".to_string()
+            }
+            Kind::Unknown => {
+                "Asserting on a string literal may have unintended results".to_string()
+            }
         }
     }
 }

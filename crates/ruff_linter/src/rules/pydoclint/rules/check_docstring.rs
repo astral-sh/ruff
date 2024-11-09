@@ -61,11 +61,11 @@ pub struct DocstringMissingReturns;
 impl Violation for DocstringMissingReturns {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`return` is not documented in docstring")
+        "`return` is not documented in docstring".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add a \"Returns\" section to the docstring"))
+        Some("Add a \"Returns\" section to the docstring".to_string())
     }
 }
 
@@ -111,11 +111,12 @@ pub struct DocstringExtraneousReturns;
 impl Violation for DocstringExtraneousReturns {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring should not have a returns section because the function doesn't return anything")
+        "Docstring should not have a returns section because the function doesn't return anything"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove the \"Returns\" section"))
+        Some("Remove the \"Returns\" section".to_string())
     }
 }
 
@@ -162,11 +163,11 @@ pub struct DocstringMissingYields;
 impl Violation for DocstringMissingYields {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`yield` is not documented in docstring")
+        "`yield` is not documented in docstring".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add a \"Yields\" section to the docstring"))
+        Some("Add a \"Yields\" section to the docstring".to_string())
     }
 }
 
@@ -212,11 +213,11 @@ pub struct DocstringExtraneousYields;
 impl Violation for DocstringExtraneousYields {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring has a \"Yields\" section but the function doesn't yield anything")
+        "Docstring has a \"Yields\" section but the function doesn't yield anything".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove the \"Yields\" section"))
+        Some("Remove the \"Yields\" section".to_string())
     }
 }
 

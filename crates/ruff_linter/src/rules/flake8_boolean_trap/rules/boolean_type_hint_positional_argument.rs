@@ -101,7 +101,7 @@ pub struct BooleanTypeHintPositionalArgument;
 impl Violation for BooleanTypeHintPositionalArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Boolean-typed positional argument in function definition")
+        "Boolean-typed positional argument in function definition".to_string()
     }
 }
 

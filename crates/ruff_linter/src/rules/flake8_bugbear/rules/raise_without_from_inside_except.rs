@@ -52,10 +52,9 @@ pub struct RaiseWithoutFromInsideExcept;
 impl Violation for RaiseWithoutFromInsideExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... \
+        "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... \
              from None` to distinguish them from errors in exception handling"
-        )
+            .to_string()
     }
 }
 

@@ -36,7 +36,7 @@ pub struct Assert;
 impl Violation for Assert {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `assert` detected")
+        "Use of `assert` detected".to_string()
     }
 }
 

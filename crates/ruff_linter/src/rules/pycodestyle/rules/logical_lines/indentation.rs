@@ -118,7 +118,7 @@ pub struct NoIndentedBlock;
 impl Violation for NoIndentedBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected an indented block")
+        "Expected an indented block".to_string()
     }
 }
 
@@ -150,7 +150,7 @@ pub struct NoIndentedBlockComment;
 impl Violation for NoIndentedBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected an indented block (comment)")
+        "Expected an indented block (comment)".to_string()
     }
 }
 
@@ -179,7 +179,7 @@ pub struct UnexpectedIndentation;
 impl Violation for UnexpectedIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unexpected indentation")
+        "Unexpected indentation".to_string()
     }
 }
 
@@ -208,7 +208,7 @@ pub struct UnexpectedIndentationComment;
 impl Violation for UnexpectedIndentationComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unexpected indentation (comment)")
+        "Unexpected indentation (comment)".to_string()
     }
 }
 
@@ -241,11 +241,10 @@ pub struct OverIndented {
 impl Violation for OverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OverIndented { is_comment } = self;
-        if *is_comment {
-            format!("Over-indented (comment)")
+        if self.is_comment {
+            "Over-indented (comment)".to_string()
         } else {
-            format!("Over-indented")
+            "Over-indented".to_string()
         }
     }
 }

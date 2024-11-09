@@ -41,11 +41,11 @@ impl Violation for UselessExceptionStatement {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing `raise` statement on exception")
+        "Missing `raise` statement on exception".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add `raise` keyword"))
+        Some("Add `raise` keyword".to_string())
     }
 }
 

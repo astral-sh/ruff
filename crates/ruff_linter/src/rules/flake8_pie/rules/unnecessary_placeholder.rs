@@ -61,19 +61,18 @@ pub struct UnnecessaryPlaceholder {
 impl AlwaysFixableViolation for UnnecessaryPlaceholder {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { kind } = self;
-        match kind {
-            Placeholder::Pass => format!("Unnecessary `pass` statement"),
-            Placeholder::Ellipsis => format!("Unnecessary `...` literal"),
+        match &self.kind {
+            Placeholder::Pass => "Unnecessary `pass` statement".to_string(),
+            Placeholder::Ellipsis => "Unnecessary `...` literal".to_string(),
         }
     }
 
     fn fix_title(&self) -> String {
-        let Self { kind } = self;
-        match kind {
-            Placeholder::Pass => format!("Remove unnecessary `pass`"),
-            Placeholder::Ellipsis => format!("Remove unnecessary `...`"),
-        }
+        let title = match &self.kind {
+            Placeholder::Pass => "Remove unnecessary `pass`",
+            Placeholder::Ellipsis => "Remove unnecessary `...`",
+        };
+        title.to_string()
     }
 }
 
@@ -105,7 +104,7 @@ pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
         };
 
         let mut diagnostic = Diagnostic::new(UnnecessaryPlaceholder { kind }, stmt.range());
-        let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.locator()) {
+        let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.source()) {
             Edit::range_deletion(stmt.range().add_end(index))
         } else {
             fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())

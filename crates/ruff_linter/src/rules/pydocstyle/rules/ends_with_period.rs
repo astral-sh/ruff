@@ -54,7 +54,7 @@ impl Violation for EndsInPeriod {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("First line should end with a period")
+        "First line should end with a period".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

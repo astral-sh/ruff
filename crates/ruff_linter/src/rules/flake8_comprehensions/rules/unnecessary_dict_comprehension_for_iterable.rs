@@ -30,6 +30,9 @@ use crate::checkers::ast::Checker;
 /// dict.fromkeys(iterable)
 /// dict.fromkeys(iterable, 1)
 /// ```
+///
+/// ## References
+/// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[violation]
 pub struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
@@ -40,19 +43,20 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead")
+        "Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        if self.is_value_none_literal {
-            Some(format!("Replace with `dict.fromkeys(iterable, value)`)"))
+        let title = if self.is_value_none_literal {
+            "Replace with `dict.fromkeys(iterable, value)`)"
         } else {
-            Some(format!("Replace with `dict.fromkeys(iterable)`)"))
-        }
+            "Replace with `dict.fromkeys(iterable)`)"
+        };
+        Some(title.to_string())
     }
 }
 
-/// RUF025
+/// C420
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     checker: &mut Checker,
     dict_comp: &ast::ExprDictComp,

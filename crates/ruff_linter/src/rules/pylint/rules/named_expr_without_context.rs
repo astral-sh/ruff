@@ -30,7 +30,7 @@ pub struct NamedExprWithoutContext;
 impl Violation for NamedExprWithoutContext {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Named expression used without context")
+        "Named expression used without context".to_string()
     }
 }
 

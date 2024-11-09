@@ -39,14 +39,14 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: gettext](https://docs.python.org/3/library/gettext.html)
+/// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[violation]
 pub struct FormatInGetTextFuncCall;
 
 impl Violation for FormatInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`")
+        "`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
     }
 }
 

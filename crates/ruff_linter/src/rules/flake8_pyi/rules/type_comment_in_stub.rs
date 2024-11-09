@@ -1,10 +1,12 @@
-use regex::Regex;
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use std::sync::LazyLock;
+
+use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_trivia::CommentRanges;
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
@@ -30,7 +32,7 @@ pub struct TypeCommentInStub;
 impl Violation for TypeCommentInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Don't use type comments in stub file")
+        "Don't use type comments in stub file".to_string()
     }
 }
 

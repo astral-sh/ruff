@@ -16,10 +16,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::TextSize;
 
 use crate::registry::Rule;
+use crate::Locator;
 
 /// Check if a comment exists anywhere in a given file
 fn comment_exists(text: &str, locator: &Locator, comment_ranges: &CommentRanges) -> bool {
@@ -74,7 +74,7 @@ impl Violation for StableTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a stable test rule.")
+        "Hey this is a stable test rule.".to_string()
     }
 }
 
@@ -110,22 +110,19 @@ impl Violation for StableTestRuleSafeFix {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a stable test rule with a safe fix.")
+        "Hey this is a stable test rule with a safe fix.".to_string()
     }
 }
 
 impl TestRule for StableTestRuleSafeFix {
     fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        let comment = format!("# fix from stable-test-rule-safe-fix\n");
+        let comment = "# fix from stable-test-rule-safe-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
             Some(
                 Diagnostic::new(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
-                    .with_fix(Fix::safe_edit(Edit::insertion(
-                        comment.to_string(),
-                        TextSize::new(0),
-                    ))),
+                    .with_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
         }
     }
@@ -154,13 +151,13 @@ impl Violation for StableTestRuleUnsafeFix {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a stable test rule with an unsafe fix.")
+        "Hey this is a stable test rule with an unsafe fix.".to_string()
     }
 }
 
 impl TestRule for StableTestRuleUnsafeFix {
     fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        let comment = format!("# fix from stable-test-rule-unsafe-fix\n");
+        let comment = "# fix from stable-test-rule-unsafe-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
@@ -169,10 +166,7 @@ impl TestRule for StableTestRuleUnsafeFix {
                     StableTestRuleUnsafeFix,
                     ruff_text_size::TextRange::default(),
                 )
-                .with_fix(Fix::unsafe_edit(Edit::insertion(
-                    comment.to_string(),
-                    TextSize::new(0),
-                ))),
+                .with_fix(Fix::unsafe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
         }
     }
@@ -201,13 +195,13 @@ impl Violation for StableTestRuleDisplayOnlyFix {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a stable test rule with a display only fix.")
+        "Hey this is a stable test rule with a display only fix.".to_string()
     }
 }
 
 impl TestRule for StableTestRuleDisplayOnlyFix {
     fn diagnostic(locator: &Locator, comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        let comment = format!("# fix from stable-test-rule-display-only-fix\n");
+        let comment = "# fix from stable-test-rule-display-only-fix\n".to_string();
         if comment_exists(&comment, locator, comment_ranges) {
             None
         } else {
@@ -217,7 +211,7 @@ impl TestRule for StableTestRuleDisplayOnlyFix {
                     ruff_text_size::TextRange::default(),
                 )
                 .with_fix(Fix::display_only_edit(Edit::insertion(
-                    comment.to_string(),
+                    comment,
                     TextSize::new(0),
                 ))),
             )
@@ -248,7 +242,7 @@ impl Violation for PreviewTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a preview test rule.")
+        "Hey this is a preview test rule.".to_string()
     }
 }
 
@@ -284,7 +278,7 @@ impl Violation for DeprecatedTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a deprecated test rule.")
+        "Hey this is a deprecated test rule.".to_string()
     }
 }
 
@@ -320,7 +314,7 @@ impl Violation for AnotherDeprecatedTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is another deprecated test rule.")
+        "Hey this is another deprecated test rule.".to_string()
     }
 }
 
@@ -356,7 +350,7 @@ impl Violation for RemovedTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a removed test rule.")
+        "Hey this is a removed test rule.".to_string()
     }
 }
 
@@ -392,7 +386,7 @@ impl Violation for AnotherRemovedTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a another removed test rule.")
+        "Hey this is a another removed test rule.".to_string()
     }
 }
 
@@ -428,7 +422,7 @@ impl Violation for RedirectedFromTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a test rule that was redirected to another.")
+        "Hey this is a test rule that was redirected to another.".to_string()
     }
 }
 
@@ -464,7 +458,7 @@ impl Violation for RedirectedToTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a test rule that was redirected from another.")
+        "Hey this is a test rule that was redirected from another.".to_string()
     }
 }
 
@@ -500,7 +494,7 @@ impl Violation for RedirectedFromPrefixTestRule {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Hey this is a test rule that was redirected to another by prefix.")
+        "Hey this is a test rule that was redirected to another by prefix.".to_string()
     }
 }
 

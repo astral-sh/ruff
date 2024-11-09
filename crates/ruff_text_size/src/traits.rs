@@ -76,3 +76,24 @@ where
         T::range(self)
     }
 }
+
+/// A slice of the source text.
+pub trait TextSlice: Sealed {
+    /// Returns the slice of the text within the given `range`.
+    ///
+    /// ## Note
+    ///
+    /// This is the same as `&self[range]` if `self` is a `str` and `range` a `TextRange`.
+    ///
+    /// ## Panics
+    /// If the range is out of bounds.
+    fn slice(&self, range: impl Ranged) -> &str;
+}
+
+impl Sealed for str {}
+
+impl TextSlice for str {
+    fn slice(&self, ranged: impl Ranged) -> &str {
+        &self[ranged.range()]
+    }
+}

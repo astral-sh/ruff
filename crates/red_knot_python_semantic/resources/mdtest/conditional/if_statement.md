@@ -3,6 +3,10 @@
 ## Simple if
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 y = 1
 y = 2
 
@@ -15,6 +19,10 @@ reveal_type(y)  # revealed: Literal[2, 3]
 ## Simple if-elif-else
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag2 = bool_instance(), bool_instance()
 y = 1
 y = 2
 if flag:
@@ -28,13 +36,24 @@ else:
 x = y
 
 reveal_type(x)  # revealed: Literal[3, 4, 5]
-reveal_type(r)  # revealed: Unbound | Literal[2]
-reveal_type(s)  # revealed: Unbound | Literal[5]
+
+# revealed: Literal[2]
+# error: [possibly-unresolved-reference]
+reveal_type(r)
+
+# revealed: Literal[5]
+# error: [possibly-unresolved-reference]
+reveal_type(s)
 ```
 
 ## Single symbol across if-elif-else
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag2 = bool_instance(), bool_instance()
+
 if flag:
     y = 1
 elif flag2:
@@ -47,6 +66,10 @@ reveal_type(y)  # revealed: Literal[1, 2, 3]
 ## if-elif-else without else assignment
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag2 = bool_instance(), bool_instance()
 y = 0
 if flag:
     y = 1
@@ -60,6 +83,10 @@ reveal_type(y)  # revealed: Literal[0, 1, 2]
 ## if-elif-else with intervening assignment
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag2 = bool_instance(), bool_instance()
 y = 0
 if flag:
     y = 1
@@ -74,6 +101,10 @@ reveal_type(y)  # revealed: Literal[0, 1, 2]
 ## Nested if statement
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag2 = bool_instance(), bool_instance()
 y = 0
 if flag:
     if flag2:
@@ -84,6 +115,10 @@ reveal_type(y)  # revealed: Literal[0, 1]
 ## if-elif without else
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag2 = bool_instance(), bool_instance()
 y = 1
 y = 2
 if flag:

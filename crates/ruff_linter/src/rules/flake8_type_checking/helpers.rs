@@ -141,7 +141,7 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
     false
 }
 
-/// Returns `true` if a function is registered as a `singledispatch` interface.
+/// Returns `true` if a function is registered as a `singledispatch` or `singledispatchmethod` interface.
 ///
 /// For example, `fun` below is a `singledispatch` interface:
 /// ```python
@@ -160,15 +160,17 @@ pub(crate) fn is_singledispatch_interface(
         semantic
             .resolve_qualified_name(&decorator.expression)
             .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["functools", "singledispatch"])
+                matches!(
+                    qualified_name.segments(),
+                    ["functools", "singledispatch" | "singledispatchmethod"]
+                )
             })
     })
 }
 
-/// Returns `true` if a function is registered as a `singledispatch` implementation.
+/// Returns `true` if a function is registered as a `singledispatch` or `singledispatchmethod` implementation.
 ///
 /// For example, `_` below is a `singledispatch` implementation:
-/// For example:
 /// ```python
 /// from functools import singledispatch
 ///

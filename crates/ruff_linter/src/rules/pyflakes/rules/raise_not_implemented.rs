@@ -42,7 +42,7 @@ impl Violation for RaiseNotImplemented {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`raise NotImplemented` should be `raise NotImplementedError`")
+        "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

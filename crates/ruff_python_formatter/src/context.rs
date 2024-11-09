@@ -1,12 +1,13 @@
-use crate::comments::Comments;
-use crate::other::f_string_element::FStringExpressionElementContext;
-use crate::PyFormatOptions;
+use std::fmt::{Debug, Formatter};
+use std::ops::{Deref, DerefMut};
+
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::Tokens;
-use ruff_source_file::Locator;
-use std::fmt::{Debug, Formatter};
-use std::ops::{Deref, DerefMut};
+
+use crate::comments::Comments;
+use crate::other::f_string_element::FStringExpressionElementContext;
+use crate::PyFormatOptions;
 
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
@@ -49,10 +50,6 @@ impl<'a> PyFormatContext<'a> {
 
     pub(crate) fn source(&self) -> &'a str {
         self.contents
-    }
-
-    pub(crate) fn locator(&self) -> Locator<'a> {
-        Locator::new(self.contents)
     }
 
     pub(crate) fn set_node_level(&mut self, level: NodeLevel) {

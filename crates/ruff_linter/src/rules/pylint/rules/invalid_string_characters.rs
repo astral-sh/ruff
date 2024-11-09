@@ -1,11 +1,11 @@
-use ruff_text_size::{TextLen, TextRange, TextSize};
-
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
-use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for strings that contain the control character `BS`.
@@ -32,7 +32,7 @@ pub struct InvalidCharacterBackspace;
 impl AlwaysFixableViolation for InvalidCharacterBackspace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid unescaped character backspace, use \"\\b\" instead")
+        "Invalid unescaped character backspace, use \"\\b\" instead".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -65,7 +65,7 @@ pub struct InvalidCharacterSub;
 impl AlwaysFixableViolation for InvalidCharacterSub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid unescaped character SUB, use \"\\x1A\" instead")
+        "Invalid unescaped character SUB, use \"\\x1A\" instead".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -98,7 +98,7 @@ pub struct InvalidCharacterEsc;
 impl AlwaysFixableViolation for InvalidCharacterEsc {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid unescaped character ESC, use \"\\x1B\" instead")
+        "Invalid unescaped character ESC, use \"\\x1B\" instead".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -131,7 +131,7 @@ pub struct InvalidCharacterNul;
 impl AlwaysFixableViolation for InvalidCharacterNul {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid unescaped character NUL, use \"\\0\" instead")
+        "Invalid unescaped character NUL, use \"\\0\" instead".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -163,7 +163,7 @@ pub struct InvalidCharacterZeroWidthSpace;
 impl AlwaysFixableViolation for InvalidCharacterZeroWidthSpace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid unescaped character zero-width-space, use \"\\u200B\" instead")
+        "Invalid unescaped character zero-width-space, use \"\\u200B\" instead".to_string()
     }
 
     fn fix_title(&self) -> String {

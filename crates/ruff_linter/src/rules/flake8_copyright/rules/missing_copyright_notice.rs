@@ -1,9 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for the absence of copyright notices within Python files.
@@ -19,7 +19,7 @@ pub struct MissingCopyrightNotice;
 impl Violation for MissingCopyrightNotice {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing copyright notice at top of file")
+        "Missing copyright notice at top of file".to_string()
     }
 }
 

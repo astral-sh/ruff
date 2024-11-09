@@ -65,17 +65,18 @@ impl AlwaysFixableViolation for NoneComparison {
     fn message(&self) -> String {
         let NoneComparison(op) = self;
         match op {
-            EqCmpOp::Eq => format!("Comparison to `None` should be `cond is None`"),
-            EqCmpOp::NotEq => format!("Comparison to `None` should be `cond is not None`"),
+            EqCmpOp::Eq => "Comparison to `None` should be `cond is None`".to_string(),
+            EqCmpOp::NotEq => "Comparison to `None` should be `cond is not None`".to_string(),
         }
     }
 
     fn fix_title(&self) -> String {
         let NoneComparison(op) = self;
-        match op {
-            EqCmpOp::Eq => "Replace with `cond is None`".to_string(),
-            EqCmpOp::NotEq => "Replace with `cond is not None`".to_string(),
-        }
+        let title = match op {
+            EqCmpOp::Eq => "Replace with `cond is None`",
+            EqCmpOp::NotEq => "Replace with `cond is not None`",
+        };
+        title.to_string()
     }
 }
 
@@ -336,7 +337,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             &compare.comparators,
             compare.into(),
             checker.comment_ranges(),
-            checker.locator(),
+            checker.source(),
         );
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

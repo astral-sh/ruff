@@ -1,11 +1,12 @@
-use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 
 /// ## What it does
 /// Checks for uses of `getattr` that take a constant attribute value as an
@@ -36,10 +37,9 @@ pub struct GetAttrWithConstant;
 impl AlwaysFixableViolation for GetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Do not call `getattr` with a constant attribute value. It is not any safer than \
-             normal property access."
-        )
+        "Do not call `getattr` with a constant attribute value. It is not any safer than \
+            normal property access."
+            .to_string()
     }
 
     fn fix_title(&self) -> String {

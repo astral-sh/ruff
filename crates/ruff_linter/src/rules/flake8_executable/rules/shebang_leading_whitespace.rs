@@ -1,9 +1,9 @@
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Locator;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::is_python_whitespace;
-use ruff_source_file::Locator;
 
 /// ## What it does
 /// Checks for whitespace before a shebang directive.
@@ -35,11 +35,11 @@ pub struct ShebangLeadingWhitespace;
 impl AlwaysFixableViolation for ShebangLeadingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid whitespace before shebang")
+        "Avoid whitespace before shebang".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove whitespace before shebang")
+        "Remove whitespace before shebang".to_string()
     }
 }
 

@@ -10,6 +10,10 @@ x: str  # error: [invalid-declaration] "Cannot declare type `str` for inferred t
 ## Incompatible declarations
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 if flag:
     x: str
 else:
@@ -20,6 +24,10 @@ x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: 
 ## Partial declarations
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 if flag:
     x: int
 x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: Unknown, int"
@@ -28,6 +36,10 @@ x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: 
 ## Incompatible declarations with bad assignment
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 if flag:
     x: str
 else:

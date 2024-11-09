@@ -38,14 +38,14 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Python documentation: `unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
-/// - [`pytest-mock`](https://pypi.org/project/pytest-mock/)
+/// - [PyPI: `pytest-mock`](https://pypi.org/project/pytest-mock/)
 #[violation]
 pub struct PytestPatchWithLambda;
 
 impl Violation for PytestPatchWithLambda {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `return_value=` instead of patching with `lambda`")
+        "Use `return_value=` instead of patching with `lambda`".to_string()
     }
 }
 

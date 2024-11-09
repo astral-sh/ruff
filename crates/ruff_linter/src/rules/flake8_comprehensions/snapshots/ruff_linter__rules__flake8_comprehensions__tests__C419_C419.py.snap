@@ -51,7 +51,7 @@ C419.py:4:5: C419 [*] Unnecessary list comprehension
 2 2 | all([x.id for x in bar])
 3 3 | any(  # first comment
 4   |-    [x.id for x in bar],  # second comment
-  4 |+    x.id for x in bar,  # second comment
+  4 |+    x.id for x in bar  # second comment
 5 5 | )  # third comment
 6 6 | all(  # first comment
 7 7 |     [x.id for x in bar],  # second comment
@@ -72,7 +72,7 @@ C419.py:7:5: C419 [*] Unnecessary list comprehension
 5 5 | )  # third comment
 6 6 | all(  # first comment
 7   |-    [x.id for x in bar],  # second comment
-  7 |+    x.id for x in bar,  # second comment
+  7 |+    x.id for x in bar  # second comment
 8 8 | )  # third comment
 9 9 | any({x.id for x in bar})
 10 10 | 

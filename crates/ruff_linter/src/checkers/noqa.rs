@@ -7,7 +7,6 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::fix::edits::delete_comment;
@@ -20,6 +19,7 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
@@ -33,13 +33,8 @@ pub(crate) fn check_noqa(
     settings: &LinterSettings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
-    let file_noqa_directives = FileNoqaDirectives::extract(
-        locator.contents(),
-        comment_ranges,
-        &settings.external,
-        path,
-        locator,
-    );
+    let file_noqa_directives =
+        FileNoqaDirectives::extract(locator, comment_ranges, &settings.external, path);
     let exemption = FileExemption::from(&file_noqa_directives);
 
     // Extract all `noqa` directives.

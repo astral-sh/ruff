@@ -29,11 +29,11 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 && !checker
                     .settings
                     .dummy_variable_rgx
-                    .is_match(binding.name(checker.locator))
+                    .is_match(binding.name(checker.source()))
             {
                 let mut diagnostic = Diagnostic::new(
                     pyflakes::rules::UnusedVariable {
-                        name: binding.name(checker.locator).to_string(),
+                        name: binding.name(checker.source()).to_string(),
                     },
                     binding.range(),
                 );

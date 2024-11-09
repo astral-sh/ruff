@@ -1,10 +1,11 @@
-use ruff_python_ast::{self as ast, Expr, Operator};
-
-use crate::settings::LinterSettings;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::Locator;
+use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
+
+use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for string literals that are explicitly concatenated (using the
@@ -36,7 +37,7 @@ pub struct ExplicitStringConcatenation;
 impl Violation for ExplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Explicitly concatenated string should be implicitly concatenated")
+        "Explicitly concatenated string should be implicitly concatenated".to_string()
     }
 }
 

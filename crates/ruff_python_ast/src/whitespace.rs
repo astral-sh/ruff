@@ -1,35 +1,35 @@
 use ruff_python_trivia::{indentation_at_offset, is_python_whitespace, PythonWhitespace};
-use ruff_source_file::{Locator, UniversalNewlineIterator};
+use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Stmt;
 
 /// Extract the leading indentation from a line.
 #[inline]
-pub fn indentation<'a, T>(locator: &'a Locator, located: &T) -> Option<&'a str>
+pub fn indentation<'a, T>(source: &'a str, located: &T) -> Option<&'a str>
 where
     T: Ranged,
 {
-    indentation_at_offset(located.start(), locator)
+    indentation_at_offset(located.start(), source)
 }
 
 /// Return the end offset at which the empty lines following a statement.
-pub fn trailing_lines_end(stmt: &Stmt, locator: &Locator) -> TextSize {
-    let line_end = locator.full_line_end(stmt.end());
-    UniversalNewlineIterator::with_offset(locator.after(line_end), line_end)
+pub fn trailing_lines_end(stmt: &Stmt, source: &str) -> TextSize {
+    let line_end = source.full_line_end(stmt.end());
+    UniversalNewlineIterator::with_offset(&source[line_end.to_usize()..], line_end)
         .take_while(|line| line.trim_whitespace().is_empty())
         .last()
         .map_or(line_end, |line| line.full_end())
 }
 
 /// If a [`Ranged`] has a trailing comment, return the index of the hash.
-pub fn trailing_comment_start_offset<T>(located: &T, locator: &Locator) -> Option<TextSize>
+pub fn trailing_comment_start_offset<T>(located: &T, source: &str) -> Option<TextSize>
 where
     T: Ranged,
 {
-    let line_end = locator.line_end(located.end());
+    let line_end = source.line_end(located.end());
 
-    let trailing = locator.slice(TextRange::new(located.end(), line_end));
+    let trailing = &source[TextRange::new(located.end(), line_end)];
 
     for (index, char) in trailing.char_indices() {
         if char == '#' {

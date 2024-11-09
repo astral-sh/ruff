@@ -40,11 +40,11 @@ pub struct MetaClassABCMeta;
 impl AlwaysFixableViolation for MetaClassABCMeta {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `metaclass=abc.ABCMeta` to define abstract base class")
+        "Use of `metaclass=abc.ABCMeta` to define abstract base class".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `abc.ABC`")
+        "Replace with `abc.ABC`".to_string()
     }
 }
 

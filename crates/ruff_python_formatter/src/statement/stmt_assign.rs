@@ -20,6 +20,7 @@ use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::statement::trailing_semicolon;
 use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
+    ImplicitConcatenatedLayout,
 };
 use crate::{has_skip_comment, prelude::*};
 
@@ -375,7 +376,13 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                             let f =
                                 &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
 
-                            write!(f, [FormatImplicitConcatenatedStringExpanded::new(string)])
+                            write!(
+                                f,
+                                [FormatImplicitConcatenatedStringExpanded::new(
+                                    string,
+                                    ImplicitConcatenatedLayout::MaybeFlat
+                                )]
+                            )
                         });
 
                         // Join the implicit concatenated string if it fits on a single line
@@ -686,6 +693,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
                         FormatImplicitConcatenatedStringExpanded::new(
                             StringLike::try_from(*value).unwrap(),
+                            ImplicitConcatenatedLayout::MaybeFlat,
                         )
                         .fmt(f)
                     })

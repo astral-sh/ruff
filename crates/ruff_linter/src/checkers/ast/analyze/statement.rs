@@ -549,6 +549,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::WhitespaceAfterDecorator) {
                 pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
             }
+            if checker.enabled(Rule::SubclassBuiltin) {
+                refurb::rules::subclass_builtin(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {
@@ -1213,8 +1216,18 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         flake8_pyi::rules::unrecognized_platform(checker, test);
                     }
                 }
-                if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder])
-                {
+                if checker.enabled(Rule::ComplexIfStatementInStub) {
+                    if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
+                        for value in values {
+                            flake8_pyi::rules::complex_if_statement_in_stub(checker, value);
+                        }
+                    } else {
+                        flake8_pyi::rules::complex_if_statement_in_stub(checker, test);
+                    }
+                }
+            }
+            if checker.any_enabled(&[Rule::BadVersionInfoComparison, Rule::BadVersionInfoOrder]) {
+                if checker.source_type.is_stub() || checker.settings.preview.is_enabled() {
                     fn bad_version_info_comparison(
                         checker: &mut Checker,
                         test: &Expr,
@@ -1245,15 +1258,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         if let Some(test) = clause.test.as_ref() {
                             bad_version_info_comparison(checker, test, has_else_clause);
                         }
-                    }
-                }
-                if checker.enabled(Rule::ComplexIfStatementInStub) {
-                    if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
-                        for value in values {
-                            flake8_pyi::rules::complex_if_statement_in_stub(checker, value);
-                        }
-                    } else {
-                        flake8_pyi::rules::complex_if_statement_in_stub(checker, test);
                     }
                 }
             }
@@ -1299,7 +1303,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
         }
-        Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
+        Stmt::With(
+            with_stmt @ ast::StmtWith {
+                items,
+                body,
+                is_async,
+                ..
+            },
+        ) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
@@ -1330,6 +1341,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CancelScopeNoCheckpoint) {
                 flake8_async::rules::cancel_scope_no_checkpoint(checker, with_stmt, items);
+            }
+            if *is_async {
+                if checker.enabled(Rule::AwaitOutsideAsync) {
+                    pylint::rules::await_outside_async(checker, stmt);
+                }
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
@@ -1418,7 +1434,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadlinesInFor) {
                 refurb::rules::readlines_in_for(checker, for_stmt);
             }
-            if !is_async {
+            if *is_async {
+                if checker.enabled(Rule::AwaitOutsideAsync) {
+                    pylint::rules::await_outside_async(checker, stmt);
+                }
+            } else {
                 if checker.enabled(Rule::ReimplementedBuiltin) {
                     flake8_simplify::rules::convert_for_loop_to_any_all(checker, stmt);
                 }

@@ -9,7 +9,7 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::AnyParameterRef;
+use ruff_python_ast::{AnyParameterRef, BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -25,12 +25,13 @@ use crate::semantic_index::symbol::{
 };
 use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
+use crate::unpack::Unpack;
 use crate::Db;
 
-use super::constraint::{Constraint, PatternConstraint};
+use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use super::definition::{
-    AssignmentKind, DefinitionCategory, ExceptHandlerDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
 };
 
 mod except_handlers;
@@ -46,6 +47,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     current_assignments: Vec<CurrentAssignment<'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
+
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
     /// Per-scope contexts regarding nested `try`/`except` statements
@@ -112,9 +114,11 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
+        #[allow(unsafe_code)]
         let scope = Scope {
             parent,
-            kind: node.scope_kind(),
+            // SAFETY: `node` is guaranteed to be a child of `self.module`
+            node: unsafe { node.to_kind(self.module.clone()) },
             descendents: children_start..children_start,
         };
         self.try_node_context_stack_manager.enter_nested_scope();
@@ -124,15 +128,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.use_def_maps.push(UseDefMapBuilder::new());
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::new());
 
-        #[allow(unsafe_code)]
-        // SAFETY: `node` is guaranteed to be a child of `self.module`
-        let scope_id = ScopeId::new(
-            self.db,
-            self.file,
-            file_scope_id,
-            unsafe { node.to_kind(self.module.clone()) },
-            countme::Count::default(),
-        );
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
 
         self.scope_ids_by_scope.push(scope_id);
         self.scopes_by_node.insert(node.node_key(), file_scope_id);
@@ -195,14 +191,18 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_symbol_table().mark_symbol_bound(id);
     }
 
+    fn mark_symbol_declared(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_declared(id);
+    }
+
     fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
         self.current_symbol_table().mark_symbol_used(id);
     }
 
-    fn add_definition<'a>(
+    fn add_definition(
         &mut self,
         symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'a>>,
+        definition_node: impl Into<DefinitionNodeRef<'db>>,
     ) -> Definition<'db> {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
@@ -226,6 +226,9 @@ impl<'db> SemanticIndexBuilder<'db> {
         if category.is_binding() {
             self.mark_symbol_bound(symbol);
         }
+        if category.is_declaration() {
+            self.mark_symbol_declared(symbol);
+        }
 
         let use_def = self.current_use_def_map_mut();
         match category {
@@ -243,12 +246,30 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
-    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
-        let expression = self.add_standalone_expression(constraint_node);
-        self.current_use_def_map_mut()
-            .record_constraint(Constraint::Expression(expression));
+    fn record_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
+        let constraint = self.build_constraint(constraint_node);
+        self.record_constraint(constraint);
+        constraint
+    }
 
-        expression
+    fn record_constraint(&mut self, constraint: Constraint<'db>) {
+        self.current_use_def_map_mut().record_constraint(constraint);
+    }
+
+    fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
+        let expression = self.add_standalone_expression(constraint_node);
+        Constraint {
+            node: ConstraintNode::Expression(expression),
+            is_positive: true,
+        }
+    }
+
+    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) {
+        self.current_use_def_map_mut()
+            .record_constraint(Constraint {
+                node: constraint.node,
+                is_positive: false,
+            });
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
@@ -260,8 +281,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         debug_assert!(popped_assignment.is_some());
     }
 
-    fn current_assignment(&self) -> Option<&CurrentAssignment<'db>> {
-        self.current_assignments.last()
+    fn current_assignment(&self) -> Option<CurrentAssignment<'db>> {
+        self.current_assignments.last().copied()
+    }
+
+    fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'db>> {
+        self.current_assignments.last_mut()
     }
 
     fn add_pattern_constraint(
@@ -285,7 +310,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
         self.current_use_def_map_mut()
-            .record_constraint(Constraint::Pattern(pattern_constraint));
+            .record_constraint(Constraint {
+                node: ConstraintNode::Pattern(pattern_constraint),
+                is_positive: true,
+            });
         pattern_constraint
     }
 
@@ -338,12 +366,18 @@ impl<'db> SemanticIndexBuilder<'db> {
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
                 self.mark_symbol_bound(symbol);
+                self.mark_symbol_declared(symbol);
                 if let Some(bounds) = bound {
                     self.visit_expr(bounds);
                 }
                 if let Some(default) = default {
                     self.visit_expr(default);
                 }
+                match type_param {
+                    ast::TypeParam::TypeVar(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::ParamSpec(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::TypeVarTuple(node) => self.add_definition(symbol, node),
+                };
             }
         }
 
@@ -416,7 +450,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
     }
 
-    fn declare_parameter(&mut self, parameter: AnyParameterRef) {
+    fn declare_parameter(&mut self, parameter: AnyParameterRef<'db>) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
@@ -590,24 +624,48 @@ where
             }
             ast::Stmt::Assign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
+
                 self.visit_expr(&node.value);
-                self.add_standalone_expression(&node.value);
-                for (target_index, target) in node.targets.iter().enumerate() {
-                    let kind = match target {
-                        ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(AssignmentKind::Sequence),
-                        ast::Expr::Name(_) => Some(AssignmentKind::Name),
+                let value = self.add_standalone_expression(&node.value);
+
+                for target in &node.targets {
+                    // We only handle assignments to names and unpackings here, other targets like
+                    // attribute and subscript are handled separately as they don't create a new
+                    // definition.
+                    let current_assignment = match target {
+                        ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                            Some(CurrentAssignment::Assign {
+                                node,
+                                first: true,
+                                unpack: Some(Unpack::new(
+                                    self.db,
+                                    self.file,
+                                    self.current_scope(),
+                                    #[allow(unsafe_code)]
+                                    unsafe {
+                                        AstNodeRef::new(self.module.clone(), target)
+                                    },
+                                    value,
+                                    countme::Count::default(),
+                                )),
+                            })
+                        }
+                        ast::Expr::Name(_) => Some(CurrentAssignment::Assign {
+                            node,
+                            unpack: None,
+                            first: false,
+                        }),
                         _ => None,
                     };
-                    if let Some(kind) = kind {
-                        self.push_assignment(CurrentAssignment::Assign {
-                            assignment: node,
-                            target_index,
-                            kind,
-                        });
+
+                    if let Some(current_assignment) = current_assignment {
+                        self.push_assignment(current_assignment);
                     }
+
                     self.visit_expr(target);
-                    if kind.is_some() {
-                        // only need to pop in the case where we pushed something
+
+                    if current_assignment.is_some() {
+                        // Only need to pop in the case where we pushed something
                         self.pop_assignment();
                     }
                 }
@@ -639,7 +697,8 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                self.add_expression_constraint(&node.test);
+                let constraint = self.record_expression_constraint(&node.test);
+                let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -649,7 +708,14 @@ where
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
                     self.flow_restore(pre_if.clone());
-                    self.visit_elif_else_clause(clause);
+                    for constraint in &constraints {
+                        self.record_negated_constraint(*constraint);
+                    }
+                    if let Some(elif_test) = &clause.test {
+                        self.visit_expr(elif_test);
+                        constraints.push(self.record_expression_constraint(elif_test));
+                    }
+                    self.visit_body(&clause.body);
                 }
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
@@ -697,12 +763,20 @@ where
                     self.flow_merge(break_state);
                 }
             }
-            ast::Stmt::With(ast::StmtWith { items, body, .. }) => {
+            ast::Stmt::With(ast::StmtWith {
+                items,
+                body,
+                is_async,
+                ..
+            }) => {
                 for item in items {
                     self.visit_expr(&item.context_expr);
                     if let Some(optional_vars) = item.optional_vars.as_deref() {
                         self.add_standalone_expression(&item.context_expr);
-                        self.push_assignment(item.into());
+                        self.push_assignment(CurrentAssignment::WithItem {
+                            item,
+                            is_async: *is_async,
+                        });
                         self.visit_expr(optional_vars);
                         self.pop_assignment();
                     }
@@ -918,20 +992,26 @@ where
                 };
                 let symbol = self.add_symbol(id.clone());
 
+                if is_use {
+                    self.mark_symbol_used(symbol);
+                    let use_id = self.current_ast_ids().record_use(expr);
+                    self.current_use_def_map_mut().record_use(symbol, use_id);
+                }
+
                 if is_definition {
-                    match self.current_assignment().copied() {
+                    match self.current_assignment() {
                         Some(CurrentAssignment::Assign {
-                            assignment,
-                            target_index,
-                            kind,
+                            node,
+                            first,
+                            unpack,
                         }) => {
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
-                                    assignment,
-                                    target_index,
+                                    unpack,
+                                    value: &node.value,
                                     name: name_node,
-                                    kind,
+                                    first,
                                 },
                             );
                         }
@@ -968,12 +1048,13 @@ where
                                 },
                             );
                         }
-                        Some(CurrentAssignment::WithItem(with_item)) => {
+                        Some(CurrentAssignment::WithItem { item, is_async }) => {
                             self.add_definition(
                                 symbol,
                                 WithItemDefinitionNodeRef {
-                                    node: with_item,
+                                    node: item,
                                     target: name_node,
+                                    is_async,
                                 },
                             );
                         }
@@ -981,10 +1062,9 @@ where
                     }
                 }
 
-                if is_use {
-                    self.mark_symbol_used(symbol);
-                    let use_id = self.current_ast_ids().record_use(expr);
-                    self.current_use_def_map_mut().record_use(symbol, use_id);
+                if let Some(CurrentAssignment::Assign { first, .. }) = self.current_assignment_mut()
+                {
+                    *first = false;
                 }
 
                 walk_expr(self, expr);
@@ -1027,10 +1107,13 @@ where
                 // AST inspection, so we can't simplify here, need to record test expression for
                 // later checking)
                 self.visit_expr(test);
+                let constraint = self.record_expression_constraint(test);
                 let pre_if = self.flow_snapshot();
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
+
+                self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
             }
@@ -1083,6 +1166,33 @@ where
                         builder.visit_expr(value);
                     },
                 );
+            }
+            ast::Expr::BoolOp(ast::ExprBoolOp {
+                values,
+                range: _,
+                op,
+            }) => {
+                // TODO detect statically known truthy or falsy values (via type inference, not naive
+                // AST inspection, so we can't simplify here, need to record test expression for
+                // later checking)
+                let mut snapshots = vec![];
+
+                for (index, value) in values.iter().enumerate() {
+                    self.visit_expr(value);
+                    // In the last value we don't need to take a snapshot nor add a constraint
+                    if index < values.len() - 1 {
+                        // Snapshot is taken after visiting the expression but before adding the constraint.
+                        snapshots.push(self.flow_snapshot());
+                        let constraint = self.build_constraint(value);
+                        match op {
+                            BoolOp::And => self.record_constraint(constraint),
+                            BoolOp::Or => self.record_negated_constraint(constraint),
+                        }
+                    }
+                }
+                for snapshot in snapshots {
+                    self.flow_merge(snapshot);
+                }
             }
             _ => {
                 walk_expr(self, expr);
@@ -1156,9 +1266,9 @@ where
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CurrentAssignment<'a> {
     Assign {
-        assignment: &'a ast::StmtAssign,
-        target_index: usize,
-        kind: AssignmentKind,
+        node: &'a ast::StmtAssign,
+        first: bool,
+        unpack: Option<Unpack<'a>>,
     },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),
@@ -1168,7 +1278,10 @@ enum CurrentAssignment<'a> {
         node: &'a ast::Comprehension,
         first: bool,
     },
-    WithItem(&'a ast::WithItem),
+    WithItem {
+        item: &'a ast::WithItem,
+        is_async: bool,
+    },
 }
 
 impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
@@ -1192,12 +1305,6 @@ impl<'a> From<&'a ast::StmtFor> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
     fn from(value: &'a ast::ExprNamed) -> Self {
         Self::Named(value)
-    }
-}
-
-impl<'a> From<&'a ast::WithItem> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::WithItem) -> Self {
-        Self::WithItem(value)
     }
 }
 

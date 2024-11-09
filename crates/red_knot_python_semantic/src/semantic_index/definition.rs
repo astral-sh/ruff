@@ -6,8 +6,22 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_resolver::file_to_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
+use crate::unpack::Unpack;
 use crate::Db;
 
+/// A definition of a symbol.
+///
+/// ## Module-local type
+/// This type should not be used as part of any cross-module API because
+/// it holds a reference to the AST node. Range-offset changes
+/// then propagate through all usages, and deserialization requires
+/// reparsing the entire module.
+///
+/// E.g. don't use this type in:
+///
+/// * a return type of a cross-module query
+/// * a field of a type that is a return type of a cross-module query
+/// * an argument of a cross-module query
 #[salsa::tracked]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
@@ -24,7 +38,7 @@ pub struct Definition<'db> {
 
     #[no_eq]
     #[return_ref]
-    pub(crate) kind: DefinitionKind,
+    pub(crate) kind: DefinitionKind<'db>,
 
     #[no_eq]
     count: countme::Count<Definition<'static>>,
@@ -78,6 +92,9 @@ pub(crate) enum DefinitionNodeRef<'a> {
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'a>),
+    TypeVar(&'a ast::TypeParamTypeVar),
+    ParamSpec(&'a ast::TypeParamParamSpec),
+    TypeVarTuple(&'a ast::TypeParamTypeVarTuple),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -113,6 +130,24 @@ impl<'a> From<&'a ast::StmtAugAssign> for DefinitionNodeRef<'a> {
 impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
     fn from(node_ref: &'a ast::Alias) -> Self {
         Self::Import(node_ref)
+    }
+}
+
+impl<'a> From<&'a ast::TypeParamTypeVar> for DefinitionNodeRef<'a> {
+    fn from(value: &'a ast::TypeParamTypeVar) -> Self {
+        Self::TypeVar(value)
+    }
+}
+
+impl<'a> From<&'a ast::TypeParamParamSpec> for DefinitionNodeRef<'a> {
+    fn from(value: &'a ast::TypeParamParamSpec) -> Self {
+        Self::ParamSpec(value)
+    }
+}
+
+impl<'a> From<&'a ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'a> {
+    fn from(value: &'a ast::TypeParamTypeVarTuple) -> Self {
+        Self::TypeVarTuple(value)
     }
 }
 
@@ -166,16 +201,17 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
-    pub(crate) assignment: &'a ast::StmtAssign,
-    pub(crate) target_index: usize,
+    pub(crate) unpack: Option<Unpack<'a>>,
+    pub(crate) value: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
-    pub(crate) kind: AssignmentKind,
+    pub(crate) first: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::WithItem,
     pub(crate) target: &'a ast::ExprName,
+    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -210,9 +246,9 @@ pub(crate) struct MatchPatternDefinitionNodeRef<'a> {
     pub(crate) index: u32,
 }
 
-impl DefinitionNodeRef<'_> {
+impl<'db> DefinitionNodeRef<'db> {
     #[allow(unsafe_code)]
-    pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind {
+    pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(alias) => {
                 DefinitionKind::Import(AstNodeRef::new(parsed, alias))
@@ -233,15 +269,15 @@ impl DefinitionNodeRef<'_> {
                 DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
             DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef {
-                assignment,
-                target_index,
+                unpack,
+                value,
                 name,
-                kind,
+                first,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
-                assignment: AstNodeRef::new(parsed.clone(), assignment),
-                target_index,
+                target: TargetKind::from(unpack),
+                value: AstNodeRef::new(parsed.clone(), value),
                 name: AstNodeRef::new(parsed, name),
-                kind,
+                first,
             }),
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
@@ -277,12 +313,15 @@ impl DefinitionNodeRef<'_> {
                     DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
                 }
             },
-            DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef { node, target }) => {
-                DefinitionKind::WithItem(WithItemDefinitionKind {
-                    node: AstNodeRef::new(parsed.clone(), node),
-                    target: AstNodeRef::new(parsed, target),
-                })
-            }
+            DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
+                node,
+                target,
+                is_async,
+            }) => DefinitionKind::WithItem(WithItemDefinitionKind {
+                node: AstNodeRef::new(parsed.clone(), node),
+                target: AstNodeRef::new(parsed, target),
+                is_async,
+            }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
                 pattern,
                 identifier,
@@ -296,9 +335,18 @@ impl DefinitionNodeRef<'_> {
                 handler,
                 is_star,
             }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
-                handler: AstNodeRef::new(parsed.clone(), handler),
+                handler: AstNodeRef::new(parsed, handler),
                 is_star,
             }),
+            DefinitionNodeRef::TypeVar(node) => {
+                DefinitionKind::TypeVar(AstNodeRef::new(parsed, node))
+            }
+            DefinitionNodeRef::ParamSpec(node) => {
+                DefinitionKind::ParamSpec(AstNodeRef::new(parsed, node))
+            }
+            DefinitionNodeRef::TypeVarTuple(node) => {
+                DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
+            }
         }
     }
 
@@ -312,10 +360,10 @@ impl DefinitionNodeRef<'_> {
             Self::Class(node) => node.into(),
             Self::NamedExpression(node) => node.into(),
             Self::Assignment(AssignmentDefinitionNodeRef {
-                assignment: _,
-                target_index: _,
+                value: _,
+                unpack: _,
                 name,
-                kind: _,
+                first: _,
             }) => name.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
@@ -329,11 +377,18 @@ impl DefinitionNodeRef<'_> {
                 ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
                 ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
             },
-            Self::WithItem(WithItemDefinitionNodeRef { node: _, target }) => target.into(),
+            Self::WithItem(WithItemDefinitionNodeRef {
+                node: _,
+                target,
+                is_async: _,
+            }) => target.into(),
             Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
                 identifier.into()
             }
             Self::ExceptHandler(ExceptHandlerDefinitionNodeRef { handler, .. }) => handler.into(),
+            Self::TypeVar(node) => node.into(),
+            Self::ParamSpec(node) => node.into(),
+            Self::TypeVarTuple(node) => node.into(),
         }
     }
 }
@@ -374,13 +429,13 @@ impl DefinitionCategory {
 }
 
 #[derive(Clone, Debug)]
-pub enum DefinitionKind {
+pub enum DefinitionKind<'db> {
     Import(AstNodeRef<ast::Alias>),
     ImportFrom(ImportFromDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
-    Assignment(AssignmentDefinitionKind),
+    Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
     For(ForStmtDefinitionKind),
@@ -390,16 +445,22 @@ pub enum DefinitionKind {
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
     ExceptHandler(ExceptHandlerDefinitionKind),
+    TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
+    ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
+    TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
 }
 
-impl DefinitionKind {
+impl DefinitionKind<'_> {
     pub(crate) fn category(&self) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
             | DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_) => DefinitionCategory::DeclarationAndBinding,
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::TypeVar(_)
+            | DefinitionKind::ParamSpec(_)
+            | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
             // a parameter always binds a value, but is only a declaration if annotated
             DefinitionKind::Parameter(parameter) => {
                 if parameter.annotation.is_some() {
@@ -433,6 +494,21 @@ impl DefinitionKind {
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum TargetKind<'db> {
+    Sequence(Unpack<'db>),
+    Name,
+}
+
+impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
+    fn from(value: Option<Unpack<'db>>) -> Self {
+        match value {
+            Some(unpack) => TargetKind::Sequence(unpack),
+            None => TargetKind::Name,
         }
     }
 }
@@ -498,42 +574,36 @@ impl ImportFromDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct AssignmentDefinitionKind {
-    assignment: AstNodeRef<ast::StmtAssign>,
-    target_index: usize,
+pub struct AssignmentDefinitionKind<'db> {
+    target: TargetKind<'db>,
+    value: AstNodeRef<ast::Expr>,
     name: AstNodeRef<ast::ExprName>,
-    kind: AssignmentKind,
+    first: bool,
 }
 
-impl AssignmentDefinitionKind {
-    pub(crate) fn value(&self) -> &ast::Expr {
-        &self.assignment.node().value
+impl<'db> AssignmentDefinitionKind<'db> {
+    pub(crate) fn target(&self) -> TargetKind<'db> {
+        self.target
     }
 
-    pub(crate) fn target(&self) -> &ast::Expr {
-        &self.assignment.node().targets[self.target_index]
+    pub(crate) fn value(&self) -> &ast::Expr {
+        self.value.node()
     }
 
     pub(crate) fn name(&self) -> &ast::ExprName {
         self.name.node()
     }
 
-    pub(crate) fn kind(&self) -> AssignmentKind {
-        self.kind
+    pub(crate) fn is_first(&self) -> bool {
+        self.first
     }
-}
-
-/// The kind of assignment target expression.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AssignmentKind {
-    Sequence,
-    Name,
 }
 
 #[derive(Clone, Debug)]
 pub struct WithItemDefinitionKind {
     node: AstNodeRef<ast::WithItem>,
     target: AstNodeRef<ast::ExprName>,
+    is_async: bool,
 }
 
 impl WithItemDefinitionKind {
@@ -543,6 +613,10 @@ impl WithItemDefinitionKind {
 
     pub(crate) fn target(&self) -> &ast::ExprName {
         self.target.node()
+    }
+
+    pub(crate) const fn is_async(&self) -> bool {
+        self.is_async
     }
 }
 
@@ -659,5 +733,23 @@ impl From<&ast::Identifier> for DefinitionNodeKey {
 impl From<&ast::ExceptHandlerExceptHandler> for DefinitionNodeKey {
     fn from(handler: &ast::ExceptHandlerExceptHandler) -> Self {
         Self(NodeKey::from_node(handler))
+    }
+}
+
+impl From<&ast::TypeParamTypeVar> for DefinitionNodeKey {
+    fn from(value: &ast::TypeParamTypeVar) -> Self {
+        Self(NodeKey::from_node(value))
+    }
+}
+
+impl From<&ast::TypeParamParamSpec> for DefinitionNodeKey {
+    fn from(value: &ast::TypeParamParamSpec) -> Self {
+        Self(NodeKey::from_node(value))
+    }
+}
+
+impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
+    fn from(value: &ast::TypeParamTypeVarTuple) -> Self {
+        Self(NodeKey::from_node(value))
     }
 }

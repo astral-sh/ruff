@@ -1,15 +1,15 @@
-use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
-use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 use crate::settings::types::UnsafeFixes;
+use crate::Locator;
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
@@ -158,13 +158,12 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::{Ranged, TextSize};
-
     use ruff_diagnostics::{Diagnostic, Edit, Fix, SourceMarker};
-    use ruff_source_file::Locator;
+    use ruff_text_size::{Ranged, TextSize};
 
     use crate::fix::{apply_fixes, FixResult};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
+    use crate::Locator;
 
     #[allow(deprecated)]
     fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {

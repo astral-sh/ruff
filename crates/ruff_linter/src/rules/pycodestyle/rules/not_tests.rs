@@ -33,7 +33,7 @@ pub struct NotInTest;
 impl AlwaysFixableViolation for NotInTest {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Test for membership should be `not in`")
+        "Test for membership should be `not in`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -69,7 +69,7 @@ pub struct NotIsTest;
 impl AlwaysFixableViolation for NotIsTest {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Test for object identity should be `is not`")
+        "Test for object identity should be `is not`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -105,7 +105,7 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
                             comparators,
                             unary_op.into(),
                             checker.comment_ranges(),
-                            checker.locator(),
+                            checker.source(),
                         ),
                         unary_op.range(),
                         checker.locator(),
@@ -126,7 +126,7 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
                             comparators,
                             unary_op.into(),
                             checker.comment_ranges(),
-                            checker.locator(),
+                            checker.source(),
                         ),
                         unary_op.range(),
                         checker.locator(),

@@ -17,7 +17,7 @@ exclude: |
 
 repos:
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.21
+    rev: v0.22
     hooks:
       - id: validate-pyproject
 
@@ -51,11 +51,15 @@ repos:
       - id: blacken-docs
         args: ["--pyi", "--line-length", "130"]
         files: '^crates/.*/resources/mdtest/.*\.md'
+        exclude: |
+          (?x)^(
+            .*?invalid(_.+)_syntax.md
+          )$
         additional_dependencies:
           - black==24.10.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.26.0
+    rev: v1.27.0
     hooks:
       - id: typos
 
@@ -69,7 +73,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.0
+    rev: v0.7.2
     hooks:
       - id: ruff-format
       - id: ruff

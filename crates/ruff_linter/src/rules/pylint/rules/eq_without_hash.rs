@@ -46,7 +46,7 @@ pub struct EqWithoutHash;
 impl Violation for EqWithoutHash {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Object does not implement `__hash__` method")
+        "Object does not implement `__hash__` method".to_string()
     }
 }
 

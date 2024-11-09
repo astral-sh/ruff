@@ -298,7 +298,7 @@ fn super_resolution_overview() {
             .unwrap();
     }
 
-    let snapshot = session.take_snapshot(file_url.clone()).unwrap();
+    let snapshot = session.take_snapshot(file_url).unwrap();
 
     insta::assert_snapshot!(
         "changed_notebook",

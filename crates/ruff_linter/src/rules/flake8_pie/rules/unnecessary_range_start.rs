@@ -33,11 +33,11 @@ pub struct UnnecessaryRangeStart;
 impl AlwaysFixableViolation for UnnecessaryRangeStart {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary `start` argument in `range`")
+        "Unnecessary `start` argument in `range`".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove `start` argument")
+        "Remove `start` argument".to_string()
     }
 }
 

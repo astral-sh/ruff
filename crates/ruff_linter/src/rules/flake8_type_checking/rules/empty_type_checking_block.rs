@@ -31,18 +31,18 @@ use crate::fix;
 /// ```
 ///
 /// ## References
-/// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct EmptyTypeCheckingBlock;
 
 impl AlwaysFixableViolation for EmptyTypeCheckingBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Found empty type-checking block")
+        "Found empty type-checking block".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Delete empty type-checking block")
+        "Delete empty type-checking block".to_string()
     }
 }
 

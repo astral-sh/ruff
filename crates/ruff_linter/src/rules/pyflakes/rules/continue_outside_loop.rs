@@ -25,7 +25,7 @@ pub struct ContinueOutsideLoop;
 impl Violation for ContinueOutsideLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`continue` not properly in loop")
+        "`continue` not properly in loop".to_string()
     }
 }
 

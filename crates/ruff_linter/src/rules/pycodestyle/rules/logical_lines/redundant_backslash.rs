@@ -2,10 +2,11 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_python_parser::TokenKind;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::Locator;
 
 use super::LogicalLine;
 
@@ -34,7 +35,7 @@ pub struct RedundantBackslash;
 impl AlwaysFixableViolation for RedundantBackslash {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Redundant backslash")
+        "Redundant backslash".to_string()
     }
 
     fn fix_title(&self) -> String {

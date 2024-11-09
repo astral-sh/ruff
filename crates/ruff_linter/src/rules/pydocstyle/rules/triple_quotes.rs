@@ -47,19 +47,18 @@ impl Violation for TripleSingleQuotes {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TripleSingleQuotes { expected_quote } = self;
-        match expected_quote {
-            Quote::Double => format!(r#"Use triple double quotes `"""`"#),
-            Quote::Single => format!(r"Use triple single quotes `'''`"),
+        match self.expected_quote {
+            Quote::Double => r#"Use triple double quotes `"""`"#.to_string(),
+            Quote::Single => r"Use triple single quotes `'''`".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let TripleSingleQuotes { expected_quote } = self;
-        Some(match expected_quote {
-            Quote::Double => format!("Convert to triple double quotes"),
-            Quote::Single => format!("Convert to triple single quotes"),
-        })
+        let title = match self.expected_quote {
+            Quote::Double => "Convert to triple double quotes",
+            Quote::Single => "Convert to triple single quotes",
+        };
+        Some(title.to_string())
     }
 }
 

@@ -26,13 +26,16 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// warnings.warn("This is a warning", stacklevel=2)
 /// ```
+///
+/// ## References
+/// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
 #[violation]
 pub struct NoExplicitStacklevel;
 
 impl Violation for NoExplicitStacklevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No explicit `stacklevel` keyword argument found")
+        "No explicit `stacklevel` keyword argument found".to_string()
     }
 }
 

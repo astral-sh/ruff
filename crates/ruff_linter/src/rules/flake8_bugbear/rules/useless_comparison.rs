@@ -42,14 +42,16 @@ impl Violation for UselessComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.at {
-            ComparisonLocationAt::MiddleBody => format!(
+            ComparisonLocationAt::MiddleBody => {
                 "Pointless comparison. Did you mean to assign a value? \
                 Otherwise, prepend `assert` or remove it."
-            ),
-            ComparisonLocationAt::EndOfFunction => format!(
+                    .to_string()
+            }
+            ComparisonLocationAt::EndOfFunction => {
                 "Pointless comparison at end of function scope. Did you mean \
                 to return the expression result?"
-            ),
+                    .to_string()
+            }
         }
     }
 }

@@ -5,6 +5,10 @@
 Comparisons on union types need to consider all possible cases:
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 one_or_two = 1 if flag else 2
 
 reveal_type(one_or_two <= 2)  # revealed: Literal[True]
@@ -48,10 +52,14 @@ reveal_type(one_or_none is not None)  # revealed: bool
 
 ## Union on both sides of the comparison
 
-With unions on both sides, we need to consider the full cross product of
-options when building the resulting (union) type:
+With unions on both sides, we need to consider the full cross product of options when building the
+resulting (union) type:
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag_s, flag_l = bool_instance(), bool_instance()
 small = 1 if flag_s else 2
 large = 2 if flag_l else 3
 
@@ -64,11 +72,15 @@ reveal_type(small > large)  # revealed: Literal[False]
 
 ## Unsupported operations
 
-Make sure we emit a diagnostic if *any* of the possible comparisons is
-unsupported. For now, we fall back to `bool` for the result type instead of
-trying to infer something more precise from the other (supported) variants:
+Make sure we emit a diagnostic if *any* of the possible comparisons is unsupported. For now, we fall
+back to `bool` for the result type instead of trying to infer something more precise from the other
+(supported) variants:
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = [1, 2] if flag else 1
 
 result = 1 in x  # error: "Operator `in` is not supported"

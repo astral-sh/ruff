@@ -1,9 +1,7 @@
-use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use countme::Count;
-use salsa::Accumulator;
 
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
@@ -17,16 +15,14 @@ use crate::Db;
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
-    let mut has_read_error = false;
+    let mut read_error = None;
 
     let kind = if is_notebook(file.path(db)) {
         file.read_to_notebook(db)
             .unwrap_or_else(|error| {
                 tracing::debug!("Failed to read notebook '{path}': {error}");
 
-                has_read_error = true;
-                SourceDiagnostic(Arc::new(SourceTextError::FailedToReadNotebook(error)))
-                    .accumulate(db);
+                read_error = Some(SourceTextError::FailedToReadNotebook(error.to_string()));
                 Notebook::empty()
             })
             .into()
@@ -35,8 +31,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
             .unwrap_or_else(|error| {
                 tracing::debug!("Failed to read file '{path}': {error}");
 
-                has_read_error = true;
-                SourceDiagnostic(Arc::new(SourceTextError::FailedToReadFile(error))).accumulate(db);
+                read_error = Some(SourceTextError::FailedToReadFile(error.to_string()));
                 String::new()
             })
             .into()
@@ -45,7 +40,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     SourceText {
         inner: Arc::new(SourceTextInner {
             kind,
-            has_read_error,
+            read_error,
             count: Count::new(),
         }),
     }
@@ -98,8 +93,8 @@ impl SourceText {
     }
 
     /// Returns `true` if there was an error when reading the content of the file.
-    pub fn has_read_error(&self) -> bool {
-        self.inner.has_read_error
+    pub fn read_error(&self) -> Option<&SourceTextError> {
+        self.inner.read_error.as_ref()
     }
 }
 
@@ -132,7 +127,7 @@ impl std::fmt::Debug for SourceText {
 struct SourceTextInner {
     count: Count<SourceText>,
     kind: SourceTextKind,
-    has_read_error: bool,
+    read_error: Option<SourceTextError>,
 }
 
 #[derive(Eq, PartialEq)]
@@ -153,21 +148,12 @@ impl From<Notebook> for SourceTextKind {
     }
 }
 
-#[salsa::accumulator]
-pub struct SourceDiagnostic(Arc<SourceTextError>);
-
-impl std::fmt::Display for SourceDiagnostic {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
 pub enum SourceTextError {
     #[error("Failed to read notebook: {0}`")]
-    FailedToReadNotebook(#[from] ruff_notebook::NotebookError),
+    FailedToReadNotebook(String),
     #[error("Failed to read file: {0}")]
-    FailedToReadFile(#[from] std::io::Error),
+    FailedToReadFile(String),
 }
 
 /// Computes the [`LineIndex`] for `file`.

@@ -31,7 +31,8 @@ pub struct ParamikoCall;
 impl Violation for ParamikoCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible shell injection via Paramiko call; check inputs are properly sanitized")
+        "Possible shell injection via Paramiko call; check inputs are properly sanitized"
+            .to_string()
     }
 }
 

@@ -34,7 +34,7 @@ pub struct BlockingSleepInAsyncFunction;
 impl Violation for BlockingSleepInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not call `time.sleep`")
+        "Async functions should not call `time.sleep`".to_string()
     }
 }
 

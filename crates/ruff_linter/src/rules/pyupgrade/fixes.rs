@@ -1,7 +1,8 @@
 use ruff_python_ast::StmtImportFrom;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::Locator;
 
 /// Remove any imports matching `members` from an import-from statement.
 pub(crate) fn remove_import_members(
@@ -66,7 +67,8 @@ pub(crate) fn remove_import_members(
 #[cfg(test)]
 mod tests {
     use ruff_python_parser::parse_module;
-    use ruff_source_file::Locator;
+
+    use crate::Locator;
 
     use super::remove_import_members;
 

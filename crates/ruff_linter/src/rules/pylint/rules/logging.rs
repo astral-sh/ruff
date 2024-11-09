@@ -42,7 +42,7 @@ pub struct LoggingTooFewArgs;
 impl Violation for LoggingTooFewArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Not enough arguments for `logging` format string")
+        "Not enough arguments for `logging` format string".to_string()
     }
 }
 
@@ -79,7 +79,7 @@ pub struct LoggingTooManyArgs;
 impl Violation for LoggingTooManyArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many arguments for `logging` format string")
+        "Too many arguments for `logging` format string".to_string()
     }
 }
 

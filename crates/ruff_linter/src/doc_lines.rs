@@ -4,12 +4,13 @@
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast, Stmt, Suite};
 use ruff_python_parser::{Token, TokenKind, Tokens};
+use ruff_source_file::UniversalNewlineIterator;
 use ruff_text_size::{Ranged, TextSize};
 
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use ruff_source_file::{Locator, UniversalNewlineIterator};
+use crate::Locator;
 
 /// Extract doc lines (standalone comments) from a token sequence.
 pub(crate) fn doc_lines_from_tokens(tokens: &Tokens) -> DocLines {

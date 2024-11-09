@@ -54,18 +54,15 @@ impl Violation for DuplicateIsinstanceCall {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateIsinstanceCall { name } = self;
-        if let Some(name) = name {
+        if let Some(name) = &self.name {
             format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
         } else {
-            format!("Multiple `isinstance` calls for expression, merge into a single call")
+            "Multiple `isinstance` calls for expression, merge into a single call".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DuplicateIsinstanceCall { name } = self;
-
-        Some(if let Some(name) = name {
+        Some(if let Some(name) = &self.name {
             format!("Merge `isinstance` calls for `{name}`")
         } else {
             "Merge `isinstance` calls".to_string()
@@ -536,7 +533,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid removing comments.
         if checker
             .comment_ranges()
-            .has_comments(expr, checker.locator())
+            .has_comments(expr, checker.source())
         {
             continue;
         }

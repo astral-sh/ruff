@@ -36,11 +36,11 @@ pub struct UnnecessaryDictIndexLookup;
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary lookup of dictionary value by key")
+        "Unnecessary lookup of dictionary value by key".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Use existing variable")
+        "Use existing variable".to_string()
     }
 }
 

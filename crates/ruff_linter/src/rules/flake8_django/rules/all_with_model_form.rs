@@ -43,7 +43,7 @@ pub struct DjangoAllWithModelForm;
 impl Violation for DjangoAllWithModelForm {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use `__all__` with `ModelForm`, use `fields` instead")
+        "Do not use `__all__` with `ModelForm`, use `fields` instead".to_string()
     }
 }
 

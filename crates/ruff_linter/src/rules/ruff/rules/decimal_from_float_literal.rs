@@ -4,10 +4,10 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `Decimal` calls passing a float literal.
@@ -38,11 +38,11 @@ pub struct DecimalFromFloatLiteral;
 impl AlwaysFixableViolation for DecimalFromFloatLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`Decimal()` called with float literal argument")
+        "`Decimal()` called with float literal argument".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Use a string literal instead".to_string()
+        "Replace with string literal".to_string()
     }
 }
 
