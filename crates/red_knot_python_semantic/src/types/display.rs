@@ -337,9 +337,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{
-        global_symbol, BytesLiteralType, SliceLiteralType, StringLiteralType, Type, UnionType,
-    };
+    use crate::types::{global_symbol, SliceLiteralType, Type, UnionType};
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -385,12 +383,12 @@ mod tests {
             Type::Unknown,
             Type::IntLiteral(-1),
             global_symbol(&db, mod_file, "A").expect_type(),
-            Type::StringLiteral(StringLiteralType::new(&db, "A")),
-            Type::BytesLiteral(BytesLiteralType::new(&db, [0u8].as_slice())),
-            Type::BytesLiteral(BytesLiteralType::new(&db, [7u8].as_slice())),
+            Type::string_literal(&db, "A"),
+            Type::bytes_literal(&db, &[0u8]),
+            Type::bytes_literal(&db, &[7u8]),
             Type::IntLiteral(0),
             Type::IntLiteral(1),
-            Type::StringLiteral(StringLiteralType::new(&db, "B")),
+            Type::string_literal(&db, "B"),
             global_symbol(&db, mod_file, "foo").expect_type(),
             global_symbol(&db, mod_file, "bar").expect_type(),
             global_symbol(&db, mod_file, "B").expect_type(),

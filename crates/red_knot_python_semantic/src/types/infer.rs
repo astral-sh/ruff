@@ -56,11 +56,10 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
-    Boundness, BytesLiteralType, Class, ClassLiteralType, FunctionType, InstanceType,
-    IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, StringLiteralType,
-    Symbol, Truthiness, TupleType, Type, TypeArrayDisplay, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionBuilder, UnionType,
+    Boundness, Class, ClassLiteralType, FunctionType, InstanceType, IntersectionBuilder,
+    IntersectionType, IterationOutcome, KnownClass, KnownFunction, KnownInstanceType,
+    MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol, Truthiness, TupleType, Type,
+    TypeArrayDisplay, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -2202,7 +2201,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::StringLiteral(StringLiteralType::new(self.db, literal.value.to_str()))
+            Type::string_literal(self.db, literal.value.to_str())
         } else {
             Type::LiteralString
         }
@@ -2210,10 +2209,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
         // TODO: ignoring r/R prefixes for now, should normalize bytes values
-        Type::BytesLiteral(BytesLiteralType::new(
-            self.db,
-            literal.value.bytes().collect::<Box<[u8]>>(),
-        ))
+        let bytes: Vec<u8> = literal.value.bytes().collect();
+        Type::bytes_literal(self.db, &bytes)
     }
 
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
@@ -2280,12 +2277,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             parenthesized: _,
         } = tuple;
 
-        let element_types = elts
-            .iter()
-            .map(|elt| self.infer_expression(elt))
-            .collect::<Vec<_>>();
+        let element_types: Vec<Type<'db>> =
+            elts.iter().map(|elt| self.infer_expression(elt)).collect();
 
-        Type::Tuple(TupleType::new(self.db, element_types.into_boxed_slice()))
+        Type::tuple(self.db, &element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -2987,21 +2982,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
-                Some(Type::BytesLiteral(BytesLiteralType::new(
-                    self.db,
-                    [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
-                        .concat()
-                        .into_boxed_slice(),
-                )))
+                let bytes = [&**lhs.value(self.db), &**rhs.value(self.db)].concat();
+                Some(Type::bytes_literal(self.db, &bytes))
             }
 
             (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
                 let lhs_value = lhs.value(self.db).to_string();
                 let rhs_value = rhs.value(self.db).as_ref();
                 let ty = if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-                    Type::StringLiteral(StringLiteralType::new(self.db, {
-                        (lhs_value + rhs_value).into_boxed_str()
-                    }))
+                    Type::string_literal(self.db, &(lhs_value + rhs_value))
                 } else {
                     Type::LiteralString
                 };
@@ -3017,16 +3006,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
                 let ty = if n < 1 {
-                    Type::StringLiteral(StringLiteralType::new(self.db, ""))
+                    Type::string_literal(self.db, "")
                 } else if let Ok(n) = usize::try_from(n) {
                     if n.checked_mul(s.value(self.db).len())
                         .is_some_and(|new_length| new_length <= Self::MAX_STRING_LITERAL_SIZE)
                     {
                         let new_literal = s.value(self.db).repeat(n);
-                        Type::StringLiteral(StringLiteralType::new(
-                            self.db,
-                            new_literal.into_boxed_str(),
-                        ))
+                        Type::string_literal(self.db, &new_literal)
                     } else {
                         Type::LiteralString
                     }
@@ -3039,7 +3025,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::LiteralString, Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::LiteralString, ast::Operator::Mult) => {
                 let ty = if n < 1 {
-                    Type::StringLiteral(StringLiteralType::new(self.db, ""))
+                    Type::string_literal(self.db, "")
                 } else {
                     Type::LiteralString
                 };
@@ -3752,7 +3738,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 if let Ok(new_elements) = elements.py_slice(start, stop, step) {
                     let new_elements: Vec<_> = new_elements.copied().collect();
-                    Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
+                    Type::tuple(self.db, &new_elements)
                 } else {
                     self.diagnostics.add_slice_step_size_zero(value_node.into());
                     Type::Unknown
@@ -3766,12 +3752,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 literal_value
                     .chars()
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
-                    .map(|ch| {
-                        Type::StringLiteral(StringLiteralType::new(
-                            self.db,
-                            ch.to_string().into_boxed_str(),
-                        ))
-                    })
+                    .map(|ch| Type::string_literal(self.db, &ch.to_string()))
                     .unwrap_or_else(|_| {
                         self.diagnostics.add_index_out_of_bounds(
                             "string",
@@ -3791,7 +3772,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let chars: Vec<_> = literal_value.chars().collect();
                 let result = if let Ok(new_chars) = chars.py_slice(start, stop, step) {
                     let literal: String = new_chars.collect();
-                    Type::StringLiteral(StringLiteralType::new(self.db, literal.into_boxed_str()))
+                    Type::string_literal(self.db, &literal)
                 } else {
                     self.diagnostics.add_slice_step_size_zero(value_node.into());
                     Type::Unknown
@@ -3806,9 +3787,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 literal_value
                     .iter()
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
-                    .map(|byte| {
-                        Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
-                    })
+                    .map(|byte| Type::bytes_literal(self.db, &[*byte]))
                     .unwrap_or_else(|_| {
                         self.diagnostics.add_index_out_of_bounds(
                             "bytes literal",
@@ -3827,7 +3806,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 if let Ok(new_bytes) = literal_value.py_slice(start, stop, step) {
                     let new_bytes: Vec<u8> = new_bytes.copied().collect();
-                    Type::BytesLiteral(BytesLiteralType::new(self.db, new_bytes.into_boxed_slice()))
+                    Type::bytes_literal(self.db, &new_bytes)
                 } else {
                     self.diagnostics.add_slice_step_size_zero(value_node.into());
                     Type::Unknown
@@ -4262,7 +4241,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if return_todo {
                     Type::Todo
                 } else {
-                    Type::Tuple(TupleType::new(self.db, element_types.into_boxed_slice()))
+                    Type::tuple(self.db, &element_types)
                 }
             }
             single_element => {
@@ -4270,7 +4249,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
                     Type::Todo
                 } else {
-                    Type::Tuple(TupleType::new(self.db, Box::from([single_element_ty])))
+                    Type::tuple(self.db, &[single_element_ty])
                 }
             }
         }
@@ -4541,7 +4520,7 @@ impl StringPartsCollector {
         if self.expression {
             KnownClass::Str.to_instance(db)
         } else if let Some(concatenated) = self.concatenated {
-            Type::StringLiteral(StringLiteralType::new(db, concatenated.into_boxed_str()))
+            Type::string_literal(db, &concatenated)
         } else {
             Type::LiteralString
         }
