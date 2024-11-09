@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
@@ -113,15 +113,15 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
 
             // typing.Union[set[int]]
             // Mark [`Fix`] as unsafe when comments are in range
-            let edit = Edit::range_replacement(checker.generator().expr(&subscript), expr.range());
-            let fix = if checker
-                .comment_ranges()
-                .has_comments(expr, checker.source())
-            {
-                Fix::unsafe_edit(edit)
-            } else {
-                Fix::safe_edit(edit)
-            };
+            let fix = Fix::applicable_edit(
+                Edit::range_replacement(checker.generator().expr(&subscript), expr.range()),
+                if checker.comment_ranges().intersects(expr.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            );
+
             for diagnostic in &mut diagnostics {
                 if diagnostic.fix.is_none() {
                     diagnostic.set_fix(fix.clone());
