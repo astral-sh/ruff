@@ -79,7 +79,7 @@ PYI055.py:44:9: PYI055 [*] Multiple `type` members in a union. Combine them into
 46 46 |     ...
 47 47 | 
 
-PYI055.py:50:9: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[_T, Converter[_T]]]`.
+PYI055.py:50:9: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
    |
 48 | def convert_union(union: UnionType) -> _T | None:
 49 |     converters: tuple[
