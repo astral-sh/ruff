@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
@@ -78,6 +78,7 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr
     }
 
     // If there's at least one diagnostic, create a fix to remove the duplicate members.
+    // TODO(SB): test if `Union[Literal[1], Literal[1]]`
     if let Expr::Subscript(subscript) = expr {
         let subscript = Expr::Subscript(ast::ExprSubscript {
             slice: Box::new(if let [elt] = unique_nodes.as_slice() {
@@ -94,10 +95,14 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });
-        let fix = Fix::safe_edit(Edit::range_replacement(
-            checker.generator().expr(&subscript),
-            expr.range(),
-        ));
+        let fix = Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(&subscript), expr.range()),
+            if checker.comment_ranges().intersects(expr.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        );
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(fix.clone());
         }
