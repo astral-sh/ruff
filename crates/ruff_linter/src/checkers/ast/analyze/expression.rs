@@ -145,11 +145,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FStringNumberFormat) {
                 refurb::rules::fstring_number_format(checker, subscript);
             }
-
             if checker.enabled(Rule::IncorrectlyParenthesizedTupleInSubscript) {
                 ruff::rules::subscript_with_parenthesized_tuple(checker, subscript);
             }
-
             if checker.enabled(Rule::NonPEP646Unpack) {
                 pyupgrade::rules::use_pep646_unpack(checker, subscript);
             }
