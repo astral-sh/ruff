@@ -53,9 +53,9 @@ use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
-    BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
-    StarImport, SubmoduleImport,
+    BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, GeneratorKind, Globals,
+    Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
+    SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{python_builtins, MAGIC_GLOBALS};
 use ruff_python_trivia::CommentRanges;
@@ -1137,19 +1137,25 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 elt,
                 generators,
                 range: _,
-            })
-            | Expr::SetComp(ast::ExprSetComp {
+            }) => {
+                self.visit_generators(GeneratorKind::ListComprehension, generators);
+                self.visit_expr(elt);
+            }
+            Expr::SetComp(ast::ExprSetComp {
                 elt,
                 generators,
                 range: _,
-            })
-            | Expr::Generator(ast::ExprGenerator {
+            }) => {
+                self.visit_generators(GeneratorKind::SetComprehension, generators);
+                self.visit_expr(elt);
+            }
+            Expr::Generator(ast::ExprGenerator {
                 elt,
                 generators,
                 range: _,
                 parenthesized: _,
             }) => {
-                self.visit_generators(generators);
+                self.visit_generators(GeneratorKind::Generator, generators);
                 self.visit_expr(elt);
             }
             Expr::DictComp(ast::ExprDictComp {
@@ -1158,7 +1164,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 generators,
                 range: _,
             }) => {
-                self.visit_generators(generators);
+                self.visit_generators(GeneratorKind::DictComprehension, generators);
                 self.visit_expr(key);
                 self.visit_expr(value);
             }
@@ -1748,7 +1754,7 @@ impl<'a> Checker<'a> {
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
-    fn visit_generators(&mut self, generators: &'a [Comprehension]) {
+    fn visit_generators(&mut self, kind: GeneratorKind, generators: &'a [Comprehension]) {
         let mut iterator = generators.iter();
 
         let Some(generator) = iterator.next() else {
@@ -1785,7 +1791,7 @@ impl<'a> Checker<'a> {
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
-        self.semantic.push_scope(ScopeKind::Generator);
+        self.semantic.push_scope(ScopeKind::Generator(kind));
 
         self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
         self.visit_expr(&generator.target);
