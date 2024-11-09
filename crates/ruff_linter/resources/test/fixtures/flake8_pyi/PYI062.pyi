@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Union
 import typing as t
 import typing_extensions
 
@@ -14,6 +14,14 @@ Literal[1, Literal[1], Literal[1]]  # twice
 Literal[1, Literal[2], Literal[2]]  # once
 t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
 typing_extensions.Literal[1, 1, 1]  # twice
+Union[Literal[1], Literal[1]]  # once
+Union[Union[Literal[1], Literal[1]]]  # once
+Literal[
+    1, # comment
+    Literal[ # another comment
+        1
+    ]
+]  # once
 
 # Ensure issue is only raised once, even on nested literals
 MyType = Literal["foo", Literal[True, False, True], "bar"]  # PYI062

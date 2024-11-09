@@ -45,6 +45,20 @@ def f6(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # P
 def f7(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: ...  # PYI041
 
 
+def f8(
+    arg: Union[  # comment 
+        float, # another
+        complex, int]
+    ) -> None: ...  # PYI041
+
+def f9(
+    arg: (
+        int | # comment
+        float |  # another
+        complex
+    )    
+    ) -> None: ... # PYI041
+
 class Foo:
     def good(self, arg: int) -> None: ...
 
