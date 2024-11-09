@@ -478,6 +478,18 @@ impl<'db> Type<'db> {
         Self::SubclassOf(SubclassOfType { class })
     }
 
+    pub fn string_literal(db: &'db dyn Db, string: &str) -> Self {
+        Self::StringLiteral(StringLiteralType::new(db, string))
+    }
+
+    pub fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {
+        Self::BytesLiteral(BytesLiteralType::new(db, bytes))
+    }
+
+    pub fn tuple(db: &'db dyn Db, elements: &[Type<'db>]) -> Self {
+        Self::Tuple(TupleType::new(db, elements))
+    }
+
     #[must_use]
     pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         IntersectionBuilder::new(db).add_negative(*self).build()
@@ -1458,7 +1470,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
             Type::KnownInstance(known_instance) => {
-                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr(db)))
+                Type::string_literal(db, known_instance.repr(db))
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -1470,17 +1482,15 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn repr(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::IntLiteral(number) => Type::StringLiteral(StringLiteralType::new(db, {
-                number.to_string().into_boxed_str()
-            })),
-            Type::BooleanLiteral(true) => Type::StringLiteral(StringLiteralType::new(db, "True")),
-            Type::BooleanLiteral(false) => Type::StringLiteral(StringLiteralType::new(db, "False")),
-            Type::StringLiteral(literal) => Type::StringLiteral(StringLiteralType::new(db, {
-                format!("'{}'", literal.value(db).escape_default()).into_boxed_str()
-            })),
+            Type::IntLiteral(number) => Type::string_literal(db, &number.to_string()),
+            Type::BooleanLiteral(true) => Type::string_literal(db, "True"),
+            Type::BooleanLiteral(false) => Type::string_literal(db, "False"),
+            Type::StringLiteral(literal) => {
+                Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
+            }
             Type::LiteralString => Type::LiteralString,
             Type::KnownInstance(known_instance) => {
-                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr(db)))
+                Type::string_literal(db, known_instance.repr(db))
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -1738,42 +1748,28 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        match (self, name) {
-            (Self::TypeVar(typevar), "__name__") => Symbol::Type(
-                Type::StringLiteral(StringLiteralType::new(db, typevar.name(db).as_str())),
-                Boundness::Bound,
-            ),
-            (Self::TypeVar(typevar), "__bound__") => Symbol::Type(
-                typevar
-                    .upper_bound(db)
+        let ty = match (self, name) {
+            (Self::TypeVar(typevar), "__name__") => Type::string_literal(db, typevar.name(db)),
+            (Self::TypeVar(typevar), "__bound__") => typevar
+                .upper_bound(db)
+                .map(|ty| ty.to_meta_type(db))
+                .unwrap_or_else(|| KnownClass::NoneType.to_instance(db)),
+            (Self::TypeVar(typevar), "__constraints__") => {
+                let tuple_elements: Vec<Type<'db>> = typevar
+                    .constraints(db)
+                    .unwrap_or_default()
+                    .iter()
                     .map(|ty| ty.to_meta_type(db))
-                    .unwrap_or(KnownClass::NoneType.to_instance(db)),
-                Boundness::Bound,
-            ),
-            (Self::TypeVar(typevar), "__constraints__") => Symbol::Type(
-                Type::Tuple(TupleType::new(
-                    db,
-                    typevar
-                        .constraints(db)
-                        .map(|constraints| {
-                            constraints
-                                .iter()
-                                .map(|ty| ty.to_meta_type(db))
-                                .collect::<Box<_>>()
-                        })
-                        .unwrap_or_else(|| std::iter::empty().collect::<Box<_>>()),
-                )),
-                Boundness::Bound,
-            ),
-            (Self::TypeVar(typevar), "__default__") => Symbol::Type(
-                typevar
-                    .default_ty(db)
-                    .map(|ty| ty.to_meta_type(db))
-                    .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
-                Boundness::Bound,
-            ),
-            _ => self.instance_fallback(db).member(db, name),
-        }
+                    .collect();
+                Type::tuple(db, &tuple_elements)
+            }
+            (Self::TypeVar(typevar), "__default__") => typevar
+                .default_ty(db)
+                .map(|ty| ty.to_meta_type(db))
+                .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
+            _ => return self.instance_fallback(db).member(db, name),
+        };
+        ty.into()
     }
 }
 
@@ -2544,11 +2540,8 @@ impl<'db> Class<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
-            let tuple_elements: Box<_> = self.iter_mro(db).map(Type::from).collect();
-            return Symbol::Type(
-                Type::Tuple(TupleType::new(db, tuple_elements)),
-                Boundness::Bound,
-            );
+            let tuple_elements: Vec<Type<'db>> = self.iter_mro(db).map(Type::from).collect();
+            return Type::tuple(db, &tuple_elements).into();
         }
 
         if name == "__class__" {
@@ -2880,10 +2873,10 @@ mod tests {
                 Ty::Any => Type::Any,
                 Ty::Todo => Type::Todo,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
-                Ty::StringLiteral(s) => Type::StringLiteral(StringLiteralType::new(db, s)),
+                Ty::StringLiteral(s) => Type::string_literal(db, s),
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
-                Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
+                Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
                 Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
                 Ty::TypingInstance(s) => typing_symbol(db, s).expect_type().to_instance(db),
                 Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
@@ -2903,8 +2896,8 @@ mod tests {
                     builder.build()
                 }
                 Ty::Tuple(tys) => {
-                    let elements: Box<_> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
-                    Type::Tuple(TupleType::new(db, elements))
+                    let elements: Vec<Type> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
+                    Type::tuple(db, &elements)
                 }
             }
         }
