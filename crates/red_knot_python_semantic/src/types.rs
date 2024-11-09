@@ -690,13 +690,11 @@ impl<'db> Type<'db> {
                     Type::Instance(InstanceType { class: self_class }),
                     Type::Instance(InstanceType { class: target_class })
                 )
-                if (
-                    self_class.is_known(db, KnownClass::NoneType) &&
-                    target_class.is_known(db, KnownClass::NoneType)
-                ) || (
-                    self_class.is_known(db, KnownClass::NoDefaultType) &&
-                    target_class.is_known(db, KnownClass::NoDefaultType)
-                )
+                if {
+                    let self_known = self_class.known(db);
+                    matches!(self_known, Some(KnownClass::NoneType | KnownClass::NoDefaultType))
+                        && self_known == target_class.known(db)
+                }
             )
     }
 
@@ -937,11 +935,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
             Type::Instance(InstanceType { class }) => {
-                if let Some(known_class) = class.known(db) {
-                    known_class.is_singleton()
-                } else {
-                    false
-                }
+                class.known(db).is_some_and(KnownClass::is_singleton)
             }
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
@@ -1595,6 +1589,9 @@ impl<'db> KnownClass {
             Self::NoneType => typeshed_symbol(db, self.as_str()).unwrap_or_unknown(),
             Self::SpecialForm => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
             Self::TypeVar => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
+            // TODO when we understand sys.version_info, we will need an explicit fallback here,
+            // because typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
+            // singleton, but not for `typing._NoDefaultType`
             Self::NoDefaultType => typing_extensions_symbol(db, self.as_str()).unwrap_or_unknown(),
         }
     }
@@ -3322,6 +3319,20 @@ mod tests {
         let db = setup_db();
 
         assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
+    }
+
+    #[test]
+    fn typing_vs_typeshed_no_default() {
+        let db = setup_db();
+
+        let typing_no_default = typing_symbol(&db, "NoDefault").expect_type();
+        let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault").expect_type();
+
+        assert_eq!(typing_no_default.display(&db).to_string(), "NoDefault");
+        assert_eq!(
+            typing_extensions_no_default.display(&db).to_string(),
+            "NoDefault"
+        );
     }
 
     #[test]
