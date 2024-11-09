@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/flake8_markupsafe/mod.rs
+---
+MS001.py:5:1: MS001 Unsafe use of `markupsafe.Markup` detected
+  |
+4 | content = "<script>alert('Hello, world!')</script>"
+5 | Markup(f"unsafe {content}")  # MS001
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ MS001
+6 | flask.Markup("unsafe {}".format(content))  # MS001
+7 | Markup("safe {}").format(content)
+  |
+
+MS001.py:6:1: MS001 Unsafe use of `flask.Markup` detected
+  |
+4 | content = "<script>alert('Hello, world!')</script>"
+5 | Markup(f"unsafe {content}")  # MS001
+6 | flask.Markup("unsafe {}".format(content))  # MS001
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MS001
+7 | Markup("safe {}").format(content)
+8 | flask.Markup(b"safe {}", encoding='utf-8').format(content)
+  |
+
+MS001.py:10:1: MS001 Unsafe use of `markupsafe.Markup` detected
+   |
+ 8 | flask.Markup(b"safe {}", encoding='utf-8').format(content)
+ 9 | escape(content)
+10 | Markup(content)  # MS001
+   | ^^^^^^^^^^^^^^^ MS001
+   |

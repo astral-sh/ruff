@@ -24,6 +24,7 @@ pub mod flake8_implicit_str_concat;
 pub mod flake8_import_conventions;
 pub mod flake8_logging;
 pub mod flake8_logging_format;
+pub mod flake8_markupsafe;
 pub mod flake8_no_pep420;
 pub mod flake8_pie;
 pub mod flake8_print;

@@ -1081,6 +1081,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
 
+        // flake8-markupsafe
+        (Flake8MarkupSafe, "001") => (RuleGroup::Preview, rules::flake8_markupsafe::rules::UnsafeMarkupUse),
+
         _ => return None,
     })
 }

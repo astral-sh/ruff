@@ -857,6 +857,10 @@ pub struct LintCommonOptions {
     #[option_group]
     pub flake8_import_conventions: Option<Flake8ImportConventionsOptions>,
 
+    /// Options for the `flake8-markupsafe` plugin.
+    #[option_group]
+    pub flake8_markupsafe: Option<Flake8MarkupSafeOptions>,
+
     /// Options for the `flake8-pytest-style` plugin.
     #[option_group]
     pub flake8_pytest_style: Option<Flake8PytestStyleOptions>,
@@ -1387,6 +1391,35 @@ impl Flake8ImportConventionsOptions {
         }
     }
 }
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8MarkupSafeOptions {
+    /// A list of additional callable names that behave like [`markupsafe.Markup`].
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
+    /// `literal`).
+    ///
+    /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
+    )]
+    pub extend_markup_names: Option<Vec<String>>,
+}
+
+impl Flake8MarkupSafeOptions {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_markupsafe::settings::Settings {
+        ruff_linter::rules::flake8_markupsafe::settings::Settings {
+            extend_markup_names: self.extend_markup_names.unwrap_or_default(),
+        }
+    }
+}
+
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]

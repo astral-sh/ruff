@@ -345,6 +345,18 @@
         }
       ]
     },
+    "flake8-markupsafe": {
+      "description": "Options for the `flake8-markupsafe` plugin.",
+      "deprecated": true,
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8MarkupSafeOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-pytest-style": {
       "description": "Options for the `flake8-pytest-style` plugin.",
       "deprecated": true,
@@ -1165,6 +1177,22 @@
             "null"
           ],
           "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8MarkupSafeOptions": {
+      "type": "object",
+      "properties": {
+        "extend-markup-names": {
+          "description": "A list of additional callable names that behave like [`markupsafe.Markup`].\n\nExpects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than `literal`).\n\n[markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
             "type": "string"
           }
         }
@@ -2109,6 +2137,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Flake8ImportConventionsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-markupsafe": {
+          "description": "Options for the `flake8-markupsafe` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8MarkupSafeOptions"
             },
             {
               "type": "null"
@@ -3306,6 +3345,10 @@
         "LOG002",
         "LOG007",
         "LOG009",
+        "MS",
+        "MS0",
+        "MS00",
+        "MS001",
         "N",
         "N8",
         "N80",
