@@ -2299,8 +2299,7 @@ impl<'a> Checker<'a> {
                             flake8_type_checking::rules::quoted_type_alias(
                                 self,
                                 parsed_expr,
-                                annotation,
-                                range,
+                                string_expr,
                             );
                         }
                     }

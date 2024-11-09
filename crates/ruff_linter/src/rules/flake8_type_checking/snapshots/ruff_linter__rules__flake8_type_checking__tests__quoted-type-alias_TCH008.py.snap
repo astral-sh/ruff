@@ -12,7 +12,7 @@ TCH008.py:15:16: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 12 12 | else:
 13 13 |     Bar = Foo
 14 14 | 
@@ -33,7 +33,7 @@ TCH008.py:17:16: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 14 14 | 
 15 15 | a: TypeAlias = 'int'  # TCH008
 16 16 | b: TypeAlias = 'Dict'  # OK
@@ -54,7 +54,7 @@ TCH008.py:20:16: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 17 17 | c: TypeAlias = 'Foo'   # TCH008
 18 18 | d: TypeAlias = 'Foo[str]'  # OK
 19 19 | e: TypeAlias = 'Foo.bar'  # OK
@@ -75,7 +75,7 @@ TCH008.py:22:16: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 19 19 | e: TypeAlias = 'Foo.bar'  # OK
 20 20 | f: TypeAlias = 'Foo | None'  # TCH008
 21 21 | g: TypeAlias = 'OptStr'   # OK
@@ -96,7 +96,7 @@ TCH008.py:23:20: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 20 20 | f: TypeAlias = 'Foo | None'  # TCH008
 21 21 | g: TypeAlias = 'OptStr'   # OK
 22 22 | h: TypeAlias = 'Bar'   # TCH008
@@ -117,7 +117,7 @@ TCH008.py:26:16: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 23 23 | i: TypeAlias = Foo['str']   # TCH008
 24 24 | j: TypeAlias = 'Baz'   # OK
 25 25 | k: TypeAlias = 'k | None'  # OK
@@ -138,7 +138,7 @@ TCH008.py:27:17: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 24 24 | j: TypeAlias = 'Baz'   # OK
 25 25 | k: TypeAlias = 'k | None'  # OK
 26 26 | l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
@@ -183,7 +183,7 @@ TCH008.py:32:10: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 29 29 | n: TypeAlias = ('int'  # TCH008 (fix removes comment currently)
 30 30 |     ' | None')
 31 31 | 
@@ -203,7 +203,7 @@ TCH008.py:33:10: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 30 30 |     ' | None')
 31 31 | 
 32 32 | type B = 'Dict'  # TCH008
@@ -224,7 +224,7 @@ TCH008.py:34:10: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 31 31 | 
 32 32 | type B = 'Dict'  # TCH008
 33 33 | type D = 'Foo[str]'  # TCH008
@@ -245,7 +245,7 @@ TCH008.py:35:10: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 32 32 | type B = 'Dict'  # TCH008
 33 33 | type D = 'Foo[str]'  # TCH008
 34 34 | type E = 'Foo.bar'  # TCH008
@@ -266,7 +266,7 @@ TCH008.py:36:14: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 33 33 | type D = 'Foo[str]'  # TCH008
 34 34 | type E = 'Foo.bar'  # TCH008
 35 35 | type G = 'OptStr'  # TCH008
@@ -287,7 +287,7 @@ TCH008.py:37:10: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 34 34 | type E = 'Foo.bar'  # TCH008
 35 35 | type G = 'OptStr'  # TCH008
 36 36 | type I = Foo['str']  # TCH008
@@ -308,7 +308,7 @@ TCH008.py:38:10: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 35 35 | type G = 'OptStr'  # TCH008
 36 36 | type I = Foo['str']  # TCH008
 37 37 | type J = 'Baz'  # TCH008
@@ -329,7 +329,7 @@ TCH008.py:39:10: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 36 36 | type I = Foo['str']  # TCH008
 37 37 | type J = 'Baz'  # TCH008
 38 38 | type K = 'K | None'  # TCH008
@@ -350,7 +350,7 @@ TCH008.py:40:11: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 37 37 | type J = 'Baz'  # TCH008
 38 38 | type K = 'K | None'  # TCH008
 39 39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
@@ -393,7 +393,7 @@ TCH008.py:48:14: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 45 45 | 
 46 46 | class Baz:
 47 47 |     a: TypeAlias = 'Baz'  # OK
@@ -412,7 +412,7 @@ TCH008.py:52:18: TCH008 [*] Remove quotes from type alias
    |
    = help: Remove quotes
 
-ℹ Unsafe fix
+ℹ Safe fix
 49 49 | 
 50 50 |     class Nested:
 51 51 |         a: TypeAlias = 'Baz'  # OK

@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::{Binding, SemanticModel};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 use std::borrow::Borrow;
 
 use crate::checkers::ast::Checker;
@@ -48,7 +48,7 @@ impl Violation for UnquotedTypeAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Add quotes to type alias")
+        "Add quotes to type alias".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -106,7 +106,7 @@ pub struct QuotedTypeAlias;
 impl AlwaysFixableViolation for QuotedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Remove quotes from type alias")
+        "Remove quotes from type alias".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -219,8 +219,7 @@ fn collect_typing_references<'a>(
 pub(crate) fn quoted_type_alias(
     checker: &mut Checker,
     expr: &Expr,
-    annotation: &str,
-    range: TextRange,
+    annotation_expr: &ast::ExprStringLiteral,
 ) {
     if checker.enabled(Rule::RuntimeStringUnion) {
         // this should return a TCH010 error instead
@@ -240,11 +239,17 @@ pub(crate) fn quoted_type_alias(
         return;
     }
 
+    let range = annotation_expr.range();
     let mut diagnostic = Diagnostic::new(QuotedTypeAlias, range);
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        annotation.to_string(),
-        range,
-    )));
+    let edit = Edit::range_replacement(annotation_expr.value.to_string(), range);
+    if checker
+        .comment_ranges()
+        .has_comments(expr, checker.source())
+    {
+        diagnostic.set_fix(Fix::unsafe_edit(edit));
+    } else {
+        diagnostic.set_fix(Fix::safe_edit(edit));
+    }
     checker.diagnostics.push(diagnostic);
 }
 
