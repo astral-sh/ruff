@@ -133,25 +133,26 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
 
     let mut names = Vec::new();
     collect_typing_references(checker, expr, &mut names);
-    if !names.is_empty() {
-        // We generate a diagnostic for every name that needs to be quoted
-        // but we currently emit a single shared fix that quotes the entire
-        // expression.
-        //
-        // Eventually we may try to be more clever and come up with the
-        // minimal set of subexpressions that need to be quoted.
-        let parent = expr.range().start();
-        let edit = quote_type_expression(expr, checker.semantic(), checker.stylist());
-        let mut diagnostics = Vec::with_capacity(names.len());
-        for name in names {
-            let mut diagnostic = Diagnostic::new(UnquotedTypeAlias, name.range());
-            diagnostic.set_parent(parent);
-            diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
-            diagnostics.push(diagnostic);
-        }
-        return Some(diagnostics);
+    if names.is_empty() {
+        return None;
     }
-    None
+
+    // We generate a diagnostic for every name that needs to be quoted
+    // but we currently emit a single shared fix that quotes the entire
+    // expression.
+    //
+    // Eventually we may try to be more clever and come up with the
+    // minimal set of subexpressions that need to be quoted.
+    let parent = expr.range().start();
+    let edit = quote_type_expression(expr, checker.semantic(), checker.stylist());
+    let mut diagnostics = Vec::with_capacity(names.len());
+    for name in names {
+        let mut diagnostic = Diagnostic::new(UnquotedTypeAlias, name.range());
+        diagnostic.set_parent(parent);
+        diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+        diagnostics.push(diagnostic);
+    }
+    return Some(diagnostics);
 }
 
 /// Traverses the type expression and collects `[Expr::Name]` nodes that are
@@ -240,7 +241,7 @@ pub(crate) fn quoted_type_alias(
     }
 
     let mut diagnostic = Diagnostic::new(QuotedTypeAlias, range);
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         annotation.to_string(),
         range,
     )));

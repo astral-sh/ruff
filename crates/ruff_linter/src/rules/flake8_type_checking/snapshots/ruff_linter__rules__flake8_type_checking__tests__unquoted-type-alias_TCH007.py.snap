@@ -83,7 +83,7 @@ TCH007.py:18:16: TCH007 [*] Add quotes to type alias
    18 |+f: TypeAlias = "Bar"   # TCH007
 19 19 | g: TypeAlias = Foo | Bar  # TCH007 x2
 20 20 | h: TypeAlias = Foo[str]  # TCH007
-21 21 | 
+21 21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
 
 TCH007.py:19:16: TCH007 [*] Add quotes to type alias
    |
@@ -92,6 +92,7 @@ TCH007.py:19:16: TCH007 [*] Add quotes to type alias
 19 | g: TypeAlias = Foo | Bar  # TCH007 x2
    |                ^^^ TCH007
 20 | h: TypeAlias = Foo[str]  # TCH007
+21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
    |
    = help: Add quotes
 
@@ -102,8 +103,8 @@ TCH007.py:19:16: TCH007 [*] Add quotes to type alias
 19    |-g: TypeAlias = Foo | Bar  # TCH007 x2
    19 |+g: TypeAlias = "Foo | Bar"  # TCH007 x2
 20 20 | h: TypeAlias = Foo[str]  # TCH007
-21 21 | 
-22 22 | type C = Foo   # OK
+21 21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+22 22 |     Bar)
 
 TCH007.py:19:22: TCH007 [*] Add quotes to type alias
    |
@@ -112,6 +113,7 @@ TCH007.py:19:22: TCH007 [*] Add quotes to type alias
 19 | g: TypeAlias = Foo | Bar  # TCH007 x2
    |                      ^^^ TCH007
 20 | h: TypeAlias = Foo[str]  # TCH007
+21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
    |
    = help: Add quotes
 
@@ -122,8 +124,8 @@ TCH007.py:19:22: TCH007 [*] Add quotes to type alias
 19    |-g: TypeAlias = Foo | Bar  # TCH007 x2
    19 |+g: TypeAlias = "Foo | Bar"  # TCH007 x2
 20 20 | h: TypeAlias = Foo[str]  # TCH007
-21 21 | 
-22 22 | type C = Foo   # OK
+21 21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+22 22 |     Bar)
 
 TCH007.py:20:16: TCH007 [*] Add quotes to type alias
    |
@@ -131,8 +133,8 @@ TCH007.py:20:16: TCH007 [*] Add quotes to type alias
 19 | g: TypeAlias = Foo | Bar  # TCH007 x2
 20 | h: TypeAlias = Foo[str]  # TCH007
    |                ^^^ TCH007
-21 | 
-22 | type C = Foo   # OK
+21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+22 |     Bar)
    |
    = help: Add quotes
 
@@ -142,6 +144,49 @@ TCH007.py:20:16: TCH007 [*] Add quotes to type alias
 19 19 | g: TypeAlias = Foo | Bar  # TCH007 x2
 20    |-h: TypeAlias = Foo[str]  # TCH007
    20 |+h: TypeAlias = "Foo[str]"  # TCH007
-21 21 | 
-22 22 | type C = Foo   # OK
-23 23 | type D = Foo | None  # OK
+21 21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+22 22 |     Bar)
+23 23 | 
+
+TCH007.py:21:17: TCH007 [*] Add quotes to type alias
+   |
+19 | g: TypeAlias = Foo | Bar  # TCH007 x2
+20 | h: TypeAlias = Foo[str]  # TCH007
+21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+   |                 ^^^ TCH007
+22 |     Bar)
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+18 18 | f: TypeAlias = Bar   # TCH007
+19 19 | g: TypeAlias = Foo | Bar  # TCH007 x2
+20 20 | h: TypeAlias = Foo[str]  # TCH007
+21    |-i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+22    |-    Bar)
+   21 |+i: TypeAlias = ("Foo | Bar")
+23 22 | 
+24 23 | type C = Foo   # OK
+25 24 | type D = Foo | None  # OK
+
+TCH007.py:22:5: TCH007 [*] Add quotes to type alias
+   |
+20 | h: TypeAlias = Foo[str]  # TCH007
+21 | i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+22 |     Bar)
+   |     ^^^ TCH007
+23 | 
+24 | type C = Foo   # OK
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+18 18 | f: TypeAlias = Bar   # TCH007
+19 19 | g: TypeAlias = Foo | Bar  # TCH007 x2
+20 20 | h: TypeAlias = Foo[str]  # TCH007
+21    |-i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+22    |-    Bar)
+   21 |+i: TypeAlias = ("Foo | Bar")
+23 22 | 
+24 23 | type C = Foo   # OK
+25 24 | type D = Foo | None  # OK

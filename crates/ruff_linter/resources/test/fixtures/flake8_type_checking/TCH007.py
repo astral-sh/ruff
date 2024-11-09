@@ -18,6 +18,8 @@ e: TypeAlias = OptStr   # TCH007
 f: TypeAlias = Bar   # TCH007
 g: TypeAlias = Foo | Bar  # TCH007 x2
 h: TypeAlias = Foo[str]  # TCH007
+i: TypeAlias = (Foo |  # TCH007 x2 (fix removes comment currently)
+    Bar)
 
 type C = Foo   # OK
 type D = Foo | None  # OK
@@ -25,3 +27,5 @@ type E = OptStr   # OK
 type F = Bar   # OK
 type G = Foo | Bar  # OK
 type H = Foo[str]  # OK
+type I = (Foo |  # OK 
+    Bar)

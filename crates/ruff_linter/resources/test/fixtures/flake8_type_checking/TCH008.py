@@ -24,6 +24,10 @@ i: TypeAlias = Foo['str']   # TCH008
 j: TypeAlias = 'Baz'   # OK
 k: TypeAlias = 'k | None'  # OK
 l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
+m: TypeAlias = ('int'  # TCH008
+    | None)
+n: TypeAlias = ('int'  # TCH008 (fix removes comment currently)
+    ' | None')
 
 type B = 'Dict'  # TCH008
 type D = 'Foo[str]'  # TCH008
@@ -33,6 +37,10 @@ type I = Foo['str']  # TCH008
 type J = 'Baz'  # TCH008
 type K = 'K | None'  # TCH008
 type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+type M = ('int'  # TCH008
+    | None)
+type N = ('int'  # TCH008 (fix removes comment currently)
+    ' | None')
 
 
 class Baz:
