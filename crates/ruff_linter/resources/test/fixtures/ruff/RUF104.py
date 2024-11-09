@@ -81,3 +81,12 @@
 # noqa: A123 ,B456
 # ruff: noqa: A123	B456
 # flake8: noqa: A123   B456
+
+
+# type: ignore  # noqa: A123, B456
+
+#pyright:ignore#noqa:A123
+
+# nopycln:file#   noqa: A123
+
+# noqa:A123 - Lorem ipsum dolor sit amet

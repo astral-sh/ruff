@@ -5,9 +5,11 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
+use std::ops::Range;
 use std::sync::LazyLock;
 
-type EndIndex = usize;
+type HintRelativeRange = Range<usize>;
+type SpecialCommentDescriptor<'a> = Option<(HintRelativeRange, &'a str, SpecialComment)>;
 
 #[derive(Debug, Eq, PartialEq)]
 enum SpecialComment {
@@ -115,22 +117,23 @@ impl AlwaysFixableViolation for UnformattedSpecialComment {
 fn add_diagnostic_if_applicable(
     diagnostics: &mut Vec<Diagnostic>,
     comment: SpecialComment,
-    original_comment_text: &str,
-    original_comment_text_range: TextRange,
+    comment_text: &str,
+    comment_range: TextRange,
+    hint_range: TextRange,
 ) {
-    let Some(formatted_comment_text) = comment.formatted() else {
+    let Some(formatted) = comment.formatted() else {
         return;
     };
 
-    if original_comment_text == formatted_comment_text {
+    if comment_text == formatted {
         return;
     }
 
-    let edit = Edit::range_replacement(formatted_comment_text, original_comment_text_range);
+    let edit = Edit::range_replacement(formatted, comment_range);
     let fix = Fix::safe_edit(edit);
 
     let violation = UnformattedSpecialComment(comment);
-    let diagnostic = Diagnostic::new(violation, original_comment_text_range).with_fix(fix);
+    let diagnostic = Diagnostic::new(violation, hint_range).with_fix(fix);
 
     diagnostics.push(diagnostic);
 }
@@ -148,21 +151,26 @@ macro_rules! try_parse_common {
     ($pattern:ident, $text:ident, $special_comment:expr) => {{
         let result = $pattern.captures($text)?;
 
-        let end_index = result.get(0).unwrap().end();
-        let rest = result.name("rest").unwrap().as_str().to_owned();
+        let comment = result.get(0).unwrap();
+        let hint = result.name("hint").unwrap();
+        let rest = result.name("rest").unwrap();
 
-        Some((end_index, $special_comment(rest)))
+        Some((
+            hint.range(),
+            comment.as_str(),
+            $special_comment(rest.as_str().to_owned()),
+        ))
     }};
 }
 
-fn try_parse_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_noqa(text: &str) -> SpecialCommentDescriptor {
     // ruff_linter::noqa::Directive::try_extract
     static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r"(?x)
             ^
             \#\s*
-            (?i:noqa)
+            (?<hint>(?i:noqa))
             (?:
                 :\s*
                 (?<code_list>
@@ -170,7 +178,6 @@ fn try_parse_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
                     (?:[\s,]+[A-Z]+[A-Za-z0-9]+)*
                 )?
             )?
-            $
             ",
         )
         .unwrap()
@@ -178,15 +185,16 @@ fn try_parse_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
 
     let result = PATTERN.captures(text)?;
 
-    let end_index = result.get(0).unwrap().end();
+    let comment = result.get(0).unwrap();
+    let hint = result.name("hint").unwrap();
     let codes = result
         .name("code_list")
         .map(|it| parse_code_list(it.as_str()));
 
-    Some((end_index, SpecialComment::Noqa(codes)))
+    Some((hint.range(), comment.as_str(), SpecialComment::Noqa(codes)))
 }
 
-fn try_parse_file_level_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_file_level_noqa(text: &str) -> SpecialCommentDescriptor {
     // ruff_linter::noqa::ParsedFileExemption::try_extract
     static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
@@ -203,7 +211,6 @@ fn try_parse_file_level_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
                 )?
                 \s*
             )?
-            $
             ",
         )
         .unwrap()
@@ -211,87 +218,110 @@ fn try_parse_file_level_noqa(text: &str) -> Option<(EndIndex, SpecialComment)> {
 
     let result = PATTERN.captures(text)?;
 
-    let end_index = result.get(0).unwrap().end();
-    let hint = result.name("hint").unwrap().as_str().to_owned();
+    let comment = result.get(0).unwrap();
+    let hint = result.name("hint").unwrap();
     let codes = result
         .name("code_list")
         .map(|it| parse_code_list(it.as_str()));
 
-    Some((end_index, SpecialComment::FileLevelNoqa { hint, codes }))
+    let special_comment = SpecialComment::FileLevelNoqa {
+        hint: hint.as_str().to_owned(),
+        codes,
+    };
+
+    Some((hint.range(), comment.as_str(), special_comment))
 }
 
-fn try_parse_fmt(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_fmt(text: &str) -> SpecialCommentDescriptor {
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^#\s*fmt:\s*(?<rest>on|off|skip)").unwrap());
+        LazyLock::new(|| Regex::new(r"^#\s*(?<hint>fmt):\s*(?<rest>on|off|skip)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Fmt)
 }
 
-fn try_parse_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_isort(text: &str) -> SpecialCommentDescriptor {
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^# isort:(?<rest>skip_file|skip)").unwrap());
+        LazyLock::new(|| Regex::new(r"^# (?<hint>isort):(?<rest>skip_file|skip)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Isort)
 }
 
-fn try_parse_mypy(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_mypy(text: &str) -> SpecialCommentDescriptor {
     // https://github.com/python/mypy/blob/3b00002acd/mypy/util.py#L228
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^# mypy:\s*(?<rest>\S+)").unwrap());
+        LazyLock::new(|| Regex::new(r"^# (?<hint>mypy):\s*(?<rest>\S)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Mypy)
 }
 
-fn try_parse_nopycln(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_nopycln(text: &str) -> SpecialCommentDescriptor {
     // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L18-L19
     // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L127
     // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L136
-    static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"(?i)^#\s*nopycln\s*:\s*(?<rest>file|import)").unwrap());
+    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^#\s*(?<hint>nopycln)\s*:\s*(?<rest>file|import)").unwrap()
+    });
 
     try_parse_common!(PATTERN, text, SpecialComment::Nopycln)
 }
 
-fn try_parse_pyright(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_pyright(text: &str) -> SpecialCommentDescriptor {
     // https://github.com/microsoft/pyright/blob/9d60c434c4/packages/pyright-internal/src/parser/tokenizer.ts#L1314
     // https://github.com/microsoft/pyright/blob/9d60c434c4/packages/pyright-internal/src/analyzer/commentUtils.ts#L138
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^#\s*pyright:\s*(?<rest>\S+)").unwrap());
+        LazyLock::new(|| Regex::new(r"^#\s*(?<hint>pyright):\s*(?<rest>\S)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Pyright)
 }
 
-fn try_parse_ruff_isort(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_ruff_isort(text: &str) -> SpecialCommentDescriptor {
     // ruff_linter::directives::extract_isort_directives
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^# ruff: isort: ?(?<rest>skip_file|skip)").unwrap());
+        LazyLock::new(|| Regex::new(r"^# (?<hint>ruff): isort: ?(?<rest>skip_file|skip)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::RuffIsort)
 }
 
-fn try_parse_type(text: &str) -> Option<(EndIndex, SpecialComment)> {
+fn try_parse_type(text: &str) -> SpecialCommentDescriptor {
     // https://github.com/python/cpython/blob/c222441fa7/Parser/lexer/lexer.c#L45-L47
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^#\s*type:\s*(?<rest>\S+)").unwrap());
+        LazyLock::new(|| Regex::new(r"^#\s*(?<hint>type):\s*(?<rest>\S)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::Type)
 }
 
+fn text_range(start: usize, end: usize) -> Option<TextRange> {
+    let Ok(start) = TextSize::try_from(start) else {
+        return None;
+    };
+    let Ok(end) = TextSize::try_from(end) else {
+        return None;
+    };
+
+    Some(TextRange::new(start, end))
+}
+
 macro_rules! parse_and_handle_comment {
-    ($parse:ident, $text:ident, $diagnostics:ident, $absolute_start_index:ident) => {
-        if let Some((relative_end_index, comment)) = $parse($text) {
-            let comment_text = &$text[..relative_end_index];
-            let absolute_end_index = $absolute_start_index + relative_end_index;
-
-            let Ok(start) = TryInto::<TextSize>::try_into($absolute_start_index) else {
+    ($parse:ident, $text:ident, $diagnostics:ident, $comment_start:ident) => {
+        if let Some((hint_relative_range, comment_text, comment)) = $parse($text) {
+            let comment_end = $comment_start + comment_text.len();
+            let Some(comment_range) = text_range($comment_start, comment_end) else {
                 return;
             };
-            let Ok(end) = TryInto::<TextSize>::try_into(absolute_end_index) else {
+
+            let hint_start = $comment_start + hint_relative_range.start;
+            let hint_end = $comment_start + hint_relative_range.end;
+            let Some(hint_range) = text_range(hint_start, hint_end) else {
                 return;
             };
-            let range = TextRange::new(start, end);
 
-            add_diagnostic_if_applicable($diagnostics, comment, comment_text, range);
+            add_diagnostic_if_applicable(
+                $diagnostics,
+                comment,
+                comment_text,
+                comment_range,
+                hint_range,
+            );
             return;
         }
     };
@@ -313,13 +343,11 @@ fn check_composite_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, range_
     for (char_index, char) in text.char_indices() {
         let next_char = text[char_index..].chars().nth(1);
 
-        if char != '#' || matches!(next_char, Some('#')) {
-            continue;
+        if char == '#' && !matches!(next_char, Some('#')) {
+            let subcomment_absolute_index = range_start + char_index;
+
+            check_single_comment(diagnostics, &text[char_index..], subcomment_absolute_index);
         }
-
-        let absolute_start_index = range_start + char_index;
-
-        check_single_comment(diagnostics, &text[char_index..], absolute_start_index);
     }
 }
 
@@ -343,7 +371,7 @@ mod tests {
 
     use super::{check_composite_comment, check_single_comment};
 
-    fn test_single(text: &str) -> Vec<Diagnostic> {
+    fn check_single(text: &str) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
         let start_index = 0;
 
@@ -352,7 +380,7 @@ mod tests {
         diagnostics
     }
 
-    fn test_composite(text: &str) -> Vec<Diagnostic> {
+    fn check_composite(text: &str) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
         let start_index = 0;
 
@@ -362,21 +390,21 @@ mod tests {
     }
 
     fn has_unformatted(text: &str) {
-        let diagnostics = test_single(text);
+        let diagnostics = check_single(text);
 
         assert_eq!(diagnostics.len(), 1);
     }
 
-    fn composite_has_unformatted(text: &str, count: usize) {
-        let diagnostics = test_composite(text);
-
-        assert_eq!(diagnostics.len(), count);
-    }
-
     fn no_unformatted(text: &str) {
-        let diagnostics = test_single(text);
+        let diagnostics = check_single(text);
 
         assert!(diagnostics.is_empty());
+    }
+
+    fn composite_has_unformatted(text: &str, count: usize) {
+        let diagnostics = check_composite(text);
+
+        assert_eq!(diagnostics.len(), count);
     }
 
     fn composite_no_unformatted(text: &str) {
@@ -512,7 +540,8 @@ mod tests {
     fn composite() {
         composite_no_unformatted("# type: ignore  # noqa: A123, B456");
 
-        composite_has_unformatted("#pyright:ignore# noqa:A123", 2);
+        composite_has_unformatted("#pyright:ignore#noqa:A123", 2);
+        composite_has_unformatted("# nopycln:file#   noqa: A123", 2);
         composite_has_unformatted("# noqa:A123 - Lorem ipsum dolor sit amet", 1);
     }
 }
