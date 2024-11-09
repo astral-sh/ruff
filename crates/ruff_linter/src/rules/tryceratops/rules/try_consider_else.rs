@@ -67,7 +67,9 @@ pub(crate) fn try_consider_else(
         if let Some(stmt) = body.last() {
             if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
                 if let Some(value) = value {
-                    if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
+                    if contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
+                        .is_yes()
+                    {
                         return;
                     }
                 }

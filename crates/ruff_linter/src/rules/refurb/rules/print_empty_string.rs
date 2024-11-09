@@ -249,7 +249,9 @@ impl EmptyStringFix {
                         return true;
                     }
 
-                    if contains_effect(&keyword.value, |id| semantic.has_builtin_binding(id)) {
+                    if contains_effect(&keyword.value, |id| semantic.has_builtin_binding(id))
+                        .is_yes()
+                    {
                         applicability = Applicability::Unsafe;
                     }
 

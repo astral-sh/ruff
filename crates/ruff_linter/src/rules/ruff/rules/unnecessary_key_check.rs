@@ -1,9 +1,9 @@
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::helpers::{contains_effect, Maybe};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
 
@@ -96,36 +96,48 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
-        || contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id))
-    {
-        return;
-    }
+    let applicability =
+        match contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id)).merge(
+            contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id)),
+        ) {
+            Maybe::Yes => return,
+            Maybe::Maybe => {
+                if checker.settings.preview.is_enabled() {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                }
+            }
+            Maybe::No => Applicability::Safe,
+        };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryKeyCheck, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        format!(
-            "{}.get({})",
-            checker.locator().slice(
-                parenthesized_range(
-                    obj_right.into(),
-                    right.into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                )
-                .unwrap_or(obj_right.range())
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(
+            format!(
+                "{}.get({})",
+                checker.locator().slice(
+                    parenthesized_range(
+                        obj_right.into(),
+                        right.into(),
+                        checker.comment_ranges(),
+                        checker.locator().contents(),
+                    )
+                    .unwrap_or(obj_right.range())
+                ),
+                checker.locator().slice(
+                    parenthesized_range(
+                        key_right.into(),
+                        right.into(),
+                        checker.comment_ranges(),
+                        checker.locator().contents(),
+                    )
+                    .unwrap_or(key_right.range())
+                ),
             ),
-            checker.locator().slice(
-                parenthesized_range(
-                    key_right.into(),
-                    right.into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                )
-                .unwrap_or(key_right.range())
-            ),
+            expr.range(),
         ),
-        expr.range(),
-    )));
+        applicability,
+    ));
     checker.diagnostics.push(diagnostic);
 }

@@ -186,7 +186,8 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
                 if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
                     && !contains_effect(test_node, |id| {
                         checker.semantic().has_builtin_binding(id)
-                    }) =>
+                    })
+                    .is_yes() =>
             {
                 let target_var = &body_target;
                 let binary = assignment_binary_or(target_var, body_value, else_value);
@@ -201,7 +202,8 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
                         && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
                 })) && !contains_effect(test_node, |id| {
                     checker.semantic().has_builtin_binding(id)
-                }) =>
+                })
+                .is_yes() =>
             {
                 let target_var = &body_target;
                 let binary = assignment_binary_and(target_var, body_value, else_value);
