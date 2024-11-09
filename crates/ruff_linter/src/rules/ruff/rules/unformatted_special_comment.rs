@@ -309,6 +309,20 @@ fn check_single_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, start_ind
     parse_and_handle_comment!(try_parse_type, text, diagnostics, start_index);
 }
 
+fn check_composite_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, range_start: usize) {
+    for (char_index, char) in text.char_indices() {
+        let next_char = text[char_index..].chars().nth(1);
+
+        if char != '#' || matches!(next_char, Some('#')) {
+            continue;
+        }
+
+        let absolute_start_index = range_start + char_index;
+
+        check_single_comment(diagnostics, &text[char_index..], absolute_start_index);
+    }
+}
+
 /// RUF104
 pub(crate) fn unformatted_special_comment(
     diagnostics: &mut Vec<Diagnostic>,
@@ -319,17 +333,7 @@ pub(crate) fn unformatted_special_comment(
         let text = locator.slice(range);
         let range_start: usize = range.start().into();
 
-        for (char_index, char) in text.char_indices() {
-            let next_char = text[char_index..].chars().next();
-
-            if char != '#' || matches!(next_char, Some('#')) {
-                continue;
-            }
-
-            let absolute_start_index = range_start + char_index;
-
-            check_single_comment(diagnostics, &text[char_index..], absolute_start_index);
-        }
+        check_composite_comment(diagnostics, text, range_start);
     }
 }
 
@@ -337,9 +341,9 @@ pub(crate) fn unformatted_special_comment(
 mod tests {
     use ruff_diagnostics::Diagnostic;
 
-    use super::check_single_comment;
+    use super::{check_composite_comment, check_single_comment};
 
-    fn test(text: &str) -> Vec<Diagnostic> {
+    fn test_single(text: &str) -> Vec<Diagnostic> {
         let mut diagnostics = vec![];
         let start_index = 0;
 
@@ -348,16 +352,35 @@ mod tests {
         diagnostics
     }
 
-    fn has_unformatted(text: &str) {
-        let diagnostics = test(text);
+    fn test_composite(text: &str) -> Vec<Diagnostic> {
+        let mut diagnostics = vec![];
+        let start_index = 0;
 
-        assert!(!diagnostics.is_empty());
+        check_composite_comment(&mut diagnostics, text, start_index);
+
+        diagnostics
+    }
+
+    fn has_unformatted(text: &str) {
+        let diagnostics = test_single(text);
+
+        assert_eq!(diagnostics.len(), 1);
+    }
+
+    fn composite_has_unformatted(text: &str, count: usize) {
+        let diagnostics = test_composite(text);
+
+        assert_eq!(diagnostics.len(), count);
     }
 
     fn no_unformatted(text: &str) {
-        let diagnostics = test(text);
+        let diagnostics = test_single(text);
 
         assert!(diagnostics.is_empty());
+    }
+
+    fn composite_no_unformatted(text: &str) {
+        composite_has_unformatted(text, 0);
     }
 
     #[test]
@@ -487,7 +510,9 @@ mod tests {
 
     #[test]
     fn composite() {
-        has_unformatted("# type: ignore  # noqa:A123");
-        has_unformatted("# noqa:A123 - Lorem ipsum dolor sit amet");
+        composite_no_unformatted("# type: ignore  # noqa: A123, B456");
+
+        composite_has_unformatted("#pyright:ignore# noqa:A123", 2);
+        composite_has_unformatted("# noqa:A123 - Lorem ipsum dolor sit amet", 1);
     }
 }
