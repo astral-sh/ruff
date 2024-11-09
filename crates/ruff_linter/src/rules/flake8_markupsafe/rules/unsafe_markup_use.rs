@@ -74,24 +74,25 @@ pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
     {
         return;
     }
+
     if !is_unsafe_call(call) {
         return;
     }
-    if let Some(name) = checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .and_then(|qualified_name| {
-            if is_markup_call(&qualified_name, checker.settings) {
-                Some(qualified_name.to_string())
-            } else {
-                None
-            }
-        })
-    {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UnsafeMarkupUse { name }, call.range()));
+
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
+        return;
+    };
+
+    if !is_markup_call(&qualified_name, checker.settings) {
+        return;
     }
+
+    checker.diagnostics.push(Diagnostic::new(
+        UnsafeMarkupUse {
+            name: qualified_name.to_string(),
+        },
+        call.range(),
+    ));
 }
 
 fn is_markup_call(qualified_name: &QualifiedName, settings: &LinterSettings) -> bool {
