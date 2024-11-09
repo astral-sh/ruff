@@ -103,7 +103,7 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
     // Traverse the union a second time to construct the fix.
     let mut flat_nodes: Vec<&Expr> = Vec::new();
 
-    let mut union_type = UnionLike::TypingUnion;
+    let mut union_type = UnionKind::TypingUnion;
     let mut remove_numeric_type = |expr: &'a Expr, parent: &'a Expr| {
         let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
             // Keep type annotations that are not numeric.
@@ -112,7 +112,7 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
         };
 
         if matches!(parent, Expr::BinOp(_)) {
-            union_type = UnionLike::BinOp;
+            union_type = UnionKind::PEP604;
         }
 
         // `int` is always dropped, since `float` or `complex` must be present.
@@ -132,8 +132,8 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
         generate_single_fix(checker, fix_expr, annotation)
     } else {
         match union_type {
-            UnionLike::BinOp => generate_bit_or_fix(checker, flat_nodes, annotation),
-            UnionLike::TypingUnion => generate_union_fix(checker, flat_nodes, annotation)
+            UnionKind::PEP604 => generate_bit_or_fix(checker, flat_nodes, annotation),
+            UnionKind::TypingUnion => generate_union_fix(checker, flat_nodes, annotation)
                 .ok()
                 .unwrap(),
         }
@@ -191,11 +191,11 @@ impl NumericFlags {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum UnionLike {
+enum UnionKind {
     /// E.g., `typing.Union[int, str]`
     TypingUnion,
     /// E.g., `int | str`
-    BinOp,
+    PEP604,
 }
 
 // Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
