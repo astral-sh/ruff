@@ -484,4 +484,10 @@ mod tests {
         has_unformatted("# ruff: noqa: A123\tB456");
         has_unformatted("# flake8: noqa: A123   B456");
     }
+
+    #[test]
+    fn composite() {
+        has_unformatted("# type: ignore  # noqa:A123");
+        has_unformatted("# noqa:A123 - Lorem ipsum dolor sit amet");
+    }
 }
