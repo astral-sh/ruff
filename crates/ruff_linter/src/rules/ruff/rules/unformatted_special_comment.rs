@@ -50,7 +50,8 @@ impl SpecialComment {
             SpecialComment::FileLevelNoqa { hint, codes: None } => format!("# {hint}: noqa"),
 
             SpecialComment::FileLevelNoqa {
-                hint, codes: Some(codes)
+                hint,
+                codes: Some(codes),
             } if codes.is_empty() => format!("# {hint}: noqa:"),
 
             SpecialComment::FileLevelNoqa {
@@ -150,8 +151,7 @@ macro_rules! try_parse_common {
 
 fn try_parse_noqa(text: &str) -> SpecialCommentDescriptor {
     fn parse_code_list(code_list: &str) -> Vec<String> {
-        static PATTERN: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"[A-Z]+[0-9]+").unwrap());
+        static PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[A-Z]+[0-9]+").unwrap());
 
         PATTERN
             .find_iter(code_list)
