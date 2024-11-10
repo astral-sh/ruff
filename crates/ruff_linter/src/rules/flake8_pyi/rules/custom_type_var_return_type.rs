@@ -372,7 +372,7 @@ fn remove_typevar_declaration(type_params: Option<&TypeParams>, name: &str) -> O
             return typevar.name.as_str() == name;
         };
 
-        return false;
+        false
     };
 
     let parameter_list = type_params?;
@@ -383,22 +383,19 @@ fn remove_typevar_declaration(type_params: Option<&TypeParams>, name: &str) -> O
         return Some(Edit::range_deletion(parameter_list.range));
     }
 
-    let Some((index, ..)) = parameters.iter().find_position(is_declaration_in_question) else {
-        return None;
-    };
+    let (index, ..) = parameters
+        .iter()
+        .find_position(is_declaration_in_question)?;
 
     let typevar_range = parameters[index].as_type_var().unwrap().range();
     let last_index = parameters.len() - 1;
 
-    let range = match (0..last_index).contains(&index) {
-        true => {
-            let next_range = parameters[index + 1].range();
-            TextRange::new(typevar_range.start(), next_range.start())
-        }
-        false => {
-            let previous_range = parameters[index - 1].range();
-            TextRange::new(previous_range.end(), typevar_range.start())
-        }
+    let range = if (0..last_index).contains(&index) {
+        let next_range = parameters[index + 1].range();
+        TextRange::new(typevar_range.start(), next_range.start())
+    } else {
+        let previous_range = parameters[index - 1].range();
+        TextRange::new(previous_range.end(), typevar_range.start())
     };
 
     Some(Edit::range_deletion(range))
