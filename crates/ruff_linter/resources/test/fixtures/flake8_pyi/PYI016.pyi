@@ -99,3 +99,9 @@ field29: typing.Union[int, typing.Union[typing.Union[int, int]]]  # Error
 
 # Should emit once in cases with multiple nested `typing.Union`
 field30: typing.Union[int, typing.Union[typing.Union[int, str]]]  # Error
+
+# Should emit once, and fix to `typing.Union[float, int]`
+field31: typing.Union[float, typing.Union[int | int]]  # Error
+
+# Should emit once, and fix to `typing.Union[float, int]`
+field32: typing.Union[float, typing.Union[int | int | int]]  # Error
