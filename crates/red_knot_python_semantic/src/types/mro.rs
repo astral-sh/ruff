@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 use std::ops::Deref;
 
-use indexmap::IndexSet;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
@@ -26,21 +25,29 @@ impl<'db> Mro<'db> {
     /// (We emit a diagnostic warning about the runtime `TypeError` in
     /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
     pub(super) fn of_class(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroError<'db>> {
-        Self::of_class_impl(db, class).map_err(|error_kind| {
-            let fallback_mro = Self::from([
-                ClassBase::Class(class),
-                ClassBase::Unknown,
-                ClassBase::object(db),
-            ]);
-            MroError {
-                kind: error_kind,
-                fallback_mro,
-            }
+        Self::of_class_impl(db, class).map_err(|error_kind| MroError {
+            kind: error_kind,
+            fallback_mro: Self::from_error(db, class),
         })
+    }
+
+    pub(super) fn from_error(db: &'db dyn Db, class: Class<'db>) -> Self {
+        Self::from([
+            ClassBase::Class(class),
+            ClassBase::Unknown,
+            ClassBase::object(db),
+        ])
     }
 
     fn of_class_impl(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroErrorKind<'db>> {
         let class_bases = class.explicit_bases(db);
+
+        if !class_bases.is_empty() && class.is_cyclically_defined(db) {
+            // We emit errors for cyclically defined classes elsewhere.
+            // It's important that we don't even try to infer the MRO for a cyclically defined class,
+            // or we'll end up in an infinite loop.
+            return Ok(Mro::from_error(db, class));
+        }
 
         match class_bases {
             // `builtins.object` is the special case:
@@ -77,11 +84,6 @@ impl<'db> Mro<'db> {
                         Err(MroErrorKind::InvalidBases(bases_info))
                     },
                     |single_base| {
-                        if let ClassBase::Class(class_base) = single_base {
-                            if class_is_cyclically_defined(db, class_base) {
-                                return Err(MroErrorKind::CyclicClassDefinition);
-                            }
-                        }
                         let mro = std::iter::once(ClassBase::Class(class))
                             .chain(single_base.mro(db))
                             .collect();
@@ -96,10 +98,6 @@ impl<'db> Mro<'db> {
             // what MRO Python will give this class at runtime
             // (if an MRO is indeed resolvable at all!)
             multiple_bases => {
-                if class_is_cyclically_defined(db, class) {
-                    return Err(MroErrorKind::CyclicClassDefinition);
-                }
-
                 let mut valid_bases = vec![];
                 let mut invalid_bases = vec![];
 
@@ -282,13 +280,6 @@ pub(super) enum MroErrorKind<'db> {
     /// Each index is the index of a node representing an invalid base.
     InvalidBases(Box<[(usize, Type<'db>)]>),
 
-    /// The class inherits from itself!
-    ///
-    /// This is very unlikely to happen in working real-world code,
-    /// but it's important to explicitly account for it.
-    /// If we don't, there's a possibility of an infinite loop and a panic.
-    CyclicClassDefinition,
-
     /// The class has one or more duplicate bases.
     ///
     /// This variant records the indices and [`Class`]es
@@ -381,6 +372,7 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_) => None,
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::Literal => None,
+                KnownInstanceType::TypeVar(_) => None,
             },
         }
     }
@@ -414,7 +406,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
             ClassBase::Any => Type::Any,
             ClassBase::Todo => Type::Todo,
             ClassBase::Unknown => Type::Unknown,
-            ClassBase::Class(class) => Type::ClassLiteral(ClassLiteralType { class }),
+            ClassBase::Class(class) => Type::class_literal(class),
         }
     }
 }
@@ -459,47 +451,4 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
             }
         }
     }
-}
-
-/// Return `true` if this class appears to be a cyclic definition,
-/// i.e., it inherits either directly or indirectly from itself.
-///
-/// A class definition like this will fail at runtime,
-/// but we must be resilient to it or we could panic.
-fn class_is_cyclically_defined(db: &dyn Db, class: Class) -> bool {
-    fn is_cyclically_defined_recursive<'db>(
-        db: &'db dyn Db,
-        class: Class<'db>,
-        classes_to_watch: &mut IndexSet<Class<'db>>,
-    ) -> bool {
-        if !classes_to_watch.insert(class) {
-            return true;
-        }
-        for explicit_base_class in class
-            .explicit_bases(db)
-            .iter()
-            .copied()
-            .filter_map(Type::into_class_literal)
-            .map(|ClassLiteralType { class }| class)
-        {
-            // Each base must be considered in isolation.
-            // This is due to the fact that if a class uses multiple inheritance,
-            // there could easily be a situation where two bases have the same class in their MROs;
-            // that isn't enough to constitute the class being cyclically defined.
-            let classes_to_watch_len = classes_to_watch.len();
-            if is_cyclically_defined_recursive(db, explicit_base_class, classes_to_watch) {
-                return true;
-            }
-            classes_to_watch.truncate(classes_to_watch_len);
-        }
-        false
-    }
-
-    class
-        .explicit_bases(db)
-        .iter()
-        .copied()
-        .filter_map(Type::into_class_literal)
-        .map(|ClassLiteralType { class }| class)
-        .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::default()))
 }

@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF013_4.py:15:61: RUF013 [*] PEP 484 prohibits implicit `Optional`
+   |
+15 | def multiple_2(arg1: Optional, arg2: Optional = None, arg3: int = None): ...
+   |                                                             ^^^ RUF013
+   |
+   = help: Convert to `T | None`
+
+ℹ Unsafe fix
+12 12 | def multiple_1(arg1: Optional, arg2: Optional = None): ...
+13 13 | 
+14 14 | 
+15    |-def multiple_2(arg1: Optional, arg2: Optional = None, arg3: int = None): ...
+   15 |+def multiple_2(arg1: Optional, arg2: Optional = None, arg3: int | None = None): ...
+16 16 | 
+17 17 | 
+18 18 | def return_type(arg: Optional = None) -> Optional: ...

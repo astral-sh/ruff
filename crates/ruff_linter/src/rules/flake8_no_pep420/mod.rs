@@ -8,8 +8,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
     use crate::registry::Rule;
+
+    use crate::assert_messages;
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
 
@@ -22,7 +23,7 @@ mod tests {
     #[test_case(Path::new("test_pass_pyi"), Path::new("example.pyi"))]
     #[test_case(Path::new("test_pass_script"), Path::new("script"))]
     #[test_case(Path::new("test_pass_shebang"), Path::new("example.py"))]
-    fn test_flake8_no_pep420(path: &Path, filename: &Path) -> Result<()> {
+    fn default(path: &Path, filename: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let p = PathBuf::from(format!(
             "flake8_no_pep420/{}/{}",

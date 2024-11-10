@@ -48,7 +48,7 @@ FURB189.py:20:9: FURB189 [*] Subclassing `list` can be error prone, use `collect
 22 22 | 
 23 23 | class S(str):
 
-FURB189.py:23:9: FURB189 [*] Subclassing `str` can be error prone, use `collections.UserStr` instead
+FURB189.py:23:9: FURB189 [*] Subclassing `str` can be error prone, use `collections.UserString` instead
    |
 21 |     pass
 22 | 
@@ -56,13 +56,13 @@ FURB189.py:23:9: FURB189 [*] Subclassing `str` can be error prone, use `collecti
    |         ^^^ FURB189
 24 |     pass
    |
-   = help: Replace with `collections.UserStr`
+   = help: Replace with `collections.UserString`
 
 ℹ Unsafe fix
 1  1  | # setup
 2  2  | from enum import Enum, EnumMeta
 3     |-from collections import UserList as UL
-   3  |+from collections import UserList as UL, UserStr
+   3  |+from collections import UserList as UL, UserString
 4  4  | 
 5  5  | class SetOnceMappingMixin:
 6  6  |     __slots__ = ()
@@ -71,7 +71,7 @@ FURB189.py:23:9: FURB189 [*] Subclassing `str` can be error prone, use `collecti
 21 21 |     pass
 22 22 | 
 23    |-class S(str):
-   23 |+class S(UserStr):
+   23 |+class S(UserString):
 24 24 |     pass
 25 25 | 
 26 26 | # currently not detected

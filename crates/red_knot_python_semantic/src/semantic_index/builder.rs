@@ -373,6 +373,11 @@ impl<'db> SemanticIndexBuilder<'db> {
                 if let Some(default) = default {
                     self.visit_expr(default);
                 }
+                match type_param {
+                    ast::TypeParam::TypeVar(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::ParamSpec(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::TypeVarTuple(node) => self.add_definition(symbol, node),
+                };
             }
         }
 

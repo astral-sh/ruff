@@ -10,7 +10,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// ## Why is this bad?
 /// Subclassing `dict`, `list`, or `str` objects can be error prone, use the
-/// `UserDict`, `UserList`, and `UserStr` objects from the `collections` module
+/// `UserDict`, `UserList`, and `UserString` objects from the `collections` module
 /// instead.
 ///
 /// ## Example
@@ -124,7 +124,7 @@ impl SupportedBuiltins {
         match self {
             SupportedBuiltins::Dict => "UserDict",
             SupportedBuiltins::List => "UserList",
-            SupportedBuiltins::Str => "UserStr",
+            SupportedBuiltins::Str => "UserString",
         }
     }
 }

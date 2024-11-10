@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use itertools::{EitherOrBoth, Itertools};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -13,12 +11,12 @@ use ruff_python_trivia::{leading_indentation, textwrap::indent, PythonWhitespace
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::line_width::LineWidthBuilder;
-use crate::settings::LinterSettings;
-use crate::Locator;
-
 use super::super::block::Block;
 use super::super::{comments, format_imports};
+use crate::line_width::LineWidthBuilder;
+use crate::package::PackageRoot;
+use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// ## What it does
 /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
@@ -87,7 +85,7 @@ pub(crate) fn organize_imports(
     stylist: &Stylist,
     indexer: &Indexer,
     settings: &LinterSettings,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     tokens: &Tokens,
 ) -> Option<Diagnostic> {
