@@ -1,6 +1,6 @@
 //! Rules from [isort](https://pypi.org/project/isort/).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use annotate::annotate_imports;
 use block::{Block, Trailer};
@@ -18,6 +18,7 @@ use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, ImportBlock, TrailingComma};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
+use crate::package::PackageRoot;
 use crate::settings::types::PythonVersion;
 use crate::Locator;
 
@@ -71,7 +72,7 @@ pub(crate) fn format_imports(
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     target_version: PythonVersion,
     settings: &Settings,
@@ -155,7 +156,7 @@ fn format_import_block(
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     target_version: PythonVersion,
     settings: &Settings,
 ) -> String {

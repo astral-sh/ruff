@@ -24,6 +24,7 @@ use ruff_text_size::Ranged;
 use crate::fix::{fix_file, FixResult};
 use crate::linter::check_path;
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
+use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::settings::types::UnsafeFixes;
@@ -122,7 +123,8 @@ pub(crate) fn test_contents<'a>(
     let diagnostics = check_path(
         path,
         path.parent()
-            .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
+            .and_then(|parent| detect_package_root(parent, &settings.namespace_packages))
+            .map(|path| PackageRoot::Root { path }),
         &locator,
         &stylist,
         &indexer,

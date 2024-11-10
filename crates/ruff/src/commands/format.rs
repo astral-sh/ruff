@@ -18,6 +18,7 @@ use tracing::debug;
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::{DisplayParseError, LogLevel};
+use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
@@ -136,7 +137,9 @@ pub(crate) fn format(
                         .parent()
                         .and_then(|parent| package_roots.get(parent).copied())
                         .flatten();
-                    let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
+                    let cache_root = package
+                        .map(PackageRoot::path)
+                        .unwrap_or_else(|| path.parent().unwrap_or(path));
                     let cache = caches.get(cache_root);
 
                     Some(
