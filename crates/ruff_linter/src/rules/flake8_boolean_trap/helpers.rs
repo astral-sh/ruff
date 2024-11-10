@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::is_known_dunder_method;
 use crate::settings::LinterSettings;
 
 /// Returns `true` if a function call is allowed to use a boolean trap.
@@ -68,21 +69,7 @@ pub(super) fn is_user_allowed_func_call(
 
 /// Returns `true` if a function definition is allowed to use a boolean trap.
 pub(super) fn is_allowed_func_def(name: &str) -> bool {
-    matches!(
-        name,
-        "__setitem__"
-            | "__post_init__"
-            // exclude boolean operators
-            | "__and__"
-            | "__rand__"
-            | "__iand__"
-            | "__or__"
-            | "__ror__"
-            | "__ior__"
-            | "__xor__"
-            | "__rxor__"
-            | "__ixor__"
-    )
+    is_known_dunder_method(name)
 }
 
 /// Returns `true` if an argument is allowed to use a boolean trap. To return
