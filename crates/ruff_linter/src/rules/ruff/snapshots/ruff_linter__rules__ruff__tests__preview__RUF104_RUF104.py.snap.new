@@ -1,6 +1,0 @@
----
-source: crates/ruff_linter/src/rules/ruff/mod.rs
-assertion_line: 401
-snapshot_kind: text
----
-
