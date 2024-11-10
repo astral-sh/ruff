@@ -1266,6 +1266,7 @@ impl<'a> SemanticModel<'a> {
             "anyio" => self.seen.insert(Modules::ANYIO),
             "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
+            "copy" => self.seen.insert(Modules::COPY),
             "contextvars" => self.seen.insert(Modules::CONTEXTVARS),
             "dataclasses" => self.seen.insert(Modules::DATACLASSES),
             "datetime" => self.seen.insert(Modules::DATETIME),
@@ -1856,6 +1857,7 @@ bitflags! {
         const CONTEXTVARS = 1 << 19;
         const ANYIO = 1 << 20;
         const FASTAPI = 1 << 21;
+        const COPY = 1 << 22;
     }
 }
 

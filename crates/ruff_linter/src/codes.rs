@@ -283,6 +283,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0642") => (RuleGroup::Stable, rules::pylint::rules::SelfOrClsAssignment),
         (Pylint, "W0711") => (RuleGroup::Stable, rules::pylint::rules::BinaryOpException),
         (Pylint, "W1501") => (RuleGroup::Stable, rules::pylint::rules::BadOpenMode),
+        (Pylint, "W1507") => (RuleGroup::Preview, rules::pylint::rules::ShallowCopyEnviron),
         (Pylint, "W1508") => (RuleGroup::Stable, rules::pylint::rules::InvalidEnvvarDefault),
         (Pylint, "W1509") => (RuleGroup::Stable, rules::pylint::rules::SubprocessPopenPreexecFn),
         (Pylint, "W1510") => (RuleGroup::Stable, rules::pylint::rules::SubprocessRunWithoutCheck),
