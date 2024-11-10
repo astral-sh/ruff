@@ -13,6 +13,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
+use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
@@ -87,7 +88,9 @@ pub(crate) fn check(
                     return None;
                 }
 
-                let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
+                let cache_root = package
+                    .map(PackageRoot::path)
+                    .unwrap_or_else(|| path.parent().unwrap_or(path));
                 let cache = caches.get(cache_root);
 
                 lint_path(
@@ -181,7 +184,7 @@ pub(crate) fn check(
 #[allow(clippy::too_many_arguments)]
 fn lint_path(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,

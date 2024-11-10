@@ -3,7 +3,14 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
+use crate::{
+    edit::{NotebookRange, ToRangeExt},
+    resolve::is_document_excluded,
+    session::DocumentQuery,
+    PositionEncoding, DIAGNOSTIC_NAME,
+};
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
+use ruff_linter::package::PackageRoot;
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
@@ -20,13 +27,6 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::ParseError;
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
-
-use crate::{
-    edit::{NotebookRange, ToRangeExt},
-    resolve::is_document_excluded,
-    session::DocumentQuery,
-    PositionEncoding, DIAGNOSTIC_NAME,
-};
 
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -89,6 +89,7 @@ pub(crate) fn check(
                 .expect("a path to a document should have a parent path"),
             &linter_settings.namespace_packages,
         )
+        .map(PackageRoot::root)
     } else {
         None
     };

@@ -20,6 +20,7 @@ use tempfile::NamedTempFile;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_linter::message::{DiagnosticMessage, Message};
+use ruff_linter::package::PackageRoot;
 use ruff_linter::{warn_user, VERSION};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
@@ -497,7 +498,7 @@ pub(crate) struct PackageCacheMap<'a>(FxHashMap<&'a Path, Cache>);
 
 impl<'a> PackageCacheMap<'a> {
     pub(crate) fn init(
-        package_roots: &FxHashMap<&'a Path, Option<&'a Path>>,
+        package_roots: &FxHashMap<&'a Path, Option<PackageRoot<'a>>>,
         resolver: &Resolver,
     ) -> Self {
         fn init_cache(path: &Path) {
@@ -513,7 +514,9 @@ impl<'a> PackageCacheMap<'a> {
         Self(
             package_roots
                 .iter()
-                .map(|(package, package_root)| package_root.unwrap_or(package))
+                .map(|(package, package_root)| {
+                    package_root.map(PackageRoot::path).unwrap_or(package)
+                })
                 .unique()
                 .par_bridge()
                 .map(|cache_root| {
@@ -587,6 +590,7 @@ mod tests {
 
     use ruff_cache::CACHE_DIR_NAME;
     use ruff_linter::message::Message;
+    use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_python_ast::PySourceType;
@@ -641,7 +645,7 @@ mod tests {
 
                 let diagnostics = lint_path(
                     &path,
-                    Some(&package_root),
+                    Some(PackageRoot::root(&package_root)),
                     &settings.linter,
                     Some(&cache),
                     flags::Noqa::Enabled,
@@ -683,7 +687,7 @@ mod tests {
         for path in paths {
             got_diagnostics += lint_path(
                 &path,
-                Some(&package_root),
+                Some(PackageRoot::root(&package_root)),
                 &settings.linter,
                 Some(&cache),
                 flags::Noqa::Enabled,
@@ -1056,7 +1060,7 @@ mod tests {
         ) -> Result<Diagnostics, anyhow::Error> {
             lint_path(
                 &self.package_root.join(path),
-                Some(&self.package_root),
+                Some(PackageRoot::root(&self.package_root)),
                 &self.settings.linter,
                 Some(cache),
                 flags::Noqa::Enabled,
