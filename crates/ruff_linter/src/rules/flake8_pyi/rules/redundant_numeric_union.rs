@@ -155,9 +155,13 @@ enum Redundancy {
 impl Redundancy {
     pub(super) fn from_numeric_flags(numeric_flags: NumericFlags) -> Option<Self> {
         match numeric_flags.bits() {
-            0b0110 => Some(Self::FloatComplex),
+            // NumericFlags::INT | NumericFlags::FLOAT | NumericFlags::COMPLEX
             0b0111 => Some(Self::IntFloatComplex),
+            // NumericFlags::FLOAT | NumericFlags::COMPLEX
+            0b0110 => Some(Self::FloatComplex),
+            // NumericFlags::INT | NumericFlags::COMPLEX
             0b0101 => Some(Self::IntComplex),
+            // NumericFlags::INT | NumericFlags::FLOAT
             0b0011 => Some(Self::IntFloat),
             _ => None,
         }
@@ -168,11 +172,11 @@ bitflags! {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub(super) struct NumericFlags: u8 {
         /// `int`
-        const INT = 0b0001;
+        const INT = 1 << 0;
         /// `float`
-        const FLOAT = 0b0010;
+        const FLOAT = 1 << 1;
         /// `complex`
-        const COMPLEX = 0b0100;
+        const COMPLEX = 1 << 2;
     }
 }
 
