@@ -817,6 +817,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BadStrStripCall) {
                 pylint::rules::bad_str_strip_call(checker, func, args);
             }
+            if checker.enabled(Rule::ShallowCopyEnviron) {
+                pylint::rules::shallow_copy_environ(checker, call);
+            }
             if checker.enabled(Rule::InvalidEnvvarDefault) {
                 pylint::rules::invalid_envvar_default(checker, call);
             }

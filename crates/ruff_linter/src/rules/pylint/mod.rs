@@ -105,6 +105,7 @@ mod tests {
         Rule::InvalidCharacterBackspace,
         Path::new("invalid_characters_syntax_error.py")
     )]
+    #[test_case(Rule::ShallowCopyEnviron, Path::new("shallow_copy_environ.py"))]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
     #[test_case(Rule::IterationOverSet, Path::new("iteration_over_set.py"))]
