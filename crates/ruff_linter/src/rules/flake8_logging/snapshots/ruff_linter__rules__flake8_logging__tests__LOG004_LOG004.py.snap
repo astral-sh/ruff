@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
+snapshot_kind: text
+---
+LOG004.py:3:1: LOG004 [*] Use of `logging.exception` outside exception handler
+  |
+1 | import logging
+2 | 
+3 | logging.exception("foo")  # LOG004
+  | ^^^^^^^^^^^^^^^^^ LOG004
+4 | logging.info("shouldnt_be_found")  # OK
+5 | try:
+  |
+  = help: Replace `logging.exception` with `logging.error`
+
+ℹ Safe fix
+1 1 | import logging
+2 2 | 
+3   |-logging.exception("foo")  # LOG004
+  3 |+logging.error("foo")  # LOG004
+4 4 | logging.info("shouldnt_be_found")  # OK
+5 5 | try:
+6 6 |     logging.exception("bar")  # LOG004
+
+LOG004.py:6:5: LOG004 [*] Use of `logging.exception` outside exception handler
+  |
+4 | logging.info("shouldnt_be_found")  # OK
+5 | try:
+6 |     logging.exception("bar")  # LOG004
+  |     ^^^^^^^^^^^^^^^^^ LOG004
+7 |     logging.info("baz")  # OK
+8 |     _ = 1 / 0
+  |
+  = help: Replace `logging.exception` with `logging.error`
+
+ℹ Safe fix
+3 3 | logging.exception("foo")  # LOG004
+4 4 | logging.info("shouldnt_be_found")  # OK
+5 5 | try:
+6   |-    logging.exception("bar")  # LOG004
+  6 |+    logging.error("bar")  # LOG004
+7 7 |     logging.info("baz")  # OK
+8 8 |     _ = 1 / 0
+9 9 | except ZeroDivisionError:
+
+LOG004.py:14:9: LOG004 [*] Use of `logging.exception` outside exception handler
+   |
+13 |     def handle():
+14 |         logging.exception("qux")  # LOG004
+   |         ^^^^^^^^^^^^^^^^^ LOG004
+   |
+   = help: Replace `logging.exception` with `logging.error`
+
+ℹ Safe fix
+11 11 |     logging.info("baz")  # OK
+12 12 | 
+13 13 |     def handle():
+14    |-        logging.exception("qux")  # LOG004
+   14 |+        logging.error("qux")  # LOG004

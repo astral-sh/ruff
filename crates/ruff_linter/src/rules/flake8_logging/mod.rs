@@ -15,6 +15,7 @@ mod tests {
 
     #[test_case(Rule::DirectLoggerInstantiation, Path::new("LOG001.py"))]
     #[test_case(Rule::InvalidGetLoggerArgument, Path::new("LOG002.py"))]
+    #[test_case(Rule::ExceptionOutsideExcept, Path::new("LOG004.py"))]
     #[test_case(Rule::ExceptionWithoutExcInfo, Path::new("LOG007.py"))]
     #[test_case(Rule::UndocumentedWarn, Path::new("LOG009.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
