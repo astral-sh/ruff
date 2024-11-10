@@ -2932,7 +2932,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // https://docs.python.org/3/reference/datamodel.html#object.__len__
                     // The type returned by len must be able to be interpreted as integer
 
-                    if matches!(len_rt, Type::BooleanLiteral(_) | Type::IntLiteral(_)) {
+                    if len_rt.is_subtype_of(
+                        self.db,
+                        KnownClass::Int.to_class(self.db).to_instance(self.db),
+                    ) {
                         len_rt.bool(self.db)
                     } else {
                         self.diagnostics.add(
