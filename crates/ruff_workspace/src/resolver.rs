@@ -149,8 +149,8 @@ impl<'a> Resolver<'a> {
     fn add(&mut self, path: &Path, settings: Settings) {
         self.settings.push(settings);
 
-        // normalize the path to use `/` separators and escape the '{' and '}' characters,
-        // which matchit uses for routing parameters
+        // Normalize the path to use `/` separators and escape the '{' and '}' characters,
+        // which matchit uses for routing parameters.
         let path = path.to_slash_lossy().replace('{', "{{").replace('}', "}}");
 
         match self
@@ -231,13 +231,13 @@ impl<'a> Resolver<'a> {
             .values()
             .flatten()
             .copied()
-            .map(ruff_linter::package::PackageRoot::path)
+            .map(PackageRoot::path)
             .collect::<BTreeSet<_>>()
         {
-            let Some(root_str) = root.to_str() else {
-                continue;
-            };
-            if let Ok(matched) = router.at_mut(root_str) {
+            // Normalize the path to use `/` separators and escape the '{' and '}' characters,
+            // which matchit uses for routing parameters.
+            let path = root.to_slash_lossy().replace('{', "{{").replace('}', "}}");
+            if let Ok(matched) = router.at_mut(&path) {
                 debug!(
                     "Ignoring nested package root: {} (under {})",
                     root.display(),
@@ -246,7 +246,7 @@ impl<'a> Resolver<'a> {
                 package_roots.insert(root, Some(PackageRoot::nested(root)));
                 non_roots.insert(root);
             } else {
-                let _ = router.insert(format!("{root_str}/{{*filepath}}"), root);
+                let _ = router.insert(format!("{path}/{{*filepath}}"), root);
             }
         }
 
