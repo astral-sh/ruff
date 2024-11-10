@@ -13,6 +13,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
 /// as determined by the presence of a `bool` type hint.
+/// Dunder methods that define operators are exempt from this rule.
 ///
 /// ## Why is this bad?
 /// Calling a function with boolean positional arguments is confusing as the
@@ -93,6 +94,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
+/// - [operator module](https://docs.python.org/3/library/operator.html)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]

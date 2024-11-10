@@ -68,7 +68,8 @@ pub(super) fn is_user_allowed_func_call(
 
 /// Returns `true` if a function defines a binary operator.
 /// This only includes operators, i.e. functions that are usually not called directly.
-pub(super) fn is_binary_operator_method(name: &str) -> bool {
+/// See: <https://docs.python.org/3/library/operator.html>
+pub(super) fn is_operator_method(name: &str) -> bool {
     matches!(
         name,
         "__contains__"  // in
@@ -135,12 +136,16 @@ pub(super) fn is_binary_operator_method(name: &str) -> bool {
             | "__le__"  // <=
             | "__eq__"  // ==
             | "__ne__" // !=
+            // unary operators (included for completeness)
+            | "__pos__"  // +
+            | "__neg__"  // -
+            | "__invert__" // ~
     )
 }
 
 /// Returns `true` if a function definition is allowed to use a boolean trap.
 pub(super) fn is_allowed_func_def(name: &str) -> bool {
-    matches!(name, "__post_init__") || is_binary_operator_method(name)
+    matches!(name, "__post_init__") || is_operator_method(name)
 }
 
 /// Returns `true` if an argument is allowed to use a boolean trap. To return
