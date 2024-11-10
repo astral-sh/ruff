@@ -285,7 +285,7 @@ fn replace_custom_typevar_with_self(
 
     let mut all_edits = vec![
         replace_return_annotation_with_self(returns),
-        remove_first_parameter_annotation(parameters)
+        remove_first_parameter_annotation(parameters),
     ];
 
     if let Some(edit) = import_self(checker, returns.range()) {
