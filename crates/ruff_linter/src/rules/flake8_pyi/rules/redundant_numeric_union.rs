@@ -2,7 +2,7 @@ use bitflags::bitflags;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     name::Name, AnyParameterRef, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple,
@@ -45,8 +45,11 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe; however, the fix will flatten nested
-/// unions type expressions into a single top-level union.
+/// This rule's fix is marked as safe for most cases; however, the fix will
+/// nested unions type expressions into a single top-level union.
+///
+/// The fix is marked as unsafe when comments are present within the type
+/// expression.
 ///
 /// ## References
 /// - [Python documentation: The numeric tower](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
@@ -127,15 +130,30 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
     // Traverse the union, and remember which numeric types are found.
     traverse_union(&mut remove_numeric_type, checker.semantic(), annotation);
 
+    // Mark [`Fix`] as unsafe when comments are in range.
+    let applicability = if checker.comment_ranges().intersects(annotation.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     // Generate the flattened fix once.
-    let fix = if let &[fix_expr] = flat_nodes.as_slice() {
-        generate_single_fix(checker, fix_expr, annotation)
+    let fix = if let &[edit_expr] = flat_nodes.as_slice() {
+        // Generate a [`Fix`] for a single type expression, e.g. `int`.
+        Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(edit_expr), annotation.range()),
+            applicability,
+        )
     } else {
         match union_type {
-            UnionKind::PEP604 => generate_bit_or_fix(checker, flat_nodes, annotation),
-            UnionKind::TypingUnion => generate_union_fix(checker, flat_nodes, annotation)
-                .ok()
-                .unwrap(),
+            UnionKind::PEP604 => {
+                generate_pep604_fix(checker, flat_nodes, annotation, applicability)
+            }
+            UnionKind::TypingUnion => {
+                generate_union_fix(checker, flat_nodes, annotation, applicability)
+                    .ok()
+                    .unwrap()
+            }
         }
     };
 
@@ -203,7 +221,12 @@ enum UnionKind {
 }
 
 // Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
-fn generate_bit_or_fix(checker: &Checker, nodes: Vec<&Expr>, annotation: &Expr) -> Fix {
+fn generate_pep604_fix(
+    checker: &Checker,
+    nodes: Vec<&Expr>,
+    annotation: &Expr,
+    applicability: Applicability,
+) -> Fix {
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
     let new_expr = nodes
@@ -222,14 +245,19 @@ fn generate_bit_or_fix(checker: &Checker, nodes: Vec<&Expr>, annotation: &Expr) 
         })
         .unwrap();
 
-    Fix::safe_edit(Edit::range_replacement(
-        checker.generator().expr(&new_expr),
-        annotation.range(),
-    ))
+    Fix::applicable_edit(
+        Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
+        applicability,
+    )
 }
 
 // Generate a [`Fix`] for two or more type expresisons, e.g. `typing.Union[int, float, complex]`.
-fn generate_union_fix(checker: &Checker, nodes: Vec<&Expr>, annotation: &Expr) -> Result<Fix> {
+fn generate_union_fix(
+    checker: &Checker,
+    nodes: Vec<&Expr>,
+    annotation: &Expr,
+    applicability: Applicability,
+) -> Result<Fix> {
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
     // Request `typing.Union`
@@ -259,16 +287,10 @@ fn generate_union_fix(checker: &Checker, nodes: Vec<&Expr>, annotation: &Expr) -
         }),
         ctx: ExprContext::Load,
     });
-    Ok(Fix::safe_edits(
+
+    Ok(Fix::applicable_edits(
         Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
         [import_edit],
-    ))
-}
-
-// Generate a [`Fix`] for a single type expression, e.g. `int`.
-fn generate_single_fix(checker: &Checker, expr: &Expr, annotation: &Expr) -> Fix {
-    Fix::safe_edit(Edit::range_replacement(
-        checker.generator().expr(expr),
-        annotation.range(),
+        applicability,
     ))
 }

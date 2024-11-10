@@ -166,7 +166,7 @@ PYI041.pyi:49:10: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
    = help: Remove duplicates
 
-ℹ Safe fix
+ℹ Unsafe fix
 46 46 | 
 47 47 | 
 48 48 | def f8(
@@ -192,7 +192,7 @@ PYI041.pyi:56:9: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
    = help: Remove duplicates
 
-ℹ Safe fix
+ℹ Unsafe fix
 53 53 | 
 54 54 | def f9(
 55 55 |     arg: (
