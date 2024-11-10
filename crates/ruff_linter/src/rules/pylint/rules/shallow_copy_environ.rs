@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
@@ -30,16 +30,22 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct ShallowCopyEnviron;
 
-impl Violation for ShallowCopyEnviron {
+impl AlwaysFixableViolation for ShallowCopyEnviron {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Using `copy.copy(os.environ)`. Use `os.environ.copy()` instead.".to_string()
+    }
+
+    fn fix_title(&self) -> String {
+        "Replace with `os.environ.copy()`".to_string()
     }
 }
 
 /// PLW1507
 pub(crate) fn shallow_copy_environ(checker: &mut Checker, call: &ast::ExprCall) {
-    if !checker.semantic().seen_module(Modules::OS) {
+    if !(checker.semantic().seen_module(Modules::OS)
+        && checker.semantic().seen_module(Modules::COPY))
+    {
         return;
     }
 
@@ -63,7 +69,10 @@ pub(crate) fn shallow_copy_environ(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ShallowCopyEnviron {}, call.range()));
+    let mut diagnostic = Diagnostic::new(ShallowCopyEnviron, call.range());
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "os.environ.copy()".to_string(),
+        call.range(),
+    )));
+    checker.diagnostics.push(diagnostic);
 }

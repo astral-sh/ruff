@@ -3,10 +3,18 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 assertion_line: 237
 snapshot_kind: text
 ---
-shallow_copy_environ.py:4:14: PLW1507 Using `copy.copy(os.environ)`. Use `os.environ.copy()` instead.
+shallow_copy_environ.py:4:14: PLW1507 [*] Using `copy.copy(os.environ)`. Use `os.environ.copy()` instead.
   |
 2 | import os
 3 | 
 4 | copied_env = copy.copy(os.environ)  # [shallow-copy-environ]
   |              ^^^^^^^^^^^^^^^^^^^^^ PLW1507
   |
+  = help: Replace with `os.environ.copy()`
+
+ℹ Safe fix
+1 1 | import copy
+2 2 | import os
+3 3 | 
+4   |-copied_env = copy.copy(os.environ)  # [shallow-copy-environ]
+  4 |+copied_env = os.environ.copy()  # [shallow-copy-environ]
