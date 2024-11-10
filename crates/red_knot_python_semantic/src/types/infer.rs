@@ -2875,48 +2875,92 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::USub, Type::BooleanLiteral(bool)) => Type::IntLiteral(-i64::from(bool)),
             (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
 
-            (UnaryOp::Not, ty) => {
+            (UnaryOp::Not, Type::Instance(InstanceType { class })) => {
                 // TODO: move to Type::bool method
-                // I initially wrote this code in the bool method but it caused a cycle. And since
-                // the cycle detection was not turned on for that method it was crashing.
-                let bool_type = if let Type::Instance(class) = ty {
-                    let bool_method = class.class_member(self.db, "__bool__");
-                    let bool_call = bool_method.call(self.db, &[operand_type]);
+                // I initially wrote this code in the bool method but it caused a cycle.
+                // Also this requires refactoring of that method to pass the node and diagnostics
+                // so we can emit the diagnostic when it's not possible to get the boolean of the
+                // type.
+                let bool_type = if let Symbol::Type(bool_method, _) =
+                    class.class_member(self.db, "__bool__")
+                {
+                    let call = bool_method.call(self.db, &[operand_type]);
+                    let bool_rt = match call.return_ty_result(
+                        self.db,
+                        AnyNodeRef::ExprUnaryOp(unary),
+                        &mut self.diagnostics,
+                    ) {
+                        Ok(t) => t,
+                        Err(_) => Type::BooleanLiteral(true),
+                    };
 
-                    let bool_rt = bool_call.return_ty(self.db);
-                    match bool_rt {
-                        Some(ty) => {
-                            // TODO: if the bool_rt is not boolean we can emit diagnostic.
-                            // https://pyright-play.net/?code=GYJw9gtgBALgngBwJYDsDmUkQWEMoAySMApiAIYA2AULQMaXkDOTUAggFzVQ9QAmJYFAD6wgEZgwlUQAomJSsACUAWgB8mFDC69dUECRgBXECigAGWgYBuJKsPgISMlGHxsZSpUA
-                            match ty {
-                                Type::BooleanLiteral(_) => {}
-                                Type::Instance(cls) => {
-                                    if !cls.is_known(self.db, KnownClass::Bool) {
-                                        self.add_diagnostic(
-                                            unary.into(),
-                                            "invalid-method",
-                                            format_args!("Method __bool__ for type `{}` returns type `{}` rather than `bool`", class.name(self.db), ty.display(self.db))
-                                        );
-                                    }
-                                }
-                                _ => {
-                                    self.add_diagnostic(
-                                        unary.into(),
-                                        "invalid-method",
-                                        format_args!("Method __bool__ for type `{}` returns type `{}` rather than `bool`", class.name(self.db), ty.display(self.db)),
-                                    );
-                                }
-                            }
-                            ty.bool(self.db)
-                        }
-                        // TODO: Also call the len method
-                        None => Truthiness::AlwaysTrue,
+                    if bool_rt.is_subtype_of(
+                        self.db,
+                        KnownClass::Bool.to_class(self.db).to_instance(self.db),
+                    ) {
+                        bool_rt.bool(self.db)
+                    } else {
+                        dbg!(KnownClass::Bool.to_class(self.db));
+                        self.diagnostics.add(
+                            unary.into(),
+                            "unsupported-operator",
+                            format_args!(
+                                "Method __bool__ for type `{}` should return `bool`, returned type `{}`",
+                                operand_type.display(self.db),
+                                bool_rt.display(self.db)
+                            ),
+                        );
+                        Truthiness::Ambiguous
                     }
                 } else {
-                    ty.bool(self.db)
+                    Truthiness::AlwaysTrue
                 };
-                bool_type.negate().into_type(self.db)
+
+                let len_type = if let Symbol::Type(len_method, _) =
+                    class.class_member(self.db, "__len__")
+                {
+                    let call = len_method.call(self.db, &[operand_type]);
+                    let len_rt = match call.return_ty_result(
+                        self.db,
+                        AnyNodeRef::ExprUnaryOp(unary),
+                        &mut self.diagnostics,
+                    ) {
+                        Ok(t) => t,
+                        Err(_) => Type::BooleanLiteral(true),
+                    };
+                    // TODO: len should be an integer >= 0 and should fit into sys.maxsize
+                    // https://docs.python.org/3/reference/datamodel.html#object.__len__
+                    // The type returned by len must be able to be interpreted as integer
+
+                    if matches!(len_rt, Type::BooleanLiteral(_) | Type::IntLiteral(_)) {
+                        len_rt.bool(self.db)
+                    } else {
+                        self.diagnostics.add(
+                            unary.into(),
+                            "unsupported-operator",
+                            format_args!(
+                                "Method __len__ for type `{}` should return `int`, returned type `{}`",
+                                operand_type.display(self.db),
+                                len_rt.display(self.db)
+                            ),
+                        );
+                        Truthiness::Ambiguous
+                    }
+                } else {
+                    Truthiness::AlwaysTrue
+                };
+
+                // Every object is considered True unless __len__ or __bool__ methods are False
+                if bool_type == Truthiness::AlwaysFalse || len_type == Truthiness::AlwaysFalse {
+                    Truthiness::AlwaysTrue.into_type(self.db)
+                // If the method is returning something that cannot be interpreted
+                } else if bool_type == Truthiness::Ambiguous || len_type == Truthiness::Ambiguous {
+                    Truthiness::Ambiguous.into_type(self.db)
+                } else {
+                    Truthiness::AlwaysFalse.into_type(self.db)
+                }
             }
+            (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
             (_, Type::Any) => Type::Any,
             (_, Type::Unknown) => Type::Unknown,
             (

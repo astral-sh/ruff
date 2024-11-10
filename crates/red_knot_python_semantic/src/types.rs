@@ -1188,20 +1188,10 @@ impl<'db> Type<'db> {
             Type::Any | Type::Todo | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
-            Type::ClassLiteral(_) => {
+            Type::ClassLiteral(ClassLiteralType { class: _ }) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                let bool_method = class.class_member(db, "__bool__").call(db, &[*self]);
-                let bool_rt = bool_method.return_ty(db);
-                if bool_rt.is_some_and(|t| t.bool(db) == Truthiness::AlwaysFalse) {
-                    return Truthiness::AlwaysFalse;
-                }
-                let len_method = class.class_member(db, "__len__").call(db, &[*self]);
-                let len_rt = len_method.return_ty(db);
-                if len_rt.is_some_and(|t| t.bool(db) == Truthiness::AlwaysFalse) {
-                    return Truthiness::AlwaysFalse;
-                }
-                Truthiness::AlwaysTrue
+                Truthiness::Ambiguous
             }
             Type::SubclassOf(_) => {
                 // TODO: see above
@@ -1239,6 +1229,7 @@ impl<'db> Type<'db> {
             }
             Type::IntLiteral(num) => Truthiness::from(*num != 0),
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
+            Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::LiteralString => Truthiness::Ambiguous,
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             Type::SliceLiteral(_) => Truthiness::AlwaysTrue,
@@ -1250,6 +1241,10 @@ impl<'db> Type<'db> {
     #[must_use]
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
+            // TODO validate typed call arguments vs callable signature
+            Type::FunctionLiteral(function_type) => {
+                if function_type.is_known(db, KnownFunction::RevealType) {
+                    CallOutcome::revealed(
                         function_type.return_ty(db),
                         *arg_types.first().unwrap_or(&Type::Unknown),
                     )
