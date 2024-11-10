@@ -78,7 +78,6 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr
     }
 
     // If there's at least one diagnostic, create a fix to remove the duplicate members.
-    // TODO(SB): test if `Union[Literal[1], Literal[1]]`
     if let Expr::Subscript(subscript) = expr {
         let subscript = Expr::Subscript(ast::ExprSubscript {
             slice: Box::new(if let [elt] = unique_nodes.as_slice() {
