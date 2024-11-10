@@ -1,5 +1,5 @@
 use ast::ExprContext;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;
@@ -28,8 +28,11 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as safe; however, the fix will flatten nested
-/// unions type expressions into a single top-level union.
+/// This rule's fix is marked as safe in most cases; however, the fix will
+/// flatten nested unions type expressions into a single top-level union.
+///
+/// The fix is marked as unsafe when comments are present within the type
+/// expression.
 #[violation]
 pub struct UnnecessaryTypeUnion {
     members: Vec<Name>,
@@ -196,10 +199,17 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             }
         };
 
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            content,
-            union.range(),
-        )));
+        // Mark [`Fix`] as unsafe when comments are in range.
+        let applicability = if checker.comment_ranges().intersects(union.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(content, union.range()),
+            applicability,
+        ));
     }
 
     checker.diagnostics.push(diagnostic);
