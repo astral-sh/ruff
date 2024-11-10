@@ -68,6 +68,8 @@ def import_fixture(fixture: Path, fixture_set: str):
         expect_path = fixture_path.with_suffix(f".{extension}.expect")
         options_path = fixture_path.with_suffix(".options.json")
 
+        options = OPTIONS_OVERRIDES.get(fixture.name, options)
+
         if len(options) > 0:
             if extension == "pyi":
                 options["source_type"] = "Stub"
@@ -108,6 +110,16 @@ IGNORE_LIST = [
     # Tests line ranges that fall outside the source range. This is a CLI test case and not a formatting test case.
     "line_ranges_outside_source.py",
 ]
+
+# Specs for which to override the formatter options
+OPTIONS_OVERRIDES = {
+    "context_managers_38.py": {
+        "target_version": "py38"
+    },
+    "context_managers_autodetect_38.py" : {
+        "target_version": "py38"
+    }
+}
 
 
 def import_fixtures(black_dir: str):
