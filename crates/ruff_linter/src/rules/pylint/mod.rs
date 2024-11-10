@@ -1,5 +1,5 @@
 //! Rules from [Pylint](https://pypi.org/project/pylint/).
-pub(crate) mod helpers;
+mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 

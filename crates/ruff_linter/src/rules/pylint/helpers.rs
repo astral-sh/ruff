@@ -167,7 +167,7 @@ impl<'a> Visitor<'_> for SequenceIndexVisitor<'a> {
 }
 
 /// Returns `true` if a method is a known dunder method.
-pub(crate) fn is_known_dunder_method(method: &str) -> bool {
+pub(super) fn is_known_dunder_method(method: &str) -> bool {
     matches!(
         method,
         "__abs__"
