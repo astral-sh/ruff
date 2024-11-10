@@ -2900,7 +2900,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ) {
                         bool_rt.bool(self.db)
                     } else {
-                        dbg!(KnownClass::Bool.to_class(self.db));
                         self.diagnostics.add(
                             unary.into(),
                             "unsupported-operator",
