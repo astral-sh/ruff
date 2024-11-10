@@ -2,47 +2,55 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF104_3.py:1:2: RUF104 [*] Unformatted special comment
+RUF104_3.py:5:2: RUF104 [*] Unformatted special comment
   |
-1 | #noqa:
+3 | ###
+4 | 
+5 | #noqa:
   |  ^^^^ RUF104
-2 | #ruff:noqa:
-3 | #flake8:noqa:
+6 | #ruff:noqa:
+7 | #flake8:noqa:
   |
   = help: Format comment
 
 ℹ Safe fix
-1   |-#noqa:
-  1 |+# noqa:
-2 2 | #ruff:noqa:
-3 3 | #flake8:noqa:
+2 2 | # All of these should be reformatted.
+3 3 | ###
+4 4 | 
+5   |-#noqa:
+  5 |+# noqa:
+6 6 | #ruff:noqa:
+7 7 | #flake8:noqa:
 
-RUF104_3.py:2:2: RUF104 [*] Unformatted special comment
+RUF104_3.py:6:2: RUF104 [*] Unformatted special comment
   |
-1 | #noqa:
-2 | #ruff:noqa:
+5 | #noqa:
+6 | #ruff:noqa:
   |  ^^^^ RUF104
-3 | #flake8:noqa:
+7 | #flake8:noqa:
   |
   = help: Format comment
 
 ℹ Safe fix
-1 1 | #noqa:
-2   |-#ruff:noqa:
-  2 |+# ruff: noqa:
-3 3 | #flake8:noqa:
+3 3 | ###
+4 4 | 
+5 5 | #noqa:
+6   |-#ruff:noqa:
+  6 |+# ruff: noqa:
+7 7 | #flake8:noqa:
 
-RUF104_3.py:3:2: RUF104 [*] Unformatted special comment
+RUF104_3.py:7:2: RUF104 [*] Unformatted special comment
   |
-1 | #noqa:
-2 | #ruff:noqa:
-3 | #flake8:noqa:
+5 | #noqa:
+6 | #ruff:noqa:
+7 | #flake8:noqa:
   |  ^^^^^^ RUF104
   |
   = help: Format comment
 
 ℹ Safe fix
-1 1 | #noqa:
-2 2 | #ruff:noqa:
-3   |-#flake8:noqa:
-  3 |+# flake8: noqa:
+4 4 | 
+5 5 | #noqa:
+6 6 | #ruff:noqa:
+7   |-#flake8:noqa:
+  7 |+# flake8: noqa:
