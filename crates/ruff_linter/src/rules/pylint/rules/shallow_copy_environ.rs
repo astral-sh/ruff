@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// `os.environ` is not a dict object but proxy object, so shallow copy has still
-/// effects on original object. See https://bugs.python.org/issue15373 for reference.
+/// effects on original object. See [Python issue 15373: `copy.copy()` does not properly copy `os.environment`](https://bugs.python.org/issue15373) for reference.
 ///
 /// ## Example
 /// ```python
@@ -27,6 +27,10 @@ use crate::checkers::ast::Checker;
 ///
 /// copied_env = os.environ.copy()
 /// ```
+///
+/// ## References
+/// - [Python documentation: `copy` — Shallow and deep copy operations](https://docs.python.org/3/library/copy.html)
+/// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[violation]
 pub struct ShallowCopyEnviron;
 
