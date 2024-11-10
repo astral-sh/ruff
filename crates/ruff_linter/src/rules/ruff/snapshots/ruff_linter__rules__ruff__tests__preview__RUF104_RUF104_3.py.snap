@@ -1,0 +1,48 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF104_3.py:1:2: RUF104 [*] Unformatted special comment
+  |
+1 | #noqa:
+  |  ^^^^ RUF104
+2 | #ruff:noqa:
+3 | #flake8:noqa:
+  |
+  = help: Format comment
+
+ℹ Safe fix
+1   |-#noqa:
+  1 |+# noqa:
+2 2 | #ruff:noqa:
+3 3 | #flake8:noqa:
+
+RUF104_3.py:2:2: RUF104 [*] Unformatted special comment
+  |
+1 | #noqa:
+2 | #ruff:noqa:
+  |  ^^^^ RUF104
+3 | #flake8:noqa:
+  |
+  = help: Format comment
+
+ℹ Safe fix
+1 1 | #noqa:
+2   |-#ruff:noqa:
+  2 |+# ruff: noqa:
+3 3 | #flake8:noqa:
+
+RUF104_3.py:3:2: RUF104 [*] Unformatted special comment
+  |
+1 | #noqa:
+2 | #ruff:noqa:
+3 | #flake8:noqa:
+  |  ^^^^^^ RUF104
+  |
+  = help: Format comment
+
+ℹ Safe fix
+1 1 | #noqa:
+2 2 | #ruff:noqa:
+3   |-#flake8:noqa:
+  3 |+# flake8: noqa:

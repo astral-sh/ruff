@@ -39,37 +39,33 @@ enum SpecialComment {
 }
 
 impl SpecialComment {
-    fn formatted(&self) -> Option<String> {
+    fn formatted(&self) -> String {
         match self {
-            SpecialComment::Noqa(None) => Some("# noqa".to_string()),
+            SpecialComment::Noqa(None) => "# noqa".to_string(),
 
-            // Avoid suggesting the unsafe fix
-            // `# noqa:` (ignore nothing) -> `# noqa` (ignore everything).
-            SpecialComment::Noqa(Some(codes)) if codes.is_empty() => None,
+            SpecialComment::Noqa(Some(codes)) if codes.is_empty() => "# noqa:".to_string(),
 
-            SpecialComment::Noqa(Some(codes)) => Some(format!("# noqa: {}", codes.join(", "))),
+            SpecialComment::Noqa(Some(codes)) => format!("# noqa: {}", codes.join(", ")),
 
-            SpecialComment::FileLevelNoqa { hint, codes: None } => Some(format!("# {hint}: noqa")),
+            SpecialComment::FileLevelNoqa { hint, codes: None } => format!("# {hint}: noqa"),
 
-            // Avoid suggesting the unsafe fix
-            // `# ruff: noqa:` (ignore nothing) -> `# ruff: noqa` (ignore everything).
             SpecialComment::FileLevelNoqa {
-                codes: Some(codes), ..
-            } if codes.is_empty() => None,
+                hint, codes: Some(codes)
+            } if codes.is_empty() => format!("# {hint}: noqa:"),
 
             SpecialComment::FileLevelNoqa {
                 hint,
                 codes: Some(codes),
-            } => Some(format!("# {hint}: noqa: {}", codes.join(", "))),
+            } => format!("# {hint}: noqa: {}", codes.join(", ")),
 
-            SpecialComment::Nopycln(rest) => Some(format!("# nopycln: {}", rest.to_lowercase())),
+            SpecialComment::Nopycln(rest) => format!("# nopycln: {}", rest.to_lowercase()),
 
-            SpecialComment::Fmt(rest) => Some(format!("# fmt: {rest}")),
-            SpecialComment::Isort(rest) => Some(format!("# isort: {rest}")),
-            SpecialComment::Mypy(rest) => Some(format!("# mypy: {rest}")),
-            SpecialComment::Pyright(rest) => Some(format!("# pyright: {rest}")),
-            SpecialComment::RuffIsort(rest) => Some(format!("# ruff: isort: {rest}")),
-            SpecialComment::Type(rest) => Some(format!("# type: {rest}")),
+            SpecialComment::Fmt(rest) => format!("# fmt: {rest}"),
+            SpecialComment::Isort(rest) => format!("# isort: {rest}"),
+            SpecialComment::Mypy(rest) => format!("# mypy: {rest}"),
+            SpecialComment::Pyright(rest) => format!("# pyright: {rest}"),
+            SpecialComment::RuffIsort(rest) => format!("# ruff: isort: {rest}"),
+            SpecialComment::Type(rest) => format!("# type: {rest}"),
         }
     }
 }
@@ -121,9 +117,7 @@ fn add_diagnostic_if_applicable(
     comment_range: TextRange,
     hint_range: TextRange,
 ) {
-    let Some(formatted) = comment.formatted() else {
-        return;
-    };
+    let formatted = comment.formatted();
 
     if comment_text == formatted {
         return;
@@ -136,15 +130,6 @@ fn add_diagnostic_if_applicable(
     let diagnostic = Diagnostic::new(violation, hint_range).with_fix(fix);
 
     diagnostics.push(diagnostic);
-}
-
-fn parse_code_list(code_list: &str) -> Vec<String> {
-    static PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[A-Z]+[A-Za-z0-9]+").unwrap());
-
-    PATTERN
-        .find_iter(code_list)
-        .map(|code| code.as_str().to_owned())
-        .collect()
 }
 
 macro_rules! try_parse_common {
@@ -164,6 +149,16 @@ macro_rules! try_parse_common {
 }
 
 fn try_parse_noqa(text: &str) -> SpecialCommentDescriptor {
+    fn parse_code_list(code_list: &str) -> Vec<String> {
+        static PATTERN: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"[A-Z]+[0-9]+").unwrap());
+
+        PATTERN
+            .find_iter(code_list)
+            .map(|code| code.as_str().to_owned())
+            .collect()
+    }
+
     // ruff_linter::noqa::Directive::try_extract
     static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
@@ -171,11 +166,12 @@ fn try_parse_noqa(text: &str) -> SpecialCommentDescriptor {
             ^
             \#\s*
             (?<hint>(?i:noqa))
-            (?:
-                :\s*
-                (?<code_list>
-                    [A-Z]+[A-Za-z0-9]+
-                    (?:[\s,]+[A-Z]+[A-Za-z0-9]+)*
+            (?<code_list>
+                :
+                (?:
+                    \s*
+                    [A-Z]+[0-9]+
+                    (?:[\s,]+[A-Z]+[0-9]+)*
                 )?
             )?
             ",
@@ -195,6 +191,16 @@ fn try_parse_noqa(text: &str) -> SpecialCommentDescriptor {
 }
 
 fn try_parse_file_level_noqa(text: &str) -> SpecialCommentDescriptor {
+    fn parse_code_list(code_list: &str) -> Vec<String> {
+        static PATTERN: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"[A-Z]+[A-Za-z0-9]+").unwrap());
+
+        PATTERN
+            .find_iter(code_list)
+            .map(|code| code.as_str().to_owned())
+            .collect()
+    }
+
     // ruff_linter::noqa::ParsedFileExemption::try_extract
     static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
@@ -203,13 +209,13 @@ fn try_parse_file_level_noqa(text: &str) -> SpecialCommentDescriptor {
             \#\s*
             (?<hint>flake8|ruff)\s*:\s*
             (?i:noqa)\s*
-            (?:
-                :\s*
-                (?<code_list>
+            (?<code_list>
+                :
+                (?:
+                    \s*
                     [A-Z]+[A-Za-z0-9]+
                     (?:[\s,]\s*[A-Z]+[A-Za-z0-9]+)*
                 )?
-                \s*
             )?
             ",
         )
