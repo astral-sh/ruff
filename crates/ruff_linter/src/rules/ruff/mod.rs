@@ -385,6 +385,8 @@ mod tests {
 
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::UnformattedSpecialComment, Path::new("RUF104.py"))]
+    #[test_case(Rule::UnformattedSpecialComment, Path::new("RUF104_1.py"))]
+    #[test_case(Rule::UnformattedSpecialComment, Path::new("RUF104_2.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

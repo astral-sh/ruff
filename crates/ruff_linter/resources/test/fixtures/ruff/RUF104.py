@@ -13,8 +13,10 @@
 # noqa
 # noqa: A123
 # noqa: A123, B456
+# ruff: noqa
 # ruff: noqa: A123
 # ruff: noqa: A123, B456
+# flake8: noqa
 # flake8: noqa: A123
 # flake8: noqa: A123, B456
 # fmt: on

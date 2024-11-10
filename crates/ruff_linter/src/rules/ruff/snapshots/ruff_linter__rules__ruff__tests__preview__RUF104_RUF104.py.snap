@@ -2,890 +2,890 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF104.py:42:3: RUF104 [*] Unformatted special comment
+RUF104.py:44:3: RUF104 [*] Unformatted special comment
    |
-40 | # type: list[str]
-41 | 
-42 | # noqa:A123
+42 | # type: list[str]
+43 | 
+44 | # noqa:A123
    |   ^^^^ RUF104
-43 | #noqa:   A123
-44 | #    type:ignore
+45 | #noqa:   A123
+46 | #    type:ignore
    |
    = help: Format comment
 
 ℹ Safe fix
-39 39 | # type: int
-40 40 | # type: list[str]
-41 41 | 
-42    |-# noqa:A123
-   42 |+# noqa: A123
-43 43 | #noqa:   A123
-44 44 | #    type:ignore
-45 45 | #type:	int
-
-RUF104.py:43:2: RUF104 [*] Unformatted special comment
-   |
-42 | # noqa:A123
-43 | #noqa:   A123
-   |  ^^^^ RUF104
-44 | #    type:ignore
-45 | #type:  int
-   |
-   = help: Format comment
-
-ℹ Safe fix
-40 40 | # type: list[str]
-41 41 | 
-42 42 | # noqa:A123
-43    |-#noqa:   A123
-   43 |+# noqa: A123
-44 44 | #    type:ignore
-45 45 | #type:	int
-46 46 | # fmt:off
-
-RUF104.py:44:6: RUF104 [*] Unformatted special comment
-   |
-42 | # noqa:A123
-43 | #noqa:   A123
-44 | #    type:ignore
-   |      ^^^^ RUF104
-45 | #type:  int
-46 | # fmt:off
-   |
-   = help: Format comment
-
-ℹ Safe fix
-41 41 | 
-42 42 | # noqa:A123
-43 43 | #noqa:   A123
-44    |-#    type:ignore
-   44 |+# type: ignore
-45 45 | #type:	int
-46 46 | # fmt:off
-47 47 | #fmt: on
+41 41 | # type: int
+42 42 | # type: list[str]
+43 43 | 
+44    |-# noqa:A123
+   44 |+# noqa: A123
+45 45 | #noqa:   A123
+46 46 | #    type:ignore
+47 47 | #type:	int
 
 RUF104.py:45:2: RUF104 [*] Unformatted special comment
    |
-43 | #noqa:   A123
-44 | #    type:ignore
-45 | #type:  int
+44 | # noqa:A123
+45 | #noqa:   A123
    |  ^^^^ RUF104
-46 | # fmt:off
-47 | #fmt: on
+46 | #    type:ignore
+47 | #type:  int
    |
    = help: Format comment
 
 ℹ Safe fix
-42 42 | # noqa:A123
-43 43 | #noqa:   A123
-44 44 | #    type:ignore
-45    |-#type:	int
-   45 |+# type: int
-46 46 | # fmt:off
-47 47 | #fmt: on
-48 48 | # 	 fmt:	 skip
+42 42 | # type: list[str]
+43 43 | 
+44 44 | # noqa:A123
+45    |-#noqa:   A123
+   45 |+# noqa: A123
+46 46 | #    type:ignore
+47 47 | #type:	int
+48 48 | # fmt:off
 
-RUF104.py:46:3: RUF104 [*] Unformatted special comment
+RUF104.py:46:6: RUF104 [*] Unformatted special comment
    |
-44 | #    type:ignore
-45 | #type:  int
-46 | # fmt:off
-   |   ^^^ RUF104
-47 | #fmt: on
-48 | #    fmt:    skip
+44 | # noqa:A123
+45 | #noqa:   A123
+46 | #    type:ignore
+   |      ^^^^ RUF104
+47 | #type:  int
+48 | # fmt:off
    |
    = help: Format comment
 
 ℹ Safe fix
-43 43 | #noqa:   A123
-44 44 | #    type:ignore
-45 45 | #type:	int
-46    |-# fmt:off
-   46 |+# fmt: off
-47 47 | #fmt: on
-48 48 | # 	 fmt:	 skip
-49 49 | # isort:skip
+43 43 | 
+44 44 | # noqa:A123
+45 45 | #noqa:   A123
+46    |-#    type:ignore
+   46 |+# type: ignore
+47 47 | #type:	int
+48 48 | # fmt:off
+49 49 | #fmt: on
 
 RUF104.py:47:2: RUF104 [*] Unformatted special comment
    |
-45 | #type:  int
-46 | # fmt:off
-47 | #fmt: on
+45 | #noqa:   A123
+46 | #    type:ignore
+47 | #type:  int
+   |  ^^^^ RUF104
+48 | # fmt:off
+49 | #fmt: on
+   |
+   = help: Format comment
+
+ℹ Safe fix
+44 44 | # noqa:A123
+45 45 | #noqa:   A123
+46 46 | #    type:ignore
+47    |-#type:	int
+   47 |+# type: int
+48 48 | # fmt:off
+49 49 | #fmt: on
+50 50 | # 	 fmt:	 skip
+
+RUF104.py:48:3: RUF104 [*] Unformatted special comment
+   |
+46 | #    type:ignore
+47 | #type:  int
+48 | # fmt:off
+   |   ^^^ RUF104
+49 | #fmt: on
+50 | #    fmt:    skip
+   |
+   = help: Format comment
+
+ℹ Safe fix
+45 45 | #noqa:   A123
+46 46 | #    type:ignore
+47 47 | #type:	int
+48    |-# fmt:off
+   48 |+# fmt: off
+49 49 | #fmt: on
+50 50 | # 	 fmt:	 skip
+51 51 | # isort:skip
+
+RUF104.py:49:2: RUF104 [*] Unformatted special comment
+   |
+47 | #type:  int
+48 | # fmt:off
+49 | #fmt: on
    |  ^^^ RUF104
-48 | #    fmt:    skip
-49 | # isort:skip
+50 | #    fmt:    skip
+51 | # isort:skip
    |
    = help: Format comment
 
 ℹ Safe fix
-44 44 | #    type:ignore
-45 45 | #type:	int
-46 46 | # fmt:off
-47    |-#fmt: on
-   47 |+# fmt: on
-48 48 | # 	 fmt:	 skip
-49 49 | # isort:skip
-50 50 | # isort:skip_file
+46 46 | #    type:ignore
+47 47 | #type:	int
+48 48 | # fmt:off
+49    |-#fmt: on
+   49 |+# fmt: on
+50 50 | # 	 fmt:	 skip
+51 51 | # isort:skip
+52 52 | # isort:skip_file
 
-RUF104.py:48:5: RUF104 [*] Unformatted special comment
+RUF104.py:50:5: RUF104 [*] Unformatted special comment
    |
-46 | # fmt:off
-47 | #fmt: on
-48 | #    fmt:    skip
+48 | # fmt:off
+49 | #fmt: on
+50 | #    fmt:    skip
    |      ^^^ RUF104
-49 | # isort:skip
-50 | # isort:skip_file
+51 | # isort:skip
+52 | # isort:skip_file
    |
    = help: Format comment
 
 ℹ Safe fix
-45 45 | #type:	int
-46 46 | # fmt:off
-47 47 | #fmt: on
-48    |-# 	 fmt:	 skip
-   48 |+# fmt: skip
-49 49 | # isort:skip
-50 50 | # isort:skip_file
-51 51 | # mypy:  disallow-subclassing-any
-
-RUF104.py:49:3: RUF104 [*] Unformatted special comment
-   |
-47 | #fmt: on
-48 | #    fmt:    skip
-49 | # isort:skip
-   |   ^^^^^ RUF104
-50 | # isort:skip_file
-51 | # mypy:  disallow-subclassing-any
-   |
-   = help: Format comment
-
-ℹ Safe fix
-46 46 | # fmt:off
-47 47 | #fmt: on
-48 48 | # 	 fmt:	 skip
-49    |-# isort:skip
-   49 |+# isort: skip
-50 50 | # isort:skip_file
-51 51 | # mypy:  disallow-subclassing-any
-52 52 | #   nopycln: 	 		file
-
-RUF104.py:50:3: RUF104 [*] Unformatted special comment
-   |
-48 | #    fmt:    skip
-49 | # isort:skip
-50 | # isort:skip_file
-   |   ^^^^^ RUF104
-51 | # mypy:  disallow-subclassing-any
-52 | #   nopycln:            file
-   |
-   = help: Format comment
-
-ℹ Safe fix
-47 47 | #fmt: on
-48 48 | # 	 fmt:	 skip
-49 49 | # isort:skip
-50    |-# isort:skip_file
-   50 |+# isort: skip_file
-51 51 | # mypy:  disallow-subclassing-any
-52 52 | #   nopycln: 	 		file
-53 53 | # 	nopycln:	   import
+47 47 | #type:	int
+48 48 | # fmt:off
+49 49 | #fmt: on
+50    |-# 	 fmt:	 skip
+   50 |+# fmt: skip
+51 51 | # isort:skip
+52 52 | # isort:skip_file
+53 53 | # mypy:  disallow-subclassing-any
 
 RUF104.py:51:3: RUF104 [*] Unformatted special comment
    |
-49 | # isort:skip
-50 | # isort:skip_file
-51 | # mypy:  disallow-subclassing-any
+49 | #fmt: on
+50 | #    fmt:    skip
+51 | # isort:skip
+   |   ^^^^^ RUF104
+52 | # isort:skip_file
+53 | # mypy:  disallow-subclassing-any
+   |
+   = help: Format comment
+
+ℹ Safe fix
+48 48 | # fmt:off
+49 49 | #fmt: on
+50 50 | # 	 fmt:	 skip
+51    |-# isort:skip
+   51 |+# isort: skip
+52 52 | # isort:skip_file
+53 53 | # mypy:  disallow-subclassing-any
+54 54 | #   nopycln: 	 		file
+
+RUF104.py:52:3: RUF104 [*] Unformatted special comment
+   |
+50 | #    fmt:    skip
+51 | # isort:skip
+52 | # isort:skip_file
+   |   ^^^^^ RUF104
+53 | # mypy:  disallow-subclassing-any
+54 | #   nopycln:            file
+   |
+   = help: Format comment
+
+ℹ Safe fix
+49 49 | #fmt: on
+50 50 | # 	 fmt:	 skip
+51 51 | # isort:skip
+52    |-# isort:skip_file
+   52 |+# isort: skip_file
+53 53 | # mypy:  disallow-subclassing-any
+54 54 | #   nopycln: 	 		file
+55 55 | # 	nopycln:	   import
+
+RUF104.py:53:3: RUF104 [*] Unformatted special comment
+   |
+51 | # isort:skip
+52 | # isort:skip_file
+53 | # mypy:  disallow-subclassing-any
    |   ^^^^ RUF104
-52 | #   nopycln:            file
-53 | #   nopycln:       import
+54 | #   nopycln:            file
+55 | #   nopycln:       import
    |
    = help: Format comment
 
 ℹ Safe fix
-48 48 | # 	 fmt:	 skip
-49 49 | # isort:skip
-50 50 | # isort:skip_file
-51    |-# mypy:  disallow-subclassing-any
-   51 |+# mypy: disallow-subclassing-any
-52 52 | #   nopycln: 	 		file
-53 53 | # 	nopycln:	   import
-54 54 | #pyright:ignore[]
+50 50 | # 	 fmt:	 skip
+51 51 | # isort:skip
+52 52 | # isort:skip_file
+53    |-# mypy:  disallow-subclassing-any
+   53 |+# mypy: disallow-subclassing-any
+54 54 | #   nopycln: 	 		file
+55 55 | # 	nopycln:	   import
+56 56 | #pyright:ignore[]
 
-RUF104.py:52:5: RUF104 [*] Unformatted special comment
+RUF104.py:54:5: RUF104 [*] Unformatted special comment
    |
-50 | # isort:skip_file
-51 | # mypy:  disallow-subclassing-any
-52 | #   nopycln:            file
+52 | # isort:skip_file
+53 | # mypy:  disallow-subclassing-any
+54 | #   nopycln:            file
    |     ^^^^^^^ RUF104
-53 | #   nopycln:       import
-54 | #pyright:ignore[]
+55 | #   nopycln:       import
+56 | #pyright:ignore[]
    |
    = help: Format comment
 
 ℹ Safe fix
-49 49 | # isort:skip
-50 50 | # isort:skip_file
-51 51 | # mypy:  disallow-subclassing-any
-52    |-#   nopycln: 	 		file
-   52 |+# nopycln: file
-53 53 | # 	nopycln:	   import
-54 54 | #pyright:ignore[]
-55 55 | #			pyright:    ignore[]
+51 51 | # isort:skip
+52 52 | # isort:skip_file
+53 53 | # mypy:  disallow-subclassing-any
+54    |-#   nopycln: 	 		file
+   54 |+# nopycln: file
+55 55 | # 	nopycln:	   import
+56 56 | #pyright:ignore[]
+57 57 | #			pyright:    ignore[]
 
-RUF104.py:53:4: RUF104 [*] Unformatted special comment
+RUF104.py:55:4: RUF104 [*] Unformatted special comment
    |
-51 | # mypy:  disallow-subclassing-any
-52 | #   nopycln:            file
-53 | #   nopycln:       import
+53 | # mypy:  disallow-subclassing-any
+54 | #   nopycln:            file
+55 | #   nopycln:       import
    |     ^^^^^^^ RUF104
-54 | #pyright:ignore[]
-55 | #           pyright:    ignore[]
+56 | #pyright:ignore[]
+57 | #           pyright:    ignore[]
    |
    = help: Format comment
 
 ℹ Safe fix
-50 50 | # isort:skip_file
-51 51 | # mypy:  disallow-subclassing-any
-52 52 | #   nopycln: 	 		file
-53    |-# 	nopycln:	   import
-   53 |+# nopycln: import
-54 54 | #pyright:ignore[]
-55 55 | #			pyright:    ignore[]
-56 56 | # ruff: isort:skip
+52 52 | # isort:skip_file
+53 53 | # mypy:  disallow-subclassing-any
+54 54 | #   nopycln: 	 		file
+55    |-# 	nopycln:	   import
+   55 |+# nopycln: import
+56 56 | #pyright:ignore[]
+57 57 | #			pyright:    ignore[]
+58 58 | # ruff: isort:skip
 
-RUF104.py:54:2: RUF104 [*] Unformatted special comment
+RUF104.py:56:2: RUF104 [*] Unformatted special comment
    |
-52 | #   nopycln:            file
-53 | #   nopycln:       import
-54 | #pyright:ignore[]
+54 | #   nopycln:            file
+55 | #   nopycln:       import
+56 | #pyright:ignore[]
    |  ^^^^^^^ RUF104
-55 | #           pyright:    ignore[]
-56 | # ruff: isort:skip
+57 | #           pyright:    ignore[]
+58 | # ruff: isort:skip
    |
    = help: Format comment
 
 ℹ Safe fix
-51 51 | # mypy:  disallow-subclassing-any
-52 52 | #   nopycln: 	 		file
-53 53 | # 	nopycln:	   import
-54    |-#pyright:ignore[]
-   54 |+# pyright: ignore[]
-55 55 | #			pyright:    ignore[]
-56 56 | # ruff: isort:skip
-57 57 | # ruff: isort:skip_file
+53 53 | # mypy:  disallow-subclassing-any
+54 54 | #   nopycln: 	 		file
+55 55 | # 	nopycln:	   import
+56    |-#pyright:ignore[]
+   56 |+# pyright: ignore[]
+57 57 | #			pyright:    ignore[]
+58 58 | # ruff: isort:skip
+59 59 | # ruff: isort:skip_file
 
-RUF104.py:55:5: RUF104 [*] Unformatted special comment
+RUF104.py:57:5: RUF104 [*] Unformatted special comment
    |
-53 | #   nopycln:       import
-54 | #pyright:ignore[]
-55 | #           pyright:    ignore[]
+55 | #   nopycln:       import
+56 | #pyright:ignore[]
+57 | #           pyright:    ignore[]
    |             ^^^^^^^ RUF104
-56 | # ruff: isort:skip
-57 | # ruff: isort:skip_file
+58 | # ruff: isort:skip
+59 | # ruff: isort:skip_file
    |
    = help: Format comment
 
 ℹ Safe fix
-52 52 | #   nopycln: 	 		file
-53 53 | # 	nopycln:	   import
-54 54 | #pyright:ignore[]
-55    |-#			pyright:    ignore[]
-   55 |+# pyright: ignore[]
-56 56 | # ruff: isort:skip
-57 57 | # ruff: isort:skip_file
-58 58 | #    type:			ignore
+54 54 | #   nopycln: 	 		file
+55 55 | # 	nopycln:	   import
+56 56 | #pyright:ignore[]
+57    |-#			pyright:    ignore[]
+   57 |+# pyright: ignore[]
+58 58 | # ruff: isort:skip
+59 59 | # ruff: isort:skip_file
+60 60 | #    type:			ignore
 
-RUF104.py:56:3: RUF104 [*] Unformatted special comment
+RUF104.py:58:3: RUF104 [*] Unformatted special comment
    |
-54 | #pyright:ignore[]
-55 | #           pyright:    ignore[]
-56 | # ruff: isort:skip
+56 | #pyright:ignore[]
+57 | #           pyright:    ignore[]
+58 | # ruff: isort:skip
    |   ^^^^ RUF104
-57 | # ruff: isort:skip_file
-58 | #    type:          ignore
+59 | # ruff: isort:skip_file
+60 | #    type:          ignore
    |
    = help: Format comment
 
 ℹ Safe fix
-53 53 | # 	nopycln:	   import
-54 54 | #pyright:ignore[]
-55 55 | #			pyright:    ignore[]
-56    |-# ruff: isort:skip
-   56 |+# ruff: isort: skip
-57 57 | # ruff: isort:skip_file
-58 58 | #    type:			ignore
-59 59 | #	 	 	type:		 	int
+55 55 | # 	nopycln:	   import
+56 56 | #pyright:ignore[]
+57 57 | #			pyright:    ignore[]
+58    |-# ruff: isort:skip
+   58 |+# ruff: isort: skip
+59 59 | # ruff: isort:skip_file
+60 60 | #    type:			ignore
+61 61 | #	 	 	type:		 	int
 
-RUF104.py:57:3: RUF104 [*] Unformatted special comment
+RUF104.py:59:3: RUF104 [*] Unformatted special comment
    |
-55 | #           pyright:    ignore[]
-56 | # ruff: isort:skip
-57 | # ruff: isort:skip_file
+57 | #           pyright:    ignore[]
+58 | # ruff: isort:skip
+59 | # ruff: isort:skip_file
    |   ^^^^ RUF104
-58 | #    type:          ignore
-59 | #           type:           int
+60 | #    type:          ignore
+61 | #           type:           int
    |
    = help: Format comment
 
 ℹ Safe fix
-54 54 | #pyright:ignore[]
-55 55 | #			pyright:    ignore[]
-56 56 | # ruff: isort:skip
-57    |-# ruff: isort:skip_file
-   57 |+# ruff: isort: skip_file
-58 58 | #    type:			ignore
-59 59 | #	 	 	type:		 	int
-60 60 | 
+56 56 | #pyright:ignore[]
+57 57 | #			pyright:    ignore[]
+58 58 | # ruff: isort:skip
+59    |-# ruff: isort:skip_file
+   59 |+# ruff: isort: skip_file
+60 60 | #    type:			ignore
+61 61 | #	 	 	type:		 	int
+62 62 | 
 
-RUF104.py:58:6: RUF104 [*] Unformatted special comment
+RUF104.py:60:6: RUF104 [*] Unformatted special comment
    |
-56 | # ruff: isort:skip
-57 | # ruff: isort:skip_file
-58 | #    type:          ignore
+58 | # ruff: isort:skip
+59 | # ruff: isort:skip_file
+60 | #    type:          ignore
    |      ^^^^ RUF104
-59 | #           type:           int
+61 | #           type:           int
    |
    = help: Format comment
 
 ℹ Safe fix
-55 55 | #			pyright:    ignore[]
-56 56 | # ruff: isort:skip
-57 57 | # ruff: isort:skip_file
-58    |-#    type:			ignore
-   58 |+# type: ignore
-59 59 | #	 	 	type:		 	int
-60 60 | 
-61 61 | # NoQA: A123, B456
+57 57 | #			pyright:    ignore[]
+58 58 | # ruff: isort:skip
+59 59 | # ruff: isort:skip_file
+60    |-#    type:			ignore
+   60 |+# type: ignore
+61 61 | #	 	 	type:		 	int
+62 62 | 
+63 63 | # NoQA: A123, B456
 
-RUF104.py:59:7: RUF104 [*] Unformatted special comment
+RUF104.py:61:7: RUF104 [*] Unformatted special comment
    |
-57 | # ruff: isort:skip_file
-58 | #    type:          ignore
-59 | #           type:           int
+59 | # ruff: isort:skip_file
+60 | #    type:          ignore
+61 | #           type:           int
    |             ^^^^ RUF104
-60 | 
-61 | # NoQA: A123, B456
+62 | 
+63 | # NoQA: A123, B456
    |
    = help: Format comment
 
 ℹ Safe fix
-56 56 | # ruff: isort:skip
-57 57 | # ruff: isort:skip_file
-58 58 | #    type:			ignore
-59    |-#	 	 	type:		 	int
-   59 |+# type: int
-60 60 | 
-61 61 | # NoQA: A123, B456
-62 62 | # ruff: NoQA: A123, B456
-
-RUF104.py:61:3: RUF104 [*] Unformatted special comment
-   |
-59 | #           type:           int
-60 | 
-61 | # NoQA: A123, B456
-   |   ^^^^ RUF104
-62 | # ruff: NoQA: A123, B456
-63 | # flake8: NoQA: A123, B456
-   |
-   = help: Format comment
-
-ℹ Safe fix
-58 58 | #    type:			ignore
-59 59 | #	 	 	type:		 	int
-60 60 | 
-61    |-# NoQA: A123, B456
-   61 |+# noqa: A123, B456
-62 62 | # ruff: NoQA: A123, B456
-63 63 | # flake8: NoQA: A123, B456
-64 64 | # NoPyCLN: File
-
-RUF104.py:62:3: RUF104 [*] Unformatted special comment
-   |
-61 | # NoQA: A123, B456
-62 | # ruff: NoQA: A123, B456
-   |   ^^^^ RUF104
-63 | # flake8: NoQA: A123, B456
-64 | # NoPyCLN: File
-   |
-   = help: Format comment
-
-ℹ Safe fix
-59 59 | #	 	 	type:		 	int
-60 60 | 
-61 61 | # NoQA: A123, B456
-62    |-# ruff: NoQA: A123, B456
-   62 |+# ruff: noqa: A123, B456
-63 63 | # flake8: NoQA: A123, B456
-64 64 | # NoPyCLN: File
-65 65 | # NoPycln: Import
+58 58 | # ruff: isort:skip
+59 59 | # ruff: isort:skip_file
+60 60 | #    type:			ignore
+61    |-#	 	 	type:		 	int
+   61 |+# type: int
+62 62 | 
+63 63 | # NoQA: A123, B456
+64 64 | # ruff: NoQA: A123, B456
 
 RUF104.py:63:3: RUF104 [*] Unformatted special comment
    |
-61 | # NoQA: A123, B456
-62 | # ruff: NoQA: A123, B456
-63 | # flake8: NoQA: A123, B456
-   |   ^^^^^^ RUF104
-64 | # NoPyCLN: File
-65 | # NoPycln: Import
+61 | #           type:           int
+62 | 
+63 | # NoQA: A123, B456
+   |   ^^^^ RUF104
+64 | # ruff: NoQA: A123, B456
+65 | # flake8: NoQA: A123, B456
    |
    = help: Format comment
 
 ℹ Safe fix
-60 60 | 
-61 61 | # NoQA: A123, B456
-62 62 | # ruff: NoQA: A123, B456
-63    |-# flake8: NoQA: A123, B456
-   63 |+# flake8: noqa: A123, B456
-64 64 | # NoPyCLN: File
-65 65 | # NoPycln: Import
-66 66 | # nOpYcLn: iMpOrT
+60 60 | #    type:			ignore
+61 61 | #	 	 	type:		 	int
+62 62 | 
+63    |-# NoQA: A123, B456
+   63 |+# noqa: A123, B456
+64 64 | # ruff: NoQA: A123, B456
+65 65 | # flake8: NoQA: A123, B456
+66 66 | # NoPyCLN: File
 
 RUF104.py:64:3: RUF104 [*] Unformatted special comment
    |
-62 | # ruff: NoQA: A123, B456
-63 | # flake8: NoQA: A123, B456
-64 | # NoPyCLN: File
-   |   ^^^^^^^ RUF104
-65 | # NoPycln: Import
-66 | # nOpYcLn: iMpOrT
+63 | # NoQA: A123, B456
+64 | # ruff: NoQA: A123, B456
+   |   ^^^^ RUF104
+65 | # flake8: NoQA: A123, B456
+66 | # NoPyCLN: File
    |
    = help: Format comment
 
 ℹ Safe fix
-61 61 | # NoQA: A123, B456
-62 62 | # ruff: NoQA: A123, B456
-63 63 | # flake8: NoQA: A123, B456
-64    |-# NoPyCLN: File
-   64 |+# nopycln: file
-65 65 | # NoPycln: Import
-66 66 | # nOpYcLn: iMpOrT
-67 67 | 
+61 61 | #	 	 	type:		 	int
+62 62 | 
+63 63 | # NoQA: A123, B456
+64    |-# ruff: NoQA: A123, B456
+   64 |+# ruff: noqa: A123, B456
+65 65 | # flake8: NoQA: A123, B456
+66 66 | # NoPyCLN: File
+67 67 | # NoPycln: Import
 
 RUF104.py:65:3: RUF104 [*] Unformatted special comment
    |
-63 | # flake8: NoQA: A123, B456
-64 | # NoPyCLN: File
-65 | # NoPycln: Import
-   |   ^^^^^^^ RUF104
-66 | # nOpYcLn: iMpOrT
+63 | # NoQA: A123, B456
+64 | # ruff: NoQA: A123, B456
+65 | # flake8: NoQA: A123, B456
+   |   ^^^^^^ RUF104
+66 | # NoPyCLN: File
+67 | # NoPycln: Import
    |
    = help: Format comment
 
 ℹ Safe fix
-62 62 | # ruff: NoQA: A123, B456
-63 63 | # flake8: NoQA: A123, B456
-64 64 | # NoPyCLN: File
-65    |-# NoPycln: Import
-   65 |+# nopycln: import
-66 66 | # nOpYcLn: iMpOrT
-67 67 | 
-68 68 | # noqa: A123 B456
+62 62 | 
+63 63 | # NoQA: A123, B456
+64 64 | # ruff: NoQA: A123, B456
+65    |-# flake8: NoQA: A123, B456
+   65 |+# flake8: noqa: A123, B456
+66 66 | # NoPyCLN: File
+67 67 | # NoPycln: Import
+68 68 | # nOpYcLn: iMpOrT
 
 RUF104.py:66:3: RUF104 [*] Unformatted special comment
    |
-64 | # NoPyCLN: File
-65 | # NoPycln: Import
-66 | # nOpYcLn: iMpOrT
+64 | # ruff: NoQA: A123, B456
+65 | # flake8: NoQA: A123, B456
+66 | # NoPyCLN: File
    |   ^^^^^^^ RUF104
-67 | 
-68 | # noqa: A123 B456
+67 | # NoPycln: Import
+68 | # nOpYcLn: iMpOrT
    |
    = help: Format comment
 
 ℹ Safe fix
-63 63 | # flake8: NoQA: A123, B456
-64 64 | # NoPyCLN: File
-65 65 | # NoPycln: Import
-66    |-# nOpYcLn: iMpOrT
-   66 |+# nopycln: import
-67 67 | 
-68 68 | # noqa: A123 B456
-69 69 | # ruff: noqa: A123 B456
+63 63 | # NoQA: A123, B456
+64 64 | # ruff: NoQA: A123, B456
+65 65 | # flake8: NoQA: A123, B456
+66    |-# NoPyCLN: File
+   66 |+# nopycln: file
+67 67 | # NoPycln: Import
+68 68 | # nOpYcLn: iMpOrT
+69 69 | 
+
+RUF104.py:67:3: RUF104 [*] Unformatted special comment
+   |
+65 | # flake8: NoQA: A123, B456
+66 | # NoPyCLN: File
+67 | # NoPycln: Import
+   |   ^^^^^^^ RUF104
+68 | # nOpYcLn: iMpOrT
+   |
+   = help: Format comment
+
+ℹ Safe fix
+64 64 | # ruff: NoQA: A123, B456
+65 65 | # flake8: NoQA: A123, B456
+66 66 | # NoPyCLN: File
+67    |-# NoPycln: Import
+   67 |+# nopycln: import
+68 68 | # nOpYcLn: iMpOrT
+69 69 | 
+70 70 | # noqa: A123 B456
 
 RUF104.py:68:3: RUF104 [*] Unformatted special comment
    |
-66 | # nOpYcLn: iMpOrT
-67 | 
-68 | # noqa: A123 B456
-   |   ^^^^ RUF104
-69 | # ruff: noqa: A123 B456
-70 | # flake8: noqa: A123 B456
+66 | # NoPyCLN: File
+67 | # NoPycln: Import
+68 | # nOpYcLn: iMpOrT
+   |   ^^^^^^^ RUF104
+69 | 
+70 | # noqa: A123 B456
    |
    = help: Format comment
 
 ℹ Safe fix
-65 65 | # NoPycln: Import
-66 66 | # nOpYcLn: iMpOrT
-67 67 | 
-68    |-# noqa: A123 B456
-   68 |+# noqa: A123, B456
-69 69 | # ruff: noqa: A123 B456
-70 70 | # flake8: noqa: A123 B456
-71 71 | # noqa: A123,B456
-
-RUF104.py:69:3: RUF104 [*] Unformatted special comment
-   |
-68 | # noqa: A123 B456
-69 | # ruff: noqa: A123 B456
-   |   ^^^^ RUF104
-70 | # flake8: noqa: A123 B456
-71 | # noqa: A123,B456
-   |
-   = help: Format comment
-
-ℹ Safe fix
-66 66 | # nOpYcLn: iMpOrT
-67 67 | 
-68 68 | # noqa: A123 B456
-69    |-# ruff: noqa: A123 B456
-   69 |+# ruff: noqa: A123, B456
-70 70 | # flake8: noqa: A123 B456
-71 71 | # noqa: A123,B456
-72 72 | # ruff: noqa: A123,B456
+65 65 | # flake8: NoQA: A123, B456
+66 66 | # NoPyCLN: File
+67 67 | # NoPycln: Import
+68    |-# nOpYcLn: iMpOrT
+   68 |+# nopycln: import
+69 69 | 
+70 70 | # noqa: A123 B456
+71 71 | # ruff: noqa: A123 B456
 
 RUF104.py:70:3: RUF104 [*] Unformatted special comment
    |
-68 | # noqa: A123 B456
-69 | # ruff: noqa: A123 B456
-70 | # flake8: noqa: A123 B456
-   |   ^^^^^^ RUF104
-71 | # noqa: A123,B456
-72 | # ruff: noqa: A123,B456
+68 | # nOpYcLn: iMpOrT
+69 | 
+70 | # noqa: A123 B456
+   |   ^^^^ RUF104
+71 | # ruff: noqa: A123 B456
+72 | # flake8: noqa: A123 B456
    |
    = help: Format comment
 
 ℹ Safe fix
-67 67 | 
-68 68 | # noqa: A123 B456
-69 69 | # ruff: noqa: A123 B456
-70    |-# flake8: noqa: A123 B456
-   70 |+# flake8: noqa: A123, B456
-71 71 | # noqa: A123,B456
-72 72 | # ruff: noqa: A123,B456
-73 73 | # flake8: noqa: A123,B456
+67 67 | # NoPycln: Import
+68 68 | # nOpYcLn: iMpOrT
+69 69 | 
+70    |-# noqa: A123 B456
+   70 |+# noqa: A123, B456
+71 71 | # ruff: noqa: A123 B456
+72 72 | # flake8: noqa: A123 B456
+73 73 | # noqa: A123,B456
 
 RUF104.py:71:3: RUF104 [*] Unformatted special comment
    |
-69 | # ruff: noqa: A123 B456
-70 | # flake8: noqa: A123 B456
-71 | # noqa: A123,B456
+70 | # noqa: A123 B456
+71 | # ruff: noqa: A123 B456
    |   ^^^^ RUF104
-72 | # ruff: noqa: A123,B456
-73 | # flake8: noqa: A123,B456
+72 | # flake8: noqa: A123 B456
+73 | # noqa: A123,B456
    |
    = help: Format comment
 
 ℹ Safe fix
-68 68 | # noqa: A123 B456
-69 69 | # ruff: noqa: A123 B456
-70 70 | # flake8: noqa: A123 B456
-71    |-# noqa: A123,B456
-   71 |+# noqa: A123, B456
-72 72 | # ruff: noqa: A123,B456
-73 73 | # flake8: noqa: A123,B456
-74 74 | # noqa: A123,,B456
+68 68 | # nOpYcLn: iMpOrT
+69 69 | 
+70 70 | # noqa: A123 B456
+71    |-# ruff: noqa: A123 B456
+   71 |+# ruff: noqa: A123, B456
+72 72 | # flake8: noqa: A123 B456
+73 73 | # noqa: A123,B456
+74 74 | # ruff: noqa: A123,B456
 
 RUF104.py:72:3: RUF104 [*] Unformatted special comment
    |
-70 | # flake8: noqa: A123 B456
-71 | # noqa: A123,B456
-72 | # ruff: noqa: A123,B456
-   |   ^^^^ RUF104
-73 | # flake8: noqa: A123,B456
-74 | # noqa: A123,,B456
+70 | # noqa: A123 B456
+71 | # ruff: noqa: A123 B456
+72 | # flake8: noqa: A123 B456
+   |   ^^^^^^ RUF104
+73 | # noqa: A123,B456
+74 | # ruff: noqa: A123,B456
    |
    = help: Format comment
 
 ℹ Safe fix
-69 69 | # ruff: noqa: A123 B456
-70 70 | # flake8: noqa: A123 B456
-71 71 | # noqa: A123,B456
-72    |-# ruff: noqa: A123,B456
-   72 |+# ruff: noqa: A123, B456
-73 73 | # flake8: noqa: A123,B456
-74 74 | # noqa: A123,,B456
-75 75 | # noqa: A123 , 	,	 	B456
+69 69 | 
+70 70 | # noqa: A123 B456
+71 71 | # ruff: noqa: A123 B456
+72    |-# flake8: noqa: A123 B456
+   72 |+# flake8: noqa: A123, B456
+73 73 | # noqa: A123,B456
+74 74 | # ruff: noqa: A123,B456
+75 75 | # flake8: noqa: A123,B456
 
 RUF104.py:73:3: RUF104 [*] Unformatted special comment
    |
-71 | # noqa: A123,B456
-72 | # ruff: noqa: A123,B456
-73 | # flake8: noqa: A123,B456
-   |   ^^^^^^ RUF104
-74 | # noqa: A123,,B456
-75 | # noqa: A123 ,  ,       B456
+71 | # ruff: noqa: A123 B456
+72 | # flake8: noqa: A123 B456
+73 | # noqa: A123,B456
+   |   ^^^^ RUF104
+74 | # ruff: noqa: A123,B456
+75 | # flake8: noqa: A123,B456
    |
    = help: Format comment
 
 ℹ Safe fix
-70 70 | # flake8: noqa: A123 B456
-71 71 | # noqa: A123,B456
-72 72 | # ruff: noqa: A123,B456
-73    |-# flake8: noqa: A123,B456
-   73 |+# flake8: noqa: A123, B456
-74 74 | # noqa: A123,,B456
-75 75 | # noqa: A123 , 	,	 	B456
-76 76 | # noqa: A123	B456
+70 70 | # noqa: A123 B456
+71 71 | # ruff: noqa: A123 B456
+72 72 | # flake8: noqa: A123 B456
+73    |-# noqa: A123,B456
+   73 |+# noqa: A123, B456
+74 74 | # ruff: noqa: A123,B456
+75 75 | # flake8: noqa: A123,B456
+76 76 | # noqa: A123,,B456
 
 RUF104.py:74:3: RUF104 [*] Unformatted special comment
    |
-72 | # ruff: noqa: A123,B456
-73 | # flake8: noqa: A123,B456
-74 | # noqa: A123,,B456
+72 | # flake8: noqa: A123 B456
+73 | # noqa: A123,B456
+74 | # ruff: noqa: A123,B456
    |   ^^^^ RUF104
-75 | # noqa: A123 ,  ,       B456
-76 | # noqa: A123    B456
+75 | # flake8: noqa: A123,B456
+76 | # noqa: A123,,B456
    |
    = help: Format comment
 
 ℹ Safe fix
-71 71 | # noqa: A123,B456
-72 72 | # ruff: noqa: A123,B456
-73 73 | # flake8: noqa: A123,B456
-74    |-# noqa: A123,,B456
-   74 |+# noqa: A123, B456
-75 75 | # noqa: A123 , 	,	 	B456
-76 76 | # noqa: A123	B456
-77 77 | # noqa: A123			B456
+71 71 | # ruff: noqa: A123 B456
+72 72 | # flake8: noqa: A123 B456
+73 73 | # noqa: A123,B456
+74    |-# ruff: noqa: A123,B456
+   74 |+# ruff: noqa: A123, B456
+75 75 | # flake8: noqa: A123,B456
+76 76 | # noqa: A123,,B456
+77 77 | # noqa: A123 , 	,	 	B456
 
 RUF104.py:75:3: RUF104 [*] Unformatted special comment
    |
-73 | # flake8: noqa: A123,B456
-74 | # noqa: A123,,B456
-75 | # noqa: A123 ,  ,       B456
-   |   ^^^^ RUF104
-76 | # noqa: A123    B456
-77 | # noqa: A123            B456
+73 | # noqa: A123,B456
+74 | # ruff: noqa: A123,B456
+75 | # flake8: noqa: A123,B456
+   |   ^^^^^^ RUF104
+76 | # noqa: A123,,B456
+77 | # noqa: A123 ,  ,       B456
    |
    = help: Format comment
 
 ℹ Safe fix
-72 72 | # ruff: noqa: A123,B456
-73 73 | # flake8: noqa: A123,B456
-74 74 | # noqa: A123,,B456
-75    |-# noqa: A123 , 	,	 	B456
-   75 |+# noqa: A123, B456
-76 76 | # noqa: A123	B456
-77 77 | # noqa: A123			B456
-78 78 | # noqa: A123				B456
+72 72 | # flake8: noqa: A123 B456
+73 73 | # noqa: A123,B456
+74 74 | # ruff: noqa: A123,B456
+75    |-# flake8: noqa: A123,B456
+   75 |+# flake8: noqa: A123, B456
+76 76 | # noqa: A123,,B456
+77 77 | # noqa: A123 , 	,	 	B456
+78 78 | # noqa: A123	B456
 
 RUF104.py:76:3: RUF104 [*] Unformatted special comment
    |
-74 | # noqa: A123,,B456
-75 | # noqa: A123 ,  ,       B456
-76 | # noqa: A123    B456
+74 | # ruff: noqa: A123,B456
+75 | # flake8: noqa: A123,B456
+76 | # noqa: A123,,B456
    |   ^^^^ RUF104
-77 | # noqa: A123            B456
-78 | # noqa: A123                B456
+77 | # noqa: A123 ,  ,       B456
+78 | # noqa: A123    B456
    |
    = help: Format comment
 
 ℹ Safe fix
-73 73 | # flake8: noqa: A123,B456
-74 74 | # noqa: A123,,B456
-75 75 | # noqa: A123 , 	,	 	B456
-76    |-# noqa: A123	B456
+73 73 | # noqa: A123,B456
+74 74 | # ruff: noqa: A123,B456
+75 75 | # flake8: noqa: A123,B456
+76    |-# noqa: A123,,B456
    76 |+# noqa: A123, B456
-77 77 | # noqa: A123			B456
-78 78 | # noqa: A123				B456
-79 79 | # noqa: A123 ,B456
+77 77 | # noqa: A123 , 	,	 	B456
+78 78 | # noqa: A123	B456
+79 79 | # noqa: A123			B456
 
 RUF104.py:77:3: RUF104 [*] Unformatted special comment
    |
-75 | # noqa: A123 ,  ,       B456
-76 | # noqa: A123    B456
-77 | # noqa: A123            B456
+75 | # flake8: noqa: A123,B456
+76 | # noqa: A123,,B456
+77 | # noqa: A123 ,  ,       B456
    |   ^^^^ RUF104
-78 | # noqa: A123                B456
-79 | # noqa: A123 ,B456
+78 | # noqa: A123    B456
+79 | # noqa: A123            B456
    |
    = help: Format comment
 
 ℹ Safe fix
-74 74 | # noqa: A123,,B456
-75 75 | # noqa: A123 , 	,	 	B456
-76 76 | # noqa: A123	B456
-77    |-# noqa: A123			B456
+74 74 | # ruff: noqa: A123,B456
+75 75 | # flake8: noqa: A123,B456
+76 76 | # noqa: A123,,B456
+77    |-# noqa: A123 , 	,	 	B456
    77 |+# noqa: A123, B456
-78 78 | # noqa: A123				B456
-79 79 | # noqa: A123 ,B456
-80 80 | # ruff: noqa: A123	B456
+78 78 | # noqa: A123	B456
+79 79 | # noqa: A123			B456
+80 80 | # noqa: A123				B456
 
 RUF104.py:78:3: RUF104 [*] Unformatted special comment
    |
-76 | # noqa: A123    B456
-77 | # noqa: A123            B456
-78 | # noqa: A123                B456
+76 | # noqa: A123,,B456
+77 | # noqa: A123 ,  ,       B456
+78 | # noqa: A123    B456
    |   ^^^^ RUF104
-79 | # noqa: A123 ,B456
-80 | # ruff: noqa: A123  B456
+79 | # noqa: A123            B456
+80 | # noqa: A123                B456
    |
    = help: Format comment
 
 ℹ Safe fix
-75 75 | # noqa: A123 , 	,	 	B456
-76 76 | # noqa: A123	B456
-77 77 | # noqa: A123			B456
-78    |-# noqa: A123				B456
+75 75 | # flake8: noqa: A123,B456
+76 76 | # noqa: A123,,B456
+77 77 | # noqa: A123 , 	,	 	B456
+78    |-# noqa: A123	B456
    78 |+# noqa: A123, B456
-79 79 | # noqa: A123 ,B456
-80 80 | # ruff: noqa: A123	B456
-81 81 | # flake8: noqa: A123   B456
+79 79 | # noqa: A123			B456
+80 80 | # noqa: A123				B456
+81 81 | # noqa: A123 ,B456
 
 RUF104.py:79:3: RUF104 [*] Unformatted special comment
    |
-77 | # noqa: A123            B456
-78 | # noqa: A123                B456
-79 | # noqa: A123 ,B456
+77 | # noqa: A123 ,  ,       B456
+78 | # noqa: A123    B456
+79 | # noqa: A123            B456
    |   ^^^^ RUF104
-80 | # ruff: noqa: A123  B456
-81 | # flake8: noqa: A123   B456
+80 | # noqa: A123                B456
+81 | # noqa: A123 ,B456
    |
    = help: Format comment
 
 ℹ Safe fix
-76 76 | # noqa: A123	B456
-77 77 | # noqa: A123			B456
-78 78 | # noqa: A123				B456
-79    |-# noqa: A123 ,B456
+76 76 | # noqa: A123,,B456
+77 77 | # noqa: A123 , 	,	 	B456
+78 78 | # noqa: A123	B456
+79    |-# noqa: A123			B456
    79 |+# noqa: A123, B456
-80 80 | # ruff: noqa: A123	B456
-81 81 | # flake8: noqa: A123   B456
-82 82 | 
+80 80 | # noqa: A123				B456
+81 81 | # noqa: A123 ,B456
+82 82 | # ruff: noqa: A123	B456
 
 RUF104.py:80:3: RUF104 [*] Unformatted special comment
    |
-78 | # noqa: A123                B456
-79 | # noqa: A123 ,B456
-80 | # ruff: noqa: A123  B456
+78 | # noqa: A123    B456
+79 | # noqa: A123            B456
+80 | # noqa: A123                B456
    |   ^^^^ RUF104
-81 | # flake8: noqa: A123   B456
+81 | # noqa: A123 ,B456
+82 | # ruff: noqa: A123  B456
    |
    = help: Format comment
 
 ℹ Safe fix
-77 77 | # noqa: A123			B456
-78 78 | # noqa: A123				B456
-79 79 | # noqa: A123 ,B456
-80    |-# ruff: noqa: A123	B456
-   80 |+# ruff: noqa: A123, B456
-81 81 | # flake8: noqa: A123   B456
-82 82 | 
-83 83 | 
+77 77 | # noqa: A123 , 	,	 	B456
+78 78 | # noqa: A123	B456
+79 79 | # noqa: A123			B456
+80    |-# noqa: A123				B456
+   80 |+# noqa: A123, B456
+81 81 | # noqa: A123 ,B456
+82 82 | # ruff: noqa: A123	B456
+83 83 | # flake8: noqa: A123   B456
 
 RUF104.py:81:3: RUF104 [*] Unformatted special comment
    |
-79 | # noqa: A123 ,B456
-80 | # ruff: noqa: A123  B456
-81 | # flake8: noqa: A123   B456
+79 | # noqa: A123            B456
+80 | # noqa: A123                B456
+81 | # noqa: A123 ,B456
+   |   ^^^^ RUF104
+82 | # ruff: noqa: A123  B456
+83 | # flake8: noqa: A123   B456
+   |
+   = help: Format comment
+
+ℹ Safe fix
+78 78 | # noqa: A123	B456
+79 79 | # noqa: A123			B456
+80 80 | # noqa: A123				B456
+81    |-# noqa: A123 ,B456
+   81 |+# noqa: A123, B456
+82 82 | # ruff: noqa: A123	B456
+83 83 | # flake8: noqa: A123   B456
+84 84 | 
+
+RUF104.py:82:3: RUF104 [*] Unformatted special comment
+   |
+80 | # noqa: A123                B456
+81 | # noqa: A123 ,B456
+82 | # ruff: noqa: A123  B456
+   |   ^^^^ RUF104
+83 | # flake8: noqa: A123   B456
+   |
+   = help: Format comment
+
+ℹ Safe fix
+79 79 | # noqa: A123			B456
+80 80 | # noqa: A123				B456
+81 81 | # noqa: A123 ,B456
+82    |-# ruff: noqa: A123	B456
+   82 |+# ruff: noqa: A123, B456
+83 83 | # flake8: noqa: A123   B456
+84 84 | 
+85 85 | 
+
+RUF104.py:83:3: RUF104 [*] Unformatted special comment
+   |
+81 | # noqa: A123 ,B456
+82 | # ruff: noqa: A123  B456
+83 | # flake8: noqa: A123   B456
    |   ^^^^^^ RUF104
    |
    = help: Format comment
 
 ℹ Safe fix
-78 78 | # noqa: A123				B456
-79 79 | # noqa: A123 ,B456
-80 80 | # ruff: noqa: A123	B456
-81    |-# flake8: noqa: A123   B456
-   81 |+# flake8: noqa: A123, B456
-82 82 | 
-83 83 | 
-84 84 | # type: ignore  # noqa: A123, B456
+80 80 | # noqa: A123				B456
+81 81 | # noqa: A123 ,B456
+82 82 | # ruff: noqa: A123	B456
+83    |-# flake8: noqa: A123   B456
+   83 |+# flake8: noqa: A123, B456
+84 84 | 
+85 85 | 
+86 86 | # type: ignore  # noqa: A123, B456
 
-RUF104.py:86:2: RUF104 [*] Unformatted special comment
+RUF104.py:88:2: RUF104 [*] Unformatted special comment
    |
-84 | # type: ignore  # noqa: A123, B456
-85 | 
-86 | #pyright:ignore#noqa:A123
+86 | # type: ignore  # noqa: A123, B456
+87 | 
+88 | #pyright:ignore#noqa:A123
    |  ^^^^^^^ RUF104
-87 | 
-88 | # nopycln:file#   noqa: A123
+89 | 
+90 | # nopycln:file#   noqa: A123
    |
    = help: Format comment
 
 ℹ Safe fix
-83 83 | 
-84 84 | # type: ignore  # noqa: A123, B456
 85 85 | 
-86    |-#pyright:ignore#noqa:A123
-   86 |+# pyright: ignore#noqa:A123
+86 86 | # type: ignore  # noqa: A123, B456
 87 87 | 
-88 88 | # nopycln:file#   noqa: A123
+88    |-#pyright:ignore#noqa:A123
+   88 |+# pyright: ignore#noqa:A123
 89 89 | 
+90 90 | # nopycln:file#   noqa: A123
+91 91 | 
 
-RUF104.py:86:17: RUF104 [*] Unformatted special comment
+RUF104.py:88:17: RUF104 [*] Unformatted special comment
    |
-84 | # type: ignore  # noqa: A123, B456
-85 | 
-86 | #pyright:ignore#noqa:A123
+86 | # type: ignore  # noqa: A123, B456
+87 | 
+88 | #pyright:ignore#noqa:A123
    |                 ^^^^ RUF104
-87 | 
-88 | # nopycln:file#   noqa: A123
-   |
-   = help: Format comment
-
-ℹ Safe fix
-83 83 | 
-84 84 | # type: ignore  # noqa: A123, B456
-85 85 | 
-86    |-#pyright:ignore#noqa:A123
-   86 |+#pyright:ignore# noqa: A123
-87 87 | 
-88 88 | # nopycln:file#   noqa: A123
-89 89 | 
-
-RUF104.py:88:3: RUF104 [*] Unformatted special comment
-   |
-86 | #pyright:ignore#noqa:A123
-87 | 
-88 | # nopycln:file#   noqa: A123
-   |   ^^^^^^^ RUF104
 89 | 
-90 | # noqa:A123 - Lorem ipsum dolor sit amet
+90 | # nopycln:file#   noqa: A123
    |
    = help: Format comment
 
 ℹ Safe fix
 85 85 | 
-86 86 | #pyright:ignore#noqa:A123
+86 86 | # type: ignore  # noqa: A123, B456
 87 87 | 
-88    |-# nopycln:file#   noqa: A123
-   88 |+# nopycln: file#   noqa: A123
+88    |-#pyright:ignore#noqa:A123
+   88 |+#pyright:ignore# noqa: A123
 89 89 | 
-90 90 | # noqa:A123 - Lorem ipsum dolor sit amet
-
-RUF104.py:88:19: RUF104 [*] Unformatted special comment
-   |
-86 | #pyright:ignore#noqa:A123
-87 | 
-88 | # nopycln:file#   noqa: A123
-   |                   ^^^^ RUF104
-89 | 
-90 | # noqa:A123 - Lorem ipsum dolor sit amet
-   |
-   = help: Format comment
-
-ℹ Safe fix
-85 85 | 
-86 86 | #pyright:ignore#noqa:A123
-87 87 | 
-88    |-# nopycln:file#   noqa: A123
-   88 |+# nopycln:file# noqa: A123
-89 89 | 
-90 90 | # noqa:A123 - Lorem ipsum dolor sit amet
+90 90 | # nopycln:file#   noqa: A123
+91 91 | 
 
 RUF104.py:90:3: RUF104 [*] Unformatted special comment
    |
-88 | # nopycln:file#   noqa: A123
+88 | #pyright:ignore#noqa:A123
 89 | 
-90 | # noqa:A123 - Lorem ipsum dolor sit amet
+90 | # nopycln:file#   noqa: A123
+   |   ^^^^^^^ RUF104
+91 | 
+92 | # noqa:A123 - Lorem ipsum dolor sit amet
+   |
+   = help: Format comment
+
+ℹ Safe fix
+87 87 | 
+88 88 | #pyright:ignore#noqa:A123
+89 89 | 
+90    |-# nopycln:file#   noqa: A123
+   90 |+# nopycln: file#   noqa: A123
+91 91 | 
+92 92 | # noqa:A123 - Lorem ipsum dolor sit amet
+
+RUF104.py:90:19: RUF104 [*] Unformatted special comment
+   |
+88 | #pyright:ignore#noqa:A123
+89 | 
+90 | # nopycln:file#   noqa: A123
+   |                   ^^^^ RUF104
+91 | 
+92 | # noqa:A123 - Lorem ipsum dolor sit amet
+   |
+   = help: Format comment
+
+ℹ Safe fix
+87 87 | 
+88 88 | #pyright:ignore#noqa:A123
+89 89 | 
+90    |-# nopycln:file#   noqa: A123
+   90 |+# nopycln:file# noqa: A123
+91 91 | 
+92 92 | # noqa:A123 - Lorem ipsum dolor sit amet
+
+RUF104.py:92:3: RUF104 [*] Unformatted special comment
+   |
+90 | # nopycln:file#   noqa: A123
+91 | 
+92 | # noqa:A123 - Lorem ipsum dolor sit amet
    |   ^^^^ RUF104
    |
    = help: Format comment
 
 ℹ Safe fix
-87 87 | 
-88 88 | # nopycln:file#   noqa: A123
 89 89 | 
-90    |-# noqa:A123 - Lorem ipsum dolor sit amet
-   90 |+# noqa: A123 - Lorem ipsum dolor sit amet
+90 90 | # nopycln:file#   noqa: A123
+91 91 | 
+92    |-# noqa:A123 - Lorem ipsum dolor sit amet
+   92 |+# noqa: A123 - Lorem ipsum dolor sit amet

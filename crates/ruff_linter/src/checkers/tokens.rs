@@ -11,6 +11,7 @@ use ruff_python_parser::Tokens;
 use ruff_text_size::Ranged;
 
 use crate::directives::TodoComment;
+use crate::noqa::{FileExemption, FileNoqaDirectives};
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::{
@@ -18,7 +19,7 @@ use crate::rules::{
     flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
 use crate::settings::LinterSettings;
-use crate::Locator;
+use crate::{fs, Locator};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
@@ -33,6 +34,11 @@ pub(crate) fn check_tokens(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let comment_ranges = indexer.comment_ranges();
+
+    let per_file_ignores = fs::ignores_from_path(path, &settings.per_file_ignores);
+    let file_noqa_directives =
+        FileNoqaDirectives::extract(locator, comment_ranges, &settings.external, path);
+    let exemption = FileExemption::from(&file_noqa_directives);
 
     if settings.rules.any_enabled(&[
         Rule::BlankLineBetweenMethods,
@@ -191,7 +197,10 @@ pub(crate) fn check_tokens(
         pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens);
     }
 
-    if settings.rules.enabled(Rule::UnformattedSpecialComment) {
+    if settings.rules.enabled(Rule::UnformattedSpecialComment)
+        && !per_file_ignores.contains(Rule::UnformattedSpecialComment)
+        && !exemption.enumerates(Rule::UnformattedSpecialComment)
+    {
         ruff::rules::unformatted_special_comment(&mut diagnostics, locator, comment_ranges);
     }
 

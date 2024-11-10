@@ -45,7 +45,7 @@ pub(crate) fn check_noqa(
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
-        if matches!(diagnostic.kind.rule(), Rule::BlanketNOQA) {
+        if matches!(diagnostic.kind.rule(), Rule::BlanketNOQA | Rule::UnformattedSpecialComment) {
             continue;
         }
 
