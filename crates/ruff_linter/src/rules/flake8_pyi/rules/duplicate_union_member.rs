@@ -95,26 +95,32 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
     if diagnostics.iter().any(|f| f.fix.is_none()) {
         // Flatten the union with only unique elements.
         if let Expr::Subscript(subscript) = expr {
-            let subscript = Expr::Subscript(ast::ExprSubscript {
-                slice: Box::new(if let [elt] = unique_nodes.as_slice() {
-                    (*elt).clone()
-                } else {
-                    Expr::Tuple(ast::ExprTuple {
-                        elts: unique_nodes.into_iter().cloned().collect(),
-                        range: TextRange::default(),
-                        ctx: ExprContext::Load,
-                        parenthesized: false,
-                    })
-                }),
-                value: subscript.value.clone(),
-                range: TextRange::default(),
-                ctx: ExprContext::Load,
-            });
+            let edit = if let &[node] = unique_nodes.as_slice() {
+                // Single element.
+                Edit::range_replacement(checker.generator().expr(node), expr.range())
+            } else {
+                // `typing.Union[a, b]`
+                let subscript = Expr::Subscript(ast::ExprSubscript {
+                    slice: Box::new(if let [elt] = unique_nodes.as_slice() {
+                        (*elt).clone()
+                    } else {
+                        Expr::Tuple(ast::ExprTuple {
+                            elts: unique_nodes.into_iter().cloned().collect(),
+                            range: TextRange::default(),
+                            ctx: ExprContext::Load,
+                            parenthesized: false,
+                        })
+                    }),
+                    value: subscript.value.clone(),
+                    range: TextRange::default(),
+                    ctx: ExprContext::Load,
+                });
+                Edit::range_replacement(checker.generator().expr(&subscript), expr.range())
+            };
 
-            // typing.Union[set[int]]
             // Mark [`Fix`] as unsafe when comments are in range
             let fix = Fix::applicable_edit(
-                Edit::range_replacement(checker.generator().expr(&subscript), expr.range()),
+                edit,
                 if checker.comment_ranges().intersects(expr.range()) {
                     Applicability::Unsafe
                 } else {
