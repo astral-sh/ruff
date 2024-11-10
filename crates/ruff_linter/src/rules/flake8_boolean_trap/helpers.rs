@@ -67,7 +67,9 @@ pub(super) fn is_user_allowed_func_call(
 }
 
 /// Returns `true` if a function defines a binary operator.
-/// This only includes operators, i.e. functions that are usually not called directly.
+///
+/// This only includes operators, i.e., functions that are usually not called directly.
+///
 /// See: <https://docs.python.org/3/library/operator.html>
 pub(super) fn is_operator_method(name: &str) -> bool {
     matches!(
