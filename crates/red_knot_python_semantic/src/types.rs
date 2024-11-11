@@ -1089,17 +1089,17 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
 
                 let mut all_unbound = true;
-                let mut may_be_unbound = false;
+                let mut possibly_unbound = false;
                 for ty in union.elements(db) {
                     let ty_member = ty.member(db, name);
                     match ty_member {
                         Symbol::Unbound => {
-                            may_be_unbound = true;
+                            possibly_unbound = true;
                         }
                         Symbol::Type(ty_member, member_boundness) => {
                             // TODO: raise a diagnostic if member_boundness indicates potential unboundness
                             if member_boundness == Boundness::PossiblyUnbound {
-                                may_be_unbound = true;
+                                possibly_unbound = true;
                             }
 
                             all_unbound = false;
@@ -1113,7 +1113,7 @@ impl<'db> Type<'db> {
                 } else {
                     Symbol::Type(
                         builder.build(),
-                        if may_be_unbound {
+                        if possibly_unbound {
                             Boundness::PossiblyUnbound
                         } else {
                             Boundness::Bound
