@@ -45,9 +45,13 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
         return;
     };
 
-    if name != "__future__" || names.iter().all(|alias| &*alias.name != "annotations") {
+    if name != "__future__" {
         return;
     };
+    
+    if names.iter().all(|alias| &*alias.name != "annotations") {
+        return;
+    }
 
     let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
 
