@@ -1237,7 +1237,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Unknown
             }
             (Symbol::Type(enter_ty, enter_boundness), exit) => {
-                if enter_boundness == Boundness::MayBeUnbound {
+                if enter_boundness == Boundness::PossiblyUnbound {
                     self.diagnostics.add(
                         context_expression.into(),
                         "invalid-context-manager",
@@ -1276,7 +1276,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Symbol::Type(exit_ty, exit_boundness) => {
                         // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
 
-                        if exit_boundness == Boundness::MayBeUnbound {
+                        if exit_boundness == Boundness::PossiblyUnbound {
                             self.diagnostics.add(
                                 context_expression.into(),
                                 "invalid-context-manager",
@@ -1340,7 +1340,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO should infer `ExceptionGroup` if all caught exceptions
             // are subclasses of `Exception` --Alex
             builtins_symbol(self.db, "BaseExceptionGroup")
-                .unwrap_or_unknown()
+                .ignore_possibly_unbound()
+                .unwrap_or(Type::Unknown)
                 .to_instance(self.db)
         } else {
             // TODO: anything that's a consistent subtype of
@@ -1710,7 +1711,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     return match boundness {
                         Boundness::Bound => augmented_return_ty,
-                        Boundness::MayBeUnbound => {
+                        Boundness::PossiblyUnbound => {
                             let left_ty = target_type;
                             let right_ty = value_type;
 
@@ -2008,10 +2009,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     } = alias;
 
                     // For possibly-unbound names, just eliminate Unbound from the type; we
-                    // must be in a bound path. TODO diagnostic for maybe-unbound import?
+                    // must be in a bound path. TODO diagnostic for possibly-unbound import?
                     module_ty
                         .member(self.db, &ast::name::Name::new(&name.id))
-                        .as_type()
+                        .ignore_possibly_unbound()
                         .unwrap_or_else(|| {
                             self.diagnostics.add(
                                 AnyNodeRef::Alias(alias),
@@ -2186,7 +2187,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
             ast::Number::Float(_) => KnownClass::Float.to_instance(self.db),
             ast::Number::Complex { .. } => builtins_symbol(self.db, "complex")
-                .unwrap_or_unknown()
+                .ignore_possibly_unbound()
+                .unwrap_or(Type::Unknown)
                 .to_instance(self.db),
         }
     }
@@ -2265,7 +2267,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        builtins_symbol(self.db, "Ellipsis").unwrap_or_unknown()
+        builtins_symbol(self.db, "Ellipsis")
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown)
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -2688,21 +2692,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             };
 
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
-            if global_symbol.may_be_unbound()
+            if global_symbol.possibly_unbound()
                 && Some(self.scope()) != builtins_module_scope(self.db)
             {
-                let mut symbol = builtins_symbol(self.db, name);
-                if symbol.is_unbound() && name == "reveal_type" {
+                let mut builtins_symbol = builtins_symbol(self.db, name);
+                if builtins_symbol.is_unbound() && name == "reveal_type" {
                     self.diagnostics.add(
                         name_node.into(),
                         "undefined-reveal",
                         format_args!(
                             "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime"),
                     );
-                    symbol = typing_extensions_symbol(self.db, name);
+                    builtins_symbol = typing_extensions_symbol(self.db, name);
                 }
 
-                global_symbol.replace_unbound_with(self.db, &symbol)
+                global_symbol.or_fall_back_to(self.db, &builtins_symbol)
             } else {
                 global_symbol
             }
@@ -2742,10 +2746,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let bindings_ty = bindings_ty(self.db, definitions);
 
-        if boundness == Boundness::MayBeUnbound {
+        if boundness == Boundness::PossiblyUnbound {
             match self.lookup_name(name) {
                 Symbol::Type(looked_up_ty, looked_up_boundness) => {
-                    if looked_up_boundness == Boundness::MayBeUnbound {
+                    if looked_up_boundness == Boundness::PossiblyUnbound {
                         self.diagnostics.add_possibly_unresolved_reference(name);
                     }
 
@@ -2787,7 +2791,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         value_ty
             .member(self.db, &Name::new(&attr.id))
-            .unwrap_or_unknown()
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown)
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -3850,7 +3855,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match value_meta_ty.member(self.db, "__getitem__") {
                     Symbol::Unbound => {}
                     Symbol::Type(dunder_getitem_method, boundness) => {
-                        if boundness == Boundness::MayBeUnbound {
+                        if boundness == Boundness::PossiblyUnbound {
                             self.diagnostics.add(
                                 value_node.into(),
                                 "call-possibly-unbound-method",
@@ -3894,7 +3899,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match dunder_class_getitem_method {
                         Symbol::Unbound => {}
                         Symbol::Type(ty, boundness) => {
-                            if boundness == Boundness::MayBeUnbound {
+                            if boundness == Boundness::PossiblyUnbound {
                                 self.diagnostics.add(
                                     value_node.into(),
                                     "call-possibly-unbound-method",
@@ -4383,7 +4388,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
                 // TODO: Check that value type is enum otherwise return None
-                value_ty.member(self.db, &attr.id).unwrap_or_unknown()
+                value_ty
+                    .member(self.db, &attr.id)
+                    .ignore_possibly_unbound()
+                    .unwrap_or(Type::Unknown)
             }
             ast::Expr::NoneLiteral(_) => Type::none(self.db),
             // for negative and positive numbers
@@ -4740,7 +4748,9 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        let ty = symbol(db, scope, symbol_name).unwrap_or_unknown();
+        let ty = symbol(db, scope, symbol_name)
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown);
         assert_eq!(ty.display(db).to_string(), expected);
     }
 

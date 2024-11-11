@@ -157,7 +157,7 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
 pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
     let explicit_symbol = symbol(db, global_scope(db, file), name);
 
-    if !explicit_symbol.may_be_unbound() {
+    if !explicit_symbol.possibly_unbound() {
         return explicit_symbol;
     }
 
@@ -171,7 +171,7 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
         // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
         // on instance types yet.
         let module_type_member = KnownClass::ModuleType.to_class_literal(db).member(db, name);
-        return explicit_symbol.replace_unbound_with(db, &module_type_member);
+        return explicit_symbol.or_fall_back_to(db, &module_type_member);
     }
 
     explicit_symbol
@@ -1071,11 +1071,11 @@ impl<'db> Type<'db> {
                 // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
                 // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
                 // where we know exactly which module we're dealing with.
-                if name != "__getattr__" && global_lookup.may_be_unbound() {
+                if name != "__getattr__" && global_lookup.possibly_unbound() {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
                     let module_type_instance_member =
                         KnownClass::ModuleType.to_class_literal(db).member(db, name);
-                    global_lookup.replace_unbound_with(db, &module_type_instance_member)
+                    global_lookup.or_fall_back_to(db, &module_type_instance_member)
                 } else {
                     global_lookup
                 }
@@ -1100,17 +1100,17 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
 
                 let mut all_unbound = true;
-                let mut may_be_unbound = false;
+                let mut possibly_unbound = false;
                 for ty in union.elements(db) {
                     let ty_member = ty.member(db, name);
                     match ty_member {
                         Symbol::Unbound => {
-                            may_be_unbound = true;
+                            possibly_unbound = true;
                         }
                         Symbol::Type(ty_member, member_boundness) => {
                             // TODO: raise a diagnostic if member_boundness indicates potential unboundness
-                            if member_boundness == Boundness::MayBeUnbound {
-                                may_be_unbound = true;
+                            if member_boundness == Boundness::PossiblyUnbound {
+                                possibly_unbound = true;
                             }
 
                             all_unbound = false;
@@ -1124,8 +1124,8 @@ impl<'db> Type<'db> {
                 } else {
                     Symbol::Type(
                         builder.build(),
-                        if may_be_unbound {
-                            Boundness::MayBeUnbound
+                        if possibly_unbound {
+                            Boundness::PossiblyUnbound
                         } else {
                             Boundness::Bound
                         },
@@ -1319,7 +1319,7 @@ impl<'db> Type<'db> {
             Symbol::Type(callable_ty, Boundness::Bound) => {
                 CallDunderResult::CallOutcome(callable_ty.call(db, arg_types))
             }
-            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
+            Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
                 CallDunderResult::PossiblyUnbound(callable_ty.call(db, arg_types))
             }
             Symbol::Unbound => CallDunderResult::MethodNotAvailable,
@@ -1625,7 +1625,9 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        core_module_symbol(db, self.canonical_module(), self.as_str()).unwrap_or_unknown()
+        core_module_symbol(db, self.canonical_module(), self.as_str())
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown)
     }
 
     /// Return the module in which we should look up the definition for this class
@@ -2853,7 +2855,7 @@ impl<'db> TupleType<'db> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
@@ -2874,7 +2876,7 @@ mod tests {
         assert_eq!(size_of::<Type>(), 16);
     }
 
-    fn setup_db() -> TestDb {
+    pub(crate) fn setup_db() -> TestDb {
         let db = TestDb::new();
 
         let src_root = SystemPathBuf::from("/src");
