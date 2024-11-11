@@ -245,7 +245,7 @@ fn try_parse_isort(text: &str) -> SpecialCommentDescriptor {
 fn try_parse_ruff_isort(text: &str) -> SpecialCommentDescriptor {
     // ruff_linter::directives::extract_isort_directives
     static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^# (?<hint>ruff): isort: ?(?<rest>skip_file|skip)").unwrap());
+        LazyLock::new(|| Regex::new(r"^# (?<hint>ruff): isort:(?<rest>skip_file|skip)").unwrap());
 
     try_parse_common!(PATTERN, text, SpecialComment::RuffIsort)
 }
@@ -483,7 +483,7 @@ mod tests {
     fn composite() {
         composite_no_unformatted("# type: ignore  # noqa: A123, B456");
 
-        composite_has_unformatted("#isort:skip#noqa:A123", 2);
+        composite_has_unformatted("# isort:skip#noqa:A123", 2);
         composite_has_unformatted("# fmt:off#   noqa: A123", 2);
         composite_has_unformatted("# noqa:A123 - Lorem ipsum dolor sit amet", 1);
     }
