@@ -85,7 +85,6 @@ field24: typing.Union[int, typing.Union[int, int]]  # PYI016: Duplicate union me
 # we incorrectly re-checked the nested union).
 field25: typing.Union[int, int | int]  # PYI016: Duplicate union member `int`
 
-
 # Should emit in cases with nested `typing.Union`
 field26: typing.Union[typing.Union[int, int]]  # PYI016: Duplicate union member `int`
 
