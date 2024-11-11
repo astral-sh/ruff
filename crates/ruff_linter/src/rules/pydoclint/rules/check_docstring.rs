@@ -359,6 +359,53 @@ impl Violation for DocstringExtraneousException {
     }
 }
 
+/// ## What it does
+/// Checks for functions with arguments missing from the docstring.
+///
+/// ## Why is this bad?
+/// Missing argument documentation makes it harder for users to understand
+/// how to use the function correctly.
+///
+/// ## Example
+/// ```python
+/// def greet(name: str, times: int) -> None:
+///     """Greet someone.
+///
+///     Args:
+///         name (str): The person to greet.
+///     """
+///     for _ in range(times):
+///         print(f"Hello {name}!")
+/// ```
+#[violation]
+pub struct DocstringMissingArguments {
+    ids: Vec<String>,
+}
+
+impl Violation for DocstringMissingArguments {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DocstringMissingArguments { ids } = self;
+
+        if let [id] = ids.as_slice() {
+            format!("Argument `{id}` missing from docstring")
+        } else {
+            format!(
+                "Arguments {} missing from docstring",
+                ids.iter().map(|id| format!("`{id}`")).join(", ")
+            )
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let DocstringMissingArguments { ids } = self;
+        Some(format!(
+            "Add {} to the docstring",
+            ids.iter().map(|id| format!("`{id}`")).join(", ")
+        ))
+    }
+}
+
 /// A generic docstring section.
 #[derive(Debug)]
 struct GenericSection {
