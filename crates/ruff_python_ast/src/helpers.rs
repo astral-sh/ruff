@@ -1203,7 +1203,7 @@ impl Truthiness {
                     return Self::Falsey;
                 }
 
-                let is_unpack = |item: &DictItem| {
+                if dict.items.iter().all(|item| {
                     matches!(
                         item,
                         DictItem {
@@ -1211,10 +1211,8 @@ impl Truthiness {
                             value: Expr::Name(..)
                         }
                     )
-                };
-
-                if dict.items.iter().all(is_unpack) {
-                    // {**a} / {**a, **b}
+                }) {
+                    // {**foo} / {**foo, **bar}
                     Self::Unknown
                 } else {
                     Self::Truthy
