@@ -11,9 +11,6 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// Using `await` outside an `async` function is a syntax error.
 ///
-/// As an exception, `await` is allowed at the top level of a Jupyter notebook
-/// (see: [autoawait]).
-///
 /// ## Example
 /// ```python
 /// import asyncio
@@ -31,6 +28,10 @@ use crate::checkers::ast::Checker;
 /// async def foo():
 ///     await asyncio.sleep(1)
 /// ```
+///
+/// ## Notebook behavior
+/// As an exception, `await` is allowed at the top level of a Jupyter notebook
+/// (see: [autoawait]).
 ///
 /// ## References
 /// - [Python documentation: Await expression](https://docs.python.org/3/reference/expressions.html#await)
