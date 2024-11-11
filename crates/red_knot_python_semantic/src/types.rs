@@ -1432,7 +1432,7 @@ impl<'db> Type<'db> {
     /// Return the type of `tuple(sys.version_info)`.
     ///
     /// This is not exactly the type that `sys.version_info` has at runtime,
-    /// but it's a useful fallback for us in  order to infer `Literal` types from `sys.version_info` comparisons.
+    /// but it's a useful fallback for us in order to infer `Literal` types from `sys.version_info` comparisons.
     fn version_info_tuple(db: &'db dyn Db) -> Self {
         let target_version = Program::get(db).target_version(db);
         let int_instance_ty = KnownClass::Int.to_instance(db);
