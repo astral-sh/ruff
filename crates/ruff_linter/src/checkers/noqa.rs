@@ -53,7 +53,7 @@ pub(crate) fn check_noqa(
             FileExemption::All(_) => {
                 // If the file is exempted, ignore all diagnostics,
                 // save for RUF104, which operates on `# noqa` comments
-                // and should thus need to be suppressed explicitly.
+                // and thus needs to be suppressed explicitly.
                 if !matches!(diagnostic.kind.rule(), Rule::UnformattedSpecialComment)
                     || per_file_ignores.contains(Rule::UnformattedSpecialComment)
                     || exemption.enumerates(Rule::UnformattedSpecialComment)
