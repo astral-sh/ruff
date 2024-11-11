@@ -2789,10 +2789,35 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = attribute;
 
         let value_ty = self.infer_expression(value);
-        value_ty
-            .member(self.db, &Name::new(&attr.id))
-            .ignore_possibly_unbound()
-            .unwrap_or(Type::Unknown)
+        match value_ty.member(self.db, &Name::new(&attr.id)) {
+            Symbol::Type(member_ty, boundness) => {
+                if boundness == Boundness::PossiblyUnbound {
+                    self.diagnostics.add(
+                        attribute.into(),
+                        "possibly-unbound-attribute",
+                        format_args!(
+                            "The attribute `{}` on type `{}` is possibly unbound",
+                            attr.id,
+                            value_ty.display(self.db),
+                        ),
+                    );
+                }
+
+                member_ty
+            }
+            Symbol::Unbound => {
+                self.diagnostics.add(
+                    attribute.into(),
+                    "unresolved-attribute",
+                    format_args!(
+                        "Type `{}` has no attribute `{}`",
+                        value_ty.display(self.db),
+                        attr.id
+                    ),
+                );
+                Type::Unknown
+            }
+        }
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
