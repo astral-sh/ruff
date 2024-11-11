@@ -9,6 +9,15 @@ pub(crate) enum Boundness {
     PossiblyUnbound,
 }
 
+impl Boundness {
+    pub(crate) fn or(self, other: Boundness) -> Boundness {
+        match (self, other) {
+            (Boundness::Bound, _) | (_, Boundness::Bound) => Boundness::Bound,
+            (Boundness::PossiblyUnbound, Boundness::PossiblyUnbound) => Boundness::PossiblyUnbound,
+        }
+    }
+}
+
 /// The result of a symbol lookup, which can either be a (possibly unbound) type
 /// or a completely unbound symbol.
 ///
@@ -63,23 +72,75 @@ impl<'db> Symbol<'db> {
     }
 
     #[must_use]
-    pub(crate) fn replace_unbound_with(
-        self,
-        db: &'db dyn Db,
-        replacement: &Symbol<'db>,
-    ) -> Symbol<'db> {
+    pub(crate) fn or_fall_back_to(self, db: &'db dyn Db, replacement: &Symbol<'db>) -> Symbol<'db> {
         match replacement {
-            Symbol::Type(replacement, _) => Symbol::Type(
-                match self {
-                    Symbol::Type(ty, Boundness::Bound) => ty,
-                    Symbol::Type(ty, Boundness::PossiblyUnbound) => {
-                        UnionType::from_elements(db, [*replacement, ty])
-                    }
-                    Symbol::Unbound => *replacement,
-                },
-                Boundness::Bound,
-            ),
+            Symbol::Type(replacement_ty, replacement_boundness) => match self {
+                s @ Symbol::Type(_, Boundness::Bound) => s,
+                Symbol::Type(ty, boundness @ Boundness::PossiblyUnbound) => Symbol::Type(
+                    UnionType::from_elements(db, [*replacement_ty, ty]),
+                    boundness.or(*replacement_boundness),
+                ),
+                Symbol::Unbound => replacement.clone(),
+            },
             Symbol::Unbound => self,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::tests::setup_db;
+
+    #[test]
+    fn test_symbol_or_fall_back_to() {
+        use Boundness::{Bound, PossiblyUnbound};
+
+        let db = setup_db();
+        let ty1 = Type::IntLiteral(1);
+        let ty2 = Type::IntLiteral(2);
+
+        // Start from an unbound symbol
+        assert_eq!(
+            Symbol::Unbound.or_fall_back_to(&db, &Symbol::Unbound),
+            Symbol::Unbound
+        );
+        assert_eq!(
+            Symbol::Unbound.or_fall_back_to(&db, &Symbol::Type(ty1, PossiblyUnbound)),
+            Symbol::Type(ty1, PossiblyUnbound)
+        );
+        assert_eq!(
+            Symbol::Unbound.or_fall_back_to(&db, &Symbol::Type(ty1, Bound)),
+            Symbol::Type(ty1, Bound)
+        );
+
+        // Start from a possibly unbound symbol
+        assert_eq!(
+            Symbol::Type(ty1, PossiblyUnbound).or_fall_back_to(&db, &Symbol::Unbound),
+            Symbol::Type(ty1, PossiblyUnbound)
+        );
+        assert_eq!(
+            Symbol::Type(ty1, PossiblyUnbound)
+                .or_fall_back_to(&db, &Symbol::Type(ty2, PossiblyUnbound)),
+            Symbol::Type(UnionType::from_elements(&db, [ty2, ty1]), PossiblyUnbound)
+        );
+        assert_eq!(
+            Symbol::Type(ty1, PossiblyUnbound).or_fall_back_to(&db, &Symbol::Type(ty2, Bound)),
+            Symbol::Type(UnionType::from_elements(&db, [ty2, ty1]), Bound)
+        );
+
+        // Start from a definitely bound symbol
+        assert_eq!(
+            Symbol::Type(ty1, Bound).or_fall_back_to(&db, &Symbol::Unbound),
+            Symbol::Type(ty1, Bound)
+        );
+        assert_eq!(
+            Symbol::Type(ty1, Bound).or_fall_back_to(&db, &Symbol::Type(ty2, PossiblyUnbound)),
+            Symbol::Type(ty1, Bound)
+        );
+        assert_eq!(
+            Symbol::Type(ty1, Bound).or_fall_back_to(&db, &Symbol::Type(ty2, Bound)),
+            Symbol::Type(ty1, Bound)
+        );
     }
 }

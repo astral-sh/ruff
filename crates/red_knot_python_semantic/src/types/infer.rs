@@ -2696,18 +2696,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             if global_symbol.possibly_unbound()
                 && Some(self.scope()) != builtins_module_scope(self.db)
             {
-                let mut symbol = builtins_symbol(self.db, name);
-                if symbol.is_unbound() && name == "reveal_type" {
+                let mut builtins_symbol = builtins_symbol(self.db, name);
+                if builtins_symbol.is_unbound() && name == "reveal_type" {
                     self.diagnostics.add(
                         name_node.into(),
                         "undefined-reveal",
                         format_args!(
                             "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime"),
                     );
-                    symbol = typing_extensions_symbol(self.db, name);
+                    builtins_symbol = typing_extensions_symbol(self.db, name);
                 }
 
-                global_symbol.replace_unbound_with(self.db, &symbol)
+                global_symbol.or_fall_back_to(self.db, &builtins_symbol)
             } else {
                 global_symbol
             }

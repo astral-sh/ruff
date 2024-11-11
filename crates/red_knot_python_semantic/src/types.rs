@@ -171,7 +171,7 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
         // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
         // on instance types yet.
         let module_type_member = KnownClass::ModuleType.to_class_literal(db).member(db, name);
-        return explicit_symbol.replace_unbound_with(db, &module_type_member);
+        return explicit_symbol.or_fall_back_to(db, &module_type_member);
     }
 
     explicit_symbol
@@ -1073,7 +1073,7 @@ impl<'db> Type<'db> {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
                     let module_type_instance_member =
                         KnownClass::ModuleType.to_class_literal(db).member(db, name);
-                    global_lookup.replace_unbound_with(db, &module_type_instance_member)
+                    global_lookup.or_fall_back_to(db, &module_type_instance_member)
                 } else {
                     global_lookup
                 }
@@ -2800,7 +2800,7 @@ impl<'db> TupleType<'db> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
@@ -2821,7 +2821,7 @@ mod tests {
         assert_eq!(size_of::<Type>(), 16);
     }
 
-    fn setup_db() -> TestDb {
+    pub(crate) fn setup_db() -> TestDb {
         let db = TestDb::new();
 
         let src_root = SystemPathBuf::from("/src");
