@@ -256,8 +256,11 @@ fn add_diagnostic(
 
     // See `replace_custom_typevar_with_self`'s doc comment
     if in_stub {
-        let fix = replace_custom_typevar_with_self(checker, type_params, parameters, returns);
-        diagnostic.set_fix(fix);
+        if let Some(fix) =
+            replace_custom_typevar_with_self(checker, type_params, parameters, returns)
+        {
+            diagnostic.set_fix(fix);
+        }
     }
 
     checker.diagnostics.push(diagnostic);
@@ -283,37 +286,32 @@ fn replace_custom_typevar_with_self(
     type_params: Option<&TypeParams>,
     parameters: &Parameters,
     returns: &Expr,
-) -> Fix {
+) -> Option<Fix> {
+    // The return annotation is guaranteed to be a name,
+    // as verified by `uses_custom_var()`.
     let typevar_name = returns.as_name_expr().unwrap().id();
-    let mut fix_applicability = Applicability::Safe;
 
     let mut all_edits = vec![
         replace_return_annotation_with_self(returns),
         remove_first_parameter_annotation(parameters),
     ];
 
-    if let Some(edit) = import_self(checker, returns.range()) {
-        all_edits.push(edit);
-    }
+    let edit = import_self(checker, returns.range())?;
+    all_edits.push(edit);
 
     if let Some(edit) = remove_typevar_declaration(type_params, typevar_name) {
         all_edits.push(edit);
     }
 
-    match replace_typevar_usages_with_self(parameters, typevar_name) {
-        Ok(mut edits) => all_edits.append(&mut edits),
-        Err(mut edits) => {
-            fix_applicability = Applicability::Unsafe;
-            all_edits.append(&mut edits)
-        }
-    }
+    let (mut edits, fix_applicability) = replace_typevar_usages_with_self(parameters, typevar_name);
+    all_edits.append(&mut edits);
 
-    let (first, rest) = (all_edits.remove(0), all_edits);
+    let (first, rest) = (all_edits.swap_remove(0), all_edits);
 
-    if fix_applicability == Applicability::Safe {
-        Fix::safe_edits(first, rest)
-    } else {
-        Fix::unsafe_edits(first, rest)
+    match fix_applicability {
+        Applicability::DisplayOnly => Some(Fix::display_only_edits(first, rest)),
+        Applicability::Unsafe => Some(Fix::unsafe_edits(first, rest)),
+        Applicability::Safe => Some(Fix::safe_edits(first, rest)),
     }
 }
 
@@ -338,6 +336,8 @@ fn import_self(checker: &Checker, return_range: TextRange) -> Option<Edit> {
 }
 
 fn remove_first_parameter_annotation(parameters: &Parameters) -> Edit {
+    // The first parameter is guaranteed to be `self`/`cls`,
+    // as verified by `uses_custom_var()`.
     let mut non_variadic_positional = parameters.posonlyargs.iter().chain(&parameters.args);
     let first = &non_variadic_positional.next().unwrap().parameter;
 
@@ -354,7 +354,7 @@ fn replace_return_annotation_with_self(returns: &Expr) -> Edit {
 fn replace_typevar_usages_with_self(
     parameters: &Parameters,
     typevar_name: &str,
-) -> Result<Vec<Edit>, Vec<Edit>> {
+) -> (Vec<Edit>, Applicability) {
     let mut edits = vec![];
     let mut could_not_handle_all_usages = false;
 
@@ -363,6 +363,7 @@ fn replace_typevar_usages_with_self(
             continue;
         };
         let Expr::Name(name) = annotation else {
+            could_not_handle_all_usages = true;
             continue;
         };
 
@@ -370,15 +371,14 @@ fn replace_typevar_usages_with_self(
             let edit = Edit::range_replacement("Self".to_string(), annotation.range());
             edits.push(edit);
         } else {
-            // Bail for complex cases
             could_not_handle_all_usages = true;
         }
     }
 
     if could_not_handle_all_usages {
-        Err(edits)
+        (edits, Applicability::DisplayOnly)
     } else {
-        Ok(edits)
+        (edits, Applicability::Safe)
     }
 }
 
@@ -399,17 +399,21 @@ fn remove_typevar_declaration(type_params: Option<&TypeParams>, name: &str) -> O
         return Some(Edit::range_deletion(parameter_list.range));
     }
 
-    let (index, ..) = parameters
+    let (index, declaration) = parameters
         .iter()
         .find_position(is_declaration_in_question)?;
 
-    let typevar_range = parameters[index].as_type_var().unwrap().range();
+    let typevar_range = declaration.range();
     let last_index = parameters.len() - 1;
 
-    let range = if (0..last_index).contains(&index) {
+    let range = if index < last_index {
+        // [A, B, C]
+        //     ^^^ Remove this
         let next_range = parameters[index + 1].range();
         TextRange::new(typevar_range.start(), next_range.start())
     } else {
+        // [A, B, C]
+        //      ^^^ Remove this
         let previous_range = parameters[index - 1].range();
         TextRange::new(previous_range.end(), typevar_range.start())
     };

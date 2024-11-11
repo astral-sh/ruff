@@ -54,7 +54,9 @@ class CustomClassMethod:
    def foo[S](cls: type[S]) -> S: ...  # PYI019
 
 
-# No fixes for .py
+_S695 = TypeVar("_S695", bound="PEP695Fix")
+
+# Only .pyi gets fixes, no fixes for .py
 class PEP695Fix:
     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
 
@@ -83,3 +85,5 @@ class PEP695Fix:
     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
 
     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
+
+    def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
