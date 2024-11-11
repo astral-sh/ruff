@@ -39,6 +39,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 ///
 /// content = "<script>alert('Hello, world!')</script>"
 /// html = Markup("<b>{}</b>").format(content)  # Safe
+/// ```
 ///
 /// Given:
 /// ```python
