@@ -4,7 +4,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::StoredNameFinder;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_semantic::Binding;
+use ruff_python_semantic::{Binding, BindingId};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -89,11 +89,17 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
             continue;
         }
 
-        // Ignore any names whose bindings are referenced in the loop body.
+        // Determine whether the associated binding is referenced in the loop body.
+        // NB: We cannot use `checker.semantic().binding(scope.get(name).unwrap())` because we need to handle cases where the most recent binding is
+        // a deletion or other shadowing.
         let scope = &checker.semantic().current_scope();
-        if checker
-            .semantic()
-            .binding(scope.get(name).unwrap())
+        let loop_var_binding = scope
+            .get_all(name)
+            .map(|bid| checker.semantic().binding(bid))
+            .filter(|bdg| bdg.range == expr.range)
+            .next()
+            .unwrap();
+        if loop_var_binding
             .references
             .iter()
             .map(|&refid| checker.semantic().reference(refid).range())
