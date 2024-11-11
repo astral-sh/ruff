@@ -2,6 +2,7 @@ use ruff_python_ast::Alias;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic as semantic;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -51,6 +52,61 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     }
     if alias.name.as_str() != asname.as_str() {
         return;
+    }
+    // See https://github.com/astral-sh/ruff/issues/14283
+    let required_imports = &checker.settings.isort.required_imports;
+    if !required_imports.is_empty() {
+        let semantic_alias = semantic::Alias {
+            name: alias.name.as_str().to_owned(),
+            as_name: Some(asname.as_str().to_owned()),
+        };
+        if required_imports.contains(&semantic::NameImport::Import(semantic::ModuleNameImport {
+            name: semantic_alias,
+        })) {
+            return;
+        }
+    }
+
+    let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        asname.to_string(),
+        alias.range(),
+    )));
+    checker.diagnostics.push(diagnostic);
+}
+
+/// PLC0414
+pub(crate) fn useless_importfrom_alias(
+    checker: &mut Checker,
+    alias: &Alias,
+    module: Option<&str>,
+    level: u32,
+) {
+    let Some(asname) = &alias.asname else {
+        return;
+    };
+    if alias.name.contains('.') {
+        return;
+    }
+    if alias.name.as_str() != asname.as_str() {
+        return;
+    }
+    // See https://github.com/astral-sh/ruff/issues/14283
+    let required_imports = &checker.settings.isort.required_imports;
+    if !required_imports.is_empty() {
+        let semantic_alias = semantic::Alias {
+            name: alias.name.as_str().to_owned(),
+            as_name: Some(asname.as_str().to_owned()),
+        };
+        if required_imports.contains(&semantic::NameImport::ImportFrom(
+            semantic::MemberNameImport {
+                name: semantic_alias,
+                module: module.map(str::to_string),
+                level,
+            },
+        )) {
+            return;
+        }
     }
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
