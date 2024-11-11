@@ -27,12 +27,6 @@ enum SpecialComment {
     /// `# isort: skip_file`
     Isort(String),
     /// `# mypy: ignore-errors`
-    Mypy(String),
-    /// `# nopycln: import`
-    Nopycln(String),
-    /// `# pyright: strict`, `# pyright: ignore[reportFoo]`
-    Pyright(String),
-    /// `# ruff: isort: skip_file`
     RuffIsort(String),
     /// `# type: int`, `# type: ignore`
     Type(String),
@@ -59,12 +53,8 @@ impl SpecialComment {
                 codes: Some(codes),
             } => format!("# {hint}: noqa: {}", codes.join(", ")),
 
-            SpecialComment::Nopycln(rest) => format!("# nopycln: {}", rest.to_lowercase()),
-
             SpecialComment::Fmt(rest) => format!("# fmt: {rest}"),
             SpecialComment::Isort(rest) => format!("# isort: {rest}"),
-            SpecialComment::Mypy(rest) => format!("# mypy: {rest}"),
-            SpecialComment::Pyright(rest) => format!("# pyright: {rest}"),
             SpecialComment::RuffIsort(rest) => format!("# ruff: isort: {rest}"),
             SpecialComment::Type(rest) => format!("# type: {rest}"),
         }
@@ -252,34 +242,6 @@ fn try_parse_isort(text: &str) -> SpecialCommentDescriptor {
     try_parse_common!(PATTERN, text, SpecialComment::Isort)
 }
 
-fn try_parse_mypy(text: &str) -> SpecialCommentDescriptor {
-    // https://github.com/python/mypy/blob/3b00002acd/mypy/util.py#L228
-    static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^# (?<hint>mypy):\s*(?<rest>\S)").unwrap());
-
-    try_parse_common!(PATTERN, text, SpecialComment::Mypy)
-}
-
-fn try_parse_nopycln(text: &str) -> SpecialCommentDescriptor {
-    // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L18-L19
-    // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L127
-    // https://github.com/hadialqattan/pycln/blob/d0aeb62860/pycln/utils/regexu.py#L136
-    static PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)^#\s*(?<hint>nopycln)\s*:\s*(?<rest>file|import)").unwrap()
-    });
-
-    try_parse_common!(PATTERN, text, SpecialComment::Nopycln)
-}
-
-fn try_parse_pyright(text: &str) -> SpecialCommentDescriptor {
-    // https://github.com/microsoft/pyright/blob/9d60c434c4/packages/pyright-internal/src/parser/tokenizer.ts#L1314
-    // https://github.com/microsoft/pyright/blob/9d60c434c4/packages/pyright-internal/src/analyzer/commentUtils.ts#L138
-    static PATTERN: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"^#\s*(?<hint>pyright):\s*(?<rest>\S)").unwrap());
-
-    try_parse_common!(PATTERN, text, SpecialComment::Pyright)
-}
-
 fn try_parse_ruff_isort(text: &str) -> SpecialCommentDescriptor {
     // ruff_linter::directives::extract_isort_directives
     static PATTERN: LazyLock<Regex> =
@@ -338,9 +300,6 @@ fn check_single_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, start_ind
     parse_and_handle_comment!(try_parse_file_level_noqa, text, diagnostics, start_index);
     parse_and_handle_comment!(try_parse_fmt, text, diagnostics, start_index);
     parse_and_handle_comment!(try_parse_isort, text, diagnostics, start_index);
-    parse_and_handle_comment!(try_parse_mypy, text, diagnostics, start_index);
-    parse_and_handle_comment!(try_parse_nopycln, text, diagnostics, start_index);
-    parse_and_handle_comment!(try_parse_pyright, text, diagnostics, start_index);
     parse_and_handle_comment!(try_parse_ruff_isort, text, diagnostics, start_index);
     parse_and_handle_comment!(try_parse_type, text, diagnostics, start_index);
 }
@@ -432,8 +391,6 @@ mod tests {
     fn incorrect_casing() {
         no_unformatted("# FMT:OFF");
         no_unformatted("# isort: On");
-        no_unformatted("# Mypy: disallow-subclassing-any");
-        no_unformatted("# PyRight: basic");
         no_unformatted("# Type: ignore");
     }
 
@@ -461,16 +418,8 @@ mod tests {
         no_unformatted("# isort: skip");
         no_unformatted("# isort: skip_file");
 
-        no_unformatted("# mypy: enable-error-codes=");
-
         no_unformatted("# nopycln: file");
         no_unformatted("# nopycln: import");
-
-        no_unformatted("# pyright: basic");
-        no_unformatted("# pyright: standard");
-        no_unformatted("# pyright: strict");
-        no_unformatted("# pyright: ignore");
-        no_unformatted("# pyright: ignore [reportFoo]");
 
         no_unformatted("# ruff: isort: on");
         no_unformatted("# ruff: isort: skip_file");
@@ -495,14 +444,6 @@ mod tests {
         has_unformatted("# isort:skip");
         has_unformatted("# isort:skip_file");
 
-        has_unformatted("# mypy:  disallow-subclassing-any");
-
-        has_unformatted("#   nopycln: \t \t\tfile");
-        has_unformatted("# \tnopycln:\t   import");
-
-        has_unformatted("#pyright:ignore[]");
-        has_unformatted("#\t\t\tpyright:    ignore[]");
-
         has_unformatted("# ruff: isort:skip");
         has_unformatted("# ruff: isort:skip_file");
 
@@ -515,10 +456,6 @@ mod tests {
         has_unformatted("# NoQA: A123, B456");
         has_unformatted("# ruff: NoQA: A123, B456");
         has_unformatted("# flake8: NoQA: A123, B456");
-
-        has_unformatted("# NoPyCLN: File");
-        has_unformatted("# NoPycln: Import");
-        has_unformatted("# nOpYcLn: iMpOrT");
     }
 
     #[test]
@@ -546,8 +483,8 @@ mod tests {
     fn composite() {
         composite_no_unformatted("# type: ignore  # noqa: A123, B456");
 
-        composite_has_unformatted("#pyright:ignore#noqa:A123", 2);
-        composite_has_unformatted("# nopycln:file#   noqa: A123", 2);
+        composite_has_unformatted("#isort:skip#noqa:A123", 2);
+        composite_has_unformatted("# fmt:off#   noqa: A123", 2);
         composite_has_unformatted("# noqa:A123 - Lorem ipsum dolor sit amet", 1);
     }
 }
