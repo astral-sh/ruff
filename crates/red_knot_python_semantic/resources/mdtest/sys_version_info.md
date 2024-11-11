@@ -2,8 +2,11 @@
 
 ## The type of `sys.version_info`
 
-The type of `sys.version_info` is `sys._version_info`. This is quite a complicated type in typeshed,
-so there are many things we don't fully understand about the type yet:
+The type of `sys.version_info` is `sys._version_info`, at least according to typeshed's stubs (which
+we treat as the single source of truth for the standard library). This is quite a complicated type
+in typeshed, so there are many things we don't fully understand about the type yet; this is the
+source of several TODOs in this test file. Many of these TODOs should be naturally fixed as we
+implement more type-system features in the future.
 
 ```py
 import sys
@@ -52,6 +55,9 @@ reveal_type(sys.version_info >= (3, 8, 1, "final", 0))  # revealed: bool
 # TODO: this is an invalid comparison (`sys.version_info` is a tuple of length 5)
 # Should we issue a diagnostic here?
 reveal_type(sys.version_info >= (3, 8, 1, "final", 0, 5))  # revealed: bool
+
+# TODO: this should be `Literal[False]`; see #14279
+reveal_type(sys.version_info == (3, 8, 1, "finallllll", 0))  # revealed: bool
 ```
 
 ## Imports and aliases
