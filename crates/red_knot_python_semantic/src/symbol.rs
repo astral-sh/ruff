@@ -75,7 +75,7 @@ impl<'db> Symbol<'db> {
     pub(crate) fn or_fall_back_to(self, db: &'db dyn Db, fallback: &Symbol<'db>) -> Symbol<'db> {
         match fallback {
             Symbol::Type(fallback_ty, fallback_boundness) => match self {
-                s @ Symbol::Type(_, Boundness::Bound) => s,
+                Symbol::Type(_, Boundness::Bound) => self,
                 Symbol::Type(ty, boundness @ Boundness::PossiblyUnbound) => Symbol::Type(
                     UnionType::from_elements(db, [*fallback_ty, ty]),
                     fallback_boundness.or(boundness),
