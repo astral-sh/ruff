@@ -333,24 +333,6 @@ PYI062.pyi:32:37: PYI062 [*] Duplicate literal member `1`
 30 30 | # nested literals, all equivalent to `Literal[1]`
 31 31 | Literal[Literal[1]]  # no duplicate
 32    |-Literal[Literal[Literal[1], Literal[1]]]  # once
-   32 |+Literal[Literal[1]]  # once
-33 33 | Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
-
-PYI062.pyi:32:37: PYI062 [*] Duplicate literal member `1`
-   |
-30 | # nested literals, all equivalent to `Literal[1]`
-31 | Literal[Literal[1]]  # no duplicate
-32 | Literal[Literal[Literal[1], Literal[1]]]  # once
-   |                                     ^ PYI062
-33 | Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
-   |
-   = help: Remove duplicates
-
-ℹ Safe fix
-29 29 | 
-30 30 | # nested literals, all equivalent to `Literal[1]`
-31 31 | Literal[Literal[1]]  # no duplicate
-32    |-Literal[Literal[Literal[1], Literal[1]]]  # once
    32 |+Literal[1]  # once
 33 33 | Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
 
