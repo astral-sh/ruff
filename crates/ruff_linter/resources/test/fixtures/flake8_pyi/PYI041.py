@@ -39,14 +39,30 @@ async def f4(**kwargs: int | int | float) -> None:
     ...
 
 
-def f5(
+def f5(arg1: int, *args: Union[int, int, float]) -> None: 
+    ...
+
+
+def f6(arg1: int, *args: Union[Union[int, int, float]]) -> None: 
+    ...
+
+
+def f7(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: 
+    ...
+
+
+def f8(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: 
+    ...
+
+
+def f9(
     arg: Union[  # comment 
         float, # another
         complex, int]
     ) -> None: 
     ...
 
-def f6(
+def f10(
     arg: (
         int | # comment
         float |  # another
