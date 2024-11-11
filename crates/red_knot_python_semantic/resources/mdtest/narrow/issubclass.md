@@ -102,6 +102,8 @@ else:
 ### Handling of `None`
 
 ```py
+# TODO: this should go away once we understand sys.version_info branches
+# error: [possibly-unbound-import] "The member `NoneType` in module `types` is possibly unbound"
 from types import NoneType
 
 def flag() -> bool: ...
