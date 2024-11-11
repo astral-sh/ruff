@@ -14,8 +14,20 @@ Literal[1, Literal[1], Literal[1]]  # twice
 Literal[1, Literal[2], Literal[2]]  # once
 t.Literal[1, t.Literal[2, t.Literal[1]]]  # once
 typing_extensions.Literal[1, 1, 1]  # twice
+Literal[
+    1, # comment
+    Literal[ # another comment
+        1
+    ]
+]  # once
 
 # Ensure issue is only raised once, even on nested literals
 MyType = Literal["foo", Literal[True, False, True], "bar"]  # PYI062
 
 n: Literal["No", "duplicates", "here", 1, "1"]
+
+
+# nested literals, all equivalent to `Literal[1]`
+Literal[Literal[1]]  # no duplicate
+Literal[Literal[Literal[1], Literal[1]]]  # once
+Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once

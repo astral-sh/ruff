@@ -91,20 +91,221 @@ PYI041.py:38:24: PYI041 [*] Use `float` instead of `int | float`
 40 40 | 
 41 41 | 
 
-PYI041.py:46:24: PYI041 [*] Use `complex` instead of `int | float | complex`
+PYI041.py:43:26: PYI041 [*] Use `float` instead of `int | float`
    |
-44 |         ...
-45 | 
-46 |     def bad(self, arg: int | float | complex) -> None:
-   |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
-47 |         ...
+43 | def f5(arg1: int, *args: Union[int, int, float]) -> None: 
+   |                          ^^^^^^^^^^^^^^^^^^^^^^ PYI041
+44 |     ...
    |
    = help: Remove duplicates
 
 ℹ Safe fix
-43 43 |     def good(self, arg: int) -> None:
-44 44 |         ...
+40 40 | 
+41 41 | 
+42 42 | 
+43    |-def f5(arg1: int, *args: Union[int, int, float]) -> None: 
+   43 |+def f5(arg1: int, *args: float) -> None: 
+44 44 |     ...
 45 45 | 
-46    |-    def bad(self, arg: int | float | complex) -> None:
-   46 |+    def bad(self, arg: complex) -> None:
-47 47 |         ...
+46 46 | 
+
+PYI041.py:47:26: PYI041 [*] Use `float` instead of `int | float`
+   |
+47 | def f6(arg1: int, *args: Union[Union[int, int, float]]) -> None: 
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+48 |     ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+44 44 |     ...
+45 45 | 
+46 46 | 
+47    |-def f6(arg1: int, *args: Union[Union[int, int, float]]) -> None: 
+   47 |+def f6(arg1: int, *args: float) -> None: 
+48 48 |     ...
+49 49 | 
+50 50 | 
+
+PYI041.py:51:26: PYI041 [*] Use `float` instead of `int | float`
+   |
+51 | def f7(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: 
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+52 |     ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+48 48 |     ...
+49 49 | 
+50 50 | 
+51    |-def f7(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: 
+   51 |+def f7(arg1: int, *args: float) -> None: 
+52 52 |     ...
+53 53 | 
+54 54 | 
+
+PYI041.py:55:26: PYI041 [*] Use `float` instead of `int | float`
+   |
+55 | def f8(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: 
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+56 |     ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+52 52 |     ...
+53 53 | 
+54 54 | 
+55    |-def f8(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: 
+   55 |+def f8(arg1: int, *args: float) -> None: 
+56 56 |     ...
+57 57 | 
+58 58 | 
+
+PYI041.py:60:10: PYI041 [*] Use `complex` instead of `int | float | complex`
+   |
+59 |   def f9(
+60 |       arg: Union[  # comment 
+   |  __________^
+61 | |         float, # another
+62 | |         complex, int]
+   | |_____________________^ PYI041
+63 |       ) -> None: 
+64 |       ...
+   |
+   = help: Remove duplicates
+
+ℹ Unsafe fix
+57 57 | 
+58 58 | 
+59 59 | def f9(
+60    |-    arg: Union[  # comment 
+61    |-        float, # another
+62    |-        complex, int]
+   60 |+    arg: complex
+63 61 |     ) -> None: 
+64 62 |     ...
+65 63 | 
+
+PYI041.py:68:9: PYI041 [*] Use `complex` instead of `int | float | complex`
+   |
+66 |   def f10(
+67 |       arg: (
+68 |           int | # comment
+   |  _________^
+69 | |         float |  # another
+70 | |         complex
+   | |_______________^ PYI041
+71 |       )    
+72 |       ) -> None: 
+   |
+   = help: Remove duplicates
+
+ℹ Unsafe fix
+65 65 | 
+66 66 | def f10(
+67 67 |     arg: (
+68    |-        int | # comment
+69    |-        float |  # another
+70 68 |         complex
+71 69 |     )    
+72 70 |     ) -> None: 
+
+PYI041.py:80:24: PYI041 [*] Use `complex` instead of `int | float | complex`
+   |
+78 |         ...
+79 | 
+80 |     def bad(self, arg: int | float | complex) -> None:
+   |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
+81 |         ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+77 77 |     def good(self, arg: int) -> None:
+78 78 |         ...
+79 79 | 
+80    |-    def bad(self, arg: int | float | complex) -> None:
+   80 |+    def bad(self, arg: complex) -> None:
+81 81 |         ...
+82 82 | 
+83 83 |     def bad2(self, arg: int | Union[float, complex]) -> None: 
+
+PYI041.py:83:25: PYI041 [*] Use `complex` instead of `int | float | complex`
+   |
+81 |         ...
+82 | 
+83 |     def bad2(self, arg: int | Union[float, complex]) -> None: 
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+84 |         ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+80 80 |     def bad(self, arg: int | float | complex) -> None:
+81 81 |         ...
+82 82 | 
+83    |-    def bad2(self, arg: int | Union[float, complex]) -> None: 
+   83 |+    def bad2(self, arg: complex) -> None: 
+84 84 |         ...
+85 85 | 
+86 86 |     def bad3(self, arg: Union[Union[float, complex], int]) -> None: 
+
+PYI041.py:86:25: PYI041 [*] Use `complex` instead of `int | float | complex`
+   |
+84 |         ...
+85 | 
+86 |     def bad3(self, arg: Union[Union[float, complex], int]) -> None: 
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+87 |         ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+83 83 |     def bad2(self, arg: int | Union[float, complex]) -> None: 
+84 84 |         ...
+85 85 | 
+86    |-    def bad3(self, arg: Union[Union[float, complex], int]) -> None: 
+   86 |+    def bad3(self, arg: complex) -> None: 
+87 87 |         ...
+88 88 | 
+89 89 |     def bad4(self, arg: Union[float | complex, int]) -> None: 
+
+PYI041.py:89:25: PYI041 [*] Use `complex` instead of `int | float | complex`
+   |
+87 |         ...
+88 | 
+89 |     def bad4(self, arg: Union[float | complex, int]) -> None: 
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+90 |         ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+86 86 |     def bad3(self, arg: Union[Union[float, complex], int]) -> None: 
+87 87 |         ...
+88 88 | 
+89    |-    def bad4(self, arg: Union[float | complex, int]) -> None: 
+   89 |+    def bad4(self, arg: complex) -> None: 
+90 90 |         ...
+91 91 | 
+92 92 |     def bad5(self, arg: int | (float | complex)) -> None: 
+
+PYI041.py:92:25: PYI041 [*] Use `complex` instead of `int | float | complex`
+   |
+90 |         ...
+91 | 
+92 |     def bad5(self, arg: int | (float | complex)) -> None: 
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+93 |         ...
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+89 89 |     def bad4(self, arg: Union[float | complex, int]) -> None: 
+90 90 |         ...
+91 91 | 
+92    |-    def bad5(self, arg: int | (float | complex)) -> None: 
+   92 |+    def bad5(self, arg: complex) -> None: 
+93 93 |         ...

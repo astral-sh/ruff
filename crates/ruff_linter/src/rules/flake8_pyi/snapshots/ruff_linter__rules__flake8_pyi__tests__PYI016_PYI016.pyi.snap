@@ -784,7 +784,7 @@ PYI016.pyi:107:49: PYI016 [*] Duplicate union member `int`
 107 | field32: typing.Union[float, typing.Union[int | int | int]]  # Error
     |                                                 ^^^ PYI016
 108 | 
-109 | # ...
+109 | # Test case for mixed union type fix
     |
     = help: Remove duplicate union member `int`
 
@@ -795,7 +795,7 @@ PYI016.pyi:107:49: PYI016 [*] Duplicate union member `int`
 107     |-field32: typing.Union[float, typing.Union[int | int | int]]  # Error
     107 |+field32: float | int  # Error
 108 108 | 
-109 109 | # ...
+109 109 | # Test case for mixed union type fix
 110 110 | field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
 
 PYI016.pyi:107:55: PYI016 [*] Duplicate union member `int`
@@ -804,7 +804,7 @@ PYI016.pyi:107:55: PYI016 [*] Duplicate union member `int`
 107 | field32: typing.Union[float, typing.Union[int | int | int]]  # Error
     |                                                       ^^^ PYI016
 108 | 
-109 | # ...
+109 | # Test case for mixed union type fix
     |
     = help: Remove duplicate union member `int`
 
@@ -815,12 +815,12 @@ PYI016.pyi:107:55: PYI016 [*] Duplicate union member `int`
 107     |-field32: typing.Union[float, typing.Union[int | int | int]]  # Error
     107 |+field32: float | int  # Error
 108 108 | 
-109 109 | # ...
+109 109 | # Test case for mixed union type fix
 110 110 | field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
 
 PYI016.pyi:110:42: PYI016 [*] Duplicate union member `int`
     |
-109 | # ...
+109 | # Test case for mixed union type fix
 110 | field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     |                                          ^^^ PYI016
     |
@@ -829,13 +829,13 @@ PYI016.pyi:110:42: PYI016 [*] Duplicate union member `int`
 ℹ Safe fix
 107 107 | field32: typing.Union[float, typing.Union[int | int | int]]  # Error
 108 108 | 
-109 109 | # ...
+109 109 | # Test case for mixed union type fix
 110     |-field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     110 |+field33: int # Error
 
 PYI016.pyi:110:62: PYI016 [*] Duplicate union member `int`
     |
-109 | # ...
+109 | # Test case for mixed union type fix
 110 | field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     |                                                              ^^^ PYI016
     |
@@ -844,13 +844,13 @@ PYI016.pyi:110:62: PYI016 [*] Duplicate union member `int`
 ℹ Safe fix
 107 107 | field32: typing.Union[float, typing.Union[int | int | int]]  # Error
 108 108 | 
-109 109 | # ...
+109 109 | # Test case for mixed union type fix
 110     |-field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     110 |+field33: int # Error
 
 PYI016.pyi:110:68: PYI016 [*] Duplicate union member `int`
     |
-109 | # ...
+109 | # Test case for mixed union type fix
 110 | field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     |                                                                    ^^^ PYI016
     |
@@ -859,6 +859,6 @@ PYI016.pyi:110:68: PYI016 [*] Duplicate union member `int`
 ℹ Safe fix
 107 107 | field32: typing.Union[float, typing.Union[int | int | int]]  # Error
 108 108 | 
-109 109 | # ...
+109 109 | # Test case for mixed union type fix
 110     |-field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     110 |+field33: int # Error

@@ -84,11 +84,11 @@ PYI041.pyi:33:24: PYI041 [*] Use `float` instead of `int | float`
    33 |+async def f4(**kwargs: float) -> None: ...  # PYI041
 34 34 | 
 35 35 | 
-36 36 | def f4(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
+36 36 | def f5(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
 
 PYI041.pyi:36:26: PYI041 [*] Use `float` instead of `int | float`
    |
-36 | def f4(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
+36 | def f5(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
    |                          ^^^^^^^^^^^^^^^^^^^^^^ PYI041
    |
    = help: Remove duplicates
@@ -97,66 +97,66 @@ PYI041.pyi:36:26: PYI041 [*] Use `float` instead of `int | float`
 33 33 | async def f4(**kwargs: int | int | float) -> None: ...  # PYI041
 34 34 | 
 35 35 | 
-36    |-def f4(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
-   36 |+def f4(arg1: int, *args: float) -> None: ...  # PYI041
+36    |-def f5(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
+   36 |+def f5(arg1: int, *args: float) -> None: ...  # PYI041
 37 37 | 
 38 38 | 
-39 39 | def f5(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
+39 39 | def f6(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
 
 PYI041.pyi:39:26: PYI041 [*] Use `float` instead of `int | float`
    |
-39 | def f5(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
+39 | def f6(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
    |
    = help: Remove duplicates
 
 ℹ Safe fix
-36 36 | def f4(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
+36 36 | def f5(arg1: int, *args: Union[int, int, float]) -> None: ...  # PYI041
 37 37 | 
 38 38 | 
-39    |-def f5(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
-   39 |+def f5(arg1: int, *args: float) -> None: ...  # PYI041
+39    |-def f6(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
+   39 |+def f6(arg1: int, *args: float) -> None: ...  # PYI041
 40 40 | 
 41 41 | 
-42 42 | def f6(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
+42 42 | def f7(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
 
 PYI041.pyi:42:26: PYI041 [*] Use `float` instead of `int | float`
    |
-42 | def f6(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
+42 | def f7(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
    |
    = help: Remove duplicates
 
 ℹ Safe fix
-39 39 | def f5(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
+39 39 | def f6(arg1: int, *args: Union[Union[int, int, float]]) -> None: ...  # PYI041
 40 40 | 
 41 41 | 
-42    |-def f6(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
-   42 |+def f6(arg1: int, *args: float) -> None: ...  # PYI041
+42    |-def f7(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
+   42 |+def f7(arg1: int, *args: float) -> None: ...  # PYI041
 43 43 | 
 44 44 | 
-45 45 | def f7(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: ...  # PYI041
+45 45 | def f8(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: ...  # PYI041
 
 PYI041.pyi:45:26: PYI041 [*] Use `float` instead of `int | float`
    |
-45 | def f7(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: ...  # PYI041
+45 | def f8(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: ...  # PYI041
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
    |
    = help: Remove duplicates
 
 ℹ Safe fix
-42 42 | def f6(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
+42 42 | def f7(arg1: int, *args: Union[Union[Union[int, int, float]]]) -> None: ...  # PYI041
 43 43 | 
 44 44 | 
-45    |-def f7(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: ...  # PYI041
-   45 |+def f7(arg1: int, *args: float) -> None: ...  # PYI041
+45    |-def f8(arg1: int, *args: Union[Union[Union[int | int | float]]]) -> None: ...  # PYI041
+   45 |+def f8(arg1: int, *args: float) -> None: ...  # PYI041
 46 46 | 
 47 47 | 
-48 48 | def f8(
+48 48 | def f9(
 
 PYI041.pyi:49:10: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
-48 |   def f8(
+48 |   def f9(
 49 |       arg: Union[  # comment 
    |  __________^
 50 | |         float, # another
@@ -169,18 +169,18 @@ PYI041.pyi:49:10: PYI041 [*] Use `complex` instead of `int | float | complex`
 ℹ Unsafe fix
 46 46 | 
 47 47 | 
-48 48 | def f8(
+48 48 | def f9(
 49    |-    arg: Union[  # comment 
 50    |-        float, # another
 51    |-        complex, int]
    49 |+    arg: complex
 52 50 |     ) -> None: ...  # PYI041
 53 51 | 
-54 52 | def f9(
+54 52 | def f10(
 
 PYI041.pyi:56:9: PYI041 [*] Use `complex` instead of `int | float | complex`
    |
-54 |   def f9(
+54 |   def f10(
 55 |       arg: (
 56 |           int | # comment
    |  _________^
@@ -194,7 +194,7 @@ PYI041.pyi:56:9: PYI041 [*] Use `complex` instead of `int | float | complex`
 
 ℹ Unsafe fix
 53 53 | 
-54 54 | def f9(
+54 54 | def f10(
 55 55 |     arg: (
 56    |-        int | # comment
 57    |-        float |  # another

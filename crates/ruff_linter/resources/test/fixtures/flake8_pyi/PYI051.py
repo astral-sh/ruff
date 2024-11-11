@@ -5,6 +5,9 @@ A: str | Literal["foo"]
 B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
 C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
 D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
+E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
+F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
+G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
 
 def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
 
