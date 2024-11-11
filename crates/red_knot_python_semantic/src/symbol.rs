@@ -72,15 +72,15 @@ impl<'db> Symbol<'db> {
     }
 
     #[must_use]
-    pub(crate) fn or_fall_back_to(self, db: &'db dyn Db, replacement: &Symbol<'db>) -> Symbol<'db> {
-        match replacement {
-            Symbol::Type(replacement_ty, replacement_boundness) => match self {
+    pub(crate) fn or_fall_back_to(self, db: &'db dyn Db, fallback: &Symbol<'db>) -> Symbol<'db> {
+        match fallback {
+            Symbol::Type(fallback_ty, fallback_boundness) => match self {
                 s @ Symbol::Type(_, Boundness::Bound) => s,
                 Symbol::Type(ty, boundness @ Boundness::PossiblyUnbound) => Symbol::Type(
-                    UnionType::from_elements(db, [*replacement_ty, ty]),
-                    boundness.or(*replacement_boundness),
+                    UnionType::from_elements(db, [*fallback_ty, ty]),
+                    fallback_boundness.or(boundness),
                 ),
-                Symbol::Unbound => replacement.clone(),
+                Symbol::Unbound => fallback.clone(),
             },
             Symbol::Unbound => self,
         }
