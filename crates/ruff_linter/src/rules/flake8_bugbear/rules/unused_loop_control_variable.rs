@@ -96,8 +96,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
         let loop_var_binding = scope
             .get_all(name)
             .map(|bid| checker.semantic().binding(bid))
-            .filter(|bdg| bdg.range == expr.range)
-            .next()
+            .find(|bdg| bdg.range == expr.range)
             .unwrap();
         if loop_var_binding
             .references
