@@ -114,3 +114,7 @@ for x in ls:
 for y in ls:
     y=2
 
+def g():
+    for x in [a,b,c]:
+        print(x)
+        del x
