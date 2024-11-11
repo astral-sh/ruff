@@ -2008,20 +2008,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                         asname: _,
                     } = alias;
 
-                    // For possibly-unbound names, just eliminate Unbound from the type; we
-                    // must be in a bound path. TODO diagnostic for possibly-unbound import?
-                    module_ty
-                        .member(self.db, &ast::name::Name::new(&name.id))
-                        .ignore_possibly_unbound()
-                        .unwrap_or_else(|| {
+                    match module_ty.member(self.db, &ast::name::Name::new(&name.id)) {
+                        Symbol::Type(ty, boundness) => {
+                            if boundness == Boundness::PossiblyUnbound {
+                                self.diagnostics.add(
+                                    AnyNodeRef::Alias(alias),
+                                    "possibly-unbound-import",
+                                    format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
+                                );
+                            }
+
+                            ty
+                        }
+                        Symbol::Unbound => {
                             self.diagnostics.add(
                                 AnyNodeRef::Alias(alias),
                                 "unresolved-import",
                                 format_args!("Module `{module_name}` has no member `{name}`",),
                             );
-
                             Type::Unknown
-                        })
+                        }
+                    }
                 } else {
                     self.diagnostics
                         .add_unresolved_module(import_from, *level, module);
