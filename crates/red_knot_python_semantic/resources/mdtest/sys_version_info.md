@@ -1,0 +1,125 @@
+# `sys.version_info`
+
+## The type of `sys.version_info`
+
+The type of `sys.version_info` is `sys._version_info`. This is quite a complicated type in typeshed,
+so there are many things we don't fully understand about the type yet:
+
+```py
+import sys
+
+reveal_type(sys.version_info)  # revealed: _version_info
+```
+
+## Literal types from comparisons
+
+Comparing `sys.version_info` with a 2-element tuple of literal integers always produces a `Literal`
+type:
+
+```py
+import sys
+
+reveal_type(sys.version_info >= (3, 8))  # revealed: Literal[True]
+reveal_type((3, 8) <= sys.version_info)  # revealed: Literal[True]
+
+reveal_type(sys.version_info > (3, 8))  # revealed: Literal[True]
+reveal_type((3, 8) < sys.version_info)  # revealed: Literal[True]
+
+reveal_type(sys.version_info < (3, 8))  # revealed: Literal[False]
+reveal_type((3, 8) > sys.version_info)  # revealed: Literal[False]
+
+reveal_type(sys.version_info <= (3, 8))  # revealed: Literal[False]
+reveal_type((3, 8) >= sys.version_info)  # revealed: Literal[False]
+
+reveal_type(sys.version_info == (3, 8))  # revealed: Literal[False]
+reveal_type((3, 8) == sys.version_info)  # revealed: Literal[False]
+
+reveal_type(sys.version_info != (3, 8))  # revealed: Literal[True]
+reveal_type((3, 8) != sys.version_info)  # revealed: Literal[True]
+```
+
+## Non-literal types from comparisons
+
+Comparing `sys.version_info` with tuples of other lengths will sometimes produce `Literal` types,
+sometimes not:
+
+```py
+import sys
+
+reveal_type(sys.version_info >= (3, 8, 1))  # revealed: bool
+reveal_type(sys.version_info >= (3, 8, 1, "final", 0))  # revealed: bool
+
+# TODO: this is an invalid comparison (`sys.version_info` is a tuple of length 5)
+# Should we issue a diagnostic here?
+reveal_type(sys.version_info >= (3, 8, 1, "final", 0, 5))  # revealed: bool
+```
+
+## Imports and aliases
+
+Comparisons with `sys.version_info` still produce literal types, even if the symbol is aliased to
+another name:
+
+```py
+from sys import version_info
+from sys import version_info as foo
+
+reveal_type(version_info >= (3, 8))  # revealed: Literal[True]
+reveal_type(foo >= (3, 8))  # revealed: Literal[True]
+
+bar = version_info
+reveal_type(bar >= (3, 8))  # revealed: Literal[True]
+```
+
+## Non-stdlib modules named `sys`
+
+Only comparisons with the symbol `version_info` from the `sys` module produce literal types:
+
+```py path=package/__init__.py
+```
+
+```py path=package/sys.py
+version_info: tuple[int, int] = (4, 2)
+```
+
+```py path=package/script.py
+from .sys import version_info
+
+reveal_type(version_info >= (3, 8))  # revealed: bool
+```
+
+## Accessing fields by name
+
+The fields of `sys.version_info` can be accessed by name:
+
+```py path=a.py
+import sys
+
+reveal_type(sys.version_info.major >= 3)  # revealed: Literal[True]
+reveal_type(sys.version_info.minor >= 8)  # revealed: Literal[True]
+reveal_type(sys.version_info.minor >= 9)  # revealed: Literal[False]
+```
+
+But the `micro`, `releaselevel` and `serial` fields are inferred as `@Todo` until we support
+properties on instance types:
+
+```py path=b.py
+import sys
+
+reveal_type(sys.version_info.micro)  # revealed: @Todo
+reveal_type(sys.version_info.releaselevel)  # revealed: @Todo
+reveal_type(sys.version_info.serial)  # revealed: @Todo
+```
+
+## Accessing fields by index/slice
+
+The fields of `sys.version_info` can be accessed by index or by slice:
+
+```py
+import sys
+
+reveal_type(sys.version_info[0] < 3)  # revealed: Literal[False]
+reveal_type(sys.version_info[1] > 8)  # revealed: Literal[False]
+reveal_type(sys.version_info[:2] >= (3, 8))  # revealed: Literal[True]
+reveal_type(sys.version_info[0:2] >= (3, 9))  # revealed: Literal[False]
+reveal_type(sys.version_info[:3] >= (3, 9, 1))  # revealed: Literal[False]
+```

@@ -1628,8 +1628,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut annotation_ty = self.infer_annotation_expression(annotation);
 
-        // If the declared variable is annotated with _SpecialForm class then we treat it differently
-        // by assigning the known field to the instance.
+        // Handle various singletons.
         if let Type::Instance(InstanceType { class }) = annotation_ty {
             if class.is_known(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
@@ -3531,6 +3530,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             (_, Type::BytesLiteral(_)) => {
                 self.infer_binary_type_comparison(left, op, KnownClass::Bytes.to_instance(self.db))
             }
+            (Type::Tuple(_), Type::Instance(InstanceType { class }))
+                if class.is_known(self.db, KnownClass::VersionInfo) =>
+            {
+                self.infer_binary_type_comparison(left, op, Type::version_info_tuple(self.db))
+            }
+            (Type::Instance(InstanceType { class }), Type::Tuple(_))
+                if class.is_known(self.db, KnownClass::VersionInfo) =>
+            {
+                self.infer_binary_type_comparison(Type::version_info_tuple(self.db), op, right)
+            }
             (Type::Tuple(lhs), Type::Tuple(rhs)) => {
                 // Note: This only works on heterogeneous tuple types.
                 let lhs_elements = lhs.elements(self.db);
@@ -3713,6 +3722,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         slice_ty: Type<'db>,
     ) -> Type<'db> {
         match (value_ty, slice_ty) {
+            (
+                Type::Instance(InstanceType { class }),
+                Type::IntLiteral(0 | 1) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
+            ) if class.is_known(self.db, KnownClass::VersionInfo) => self
+                .infer_subscript_expression_types(
+                    value_node,
+                    Type::version_info_tuple(self.db),
+                    slice_ty,
+                ),
+
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
                 let elements = tuple_ty.elements(self.db);

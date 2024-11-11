@@ -20,7 +20,7 @@ use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
+use crate::{Db, FxOrderSet, HasTy, Module, Program, SemanticModel};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -991,7 +991,9 @@ impl<'db> Type<'db> {
                 .all(|elem| elem.is_single_valued(db)),
 
             Type::Instance(InstanceType { class }) => match class.known(db) {
-                Some(KnownClass::NoneType | KnownClass::NoDefaultType) => true,
+                Some(
+                    KnownClass::NoneType | KnownClass::NoDefaultType | KnownClass::VersionInfo,
+                ) => true,
                 Some(
                     KnownClass::Bool
                     | KnownClass::Object
@@ -1081,9 +1083,18 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class_ty) => class_ty.member(db, name),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.member(db, name),
             Type::KnownInstance(known_instance) => known_instance.member(db, name),
-            Type::Instance(_) => {
-                // TODO MRO? get_own_instance_member, get_instance_member
-                Type::Todo.into()
+            Type::Instance(InstanceType { class }) => {
+                let ty = match (class.known(db), name) {
+                    (Some(KnownClass::VersionInfo), "major") => {
+                        Type::IntLiteral(Program::get(db).target_version(db).major.into())
+                    }
+                    (Some(KnownClass::VersionInfo), "minor") => {
+                        Type::IntLiteral(Program::get(db).target_version(db).minor.into())
+                    }
+                    // TODO MRO? get_own_instance_member, get_instance_member
+                    _ => Type::Todo,
+                };
+                ty.into()
             }
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -1418,6 +1429,34 @@ impl<'db> Type<'db> {
         KnownClass::NoneType.to_instance(db)
     }
 
+    /// Return the type of `tuple(sys.version_info)`.
+    ///
+    /// This is not exactly the type that `sys.version_info` has at runtime,
+    /// but it's a useful fallback for us in  order to infer `Literal` types from `sys.version_info` comparisons.
+    fn version_info_tuple(db: &'db dyn Db) -> Self {
+        let target_version = Program::get(db).target_version(db);
+        let int_instance_ty = KnownClass::Int.to_instance(db);
+
+        // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
+        let release_level_ty = {
+            let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
+                .iter()
+                .map(|level| Type::string_literal(db, level))
+                .collect();
+            Type::Union(UnionType::new(db, elements))
+        };
+
+        let version_info_elements = &[
+            Type::IntLiteral(target_version.major.into()),
+            Type::IntLiteral(target_version.minor.into()),
+            int_instance_ty,
+            release_level_ty,
+            int_instance_ty,
+        ];
+
+        Self::tuple(db, version_info_elements)
+    }
+
     /// Given a type that is assumed to represent an instance of a class,
     /// return a type that represents that class itself.
     #[must_use]
@@ -1541,6 +1580,8 @@ pub enum KnownClass {
     SpecialForm,
     TypeVar,
     NoDefaultType,
+    // sys
+    VersionInfo,
 }
 
 impl<'db> KnownClass {
@@ -1565,6 +1606,12 @@ impl<'db> KnownClass {
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
             Self::NoDefaultType => "_NoDefaultType",
+            // This is the name the type of `sys.version_info` has in typeshed,
+            // which is different to what `type(sys.version_info).__name__` is at runtime.
+            // (At runtime, `type(sys.version_info).__name__ == "version_info"`,
+            // which is impossible to replicate in the stubs since the sole instance of the class
+            // also has that name in the `sys` module.)
+            Self::VersionInfo => "_version_info",
         }
     }
 
@@ -1591,6 +1638,7 @@ impl<'db> KnownClass {
             | Self::Set
             | Self::Dict
             | Self::Slice => CoreStdlibModule::Builtins,
+            Self::VersionInfo => CoreStdlibModule::Sys,
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
             Self::NoneType => CoreStdlibModule::Typeshed,
             Self::SpecialForm | Self::TypeVar => CoreStdlibModule::Typing,
@@ -1607,7 +1655,7 @@ impl<'db> KnownClass {
     const fn is_singleton(self) -> bool {
         // TODO there are other singleton types (EllipsisType, NotImplementedType)
         match self {
-            Self::NoneType | Self::NoDefaultType => true,
+            Self::NoneType | Self::NoDefaultType | Self::VersionInfo => true,
             Self::Bool
             | Self::Object
             | Self::Bytes
@@ -1651,13 +1699,14 @@ impl<'db> KnownClass {
             "FunctionType" => Self::FunctionType,
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
+            "_version_info" => Self::VersionInfo,
             _ => return None,
         };
 
         candidate.check_module(module).then_some(candidate)
     }
 
-    /// Private method checking if known class can be defined in the given module.
+    /// Return `true` if the module of `self` matches `module_name`
     fn check_module(self, module: &Module) -> bool {
         if !module.search_path().is_standard_library() {
             return false;
@@ -1677,6 +1726,7 @@ impl<'db> KnownClass {
             | Self::Slice
             | Self::GenericAlias
             | Self::ModuleType
+            | Self::VersionInfo
             | Self::FunctionType => module.name() == self.canonical_module().as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm | Self::TypeVar | Self::NoDefaultType => {

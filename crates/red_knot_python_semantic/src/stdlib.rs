@@ -14,6 +14,7 @@ pub(crate) enum CoreStdlibModule {
     Typeshed,
     TypingExtensions,
     Typing,
+    Sys,
 }
 
 impl CoreStdlibModule {
@@ -24,6 +25,7 @@ impl CoreStdlibModule {
             Self::Typing => "typing",
             Self::Typeshed => "_typeshed",
             Self::TypingExtensions => "typing_extensions",
+            Self::Sys => "sys",
         }
     }
 
