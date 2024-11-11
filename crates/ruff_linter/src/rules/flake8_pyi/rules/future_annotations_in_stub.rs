@@ -37,7 +37,7 @@ impl Violation for FutureAnnotationsInStub {
 pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom) {
     let StmtImportFrom {
         range,
-        module: Some(name),
+        module: Some(module_name),
         names,
         ..
     } = target
@@ -45,10 +45,10 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
         return;
     };
 
-    if name != "__future__" {
+    if module_name != "__future__" {
         return;
     };
-    
+
     if names.iter().all(|alias| &*alias.name != "annotations") {
         return;
     }
