@@ -12,8 +12,8 @@ use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, CmpOp, ExceptHandler, Expr, FStringElement, MatchCase, Operator,
-    Pattern, Stmt, TypeParam,
+    self as ast, Arguments, CmpOp, DictItem, ExceptHandler, Expr, FStringElement, MatchCase,
+    Operator, Pattern, Stmt, TypeParam,
 };
 use crate::{AnyNodeRef, ExprContext};
 
@@ -1188,14 +1188,36 @@ impl Truthiness {
             | Expr::Set(ast::ExprSet { elts, .. })
             | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 if elts.is_empty() {
-                    Self::Falsey
+                    return Self::Falsey;
+                }
+
+                let is_unpack = |elt: &Expr| matches!(elt, Expr::Starred(..));
+
+                if elts.iter().all(is_unpack) {
+                    // [*foo] / [*foo, *bar]
+                    Self::Unknown
                 } else {
                     Self::Truthy
                 }
             }
             Expr::Dict(dict) => {
                 if dict.is_empty() {
-                    Self::Falsey
+                    return Self::Falsey;
+                }
+
+                let is_unpack = |item: &DictItem| {
+                    matches!(
+                        item,
+                        DictItem {
+                            key: None,
+                            value: Expr::Name(..)
+                        }
+                    )
+                };
+
+                if dict.items.iter().all(is_unpack) {
+                    // {**a} / {**a, **b}
+                    Self::Unknown
                 } else {
                     Self::Truthy
                 }
