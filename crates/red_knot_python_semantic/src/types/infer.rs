@@ -31,7 +31,6 @@ use std::num::NonZeroU32;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, ExprContext, UnaryOp};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -2789,14 +2788,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = attribute;
 
         let value_ty = self.infer_expression(value);
-        match value_ty.member(self.db, &Name::new(&attr.id)) {
+        match value_ty.member(self.db, &attr.id) {
             Symbol::Type(member_ty, boundness) => {
                 if boundness == Boundness::PossiblyUnbound {
                     self.diagnostics.add(
                         attribute.into(),
                         "possibly-unbound-attribute",
                         format_args!(
-                            "The attribute `{}` on type `{}` is possibly unbound",
+                            "Attribute `{}` on type `{}` is possibly unbound",
                             attr.id,
                             value_ty.display(self.db),
                         ),
@@ -5466,7 +5465,7 @@ mod tests {
         let x = get_symbol(&db, "src/a.py", &["<listcomp>"], "x");
         assert!(x.is_unbound());
 
-        // Iterating over an `Unbound` yields `Unknown`:
+        // Iterating over an unbound iterable yields `Unknown`:
         assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "z", "Unknown");
 
         assert_file_diagnostics(&db, "src/a.py", &["Name `x` used when not defined"]);

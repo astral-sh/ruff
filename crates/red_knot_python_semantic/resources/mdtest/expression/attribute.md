@@ -20,7 +20,7 @@ reveal_type(A.always_bound)  # revealed: Literal[1]
 
 reveal_type(A.union)  # revealed: Literal[1] | Literal["abc"]
 
-# error: [possibly-unbound-attribute] "The attribute `possibly_unbound` on type `Literal[A]` is possibly unbound"
+# error: [possibly-unbound-attribute] "Attribute `possibly_unbound` on type `Literal[A]` is possibly unbound"
 reveal_type(A.possibly_unbound)  # revealed: Literal["abc"]
 
 # error: [unresolved-attribute] "Type `Literal[A]` has no attribute `non_existent`"

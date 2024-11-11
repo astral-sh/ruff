@@ -35,7 +35,7 @@ class C:
     if flag:
         x = 2
 
-# error: [possibly-unbound-attribute] "The attribute `x` on type `Literal[C]` is possibly unbound"
+# error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C]` is possibly unbound"
 reveal_type(C.x)  # revealed: Literal[2]
 reveal_type(C.y)  # revealed: Literal[1]
 ```
