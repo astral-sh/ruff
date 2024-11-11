@@ -1,9 +1,8 @@
-use bitflags::bitflags;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -59,11 +58,11 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = mode else {
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = mode else {
         return;
     };
 
-    if is_valid_mode(value) {
+    if OpenMode::from_chars(value.chars()).is_ok() {
         return;
     }
 
@@ -111,84 +110,4 @@ fn extract_mode(call: &ast::ExprCall, kind: Kind) -> Option<&Expr> {
         Kind::Builtin => call.arguments.find_argument("mode", 1),
         Kind::Pathlib => call.arguments.find_argument("mode", 0),
     }
-}
-
-bitflags! {
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    pub(super) struct OpenMode: u8 {
-        /// `r`
-        const READ = 0b0001;
-        /// `w`
-        const WRITE = 0b0010;
-        /// `a`
-        const APPEND = 0b0100;
-        /// `x`
-        const CREATE = 0b1000;
-        /// `b`
-        const BINARY = 0b10000;
-        /// `t`
-        const TEXT = 0b10_0000;
-        /// `+`
-        const PLUS = 0b100_0000;
-        /// `U`
-        const UNIVERSAL_NEWLINES = 0b1000_0000;
-
-    }
-}
-
-impl TryFrom<char> for OpenMode {
-    type Error = ();
-
-    fn try_from(value: char) -> Result<Self, Self::Error> {
-        match value {
-            'r' => Ok(Self::READ),
-            'w' => Ok(Self::WRITE),
-            'a' => Ok(Self::APPEND),
-            'x' => Ok(Self::CREATE),
-            'b' => Ok(Self::BINARY),
-            't' => Ok(Self::TEXT),
-            '+' => Ok(Self::PLUS),
-            'U' => Ok(Self::UNIVERSAL_NEWLINES),
-            _ => Err(()),
-        }
-    }
-}
-
-/// Returns `true` if the open mode is valid.
-fn is_valid_mode(mode: &ast::StringLiteralValue) -> bool {
-    // Flag duplicates and invalid characters.
-    let mut flags = OpenMode::empty();
-    for char in mode.chars() {
-        let Ok(flag) = OpenMode::try_from(char) else {
-            return false;
-        };
-        if flags.intersects(flag) {
-            return false;
-        }
-        flags.insert(flag);
-    }
-
-    // Both text and binary mode cannot be set at the same time.
-    if flags.contains(OpenMode::TEXT | OpenMode::BINARY) {
-        return false;
-    }
-
-    // The `U` mode is only valid with `r`.
-    if flags.contains(OpenMode::UNIVERSAL_NEWLINES)
-        && flags.intersects(OpenMode::WRITE | OpenMode::APPEND | OpenMode::CREATE)
-    {
-        return false;
-    }
-
-    // Otherwise, reading, writing, creating, and appending are mutually exclusive.
-    [
-        OpenMode::READ | OpenMode::UNIVERSAL_NEWLINES,
-        OpenMode::WRITE,
-        OpenMode::CREATE,
-        OpenMode::APPEND,
-    ]
-    .into_iter()
-    .filter(|flag| flags.intersects(*flag))
-    .count()
-        == 1
 }

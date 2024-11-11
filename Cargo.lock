@@ -2911,6 +2911,7 @@ dependencies = [
 name = "ruff_python_stdlib"
 version = "0.0.0"
 dependencies = [
+ "bitflags 2.6.0",
  "unicode-ident",
 ]
 
