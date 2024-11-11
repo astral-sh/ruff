@@ -1340,7 +1340,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO should infer `ExceptionGroup` if all caught exceptions
             // are subclasses of `Exception` --Alex
             builtins_symbol(self.db, "BaseExceptionGroup")
-                .unwrap_or_unknown()
+                .ignore_possibly_unbound()
+                .unwrap_or(Type::Unknown)
                 .to_instance(self.db)
         } else {
             // TODO: anything that's a consistent subtype of
@@ -2012,7 +2013,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // must be in a bound path. TODO diagnostic for maybe-unbound import?
                     module_ty
                         .member(self.db, &ast::name::Name::new(&name.id))
-                        .as_type()
+                        .ignore_possibly_unbound()
                         .unwrap_or_else(|| {
                             self.diagnostics.add(
                                 AnyNodeRef::Alias(alias),
@@ -2187,7 +2188,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
             ast::Number::Float(_) => KnownClass::Float.to_instance(self.db),
             ast::Number::Complex { .. } => builtins_symbol(self.db, "complex")
-                .unwrap_or_unknown()
+                .ignore_possibly_unbound()
+                .unwrap_or(Type::Unknown)
                 .to_instance(self.db),
         }
     }
@@ -2266,7 +2268,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        builtins_symbol(self.db, "Ellipsis").unwrap_or_unknown()
+        builtins_symbol(self.db, "Ellipsis")
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown)
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -2788,7 +2792,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         value_ty
             .member(self.db, &Name::new(&attr.id))
-            .unwrap_or_unknown()
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown)
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -4364,7 +4369,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
                 // TODO: Check that value type is enum otherwise return None
-                value_ty.member(self.db, &attr.id).unwrap_or_unknown()
+                value_ty
+                    .member(self.db, &attr.id)
+                    .ignore_possibly_unbound()
+                    .unwrap_or(Type::Unknown)
             }
             ast::Expr::NoneLiteral(_) => Type::none(self.db),
             // for negative and positive numbers
@@ -4721,7 +4729,9 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        let ty = symbol(db, scope, symbol_name).unwrap_or_unknown();
+        let ty = symbol(db, scope, symbol_name)
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown);
         assert_eq!(ty.display(db).to_string(), expected);
     }
 

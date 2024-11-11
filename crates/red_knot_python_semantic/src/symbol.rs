@@ -44,14 +44,11 @@ impl<'db> Symbol<'db> {
         }
     }
 
-    pub(crate) fn unwrap_or_unknown(&self) -> Type<'db> {
-        match self {
-            Symbol::Type(ty, _) => *ty,
-            Symbol::Unbound => Type::Unknown,
-        }
-    }
-
-    pub(crate) fn as_type(&self) -> Option<Type<'db>> {
+    /// Returns the type of the symbol, ignoring possible unboundness.
+    ///
+    /// If the symbol is *definitely* unbound, this function will return `None`. Otherwise,
+    /// if there is at least one control-flow path where the symbol is bound, return the type.
+    pub(crate) fn ignore_possibly_unbound(&self) -> Option<Type<'db>> {
         match self {
             Symbol::Type(ty, _) => Some(*ty),
             Symbol::Unbound => None,
@@ -61,7 +58,7 @@ impl<'db> Symbol<'db> {
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn expect_type(self) -> Type<'db> {
-        self.as_type()
+        self.ignore_possibly_unbound()
             .expect("Expected a (possibly unbound) type, not an unbound symbol")
     }
 

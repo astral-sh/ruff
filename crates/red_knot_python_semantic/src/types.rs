@@ -1573,7 +1573,9 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        core_module_symbol(db, self.canonical_module(), self.as_str()).unwrap_or_unknown()
+        core_module_symbol(db, self.canonical_module(), self.as_str())
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown)
     }
 
     /// Return the module in which we should look up the definition for this class
