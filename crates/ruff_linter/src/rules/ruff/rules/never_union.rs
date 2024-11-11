@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for NeverUnion {
             union_like,
         } = self;
         match union_like {
-            UnionLike::BinOp => {
+            UnionLike::PEP604 => {
                 format!("`{never_like} | T` is equivalent to `T`")
             }
             UnionLike::TypingUnion => {
@@ -77,7 +77,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                 let mut diagnostic = Diagnostic::new(
                     NeverUnion {
                         never_like,
-                        union_like: UnionLike::BinOp,
+                        union_like: UnionLike::PEP604,
                     },
                     left.range(),
                 );
@@ -93,7 +93,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                 let mut diagnostic = Diagnostic::new(
                     NeverUnion {
                         never_like,
-                        union_like: UnionLike::BinOp,
+                        union_like: UnionLike::PEP604,
                     },
                     right.range(),
                 );
@@ -174,7 +174,7 @@ enum UnionLike {
     /// E.g., `typing.Union[int, str]`
     TypingUnion,
     /// E.g., `int | str`
-    BinOp,
+    PEP604,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
