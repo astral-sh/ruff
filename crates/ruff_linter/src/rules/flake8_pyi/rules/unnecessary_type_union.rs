@@ -70,15 +70,22 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
 
     // Check if `union` is a PEP604 union (e.g. `float | int`) or a `typing.Union[float, int]`
     let subscript = union.as_subscript_expr();
-    if subscript.is_some_and(|subscript| !semantic.match_typing_expr(&subscript.value, "Union")) {
-        return;
-    }
+    let mut union_kind = match subscript {
+        Some(subscript) => {
+            if !semantic.match_typing_expr(&subscript.value, "Union") {
+                return;
+            }
+            UnionKind::TypingUnion
+        }
+        None => UnionKind::PEP604,
+    };
 
     let mut type_exprs: Vec<&Expr> = Vec::new();
     let mut other_exprs: Vec<&Expr> = Vec::new();
 
-    let mut union_kind = UnionKind::TypingUnion;
     let mut collect_type_exprs = |expr: &'a Expr, parent: &'a Expr| {
+        // If a PEP604-style union is used within a `typing.Union`, then the fix can
+        // use PEP604-style unions.
         if matches!(parent, Expr::BinOp(_)) {
             union_kind = UnionKind::PEP604;
         }
@@ -141,60 +148,58 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                 }
             }
             UnionKind::TypingUnion => {
-                if let Some(subscript) = subscript {
-                    let types = &Expr::Subscript(ast::ExprSubscript {
-                        value: Box::new(Expr::Name(ast::ExprName {
-                            id: Name::new_static("type"),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                        })),
-                        slice: Box::new(Expr::Subscript(ast::ExprSubscript {
-                            value: subscript.value.clone(),
-                            slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                                elts: type_members
-                                    .into_iter()
-                                    .map(|type_member| {
-                                        Expr::Name(ast::ExprName {
-                                            id: type_member,
-                                            ctx: ExprContext::Load,
-                                            range: TextRange::default(),
-                                        })
+                // When subscript is None, it uses the pervious match case.
+                let subscript = subscript.unwrap();
+                let types = &Expr::Subscript(ast::ExprSubscript {
+                    value: Box::new(Expr::Name(ast::ExprName {
+                        id: Name::new_static("type"),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    })),
+                    slice: Box::new(Expr::Subscript(ast::ExprSubscript {
+                        value: subscript.value.clone(),
+                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                            elts: type_members
+                                .into_iter()
+                                .map(|type_member| {
+                                    Expr::Name(ast::ExprName {
+                                        id: type_member,
+                                        ctx: ExprContext::Load,
+                                        range: TextRange::default(),
                                     })
-                                    .collect(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                                parenthesized: true,
-                            })),
+                                })
+                                .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
+                        })),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    })),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                });
+
+                if other_exprs.is_empty() {
+                    checker.generator().expr(types)
+                } else {
+                    let mut exprs = Vec::new();
+                    exprs.push(types);
+                    exprs.extend(other_exprs);
+
+                    let union = Expr::Subscript(ast::ExprSubscript {
+                        value: subscript.value.clone(),
+                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                            elts: exprs.into_iter().cloned().collect(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                            parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                     });
 
-                    if other_exprs.is_empty() {
-                        checker.generator().expr(types)
-                    } else {
-                        let mut exprs = Vec::new();
-                        exprs.push(types);
-                        exprs.extend(other_exprs);
-
-                        let union = Expr::Subscript(ast::ExprSubscript {
-                            value: subscript.value.clone(),
-                            slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                                elts: exprs.into_iter().cloned().collect(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                                parenthesized: true,
-                            })),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                        });
-
-                        checker.generator().expr(&union)
-                    }
-                } else {
-                    return;
+                    checker.generator().expr(&union)
                 }
             }
         };
