@@ -114,7 +114,5 @@ fn is_unsafe_call(call: &ExprCall) -> bool {
     // unlikely that someone will actually use a keyword argument here
     // TODO: Eventually we may want to allow dynamic values, as long as they
     //       have a __html__ attribute, since that is part of the API
-    !(call.arguments.args.is_empty()
-        || call.arguments.args[0].is_string_literal_expr()
-        || call.arguments.args[0].is_bytes_literal_expr())
+	matches!(&*call.arguments.args, [first] if !first.is_string_literal_expr() && !first.is_bytes_literal_expr())
 }
