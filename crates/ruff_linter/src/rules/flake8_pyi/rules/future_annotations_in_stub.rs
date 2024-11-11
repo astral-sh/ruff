@@ -35,34 +35,38 @@ impl Violation for FutureAnnotationsInStub {
 
 /// PYI044
 pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom) {
-    if let StmtImportFrom {
+    let StmtImportFrom {
         range,
         module: Some(name),
         names,
         ..
     } = target
-    {
-        if name == "__future__" && names.iter().any(|alias| &*alias.name == "annotations") {
-            let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
+    else {
+        return;
+    };
 
-            if checker.settings.preview.is_enabled() {
-                let stmt = checker.semantic().current_statement();
+    if name != "__future__" || names.iter().all(|alias| &*alias.name != "annotations") {
+        return;
+    };
 
-                diagnostic.try_set_fix(|| {
-                    let edit = fix::edits::remove_unused_imports(
-                        std::iter::once("annotations"),
-                        stmt,
-                        None,
-                        checker.locator(),
-                        checker.stylist(),
-                        checker.indexer(),
-                    )?;
+    let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
 
-                    Ok(Fix::safe_edit(edit))
-                });
-            }
+    if checker.settings.preview.is_enabled() {
+        let stmt = checker.semantic().current_statement();
 
-            checker.diagnostics.push(diagnostic);
-        }
+        diagnostic.try_set_fix(|| {
+            let edit = fix::edits::remove_unused_imports(
+                std::iter::once("annotations"),
+                stmt,
+                None,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
+            )?;
+
+            Ok(Fix::safe_edit(edit))
+        });
     }
+
+    checker.diagnostics.push(diagnostic);
 }
