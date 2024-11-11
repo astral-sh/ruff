@@ -301,9 +301,7 @@ fn replace_custom_typevar_with_self(
     }
 
     match replace_typevar_usages_with_self(parameters, typevar_name) {
-        Ok(mut edits) => {
-            all_edits.append(&mut edits)
-        }
+        Ok(mut edits) => all_edits.append(&mut edits),
         Err(mut edits) => {
             fix_applicability = Applicability::Unsafe;
             all_edits.append(&mut edits)
@@ -332,7 +330,9 @@ fn import_self(checker: &Checker, return_range: TextRange) -> Option<Edit> {
     let request = ImportRequest::import_from(source_module, "Self");
 
     let position = return_range.start();
-    let (edit, ..) = importer.get_or_import_symbol(&request, position, semantic).ok()?;
+    let (edit, ..) = importer
+        .get_or_import_symbol(&request, position, semantic)
+        .ok()?;
 
     Some(edit)
 }

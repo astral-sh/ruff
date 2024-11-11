@@ -200,10 +200,9 @@ fn add_diagnostic(
         let (importer, semantic) = (checker.importer(), checker.semantic());
         let request = ImportRequest::import_from(source_module, "Self");
 
-        let Ok((edit, ..)) = importer.get_or_import_symbol(&request, range.start(), semantic)
-        else {
-            return None;
-        };
+        let (edit, ..) = importer
+            .get_or_import_symbol(&request, range.start(), semantic)
+            .ok()?;
 
         Some(edit)
     }
