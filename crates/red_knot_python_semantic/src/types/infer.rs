@@ -4726,14 +4726,12 @@ mod tests {
         );
     }
 
-    #[track_caller]
-    fn assert_scope_ty(
-        db: &TestDb,
+    fn get_symbol<'db>(
+        db: &'db TestDb,
         file_name: &str,
         scopes: &[&str],
         symbol_name: &str,
-        expected: &str,
-    ) {
+    ) -> Symbol<'db> {
         let file = system_path_to_file(db, file_name).expect("file to exist");
         let index = semantic_index(db, file);
         let mut file_scope_id = FileScopeId::global();
@@ -4748,9 +4746,18 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        let ty = symbol(db, scope, symbol_name)
-            .ignore_possibly_unbound()
-            .unwrap_or(Type::Unknown);
+        symbol(db, scope, symbol_name)
+    }
+
+    #[track_caller]
+    fn assert_scope_ty(
+        db: &TestDb,
+        file_name: &str,
+        scopes: &[&str],
+        symbol_name: &str,
+        expected: &str,
+    ) {
+        let ty = get_symbol(db, file_name, scopes, symbol_name).expect_type();
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
@@ -5430,7 +5437,8 @@ mod tests {
 
         db.write_dedented("src/a.py", "[z for z in x]")?;
 
-        assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "x", "Unknown");
+        let x = get_symbol(&db, "src/a.py", &["<listcomp>"], "x");
+        assert!(x.is_unbound());
 
         // Iterating over an `Unbound` yields `Unknown`:
         assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "z", "Unknown");
@@ -5566,7 +5574,8 @@ mod tests {
             ",
         )?;
 
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unknown");
+        let z = get_symbol(&db, "src/a.py", &["foo", "<listcomp>"], "z");
+        assert!(z.is_unbound());
 
         // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
         assert_file_diagnostics(&db, "src/a.py", &["Name `z` used when not defined"]);
