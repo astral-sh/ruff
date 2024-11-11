@@ -45,11 +45,11 @@ use crate::options::{
     AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
     Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
     Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
-    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8MarkupSafeOptions,
-    Flake8PytestStyleOptions, Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions,
-    Flake8TypeCheckingOptions, Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions,
-    LintCommonOptions, LintOptions, McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions,
-    PycodestyleOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
+    Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
+    McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
+    PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -345,10 +345,6 @@ impl Configuration {
                     .flake8_import_conventions
                     .map(Flake8ImportConventionsOptions::into_settings)
                     .unwrap_or_default(),
-                flake8_markupsafe: lint
-                    .flake8_markupsafe
-                    .map(Flake8MarkupSafeOptions::into_settings)
-                    .unwrap_or_default(),
                 flake8_pytest_style: lint
                     .flake8_pytest_style
                     .map(Flake8PytestStyleOptions::try_into_settings)
@@ -621,7 +617,6 @@ pub struct LintConfiguration {
     pub flake8_gettext: Option<Flake8GetTextOptions>,
     pub flake8_implicit_str_concat: Option<Flake8ImplicitStrConcatOptions>,
     pub flake8_import_conventions: Option<Flake8ImportConventionsOptions>,
-    pub flake8_markupsafe: Option<Flake8MarkupSafeOptions>,
     pub flake8_pytest_style: Option<Flake8PytestStyleOptions>,
     pub flake8_quotes: Option<Flake8QuotesOptions>,
     pub flake8_self: Option<Flake8SelfOptions>,
@@ -734,7 +729,6 @@ impl LintConfiguration {
             flake8_gettext: options.common.flake8_gettext,
             flake8_implicit_str_concat: options.common.flake8_implicit_str_concat,
             flake8_import_conventions: options.common.flake8_import_conventions,
-            flake8_markupsafe: options.common.flake8_markupsafe,
             flake8_pytest_style: options.common.flake8_pytest_style,
             flake8_quotes: options.common.flake8_quotes,
             flake8_self: options.common.flake8_self,
@@ -1110,7 +1104,6 @@ impl LintConfiguration {
             flake8_import_conventions: self
                 .flake8_import_conventions
                 .combine(config.flake8_import_conventions),
-            flake8_markupsafe: self.flake8_markupsafe.combine(config.flake8_markupsafe),
             flake8_pytest_style: self.flake8_pytest_style.combine(config.flake8_pytest_style),
             flake8_quotes: self.flake8_quotes.combine(config.flake8_quotes),
             flake8_self: self.flake8_self.combine(config.flake8_self),
@@ -1332,7 +1325,6 @@ fn warn_about_deprecated_top_level_lint_options(
         flake8_import_conventions,
         flake8_pytest_style,
         flake8_unused_arguments,
-        flake8_markupsafe,
         isort,
         mccabe,
         pep8_naming,
@@ -1484,10 +1476,6 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if flake8_unused_arguments.is_some() {
         used_options.push("flake8-unused-arguments");
-    }
-
-    if flake8_markupsafe.is_some() {
-        used_options.push("flake8-markupsafe");
     }
 
     if isort.is_some() {

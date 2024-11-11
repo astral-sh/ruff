@@ -12,17 +12,17 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// Checks for non-literal strings being passed to [`markupsafe.Markup`].
 ///
 /// ## Why is this bad?
-/// `markupsafe.Markup` does not perform any escaping, so passing dynamic
+/// [`markupsafe.Markup`] does not perform any escaping, so passing dynamic
 /// content, like f-strings, variables or interpolated strings will potentially
 /// lead to XSS vulnerabilities.
 ///
 /// Instead you should interpolate the [`markupsafe.Markup`] object.
 ///
-/// In contrast to the original rule, we do not make an exception for i18n calls
-/// within [`markupsafe.Markup`].
+/// Using [`lint.ruff.extend-markup-names`] additional objects can be
+/// treated like [`markupsafe.Markup`].
 ///
-/// Using [`lint.flake8-markupsafe.extend-markup-names`] additional objects
-/// can be treated like [`markupsafe.Markup`].
+/// This rule was originally inspired by [flake8-markupsafe] but doesn't carve
+/// out any exceptions for i18n related calls.
 ///
 /// ## Example
 /// ```python
@@ -40,13 +40,14 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// html = Markup("<b>{}</b>").format(content)  # Safe
 /// ```
 /// ## Options
-/// - `lint.flake8-markupsafe.extend-markup-names`
+/// - `lint.ruff.extend-markup-names`
 ///
 /// ## References
 /// - [MarkupSafe](https://pypi.org/project/MarkupSafe/)
 /// - [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup)
 ///
 /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+/// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
 #[violation]
 pub struct UnsafeMarkupUse {
     name: String,
@@ -64,11 +65,7 @@ impl Violation for UnsafeMarkupUse {
 ///
 /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
-    if checker
-        .settings
-        .flake8_markupsafe
-        .extend_markup_names
-        .is_empty()
+    if checker.settings.ruff.extend_markup_names.is_empty()
         && !(checker.semantic().seen_module(Modules::MARKUPSAFE)
             || checker.semantic().seen_module(Modules::FLASK))
     {
@@ -100,7 +97,7 @@ fn is_markup_call(qualified_name: &QualifiedName, settings: &LinterSettings) -> 
         qualified_name.segments(),
         ["markupsafe" | "flask", "Markup"]
     ) || settings
-        .flake8_markupsafe
+        .ruff
         .extend_markup_names
         .iter()
         .map(|target| QualifiedName::from_dotted_name(target))

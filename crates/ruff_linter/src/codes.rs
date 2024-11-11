@@ -966,6 +966,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "032") => (RuleGroup::Preview, rules::ruff::rules::DecimalFromFloatLiteral),
         (Ruff, "033") => (RuleGroup::Preview, rules::ruff::rules::PostInitDefault),
         (Ruff, "034") => (RuleGroup::Preview, rules::ruff::rules::UselessIfElse),
+        (Ruff, "035") => (RuleGroup::Preview, rules::ruff::rules::UnsafeMarkupUse),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
 
@@ -1081,9 +1082,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "002") => (RuleGroup::Stable, rules::flake8_logging::rules::InvalidGetLoggerArgument),
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
-
-        // flake8-markupsafe
-        (Flake8MarkupSafe, "001") => (RuleGroup::Preview, rules::flake8_markupsafe::rules::UnsafeMarkupUse),
 
         _ => return None,
     })

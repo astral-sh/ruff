@@ -17,9 +17,9 @@ use crate::registry::{Linter, Rule};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
     flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext,
-    flake8_implicit_str_concat, flake8_import_conventions, flake8_markupsafe, flake8_pytest_style,
-    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
+    pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use crate::settings::types::{
     CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet, PythonVersion,
@@ -250,7 +250,6 @@ pub struct LinterSettings {
     pub flake8_gettext: flake8_gettext::settings::Settings,
     pub flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
-    pub flake8_markupsafe: flake8_markupsafe::settings::Settings,
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_self: flake8_self::settings::Settings,
@@ -416,7 +415,6 @@ impl LinterSettings {
             flake8_gettext: flake8_gettext::settings::Settings::default(),
             flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings::default(),
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
-            flake8_markupsafe: flake8_markupsafe::settings::Settings::default(),
             flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_self: flake8_self::settings::Settings::default(),

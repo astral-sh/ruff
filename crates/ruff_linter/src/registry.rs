@@ -118,9 +118,6 @@ pub enum Linter {
     /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
     #[prefix = "G"]
     Flake8LoggingFormat,
-    /// [flake8-markupsafe](https://github.com/vmagamedov/flake8-markupsafe)
-    #[prefix = "MS"]
-    Flake8MarkupSafe,
     /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
     #[prefix = "INP"]
     Flake8NoPep420,
