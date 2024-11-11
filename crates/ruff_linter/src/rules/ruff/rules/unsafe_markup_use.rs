@@ -25,6 +25,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// out any exceptions for i18n related calls.
 ///
 /// ## Example
+/// Given:
 /// ```python
 /// from markupsafe import Markup
 ///
@@ -38,6 +39,27 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 ///
 /// content = "<script>alert('Hello, world!')</script>"
 /// html = Markup("<b>{}</b>").format(content)  # Safe
+///
+/// Given:
+/// ```python
+/// from markupsafe import Markup
+///
+/// lines = [
+///     Markup("<b>heading</b>"),
+///     "<script>alert('XSS attempt')</script>",
+/// ]
+/// html = Markup("<br>".join(lines))  # XSS
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from markupsafe import Markup
+///
+/// lines = [
+///     Markup("<b>heading</b>"),
+///     "<script>alert('XSS attempt')</script>",
+/// ]
+/// html = Markup("<br>").join(lines)  # Safe
 /// ```
 /// ## Options
 /// - `lint.ruff.extend-markup-names`
