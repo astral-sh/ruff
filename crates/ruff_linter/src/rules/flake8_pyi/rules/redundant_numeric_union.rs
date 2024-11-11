@@ -2,7 +2,7 @@ use bitflags::bitflags;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     name::Name, AnyParameterRef, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple,
@@ -61,7 +61,10 @@ pub struct RedundantNumericUnion {
     redundancy: Redundancy,
 }
 
-impl AlwaysFixableViolation for RedundantNumericUnion {
+impl Violation for RedundantNumericUnion {
+    // Always fixable, but currently under preview.
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let (subtype, supertype) = match self.redundancy {
@@ -73,8 +76,8 @@ impl AlwaysFixableViolation for RedundantNumericUnion {
         format!("Use `{supertype}` instead of `{subtype} | {supertype}`")
     }
 
-    fn fix_title(&self) -> String {
-        "Remove duplicates".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove duplicates".to_string())
     }
 }
 
@@ -130,36 +133,38 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
     // Traverse the union, and remember which numeric types are found.
     traverse_union(&mut remove_numeric_type, checker.semantic(), annotation);
 
-    // Mark [`Fix`] as unsafe when comments are in range.
-    let applicability = if checker.comment_ranges().intersects(annotation.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
+    let mut diagnostic = Diagnostic::new(RedundantNumericUnion { redundancy }, annotation.range());
+    if checker.settings.preview.is_enabled() {
+        // Mark [`Fix`] as unsafe when comments are in range.
+        let applicability = if checker.comment_ranges().intersects(annotation.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        // Generate the flattened fix once.
+        let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
+            // Generate a [`Fix`] for a single type expression, e.g. `int`.
+            Fix::applicable_edit(
+                Edit::range_replacement(checker.generator().expr(edit_expr), annotation.range()),
+                applicability,
+            )
+        } else {
+            match union_type {
+                UnionKind::PEP604 => {
+                    generate_pep604_fix(checker, necessary_nodes, annotation, applicability)
+                }
+                UnionKind::TypingUnion => {
+                    generate_union_fix(checker, necessary_nodes, annotation, applicability)
+                        .ok()
+                        .unwrap()
+                }
+            }
+        };
+        diagnostic.set_fix(fix);
     };
 
-    // Generate the flattened fix once.
-    let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
-        // Generate a [`Fix`] for a single type expression, e.g. `int`.
-        Fix::applicable_edit(
-            Edit::range_replacement(checker.generator().expr(edit_expr), annotation.range()),
-            applicability,
-        )
-    } else {
-        match union_type {
-            UnionKind::PEP604 => {
-                generate_pep604_fix(checker, necessary_nodes, annotation, applicability)
-            }
-            UnionKind::TypingUnion => {
-                generate_union_fix(checker, necessary_nodes, annotation, applicability)
-                    .ok()
-                    .unwrap()
-            }
-        }
-    };
-
-    checker.diagnostics.push(
-        Diagnostic::new(RedundantNumericUnion { redundancy }, annotation.range()).with_fix(fix),
-    );
+    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
