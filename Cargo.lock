@@ -418,7 +418,7 @@ checksum = "2f8c93eb5f77c9050c7750e14f13ef1033a40a0aac70c6371535b6763a01438c"
 dependencies = [
  "nix 0.28.0",
  "terminfo",
- "thiserror",
+ "thiserror 1.0.67",
  "which",
  "winapi",
 ]
@@ -1517,7 +1517,7 @@ dependencies = [
  "paste",
  "peg",
  "regex",
- "thiserror",
+ "thiserror 1.0.67",
 ]
 
 [[package]]
@@ -1955,7 +1955,7 @@ dependencies = [
  "pep440_rs 0.4.0",
  "regex",
  "serde",
- "thiserror",
+ "thiserror 1.0.67",
  "tracing",
  "unicode-width 0.1.13",
  "url",
@@ -1974,7 +1974,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd53dff83f26735fdc1ca837098ccf133605d794cdae66acfc2bfac3ec809d95"
 dependencies = [
  "memchr",
- "thiserror",
+ "thiserror 1.0.67",
  "ucd-trie",
 ]
 
@@ -2144,7 +2144,7 @@ dependencies = [
  "newtype-uuid",
  "quick-xml",
  "strip-ansi-escapes",
- "thiserror",
+ "thiserror 1.0.67",
  "uuid",
 ]
 
@@ -2273,7 +2273,7 @@ dependencies = [
  "static_assertions",
  "tempfile",
  "test-case",
- "thiserror",
+ "thiserror 2.0.3",
  "tracing",
 ]
 
@@ -2393,7 +2393,7 @@ checksum = "bd283d9651eeda4b2a83a43c1c91b266c40fd76ecd39a50a8c630ae69dc72891"
 dependencies = [
  "getrandom",
  "libredox",
- "thiserror",
+ "thiserror 1.0.67",
 ]
 
 [[package]]
@@ -2504,7 +2504,7 @@ dependencies = [
  "strum",
  "tempfile",
  "test-case",
- "thiserror",
+ "thiserror 2.0.3",
  "tikv-jemallocator",
  "toml",
  "tracing",
@@ -2572,7 +2572,7 @@ dependencies = [
  "salsa",
  "serde",
  "tempfile",
- "thiserror",
+ "thiserror 2.0.3",
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
@@ -2724,7 +2724,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "test-case",
- "thiserror",
+ "thiserror 2.0.3",
  "toml",
  "typed-arena",
  "unicode-normalization",
@@ -2758,7 +2758,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "test-case",
- "thiserror",
+ "thiserror 2.0.3",
  "uuid",
 ]
 
@@ -2831,7 +2831,7 @@ dependencies = [
  "similar",
  "smallvec",
  "static_assertions",
- "thiserror",
+ "thiserror 2.0.3",
  "tracing",
 ]
 
@@ -2964,7 +2964,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
- "thiserror",
+ "thiserror 2.0.3",
  "tracing",
  "tracing-subscriber",
 ]
@@ -3550,7 +3550,16 @@ version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b3c6efbfc763e64eb85c11c25320f0737cb7364c4b6336db90aa9ebe27a0bbd"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.67",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c006c85c7651b3cf2ada4584faa36773bd07bac24acfb39f3c431b36d7e667aa"
+dependencies = [
+ "thiserror-impl 2.0.3",
 ]
 
 [[package]]
@@ -3558,6 +3567,17 @@ name = "thiserror-impl"
 version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b607164372e89797d78b8e23a6d67d5d1038c1c65efd52e1389ef8b77caba2a6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f077553d607adc1caf65430528a576c757a71ed73944b66ebb58ef2bbd243568"
 dependencies = [
  "proc-macro2",
  "quote",
