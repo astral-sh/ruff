@@ -277,7 +277,7 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn use_boundness(&self, use_id: ScopedUseId) -> Boundness {
         if self.bindings_by_use[use_id].may_be_unbound() {
-            Boundness::MayBeUnbound
+            Boundness::PossiblyUnbound
         } else {
             Boundness::Bound
         }
@@ -292,7 +292,7 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn public_boundness(&self, symbol: ScopedSymbolId) -> Boundness {
         if self.public_symbols[symbol].may_be_unbound() {
-            Boundness::MayBeUnbound
+            Boundness::PossiblyUnbound
         } else {
             Boundness::Bound
         }

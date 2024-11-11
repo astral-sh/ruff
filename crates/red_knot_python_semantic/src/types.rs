@@ -157,7 +157,7 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
 pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
     let explicit_symbol = symbol(db, global_scope(db, file), name);
 
-    if !explicit_symbol.may_be_unbound() {
+    if !explicit_symbol.possibly_unbound() {
         return explicit_symbol;
     }
 
@@ -1069,7 +1069,7 @@ impl<'db> Type<'db> {
                 // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
                 // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
                 // where we know exactly which module we're dealing with.
-                if name != "__getattr__" && global_lookup.may_be_unbound() {
+                if name != "__getattr__" && global_lookup.possibly_unbound() {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
                     let module_type_instance_member =
                         KnownClass::ModuleType.to_class_literal(db).member(db, name);
@@ -1098,7 +1098,7 @@ impl<'db> Type<'db> {
                         }
                         Symbol::Type(ty_member, member_boundness) => {
                             // TODO: raise a diagnostic if member_boundness indicates potential unboundness
-                            if member_boundness == Boundness::MayBeUnbound {
+                            if member_boundness == Boundness::PossiblyUnbound {
                                 may_be_unbound = true;
                             }
 
@@ -1114,7 +1114,7 @@ impl<'db> Type<'db> {
                     Symbol::Type(
                         builder.build(),
                         if may_be_unbound {
-                            Boundness::MayBeUnbound
+                            Boundness::PossiblyUnbound
                         } else {
                             Boundness::Bound
                         },
@@ -1308,7 +1308,7 @@ impl<'db> Type<'db> {
             Symbol::Type(callable_ty, Boundness::Bound) => {
                 CallDunderResult::CallOutcome(callable_ty.call(db, arg_types))
             }
-            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
+            Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
                 CallDunderResult::PossiblyUnbound(callable_ty.call(db, arg_types))
             }
             Symbol::Unbound => CallDunderResult::MethodNotAvailable,

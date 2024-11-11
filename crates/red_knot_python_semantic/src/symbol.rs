@@ -6,7 +6,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Boundness {
     Bound,
-    MayBeUnbound,
+    PossiblyUnbound,
 }
 
 /// The result of a symbol lookup, which can either be a (possibly unbound) type
@@ -17,14 +17,14 @@ pub(crate) enum Boundness {
 /// bound = 1
 ///
 /// if flag:
-///     maybe_unbound = 2
+///     possibly_unbound = 2
 /// ```
 ///
 /// If we look up symbols in this scope, we would get the following results:
 /// ```rs
-/// bound:          Symbol::Type(Type::IntLiteral(1), Boundness::Bound),
-/// maybe_unbound:  Symbol::Type(Type::IntLiteral(2), Boundness::MayBeUnbound),
-/// non_existent:   Symbol::Unbound,
+/// bound:             Symbol::Type(Type::IntLiteral(1), Boundness::Bound),
+/// possibly_unbound:  Symbol::Type(Type::IntLiteral(2), Boundness::PossiblyUnbound),
+/// non_existent:      Symbol::Unbound,
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Symbol<'db> {
@@ -37,9 +37,9 @@ impl<'db> Symbol<'db> {
         matches!(self, Symbol::Unbound)
     }
 
-    pub(crate) fn may_be_unbound(&self) -> bool {
+    pub(crate) fn possibly_unbound(&self) -> bool {
         match self {
-            Symbol::Type(_, Boundness::MayBeUnbound) | Symbol::Unbound => true,
+            Symbol::Type(_, Boundness::PossiblyUnbound) | Symbol::Unbound => true,
             Symbol::Type(_, Boundness::Bound) => false,
         }
     }
@@ -72,7 +72,7 @@ impl<'db> Symbol<'db> {
             Symbol::Type(replacement, _) => Symbol::Type(
                 match self {
                     Symbol::Type(ty, Boundness::Bound) => ty,
-                    Symbol::Type(ty, Boundness::MayBeUnbound) => {
+                    Symbol::Type(ty, Boundness::PossiblyUnbound) => {
                         UnionType::from_elements(db, [*replacement, ty])
                     }
                     Symbol::Unbound => *replacement,
