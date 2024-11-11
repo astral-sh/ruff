@@ -4,7 +4,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::StoredNameFinder;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_semantic::{Binding, BindingId};
+use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;

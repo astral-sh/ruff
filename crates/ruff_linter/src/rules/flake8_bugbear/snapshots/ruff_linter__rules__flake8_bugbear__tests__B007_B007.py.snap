@@ -219,4 +219,5 @@ B007.py:114:5: B007 [*] Loop control variable `y` not used within loop body
 114     |-for y in ls:
     114 |+for _y in ls:
 115 115 |     y=2
-116 116 |
+116 116 | 
+117 117 | def g():
