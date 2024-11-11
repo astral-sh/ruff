@@ -1,3 +1,5 @@
+use std::fmt;
+
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_generator_return_type::*;
 pub(crate) use bad_version_info_comparison::*;
@@ -27,7 +29,6 @@ pub(crate) use redundant_final_literal::*;
 pub(crate) use redundant_literal_union::*;
 pub(crate) use redundant_numeric_union::*;
 pub(crate) use simple_defaults::*;
-use std::fmt;
 pub(crate) use str_or_repr_defined_in_stub::*;
 pub(crate) use string_or_bytes_too_long::*;
 pub(crate) use stub_body_multiple_statements::*;
