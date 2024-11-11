@@ -1191,9 +1191,7 @@ impl Truthiness {
                     return Self::Falsey;
                 }
 
-                let is_unpack = |elt: &Expr| matches!(elt, Expr::Starred(..));
-
-                if elts.iter().all(is_unpack) {
+                if elts.iter().all(Expr::is_starred_expr) {
                     // [*foo] / [*foo, *bar]
                     Self::Unknown
                 } else {
