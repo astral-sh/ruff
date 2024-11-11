@@ -119,7 +119,13 @@ import sys
 
 reveal_type(sys.version_info[0] < 3)  # revealed: Literal[False]
 reveal_type(sys.version_info[1] > 8)  # revealed: Literal[False]
+
+# revealed: tuple[Literal[3], Literal[8], int, Literal["alpha", "beta", "candidate", "final"], int]
+reveal_type(sys.version_info[:5])
+
 reveal_type(sys.version_info[:2] >= (3, 8))  # revealed: Literal[True]
 reveal_type(sys.version_info[0:2] >= (3, 9))  # revealed: Literal[False]
 reveal_type(sys.version_info[:3] >= (3, 9, 1))  # revealed: Literal[False]
+reveal_type(sys.version_info[3] == "final")  # revealed: bool
+reveal_type(sys.version_info[3] == "finalllllll")  # revealed: Literal[False]
 ```
