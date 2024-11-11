@@ -272,6 +272,11 @@ pub(crate) fn quote_annotation(
     let quote = stylist.quote();
     let mut quote_annotator = QuoteAnnotator::new(semantic, stylist);
     quote_annotator.visit_expr(expr);
+    if quote_annotator.failed {
+        return Err(anyhow::anyhow!(
+            "Annotation already contains quotes that require escaping"
+        ));
+    }
     let annotation = quote_annotator.into_annotation();
 
     Ok(Edit::range_replacement(
@@ -313,6 +318,7 @@ pub(crate) struct QuoteAnnotator<'a> {
     semantic: &'a SemanticModel<'a>,
     state: Vec<QuoteAnnotatorState>,
     annotation: String,
+    failed: bool,
 }
 
 impl<'a> QuoteAnnotator<'a> {
@@ -322,6 +328,7 @@ impl<'a> QuoteAnnotator<'a> {
             semantic,
             state: Vec::new(),
             annotation: String::new(),
+            failed: false,
         }
     }
 
@@ -388,10 +395,16 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                 let source = match self.state.last().copied() {
                     Some(QuoteAnnotatorState::Literal | QuoteAnnotatorState::AnnotatedRest) => {
                         let mut source = generator.expr(expr);
-                        source = source.replace(
-                            self.stylist.quote().as_char(),
-                            &self.stylist.quote().opposite().as_char().to_string(),
-                        );
+                        let opposite_quote = &self.stylist.quote().opposite().as_char().to_string();
+                        // If the quotes we are going to insert in this source already exists set the auto quote outcome
+                        // to failed. Because this means we are inserting quotes that are in the string and they collect.
+                        if source.contains(opposite_quote)
+                            || source.contains('\n')
+                            || source.contains('\\')
+                        {
+                            self.failed = true
+                        }
+                        source = source.replace(self.stylist.quote().as_char(), opposite_quote);
                         source
                     }
                     None
