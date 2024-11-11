@@ -1,5 +1,4 @@
 //! Lint rules based on import analysis.
-use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::CellOffsets;
@@ -10,6 +9,7 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
 
 use crate::directives::IsortDirectives;
+use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
@@ -24,7 +24,7 @@ pub(crate) fn check_imports(
     directives: &IsortDirectives,
     settings: &LinterSettings,
     stylist: &Stylist,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {

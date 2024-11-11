@@ -146,11 +146,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FStringNumberFormat) {
                 refurb::rules::fstring_number_format(checker, subscript);
             }
-
             if checker.enabled(Rule::IncorrectlyParenthesizedTupleInSubscript) {
                 ruff::rules::subscript_with_parenthesized_tuple(checker, subscript);
             }
-
             if checker.enabled(Rule::NonPEP646Unpack) {
                 pyupgrade::rules::use_pep646_unpack(checker, subscript);
             }
@@ -820,6 +818,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BadStrStripCall) {
                 pylint::rules::bad_str_strip_call(checker, func, args);
             }
+            if checker.enabled(Rule::ShallowCopyEnviron) {
+                pylint::rules::shallow_copy_environ(checker, call);
+            }
             if checker.enabled(Rule::InvalidEnvvarDefault) {
                 pylint::rules::invalid_envvar_default(checker, call);
             }
@@ -1374,9 +1375,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SingleItemMembershipTest) {
                 refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
-            }
-            if checker.enabled(Rule::HardcodedStringCharset) {
-                refurb::rules::hardcoded_string_charset_comparison(checker, compare);
             }
         }
         Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {

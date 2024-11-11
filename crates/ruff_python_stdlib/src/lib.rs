@@ -3,6 +3,7 @@ pub mod future;
 pub mod identifiers;
 pub mod keyword;
 pub mod logging;
+pub mod open_mode;
 pub mod path;
 pub mod str;
 pub mod sys;

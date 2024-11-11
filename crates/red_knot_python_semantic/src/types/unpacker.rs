@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 
 use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{TupleType, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
+use crate::types::{Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
 use crate::Db;
 
 /// Unpacks the value expression type to their respective targets.
@@ -93,11 +93,10 @@ impl<'db> Unpacker<'db> {
                     // further and deconstruct to an array of `StringLiteral` with each
                     // individual character, instead of just an array of `LiteralString`, but
                     // there would be a cost and it's not clear that it's worth it.
-                    let value_ty = Type::Tuple(TupleType::new(
+                    let value_ty = Type::tuple(
                         self.db,
-                        vec![Type::LiteralString; string_literal_ty.len(self.db)]
-                            .into_boxed_slice(),
-                    ));
+                        &vec![Type::LiteralString; string_literal_ty.len(self.db)],
+                    );
                     self.unpack(target, value_ty, scope);
                 }
                 _ => {

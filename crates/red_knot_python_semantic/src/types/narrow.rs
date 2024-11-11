@@ -5,7 +5,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
-    infer_expression_types, ClassLiteralType, InstanceType, IntersectionBuilder, KnownClass,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass,
     KnownConstraintFunction, KnownFunction, Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
@@ -353,14 +353,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     let to_constraint = match function {
                         KnownConstraintFunction::IsInstance => {
                             |class_literal: ClassLiteralType<'db>| {
-                                Type::Instance(InstanceType {
-                                    class: class_literal.class,
-                                })
+                                Type::instance(class_literal.class)
                             }
                         }
                         KnownConstraintFunction::IsSubclass => {
                             |class_literal: ClassLiteralType<'db>| {
-                                Type::SubclassOf(class_literal.to_subclass_of_type())
+                                Type::subclass_of(class_literal.class)
                             }
                         }
                     };

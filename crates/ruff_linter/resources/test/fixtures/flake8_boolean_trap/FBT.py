@@ -94,7 +94,7 @@ class Registry:
         object.__setattr__(self, "flag", True)
 
 
-from typing import Optional, Union
+from typing import Optional, Union, Self
 
 
 def func(x: Union[list, Optional[int | str | float | bool]]):
@@ -154,3 +154,23 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     foo: bool = Field(True, exclude=True)
+
+
+# https://github.com/astral-sh/ruff/issues/14202
+class SupportsXorBool:
+    def __xor__(self, other: bool) -> Self: ...
+
+# check overload
+class CustomFloat:
+    @overload
+    def __mul__(self, other: bool) -> Self: ...
+    @overload
+    def __mul__(self, other: float) -> Self: ...
+    @overload
+    def __mul__(self, other: Self) -> Self: ...
+
+# check union
+class BooleanArray:
+    def __or__(self, other: Self | bool) -> Self: ...
+    def __ror__(self, other: Self | bool) -> Self: ...
+    def __ior__(self, other: Self | bool) -> Self: ...
