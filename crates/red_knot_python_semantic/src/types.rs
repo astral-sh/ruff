@@ -14,7 +14,7 @@ use crate::semantic_index::{
     BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::stdlib::{
-    builtins_symbol, types_symbol, typeshed_symbol, typing_extensions_symbol, typing_symbol,
+    builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
 };
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
@@ -126,7 +126,10 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
 /// so the cost of hashing the names is likely to be more expensive than it's worth.
 #[salsa::tracked(return_ref)]
 fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-    let Some(module_type) = KnownClass::ModuleType.to_class(db).into_class_literal() else {
+    let Some(module_type) = KnownClass::ModuleType
+        .to_class_literal(db)
+        .into_class_literal()
+    else {
         // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
         // without a `types.pyi` stub in the `stdlib/` directory
         return smallvec::SmallVec::default();
@@ -167,7 +170,7 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
     {
         // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
         // on instance types yet.
-        let module_type_member = KnownClass::ModuleType.to_class(db).member(db, name);
+        let module_type_member = KnownClass::ModuleType.to_class_literal(db).member(db, name);
         return explicit_symbol.replace_unbound_with(db, &module_type_member);
     }
 
@@ -1069,7 +1072,7 @@ impl<'db> Type<'db> {
                 if name != "__getattr__" && global_lookup.may_be_unbound() {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
                     let module_type_instance_member =
-                        KnownClass::ModuleType.to_class(db).member(db, name);
+                        KnownClass::ModuleType.to_class_literal(db).member(db, name);
                     global_lookup.replace_unbound_with(db, &module_type_instance_member)
                 } else {
                     global_lookup
@@ -1424,25 +1427,25 @@ impl<'db> Type<'db> {
             Type::Instance(InstanceType { class }) => {
                 Type::SubclassOf(SubclassOfType { class: *class })
             }
-            Type::KnownInstance(known_instance) => known_instance.class().to_class(db),
+            Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
-            Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
-            Type::SliceLiteral(_) => KnownClass::Slice.to_class(db),
-            Type::IntLiteral(_) => KnownClass::Int.to_class(db),
-            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
-            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
-            Type::Tuple(_) => KnownClass::Tuple.to_class(db),
+            Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
+            Type::SliceLiteral(_) => KnownClass::Slice.to_class_literal(db),
+            Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
+            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
+            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
+            Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
             Type::SubclassOf(SubclassOfType { class }) => Type::subclass_of(
                 class
                     .try_metaclass(db)
                     .ok()
                     .and_then(Type::into_class_literal)
-                    .unwrap_or_else(|| KnownClass::Type.to_class(db).expect_class_literal())
+                    .unwrap_or_else(|| KnownClass::Type.to_class_literal(db).expect_class_literal())
                     .class,
             ),
-            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
+            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             // TODO: `type[Any]`?
             Type::Any => Type::Any,
             // TODO: `type[Unknown]`?
@@ -1566,10 +1569,15 @@ impl<'db> KnownClass {
     }
 
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
-        self.to_class(db).to_instance(db)
+        self.to_class_literal(db).to_instance(db)
     }
 
-    pub fn to_class(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+        core_module_symbol(db, self.canonical_module(), self.as_str()).unwrap_or_unknown()
+    }
+
+    /// Return the module in which we should look up the definition for this class
+    pub(crate) const fn canonical_module(self) -> CoreStdlibModule {
         match self {
             Self::Bool
             | Self::Object
@@ -1582,20 +1590,20 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
-            | Self::Slice => builtins_symbol(db, self.as_str()).unwrap_or_unknown(),
-            Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
-                types_symbol(db, self.as_str()).unwrap_or_unknown()
-            }
-            Self::NoneType => typeshed_symbol(db, self.as_str()).unwrap_or_unknown(),
-            Self::SpecialForm => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
-            Self::TypeVar => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
+            | Self::Slice => CoreStdlibModule::Builtins,
+            Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
+            Self::NoneType => CoreStdlibModule::Typeshed,
+            Self::SpecialForm | Self::TypeVar => CoreStdlibModule::Typing,
             // TODO when we understand sys.version_info, we will need an explicit fallback here,
             // because typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
             // singleton, but not for `typing._NoDefaultType`
-            Self::NoDefaultType => typing_extensions_symbol(db, self.as_str()).unwrap_or_unknown(),
+            Self::NoDefaultType => CoreStdlibModule::TypingExtensions,
         }
     }
 
+    /// Is this class a singleton class?
+    ///
+    /// A singleton class is a class where it is known that only one instance can ever exist at runtime.
     const fn is_singleton(self) -> bool {
         // TODO there are other singleton types (EllipsisType, NotImplementedType)
         match self {
@@ -1620,40 +1628,33 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn maybe_from_module(module: &Module, class_name: &str) -> Option<Self> {
-        let candidate = Self::from_name(class_name)?;
-        if candidate.check_module(module) {
-            Some(candidate)
-        } else {
-            None
-        }
-    }
-
-    fn from_name(name: &str) -> Option<Self> {
+    pub fn try_from_module(module: &Module, class_name: &str) -> Option<Self> {
         // Note: if this becomes hard to maintain (as rust can't ensure at compile time that all
         // variants of `Self` are covered), we might use a macro (in-house or dependency)
         // See: https://stackoverflow.com/q/39070244
-        match name {
-            "bool" => Some(Self::Bool),
-            "object" => Some(Self::Object),
-            "bytes" => Some(Self::Bytes),
-            "tuple" => Some(Self::Tuple),
-            "type" => Some(Self::Type),
-            "int" => Some(Self::Int),
-            "float" => Some(Self::Float),
-            "str" => Some(Self::Str),
-            "set" => Some(Self::Set),
-            "dict" => Some(Self::Dict),
-            "list" => Some(Self::List),
-            "slice" => Some(Self::Slice),
-            "GenericAlias" => Some(Self::GenericAlias),
-            "NoneType" => Some(Self::NoneType),
-            "ModuleType" => Some(Self::ModuleType),
-            "FunctionType" => Some(Self::FunctionType),
-            "_SpecialForm" => Some(Self::SpecialForm),
-            "_NoDefaultType" => Some(Self::NoDefaultType),
-            _ => None,
-        }
+        let candidate = match class_name {
+            "bool" => Self::Bool,
+            "object" => Self::Object,
+            "bytes" => Self::Bytes,
+            "tuple" => Self::Tuple,
+            "type" => Self::Type,
+            "int" => Self::Int,
+            "float" => Self::Float,
+            "str" => Self::Str,
+            "set" => Self::Set,
+            "dict" => Self::Dict,
+            "list" => Self::List,
+            "slice" => Self::Slice,
+            "GenericAlias" => Self::GenericAlias,
+            "NoneType" => Self::NoneType,
+            "ModuleType" => Self::ModuleType,
+            "FunctionType" => Self::FunctionType,
+            "_SpecialForm" => Self::SpecialForm,
+            "_NoDefaultType" => Self::NoDefaultType,
+            _ => return None,
+        };
+
+        candidate.check_module(module).then_some(candidate)
     }
 
     /// Private method checking if known class can be defined in the given module.
@@ -1673,8 +1674,10 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
-            | Self::Slice => module.name() == "builtins",
-            Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
+            | Self::Slice
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType => module.name() == self.canonical_module().as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm | Self::TypeVar | Self::NoDefaultType => {
                 matches!(module.name().as_str(), "typing" | "typing_extensions")
@@ -2482,7 +2485,7 @@ impl<'db> Class<'db> {
         } else if let Some(base_class) = base_classes.next() {
             (base_class.metaclass(db), base_class)
         } else {
-            (KnownClass::Type.to_class(db), self)
+            (KnownClass::Type.to_class_literal(db), self)
         };
 
         let mut candidate = if let Type::ClassLiteral(metaclass_ty) = metaclass {
@@ -2800,6 +2803,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
+    use crate::stdlib::typing_symbol;
     use crate::ProgramSettings;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
