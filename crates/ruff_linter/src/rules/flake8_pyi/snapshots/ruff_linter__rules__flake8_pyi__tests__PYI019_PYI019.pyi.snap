@@ -63,7 +63,7 @@ PYI019.pyi:18:55: PYI019 [*] Methods like `bad_posonly_class_method` should retu
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 15 15 | 
 16 16 | 
 17 17 |     @classmethod
@@ -99,7 +99,7 @@ PYI019.pyi:42:46: PYI019 [*] Methods like `generic_instance_method` should retur
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 39 39 |   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
 40 40 | 
 41 41 | 
@@ -118,7 +118,7 @@ PYI019.pyi:54:32: PYI019 [*] Methods like `foo` should return `Self` instead of 
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 51 51 |    # due to `foo_classmethod being listed in `pep8_naming.classmethod-decorators`
 52 52 |    # in the settings for this test:
 53 53 |    @foo_classmethod
@@ -139,7 +139,7 @@ PYI019.pyi:59:48: PYI019 [*] Methods like `__new__` should return `Self` instead
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 56 56 | 
 57 57 | # Only .pyi gets fixes
 58 58 | class PEP695Fix:
@@ -160,7 +160,7 @@ PYI019.pyi:61:47: PYI019 [*] Methods like `__init_subclass__` should return `Sel
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 58 58 | class PEP695Fix:
 59 59 |     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
 60 60 | 
@@ -181,7 +181,7 @@ PYI019.pyi:63:43: PYI019 [*] Methods like `__neg__` should return `Self` instead
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 60 60 | 
 61 61 |     def __init_subclass__[S](cls: type[S]) -> S: ...
 62 62 | 
@@ -202,7 +202,7 @@ PYI019.pyi:65:32: PYI019 [*] Methods like `__pos__` should return `Self` instead
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 62 62 | 
 63 63 |     def __neg__[S: PEP695Fix](self: S) -> S: ...
 64 64 | 
@@ -223,7 +223,7 @@ PYI019.pyi:67:53: PYI019 [*] Methods like `__add__` should return `Self` instead
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 64 64 | 
 65 65 |     def __pos__[S](self: S) -> S: ...
 66 66 | 
@@ -244,7 +244,7 @@ PYI019.pyi:69:42: PYI019 [*] Methods like `__sub__` should return `Self` instead
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 66 66 | 
 67 67 |     def __add__[S: PEP695Fix](self: S, other: S) -> S: ...
 68 68 | 
@@ -264,7 +264,7 @@ PYI019.pyi:72:59: PYI019 [*] Methods like `class_method_bound` should return `Se
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 69 69 |     def __sub__[S](self: S, other: S) -> S: ...
 70 70 | 
 71 71 |     @classmethod
@@ -284,7 +284,7 @@ PYI019.pyi:75:50: PYI019 [*] Methods like `class_method_unbound` should return `
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 72 72 |     def class_method_bound[S: PEP695Fix](cls: type[S]) -> S: ...
 73 73 | 
 74 74 |     @classmethod
@@ -305,7 +305,7 @@ PYI019.pyi:77:57: PYI019 [*] Methods like `instance_method_bound` should return 
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 74 74 |     @classmethod
 75 75 |     def class_method_unbound[S](cls: type[S]) -> S: ...
 76 76 | 
@@ -326,7 +326,7 @@ PYI019.pyi:79:48: PYI019 [*] Methods like `instance_method_unbound` should retur
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 76 76 | 
 77 77 |     def instance_method_bound[S: PEP695Fix](self: S) -> S: ...
 78 78 | 
@@ -347,7 +347,7 @@ PYI019.pyi:81:90: PYI019 [*] Methods like `instance_method_bound_with_another_pa
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 78 78 | 
 79 79 |     def instance_method_unbound[S](self: S) -> S: ...
 80 80 | 
@@ -364,25 +364,25 @@ PYI019.pyi:83:81: PYI019 [*] Methods like `instance_method_unbound_with_another_
 83 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
    |                                                                                 ^ PYI019
 84 | 
-85 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: T) -> S: ...
+85 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
    |
    = help: Replace with `Self`
 
-ℹ Unsafe fix
+ℹ Safe fix
 80 80 | 
 81 81 |     def instance_method_bound_with_another_parameter[S: PEP695Fix](self: S, other: S) -> S: ...
 82 82 | 
 83    |-    def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
    83 |+    def instance_method_unbound_with_another_parameter(self, other: Self) -> Self: ...
 84 84 | 
-85 85 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: T) -> S: ...
+85 85 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
 
-PYI019.pyi:85:88: PYI019 [*] Methods like `multiple_type_vars` should return `Self` instead of a custom `TypeVar`
+PYI019.pyi:85:94: PYI019 [*] Methods like `multiple_type_vars` should return `Self` instead of a custom `TypeVar`
    |
 83 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
 84 | 
-85 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: T) -> S: ...
-   |                                                                                        ^ PYI019
+85 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
+   |                                                                                              ^ PYI019
    |
    = help: Replace with `Self`
 
@@ -390,5 +390,5 @@ PYI019.pyi:85:88: PYI019 [*] Methods like `multiple_type_vars` should return `Se
 82 82 | 
 83 83 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
 84 84 | 
-85    |-    def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: T) -> S: ...
-   85 |+    def multiple_type_vars[*Ts, T](self, other: S, /, *args: *Ts, a: T, b: T) -> Self: ...
+85    |-    def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
+   85 |+    def multiple_type_vars[*Ts, T](self, other: Self, /, *args: *Ts, a: T, b: list[T]) -> Self: ...

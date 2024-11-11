@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use itertools::Itertools;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
@@ -268,13 +268,16 @@ fn add_diagnostic(
 /// * Import `Self` if necessary
 /// * Remove the first parameter's annotation
 /// * Replace the return annotation with `Self`
-/// * Replace other uses of the original `TypeVar` elsewhere in the signature with `Self`
-/// * Remove that `TypeVar` from the PEP 695 type parameter list.
+/// * Replace other uses of the original type variable elsewhere in the signature with `Self`
+/// * Remove that type variable from the PEP 695 type parameter list
 ///
 /// This fix cannot be suggested for non-stubs,
-/// as a non-stub fix would have to deal with
-/// references in body/at runtime as well, which is
-/// substantially harder and requires a type-aware backend.
+/// as a non-stub fix would have to deal with references in body/at runtime as well,
+/// which is substantially harder and requires a type-aware backend.
+///
+/// The fourth step above has the same problem.
+/// This function thus only does replacements for the simplest of cases
+/// and will mark the fix as unsafe if an annotation cannot be handled.
 fn replace_custom_typevar_with_self(
     checker: &Checker,
     type_params: Option<&TypeParams>,
@@ -282,6 +285,7 @@ fn replace_custom_typevar_with_self(
     returns: &Expr,
 ) -> Fix {
     let typevar_name = returns.as_name_expr().unwrap().id();
+    let mut fix_applicability = Applicability::Safe;
 
     let mut all_edits = vec![
         replace_return_annotation_with_self(returns),
@@ -296,14 +300,23 @@ fn replace_custom_typevar_with_self(
         all_edits.push(edit);
     }
 
-    if let Ok(mut edits) = replace_typevar_usages_with_self(parameters, typevar_name) {
-        all_edits.append(&mut edits);
+    match replace_typevar_usages_with_self(parameters, typevar_name) {
+        Ok(mut edits) => {
+            all_edits.append(&mut edits)
+        }
+        Err(mut edits) => {
+            fix_applicability = Applicability::Unsafe;
+            all_edits.append(&mut edits)
+        }
     }
 
-    let first = all_edits.remove(0);
-    let rest = all_edits;
+    let (first, rest) = (all_edits.remove(0), all_edits);
 
-    Fix::unsafe_edits(first, rest)
+    if fix_applicability == Applicability::Safe {
+        Fix::safe_edits(first, rest)
+    } else {
+        Fix::unsafe_edits(first, rest)
+    }
 }
 
 fn import_self(checker: &Checker, return_range: TextRange) -> Option<Edit> {
@@ -319,9 +332,7 @@ fn import_self(checker: &Checker, return_range: TextRange) -> Option<Edit> {
     let request = ImportRequest::import_from(source_module, "Self");
 
     let position = return_range.start();
-    let Ok((edit, ..)) = importer.get_or_import_symbol(&request, position, semantic) else {
-        return None;
-    };
+    let (edit, ..) = importer.get_or_import_symbol(&request, position, semantic).ok()?;
 
     Some(edit)
 }
@@ -343,8 +354,9 @@ fn replace_return_annotation_with_self(returns: &Expr) -> Edit {
 fn replace_typevar_usages_with_self(
     parameters: &Parameters,
     typevar_name: &str,
-) -> Result<Vec<Edit>, ()> {
+) -> Result<Vec<Edit>, Vec<Edit>> {
     let mut edits = vec![];
+    let mut could_not_handle_all_usages = false;
 
     for parameter in parameters.iter().skip(1) {
         let Some(annotation) = parameter.annotation() else {
@@ -358,12 +370,16 @@ fn replace_typevar_usages_with_self(
             let edit = Edit::range_replacement("Self".to_string(), annotation.range());
             edits.push(edit);
         } else {
-            // FIXME: Handle complex annotations.
-            return Err(());
+            // Bail for complex cases
+            could_not_handle_all_usages = true;
         }
     }
 
-    Ok(edits)
+    if could_not_handle_all_usages {
+        Err(edits)
+    } else {
+        Ok(edits)
+    }
 }
 
 fn remove_typevar_declaration(type_params: Option<&TypeParams>, name: &str) -> Option<Edit> {
