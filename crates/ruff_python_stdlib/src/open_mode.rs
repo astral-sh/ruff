@@ -2,21 +2,21 @@ bitflags::bitflags! {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct OpenMode: u8 {
         /// `r`
-        const READ = 0b0001;
+        const READ = 1 << 0;
         /// `w`
-        const WRITE = 0b0010;
+        const WRITE = 1 << 1;
         /// `a`
-        const APPEND = 0b0100;
+        const APPEND = 1 << 2;
         /// `x`
-        const CREATE = 0b1000;
+        const CREATE = 1 << 3;
         /// `b`
-        const BINARY = 0b10000;
+        const BINARY = 1 << 4;
         /// `t`
-        const TEXT = 0b10_0000;
+        const TEXT = 1 << 5;
         /// `+`
-        const PLUS = 0b100_0000;
+        const PLUS = 1 << 6;
         /// `U`
-        const UNIVERSAL_NEWLINES = 0b1000_0000;
+        const UNIVERSAL_NEWLINES = 1 << 7;
     }
 }
 

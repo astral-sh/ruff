@@ -18,8 +18,8 @@ use crate::Locator;
 bitflags! {
     #[derive(Debug, Copy, Clone)]
     pub struct Flags: u8 {
-        const NOQA  = 0b0000_0001;
-        const ISORT = 0b0000_0010;
+        const NOQA  = 1 << 0;
+        const ISORT = 1 << 1;
     }
 }
 
