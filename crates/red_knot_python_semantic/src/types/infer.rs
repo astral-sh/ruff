@@ -1038,7 +1038,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let maybe_known_class = file_to_module(self.db, self.file)
             .as_ref()
-            .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
+            .and_then(|module| KnownClass::try_from_module(module, name.as_str()));
 
         let class = Class::new(self.db, &*name.id, body_scope, maybe_known_class);
         let class_ty = Type::class_literal(class);
