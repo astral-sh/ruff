@@ -105,3 +105,6 @@ field31: typing.Union[float, typing.Union[int | int]]  # Error
 
 # Should emit once, and fix to `typing.Union[float, int]`
 field32: typing.Union[float, typing.Union[int | int | int]]  # Error
+
+# ...
+field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
