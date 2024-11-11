@@ -2,7 +2,7 @@ PyYAML==6.0.2
 ruff==0.7.2
 mkdocs==1.6.1
 mkdocs-material==9.1.18
-mkdocs-redirects==1.2.1
+mkdocs-redirects==1.2.2
 mdformat==0.7.18
 mdformat-mkdocs==3.1.1
 mdformat-admon==2.0.6
