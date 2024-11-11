@@ -2014,7 +2014,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 self.diagnostics.add(
                                     AnyNodeRef::Alias(alias),
                                     "possibly-unbound-import",
-                                    format_args!("The member `{name}` in module `{module_name}` is possibly unbound",),
+                                    format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
                                 );
                             }
 
