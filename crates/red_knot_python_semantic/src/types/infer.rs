@@ -4751,6 +4751,7 @@ mod tests {
         );
     }
 
+    #[track_caller]
     fn get_symbol<'db>(
         db: &'db TestDb,
         file_name: &str,
