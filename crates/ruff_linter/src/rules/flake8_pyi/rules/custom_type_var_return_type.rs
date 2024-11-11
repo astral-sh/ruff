@@ -45,7 +45,17 @@ use ruff_text_size::{Ranged, TextRange};
 ///     def bar(cls, arg: int) -> Self: ...
 /// ```
 ///
+/// ## Fix safety
+/// The fix is only available in stub files.
+/// It will try to remove all usages and declarations of the custom type variable.
+/// Pre-[PEP-695]-style declarations will not be removed.
+///
+/// If a variable's annotation is too complex to handle,
+/// the fix will be marked as display only.
+/// Otherwise, it will be marked as safe.
+///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
+/// [PEP 695]: https://peps.python.org/pep-0695/
 #[violation]
 pub struct CustomTypeVarReturnType {
     method_name: String,
