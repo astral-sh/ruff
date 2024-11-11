@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
@@ -28,8 +28,10 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe; however, the fix will flatten nested
-/// literals into a single top-level literal.
+/// This rule's fix is marked as safe, unless the type annotation contains comments.
+///
+/// Note that the fix will flatten nested literals into a single top-level
+/// literal.
 ///
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
@@ -73,33 +75,39 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &mut Checker, expr: &'a Expr
     // Traverse the literal, collect all diagnostic members.
     traverse_literal(&mut check_for_duplicate_members, checker.semantic(), expr);
 
-    // If there's at least one diagnostic, create a fix to remove the duplicate members.
-    if !diagnostics.is_empty() {
-        if let Expr::Subscript(subscript) = expr {
-            let subscript = Expr::Subscript(ast::ExprSubscript {
-                slice: Box::new(if let [elt] = unique_nodes.as_slice() {
-                    (*elt).clone()
-                } else {
-                    Expr::Tuple(ast::ExprTuple {
-                        elts: unique_nodes.into_iter().cloned().collect(),
-                        range: TextRange::default(),
-                        ctx: ExprContext::Load,
-                        parenthesized: false,
-                    })
-                }),
-                value: subscript.value.clone(),
-                range: TextRange::default(),
-                ctx: ExprContext::Load,
-            });
-            let fix = Fix::safe_edit(Edit::range_replacement(
-                checker.generator().expr(&subscript),
-                expr.range(),
-            ));
-            for diagnostic in &mut diagnostics {
-                diagnostic.set_fix(fix.clone());
-            }
-        }
+    if diagnostics.is_empty() {
+        return;
     }
+
+    // If there's at least one diagnostic, create a fix to remove the duplicate members.
+    if let Expr::Subscript(subscript) = expr {
+        let subscript = Expr::Subscript(ast::ExprSubscript {
+            slice: Box::new(if let [elt] = unique_nodes.as_slice() {
+                (*elt).clone()
+            } else {
+                Expr::Tuple(ast::ExprTuple {
+                    elts: unique_nodes.into_iter().cloned().collect(),
+                    range: TextRange::default(),
+                    ctx: ExprContext::Load,
+                    parenthesized: false,
+                })
+            }),
+            value: subscript.value.clone(),
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        });
+        let fix = Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(&subscript), expr.range()),
+            if checker.comment_ranges().intersects(expr.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        );
+        for diagnostic in &mut diagnostics {
+            diagnostic.set_fix(fix.clone());
+        }
+    };
 
     checker.diagnostics.append(&mut diagnostics);
 }
