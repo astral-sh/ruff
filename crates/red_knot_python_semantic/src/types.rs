@@ -3188,7 +3188,7 @@ mod tests {
     }
 
     #[test]
-    fn is_disjoint_type_type() {
+    fn is_disjoint_type_subclass_of() {
         let mut db = setup_db();
         db.write_dedented(
             "/src/module.py",
@@ -3219,6 +3219,64 @@ mod tests {
         // However, type[A] is not disjoint from type[B], as there could be
         // classes that inherit from both A and B:
         assert!(!subclass_of_a.is_disjoint_from(&db, subclass_of_b));
+    }
+
+    #[test]
+    fn is_disjoint_module_literals() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            import random
+            import math
+        ",
+        )
+        .unwrap();
+
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let module_literal_random = super::global_symbol(&db, module, "random").expect_type();
+        let module_literal_math = super::global_symbol(&db, module, "math").expect_type();
+
+        assert!(module_literal_random.is_disjoint_from(&db, module_literal_math));
+
+        assert!(!module_literal_random.is_disjoint_from(
+            &db,
+            Ty::KnownClassInstance(KnownClass::ModuleType).into_type(&db)
+        ));
+        assert!(!module_literal_random.is_disjoint_from(
+            &db,
+            Ty::KnownClassInstance(KnownClass::Object).into_type(&db)
+        ));
+    }
+
+    #[test]
+    fn is_disjoint_function_literals() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            def f(): ...
+            def g(): ...
+        ",
+        )
+        .unwrap();
+
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let function_literal_f = super::global_symbol(&db, module, "f").expect_type();
+        let function_literal_g = super::global_symbol(&db, module, "g").expect_type();
+
+        assert!(function_literal_f.is_disjoint_from(&db, function_literal_g));
+
+        assert!(!function_literal_f.is_disjoint_from(
+            &db,
+            Ty::KnownClassInstance(KnownClass::FunctionType).into_type(&db)
+        ));
+        assert!(!function_literal_f.is_disjoint_from(
+            &db,
+            Ty::KnownClassInstance(KnownClass::Object).into_type(&db)
+        ));
     }
 
     #[test_case(Ty::None)]
