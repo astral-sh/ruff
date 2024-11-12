@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
-use ruff_python_semantic::Modules;
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 use std::fmt::{Display, Formatter};
 
@@ -15,11 +15,11 @@ enum MaxMin {
 }
 
 impl MaxMin {
-    fn from(attr: &str) -> Self {
+    fn from(attr: &str) -> Option<Self> {
         match attr {
-            "max" => Self::Max,
-            "min" => Self::Min,
-            _ => panic!("Unexpected argument for MaxMin"),
+            "max" => Some(Self::Max),
+            "min" => Some(Self::Min),
+            _ => None,
         }
     }
 }
@@ -87,11 +87,14 @@ pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
     };
 
     let maxmin = match qualified_name.segments() {
-        ["datetime", "datetime", attr @ ("max" | "min")] => MaxMin::from(attr),
-        _ => return,
+        ["datetime", "datetime", attr] => MaxMin::from(attr),
+        _ => None,
+    };
+    let Some(maxmin) = maxmin else {
+        return;
     };
 
-    if followed_by_replace_tzinfo(checker) {
+    if followed_by_replace_tzinfo(checker.semantic()) {
         return;
     }
 
@@ -101,9 +104,7 @@ pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
 }
 
 /// Check if the current expression has the pattern `foo.replace(tzinfo=bar)`.
-pub(super) fn followed_by_replace_tzinfo(checker: &Checker) -> bool {
-    let semantic = checker.semantic();
-
+pub(super) fn followed_by_replace_tzinfo(semantic: &SemanticModel) -> bool {
     let Some(parent) = semantic.current_expression_parent() else {
         return false;
     };
