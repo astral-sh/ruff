@@ -53,6 +53,10 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     if alias.name.as_str() != asname.as_str() {
         return;
     }
+    // While the fix is specified as always available,
+    // the presence of a user-specified required import (I002)
+    // with a useless alias causes an infinite loop. So
+    // in this case we keep the diagnostic but omit the fix.
     // See https://github.com/astral-sh/ruff/issues/14283
     let required_imports = &checker.settings.isort.required_imports;
     if !required_imports.is_empty() {
@@ -93,6 +97,10 @@ pub(crate) fn useless_importfrom_alias(
     if alias.name.as_str() != asname.as_str() {
         return;
     }
+    // While the fix is specified as always available,
+    // the presence of a user-specified required import (I002)
+    // with a useless alias causes an infinite loop. So
+    // in this case we keep the diagnostic but omit the fix.
     // See https://github.com/astral-sh/ruff/issues/14283
     let required_imports = &checker.settings.isort.required_imports;
     if !required_imports.is_empty() {
