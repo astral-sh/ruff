@@ -109,8 +109,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     }
 
     let type_members: Vec<Name> = type_exprs
-        .clone()
-        .into_iter()
+        .iter()
         .map(|type_expr| Name::new(checker.locator().slice(type_expr)))
         .collect();
 
