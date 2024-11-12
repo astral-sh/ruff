@@ -318,11 +318,7 @@ fn replace_custom_typevar_with_self(
 
     let (first, rest) = (all_edits.swap_remove(0), all_edits);
 
-    match fix_applicability {
-        Applicability::DisplayOnly => Some(Fix::display_only_edits(first, rest)),
-        Applicability::Unsafe => Some(Fix::unsafe_edits(first, rest)),
-        Applicability::Safe => Some(Fix::safe_edits(first, rest)),
-    }
+    Fix::applicable_edits(first, rest, fix_applicability)
 }
 
 fn import_self(checker: &Checker, return_range: TextRange) -> Option<Edit> {
