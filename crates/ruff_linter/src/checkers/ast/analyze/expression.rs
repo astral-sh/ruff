@@ -1033,6 +1033,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::IntOnSlicedStr) {
                 refurb::rules::int_on_sliced_str(checker, call);
             }
+            if checker.enabled(Rule::UnsafeMarkupUse) {
+                ruff::rules::unsafe_markup_call(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[

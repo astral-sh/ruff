@@ -74,6 +74,7 @@ we're dealing with:
 ```py path=__getattr__.py
 import typing
 
+# error: [unresolved-attribute]
 reveal_type(typing.__getattr__)  # revealed: Unknown
 ```
 
