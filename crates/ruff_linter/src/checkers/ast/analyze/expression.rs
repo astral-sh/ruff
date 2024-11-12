@@ -339,8 +339,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
             }
-            if checker.enabled(Rule::UseDatetimeMaxMin) {
-                flake8_datetimez::rules::use_datetime_max_min(checker, expr);
+            if checker.enabled(Rule::DatetimeMaxMin) {
+                flake8_datetimez::rules::datetime_max_min(checker, expr);
             }
             if checker.enabled(Rule::BannedApi) {
                 flake8_tidy_imports::rules::banned_attribute_access(checker, expr);

@@ -58,9 +58,9 @@ impl Display for MaxMin {
 /// datetime.max.replace(tzinfo=datetime.UTC)
 /// ```
 #[violation]
-pub struct UseDatetimeMaxMin(MaxMin);
+pub struct DatetimeMaxMin(MaxMin);
 
-impl Violation for UseDatetimeMaxMin {
+impl Violation for DatetimeMaxMin {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`datetime.datetime.{}` used", self.0)
@@ -68,7 +68,7 @@ impl Violation for UseDatetimeMaxMin {
 }
 
 /// DTZ901
-pub(crate) fn use_datetime_max_min(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::DATETIME) {
@@ -88,7 +88,7 @@ pub(crate) fn use_datetime_max_min(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    let diagnostic = Diagnostic::new(UseDatetimeMaxMin(maxmin), expr.range());
+    let diagnostic = Diagnostic::new(DatetimeMaxMin(maxmin), expr.range());
 
     checker.diagnostics.push(diagnostic);
 }

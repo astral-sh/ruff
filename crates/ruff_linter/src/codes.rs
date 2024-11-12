@@ -706,7 +706,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Datetimez, "007") => (RuleGroup::Stable, rules::flake8_datetimez::rules::CallDatetimeStrptimeWithoutZone),
         (Flake8Datetimez, "011") => (RuleGroup::Stable, rules::flake8_datetimez::rules::CallDateToday),
         (Flake8Datetimez, "012") => (RuleGroup::Stable, rules::flake8_datetimez::rules::CallDateFromtimestamp),
-        (Flake8Datetimez, "901") => (RuleGroup::Preview, rules::flake8_datetimez::rules::UseDatetimeMaxMin),
+        (Flake8Datetimez, "901") => (RuleGroup::Preview, rules::flake8_datetimez::rules::DatetimeMaxMin),
 
         // pygrep-hooks
         (PygrepHooks, "001") => (RuleGroup::Removed, rules::pygrep_hooks::rules::Eval),
