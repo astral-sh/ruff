@@ -46,7 +46,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// ## Fix safety
 /// This rule's fix is marked as safe for most cases; however, the fix will
-/// nested unions type expressions into a single top-level union.
+/// flatten nested unions type expressions into a single top-level union.
 ///
 /// The fix is marked as unsafe when comments are present within the type
 /// expression.
