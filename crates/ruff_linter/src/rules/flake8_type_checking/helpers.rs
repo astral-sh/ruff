@@ -402,7 +402,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                             || source.contains('\n')
                             || source.contains('\\')
                         {
-                            self.failed = true
+                            self.failed = true;
                         }
                         source = source.replace(self.stylist.quote().as_char(), opposite_quote);
                         source
