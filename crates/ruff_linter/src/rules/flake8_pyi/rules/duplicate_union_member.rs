@@ -5,7 +5,7 @@ use anyhow::Result;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple, Operator};
@@ -44,14 +44,19 @@ pub struct DuplicateUnionMember {
     duplicate_name: String,
 }
 
-impl AlwaysFixableViolation for DuplicateUnionMember {
+impl Violation for DuplicateUnionMember {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Duplicate union member `{}`", self.duplicate_name)
     }
 
-    fn fix_title(&self) -> String {
-        format!("Remove duplicate union member `{}`", self.duplicate_name)
+    fn fix_title(&self) -> Option<String> {
+        Some(format!(
+            "Remove duplicate union member `{}`",
+            self.duplicate_name
+        ))
     }
 }
 
@@ -98,24 +103,29 @@ pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) 
     // Generate the flattened fix once.
     let fix = if let &[edit_expr] = unique_nodes.as_slice() {
         // Generate a [`Fix`] for a single type expression, e.g. `int`.
-        Fix::applicable_edit(
+        Some(Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(edit_expr), expr.range()),
             applicability,
-        )
+        ))
     } else {
         match union_type {
             // See redundant numeric union
-            UnionKind::PEP604 => generate_pep604_fix(checker, unique_nodes, expr, applicability),
+            UnionKind::PEP604 => Some(generate_pep604_fix(
+                checker,
+                unique_nodes,
+                expr,
+                applicability,
+            )),
             UnionKind::TypingUnion => {
-                generate_union_fix(checker, unique_nodes, expr, applicability)
-                    .ok()
-                    .unwrap()
+                generate_union_fix(checker, unique_nodes, expr, applicability).ok()
             }
         }
     };
 
-    for diagnostic in &mut diagnostics {
-        diagnostic.set_fix(fix.clone());
+    if let Some(fix) = fix {
+        for diagnostic in &mut diagnostics {
+            diagnostic.set_fix(fix.clone());
+        }
     }
 
     // Add all diagnostics to the checker
@@ -185,16 +195,12 @@ fn generate_union_fix(
             ctx: ExprContext::Store,
             range: TextRange::default(),
         })),
-        slice: Box::new(if let [elt] = nodes.as_slice() {
-            (*elt).clone()
-        } else {
-            Expr::Tuple(ExprTuple {
-                elts: nodes.into_iter().cloned().collect(),
-                range: TextRange::default(),
-                ctx: ExprContext::Load,
-                parenthesized: false,
-            })
-        }),
+        slice: Box::new(Expr::Tuple(ExprTuple {
+            elts: nodes.into_iter().cloned().collect(),
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+            parenthesized: false,
+        })),
         ctx: ExprContext::Load,
     });
 
