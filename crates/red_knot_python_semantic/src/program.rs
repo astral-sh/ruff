@@ -68,7 +68,7 @@ pub struct SearchPathSettings {
     pub extra_paths: Vec<SystemPathBuf>,
 
     /// The root of the workspace, used for finding first-party modules.
-    pub src_root: SystemPathBuf,
+    pub workspace_root: SystemPathBuf,
 
     /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
@@ -82,7 +82,7 @@ pub struct SearchPathSettings {
 impl SearchPathSettings {
     pub fn new(src_root: SystemPathBuf) -> Self {
         Self {
-            src_root,
+            workspace_root: src_root,
             extra_paths: vec![],
             custom_typeshed: None,
             site_packages: SitePackages::Known(vec![]),

@@ -42,10 +42,10 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
-        let workspace = WorkspaceMetadata::from_path(
+        let workspace = WorkspaceMetadata::discover(
             SystemPath::new(root),
             &system,
-            Some(Configuration {
+            Some(&Configuration {
                 target_version: Some(settings.target_version.into()),
                 ..Configuration::default()
             }),

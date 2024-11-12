@@ -110,8 +110,8 @@ impl TestCase {
     ) -> anyhow::Result<()> {
         let program = Program::get(self.db());
 
-        self.configuration.search_paths = configuration.clone();
-        let new_settings = configuration.into_settings(self.db.workspace().root(&self.db));
+        let new_settings = configuration.to_settings(self.db.workspace().root(&self.db));
+        self.configuration.search_paths = configuration;
 
         program.update_search_paths(&mut self.db, &new_settings)?;
 
@@ -241,8 +241,7 @@ where
         search_paths,
     };
 
-    let workspace =
-        WorkspaceMetadata::from_path(&workspace_path, &system, Some(configuration.clone()))?;
+    let workspace = WorkspaceMetadata::discover(&workspace_path, &system, Some(&configuration))?;
 
     let db = RootDatabase::new(workspace, system)?;
 

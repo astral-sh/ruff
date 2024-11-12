@@ -123,6 +123,39 @@ impl SystemPath {
         self.0.parent().map(SystemPath::new)
     }
 
+    /// Produces an iterator over `SystemPath` and its ancestors.
+    ///
+    /// The iterator will yield the `SystemPath` that is returned if the [`parent`] method is used zero
+    /// or more times. That means, the iterator will yield `&self`, `&self.parent().unwrap()`,
+    /// `&self.parent().unwrap().parent().unwrap()` and so on. If the [`parent`] method returns
+    /// [`None`], the iterator will do likewise. The iterator will always yield at least one value,
+    /// namely `&self`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let mut ancestors = SystemPath::new("/foo/bar").ancestors();
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/foo/bar")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/foo")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/")));
+    /// assert_eq!(ancestors.next(), None);
+    ///
+    /// let mut ancestors = SystemPath::new("../foo/bar").ancestors();
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("../foo/bar")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("../foo")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("..")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("")));
+    /// assert_eq!(ancestors.next(), None);
+    /// ```
+    ///
+    /// [`parent`]: SystemPath::parent
+    #[inline]
+    pub fn ancestors(&self) -> impl Iterator<Item = &SystemPath> {
+        self.0.ancestors().map(SystemPath::new)
+    }
+
     /// Produces an iterator over the [`camino::Utf8Component`]s of the path.
     ///
     /// When parsing the path, there is a small amount of normalization:

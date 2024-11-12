@@ -75,10 +75,10 @@ fn setup_case() -> Case {
     .unwrap();
 
     let src_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::from_path(
+    let metadata = WorkspaceMetadata::discover(
         src_root,
         &system,
-        Some(Configuration {
+        Some(&Configuration {
             target_version: Some(PythonVersion::PY312),
             ..Configuration::default()
         }),

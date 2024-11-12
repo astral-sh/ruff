@@ -151,11 +151,7 @@ impl RootDatabase {
         }
 
         if workspace_change {
-            match WorkspaceMetadata::from_path(
-                &workspace_path,
-                self.system(),
-                base_configuration.cloned(),
-            ) {
+            match WorkspaceMetadata::discover(&workspace_path, self.system(), base_configuration) {
                 Ok(metadata) => {
                     tracing::debug!("Reloading workspace after structural change");
                     // TODO: Handle changes in the program settings.

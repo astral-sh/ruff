@@ -159,7 +159,7 @@ impl SearchPaths {
 
         let SearchPathSettings {
             extra_paths,
-            src_root,
+            workspace_root: src_root,
             custom_typeshed,
             site_packages: site_packages_paths,
         } = settings;
@@ -1293,7 +1293,7 @@ mod tests {
                 target_version: PythonVersion::PY38,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: src.clone(),
+                    workspace_root: src.clone(),
                     custom_typeshed: Some(custom_typeshed),
                     site_packages: SitePackages::Known(vec![site_packages]),
                 },
@@ -1798,7 +1798,7 @@ not_a_directory
                 target_version: PythonVersion::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: SystemPathBuf::from("/src"),
+                    workspace_root: SystemPathBuf::from("/src"),
                     custom_typeshed: None,
                     site_packages: SitePackages::Known(vec![
                         venv_site_packages,

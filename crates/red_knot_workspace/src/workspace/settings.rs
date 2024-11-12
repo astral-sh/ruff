@@ -1,3 +1,4 @@
+use crate::workspace::PackageMetadata;
 use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings, SitePackages};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 
@@ -29,11 +30,15 @@ impl Configuration {
         self.search_paths.extend(with.search_paths);
     }
 
-    pub fn into_workspace_settings(self, workspace_root: &SystemPath) -> WorkspaceSettings {
+    pub fn to_workspace_settings(
+        &self,
+        workspace_root: &SystemPath,
+        _packages: &[PackageMetadata],
+    ) -> WorkspaceSettings {
         WorkspaceSettings {
             program: ProgramSettings {
                 target_version: self.target_version.unwrap_or_default(),
-                search_paths: self.search_paths.into_settings(workspace_root),
+                search_paths: self.search_paths.to_settings(workspace_root),
             },
         }
     }
@@ -59,15 +64,19 @@ pub struct SearchPathConfiguration {
 }
 
 impl SearchPathConfiguration {
-    pub fn into_settings(self, workspace_root: &SystemPath) -> SearchPathSettings {
-        let site_packages = self.site_packages.unwrap_or(SitePackages::Known(vec![]));
+    pub fn to_settings(&self, workspace_root: &SystemPath) -> SearchPathSettings {
+        let site_packages = self
+            .site_packages
+            .clone()
+            .unwrap_or(SitePackages::Known(vec![]));
 
         SearchPathSettings {
-            extra_paths: self.extra_paths.unwrap_or_default(),
-            src_root: self
+            extra_paths: self.clone().extra_paths.unwrap_or_default(),
+            workspace_root: self
+                .clone()
                 .src_root
                 .unwrap_or_else(|| workspace_root.to_path_buf()),
-            custom_typeshed: self.custom_typeshed,
+            custom_typeshed: self.clone().custom_typeshed,
             site_packages,
         }
     }

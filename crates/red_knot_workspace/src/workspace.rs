@@ -21,6 +21,7 @@ use ruff_text_size::TextRange;
 
 mod files;
 mod metadata;
+mod pyproject;
 pub mod settings;
 
 /// The project workspace as a Salsa ingredient.
@@ -106,7 +107,6 @@ pub struct Package {
 }
 
 impl Workspace {
-    /// Discovers the closest workspace at `path` and returns its metadata.
     pub fn from_metadata(db: &dyn Db, metadata: WorkspaceMetadata) -> Self {
         let mut packages = BTreeMap::new();
 
@@ -114,14 +114,12 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
-        Workspace::builder(
-            metadata.root,
-            packages,
-            metadata.settings.program.search_paths,
-        )
-        .durability(Durability::MEDIUM)
-        .open_fileset_durability(Durability::LOW)
-        .new(db)
+        let program_settings = metadata.settings.program;
+
+        Workspace::builder(metadata.root, packages, program_settings.search_paths)
+            .durability(Durability::MEDIUM)
+            .open_fileset_durability(Durability::LOW)
+            .new(db)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -152,10 +150,10 @@ impl Workspace {
             new_packages.insert(path, package);
         }
 
-        if &metadata.settings.program.search_paths != self.search_path_settings(db) {
-            self.set_search_path_settings(db)
-                .to(metadata.settings.program.search_paths);
-        }
+        // if &metadata.settings.program.search_paths != self.search_path_settings(db) {
+        //     self.set_search_path_settings(db)
+        //         .to(metadata.settings.program.search_paths);
+        // }
 
         self.set_package_tree(db).to(new_packages);
     }

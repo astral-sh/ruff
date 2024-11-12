@@ -38,6 +38,27 @@ impl RootDatabase {
         };
 
         // Initialize the `Program` singleton
+
+        // TODO: Reasoning: We need to know the target version at this point to
+        // load the correct persistent cache so that running knot with
+        // different target versions doesn't result in 0 cache-reuse.
+        // But this does complicate things a bit because we need to have the
+        // resolved workspace settings at this point.
+        // But resolving the settings fits well into the workspace's responsibility.
+        // Should `Workspace` initialize the Program -> No, because we then need to create
+        // the program first.
+
+        // Metadata: Plain description of the workspace and the exact configuration (without doing any resolution)
+        // Workspace: Resolved workspace with all members, merged settings.
+        // Middle ground -> `metadata.resolve_settings(configuration)` returns the resolved
+        // `.workspace` configuration but it doesn't resolve any of the members configuration.
+        // The problem with this is that it makes the single project use case awkward. We should just
+        // resolve the program settings and defer everything else to later? But how does this work with
+        // with target versions that are inherited from the workspace?
+        // So this is somewhat awkward too :(
+        // The other option is that `WorkspaceMetadata` keeps working as it is today where it stores the
+        // resolved settings instead of the unresolved. I do thik that this would require another intermediate representation
+        // to not be awkward.
         Program::from_settings(&db, workspace.settings().program())?;
 
         db.workspace = Some(Workspace::from_metadata(&db, workspace));
