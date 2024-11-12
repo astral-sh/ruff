@@ -152,6 +152,23 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn custom_classmethod_rules_preview() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_pyi/PYI019.pyi"),
+            &settings::LinterSettings {
+                pep8_naming: pep8_naming::settings::Settings {
+                    classmethod_decorators: vec!["foo_classmethod".to_string()],
+                    ..pep8_naming::settings::Settings::default()
+                },
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::CustomTypeVarReturnType)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.py"))]
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.pyi"))]
     fn py38(rule_code: Rule, path: &Path) -> Result<()> {
