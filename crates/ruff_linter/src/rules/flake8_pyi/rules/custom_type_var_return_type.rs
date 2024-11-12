@@ -5,7 +5,7 @@ use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Vi
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{Decorator, Expr, Parameters, TypeParam, TypeParams};
+use ruff_python_ast::{Expr, Parameters, TypeParam, TypeParams};
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_text_size::{Ranged, TextRange};
@@ -84,16 +84,14 @@ impl Violation for CustomTypeVarReturnType {
 /// PYI019
 pub(crate) fn custom_type_var_return_type(
     checker: &mut Checker,
-    name: &str,
-    decorator_list: &[Decorator],
-    type_params: Option<&TypeParams>,
-    parameters: &Parameters,
-    returns: Option<&Expr>,
+    function_def: &ast::StmtFunctionDef,
 ) {
     // Given, e.g., `def foo(self: _S, arg: bytes) -> _T`, extract `_T`.
-    let Some(returns) = returns else {
+    let Some(returns) = function_def.returns.as_ref() else {
         return;
     };
+
+    let parameters = &*function_def.parameters;
 
     // Given, e.g., `def foo(self: _S, arg: bytes)`, extract `_S`.
     let Some(self_or_cls_annotation) = parameters
@@ -106,6 +104,8 @@ pub(crate) fn custom_type_var_return_type(
         return;
     };
 
+    let decorator_list = &*function_def.decorator_list;
+
     let semantic = checker.semantic();
 
     // Skip any abstract, static, and overloaded methods.
@@ -114,7 +114,7 @@ pub(crate) fn custom_type_var_return_type(
     }
 
     let method = match function_type::classify(
-        name,
+        &function_def.name,
         decorator_list,
         semantic.current_scope(),
         semantic,
@@ -126,17 +126,17 @@ pub(crate) fn custom_type_var_return_type(
         FunctionType::ClassMethod => Method::Class(ClassMethod {
             cls_annotation: self_or_cls_annotation,
             returns,
-            type_params,
+            type_params: function_def.type_params.as_deref(),
         }),
         FunctionType::Method => Method::Instance(InstanceMethod {
             self_annotation: self_or_cls_annotation,
             returns,
-            type_params,
+            type_params: function_def.type_params.as_deref(),
         }),
     };
 
     if method.uses_custom_var() {
-        add_diagnostic(checker, name.to_string(), type_params, parameters, returns);
+        add_diagnostic(checker, function_def, returns);
     }
 }
 
@@ -247,18 +247,12 @@ fn is_likely_private_typevar(type_var_name: &str, type_params: Option<&TypeParam
     })
 }
 
-fn add_diagnostic(
-    checker: &mut Checker,
-    method_name: String,
-    type_params: Option<&TypeParams>,
-    parameters: &Parameters,
-    returns: &Expr,
-) {
+fn add_diagnostic(checker: &mut Checker, function_def: &ast::StmtFunctionDef, returns: &Expr) {
     let in_stub = checker.source_type.is_stub();
 
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarReturnType {
-            method_name,
+            method_name: function_def.name.to_string(),
             in_stub,
         },
         returns.range(),
@@ -266,9 +260,7 @@ fn add_diagnostic(
 
     // See `replace_custom_typevar_with_self`'s doc comment
     if in_stub {
-        if let Some(fix) =
-            replace_custom_typevar_with_self(checker, type_params, parameters, returns)
-        {
+        if let Some(fix) = replace_custom_typevar_with_self(checker, function_def, returns) {
             diagnostic.set_fix(fix);
         }
     }
@@ -293,32 +285,38 @@ fn add_diagnostic(
 /// and will mark the fix as unsafe if an annotation cannot be handled.
 fn replace_custom_typevar_with_self(
     checker: &Checker,
-    type_params: Option<&TypeParams>,
-    parameters: &Parameters,
+    function_def: &ast::StmtFunctionDef,
     returns: &Expr,
 ) -> Option<Fix> {
+    if checker.settings.preview.is_disabled() {
+        return None;
+    }
+
     // The return annotation is guaranteed to be a name,
     // as verified by `uses_custom_var()`.
     let typevar_name = returns.as_name_expr().unwrap().id();
 
     let mut all_edits = vec![
         replace_return_annotation_with_self(returns),
-        remove_first_parameter_annotation(parameters),
+        remove_first_parameter_annotation(&function_def.parameters),
     ];
 
     let edit = import_self(checker, returns.range())?;
     all_edits.push(edit);
 
-    if let Some(edit) = remove_typevar_declaration(type_params, typevar_name) {
+    if let Some(edit) =
+        remove_typevar_declaration(function_def.type_params.as_deref(), typevar_name)
+    {
         all_edits.push(edit);
     }
 
-    let (mut edits, fix_applicability) = replace_typevar_usages_with_self(parameters, typevar_name);
+    let (mut edits, fix_applicability) =
+        replace_typevar_usages_with_self(&function_def.parameters, typevar_name);
     all_edits.append(&mut edits);
 
     let (first, rest) = (all_edits.swap_remove(0), all_edits);
 
-    Fix::applicable_edits(first, rest, fix_applicability)
+    Some(Fix::applicable_edits(first, rest, fix_applicability))
 }
 
 fn import_self(checker: &Checker, return_range: TextRange) -> Option<Edit> {

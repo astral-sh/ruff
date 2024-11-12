@@ -81,7 +81,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 returns,
                 parameters,
                 body,
-                type_params,
+                type_params: _,
                 range: _,
             },
         ) => {
@@ -160,14 +160,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
-                flake8_pyi::rules::custom_type_var_return_type(
-                    checker,
-                    name,
-                    decorator_list,
-                    type_params.as_deref(),
-                    parameters,
-                    returns.as_ref().map(AsRef::as_ref),
-                );
+                flake8_pyi::rules::custom_type_var_return_type(checker, function_def);
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
