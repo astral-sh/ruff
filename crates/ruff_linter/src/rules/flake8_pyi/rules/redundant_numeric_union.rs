@@ -130,7 +130,7 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
         }
     };
 
-    // Traverse the union, and remember which numeric types are found.
+    // Traverse the union a second time to construct a [`Fix`].
     traverse_union(&mut remove_numeric_type, checker.semantic(), annotation);
 
     let mut diagnostic = Diagnostic::new(RedundantNumericUnion { redundancy }, annotation.range());
@@ -177,16 +177,16 @@ enum Redundancy {
 
 impl Redundancy {
     pub(super) fn from_numeric_flags(numeric_flags: NumericFlags) -> Option<Self> {
-        match numeric_flags.bits() {
-            // NumericFlags::INT | NumericFlags::FLOAT | NumericFlags::COMPLEX
-            0b0111 => Some(Self::IntFloatComplex),
-            // NumericFlags::FLOAT | NumericFlags::COMPLEX
-            0b0110 => Some(Self::FloatComplex),
-            // NumericFlags::INT | NumericFlags::COMPLEX
-            0b0101 => Some(Self::IntComplex),
-            // NumericFlags::INT | NumericFlags::FLOAT
-            0b0011 => Some(Self::IntFloat),
-            _ => None,
+        if numeric_flags == NumericFlags::INT | NumericFlags::FLOAT | NumericFlags::COMPLEX {
+            Some(Self::IntFloatComplex)
+        } else if numeric_flags == NumericFlags::FLOAT | NumericFlags::COMPLEX {
+            Some(Self::FloatComplex)
+        } else if numeric_flags == NumericFlags::INT | NumericFlags::COMPLEX {
+            Some(Self::IntComplex)
+        } else if numeric_flags == NumericFlags::FLOAT | NumericFlags::INT {
+            Some(Self::IntFloat)
+        } else {
+            None
         }
     }
 }
@@ -280,16 +280,12 @@ fn generate_union_fix(
             ctx: ExprContext::Store,
             range: TextRange::default(),
         })),
-        slice: Box::new(if let [elt] = nodes.as_slice() {
-            (*elt).clone()
-        } else {
-            Expr::Tuple(ExprTuple {
-                elts: nodes.into_iter().cloned().collect(),
-                range: TextRange::default(),
-                ctx: ExprContext::Load,
-                parenthesized: false,
-            })
-        }),
+        slice: Box::new(Expr::Tuple(ExprTuple {
+            elts: nodes.into_iter().cloned().collect(),
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+            parenthesized: false,
+        })),
         ctx: ExprContext::Load,
     });
 
