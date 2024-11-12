@@ -63,6 +63,8 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
         if required_imports.contains(&semantic::NameImport::Import(semantic::ModuleNameImport {
             name: semantic_alias,
         })) {
+            let diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
+            checker.diagnostics.push(diagnostic);
             return;
         }
     }
@@ -105,6 +107,8 @@ pub(crate) fn useless_importfrom_alias(
                 level,
             },
         )) {
+            let diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
+            checker.diagnostics.push(diagnostic);
             return;
         }
     }
