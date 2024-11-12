@@ -475,6 +475,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SuperWithoutBrackets) {
                 pylint::rules::super_without_brackets(checker, func);
             }
+            if checker.enabled(Rule::UseImplicitBooleanessNotLen) {
+                pylint::rules::use_implicit_booleaness_not_len(checker, call);
+            }
             if checker.enabled(Rule::BitCount) {
                 refurb::rules::bit_count(checker, call);
             }
