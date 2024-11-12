@@ -1,9 +1,12 @@
-use std::fmt::Debug;
-
+pub use glob::PatternError;
 pub use memory_fs::MemoryFileSystem;
 #[cfg(feature = "os")]
 pub use os::OsSystem;
 use ruff_notebook::{Notebook, NotebookError};
+use std::error::Error;
+use std::fmt::Debug;
+use std::path::{Path, PathBuf};
+use std::{fmt, io};
 pub use test::{DbWithTestSystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
@@ -126,6 +129,14 @@ pub trait System: Debug {
     /// yields a single entry for that file.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
 
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        glob::PatternError,
+    >;
+
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
@@ -203,4 +214,60 @@ impl DirectoryEntry {
     pub fn file_type(&self) -> FileType {
         self.file_type
     }
+}
+
+/// A glob iteration error.
+///
+/// This is typically returned when a particular path cannot be read
+/// to determine if its contents match the glob pattern. This is possible
+/// if the program lacks the appropriate permissions, for example.
+#[derive(Debug)]
+pub struct GlobError {
+    path: PathBuf,
+    error: GlobErrorKind,
+}
+
+impl GlobError {
+    /// The Path that the error corresponds to.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn kind(&self) -> &GlobErrorKind {
+        &self.error
+    }
+}
+
+impl Error for GlobError {}
+
+impl fmt::Display for GlobError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.error {
+            GlobErrorKind::IOError(error) => {
+                write!(
+                    f,
+                    "attempting to read `{}` resulted in an error: {error}",
+                    self.path.display(),
+                )
+            }
+            GlobErrorKind::NonUtf8Path => {
+                write!(f, "`{}` is not a valid UTF-8 path", self.path.display(),)
+            }
+        }
+    }
+}
+
+impl From<glob::GlobError> for GlobError {
+    fn from(value: glob::GlobError) -> Self {
+        Self {
+            path: value.path().to_path_buf(),
+            error: GlobErrorKind::IOError(value.into_error()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum GlobErrorKind {
+    IOError(io::Error),
+    NonUtf8Path,
 }

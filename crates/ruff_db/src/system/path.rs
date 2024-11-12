@@ -6,7 +6,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
-use std::path::{Path, StripPrefixError};
+use std::path::{Path, PathBuf, StripPrefixError};
 
 /// A slice of a path on [`System`](super::System) (akin to [`str`]).
 ///
@@ -504,6 +504,10 @@ impl SystemPathBuf {
 
     pub fn into_utf8_path_buf(self) -> Utf8PathBuf {
         self.0
+    }
+
+    pub fn into_std_path_buf(self) -> PathBuf {
+        self.0.into_std_path_buf()
     }
 
     #[inline]

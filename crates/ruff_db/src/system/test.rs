@@ -1,14 +1,14 @@
+use glob::PatternError;
+use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_trivia::textwrap;
 use std::any::Any;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use ruff_notebook::{Notebook, NotebookError};
-use ruff_python_trivia::textwrap;
-
 use crate::files::File;
 use crate::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath,
 };
 use crate::Db;
 
@@ -118,6 +118,22 @@ impl System for TestSystem {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.walk_directory(path),
             TestSystemInner::System(system) => system.walk_directory(path),
+        }
+    }
+
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        PatternError,
+    > {
+        match &self.inner {
+            TestSystemInner::Stub(fs) => {
+                let iterator = fs.glob(pattern)?;
+                Ok(Box::new(iterator))
+            }
+            TestSystemInner::System(system) => system.glob(pattern),
         }
     }
 

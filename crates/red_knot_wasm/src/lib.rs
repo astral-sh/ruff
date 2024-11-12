@@ -10,8 +10,8 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath,
 };
 use ruff_notebook::Notebook;
 
@@ -270,6 +270,13 @@ impl System for WasmSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.fs.walk_directory(path)
+    }
+
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>>>, PatternError> {
+        Ok(Box::new(self.fs.glob(pattern)?))
     }
 
     fn as_any(&self) -> &dyn Any {

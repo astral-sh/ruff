@@ -6,8 +6,8 @@ use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 
 use crate::system::{
-    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath,
 };
 
 use super::walk_directory::{
@@ -102,6 +102,30 @@ impl System for OsSystem {
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         WalkDirectoryBuilder::new(path, OsDirectoryWalker {})
+    }
+
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        glob::PatternError,
+    > {
+        glob::glob(pattern).map(|inner| {
+            let iterator = inner.map(|result| {
+                let path = result?;
+
+                let system_path = SystemPathBuf::from_path_buf(path).map_err(|path| GlobError {
+                    path,
+                    error: GlobErrorKind::NonUtf8Path,
+                })?;
+
+                Ok(system_path)
+            });
+
+            let boxed: Box<dyn Iterator<Item = _>> = Box::new(iterator);
+            boxed
+        })
     }
 
     fn as_any(&self) -> &dyn Any {

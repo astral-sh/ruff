@@ -9,13 +9,13 @@ use rustc_hash::FxHashMap;
 use ruff_notebook::{Notebook, NotebookError};
 
 use crate::system::{
-    walk_directory, DirectoryEntry, FileType, Metadata, Result, SystemPath, SystemPathBuf,
-    SystemVirtualPath, SystemVirtualPathBuf,
+    walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result,
+    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
 };
 
 use super::walk_directory::{
-    DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration, WalkDirectoryVisitor,
-    WalkDirectoryVisitorBuilder, WalkState,
+    DirectoryWalker, ErrorKind, WalkDirectoryBuilder, WalkDirectoryConfiguration,
+    WalkDirectoryVisitor, WalkDirectoryVisitorBuilder, WalkState,
 };
 
 /// File system that stores all content in memory.
@@ -228,6 +228,45 @@ impl MemoryFileSystem {
     /// are hidden files (files with a name starting with a `.`).
     pub fn walk_directory(&self, path: impl AsRef<SystemPath>) -> WalkDirectoryBuilder {
         WalkDirectoryBuilder::new(path, MemoryWalker { fs: self.clone() })
+    }
+
+    pub fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        impl Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>,
+        glob::PatternError,
+    > {
+        // Very naive implementation that iterates over all files and collects all that match the given pattern.
+
+        let pattern = glob::Pattern::new(pattern)?;
+        let matches = std::sync::Mutex::new(Vec::new());
+
+        self.walk_directory("/").standard_filters(false).run(|| {
+            Box::new(|entry| {
+                match entry {
+                    Ok(entry) => {
+                        if pattern.matches_path(entry.path().as_std_path()) {
+                            matches.lock().unwrap().push(Ok(entry.into_path()));
+                        }
+                    }
+                    Err(error) => match error.kind {
+                        ErrorKind::Loop { .. } => {
+                            unreachable!("Loops aren't possible in the memory file system because it doesn't support symlinks.")
+                        }
+                        ErrorKind::Io { err, path } => {
+                            matches.lock().unwrap().push(Err(GlobError { path: path.expect("walk_directory to always set a path").into_std_path_buf(), error: GlobErrorKind::IOError(err)}));
+                        }
+                        ErrorKind::NonUtf8Path { path } => {
+                            matches.lock().unwrap().push(Err(GlobError { path, error: GlobErrorKind::NonUtf8Path}));
+                        }
+                    },
+                }
+                WalkState::Continue
+            })
+        });
+
+        Ok(matches.into_inner().unwrap().into_iter())
     }
 
     pub fn remove_file(&self, path: impl AsRef<SystemPath>) -> Result<()> {
@@ -629,7 +668,7 @@ impl DirectoryWalker for MemoryWalker {
                         visitor.visit(Err(walk_directory::Error {
                             depth: Some(depth),
                             kind: walk_directory::ErrorKind::Io {
-                                path: None,
+                                path: Some(path.clone()),
                                 err: error,
                             },
                         }));
@@ -676,6 +715,7 @@ fn now() -> FileTime {
 #[cfg(test)]
 mod tests {
     use std::io::ErrorKind;
+
     use std::time::Duration;
 
     use crate::system::walk_directory::tests::DirectoryEntryToString;
@@ -1146,6 +1186,28 @@ mod tests {
     ),
 }"#
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn glob() -> std::io::Result<()> {
+        let root = SystemPath::new("/src");
+        let fs = MemoryFileSystem::with_current_directory(root);
+
+        fs.write_files([
+            (root.join("foo.py"), "print('foo')"),
+            (root.join("a/bar.py"), "print('bar')"),
+            (root.join("a/.baz.py"), "print('baz')"),
+        ])?;
+
+        let mut matches = fs.glob("/src/a/**").unwrap().flatten().collect::<Vec<_>>();
+        matches.sort_unstable();
+
+        assert_eq!(matches, vec![root.join("a/.baz.py"), root.join("a/bar.py")]);
+
+        let matches = fs.glob("**/bar.py").unwrap().flatten().collect::<Vec<_>>();
+        assert_eq!(matches, vec![root.join("a/bar.py")]);
 
         Ok(())
     }

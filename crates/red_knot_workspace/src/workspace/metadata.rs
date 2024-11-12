@@ -199,6 +199,8 @@ impl PackageMetadata {
     }
 }
 
+// TODO: paths don't get normalized
+//   Adding package 'bar' at '/Users/micha/astral/test/./symlink/bar'
 fn collect_packages(
     workspace_package: PackageMetadata,
     workspace_table: &Workspace,
@@ -212,26 +214,18 @@ fn collect_packages(
     for glob in workspace_table.members() {
         let full_glob = workspace_package.root().join(glob);
 
-        // TODO: This is a problem because it bypasses `system` entirely.
-        //  We probably need a `system.glob` functionality
-        for result in glob::glob(full_glob.as_str())
+        for result in system
+            .glob(full_glob.as_str())
             .with_context(|| format!("failed to parse members glob '{glob}'"))?
         {
             let path = result.context("failed to match glob")?;
 
-            let system_path = SystemPathBuf::from_path_buf(path).map_err(|path| {
-                anyhow!(
-                    "non utf-8 path '{path}' is not supported",
-                    path = path.display()
-                )
-            })?;
-
             // Skip over non-directory entry. E.g.finder might end up creating a `.DS_STORE` file
             // that ends up matching `/projects/*`.
-            if system.is_directory(&system_path) {
-                member_paths.insert(system_path);
+            if system.is_directory(&path) {
+                member_paths.insert(path);
             } else {
-                tracing::debug!("Ignoring non-directory workspace member '{system_path}'");
+                tracing::debug!("Ignoring non-directory workspace member '{path}'");
             }
         }
     }

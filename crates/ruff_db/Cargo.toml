@@ -23,6 +23,7 @@ camino = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 filetime = { workspace = true }
+glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 salsa = { workspace = true }
