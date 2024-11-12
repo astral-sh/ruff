@@ -1,14 +1,15 @@
 use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
-
-use crate::checkers::ast::Checker;
+use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
 /// Checks for methods that are annotated with a fixed return type which
@@ -71,7 +72,7 @@ use crate::checkers::ast::Checker;
 ///     def __iadd__(self, other: Foo) -> Self: ...
 /// ```
 /// ## References
-/// - [`typing.Self` documentation](https://docs.python.org/3/library/typing.html#typing.Self)
+/// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
 #[violation]
 pub struct NonSelfReturnType {
     class_name: String,
@@ -79,12 +80,15 @@ pub struct NonSelfReturnType {
 }
 
 impl Violation for NonSelfReturnType {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let NonSelfReturnType {
             class_name,
             method_name,
         } = self;
+
         if matches!(class_name.as_str(), "__new__") {
             "`__new__` methods usually return `self` at runtime".to_string()
         } else {
@@ -93,7 +97,7 @@ impl Violation for NonSelfReturnType {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Consider using `typing_extensions.Self` as return type".to_string())
+        Some("Use `Self` as return type".to_string())
     }
 }
 
@@ -136,13 +140,7 @@ pub(crate) fn non_self_return_type(
             && is_name(returns, &class_def.name)
             && !is_final(&class_def.decorator_list, semantic)
         {
-            checker.diagnostics.push(Diagnostic::new(
-                NonSelfReturnType {
-                    class_name: class_def.name.to_string(),
-                    method_name: name.to_string(),
-                },
-                stmt.identifier(),
-            ));
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
     }
@@ -150,13 +148,7 @@ pub(crate) fn non_self_return_type(
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
         if !is_self(returns, checker) {
-            checker.diagnostics.push(Diagnostic::new(
-                NonSelfReturnType {
-                    class_name: class_def.name.to_string(),
-                    method_name: name.to_string(),
-                },
-                stmt.identifier(),
-            ));
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
     }
@@ -164,13 +156,7 @@ pub(crate) fn non_self_return_type(
     if is_name(returns, &class_def.name) {
         if matches!(name, "__enter__" | "__new__") && !is_final(&class_def.decorator_list, semantic)
         {
-            checker.diagnostics.push(Diagnostic::new(
-                NonSelfReturnType {
-                    class_name: class_def.name.to_string(),
-                    method_name: name.to_string(),
-                },
-                stmt.identifier(),
-            ));
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
     }
@@ -180,30 +166,65 @@ pub(crate) fn non_self_return_type(
             if is_iterable_or_iterator(returns, semantic)
                 && subclasses_iterator(class_def, semantic)
             {
-                checker.diagnostics.push(Diagnostic::new(
-                    NonSelfReturnType {
-                        class_name: class_def.name.to_string(),
-                        method_name: name.to_string(),
-                    },
-                    stmt.identifier(),
-                ));
+                add_diagnostic(checker, stmt, returns, class_def, name);
             }
         }
         "__aiter__" => {
             if is_async_iterable_or_iterator(returns, semantic)
                 && subclasses_async_iterator(class_def, semantic)
             {
-                checker.diagnostics.push(Diagnostic::new(
-                    NonSelfReturnType {
-                        class_name: class_def.name.to_string(),
-                        method_name: name.to_string(),
-                    },
-                    stmt.identifier(),
-                ));
+                add_diagnostic(checker, stmt, returns, class_def, name);
             }
         }
         _ => {}
     }
+}
+
+/// Add a diagnostic for the given method.
+fn add_diagnostic(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    returns: &Expr,
+    class_def: &ast::StmtClassDef,
+    method_name: &str,
+) {
+    /// Return an [`Edit`] that imports `typing.Self` from `typing` or `typing_extensions`.
+    fn import_self(checker: &Checker, range: TextRange) -> Option<Edit> {
+        let target_version = checker.settings.target_version.as_tuple();
+        let source_module = if target_version >= (3, 11) {
+            "typing"
+        } else {
+            "typing_extensions"
+        };
+
+        let (importer, semantic) = (checker.importer(), checker.semantic());
+        let request = ImportRequest::import_from(source_module, "Self");
+
+        let (edit, ..) = importer
+            .get_or_import_symbol(&request, range.start(), semantic)
+            .ok()?;
+
+        Some(edit)
+    }
+
+    /// Generate a [`Fix`] that replaces the return type with `Self`.
+    fn replace_with_self(checker: &mut Checker, range: TextRange) -> Option<Fix> {
+        let import_self = import_self(checker, range)?;
+        let replace_with_self = Edit::range_replacement("Self".to_string(), range);
+        Some(Fix::unsafe_edits(import_self, [replace_with_self]))
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        NonSelfReturnType {
+            class_name: class_def.name.to_string(),
+            method_name: method_name.to_string(),
+        },
+        stmt.identifier(),
+    );
+    if let Some(fix) = replace_with_self(checker, returns.range()) {
+        diagnostic.set_fix(fix);
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 /// Returns `true` if the method is an in-place binary operator.

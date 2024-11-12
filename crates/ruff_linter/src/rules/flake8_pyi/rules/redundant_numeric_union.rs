@@ -38,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [The typing specification](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
+/// - [Python documentation: The numeric tower](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
 /// - [PEP 484: The numeric tower](https://peps.python.org/pep-0484/#the-numeric-tower)
 ///
 /// [typing specification]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex

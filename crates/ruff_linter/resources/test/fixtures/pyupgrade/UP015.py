@@ -6,6 +6,7 @@ open("foo", "r")
 open("foo", "rt")
 open("f", "r", encoding="UTF-8")
 open("f", "wt")
+open("f", "tw")
 
 with open("foo", "U") as f:
     pass
@@ -69,19 +70,14 @@ open(file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd
 open(file="foo", buffering=-1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
 open(mode='Ub', file="foo", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-open = 1
-open("foo", "U")
-open("foo", "Ur")
-open("foo", "Ub")
-open("foo", "rUb")
-open("foo", "r")
-open("foo", "rt")
-open("f", "r", encoding="UTF-8")
-open("f", "wt")
-
-
 import aiofiles
 
 aiofiles.open("foo", "U")
 aiofiles.open("foo", "r")
 aiofiles.open("foo", mode="r")
+
+open("foo", "r+")
+open("foo", "rb")
+open("foo", "r+b")
+open("foo", "UU")
+open("foo", "wtt")

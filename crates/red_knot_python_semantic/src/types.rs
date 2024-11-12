@@ -14,13 +14,13 @@ use crate::semantic_index::{
     BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::stdlib::{
-    builtins_symbol, types_symbol, typeshed_symbol, typing_extensions_symbol, typing_symbol,
+    builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
 };
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
+use crate::{Db, FxOrderSet, HasTy, Module, Program, SemanticModel};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -126,7 +126,10 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
 /// so the cost of hashing the names is likely to be more expensive than it's worth.
 #[salsa::tracked(return_ref)]
 fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-    let Some(module_type) = KnownClass::ModuleType.to_class(db).into_class_literal() else {
+    let Some(module_type) = KnownClass::ModuleType
+        .to_class_literal(db)
+        .into_class_literal()
+    else {
         // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
         // without a `types.pyi` stub in the `stdlib/` directory
         return smallvec::SmallVec::default();
@@ -154,7 +157,7 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
 pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
     let explicit_symbol = symbol(db, global_scope(db, file), name);
 
-    if !explicit_symbol.may_be_unbound() {
+    if !explicit_symbol.possibly_unbound() {
         return explicit_symbol;
     }
 
@@ -167,8 +170,8 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
     {
         // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
         // on instance types yet.
-        let module_type_member = KnownClass::ModuleType.to_class(db).member(db, name);
-        return explicit_symbol.replace_unbound_with(db, &module_type_member);
+        let module_type_member = KnownClass::ModuleType.to_class_literal(db).member(db, name);
+        return explicit_symbol.or_fall_back_to(db, &module_type_member);
     }
 
     explicit_symbol
@@ -307,7 +310,7 @@ fn declarations_ty<'db>(
 }
 
 /// Representation of a type: a set of possible values at runtime.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Any,
@@ -336,7 +339,7 @@ pub enum Type<'db> {
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
-    KnownInstance(KnownInstanceType),
+    KnownInstance(KnownInstanceType<'db>),
     /// The set of objects in any of the types in the union
     Union(UnionType<'db>),
     /// The set of objects in all of the types in the intersection
@@ -369,6 +372,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::Todo)
     }
 
+    pub const fn class_literal(class: Class<'db>) -> Self {
+        Self::ClassLiteral(ClassLiteralType { class })
+    }
+
     pub const fn into_class_literal(self) -> Option<ClassLiteralType<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
@@ -397,20 +404,6 @@ impl<'db> Type<'db> {
     pub fn expect_module_literal(self) -> File {
         self.into_module_literal()
             .expect("Expected a Type::ModuleLiteral variant")
-    }
-
-    #[must_use]
-    pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
-        IntersectionBuilder::new(db).add_negative(*self).build()
-    }
-
-    #[must_use]
-    pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
-        if yes {
-            self.negate(db)
-        } else {
-            *self
-        }
     }
 
     pub const fn into_union(self) -> Option<UnionType<'db>> {
@@ -478,6 +471,40 @@ impl<'db> Type<'db> {
 
     pub const fn is_literal_string(&self) -> bool {
         matches!(self, Type::LiteralString)
+    }
+
+    pub const fn instance(class: Class<'db>) -> Self {
+        Self::Instance(InstanceType { class })
+    }
+
+    pub const fn subclass_of(class: Class<'db>) -> Self {
+        Self::SubclassOf(SubclassOfType { class })
+    }
+
+    pub fn string_literal(db: &'db dyn Db, string: &str) -> Self {
+        Self::StringLiteral(StringLiteralType::new(db, string))
+    }
+
+    pub fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {
+        Self::BytesLiteral(BytesLiteralType::new(db, bytes))
+    }
+
+    pub fn tuple(db: &'db dyn Db, elements: &[Type<'db>]) -> Self {
+        Self::Tuple(TupleType::new(db, elements))
+    }
+
+    #[must_use]
+    pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
+        IntersectionBuilder::new(db).add_negative(*self).build()
+    }
+
+    #[must_use]
+    pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
+        if yes {
+            self.negate(db)
+        } else {
+            *self
+        }
     }
 
     /// Return true if this type is a [subtype of] type `target`.
@@ -626,6 +653,10 @@ impl<'db> Type<'db> {
         match (self, target) {
             (Type::Unknown | Type::Any | Type::Todo, _) => true,
             (_, Type::Unknown | Type::Any | Type::Todo) => true,
+            (Type::Union(union), ty) => union
+                .elements(db)
+                .iter()
+                .all(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
             (ty, Type::Union(union)) => union
                 .elements(db)
                 .iter()
@@ -653,17 +684,21 @@ impl<'db> Type<'db> {
         // TODO: Once we have support for final classes, we can establish that
         // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
 
-        // TODO: The following is a workaround that is required to unify the two different
-        // versions of `NoneType` in typeshed. This should not be required anymore once we
-        // understand `sys.version_info` branches.
+        // TODO: The following is a workaround that is required to unify the two different versions
+        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
+        // we understand `sys.version_info` branches.
         self == other
             || matches!((self, other),
                 (
                     Type::Instance(InstanceType { class: self_class }),
                     Type::Instance(InstanceType { class: target_class })
                 )
-                if self_class.is_known(db, KnownClass::NoneType) &&
-                target_class.is_known(db, KnownClass::NoneType))
+                if {
+                    let self_known = self_class.known(db);
+                    matches!(self_known, Some(KnownClass::NoneType | KnownClass::NoDefaultType))
+                        && self_known == target_class.known(db)
+                }
+            )
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -819,14 +854,20 @@ impl<'db> Type<'db> {
             ),
             (Type::SliceLiteral(..), _) | (_, Type::SliceLiteral(..)) => true,
 
-            (
-                Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
-                Type::Instance(InstanceType { class }),
-            )
-            | (
-                Type::Instance(InstanceType { class }),
-                Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
-            ) => !class.is_known(db, KnownClass::Object),
+            (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::ClassLiteral(..)) => {
+                !matches!(class.known(db), Some(KnownClass::Type | KnownClass::Object))
+            }
+            (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => !matches!(
+                class.known(db),
+                Some(KnownClass::FunctionType | KnownClass::Object)
+            ),
+            (Type::ModuleLiteral(..), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::ModuleLiteral(..)) => !matches!(
+                class.known(db),
+                Some(KnownClass::ModuleType | KnownClass::Object)
+            ),
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
@@ -897,8 +938,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
             Type::Instance(InstanceType { class }) => {
-                // TODO some more instance types can be singleton types (EllipsisType, NotImplementedType)
-                matches!(class.known(db), Some(KnownClass::NoneType))
+                class.known(db).is_some_and(KnownClass::is_singleton)
             }
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
@@ -951,7 +991,9 @@ impl<'db> Type<'db> {
                 .all(|elem| elem.is_single_valued(db)),
 
             Type::Instance(InstanceType { class }) => match class.known(db) {
-                Some(KnownClass::NoneType) => true,
+                Some(
+                    KnownClass::NoneType | KnownClass::NoDefaultType | KnownClass::VersionInfo,
+                ) => true,
                 Some(
                     KnownClass::Bool
                     | KnownClass::Object
@@ -968,7 +1010,8 @@ impl<'db> Type<'db> {
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
-                    | KnownClass::SpecialForm,
+                    | KnownClass::SpecialForm
+                    | KnownClass::TypeVar,
                 ) => false,
                 None => false,
             },
@@ -1028,39 +1071,46 @@ impl<'db> Type<'db> {
                 // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
                 // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
                 // where we know exactly which module we're dealing with.
-                if name != "__getattr__" && global_lookup.may_be_unbound() {
+                if name != "__getattr__" && global_lookup.possibly_unbound() {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
                     let module_type_instance_member =
-                        KnownClass::ModuleType.to_class(db).member(db, name);
-                    global_lookup.replace_unbound_with(db, &module_type_instance_member)
+                        KnownClass::ModuleType.to_class_literal(db).member(db, name);
+                    global_lookup.or_fall_back_to(db, &module_type_instance_member)
                 } else {
                     global_lookup
                 }
             }
             Type::ClassLiteral(class_ty) => class_ty.member(db, name),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.member(db, name),
-            Type::KnownInstance(known_instance) => {
-                known_instance.instance_fallback(db).member(db, name)
-            }
-            Type::Instance(_) => {
-                // TODO MRO? get_own_instance_member, get_instance_member
-                Type::Todo.into()
+            Type::KnownInstance(known_instance) => known_instance.member(db, name),
+            Type::Instance(InstanceType { class }) => {
+                let ty = match (class.known(db), name) {
+                    (Some(KnownClass::VersionInfo), "major") => {
+                        Type::IntLiteral(Program::get(db).target_version(db).major.into())
+                    }
+                    (Some(KnownClass::VersionInfo), "minor") => {
+                        Type::IntLiteral(Program::get(db).target_version(db).minor.into())
+                    }
+                    // TODO MRO? get_own_instance_member, get_instance_member
+                    _ => Type::Todo,
+                };
+                ty.into()
             }
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
 
                 let mut all_unbound = true;
-                let mut may_be_unbound = false;
+                let mut possibly_unbound = false;
                 for ty in union.elements(db) {
                     let ty_member = ty.member(db, name);
                     match ty_member {
                         Symbol::Unbound => {
-                            may_be_unbound = true;
+                            possibly_unbound = true;
                         }
                         Symbol::Type(ty_member, member_boundness) => {
                             // TODO: raise a diagnostic if member_boundness indicates potential unboundness
-                            if member_boundness == Boundness::MayBeUnbound {
-                                may_be_unbound = true;
+                            if member_boundness == Boundness::PossiblyUnbound {
+                                possibly_unbound = true;
                             }
 
                             all_unbound = false;
@@ -1074,8 +1124,8 @@ impl<'db> Type<'db> {
                 } else {
                     Symbol::Type(
                         builder.build(),
-                        if may_be_unbound {
-                            Boundness::MayBeUnbound
+                        if possibly_unbound {
+                            Boundness::PossiblyUnbound
                         } else {
                             Boundness::Bound
                         },
@@ -1269,7 +1319,7 @@ impl<'db> Type<'db> {
             Symbol::Type(callable_ty, Boundness::Bound) => {
                 CallDunderResult::CallOutcome(callable_ty.call(db, arg_types))
             }
-            Symbol::Type(callable_ty, Boundness::MayBeUnbound) => {
+            Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
                 CallDunderResult::PossiblyUnbound(callable_ty.call(db, arg_types))
             }
             Symbol::Unbound => CallDunderResult::MethodNotAvailable,
@@ -1353,12 +1403,8 @@ impl<'db> Type<'db> {
             Type::Todo => Type::Todo,
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                Type::Instance(InstanceType { class: *class })
-            }
-            Type::SubclassOf(SubclassOfType { class }) => {
-                Type::Instance(InstanceType { class: *class })
-            }
+            Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
+            Type::SubclassOf(SubclassOfType { class }) => Type::instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
@@ -1383,6 +1429,39 @@ impl<'db> Type<'db> {
         KnownClass::NoneType.to_instance(db)
     }
 
+    /// Return the type of `tuple(sys.version_info)`.
+    ///
+    /// This is not exactly the type that `sys.version_info` has at runtime,
+    /// but it's a useful fallback for us in order to infer `Literal` types from `sys.version_info` comparisons.
+    fn version_info_tuple(db: &'db dyn Db) -> Self {
+        let target_version = Program::get(db).target_version(db);
+        let int_instance_ty = KnownClass::Int.to_instance(db);
+
+        // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
+        let release_level_ty = {
+            let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
+                .iter()
+                .map(|level| Type::string_literal(db, level))
+                .collect();
+
+            // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
+            // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
+            // into other types where necessary. Here, however, we know that there are no duplicates
+            // in this union, so it's probably more efficient to use `UnionType::new()` directly.
+            Type::Union(UnionType::new(db, elements))
+        };
+
+        let version_info_elements = &[
+            Type::IntLiteral(target_version.major.into()),
+            Type::IntLiteral(target_version.minor.into()),
+            int_instance_ty,
+            release_level_ty,
+            int_instance_ty,
+        ];
+
+        Self::tuple(db, version_info_elements)
+    }
+
     /// Given a type that is assumed to represent an instance of a class,
     /// return a type that represents that class itself.
     #[must_use]
@@ -1392,25 +1471,25 @@ impl<'db> Type<'db> {
             Type::Instance(InstanceType { class }) => {
                 Type::SubclassOf(SubclassOfType { class: *class })
             }
-            Type::KnownInstance(known_instance) => known_instance.class().to_class(db),
+            Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
-            Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
-            Type::SliceLiteral(_) => KnownClass::Slice.to_class(db),
-            Type::IntLiteral(_) => KnownClass::Int.to_class(db),
-            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
-            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
-            Type::Tuple(_) => KnownClass::Tuple.to_class(db),
+            Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
+            Type::SliceLiteral(_) => KnownClass::Slice.to_class_literal(db),
+            Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
+            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
+            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
+            Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
-            Type::SubclassOf(SubclassOfType { class }) => Type::SubclassOf(
+            Type::SubclassOf(SubclassOfType { class }) => Type::subclass_of(
                 class
                     .try_metaclass(db)
                     .ok()
                     .and_then(Type::into_class_literal)
-                    .unwrap_or(KnownClass::Type.to_class(db).expect_class_literal())
-                    .to_subclass_of_type(),
+                    .unwrap_or_else(|| KnownClass::Type.to_class_literal(db).expect_class_literal())
+                    .class,
             ),
-            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
+            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             // TODO: `type[Any]`?
             Type::Any => Type::Any,
             // TODO: `type[Unknown]`?
@@ -1432,7 +1511,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
             Type::KnownInstance(known_instance) => {
-                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr()))
+                Type::string_literal(db, known_instance.repr(db))
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -1444,17 +1523,15 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn repr(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::IntLiteral(number) => Type::StringLiteral(StringLiteralType::new(db, {
-                number.to_string().into_boxed_str()
-            })),
-            Type::BooleanLiteral(true) => Type::StringLiteral(StringLiteralType::new(db, "True")),
-            Type::BooleanLiteral(false) => Type::StringLiteral(StringLiteralType::new(db, "False")),
-            Type::StringLiteral(literal) => Type::StringLiteral(StringLiteralType::new(db, {
-                format!("'{}'", literal.value(db).escape_default()).into_boxed_str()
-            })),
+            Type::IntLiteral(number) => Type::string_literal(db, &number.to_string()),
+            Type::BooleanLiteral(true) => Type::string_literal(db, "True"),
+            Type::BooleanLiteral(false) => Type::string_literal(db, "False"),
+            Type::StringLiteral(literal) => {
+                Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
+            }
             Type::LiteralString => Type::LiteralString,
             Type::KnownInstance(known_instance) => {
-                Type::StringLiteral(StringLiteralType::new(db, known_instance.repr()))
+                Type::string_literal(db, known_instance.repr(db))
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -1504,7 +1581,12 @@ pub enum KnownClass {
     FunctionType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
+    // Typing
     SpecialForm,
+    TypeVar,
+    NoDefaultType,
+    // sys
+    VersionInfo,
 }
 
 impl<'db> KnownClass {
@@ -1527,14 +1609,29 @@ impl<'db> KnownClass {
             Self::FunctionType => "FunctionType",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
+            Self::TypeVar => "TypeVar",
+            Self::NoDefaultType => "_NoDefaultType",
+            // This is the name the type of `sys.version_info` has in typeshed,
+            // which is different to what `type(sys.version_info).__name__` is at runtime.
+            // (At runtime, `type(sys.version_info).__name__ == "version_info"`,
+            // which is impossible to replicate in the stubs since the sole instance of the class
+            // also has that name in the `sys` module.)
+            Self::VersionInfo => "_version_info",
         }
     }
 
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
-        self.to_class(db).to_instance(db)
+        self.to_class_literal(db).to_instance(db)
     }
 
-    pub fn to_class(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+        core_module_symbol(db, self.canonical_module(), self.as_str())
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown)
+    }
+
+    /// Return the module in which we should look up the definition for this class
+    pub(crate) const fn canonical_module(self) -> CoreStdlibModule {
         match self {
             Self::Bool
             | Self::Object
@@ -1547,51 +1644,76 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
-            | Self::Slice => builtins_symbol(db, self.as_str()).unwrap_or_unknown(),
-            Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
-                types_symbol(db, self.as_str()).unwrap_or_unknown()
-            }
-            Self::SpecialForm => typing_symbol(db, self.as_str()).unwrap_or_unknown(),
-            Self::NoneType => typeshed_symbol(db, self.as_str()).unwrap_or_unknown(),
+            | Self::Slice => CoreStdlibModule::Builtins,
+            Self::VersionInfo => CoreStdlibModule::Sys,
+            Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
+            Self::NoneType => CoreStdlibModule::Typeshed,
+            Self::SpecialForm | Self::TypeVar => CoreStdlibModule::Typing,
+            // TODO when we understand sys.version_info, we will need an explicit fallback here,
+            // because typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
+            // singleton, but not for `typing._NoDefaultType`
+            Self::NoDefaultType => CoreStdlibModule::TypingExtensions,
         }
     }
 
-    pub fn maybe_from_module(module: &Module, class_name: &str) -> Option<Self> {
-        let candidate = Self::from_name(class_name)?;
-        if candidate.check_module(module) {
-            Some(candidate)
-        } else {
-            None
+    /// Is this class a singleton class?
+    ///
+    /// A singleton class is a class where it is known that only one instance can ever exist at runtime.
+    const fn is_singleton(self) -> bool {
+        // TODO there are other singleton types (EllipsisType, NotImplementedType)
+        match self {
+            Self::NoneType | Self::NoDefaultType | Self::VersionInfo => true,
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Tuple
+            | Self::Int
+            | Self::Float
+            | Self::Str
+            | Self::Set
+            | Self::Dict
+            | Self::List
+            | Self::Type
+            | Self::Slice
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::SpecialForm
+            | Self::TypeVar => false,
         }
     }
 
-    fn from_name(name: &str) -> Option<Self> {
+    pub fn try_from_module(module: &Module, class_name: &str) -> Option<Self> {
         // Note: if this becomes hard to maintain (as rust can't ensure at compile time that all
         // variants of `Self` are covered), we might use a macro (in-house or dependency)
         // See: https://stackoverflow.com/q/39070244
-        match name {
-            "bool" => Some(Self::Bool),
-            "object" => Some(Self::Object),
-            "bytes" => Some(Self::Bytes),
-            "tuple" => Some(Self::Tuple),
-            "type" => Some(Self::Type),
-            "int" => Some(Self::Int),
-            "float" => Some(Self::Float),
-            "str" => Some(Self::Str),
-            "set" => Some(Self::Set),
-            "dict" => Some(Self::Dict),
-            "list" => Some(Self::List),
-            "slice" => Some(Self::Slice),
-            "GenericAlias" => Some(Self::GenericAlias),
-            "NoneType" => Some(Self::NoneType),
-            "ModuleType" => Some(Self::ModuleType),
-            "FunctionType" => Some(Self::FunctionType),
-            "_SpecialForm" => Some(Self::SpecialForm),
-            _ => None,
-        }
+        let candidate = match class_name {
+            "bool" => Self::Bool,
+            "object" => Self::Object,
+            "bytes" => Self::Bytes,
+            "tuple" => Self::Tuple,
+            "type" => Self::Type,
+            "int" => Self::Int,
+            "float" => Self::Float,
+            "str" => Self::Str,
+            "set" => Self::Set,
+            "dict" => Self::Dict,
+            "list" => Self::List,
+            "slice" => Self::Slice,
+            "GenericAlias" => Self::GenericAlias,
+            "NoneType" => Self::NoneType,
+            "ModuleType" => Self::ModuleType,
+            "FunctionType" => Self::FunctionType,
+            "_SpecialForm" => Self::SpecialForm,
+            "_NoDefaultType" => Self::NoDefaultType,
+            "_version_info" => Self::VersionInfo,
+            _ => return None,
+        };
+
+        candidate.check_module(module).then_some(candidate)
     }
 
-    /// Private method checking if known class can be defined in the given module.
+    /// Return `true` if the module of `self` matches `module_name`
     fn check_module(self, module: &Module) -> bool {
         if !module.search_path().is_standard_library() {
             return false;
@@ -1608,10 +1730,13 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
-            | Self::Slice => module.name() == "builtins",
-            Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
+            | Self::Slice
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::VersionInfo
+            | Self::FunctionType => module.name() == self.canonical_module().as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
-            Self::SpecialForm => {
+            Self::SpecialForm | Self::TypeVar | Self::NoDefaultType => {
                 matches!(module.name().as_str(), "typing" | "typing_extensions")
             }
         }
@@ -1619,17 +1744,20 @@ impl<'db> KnownClass {
 }
 
 /// Enumeration of specific runtime that are special enough to be considered their own type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KnownInstanceType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
+    /// A single instance of `typing.TypeVar`
+    TypeVar(TypeVarInstance<'db>),
     // TODO: fill this enum out with more special forms, etc.
 }
 
-impl KnownInstanceType {
+impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
             KnownInstanceType::Literal => "Literal",
+            KnownInstanceType::TypeVar(_) => "TypeVar",
         }
     }
 
@@ -1637,13 +1765,15 @@ impl KnownInstanceType {
     pub const fn bool(self) -> Truthiness {
         match self {
             Self::Literal => Truthiness::AlwaysTrue,
+            Self::TypeVar(_) => Truthiness::AlwaysTrue,
         }
     }
 
     /// Return the repr of the symbol at runtime
-    pub const fn repr(self) -> &'static str {
+    pub fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
             Self::Literal => "typing.Literal",
+            Self::TypeVar(typevar) => typevar.name(db),
         }
     }
 
@@ -1651,6 +1781,7 @@ impl KnownInstanceType {
     pub const fn class(self) -> KnownClass {
         match self {
             Self::Literal => KnownClass::SpecialForm,
+            Self::TypeVar(_) => KnownClass::TypeVar,
         }
     }
 
@@ -1672,6 +1803,79 @@ impl KnownInstanceType {
             _ => None,
         }
     }
+
+    fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let ty = match (self, name) {
+            (Self::TypeVar(typevar), "__name__") => Type::string_literal(db, typevar.name(db)),
+            (Self::TypeVar(typevar), "__bound__") => typevar
+                .upper_bound(db)
+                .map(|ty| ty.to_meta_type(db))
+                .unwrap_or_else(|| KnownClass::NoneType.to_instance(db)),
+            (Self::TypeVar(typevar), "__constraints__") => {
+                let tuple_elements: Vec<Type<'db>> = typevar
+                    .constraints(db)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|ty| ty.to_meta_type(db))
+                    .collect();
+                Type::tuple(db, &tuple_elements)
+            }
+            (Self::TypeVar(typevar), "__default__") => typevar
+                .default_ty(db)
+                .map(|ty| ty.to_meta_type(db))
+                .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
+            _ => return self.instance_fallback(db).member(db, name),
+        };
+        ty.into()
+    }
+}
+
+/// Data regarding a single type variable.
+///
+/// This is referenced by `KnownInstanceType::TypeVar` (to represent the singleton type of the
+/// runtime `typing.TypeVar` object itself). In the future, it will also be referenced also by a
+/// new `Type` variant to represent the type that this typevar represents as an annotation: that
+/// is, an unknown set of objects, constrained by the upper-bound/constraints on this type var,
+/// defaulting to the default type of this type var when not otherwise bound to a type.
+///
+/// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
+/// not by value. Two typevars that have the same name, bound/constraints, and default, are still
+/// different typevars: if used in the same scope, they may be bound to different types.
+#[salsa::tracked]
+pub struct TypeVarInstance<'db> {
+    /// The name of this TypeVar (e.g. `T`)
+    #[return_ref]
+    name: ast::name::Name,
+
+    /// The upper bound or constraint on the type of this TypeVar
+    bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
+
+    /// The default type for this TypeVar
+    default_ty: Option<Type<'db>>,
+}
+
+impl<'db> TypeVarInstance<'db> {
+    pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
+            Some(ty)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
+        if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
+            Some(tuple.elements(db))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
+pub enum TypeVarBoundOrConstraints<'db> {
+    UpperBound(Type<'db>),
+    Constraints(TupleType<'db>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2206,6 +2410,15 @@ impl<'db> Class<'db> {
         self.explicit_bases_query(db)
     }
 
+    /// Iterate over this class's explicit bases, filtering out any bases that are not class objects.
+    fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = Class<'db>> {
+        self.explicit_bases(db)
+            .iter()
+            .copied()
+            .filter_map(Type::into_class_literal)
+            .map(|ClassLiteralType { class }| class)
+    }
+
     #[salsa::tracked(return_ref)]
     fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let class_stmt = self.node(db);
@@ -2305,86 +2518,78 @@ impl<'db> Class<'db> {
     /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         // TODO: `type[Unknown]` would be a more precise fallback
-        // (needs support for <https://docs.python.org/3/library/typing.html#the-type-of-class-objects>)
         self.try_metaclass(db).unwrap_or(Type::Unknown)
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
     pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
-        /// Infer the metaclass of a class, tracking the classes that have been visited to detect
-        /// cyclic definitions.
-        fn infer<'db>(
-            db: &'db dyn Db,
-            class: Class<'db>,
-            seen: &mut SeenSet<Class<'db>>,
-        ) -> Result<Type<'db>, MetaclassError<'db>> {
-            // Recursively infer the metaclass of a class, ensuring that cyclic definitions are
-            // detected.
-            let mut safe_recurse = |class: Class<'db>| -> Result<Type<'db>, MetaclassError<'db>> {
-                // Each base must be considered in isolation.
-                let num_seen = seen.len();
-                if !seen.insert(class) {
-                    return Err(MetaclassError {
-                        kind: MetaclassErrorKind::CyclicDefinition,
-                    });
-                }
-                let metaclass = infer(db, class, seen)?;
-                seen.truncate(num_seen);
-                Ok(metaclass)
-            };
+        // Identify the class's own metaclass (or take the first base class's metaclass).
+        let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
-            let mut base_classes = class
-                .explicit_bases(db)
-                .iter()
-                .copied()
-                .filter_map(Type::into_class_literal);
-
-            // Identify the class's own metaclass (or take the first base class's metaclass).
-            let metaclass = if let Some(metaclass) = class.explicit_metaclass(db) {
-                metaclass
-            } else if let Some(base_class) = base_classes.next() {
-                safe_recurse(base_class.class)?
-            } else {
-                KnownClass::Type.to_class(db)
-            };
-
-            let Type::ClassLiteral(mut candidate) = metaclass else {
-                // TODO: If the metaclass is not a class, we should verify that it's a callable
-                // which accepts the same arguments as `type.__new__` (otherwise error), and return
-                // the meta-type of its return type. (And validate that is a class type?)
-                return Ok(Type::Todo);
-            };
-
-            // Reconcile all base classes' metaclasses with the candidate metaclass.
+        if base_classes.peek().is_some() && self.is_cyclically_defined(db) {
+            // We emit diagnostics for cyclic class definitions elsewhere.
+            // Avoid attempting to infer the metaclass if the class is cyclically defined:
+            // it would be easy to enter an infinite loop.
             //
-            // See:
-            // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
-            // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
-            for base_class in base_classes {
-                let metaclass = safe_recurse(base_class.class)?;
-                let Type::ClassLiteral(metaclass) = metaclass else {
-                    continue;
-                };
-                if metaclass.class.is_subclass_of(db, candidate.class) {
-                    candidate = metaclass;
-                    continue;
-                }
-                if candidate.class.is_subclass_of(db, metaclass.class) {
-                    continue;
-                }
-                return Err(MetaclassError {
-                    kind: MetaclassErrorKind::Conflict {
-                        metaclass1: candidate.class,
-                        metaclass2: metaclass.class,
-                    },
-                });
-            }
-
-            Ok(Type::ClassLiteral(candidate))
+            // TODO: `type[Unknown]` might be better here?
+            return Ok(Type::Unknown);
         }
 
-        infer(db, self, &mut SeenSet::new(self))
+        let explicit_metaclass = self.explicit_metaclass(db);
+        let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
+            (metaclass, self)
+        } else if let Some(base_class) = base_classes.next() {
+            (base_class.metaclass(db), base_class)
+        } else {
+            (KnownClass::Type.to_class_literal(db), self)
+        };
+
+        let mut candidate = if let Type::ClassLiteral(metaclass_ty) = metaclass {
+            MetaclassCandidate {
+                metaclass: metaclass_ty.class,
+                explicit_metaclass_of: class_metaclass_was_from,
+            }
+        } else {
+            // TODO: If the metaclass is not a class, we should verify that it's a callable
+            // which accepts the same arguments as `type.__new__` (otherwise error), and return
+            // the meta-type of its return type. (And validate that is a class type?)
+            return Ok(Type::Todo);
+        };
+
+        // Reconcile all base classes' metaclasses with the candidate metaclass.
+        //
+        // See:
+        // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
+        // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
+        for base_class in base_classes {
+            let metaclass = base_class.metaclass(db);
+            let Type::ClassLiteral(metaclass) = metaclass else {
+                continue;
+            };
+            if metaclass.class.is_subclass_of(db, candidate.metaclass) {
+                candidate = MetaclassCandidate {
+                    metaclass: metaclass.class,
+                    explicit_metaclass_of: base_class,
+                };
+                continue;
+            }
+            if candidate.metaclass.is_subclass_of(db, metaclass.class) {
+                continue;
+            }
+            return Err(MetaclassError {
+                kind: MetaclassErrorKind::Conflict {
+                    candidate1: candidate,
+                    candidate2: MetaclassCandidate {
+                        metaclass: metaclass.class,
+                        explicit_metaclass_of: base_class,
+                    },
+                    candidate1_is_base_class: explicit_metaclass.is_none(),
+                },
+            });
+        }
+
+        Ok(Type::class_literal(candidate.metaclass))
     }
 
     /// Returns the class member of this class named `name`.
@@ -2392,11 +2597,8 @@ impl<'db> Class<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
-            let tuple_elements: Box<_> = self.iter_mro(db).map(Type::from).collect();
-            return Symbol::Type(
-                Type::Tuple(TupleType::new(db, tuple_elements)),
-                Boundness::Bound,
-            );
+            let tuple_elements: Vec<Type<'db>> = self.iter_mro(db).map(Type::from).collect();
+            return Type::tuple(db, &tuple_elements).into();
         }
 
         if name == "__class__" {
@@ -2431,42 +2633,50 @@ impl<'db> Class<'db> {
         let scope = self.body_scope(db);
         symbol(db, scope, name)
     }
+
+    /// Return `true` if this class appears to be a cyclic definition,
+    /// i.e., it inherits either directly or indirectly from itself.
+    ///
+    /// A class definition like this will fail at runtime,
+    /// but we must be resilient to it or we could panic.
+    #[salsa::tracked]
+    fn is_cyclically_defined(self, db: &'db dyn Db) -> bool {
+        fn is_cyclically_defined_recursive<'db>(
+            db: &'db dyn Db,
+            class: Class<'db>,
+            classes_to_watch: &mut IndexSet<Class<'db>>,
+        ) -> bool {
+            if !classes_to_watch.insert(class) {
+                return true;
+            }
+            for explicit_base_class in class.fully_static_explicit_bases(db) {
+                // Each base must be considered in isolation.
+                // This is due to the fact that if a class uses multiple inheritance,
+                // there could easily be a situation where two bases have the same class in their MROs;
+                // that isn't enough to constitute the class being cyclically defined.
+                let classes_to_watch_len = classes_to_watch.len();
+                if is_cyclically_defined_recursive(db, explicit_base_class, classes_to_watch) {
+                    return true;
+                }
+                classes_to_watch.truncate(classes_to_watch_len);
+            }
+            false
+        }
+
+        self.fully_static_explicit_bases(db)
+            .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::new()))
+    }
 }
 
-/// A utility struct for detecting duplicates in class hierarchies while storing the initial
-/// entry on the stack.
+/// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct SeenSet<T: Hash + Eq> {
-    initial: T,
-    visited: IndexSet<T>,
-}
-
-impl<T: Hash + Eq> SeenSet<T> {
-    fn new(initial: T) -> SeenSet<T> {
-        Self {
-            initial,
-            visited: IndexSet::new(),
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.visited.len()
-    }
-
-    fn truncate(&mut self, len: usize) {
-        self.visited.truncate(len);
-    }
-
-    fn insert(&mut self, value: T) -> bool {
-        if value == self.initial {
-            return false;
-        }
-        self.visited.insert(value)
-    }
+pub(super) struct MetaclassCandidate<'db> {
+    metaclass: Class<'db>,
+    explicit_metaclass_of: Class<'db>,
 }
 
 /// A singleton type representing a single class object at runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct ClassLiteralType<'db> {
     class: Class<'db>,
 }
@@ -2474,10 +2684,6 @@ pub struct ClassLiteralType<'db> {
 impl<'db> ClassLiteralType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         self.class.class_member(db, name)
-    }
-
-    fn to_subclass_of_type(self) -> SubclassOfType<'db> {
-        SubclassOfType { class: self.class }
     }
 }
 
@@ -2488,7 +2694,7 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
 }
 
 /// A type that represents `type[C]`, i.e. the class literal `C` and class literals that are subclasses of `C`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
     class: Class<'db>,
 }
@@ -2500,7 +2706,7 @@ impl<'db> SubclassOfType<'db> {
 }
 
 /// A type representing the set of runtime objects which are instances of a certain class.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub struct InstanceType<'db> {
     class: Class<'db>,
 }
@@ -2537,15 +2743,17 @@ pub(super) enum MetaclassErrorKind<'db> {
     /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
     /// its bases.
     Conflict {
-        metaclass1: Class<'db>,
-        metaclass2: Class<'db>,
+        /// `candidate1` will either be the explicit `metaclass=` keyword in the class definition,
+        /// or the inferred metaclass of a base class
+        candidate1: MetaclassCandidate<'db>,
+
+        /// `candidate2` will always be the inferred metaclass of a base class
+        candidate2: MetaclassCandidate<'db>,
+
+        /// Flag to indicate whether `candidate1` is the explicit `metaclass=` keyword or the
+        /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
+        candidate1_is_base_class: bool,
     },
-    /// The class inherits from itself!
-    ///
-    /// This is very unlikely to happen in working real-world code,
-    /// but it's important to explicitly account for it.
-    /// If we don't, there's a possibility of an infinite loop and a panic.
-    CyclicDefinition,
 }
 
 #[salsa::interned]
@@ -2647,11 +2855,12 @@ impl<'db> TupleType<'db> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
+    use crate::stdlib::typing_symbol;
     use crate::ProgramSettings;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
@@ -2667,7 +2876,7 @@ mod tests {
         assert_eq!(size_of::<Type>(), 16);
     }
 
-    fn setup_db() -> TestDb {
+    pub(crate) fn setup_db() -> TestDb {
         let db = TestDb::new();
 
         let src_root = SystemPathBuf::from("/src");
@@ -2704,9 +2913,10 @@ mod tests {
         // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
         BuiltinInstance(&'static str),
         TypingInstance(&'static str),
-        KnownInstance(KnownInstanceType),
+        TypingLiteral,
         // BuiltinClassLiteral("str") corresponds to the builtin `str` class object itself
         BuiltinClassLiteral(&'static str),
+        KnownClassInstance(KnownClass),
         Union(Vec<Ty>),
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
@@ -2721,14 +2931,15 @@ mod tests {
                 Ty::Any => Type::Any,
                 Ty::Todo => Type::Todo,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
-                Ty::StringLiteral(s) => Type::StringLiteral(StringLiteralType::new(db, s)),
+                Ty::StringLiteral(s) => Type::string_literal(db, s),
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
-                Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
+                Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
                 Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
                 Ty::TypingInstance(s) => typing_symbol(db, s).expect_type().to_instance(db),
-                Ty::KnownInstance(known_instance) => Type::KnownInstance(known_instance),
+                Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
                 Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
+                Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -2743,8 +2954,8 @@ mod tests {
                     builder.build()
                 }
                 Ty::Tuple(tys) => {
-                    let elements: Box<_> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
-                    Type::Tuple(TupleType::new(db, elements))
+                    let elements: Vec<Type> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
+                    Type::tuple(db, &elements)
                 }
             }
         }
@@ -2765,6 +2976,14 @@ mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
+        Ty::BuiltinInstance("int")
+    )]
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
+        Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::None])
+    )]
     #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
     fn is_assignable_to(from: Ty, to: Ty) {
@@ -2776,6 +2995,14 @@ mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
+        Ty::BuiltinInstance("int")
+    )]
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
+        Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::None])
+    )]
     fn is_not_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -2818,14 +3045,8 @@ mod tests {
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("str")], neg: vec![Ty::StringLiteral("foo")]}, Ty::Intersection{pos: vec![], neg: vec![Ty::IntLiteral(2)]})]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("int"))]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinInstance("object"))]
-    #[test_case(
-        Ty::KnownInstance(KnownInstanceType::Literal),
-        Ty::TypingInstance("_SpecialForm")
-    )]
-    #[test_case(
-        Ty::KnownInstance(KnownInstanceType::Literal),
-        Ty::BuiltinInstance("object")
-    )]
+    #[test_case(Ty::TypingLiteral, Ty::TypingInstance("_SpecialForm"))]
+    #[test_case(Ty::TypingLiteral, Ty::BuiltinInstance("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -2885,13 +3106,11 @@ mod tests {
         assert!(literal_derived.is_class_literal());
 
         // `subclass_of_base` represents `Type[Base]`.
-        let subclass_of_base =
-            Type::SubclassOf(literal_base.expect_class_literal().to_subclass_of_type());
+        let subclass_of_base = Type::subclass_of(literal_base.expect_class_literal().class);
         assert!(literal_base.is_subtype_of(&db, subclass_of_base));
         assert!(literal_derived.is_subtype_of(&db, subclass_of_base));
 
-        let subclass_of_derived =
-            Type::SubclassOf(literal_derived.expect_class_literal().to_subclass_of_type());
+        let subclass_of_derived = Type::subclass_of(literal_derived.expect_class_literal().class);
         assert!(literal_derived.is_subtype_of(&db, subclass_of_derived));
         assert!(!literal_base.is_subtype_of(&db, subclass_of_derived));
 
@@ -2996,6 +3215,7 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(2)], neg: vec![]}, Ty::IntLiteral(2))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::BuiltinInstance("int")]))]
+    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
@@ -3029,7 +3249,7 @@ mod tests {
     }
 
     #[test]
-    fn is_disjoint_type_type() {
+    fn is_disjoint_type_subclass_of() {
         let mut db = setup_db();
         db.write_dedented(
             "/src/module.py",
@@ -3044,10 +3264,8 @@ mod tests {
         let literal_a = super::global_symbol(&db, module, "A").expect_type();
         let literal_b = super::global_symbol(&db, module, "B").expect_type();
 
-        let subclass_of_a =
-            Type::SubclassOf(literal_a.expect_class_literal().to_subclass_of_type());
-        let subclass_of_b =
-            Type::SubclassOf(literal_b.expect_class_literal().to_subclass_of_type());
+        let subclass_of_a = Type::subclass_of(literal_a.expect_class_literal().class);
+        let subclass_of_b = Type::subclass_of(literal_b.expect_class_literal().class);
 
         // Class literals are always disjoint. They are singleton types
         assert!(literal_a.is_disjoint_from(&db, literal_b));
@@ -3064,9 +3282,68 @@ mod tests {
         assert!(!subclass_of_a.is_disjoint_from(&db, subclass_of_b));
     }
 
+    #[test]
+    fn is_disjoint_module_literals() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            import random
+            import math
+        ",
+        )
+        .unwrap();
+
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let module_literal_random = super::global_symbol(&db, module, "random").expect_type();
+        let module_literal_math = super::global_symbol(&db, module, "math").expect_type();
+
+        assert!(module_literal_random.is_disjoint_from(&db, module_literal_math));
+
+        assert!(!module_literal_random.is_disjoint_from(
+            &db,
+            Ty::KnownClassInstance(KnownClass::ModuleType).into_type(&db)
+        ));
+        assert!(!module_literal_random.is_disjoint_from(
+            &db,
+            Ty::KnownClassInstance(KnownClass::Object).into_type(&db)
+        ));
+    }
+
+    #[test]
+    fn is_disjoint_function_literals() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            def f(): ...
+            def g(): ...
+        ",
+        )
+        .unwrap();
+
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let function_literal_f = super::global_symbol(&db, module, "f").expect_type();
+        let function_literal_g = super::global_symbol(&db, module, "g").expect_type();
+
+        assert!(function_literal_f.is_disjoint_from(&db, function_literal_g));
+
+        assert!(!function_literal_f.is_disjoint_from(
+            &db,
+            Ty::KnownClassInstance(KnownClass::FunctionType).into_type(&db)
+        ));
+        assert!(!function_literal_f.is_disjoint_from(
+            &db,
+            Ty::KnownClassInstance(KnownClass::Object).into_type(&db)
+        ));
+    }
+
     #[test_case(Ty::None)]
     #[test_case(Ty::BooleanLiteral(true))]
     #[test_case(Ty::BooleanLiteral(false))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::NoDefaultType))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
@@ -3161,6 +3438,20 @@ mod tests {
         let db = setup_db();
 
         assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
+    }
+
+    #[test]
+    fn typing_vs_typeshed_no_default() {
+        let db = setup_db();
+
+        let typing_no_default = typing_symbol(&db, "NoDefault").expect_type();
+        let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault").expect_type();
+
+        assert_eq!(typing_no_default.display(&db).to_string(), "NoDefault");
+        assert_eq!(
+            typing_extensions_no_default.display(&db).to_string(),
+            "NoDefault"
+        );
     }
 
     #[test]

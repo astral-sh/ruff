@@ -30,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// The [typing documentation on stub files](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing documentation: Version and platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
 #[violation]
 pub struct ComplexIfStatementInStub;
 

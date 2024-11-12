@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 236
+snapshot_kind: text
+---
+await_outside_async.ipynb:9:5: PLE1142 `await` should be used within an async function
+  |
+8 | def foo():
+9 |     await asyncio.sleep(1)  # # [await-outside-async]
+  |     ^^^^^^^^^^^^^^^^^^^^^^ PLE1142
+  |

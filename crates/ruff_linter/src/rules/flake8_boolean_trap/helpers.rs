@@ -66,9 +66,88 @@ pub(super) fn is_user_allowed_func_call(
         })
 }
 
+/// Returns `true` if a function defines a binary operator.
+///
+/// This only includes operators, i.e., functions that are usually not called directly.
+///
+/// See: <https://docs.python.org/3/library/operator.html>
+pub(super) fn is_operator_method(name: &str) -> bool {
+    matches!(
+        name,
+        "__contains__"  // in
+            // item access ([])
+            | "__getitem__"  // []
+            | "__setitem__"  // []=
+            | "__delitem__"  // del []
+            // addition (+)
+            | "__add__"  // +
+            | "__radd__"  // +
+            | "__iadd__"  // +=
+            // subtraction (-)
+            | "__sub__"  // -
+            | "__rsub__"  // -
+            | "__isub__"  // -=
+            // multiplication (*)
+            | "__mul__"  // *
+            | "__rmul__"  // *
+            | "__imul__"  // *=
+            // division (/)
+            | "__truediv__"  // /
+            | "__rtruediv__"  // /
+            | "__itruediv__"  // /=
+            // floor division (//)
+            | "__floordiv__"  // //
+            | "__rfloordiv__"  // //
+            | "__ifloordiv__"  // //=
+            // remainder (%)
+            | "__mod__"  // %
+            | "__rmod__"  // %
+            | "__imod__"  // %=
+            // exponentiation (**)
+            | "__pow__"  // **
+            | "__rpow__"  // **
+            | "__ipow__"  // **=
+            // left shift (<<)
+            | "__lshift__"  // <<
+            | "__rlshift__"  // <<
+            | "__ilshift__"  // <<=
+            // right shift (>>)
+            | "__rshift__"  // >>
+            | "__rrshift__"  // >>
+            | "__irshift__"  // >>=
+            // matrix multiplication (@)
+            | "__matmul__"  // @
+            | "__rmatmul__"  // @
+            | "__imatmul__"  // @=
+            // meet (&)
+            | "__and__"  // &
+            | "__rand__"  // &
+            | "__iand__"  // &=
+            // join (|)
+            | "__or__"  // |
+            | "__ror__"  // |
+            | "__ior__"  // |=
+            // xor (^)
+            | "__xor__"  // ^
+            | "__rxor__"  // ^
+            | "__ixor__"  // ^=
+            // comparison (>, <, >=, <=, ==, !=)
+            | "__gt__"  // >
+            | "__lt__"  // <
+            | "__ge__"  // >=
+            | "__le__"  // <=
+            | "__eq__"  // ==
+            | "__ne__" // !=
+            // unary operators (included for completeness)
+            | "__pos__"  // +
+            | "__neg__"  // -
+            | "__invert__" // ~
+    )
+}
+
 /// Returns `true` if a function definition is allowed to use a boolean trap.
 pub(super) fn is_allowed_func_def(name: &str) -> bool {
-    matches!(name, "__setitem__" | "__post_init__")
+    matches!(name, "__post_init__") || is_operator_method(name)
 }
 
 /// Returns `true` if an argument is allowed to use a boolean trap. To return

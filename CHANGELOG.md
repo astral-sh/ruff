@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.7.3
+
+### Preview features
+
+- Formatter: Disallow single-line implicit concatenated strings ([#13928](https://github.com/astral-sh/ruff/pull/13928))
+- \[`flake8-pyi`\] Include all Python file types for `PYI006` and `PYI066` ([#14059](https://github.com/astral-sh/ruff/pull/14059))
+- \[`flake8-simplify`\] Implement `split-of-static-string` (`SIM905`) ([#14008](https://github.com/astral-sh/ruff/pull/14008))
+- \[`refurb`\] Implement `subclass-builtin` (`FURB189`) ([#14105](https://github.com/astral-sh/ruff/pull/14105))
+- \[`ruff`\] Improve diagnostic messages and docs (`RUF031`, `RUF032`, `RUF034`) ([#14068](https://github.com/astral-sh/ruff/pull/14068))
+
+### Rule changes
+
+- Detect items that hash to same value in duplicate sets (`B033`, `PLC0208`) ([#14064](https://github.com/astral-sh/ruff/pull/14064))
+- \[`eradicate`\] Better detection of IntelliJ language injection comments (`ERA001`) ([#14094](https://github.com/astral-sh/ruff/pull/14094))
+- \[`flake8-pyi`\] Add autofix for `docstring-in-stub` (`PYI021`) ([#14150](https://github.com/astral-sh/ruff/pull/14150))
+- \[`flake8-pyi`\] Update `duplicate-literal-member` (`PYI062`) to alawys provide an autofix ([#14188](https://github.com/astral-sh/ruff/pull/14188))
+- \[`pyflakes`\] Detect items that hash to same value in duplicate dictionaries (`F601`) ([#14065](https://github.com/astral-sh/ruff/pull/14065))
+- \[`ruff`\] Fix false positive for decorators (`RUF028`) ([#14061](https://github.com/astral-sh/ruff/pull/14061))
+
+### Bug fixes
+
+- Avoid parsing joint rule codes as distinct codes in `# noqa` ([#12809](https://github.com/astral-sh/ruff/pull/12809))
+- \[`eradicate`\] ignore `# language=` in commented-out-code rule (ERA001) ([#14069](https://github.com/astral-sh/ruff/pull/14069))
+- \[`flake8-bugbear`\] - do not run `mutable-argument-default` on stubs (`B006`) ([#14058](https://github.com/astral-sh/ruff/pull/14058))
+- \[`flake8-builtins`\] Skip lambda expressions in `builtin-argument-shadowing (A002)` ([#14144](https://github.com/astral-sh/ruff/pull/14144))
+- \[`flake8-comprehension`\] Also remove trailing comma while fixing `C409` and `C419` ([#14097](https://github.com/astral-sh/ruff/pull/14097))
+- \[`flake8-simplify`\] Allow `open` without context manager in `return` statement (`SIM115`) ([#14066](https://github.com/astral-sh/ruff/pull/14066))
+- \[`pylint`\] Respect hash-equivalent literals in `iteration-over-set` (`PLC0208`) ([#14063](https://github.com/astral-sh/ruff/pull/14063))
+- \[`pylint`\] Update known dunder methods for Python 3.13 (`PLW3201`) ([#14146](https://github.com/astral-sh/ruff/pull/14146))
+- \[`pyupgrade`\] - ignore kwarg unpacking for `UP044` ([#14053](https://github.com/astral-sh/ruff/pull/14053))
+- \[`refurb`\] Parse more exotic decimal strings in `verbose-decimal-constructor` (`FURB157`) ([#14098](https://github.com/astral-sh/ruff/pull/14098))
+
+### Documentation
+
+- Add links to missing related options within rule documentations ([#13971](https://github.com/astral-sh/ruff/pull/13971))
+- Add rule short code to mkdocs tags to allow searching via rule codes ([#14040](https://github.com/astral-sh/ruff/pull/14040))
+
 ## 0.7.2
 
 ### Preview features

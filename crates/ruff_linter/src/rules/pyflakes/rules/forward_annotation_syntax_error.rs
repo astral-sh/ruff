@@ -21,7 +21,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 ///
 /// ## References
-/// - [PEP 563](https://www.python.org/dev/peps/pep-0563/)
+/// - [PEP 563 – Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
 #[violation]
 pub struct ForwardAnnotationSyntaxError {
     pub body: String,

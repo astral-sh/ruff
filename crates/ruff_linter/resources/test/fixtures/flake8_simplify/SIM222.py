@@ -167,3 +167,29 @@ print(f"{a}{b}" or "bar")
 print(f"{a}{''}" or "bar")
 print(f"{''}{''}" or "bar")
 print(f"{1}{''}" or "bar")
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/14237
+for x in [*a] or [None]:
+    pass
+
+for x in {*a} or [None]:
+    pass
+
+for x in (*a,) or [None]:
+    pass
+
+for x in {**a} or [None]:
+    pass
+
+for x in [*a, *b] or [None]:
+    pass
+
+for x in {*a, *b} or [None]:
+    pass
+
+for x in (*a, *b) or [None]:
+    pass
+
+for x in {**a, **b} or [None]:
+    pass

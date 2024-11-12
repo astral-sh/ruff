@@ -183,9 +183,11 @@ impl<'a> Directive<'a> {
         // Extract, e.g., the `401` in `F401`.
         let suffix = line[prefix..]
             .chars()
-            .take_while(char::is_ascii_alphanumeric)
+            .take_while(char::is_ascii_digit)
             .count();
         if prefix > 0 && suffix > 0 {
+            // SAFETY: we can use `prefix` and `suffix` to index into `line` because we know that
+            // all characters in `line` are ASCII, i.e., a single byte.
             Some(&line[..prefix + suffix])
         } else {
             None
@@ -1206,6 +1208,12 @@ mod tests {
     #[test]
     fn noqa_empty_comma_space() {
         let source = "# noqa: F401, ,F841";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_non_code() {
+        let source = "# noqa: F401 We're ignoring an import";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 

@@ -32,6 +32,7 @@ mod tests {
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_3.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_4.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
@@ -78,6 +79,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
+                    extend_markup_names: vec![],
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -93,6 +95,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
+                    extend_markup_names: vec![],
                 },
                 target_version: PythonVersion::Py310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -384,6 +387,7 @@ mod tests {
     }
 
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035.py"))]
     #[test_case(Rule::UnformattedSpecialComment, Path::new("RUF104.py"))]
     #[test_case(
         Rule::UnformattedSpecialComment,
@@ -408,6 +412,29 @@ mod tests {
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035_extend_markup_names.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035_skip_early_out.py"))]
+    fn extend_allowed_callable(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "extend_allow_callables__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    parenthesize_tuple_in_subscript: true,
+                    extend_markup_names: vec!["webhelpers.html.literal".to_string()],
+                },
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

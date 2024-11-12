@@ -10,8 +10,6 @@ reveal_type(not not None)  # revealed: Literal[False]
 ## Function
 
 ```py
-from typing import reveal_type
-
 def f():
     return 1
 

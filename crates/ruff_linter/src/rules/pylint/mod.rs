@@ -27,6 +27,7 @@ mod tests {
     )]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
+    #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.ipynb"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
     #[test_case(
         Rule::BadStringFormatCharacter,
@@ -104,6 +105,7 @@ mod tests {
         Rule::InvalidCharacterBackspace,
         Path::new("invalid_characters_syntax_error.py")
     )]
+    #[test_case(Rule::ShallowCopyEnviron, Path::new("shallow_copy_environ.py"))]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
     #[test_case(Rule::IterationOverSet, Path::new("iteration_over_set.py"))]

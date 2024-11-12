@@ -39,7 +39,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: gettext](https://docs.python.org/3/library/gettext.html)
+/// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[violation]
 pub struct FStringInGetTextFuncCall;
 

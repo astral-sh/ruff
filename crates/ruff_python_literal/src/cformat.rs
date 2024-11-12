@@ -89,11 +89,11 @@ impl From<CFormatQuantity> for CFormatPrecision {
 bitflags! {
     #[derive(Copy, Clone, Debug, PartialEq)]
     pub struct CConversionFlags: u32 {
-        const ALTERNATE_FORM = 0b0000_0001;
-        const ZERO_PAD = 0b0000_0010;
-        const LEFT_ADJUST = 0b0000_0100;
-        const BLANK_SIGN = 0b0000_1000;
-        const SIGN_CHAR = 0b0001_0000;
+        const ALTERNATE_FORM = 1 << 0;
+        const ZERO_PAD = 1 << 1;
+        const LEFT_ADJUST = 1 << 2;
+        const BLANK_SIGN = 1 << 3;
+        const SIGN_CHAR = 1 << 4;
     }
 }
 

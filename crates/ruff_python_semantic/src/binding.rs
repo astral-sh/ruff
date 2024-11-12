@@ -609,10 +609,10 @@ pub enum BindingKind<'a> {
 bitflags! {
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
     pub struct Exceptions: u8 {
-        const NAME_ERROR = 0b0000_0001;
-        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
-        const IMPORT_ERROR = 0b0000_0100;
-        const ATTRIBUTE_ERROR = 0b000_100;
+        const NAME_ERROR = 1 << 0;
+        const MODULE_NOT_FOUND_ERROR = 1 << 1;
+        const IMPORT_ERROR = 1 << 2;
+        const ATTRIBUTE_ERROR = 1 << 3;
     }
 }
 

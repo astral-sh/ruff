@@ -317,7 +317,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
                 // simplify the representation.
-                self.positive.insert(ty);
+                self.add_positive(db, ty);
             }
             // ~Literal[True] & bool = Literal[False]
             Type::BooleanLiteral(bool)
@@ -383,7 +383,7 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::stdlib::typing_symbol;
-    use crate::types::{global_symbol, KnownClass, StringLiteralType, UnionBuilder};
+    use crate::types::{global_symbol, KnownClass, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -593,6 +593,22 @@ mod tests {
     }
 
     #[test]
+    fn build_intersection_simplify_negative_any() {
+        let db = setup_db();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::Any)
+            .build();
+        assert_eq!(ty, Type::Any);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Never)
+            .add_negative(Type::Any)
+            .build();
+        assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
     fn intersection_distributes_over_union() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
@@ -759,7 +775,7 @@ mod tests {
             .build();
         assert_eq!(ty, s);
 
-        let literal = Type::StringLiteral(StringLiteralType::new(&db, "a"));
+        let literal = Type::string_literal(&db, "a");
         let expected = IntersectionBuilder::new(&db)
             .add_positive(s)
             .add_negative(literal)
@@ -862,7 +878,7 @@ mod tests {
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(s)
-            .add_negative(Type::StringLiteral(StringLiteralType::new(&db, "a")))
+            .add_negative(Type::string_literal(&db, "a"))
             .add_negative(t)
             .build();
         assert_eq!(ty, Type::Never);
@@ -896,7 +912,7 @@ mod tests {
         let db = setup_db();
 
         let t_p = KnownClass::Int.to_instance(&db);
-        let t_n = Type::StringLiteral(StringLiteralType::new(&db, "t_n"));
+        let t_n = Type::string_literal(&db, "t_n");
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t_p)

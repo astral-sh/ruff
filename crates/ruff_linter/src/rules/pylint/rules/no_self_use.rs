@@ -28,6 +28,15 @@ use crate::checkers::ast::Checker;
 /// def greeting():
 ///     print("Greetings friend!")
 /// ```
+///
+/// or
+///
+/// ```python
+/// class Person:
+///     @staticmethod
+///     def greeting():
+///         print("Greetings friend!")
+/// ```
 #[violation]
 pub struct NoSelfUse {
     method_name: String,

@@ -13,6 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+bitflags = { workspace = true }
 unicode-ident = { workspace = true }
 
 [lints]

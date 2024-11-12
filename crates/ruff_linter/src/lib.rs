@@ -32,6 +32,7 @@ mod locator;
 pub mod logging;
 pub mod message;
 mod noqa;
+pub mod package;
 pub mod packaging;
 pub mod pyproject_toml;
 pub mod registry;

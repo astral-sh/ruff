@@ -590,7 +590,7 @@ impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
 /// ```
 ///
 /// ## References
-/// - [`pytest-asyncio`](https://pypi.org/project/pytest-asyncio/)
+/// - [PyPI: `pytest-asyncio`](https://pypi.org/project/pytest-asyncio/)
 #[violation]
 pub struct PytestUnnecessaryAsyncioMarkOnFixture;
 

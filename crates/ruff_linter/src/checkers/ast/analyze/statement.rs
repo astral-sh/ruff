@@ -81,7 +81,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 returns,
                 parameters,
                 body,
-                type_params,
+                type_params: _,
                 range: _,
             },
         ) => {
@@ -160,14 +160,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
-                flake8_pyi::rules::custom_type_var_return_type(
-                    checker,
-                    name,
-                    decorator_list,
-                    returns.as_ref().map(AsRef::as_ref),
-                    parameters,
-                    type_params.as_deref(),
-                );
+                flake8_pyi::rules::custom_type_var_return_type(checker, function_def);
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
@@ -1303,7 +1296,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
         }
-        Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
+        Stmt::With(
+            with_stmt @ ast::StmtWith {
+                items,
+                body,
+                is_async,
+                ..
+            },
+        ) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
@@ -1334,6 +1334,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CancelScopeNoCheckpoint) {
                 flake8_async::rules::cancel_scope_no_checkpoint(checker, with_stmt, items);
+            }
+            if *is_async {
+                if checker.enabled(Rule::AwaitOutsideAsync) {
+                    pylint::rules::await_outside_async(checker, stmt);
+                }
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
@@ -1422,7 +1427,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadlinesInFor) {
                 refurb::rules::readlines_in_for(checker, for_stmt);
             }
-            if !is_async {
+            if *is_async {
+                if checker.enabled(Rule::AwaitOutsideAsync) {
+                    pylint::rules::await_outside_async(checker, stmt);
+                }
+            } else {
                 if checker.enabled(Rule::ReimplementedBuiltin) {
                     flake8_simplify::rules::convert_for_loop_to_any_all(checker, stmt);
                 }

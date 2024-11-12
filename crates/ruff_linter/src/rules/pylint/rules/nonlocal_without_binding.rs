@@ -27,7 +27,7 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## References
 /// - [Python documentation: The `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#nonlocal)
-/// - [PEP 3104](https://peps.python.org/pep-3104/)
+/// - [PEP 3104 – Access to Names in Outer Scopes](https://peps.python.org/pep-3104/)
 #[violation]
 pub struct NonlocalWithoutBinding {
     pub(crate) name: String,
