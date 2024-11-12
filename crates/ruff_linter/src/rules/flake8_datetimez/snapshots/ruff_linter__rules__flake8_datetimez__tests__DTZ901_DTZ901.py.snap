@@ -9,6 +9,7 @@ DTZ901.py:5:1: DTZ901 `datetime.datetime.max` used
   | ^^^^^^^^^^^^^^^^^^^^^ DTZ901
 6 | datetime.datetime.min
   |
+  = help: Use `datetime.datetime.max.replace(tzinfo=...)` instead
 
 DTZ901.py:6:1: DTZ901 `datetime.datetime.min` used
   |
@@ -19,6 +20,7 @@ DTZ901.py:6:1: DTZ901 `datetime.datetime.min` used
 7 | 
 8 | datetime.datetime.max.replace(year=...)
   |
+  = help: Use `datetime.datetime.min.replace(tzinfo=...)` instead
 
 DTZ901.py:8:1: DTZ901 `datetime.datetime.max` used
   |
@@ -28,6 +30,7 @@ DTZ901.py:8:1: DTZ901 `datetime.datetime.max` used
   | ^^^^^^^^^^^^^^^^^^^^^ DTZ901
 9 | datetime.datetime.min.replace(hour=...)
   |
+  = help: Use `datetime.datetime.max.replace(tzinfo=...)` instead
 
 DTZ901.py:9:1: DTZ901 `datetime.datetime.min` used
   |
@@ -35,6 +38,7 @@ DTZ901.py:9:1: DTZ901 `datetime.datetime.min` used
 9 | datetime.datetime.min.replace(hour=...)
   | ^^^^^^^^^^^^^^^^^^^^^ DTZ901
   |
+  = help: Use `datetime.datetime.min.replace(tzinfo=...)` instead
 
 DTZ901.py:21:1: DTZ901 `datetime.datetime.max` used
    |
@@ -43,6 +47,7 @@ DTZ901.py:21:1: DTZ901 `datetime.datetime.max` used
    | ^^^^^^^^^^^^ DTZ901
 22 | datetime.min
    |
+   = help: Use `datetime.datetime.max.replace(tzinfo=...)` instead
 
 DTZ901.py:22:1: DTZ901 `datetime.datetime.min` used
    |
@@ -53,6 +58,7 @@ DTZ901.py:22:1: DTZ901 `datetime.datetime.min` used
 23 | 
 24 | datetime.max.replace(year=...)
    |
+   = help: Use `datetime.datetime.min.replace(tzinfo=...)` instead
 
 DTZ901.py:24:1: DTZ901 `datetime.datetime.max` used
    |
@@ -62,6 +68,7 @@ DTZ901.py:24:1: DTZ901 `datetime.datetime.max` used
    | ^^^^^^^^^^^^ DTZ901
 25 | datetime.min.replace(hour=...)
    |
+   = help: Use `datetime.datetime.max.replace(tzinfo=...)` instead
 
 DTZ901.py:25:1: DTZ901 `datetime.datetime.min` used
    |
@@ -69,3 +76,4 @@ DTZ901.py:25:1: DTZ901 `datetime.datetime.min` used
 25 | datetime.min.replace(hour=...)
    | ^^^^^^^^^^^^ DTZ901
    |
+   = help: Use `datetime.datetime.min.replace(tzinfo=...)` instead

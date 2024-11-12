@@ -65,6 +65,13 @@ impl Violation for DatetimeMaxMin {
     fn message(&self) -> String {
         format!("`datetime.datetime.{}` used", self.0)
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!(
+            "Use `datetime.datetime.{}.replace(tzinfo=...)` instead",
+            self.0
+        ))
+    }
 }
 
 /// DTZ901
