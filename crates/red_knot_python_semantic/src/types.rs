@@ -1108,7 +1108,6 @@ impl<'db> Type<'db> {
                             possibly_unbound = true;
                         }
                         Symbol::Type(ty_member, member_boundness) => {
-                            // TODO: raise a diagnostic if member_boundness indicates potential unboundness
                             if member_boundness == Boundness::PossiblyUnbound {
                                 possibly_unbound = true;
                             }
