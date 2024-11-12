@@ -7,6 +7,7 @@ pub(crate) use call_datetime_today::*;
 pub(crate) use call_datetime_utcfromtimestamp::*;
 pub(crate) use call_datetime_utcnow::*;
 pub(crate) use call_datetime_without_tzinfo::*;
+pub(crate) use use_datetime_max_min::*;
 
 mod call_date_fromtimestamp;
 mod call_date_today;
@@ -18,3 +19,4 @@ mod call_datetime_utcfromtimestamp;
 mod call_datetime_utcnow;
 mod call_datetime_without_tzinfo;
 mod helpers;
+mod use_datetime_max_min;
