@@ -14,16 +14,6 @@ enum MaxMin {
     Min,
 }
 
-impl MaxMin {
-    fn from(attr: &str) -> Option<Self> {
-        match attr {
-            "max" => Some(Self::Max),
-            "min" => Some(Self::Min),
-            _ => None,
-        }
-    }
-}
-
 impl Display for MaxMin {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name = match self {
@@ -87,11 +77,9 @@ pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
     };
 
     let maxmin = match qualified_name.segments() {
-        ["datetime", "datetime", attr] => MaxMin::from(attr),
-        _ => None,
-    };
-    let Some(maxmin) = maxmin else {
-        return;
+        ["datetime", "datetime", "max"] => MaxMin::Max,
+        ["datetime", "datetime", "min"] => MaxMin::Min,
+        _ => return,
     };
 
     if followed_by_replace_tzinfo(checker.semantic()) {
@@ -114,7 +102,7 @@ pub(super) fn followed_by_replace_tzinfo(semantic: &SemanticModel) -> bool {
 
     match (parent, grandparent) {
         (Expr::Attribute(ExprAttribute { attr, .. }), Expr::Call(ExprCall { arguments, .. })) => {
-            attr.as_str() == "replace" && matches!(arguments.find_keyword("tzinfo"), Some(..))
+            attr.as_str() == "replace" && arguments.find_keyword("tzinfo").is_some()
         }
         _ => false,
     }
