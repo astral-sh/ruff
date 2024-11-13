@@ -108,6 +108,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateLiteralMember,
                 Rule::RedundantBoolLiteral,
                 Rule::RedundantNoneLiteral,
+                Rule::UnnecessaryNestedLiteral
             ]) {
                 if !checker.semantic.in_nested_literal() {
                     if checker.enabled(Rule::DuplicateLiteralMember) {
@@ -118,6 +119,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::RedundantNoneLiteral) {
                         flake8_pyi::rules::redundant_none_literal(checker, expr);
+                    }
+                    if checker.enabled(Rule::UnnecessaryNestedLiteral) {
+                        ruff::rules::unnecessary_nested_literal(checker, expr);
                     }
                 }
             }

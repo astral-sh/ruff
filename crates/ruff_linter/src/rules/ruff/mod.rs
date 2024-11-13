@@ -67,6 +67,8 @@ mod tests {
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.py"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.pyi"))]
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
+    #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
+    #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

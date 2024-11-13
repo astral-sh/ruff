@@ -1,0 +1,278 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF039.pyi:6:4: RUF039 [*] Unnecessary nested `Literal`
+  |
+6 | y: Literal[1, print("hello"), 3, Literal[4, 1]]
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+7 | Literal[1, Literal[1]]
+8 | Literal[1, 2, Literal[1, 2]]
+  |
+  = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+3 3 | import typing_extensions
+4 4 | 
+5 5 | 
+6   |-y: Literal[1, print("hello"), 3, Literal[4, 1]]
+  6 |+y: Literal[1, print("hello"), 3, 4, 1]
+7 7 | Literal[1, Literal[1]]
+8 8 | Literal[1, 2, Literal[1, 2]]
+9 9 | Literal[1, Literal[1], Literal[1]]
+
+RUF039.pyi:7:1: RUF039 [*] Unnecessary nested `Literal`
+  |
+6 | y: Literal[1, print("hello"), 3, Literal[4, 1]]
+7 | Literal[1, Literal[1]]
+  | ^^^^^^^^^^^^^^^^^^^^^^ RUF039
+8 | Literal[1, 2, Literal[1, 2]]
+9 | Literal[1, Literal[1], Literal[1]]
+  |
+  = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+4 4 | 
+5 5 | 
+6 6 | y: Literal[1, print("hello"), 3, Literal[4, 1]]
+7   |-Literal[1, Literal[1]]
+  7 |+Literal[1, 1]
+8 8 | Literal[1, 2, Literal[1, 2]]
+9 9 | Literal[1, Literal[1], Literal[1]]
+10 10 | Literal[1, Literal[2], Literal[2]]
+
+RUF039.pyi:8:1: RUF039 [*] Unnecessary nested `Literal`
+   |
+ 6 | y: Literal[1, print("hello"), 3, Literal[4, 1]]
+ 7 | Literal[1, Literal[1]]
+ 8 | Literal[1, 2, Literal[1, 2]]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+ 9 | Literal[1, Literal[1], Literal[1]]
+10 | Literal[1, Literal[2], Literal[2]]
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+5 5 | 
+6 6 | y: Literal[1, print("hello"), 3, Literal[4, 1]]
+7 7 | Literal[1, Literal[1]]
+8   |-Literal[1, 2, Literal[1, 2]]
+  8 |+Literal[1, 2, 1, 2]
+9 9 | Literal[1, Literal[1], Literal[1]]
+10 10 | Literal[1, Literal[2], Literal[2]]
+11 11 | t.Literal[1, t.Literal[2, t.Literal[1]]]
+
+RUF039.pyi:9:1: RUF039 [*] Unnecessary nested `Literal`
+   |
+ 7 | Literal[1, Literal[1]]
+ 8 | Literal[1, 2, Literal[1, 2]]
+ 9 | Literal[1, Literal[1], Literal[1]]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+10 | Literal[1, Literal[2], Literal[2]]
+11 | t.Literal[1, t.Literal[2, t.Literal[1]]]
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+6  6  | y: Literal[1, print("hello"), 3, Literal[4, 1]]
+7  7  | Literal[1, Literal[1]]
+8  8  | Literal[1, 2, Literal[1, 2]]
+9     |-Literal[1, Literal[1], Literal[1]]
+   9  |+Literal[1, 1, 1]
+10 10 | Literal[1, Literal[2], Literal[2]]
+11 11 | t.Literal[1, t.Literal[2, t.Literal[1]]]
+12 12 | Literal[
+
+RUF039.pyi:10:1: RUF039 [*] Unnecessary nested `Literal`
+   |
+ 8 | Literal[1, 2, Literal[1, 2]]
+ 9 | Literal[1, Literal[1], Literal[1]]
+10 | Literal[1, Literal[2], Literal[2]]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+11 | t.Literal[1, t.Literal[2, t.Literal[1]]]
+12 | Literal[
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+7  7  | Literal[1, Literal[1]]
+8  8  | Literal[1, 2, Literal[1, 2]]
+9  9  | Literal[1, Literal[1], Literal[1]]
+10    |-Literal[1, Literal[2], Literal[2]]
+   10 |+Literal[1, 2, 2]
+11 11 | t.Literal[1, t.Literal[2, t.Literal[1]]]
+12 12 | Literal[
+13 13 |     1, # comment 1
+
+RUF039.pyi:11:1: RUF039 [*] Unnecessary nested `Literal`
+   |
+ 9 | Literal[1, Literal[1], Literal[1]]
+10 | Literal[1, Literal[2], Literal[2]]
+11 | t.Literal[1, t.Literal[2, t.Literal[1]]]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+12 | Literal[
+13 |     1, # comment 1
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+8  8  | Literal[1, 2, Literal[1, 2]]
+9  9  | Literal[1, Literal[1], Literal[1]]
+10 10 | Literal[1, Literal[2], Literal[2]]
+11    |-t.Literal[1, t.Literal[2, t.Literal[1]]]
+   11 |+t.Literal[1, 2, 1]
+12 12 | Literal[
+13 13 |     1, # comment 1
+14 14 |     Literal[ # another comment
+
+RUF039.pyi:12:1: RUF039 [*] Unnecessary nested `Literal`
+   |
+10 |   Literal[1, Literal[2], Literal[2]]
+11 |   t.Literal[1, t.Literal[2, t.Literal[1]]]
+12 | / Literal[
+13 | |     1, # comment 1
+14 | |     Literal[ # another comment
+15 | |         1 # yet annother comment
+16 | |     ]
+17 | | ]  # once
+   | |_^ RUF039
+18 |   
+19 |   # Ensure issue is only raised once, even on nested literals
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Unsafe fix
+9  9  | Literal[1, Literal[1], Literal[1]]
+10 10 | Literal[1, Literal[2], Literal[2]]
+11 11 | t.Literal[1, t.Literal[2, t.Literal[1]]]
+12    |-Literal[
+13    |-    1, # comment 1
+14    |-    Literal[ # another comment
+15    |-        1 # yet annother comment
+16    |-    ]
+17    |-]  # once
+   12 |+Literal[1, 1]  # once
+18 13 | 
+19 14 | # Ensure issue is only raised once, even on nested literals
+20 15 | MyType = Literal["foo", Literal[True, False, True], "bar"]
+
+RUF039.pyi:20:10: RUF039 [*] Unnecessary nested `Literal`
+   |
+19 | # Ensure issue is only raised once, even on nested literals
+20 | MyType = Literal["foo", Literal[True, False, True], "bar"]
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+21 | 
+22 | # nested literals, all equivalent to `Literal[1]`
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+17 17 | ]  # once
+18 18 | 
+19 19 | # Ensure issue is only raised once, even on nested literals
+20    |-MyType = Literal["foo", Literal[True, False, True], "bar"]
+   20 |+MyType = Literal["foo", True, False, True, "bar"]
+21 21 | 
+22 22 | # nested literals, all equivalent to `Literal[1]`
+23 23 | Literal[Literal[1]]
+
+RUF039.pyi:23:1: RUF039 [*] Unnecessary nested `Literal`
+   |
+22 | # nested literals, all equivalent to `Literal[1]`
+23 | Literal[Literal[1]]
+   | ^^^^^^^^^^^^^^^^^^^ RUF039
+24 | Literal[Literal[Literal[1], Literal[1]]]
+25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+20 20 | MyType = Literal["foo", Literal[True, False, True], "bar"]
+21 21 | 
+22 22 | # nested literals, all equivalent to `Literal[1]`
+23    |-Literal[Literal[1]]
+   23 |+Literal[1]
+24 24 | Literal[Literal[Literal[1], Literal[1]]]
+25 25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
+26 26 | 
+
+RUF039.pyi:24:1: RUF039 [*] Unnecessary nested `Literal`
+   |
+22 | # nested literals, all equivalent to `Literal[1]`
+23 | Literal[Literal[1]]
+24 | Literal[Literal[Literal[1], Literal[1]]]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+21 21 | 
+22 22 | # nested literals, all equivalent to `Literal[1]`
+23 23 | Literal[Literal[1]]
+24    |-Literal[Literal[Literal[1], Literal[1]]]
+   24 |+Literal[1, 1]
+25 25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
+26 26 | 
+27 27 | # OK
+
+RUF039.pyi:24:9: RUF039 [*] Unnecessary nested `Literal`
+   |
+22 | # nested literals, all equivalent to `Literal[1]`
+23 | Literal[Literal[1]]
+24 | Literal[Literal[Literal[1], Literal[1]]]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+21 21 | 
+22 22 | # nested literals, all equivalent to `Literal[1]`
+23 23 | Literal[Literal[1]]
+24    |-Literal[Literal[Literal[1], Literal[1]]]
+   24 |+Literal[Literal[1, 1]]
+25 25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
+26 26 | 
+27 27 | # OK
+
+RUF039.pyi:25:1: RUF039 [*] Unnecessary nested `Literal`
+   |
+23 | Literal[Literal[1]]
+24 | Literal[Literal[Literal[1], Literal[1]]]
+25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+26 | 
+27 | # OK
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+22 22 | # nested literals, all equivalent to `Literal[1]`
+23 23 | Literal[Literal[1]]
+24 24 | Literal[Literal[Literal[1], Literal[1]]]
+25    |-Literal[Literal[1], Literal[Literal[Literal[1]]]]
+   25 |+Literal[1, 1]
+26 26 | 
+27 27 | # OK
+28 28 | x: Literal[True, False, True, False]
+
+RUF039.pyi:25:29: RUF039 [*] Unnecessary nested `Literal`
+   |
+23 | Literal[Literal[1]]
+24 | Literal[Literal[Literal[1], Literal[1]]]
+25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
+   |                             ^^^^^^^^^^^^^^^^^^^ RUF039
+26 | 
+27 | # OK
+   |
+   = help: Replace with flattened `Literal`
+
+ℹ Safe fix
+22 22 | # nested literals, all equivalent to `Literal[1]`
+23 23 | Literal[Literal[1]]
+24 24 | Literal[Literal[Literal[1], Literal[1]]]
+25    |-Literal[Literal[1], Literal[Literal[Literal[1]]]]
+   25 |+Literal[Literal[1], Literal[Literal[1]]]
+26 26 | 
+27 27 | # OK
+28 28 | x: Literal[True, False, True, False]
