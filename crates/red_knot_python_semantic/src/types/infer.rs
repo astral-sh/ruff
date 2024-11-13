@@ -1796,14 +1796,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtTypeAlias {
             range: _,
             name,
-            type_params,
+            type_params: _,
             value,
         } = type_alias_statement;
         self.infer_expression(value);
         self.infer_expression(name);
-        if let Some(type_params) = type_params {
-            self.infer_type_parameters(type_params);
-        }
+
+        // TODO: properly handle generic type aliases, which need their own annotation scope
     }
 
     fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {
