@@ -2518,10 +2518,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
-        let definition = self.index.definition(named);
-        let result = infer_definition_types(self.db, definition);
-        self.extend(result);
-        result.binding_ty(definition)
+        // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
+        if named.target.is_name_expr() {
+            let definition = self.index.definition(named);
+            let result = infer_definition_types(self.db, definition);
+            self.extend(result);
+            result.binding_ty(definition)
+        } else {
+            // For syntactically invalid targets, we still need to run type inference:
+            self.infer_expression(&named.target);
+            self.infer_expression(&named.value);
+            Type::Unknown
+        }
     }
 
     fn infer_named_expression_definition(

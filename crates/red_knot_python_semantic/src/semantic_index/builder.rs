@@ -676,9 +676,18 @@ where
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                 }
-                self.push_assignment(node.into());
-                self.visit_expr(&node.target);
-                self.pop_assignment();
+
+                // See https://docs.python.org/3/library/ast.html#ast.AnnAssign
+                if matches!(
+                    *node.target,
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
+                ) {
+                    self.push_assignment(node.into());
+                    self.visit_expr(&node.target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(&node.target);
+                }
             }
             ast::Stmt::AugAssign(
                 aug_assign @ ast::StmtAugAssign {
@@ -690,9 +699,21 @@ where
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(value);
-                self.push_assignment(aug_assign.into());
-                self.visit_expr(target);
-                self.pop_assignment();
+
+                // See https://docs.python.org/3/library/ast.html#ast.AugAssign
+                if matches!(
+                    **target,
+                    ast::Expr::Attribute(_)
+                        | ast::Expr::Subscript(_)
+                        | ast::Expr::Starred(_)
+                        | ast::Expr::Name(_)
+                ) {
+                    self.push_assignment(aug_assign.into());
+                    self.visit_expr(target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(target);
+                }
             }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
@@ -1072,9 +1093,15 @@ where
             ast::Expr::Named(node) => {
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
-                self.push_assignment(node.into());
-                self.visit_expr(&node.target);
-                self.pop_assignment();
+
+                // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
+                if node.target.is_name_expr() {
+                    self.push_assignment(node.into());
+                    self.visit_expr(&node.target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(&node.target);
+                }
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
