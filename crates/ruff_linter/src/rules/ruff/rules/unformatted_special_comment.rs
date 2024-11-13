@@ -415,9 +415,8 @@ mod tests {
 
     #[test]
     fn incorrect_whitespace() {
-        no_unformatted("#yapf: enable");
-        no_unformatted("#  yapf : enable");
-        no_unformatted("# yapf:disable");
+        no_unformatted("#yapf : enable");
+        no_unformatted("#  yapf : disable");
     }
 
     #[test]
