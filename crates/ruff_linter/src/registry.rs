@@ -208,6 +208,9 @@ pub enum Linter {
     /// [pydoclint](https://pypi.org/project/pydoclint/)
     #[prefix = "DOC"]
     Pydoclint,
+    /// [wps-light](https://pypi.org/project/wps-light/)
+    #[prefix = "WPS"]
+    WpsLight,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
