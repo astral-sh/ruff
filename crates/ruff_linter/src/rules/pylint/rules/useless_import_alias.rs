@@ -53,6 +53,7 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     if alias.name.as_str() != asname.as_str() {
         return;
     }
+
     // While the fix is specified as always available,
     // the presence of a user-specified required import (I002)
     // with a useless alias causes an infinite loop. So
@@ -82,7 +83,7 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 }
 
 /// PLC0414
-pub(crate) fn useless_importfrom_alias(
+pub(crate) fn useless_import_from_alias(
     checker: &mut Checker,
     alias: &Alias,
     module: Option<&str>,
@@ -97,6 +98,7 @@ pub(crate) fn useless_importfrom_alias(
     if alias.name.as_str() != asname.as_str() {
         return;
     }
+
     // While the fix is specified as always available,
     // the presence of a user-specified required import (I002)
     // with a useless alias causes an infinite loop. So
