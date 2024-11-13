@@ -1,9 +1,9 @@
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
-use std::ops::Deref;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for usages of the following `logging` top-level functions:
@@ -51,7 +51,7 @@ pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(call.func.deref()) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(&*call.func) else {
         return;
     };
 
@@ -61,7 +61,7 @@ pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
     };
 
     let kind = RootLoggerCall {
-        attr: attr.to_string(),
+        attr: (*attr).to_string(),
     };
     let diagnostic = Diagnostic::new(kind, call.range);
 
