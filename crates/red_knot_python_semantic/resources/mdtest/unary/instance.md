@@ -35,12 +35,11 @@ b = NoDunder()
 ## Not
 
 Not operator is inferred based on
-<https://docs.python.org/3/library/stdtypes.html#truth-value-testing>. All objects are true unless
-the `__bool__` or `__len__` is returning `False`.
+<https://docs.python.org/3/library/stdtypes.html#truth-value-testing>. An instance is True or False
+if the `__bool__` method says so.
 
-[`__len__`](https://docs.python.org/3/reference/datamodel.html#object.__len__) method should return
-an integer and [`__bool__`](https://docs.python.org/3/reference/datamodel.html#object.__bool__)
-method must return a boolean.
+The `__len__` method on it's own will not determine the truthiness of an instance because `__bool__`
+method can override it.
 
 ```py
 class AlwaysTrue:
@@ -59,21 +58,21 @@ reveal_type(not AlwaysFalse())
 
 class NoBoolMethod: ...
 
-# revealed: Literal[False]
+# revealed: bool
 reveal_type(not NoBoolMethod())
 
 class LenZero:
     def __len__(self) -> Literal[0]:
         return 0
 
-# revealed: Literal[True]
+# revealed: bool
 reveal_type(not LenZero())
 
 class LenNonZero:
     def __len__(self) -> Literal[1]:
         return 1
 
-# revealed: Literal[False]
+# revealed: bool
 reveal_type(not LenNonZero())
 
 class WithBothLenAndBool1:
@@ -93,22 +92,15 @@ class WithBothLenAndBool2:
     def __len__(self) -> Literal[0]:
         return 0
 
-# revealed: Literal[True]
+# revealed: Literal[False]
 reveal_type(not WithBothLenAndBool2())
 
+# TODO: raise diagnostic when __bool__ method is not valid: [unsupported-operator] "Method __bool__ for type `MethodBoolInvalid` should return `bool`, returned type `int`"
+# https://docs.python.org/3/reference/datamodel.html#object.__bool__
 class MethodBoolInvalid:
     def __bool__(self) -> int:
         return 0
 
-# error: [unsupported-operator] "Method __bool__ for type `MethodBoolInvalid` should return `bool`, returned type `int`"
 # revealed: bool
 reveal_type(not MethodBoolInvalid())
-
-class MethodLenInvalid:
-    def __len__(self) -> float:
-        return 0.0
-
-# error: [unsupported-operator] "Method __len__ for type `MethodLenInvalid` should return `int`, returned type `float`"
-# revealed: bool
-reveal_type(not MethodLenInvalid())
 ```

@@ -1197,14 +1197,26 @@ impl<'db> Type<'db> {
                 // TODO: see above
                 Truthiness::Ambiguous
             }
-            Type::Instance(InstanceType { class }) => {
-                // TODO: lookup `__bool__` and `__len__` methods on the instance's class
-                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                // For now, we only special-case some builtin classes
+            instance_ty @ Type::Instance(InstanceType { class }) => {
                 if class.is_known(db, KnownClass::NoneType) {
                     Truthiness::AlwaysFalse
                 } else {
-                    Truthiness::Ambiguous
+                    // We only check the return value of __bool__ method for truth testing.
+                    // Since the __bool__ method can take priority over __len__ we cannot rely on
+                    // the value of __len__ alone. One example is when a class has a __len__ that
+                    // is 0 but a subclass overrides __bool__ in this case the subclass truth
+                    // testing should be true.
+                    if let Some(bool_rt) = instance_ty
+                        .call_dunder(db, "__bool__", &[*instance_ty])
+                        .return_ty(db)
+                    {
+                        match bool_rt {
+                            Type::BooleanLiteral(b) => b.into(),
+                            _ => Truthiness::Ambiguous,
+                        }
+                    } else {
+                        Truthiness::Ambiguous
+                    }
                 }
             }
             Type::KnownInstance(known_instance) => known_instance.bool(),
