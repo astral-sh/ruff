@@ -20,7 +20,7 @@ use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, HasTy, Module, Program, SemanticModel};
+use crate::{Db, FxOrderSet, Module, Program};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -191,6 +191,8 @@ fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
 ///
+/// Supports expressions that are evaluated within a type-params sub-scope.
+///
 /// ## Panics
 /// If the given expression is not a sub-expression of the given [`Definition`].
 fn definition_expression_ty<'db>(
@@ -198,12 +200,22 @@ fn definition_expression_ty<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let expr_id = expression.scoped_ast_id(db, definition.scope(db));
-    let inference = infer_definition_types(db, definition);
-    if let Some(ty) = inference.try_expression_ty(expr_id) {
-        ty
+    let file = definition.file(db);
+    let index = semantic_index(db, file);
+    let file_scope = index.expression_scope_id(expression);
+    let scope = file_scope.to_scope_id(db, file);
+    let expr_id = expression.scoped_ast_id(db, scope);
+    if scope == definition.scope(db) {
+        // expression is in the definition scope
+        let inference = infer_definition_types(db, definition);
+        if let Some(ty) = inference.try_expression_ty(expr_id) {
+            ty
+        } else {
+            infer_deferred_types(db, definition).expression_ty(expr_id)
+        }
     } else {
-        infer_deferred_types(db, definition).expression_ty(expr_id)
+        // expression is in a type-params sub-scope
+        infer_scope_types(db, scope).expression_ty(expr_id)
     }
 }
 
@@ -2422,26 +2434,13 @@ impl<'db> Class<'db> {
     fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let class_stmt = self.node(db);
 
-        if class_stmt.type_params.is_some() {
-            // when we have a specialized scope, we'll look up the inference
-            // within that scope
-            let model = SemanticModel::new(db, self.file(db));
+        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
 
-            class_stmt
-                .bases()
-                .iter()
-                .map(|base| base.ty(&model))
-                .collect()
-        } else {
-            // Otherwise, we can do the lookup based on the definition scope
-            let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
-
-            class_stmt
-                .bases()
-                .iter()
-                .map(|base_node| definition_expression_ty(db, class_definition, base_node))
-                .collect()
-        }
+        class_stmt
+            .bases()
+            .iter()
+            .map(|base_node| definition_expression_ty(db, class_definition, base_node))
+            .collect()
     }
 
     fn file(self, db: &dyn Db) -> File {
@@ -2502,16 +2501,12 @@ impl<'db> Class<'db> {
             .as_ref()?
             .find_keyword("metaclass")?
             .value;
-        Some(if class_stmt.type_params.is_some() {
-            // when we have a specialized scope, we'll look up the inference
-            // within that scope
-            let model = SemanticModel::new(db, self.file(db));
-            metaclass_node.ty(&model)
-        } else {
-            // Otherwise, we can do the lookup based on the definition scope
-            let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
-            definition_expression_ty(db, class_definition, metaclass_node)
-        })
+        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+        Some(definition_expression_ty(
+            db,
+            class_definition,
+            metaclass_node,
+        ))
     }
 
     /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
