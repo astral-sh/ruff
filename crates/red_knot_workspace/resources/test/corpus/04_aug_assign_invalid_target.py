@@ -1,1 +1,1 @@
-../../../../ruff_python_parser/resources/inline/err/ann_assign_stmt_invalid_target.py
+../../../../ruff_python_parser/resources/invalid/statements/invalid_augmented_assignment_target.py
