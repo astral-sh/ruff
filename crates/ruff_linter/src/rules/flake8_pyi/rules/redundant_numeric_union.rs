@@ -77,7 +77,7 @@ impl Violation for RedundantNumericUnion {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove duplicates".to_string())
+        Some("Remove redundant type".to_string())
     }
 }
 
