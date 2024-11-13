@@ -171,7 +171,7 @@ impl ExpectedDocstringKind {
     /// Returns the semantic model flag that represents the current docstring state.
     const fn as_flag(self) -> SemanticModelFlags {
         match self {
-            ExpectedDocstringKind::Attribute => SemanticModelFlags::empty(),
+            ExpectedDocstringKind::Attribute => SemanticModelFlags::ATTRIBUTE_DOCSTRING,
             _ => SemanticModelFlags::PEP_257_DOCSTRING,
         }
     }
