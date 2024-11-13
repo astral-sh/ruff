@@ -1203,30 +1203,31 @@ impl<'db> Type<'db> {
                 } else {
                     // We only check the `__bool__` method for truth testing, even though at
                     // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
-                    // and a subclass could add a `__bool__` method.
+                    // and a subclass could add a `__bool__` method. We don't use
+                    // `Type::call_dunder` here because of the need to check for `__bool__ = bool`.
 
-                    // Check if the class has `__bool__ = bool` in the definition and avoid
-                    // infinite recursion, since `Type::call` on `bool` will call `Type::bool`
-                    // on the argument.
-                    let bool_method = instance_ty.to_meta_type(db).member(db, "__bool__");
+                    // Don't trust a maybe-unbound `__bool__` method.
+                    let Symbol::Type(bool_method, Boundness::Bound) =
+                        instance_ty.to_meta_type(db).member(db, "__bool__")
+                    else {
+                        return Truthiness::Ambiguous;
+                    };
+
+                    // Check if the class has `__bool__ = bool` and avoid infinite recursion, since
+                    // `Type::call` on `bool` will call `Type::bool` on the argument.
                     if bool_method
-                        .ignore_possibly_unbound()
-                        .is_some_and(|method_ty| {
-                            method_ty.into_class_literal().is_some_and(
-                                |ClassLiteralType { class }| class.is_known(db, KnownClass::Bool),
-                            )
+                        .into_class_literal()
+                        .is_some_and(|ClassLiteralType { class }| {
+                            class.is_known(db, KnownClass::Bool)
                         })
                     {
                         return Truthiness::Ambiguous;
                     }
-                    if let Some(bool_rt) = instance_ty
-                        .call_dunder(db, "__bool__", &[*instance_ty])
-                        .return_ty(db)
+
+                    if let Some(Type::BooleanLiteral(bool_val)) =
+                        bool_method.call(db, &[*instance_ty]).return_ty(db)
                     {
-                        match bool_rt {
-                            Type::BooleanLiteral(b) => b.into(),
-                            _ => Truthiness::Ambiguous,
-                        }
+                        bool_val.into()
                     } else {
                         Truthiness::Ambiguous
                     }
