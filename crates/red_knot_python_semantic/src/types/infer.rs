@@ -425,6 +425,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             NodeWithScopeKind::FunctionTypeParameters(function) => {
                 self.infer_function_type_params(function.node());
             }
+            NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
+                self.infer_type_alias_type_params(type_alias.node());
+            }
             NodeWithScopeKind::ListComprehension(comprehension) => {
                 self.infer_list_comprehension_expression_scope(comprehension.node());
             }
@@ -588,6 +591,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_function_definition(function.node(), definition);
             }
             DefinitionKind::Class(class) => self.infer_class_definition(class.node(), definition),
+            DefinitionKind::TypeAlias(type_alias) => {
+                self.infer_type_alias_definition(type_alias.node(), definition);
+            }
             DefinitionKind::Import(import) => {
                 self.infer_import_definition(import.node(), definition);
             }
@@ -820,6 +826,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
+    }
+
+    fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias) {
+        let type_params = type_alias
+            .type_params
+            .as_ref()
+            .expect("type alias type params scope without type params");
+
+        self.infer_type_parameters(type_params);
+        // self.infer_optional_expression(type_alias.value.as_deref());
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -1073,6 +1089,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_expression(base);
             }
         }
+    }
+
+    fn infer_type_alias_definition(
+        &mut self,
+        type_alias: &ast::StmtTypeAlias,
+        definition: Definition<'db>,
+    ) {
+        let type_alias_ty = Type::Todo;
+
+        self.add_declaration_with_binding(
+            type_alias.into(),
+            definition,
+            type_alias_ty,
+            type_alias_ty,
+        );
     }
 
     fn infer_if_statement(&mut self, if_statement: &ast::StmtIf) {
@@ -1792,18 +1823,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_augmented_op(assignment, target_type, value_type)
     }
 
-    fn infer_type_alias_statement(&mut self, type_alias_statement: &ast::StmtTypeAlias) {
-        let ast::StmtTypeAlias {
-            range: _,
-            name,
-            type_params,
-            value,
-        } = type_alias_statement;
-        self.infer_expression(value);
-        self.infer_expression(name);
-        if let Some(type_params) = type_params {
-            self.infer_type_parameters(type_params);
-        }
+    fn infer_type_alias_statement(&mut self, node: &ast::StmtTypeAlias) {
+        self.infer_definition(node);
+        // let ast::StmtTypeAlias {
+        //     range: _,
+        //     name,
+        //     type_params,
+        //     value,
+        // } = type_alias_statement;
+        // // self.infer_expression(value);
+        // // self.infer_expression(name);
+        // if let Some(type_params) = type_params {
+        //     self.infer_type_parameters(type_params);
+        // }
     }
 
     fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {

@@ -589,6 +589,27 @@ where
                     },
                 );
             }
+            ast::Stmt::TypeAlias(type_alias) => {
+                let symbol = self.add_symbol(
+                    type_alias
+                        .name
+                        .as_name_expr()
+                        .expect("type alias name is a name expr")
+                        .id
+                        .clone(),
+                );
+                self.add_definition(symbol, type_alias);
+
+                self.with_type_params(
+                    NodeWithScopeRef::TypeAliasTypeParameters(type_alias),
+                    type_alias.type_params.as_ref(),
+                    |builder| {
+                        builder.push_scope(NodeWithScopeRef::TypeAliasTypeParameters(type_alias));
+                        builder.visit_expr(&type_alias.value);
+                        builder.pop_scope()
+                    },
+                );
+            }
             ast::Stmt::Import(node) => {
                 for alias in &node.names {
                     let symbol_name = if let Some(asname) = &alias.asname {
