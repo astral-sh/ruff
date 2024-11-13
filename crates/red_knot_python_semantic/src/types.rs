@@ -1204,15 +1204,19 @@ impl<'db> Type<'db> {
                     // We only check the `__bool__` method for truth testing, even though at
                     // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
                     // and a subclass could add a `__bool__` method.
-                    let bool_method = instance_ty.to_meta_type(db).member(db, "__bool__");
+
                     // Check if the class has `__bool__ = bool` in the definition and avoid
-                    // recursion
-                    if let Symbol::Type(Type::ClassLiteral(ClassLiteralType { class }), _) =
-                        bool_method
-                    {
-                        if class.name(db) == "bool" {
-                            return Truthiness::Ambiguous;
-                        }
+                    // infinite recursion, since `Type::call` on `bool` will call `Type::bool`
+                    // on the argument.
+                    let bool_method = instance_ty.to_meta_type(db).member(db, "__bool__");
+                    if bool_method.as_type().is_some_and(|method_ty| {
+                        method_ty
+                            .into_class_literal()
+                            .is_some_and(|ClassLiteralType { class }| {
+                                class.is_known(db, KnownClass::Bool)
+                            })
+                    }) {
+                        return Truthiness::Ambiguous;
                     }
                     if let Some(bool_rt) = instance_ty
                         .call_dunder(db, "__bool__", &[*instance_ty])
