@@ -2502,11 +2502,8 @@ impl<'db> Class<'db> {
             .find_keyword("metaclass")?
             .value;
         let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
-        Some(definition_expression_ty(
-            db,
-            class_definition,
-            metaclass_node,
-        ))
+        let metaclass_ty = definition_expression_ty(db, class_definition, metaclass_node);
+        Some(metaclass_ty)
     }
 
     /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
