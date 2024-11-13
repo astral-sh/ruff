@@ -1209,8 +1209,10 @@ impl<'db> Type<'db> {
                     let bool_method = instance_ty.to_meta_type(db).member(db, "__bool__");
                     // Check if the class has `__bool__ = bool` in the definition and avoid
                     // recursion
-                    if let Symbol::Type(t, _) = bool_method {
-                        if let Type::ClassLiteral(class) = t {
+                    if let Symbol::Type(Type::ClassLiteral(ClassLiteralType { class }), _) =
+                        bool_method
+                    {
+                        if class.name(db) == "bool" {
                             return Truthiness::Ambiguous;
                         }
                     }
