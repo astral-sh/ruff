@@ -24,9 +24,9 @@ enum SpecialComment {
 
     /// `# fmt: on`, `# fmt: off`, `fmt: skip`
     Fmt(String),
-    /// `# isort: skip_file`
+    /// `# isort: skip`, `# isort: skip_file`
     Isort(String),
-    /// `# mypy: ignore-errors`
+    /// `# ruff: isort: skip`, `# ruff: isort: skip_file`
     RuffIsort(String),
     /// `# type: int`, `# type: ignore`
     Type(String),
@@ -316,7 +316,7 @@ fn check_composite_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, range_
     }
 }
 
-/// RUF104
+/// RUF037
 pub(crate) fn unformatted_special_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,

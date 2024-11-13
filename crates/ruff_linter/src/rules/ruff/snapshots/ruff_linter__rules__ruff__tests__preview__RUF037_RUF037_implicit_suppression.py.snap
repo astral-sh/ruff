@@ -2,12 +2,12 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF104_implicit_suppression.py:6:3: RUF104 [*] Unformatted special comment
+RUF037_implicit_suppression.py:6:3: RUF037 [*] Unformatted special comment
   |
 4 | ###
 5 | 
 6 | # ruff:noqa
-  |   ^^^^ RUF104
+  |   ^^^^ RUF037
 7 | 
 8 | #noqa:A123
   |
@@ -22,12 +22,12 @@ RUF104_implicit_suppression.py:6:3: RUF104 [*] Unformatted special comment
 7 7 | 
 8 8 | #noqa:A123
 
-RUF104_implicit_suppression.py:8:2: RUF104 [*] Unformatted special comment
+RUF037_implicit_suppression.py:8:2: RUF037 [*] Unformatted special comment
   |
 6 | # ruff:noqa
 7 | 
 8 | #noqa:A123
-  |  ^^^^ RUF104
+  |  ^^^^ RUF037
   |
   = help: Format comment
 

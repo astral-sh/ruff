@@ -1,5 +1,5 @@
 ###
-# Both of these should trigger RUF104
+# Both of these should trigger RUF037
 # as it is not explicitly suppressed.
 ###
 

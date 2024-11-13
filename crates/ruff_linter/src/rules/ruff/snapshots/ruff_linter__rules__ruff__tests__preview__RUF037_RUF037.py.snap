@@ -2,12 +2,12 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF104.py:34:3: RUF104 [*] Unformatted special comment
+RUF037.py:34:3: RUF037 [*] Unformatted special comment
    |
 32 | # type: list[str]
 33 | 
 34 | # noqa:A123
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 35 | #noqa:   A123
 36 | #    type:ignore
    |
@@ -23,11 +23,11 @@ RUF104.py:34:3: RUF104 [*] Unformatted special comment
 36 36 | #    type:ignore
 37 37 | #type:	int
 
-RUF104.py:35:2: RUF104 [*] Unformatted special comment
+RUF037.py:35:2: RUF037 [*] Unformatted special comment
    |
 34 | # noqa:A123
 35 | #noqa:   A123
-   |  ^^^^ RUF104
+   |  ^^^^ RUF037
 36 | #    type:ignore
 37 | #type:  int
    |
@@ -43,12 +43,12 @@ RUF104.py:35:2: RUF104 [*] Unformatted special comment
 37 37 | #type:	int
 38 38 | # fmt:off
 
-RUF104.py:36:6: RUF104 [*] Unformatted special comment
+RUF037.py:36:6: RUF037 [*] Unformatted special comment
    |
 34 | # noqa:A123
 35 | #noqa:   A123
 36 | #    type:ignore
-   |      ^^^^ RUF104
+   |      ^^^^ RUF037
 37 | #type:  int
 38 | # fmt:off
    |
@@ -64,12 +64,12 @@ RUF104.py:36:6: RUF104 [*] Unformatted special comment
 38 38 | # fmt:off
 39 39 | #fmt: on
 
-RUF104.py:37:2: RUF104 [*] Unformatted special comment
+RUF037.py:37:2: RUF037 [*] Unformatted special comment
    |
 35 | #noqa:   A123
 36 | #    type:ignore
 37 | #type:  int
-   |  ^^^^ RUF104
+   |  ^^^^ RUF037
 38 | # fmt:off
 39 | #fmt: on
    |
@@ -85,12 +85,12 @@ RUF104.py:37:2: RUF104 [*] Unformatted special comment
 39 39 | #fmt: on
 40 40 | # 	 fmt:	 skip
 
-RUF104.py:38:3: RUF104 [*] Unformatted special comment
+RUF037.py:38:3: RUF037 [*] Unformatted special comment
    |
 36 | #    type:ignore
 37 | #type:  int
 38 | # fmt:off
-   |   ^^^ RUF104
+   |   ^^^ RUF037
 39 | #fmt: on
 40 | #    fmt:    skip
    |
@@ -106,12 +106,12 @@ RUF104.py:38:3: RUF104 [*] Unformatted special comment
 40 40 | # 	 fmt:	 skip
 41 41 | # isort:skip
 
-RUF104.py:39:2: RUF104 [*] Unformatted special comment
+RUF037.py:39:2: RUF037 [*] Unformatted special comment
    |
 37 | #type:  int
 38 | # fmt:off
 39 | #fmt: on
-   |  ^^^ RUF104
+   |  ^^^ RUF037
 40 | #    fmt:    skip
 41 | # isort:skip
    |
@@ -127,12 +127,12 @@ RUF104.py:39:2: RUF104 [*] Unformatted special comment
 41 41 | # isort:skip
 42 42 | # isort:skip_file
 
-RUF104.py:40:5: RUF104 [*] Unformatted special comment
+RUF037.py:40:5: RUF037 [*] Unformatted special comment
    |
 38 | # fmt:off
 39 | #fmt: on
 40 | #    fmt:    skip
-   |      ^^^ RUF104
+   |      ^^^ RUF037
 41 | # isort:skip
 42 | # isort:skip_file
    |
@@ -148,12 +148,12 @@ RUF104.py:40:5: RUF104 [*] Unformatted special comment
 42 42 | # isort:skip_file
 43 43 | # ruff: isort:skip
 
-RUF104.py:41:3: RUF104 [*] Unformatted special comment
+RUF037.py:41:3: RUF037 [*] Unformatted special comment
    |
 39 | #fmt: on
 40 | #    fmt:    skip
 41 | # isort:skip
-   |   ^^^^^ RUF104
+   |   ^^^^^ RUF037
 42 | # isort:skip_file
 43 | # ruff: isort:skip
    |
@@ -169,12 +169,12 @@ RUF104.py:41:3: RUF104 [*] Unformatted special comment
 43 43 | # ruff: isort:skip
 44 44 | # ruff: isort:skip_file
 
-RUF104.py:42:3: RUF104 [*] Unformatted special comment
+RUF037.py:42:3: RUF037 [*] Unformatted special comment
    |
 40 | #    fmt:    skip
 41 | # isort:skip
 42 | # isort:skip_file
-   |   ^^^^^ RUF104
+   |   ^^^^^ RUF037
 43 | # ruff: isort:skip
 44 | # ruff: isort:skip_file
    |
@@ -190,12 +190,12 @@ RUF104.py:42:3: RUF104 [*] Unformatted special comment
 44 44 | # ruff: isort:skip_file
 45 45 | #    type:			ignore
 
-RUF104.py:43:3: RUF104 [*] Unformatted special comment
+RUF037.py:43:3: RUF037 [*] Unformatted special comment
    |
 41 | # isort:skip
 42 | # isort:skip_file
 43 | # ruff: isort:skip
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 44 | # ruff: isort:skip_file
 45 | #    type:          ignore
    |
@@ -211,12 +211,12 @@ RUF104.py:43:3: RUF104 [*] Unformatted special comment
 45 45 | #    type:			ignore
 46 46 | #	 	 	type:		 	int
 
-RUF104.py:44:3: RUF104 [*] Unformatted special comment
+RUF037.py:44:3: RUF037 [*] Unformatted special comment
    |
 42 | # isort:skip_file
 43 | # ruff: isort:skip
 44 | # ruff: isort:skip_file
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 45 | #    type:          ignore
 46 | #           type:           int
    |
@@ -232,12 +232,12 @@ RUF104.py:44:3: RUF104 [*] Unformatted special comment
 46 46 | #	 	 	type:		 	int
 47 47 | 
 
-RUF104.py:45:6: RUF104 [*] Unformatted special comment
+RUF037.py:45:6: RUF037 [*] Unformatted special comment
    |
 43 | # ruff: isort:skip
 44 | # ruff: isort:skip_file
 45 | #    type:          ignore
-   |      ^^^^ RUF104
+   |      ^^^^ RUF037
 46 | #           type:           int
    |
    = help: Format comment
@@ -252,12 +252,12 @@ RUF104.py:45:6: RUF104 [*] Unformatted special comment
 47 47 | 
 48 48 | # NoQA: A123, B456
 
-RUF104.py:46:7: RUF104 [*] Unformatted special comment
+RUF037.py:46:7: RUF037 [*] Unformatted special comment
    |
 44 | # ruff: isort:skip_file
 45 | #    type:          ignore
 46 | #           type:           int
-   |             ^^^^ RUF104
+   |             ^^^^ RUF037
 47 | 
 48 | # NoQA: A123, B456
    |
@@ -273,12 +273,12 @@ RUF104.py:46:7: RUF104 [*] Unformatted special comment
 48 48 | # NoQA: A123, B456
 49 49 | # ruff: NoQA: A123, B456
 
-RUF104.py:48:3: RUF104 [*] Unformatted special comment
+RUF037.py:48:3: RUF037 [*] Unformatted special comment
    |
 46 | #           type:           int
 47 | 
 48 | # NoQA: A123, B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 49 | # ruff: NoQA: A123, B456
 50 | # flake8: NoQA: A123, B456
    |
@@ -294,11 +294,11 @@ RUF104.py:48:3: RUF104 [*] Unformatted special comment
 50 50 | # flake8: NoQA: A123, B456
 51 51 | 
 
-RUF104.py:49:3: RUF104 [*] Unformatted special comment
+RUF037.py:49:3: RUF037 [*] Unformatted special comment
    |
 48 | # NoQA: A123, B456
 49 | # ruff: NoQA: A123, B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 50 | # flake8: NoQA: A123, B456
    |
    = help: Format comment
@@ -313,12 +313,12 @@ RUF104.py:49:3: RUF104 [*] Unformatted special comment
 51 51 | 
 52 52 | # noqa: A123 B456
 
-RUF104.py:50:3: RUF104 [*] Unformatted special comment
+RUF037.py:50:3: RUF037 [*] Unformatted special comment
    |
 48 | # NoQA: A123, B456
 49 | # ruff: NoQA: A123, B456
 50 | # flake8: NoQA: A123, B456
-   |   ^^^^^^ RUF104
+   |   ^^^^^^ RUF037
 51 | 
 52 | # noqa: A123 B456
    |
@@ -334,12 +334,12 @@ RUF104.py:50:3: RUF104 [*] Unformatted special comment
 52 52 | # noqa: A123 B456
 53 53 | # ruff: noqa: A123 B456
 
-RUF104.py:52:3: RUF104 [*] Unformatted special comment
+RUF037.py:52:3: RUF037 [*] Unformatted special comment
    |
 50 | # flake8: NoQA: A123, B456
 51 | 
 52 | # noqa: A123 B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 53 | # ruff: noqa: A123 B456
 54 | # flake8: noqa: A123 B456
    |
@@ -355,11 +355,11 @@ RUF104.py:52:3: RUF104 [*] Unformatted special comment
 54 54 | # flake8: noqa: A123 B456
 55 55 | # noqa: A123,B456
 
-RUF104.py:53:3: RUF104 [*] Unformatted special comment
+RUF037.py:53:3: RUF037 [*] Unformatted special comment
    |
 52 | # noqa: A123 B456
 53 | # ruff: noqa: A123 B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 54 | # flake8: noqa: A123 B456
 55 | # noqa: A123,B456
    |
@@ -375,12 +375,12 @@ RUF104.py:53:3: RUF104 [*] Unformatted special comment
 55 55 | # noqa: A123,B456
 56 56 | # ruff: noqa: A123,B456
 
-RUF104.py:54:3: RUF104 [*] Unformatted special comment
+RUF037.py:54:3: RUF037 [*] Unformatted special comment
    |
 52 | # noqa: A123 B456
 53 | # ruff: noqa: A123 B456
 54 | # flake8: noqa: A123 B456
-   |   ^^^^^^ RUF104
+   |   ^^^^^^ RUF037
 55 | # noqa: A123,B456
 56 | # ruff: noqa: A123,B456
    |
@@ -396,12 +396,12 @@ RUF104.py:54:3: RUF104 [*] Unformatted special comment
 56 56 | # ruff: noqa: A123,B456
 57 57 | # flake8: noqa: A123,B456
 
-RUF104.py:55:3: RUF104 [*] Unformatted special comment
+RUF037.py:55:3: RUF037 [*] Unformatted special comment
    |
 53 | # ruff: noqa: A123 B456
 54 | # flake8: noqa: A123 B456
 55 | # noqa: A123,B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 56 | # ruff: noqa: A123,B456
 57 | # flake8: noqa: A123,B456
    |
@@ -417,12 +417,12 @@ RUF104.py:55:3: RUF104 [*] Unformatted special comment
 57 57 | # flake8: noqa: A123,B456
 58 58 | # noqa: A123,,B456
 
-RUF104.py:56:3: RUF104 [*] Unformatted special comment
+RUF037.py:56:3: RUF037 [*] Unformatted special comment
    |
 54 | # flake8: noqa: A123 B456
 55 | # noqa: A123,B456
 56 | # ruff: noqa: A123,B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 57 | # flake8: noqa: A123,B456
 58 | # noqa: A123,,B456
    |
@@ -438,12 +438,12 @@ RUF104.py:56:3: RUF104 [*] Unformatted special comment
 58 58 | # noqa: A123,,B456
 59 59 | # noqa: A123 , 	,	 	B456
 
-RUF104.py:57:3: RUF104 [*] Unformatted special comment
+RUF037.py:57:3: RUF037 [*] Unformatted special comment
    |
 55 | # noqa: A123,B456
 56 | # ruff: noqa: A123,B456
 57 | # flake8: noqa: A123,B456
-   |   ^^^^^^ RUF104
+   |   ^^^^^^ RUF037
 58 | # noqa: A123,,B456
 59 | # noqa: A123 ,  ,       B456
    |
@@ -459,12 +459,12 @@ RUF104.py:57:3: RUF104 [*] Unformatted special comment
 59 59 | # noqa: A123 , 	,	 	B456
 60 60 | # noqa: A123	B456
 
-RUF104.py:58:3: RUF104 [*] Unformatted special comment
+RUF037.py:58:3: RUF037 [*] Unformatted special comment
    |
 56 | # ruff: noqa: A123,B456
 57 | # flake8: noqa: A123,B456
 58 | # noqa: A123,,B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 59 | # noqa: A123 ,  ,       B456
 60 | # noqa: A123    B456
    |
@@ -480,12 +480,12 @@ RUF104.py:58:3: RUF104 [*] Unformatted special comment
 60 60 | # noqa: A123	B456
 61 61 | # noqa: A123			B456
 
-RUF104.py:59:3: RUF104 [*] Unformatted special comment
+RUF037.py:59:3: RUF037 [*] Unformatted special comment
    |
 57 | # flake8: noqa: A123,B456
 58 | # noqa: A123,,B456
 59 | # noqa: A123 ,  ,       B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 60 | # noqa: A123    B456
 61 | # noqa: A123            B456
    |
@@ -501,12 +501,12 @@ RUF104.py:59:3: RUF104 [*] Unformatted special comment
 61 61 | # noqa: A123			B456
 62 62 | # noqa: A123				B456
 
-RUF104.py:60:3: RUF104 [*] Unformatted special comment
+RUF037.py:60:3: RUF037 [*] Unformatted special comment
    |
 58 | # noqa: A123,,B456
 59 | # noqa: A123 ,  ,       B456
 60 | # noqa: A123    B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 61 | # noqa: A123            B456
 62 | # noqa: A123                B456
    |
@@ -522,12 +522,12 @@ RUF104.py:60:3: RUF104 [*] Unformatted special comment
 62 62 | # noqa: A123				B456
 63 63 | # noqa: A123 ,B456
 
-RUF104.py:61:3: RUF104 [*] Unformatted special comment
+RUF037.py:61:3: RUF037 [*] Unformatted special comment
    |
 59 | # noqa: A123 ,  ,       B456
 60 | # noqa: A123    B456
 61 | # noqa: A123            B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 62 | # noqa: A123                B456
 63 | # noqa: A123 ,B456
    |
@@ -543,12 +543,12 @@ RUF104.py:61:3: RUF104 [*] Unformatted special comment
 63 63 | # noqa: A123 ,B456
 64 64 | # ruff: noqa: A123	B456
 
-RUF104.py:62:3: RUF104 [*] Unformatted special comment
+RUF037.py:62:3: RUF037 [*] Unformatted special comment
    |
 60 | # noqa: A123    B456
 61 | # noqa: A123            B456
 62 | # noqa: A123                B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 63 | # noqa: A123 ,B456
 64 | # ruff: noqa: A123  B456
    |
@@ -564,12 +564,12 @@ RUF104.py:62:3: RUF104 [*] Unformatted special comment
 64 64 | # ruff: noqa: A123	B456
 65 65 | # flake8: noqa: A123   B456
 
-RUF104.py:63:3: RUF104 [*] Unformatted special comment
+RUF037.py:63:3: RUF037 [*] Unformatted special comment
    |
 61 | # noqa: A123            B456
 62 | # noqa: A123                B456
 63 | # noqa: A123 ,B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 64 | # ruff: noqa: A123  B456
 65 | # flake8: noqa: A123   B456
    |
@@ -585,12 +585,12 @@ RUF104.py:63:3: RUF104 [*] Unformatted special comment
 65 65 | # flake8: noqa: A123   B456
 66 66 | 
 
-RUF104.py:64:3: RUF104 [*] Unformatted special comment
+RUF037.py:64:3: RUF037 [*] Unformatted special comment
    |
 62 | # noqa: A123                B456
 63 | # noqa: A123 ,B456
 64 | # ruff: noqa: A123  B456
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
 65 | # flake8: noqa: A123   B456
    |
    = help: Format comment
@@ -605,12 +605,12 @@ RUF104.py:64:3: RUF104 [*] Unformatted special comment
 66 66 | 
 67 67 | 
 
-RUF104.py:65:3: RUF104 [*] Unformatted special comment
+RUF037.py:65:3: RUF037 [*] Unformatted special comment
    |
 63 | # noqa: A123 ,B456
 64 | # ruff: noqa: A123  B456
 65 | # flake8: noqa: A123   B456
-   |   ^^^^^^ RUF104
+   |   ^^^^^^ RUF037
    |
    = help: Format comment
 
@@ -624,12 +624,12 @@ RUF104.py:65:3: RUF104 [*] Unformatted special comment
 67 67 | 
 68 68 | # type: ignore  # noqa: A123, B456
 
-RUF104.py:70:13: RUF104 [*] Unformatted special comment
+RUF037.py:70:13: RUF037 [*] Unformatted special comment
    |
 68 | # type: ignore  # noqa: A123, B456
 69 | 
 70 | #isort:skip#noqa:A123
-   |             ^^^^ RUF104
+   |             ^^^^ RUF037
 71 | 
 72 | # fmt:off#   noqa: A123
    |
@@ -645,12 +645,12 @@ RUF104.py:70:13: RUF104 [*] Unformatted special comment
 72 72 | # fmt:off#   noqa: A123
 73 73 | 
 
-RUF104.py:72:3: RUF104 [*] Unformatted special comment
+RUF037.py:72:3: RUF037 [*] Unformatted special comment
    |
 70 | #isort:skip#noqa:A123
 71 | 
 72 | # fmt:off#   noqa: A123
-   |   ^^^ RUF104
+   |   ^^^ RUF037
 73 | 
 74 | # noqa:A123 - Lorem ipsum dolor sit amet
    |
@@ -665,12 +665,12 @@ RUF104.py:72:3: RUF104 [*] Unformatted special comment
 73 73 | 
 74 74 | # noqa:A123 - Lorem ipsum dolor sit amet
 
-RUF104.py:72:14: RUF104 [*] Unformatted special comment
+RUF037.py:72:14: RUF037 [*] Unformatted special comment
    |
 70 | #isort:skip#noqa:A123
 71 | 
 72 | # fmt:off#   noqa: A123
-   |              ^^^^ RUF104
+   |              ^^^^ RUF037
 73 | 
 74 | # noqa:A123 - Lorem ipsum dolor sit amet
    |
@@ -685,12 +685,12 @@ RUF104.py:72:14: RUF104 [*] Unformatted special comment
 73 73 | 
 74 74 | # noqa:A123 - Lorem ipsum dolor sit amet
 
-RUF104.py:74:3: RUF104 [*] Unformatted special comment
+RUF037.py:74:3: RUF037 [*] Unformatted special comment
    |
 72 | # fmt:off#   noqa: A123
 73 | 
 74 | # noqa:A123 - Lorem ipsum dolor sit amet
-   |   ^^^^ RUF104
+   |   ^^^^ RUF037
    |
    = help: Format comment
 

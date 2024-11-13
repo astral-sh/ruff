@@ -388,18 +388,18 @@ mod tests {
 
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035.py"))]
-    #[test_case(Rule::UnformattedSpecialComment, Path::new("RUF104.py"))]
+    #[test_case(Rule::UnformattedSpecialComment, Path::new("RUF037.py"))]
     #[test_case(
         Rule::UnformattedSpecialComment,
-        Path::new("RUF104_implicit_suppression.py")
+        Path::new("RUF037_implicit_suppression.py")
     )]
     #[test_case(
         Rule::UnformattedSpecialComment,
-        Path::new("RUF104_explicit_suppression.py")
+        Path::new("RUF037_explicit_suppression.py")
     )]
     #[test_case(
         Rule::UnformattedSpecialComment,
-        Path::new("RUF104_empty_suppressions.py")
+        Path::new("RUF037_empty_suppressions.py")
     )]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(

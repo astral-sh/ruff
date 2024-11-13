@@ -2,12 +2,12 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF104_empty_suppressions.py:5:2: RUF104 [*] Unformatted special comment
+RUF037_empty_suppressions.py:5:2: RUF037 [*] Unformatted special comment
   |
 3 | ###
 4 | 
 5 | #noqa:
-  |  ^^^^ RUF104
+  |  ^^^^ RUF037
 6 | #ruff:noqa:
 7 | #flake8:noqa:
   |
@@ -22,11 +22,11 @@ RUF104_empty_suppressions.py:5:2: RUF104 [*] Unformatted special comment
 6 6 | #ruff:noqa:
 7 7 | #flake8:noqa:
 
-RUF104_empty_suppressions.py:6:2: RUF104 [*] Unformatted special comment
+RUF037_empty_suppressions.py:6:2: RUF037 [*] Unformatted special comment
   |
 5 | #noqa:
 6 | #ruff:noqa:
-  |  ^^^^ RUF104
+  |  ^^^^ RUF037
 7 | #flake8:noqa:
   |
   = help: Format comment
@@ -39,12 +39,12 @@ RUF104_empty_suppressions.py:6:2: RUF104 [*] Unformatted special comment
   6 |+# ruff: noqa:
 7 7 | #flake8:noqa:
 
-RUF104_empty_suppressions.py:7:2: RUF104 [*] Unformatted special comment
+RUF037_empty_suppressions.py:7:2: RUF037 [*] Unformatted special comment
   |
 5 | #noqa:
 6 | #ruff:noqa:
 7 | #flake8:noqa:
-  |  ^^^^^^ RUF104
+  |  ^^^^^^ RUF037
   |
   = help: Format comment
 
