@@ -88,11 +88,11 @@ def f():
 
 
 def f():
-    from typing import Annotated, Literal
+    from typing import Annotated
 
     from fastapi import Depends
 
     from .foo import get_foo
 
-    def test_annotated_literal_mixed_quotes(user: Annotated[str, Depends(get_foo)]):
+    def test_annotated_non_typing_reference(user: Annotated[str, Depends(get_foo)]):
         pass
