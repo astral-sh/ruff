@@ -1188,7 +1188,7 @@ impl<'db> Type<'db> {
             Type::Any | Type::Todo | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
-            Type::ClassLiteral(ClassLiteralType { class: _ }) => {
+            Type::ClassLiteral(_) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
