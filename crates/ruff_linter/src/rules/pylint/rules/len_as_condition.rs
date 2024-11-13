@@ -19,7 +19,7 @@ use ruff_text_size::Ranged;
 /// ```python
 /// fruits = ["orange", "apple"]
 ///
-/// if len(fruits):
+/// if len(fruits): #[len-as-condition]
 ///     print(fruits)
 /// ```
 ///
@@ -31,20 +31,17 @@ use ruff_text_size::Ranged;
 ///     print(fruits)
 /// ```
 #[violation]
-pub struct UseImplicitBooleanessNotLen {
+pub struct LenAsCondition {
     expression: SourceCodeSnippet,
 }
 
-impl AlwaysFixableViolation for UseImplicitBooleanessNotLen {
+impl AlwaysFixableViolation for LenAsCondition {
     #[derive_message_formats]
     fn message(&self) -> String {
         if let Some(expression) = self.expression.full_display() {
-            format!(
-                "Do not use `len({expression})` without comparison to determine if a sequence is empty"
-            )
+            format!("`len({expression})` without comparison used as condition")
         } else {
-            "Do not use `len(SEQUENCE)` without comparison to determine if a sequence is empty"
-                .to_string()
+            "`len(SEQUENCE)` without comparison used as condition".to_string()
         }
     }
 
@@ -54,7 +51,7 @@ impl AlwaysFixableViolation for UseImplicitBooleanessNotLen {
 }
 
 /// PLC1802
-pub(crate) fn use_implicit_booleaness_not_len(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn len_as_condition(checker: &mut Checker, call: &ExprCall) {
     let ExprCall {
         func, arguments, ..
     } = call;
@@ -82,7 +79,7 @@ pub(crate) fn use_implicit_booleaness_not_len(checker: &mut Checker, call: &Expr
     let replacement = checker.locator().slice(argument.range()).to_string();
 
     let mut diagnostic = Diagnostic::new(
-        UseImplicitBooleanessNotLen {
+        LenAsCondition {
             expression: SourceCodeSnippet::new(replacement.clone()),
         },
         call.range(),

@@ -1,0 +1,377 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+len_as_condition.py:1:4: PLC1802 [*] `len('TEST')` without comparison used as condition
+  |
+1 | if len('TEST'):  # [len-as-condition]
+  |    ^^^^^^^^^^^ PLC1802
+2 |     pass
+  |
+  = help: Remove `len`
+
+ℹ Safe fix
+1   |-if len('TEST'):  # [len-as-condition]
+  1 |+if 'TEST':  # [len-as-condition]
+2 2 |     pass
+3 3 | 
+4 4 | if not len('TEST'):  # [len-as-condition]
+
+len_as_condition.py:4:8: PLC1802 [*] `len('TEST')` without comparison used as condition
+  |
+2 |     pass
+3 | 
+4 | if not len('TEST'):  # [len-as-condition]
+  |        ^^^^^^^^^^^ PLC1802
+5 |     pass
+  |
+  = help: Remove `len`
+
+ℹ Safe fix
+1 1 | if len('TEST'):  # [len-as-condition]
+2 2 |     pass
+3 3 | 
+4   |-if not len('TEST'):  # [len-as-condition]
+  4 |+if not 'TEST':  # [len-as-condition]
+5 5 |     pass
+6 6 | 
+7 7 | z = []
+
+len_as_condition.py:8:10: PLC1802 [*] `len(['T', 'E', 'S', 'T'])` without comparison used as condition
+  |
+7 | z = []
+8 | if z and len(['T', 'E', 'S', 'T']):  # [len-as-condition]
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^ PLC1802
+9 |     pass
+  |
+  = help: Remove `len`
+
+ℹ Safe fix
+5 5 |     pass
+6 6 | 
+7 7 | z = []
+8   |-if z and len(['T', 'E', 'S', 'T']):  # [len-as-condition]
+  8 |+if z and ['T', 'E', 'S', 'T']:  # [len-as-condition]
+9 9 |     pass
+10 10 | 
+11 11 | if True or len('TEST'):  # [len-as-condition]
+
+len_as_condition.py:11:12: PLC1802 [*] `len('TEST')` without comparison used as condition
+   |
+ 9 |     pass
+10 | 
+11 | if True or len('TEST'):  # [len-as-condition]
+   |            ^^^^^^^^^^^ PLC1802
+12 |     pass
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+8  8  | if z and len(['T', 'E', 'S', 'T']):  # [len-as-condition]
+9  9  |     pass
+10 10 | 
+11    |-if True or len('TEST'):  # [len-as-condition]
+   11 |+if True or 'TEST':  # [len-as-condition]
+12 12 |     pass
+13 13 | 
+14 14 | if len('TEST') == 0:  # Should be fine
+
+len_as_condition.py:53:6: PLC1802 [*] `len('TEST')` without comparison used as condition
+   |
+51 | if z:
+52 |     pass
+53 | elif len('TEST'):  # [len-as-condition]
+   |      ^^^^^^^^^^^ PLC1802
+54 |     pass
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+50 50 | 
+51 51 | if z:
+52 52 |     pass
+53    |-elif len('TEST'):  # [len-as-condition]
+   53 |+elif 'TEST':  # [len-as-condition]
+54 54 |     pass
+55 55 | 
+56 56 | if z:
+
+len_as_condition.py:58:10: PLC1802 [*] `len('TEST')` without comparison used as condition
+   |
+56 | if z:
+57 |     pass
+58 | elif not len('TEST'):  # [len-as-condition]
+   |          ^^^^^^^^^^^ PLC1802
+59 |     pass
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+55 55 | 
+56 56 | if z:
+57 57 |     pass
+58    |-elif not len('TEST'):  # [len-as-condition]
+   58 |+elif not 'TEST':  # [len-as-condition]
+59 59 |     pass
+60 60 | 
+61 61 | while len('TEST'):  # [len-as-condition]
+
+len_as_condition.py:61:7: PLC1802 [*] `len('TEST')` without comparison used as condition
+   |
+59 |     pass
+60 | 
+61 | while len('TEST'):  # [len-as-condition]
+   |       ^^^^^^^^^^^ PLC1802
+62 |     pass
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+58 58 | elif not len('TEST'):  # [len-as-condition]
+59 59 |     pass
+60 60 | 
+61    |-while len('TEST'):  # [len-as-condition]
+   61 |+while 'TEST':  # [len-as-condition]
+62 62 |     pass
+63 63 | 
+64 64 | while not len('TEST'):  # [len-as-condition]
+
+len_as_condition.py:64:11: PLC1802 [*] `len('TEST')` without comparison used as condition
+   |
+62 |     pass
+63 | 
+64 | while not len('TEST'):  # [len-as-condition]
+   |           ^^^^^^^^^^^ PLC1802
+65 |     pass
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+61 61 | while len('TEST'):  # [len-as-condition]
+62 62 |     pass
+63 63 | 
+64    |-while not len('TEST'):  # [len-as-condition]
+   64 |+while not 'TEST':  # [len-as-condition]
+65 65 |     pass
+66 66 | 
+67 67 | while z and len('TEST'):  # [len-as-condition]
+
+len_as_condition.py:67:13: PLC1802 [*] `len('TEST')` without comparison used as condition
+   |
+65 |     pass
+66 | 
+67 | while z and len('TEST'):  # [len-as-condition]
+   |             ^^^^^^^^^^^ PLC1802
+68 |     pass
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+64 64 | while not len('TEST'):  # [len-as-condition]
+65 65 |     pass
+66 66 | 
+67    |-while z and len('TEST'):  # [len-as-condition]
+   67 |+while z and 'TEST':  # [len-as-condition]
+68 68 |     pass
+69 69 | 
+70 70 | while not len('TEST') and z:  # [len-as-condition]
+
+len_as_condition.py:70:11: PLC1802 [*] `len('TEST')` without comparison used as condition
+   |
+68 |     pass
+69 | 
+70 | while not len('TEST') and z:  # [len-as-condition]
+   |           ^^^^^^^^^^^ PLC1802
+71 |     pass
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+67 67 | while z and len('TEST'):  # [len-as-condition]
+68 68 |     pass
+69 69 | 
+70    |-while not len('TEST') and z:  # [len-as-condition]
+   70 |+while not 'TEST' and z:  # [len-as-condition]
+71 71 |     pass
+72 72 | 
+73 73 | assert len('TEST') > 0  # Should be fine
+
+len_as_condition.py:93:12: PLC1802 [*] `len(args)` without comparison used as condition
+   |
+92 | def github_issue_1331_v2(*args):
+93 |     assert len(args), args  # [len-as-condition]
+   |            ^^^^^^^^^ PLC1802
+94 | 
+95 | def github_issue_1331_v3(*args):
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+90 90 |     assert False, len(args)  # Should be fine
+91 91 | 
+92 92 | def github_issue_1331_v2(*args):
+93    |-    assert len(args), args  # [len-as-condition]
+   93 |+    assert args, args  # [len-as-condition]
+94 94 | 
+95 95 | def github_issue_1331_v3(*args):
+96 96 |     assert len(args) or z, args  # [len-as-condition]
+
+len_as_condition.py:96:12: PLC1802 [*] `len(args)` without comparison used as condition
+   |
+95 | def github_issue_1331_v3(*args):
+96 |     assert len(args) or z, args  # [len-as-condition]
+   |            ^^^^^^^^^ PLC1802
+97 | 
+98 | def github_issue_1331_v4(*args):
+   |
+   = help: Remove `len`
+
+ℹ Safe fix
+93 93 |     assert len(args), args  # [len-as-condition]
+94 94 | 
+95 95 | def github_issue_1331_v3(*args):
+96    |-    assert len(args) or z, args  # [len-as-condition]
+   96 |+    assert args or z, args  # [len-as-condition]
+97 97 | 
+98 98 | def github_issue_1331_v4(*args):
+99 99 |     assert z and len(args), args  # [len-as-condition]
+
+len_as_condition.py:99:18: PLC1802 [*] `len(args)` without comparison used as condition
+    |
+ 98 | def github_issue_1331_v4(*args):
+ 99 |     assert z and len(args), args  # [len-as-condition]
+    |                  ^^^^^^^^^ PLC1802
+100 | 
+101 | b = bool(len(z)) # [len-as-condition]
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+96  96  |     assert len(args) or z, args  # [len-as-condition]
+97  97  | 
+98  98  | def github_issue_1331_v4(*args):
+99      |-    assert z and len(args), args  # [len-as-condition]
+    99  |+    assert z and args, args  # [len-as-condition]
+100 100 | 
+101 101 | b = bool(len(z)) # [len-as-condition]
+102 102 | c = bool(len('TEST') or 42) # [len-as-condition]
+
+len_as_condition.py:101:10: PLC1802 [*] `len(z)` without comparison used as condition
+    |
+ 99 |     assert z and len(args), args  # [len-as-condition]
+100 | 
+101 | b = bool(len(z)) # [len-as-condition]
+    |          ^^^^^^ PLC1802
+102 | c = bool(len('TEST') or 42) # [len-as-condition]
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+98  98  | def github_issue_1331_v4(*args):
+99  99  |     assert z and len(args), args  # [len-as-condition]
+100 100 | 
+101     |-b = bool(len(z)) # [len-as-condition]
+    101 |+b = bool(z) # [len-as-condition]
+102 102 | c = bool(len('TEST') or 42) # [len-as-condition]
+103 103 | 
+104 104 | def github_issue_1879():
+
+len_as_condition.py:102:10: PLC1802 [*] `len('TEST')` without comparison used as condition
+    |
+101 | b = bool(len(z)) # [len-as-condition]
+102 | c = bool(len('TEST') or 42) # [len-as-condition]
+    |          ^^^^^^^^^^^ PLC1802
+103 | 
+104 | def github_issue_1879():
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+99  99  |     assert z and len(args), args  # [len-as-condition]
+100 100 | 
+101 101 | b = bool(len(z)) # [len-as-condition]
+102     |-c = bool(len('TEST') or 42) # [len-as-condition]
+    102 |+c = bool('TEST' or 42) # [len-as-condition]
+103 103 | 
+104 104 | def github_issue_1879():
+105 105 | 
+
+len_as_condition.py:124:12: PLC1802 [*] `len([t + 1 for t in []])` without comparison used as condition
+    |
+122 |     # assert len(ChildClassWithoutBool())  # [len-as-condition]
+123 |     # assert len(range(0))  # [len-as-condition]
+124 |     assert len([t + 1 for t in []])  # [len-as-condition]
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^ PLC1802
+125 |     assert len(u + 1 for u in [])  # [len-as-condition]
+126 |     assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+121 121 |     # assert len(ClassWithoutBool())  # [len-as-condition]
+122 122 |     # assert len(ChildClassWithoutBool())  # [len-as-condition]
+123 123 |     # assert len(range(0))  # [len-as-condition]
+124     |-    assert len([t + 1 for t in []])  # [len-as-condition]
+    124 |+    assert [t + 1 for t in []]  # [len-as-condition]
+125 125 |     assert len(u + 1 for u in [])  # [len-as-condition]
+126 126 |     assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+127 127 |     assert len(set((w + 1) for w in set()))  # [len-as-condition]
+
+len_as_condition.py:125:12: PLC1802 [*] `len(u + 1 for u in [])` without comparison used as condition
+    |
+123 |     # assert len(range(0))  # [len-as-condition]
+124 |     assert len([t + 1 for t in []])  # [len-as-condition]
+125 |     assert len(u + 1 for u in [])  # [len-as-condition]
+    |            ^^^^^^^^^^^^^^^^^^^^^^ PLC1802
+126 |     assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+127 |     assert len(set((w + 1) for w in set()))  # [len-as-condition]
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+122 122 |     # assert len(ChildClassWithoutBool())  # [len-as-condition]
+123 123 |     # assert len(range(0))  # [len-as-condition]
+124 124 |     assert len([t + 1 for t in []])  # [len-as-condition]
+125     |-    assert len(u + 1 for u in [])  # [len-as-condition]
+    125 |+    assert (u + 1 for u in [])  # [len-as-condition]
+126 126 |     assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+127 127 |     assert len(set((w + 1) for w in set()))  # [len-as-condition]
+128 128 | 
+
+len_as_condition.py:126:12: PLC1802 [*] `len({"1":(v + 1) for v in {}})` without comparison used as condition
+    |
+124 |     assert len([t + 1 for t in []])  # [len-as-condition]
+125 |     assert len(u + 1 for u in [])  # [len-as-condition]
+126 |     assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC1802
+127 |     assert len(set((w + 1) for w in set()))  # [len-as-condition]
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+123 123 |     # assert len(range(0))  # [len-as-condition]
+124 124 |     assert len([t + 1 for t in []])  # [len-as-condition]
+125 125 |     assert len(u + 1 for u in [])  # [len-as-condition]
+126     |-    assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+    126 |+    assert {"1":(v + 1) for v in {}}  # [len-as-condition]
+127 127 |     assert len(set((w + 1) for w in set()))  # [len-as-condition]
+128 128 | 
+129 129 | 
+
+len_as_condition.py:127:12: PLC1802 [*] `len(set((w + 1) for w in set()))` without comparison used as condition
+    |
+125 |     assert len(u + 1 for u in [])  # [len-as-condition]
+126 |     assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+127 |     assert len(set((w + 1) for w in set()))  # [len-as-condition]
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC1802
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+124 124 |     assert len([t + 1 for t in []])  # [len-as-condition]
+125 125 |     assert len(u + 1 for u in [])  # [len-as-condition]
+126 126 |     assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+127     |-    assert len(set((w + 1) for w in set()))  # [len-as-condition]
+    127 |+    assert set((w + 1) for w in set())  # [len-as-condition]
+128 128 | 
+129 129 | 
+130 130 |     # import numpy

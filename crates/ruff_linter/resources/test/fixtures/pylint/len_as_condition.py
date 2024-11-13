@@ -1,14 +1,14 @@
-if len('TEST'):  # [use-implicit-booleaness-not-len]
+if len('TEST'):  # [len-as-condition]
     pass
 
-if not len('TEST'):  # [use-implicit-booleaness-not-len]
+if not len('TEST'):  # [len-as-condition]
     pass
 
 z = []
-if z and len(['T', 'E', 'S', 'T']):  # [use-implicit-booleaness-not-len]
+if z and len(['T', 'E', 'S', 'T']):  # [len-as-condition]
     pass
 
-if True or len('TEST'):  # [use-implicit-booleaness-not-len]
+if True or len('TEST'):  # [len-as-condition]
     pass
 
 if len('TEST') == 0:  # Should be fine
@@ -50,24 +50,24 @@ if z or 10 > len('TEST') != 0:  # Should be fine
 
 if z:
     pass
-elif len('TEST'):  # [use-implicit-booleaness-not-len]
+elif len('TEST'):  # [len-as-condition]
     pass
 
 if z:
     pass
-elif not len('TEST'):  # [use-implicit-booleaness-not-len]
+elif not len('TEST'):  # [len-as-condition]
     pass
 
-while len('TEST'):  # [use-implicit-booleaness-not-len]
+while len('TEST'):  # [len-as-condition]
     pass
 
-while not len('TEST'):  # [use-implicit-booleaness-not-len]
+while not len('TEST'):  # [len-as-condition]
     pass
 
-while z and len('TEST'):  # [use-implicit-booleaness-not-len]
+while z and len('TEST'):  # [len-as-condition]
     pass
 
-while not len('TEST') and z:  # [use-implicit-booleaness-not-len]
+while not len('TEST') and z:  # [len-as-condition]
     pass
 
 assert len('TEST') > 0  # Should be fine
@@ -90,16 +90,16 @@ def github_issue_1331(*args):
     assert False, len(args)  # Should be fine
 
 def github_issue_1331_v2(*args):
-    assert len(args), args  # [use-implicit-booleaness-not-len]
+    assert len(args), args  # [len-as-condition]
 
 def github_issue_1331_v3(*args):
-    assert len(args) or z, args  # [use-implicit-booleaness-not-len]
+    assert len(args) or z, args  # [len-as-condition]
 
 def github_issue_1331_v4(*args):
-    assert z and len(args), args  # [use-implicit-booleaness-not-len]
+    assert z and len(args), args  # [len-as-condition]
 
-b = bool(len(z)) # [use-implicit-booleaness-not-len]
-c = bool(len('TEST') or 42) # [use-implicit-booleaness-not-len]
+b = bool(len(z)) # [len-as-condition]
+c = bool(len('TEST') or 42) # [len-as-condition]
 
 def github_issue_1879():
 
@@ -118,13 +118,13 @@ def github_issue_1879():
 
     # assert len(ClassWithBool())
     # assert len(ChildClassWithBool())
-    # assert len(ClassWithoutBool())  # [use-implicit-booleaness-not-len]
-    # assert len(ChildClassWithoutBool())  # [use-implicit-booleaness-not-len]
-    # assert len(range(0))  # [use-implicit-booleaness-not-len]
-    assert len([t + 1 for t in []])  # [use-implicit-booleaness-not-len]
-    assert len(u + 1 for u in [])  # [use-implicit-booleaness-not-len]
-    assert len({"1":(v + 1) for v in {}})  # [use-implicit-booleaness-not-len]
-    assert len(set((w + 1) for w in set()))  # [use-implicit-booleaness-not-len]
+    # assert len(ClassWithoutBool())  # [len-as-condition]
+    # assert len(ChildClassWithoutBool())  # [len-as-condition]
+    # assert len(range(0))  # [len-as-condition]
+    assert len([t + 1 for t in []])  # [len-as-condition]
+    assert len(u + 1 for u in [])  # [len-as-condition]
+    assert len({"1":(v + 1) for v in {}})  # [len-as-condition]
+    assert len(set((w + 1) for w in set()))  # [len-as-condition]
 
 
     # import numpy
@@ -165,9 +165,9 @@ def github_issue_1879():
     # def function_returning_function(r):
     #     return function_returning_generator(r)
 
-    # assert len(function_returning_list(z))  # [use-implicit-booleaness-not-len]
+    # assert len(function_returning_list(z))  # [len-as-condition]
     # assert len(function_returning_int(z))
-    # # This should raise a use-implicit-booleaness-not-len once astroid can infer it
+    # # This should raise a len-as-condition once astroid can infer it
     # # See https://github.com/pylint-dev/pylint/pull/3821#issuecomment-743771514
     # assert len(function_returning_generator(z))
     # assert len(function_returning_comprehension(z))

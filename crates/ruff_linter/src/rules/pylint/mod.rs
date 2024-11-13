@@ -219,10 +219,7 @@ mod tests {
         Rule::BadStaticmethodArgument,
         Path::new("bad_staticmethod_argument.py")
     )]
-    #[test_case(
-        Rule::UseImplicitBooleanessNotLen,
-        Path::new("use_implicit_booleaness_not_len.py")
-    )]
+    #[test_case(Rule::LenAsCondition, Path::new("len_as_condition.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
