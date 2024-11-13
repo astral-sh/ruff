@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Context};
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{GlobError, System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use thiserror::Error;
 
-use crate::workspace::pyproject::{PyProject, Workspace};
+use crate::workspace::pyproject::{PyProject, PyProjectError, Workspace};
 use crate::workspace::settings::{Configuration, WorkspaceSettings};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -29,25 +29,59 @@ pub struct PackageMetadata {
 }
 
 impl WorkspaceMetadata {
+    /// Creates a workspace that consists of a single package located at `root`.
+    pub fn single_package(name: Name, root: SystemPathBuf) -> Self {
+        let package = PackageMetadata {
+            name,
+            root: root.clone(),
+            configuration: Configuration::default(),
+        };
+
+        let packages = vec![package];
+        let settings = packages[0]
+            .configuration
+            .to_workspace_settings(&root, &packages);
+
+        Self {
+            root,
+            packages,
+            settings,
+        }
+    }
+
     /// Discovers the closest workspace at `path` and returns its metadata.
+    ///
+    /// 1. Traverse upwards in the `path`'s ancestor chain and find the first `pyproject.toml`.
+    /// 1. If the `pyproject.toml` contains no `knot.workspace` table, then keep traversing the `path`'s ancestor
+    ///    chain until we find one or reach the root.
+    /// 1. If we've found a workspace, then resolve the workspace's members and assert that the closest
+    ///    package (the first found package without a `knot.workspace` table is a member. If not, create
+    ///    a single package workspace for the closest package.
+    /// 1. If there's no `pyrpoject.toml` with a `knot.workspace` table, then create a single-package workspace.
+    /// 1. If no ancestor directory contains any `pyproject.toml`, create an ad-hoc workspace for `path`
+    ///    that consists of a single package and uses the default settings.
     pub fn discover(
         path: &SystemPath,
         system: &dyn System,
         base_configuration: Option<&Configuration>,
-    ) -> anyhow::Result<WorkspaceMetadata> {
-        assert!(
-            system.is_directory(path),
-            "Workspace root path must be a directory"
-        );
+    ) -> Result<WorkspaceMetadata, WorkspaceDiscoveryError> {
         tracing::debug!("Searching for a workspace in '{path}'");
+
+        if !system.is_directory(path) {
+            return Err(WorkspaceDiscoveryError::NotADirectory(path.to_path_buf()));
+        }
 
         let mut closest_package: Option<PackageMetadata> = None;
 
         for ancestor in path.ancestors() {
             let pyproject_path = ancestor.join("pyproject.toml");
             if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
-                let pyproject = PyProject::from_str(&pyproject_str)
-                    .with_context(|| format!("Failed to parse '{pyproject_path}'"))?;
+                let pyproject = PyProject::from_str(&pyproject_str).map_err(|error| {
+                    WorkspaceDiscoveryError::InvalidPyProject {
+                        path: pyproject_path,
+                        source: error,
+                    }
+                })?;
 
                 let workspace_table = pyproject.workspace().cloned();
                 let package = PackageMetadata::from_pyproject(
@@ -57,7 +91,8 @@ impl WorkspaceMetadata {
                 )?;
 
                 if let Some(workspace_table) = workspace_table {
-                    tracing::debug!("Found workspace at '{}'", ancestor);
+                    let workspace_root = ancestor;
+                    tracing::debug!("Found workspace at '{}'", workspace_root);
 
                     match collect_packages(
                         package,
@@ -74,25 +109,21 @@ impl WorkspaceMetadata {
 
                             for package in &packages {
                                 if let Some(conflicting) = by_name.insert(package.name(), package) {
-                                    return Err(anyhow!(
-                                        "The workspace contains two packages named '{name}': '{first}' and '{second}'",
-                                        name=package.name(),
-                                        first=conflicting.root(),
-                                        second=package.root()
-                                    ));
+                                    return Err(WorkspaceDiscoveryError::DuplicatePackageNames {
+                                        name: package.name().clone(),
+                                        first: conflicting.root().to_path_buf(),
+                                        second: conflicting.root().to_path_buf(),
+                                    });
                                 }
 
-                                if package.root() == ancestor {
+                                if package.root() == workspace_root {
                                     workspace_package = Some(package);
-                                }
-
-                                if !package.root().starts_with(ancestor) {
-                                    anyhow::bail!(
-                                        "Workspace member '{member}' located at '{member_path} is outside the workspace '{workspace_path}'",
-                                        member = package.name(),
-                                        member_path=package.root(),
-                                        workspace_path=ancestor,
-                                    )
+                                } else if !package.root().starts_with(workspace_root) {
+                                    return Err(WorkspaceDiscoveryError::PackageOutsideWorkspace {
+                                        package_name: package.name().clone(),
+                                        package_root: package.root().to_path_buf(),
+                                        workspace_root: workspace_root.to_path_buf(),
+                                    });
                                 }
                             }
 
@@ -101,10 +132,10 @@ impl WorkspaceMetadata {
 
                             let settings = workspace_package
                                 .configuration
-                                .to_workspace_settings(ancestor, &packages);
+                                .to_workspace_settings(workspace_root, &packages);
 
                             return Ok(Self {
-                                root: ancestor.to_path_buf(),
+                                root: workspace_root.to_path_buf(),
                                 packages,
                                 settings,
                             });
@@ -171,16 +202,13 @@ impl PackageMetadata {
         pyproject: PyProject,
         root: SystemPathBuf,
         base_configuration: Option<&Configuration>,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, WorkspaceDiscoveryError> {
         let Some(project) = pyproject.project else {
-            return Err(anyhow!("`[project]` table is missing"));
+            return Err(WorkspaceDiscoveryError::MissingProjectTable { package_path: root });
         };
 
-        // TODO: Should we allow pyproject.toml without a name and default to the directory
-        // name instead?
-
         let Some(name) = project.name.as_ref() else {
-            return Err(anyhow!("`project.name` is missing"));
+            return Err(WorkspaceDiscoveryError::MissingPackageName { package_path: root });
         };
 
         // TODO: load configuration from pyrpoject.toml
@@ -212,18 +240,22 @@ fn collect_packages(
     closest_package: Option<PackageMetadata>,
     base_configuration: Option<&Configuration>,
     system: &dyn System,
-) -> anyhow::Result<CollectedPackagesOrStandalone> {
+) -> Result<CollectedPackagesOrStandalone, WorkspaceDiscoveryError> {
     let workspace_root = workspace_package.root().to_path_buf();
     let mut member_paths = FxHashSet::default();
 
     for glob in workspace_table.members() {
         let full_glob = workspace_package.root().join(glob);
 
-        for result in system
-            .glob(full_glob.as_str())
-            .with_context(|| format!("failed to parse members glob '{glob}'"))?
-        {
-            let path = result.context("failed to match glob")?;
+        let matches = system.glob(full_glob.as_str()).map_err(|error| {
+            WorkspaceDiscoveryError::InvalidMembersPattern {
+                raw_glob: glob.clone(),
+                source: error,
+            }
+        })?;
+
+        for result in matches {
+            let path = result?;
             let normalized = SystemPath::absolute(path, &workspace_root);
 
             // Skip over non-directory entry. E.g.finder might end up creating a `.DS_STORE` file
@@ -285,24 +317,27 @@ fn collect_packages(
                     continue;
                 }
 
-                return Err(error).with_context(|| {
-                    format!("pyproject.toml for member '{member_path}' is missing")
-                })?;
+                return Err(WorkspaceDiscoveryError::MemberFailedToReadPyProject {
+                    package_root: member_path,
+                    source: error,
+                });
             }
         };
 
-        let pyproject = PyProject::from_str(&pyproject_str)
-            .with_context(|| format!("failed to parse '{pyproject_path}'"))?;
+        let pyproject = PyProject::from_str(&pyproject_str).map_err(|error| {
+            WorkspaceDiscoveryError::InvalidPyProject {
+                source: error,
+                path: pyproject_path,
+            }
+        })?;
 
         if pyproject.workspace().is_some() {
-            anyhow::bail!(
-                "Workspace member '{}' is a workspace itself. Nested workspaces aren't supported",
-                member_path
-            );
+            return Err(WorkspaceDiscoveryError::NestedWorkspaces {
+                package_root: member_path,
+            });
         }
 
-        let package = PackageMetadata::from_pyproject(pyproject, member_path, base_configuration)
-            .with_context(|| format!("failed to load '{pyproject_path}'"))?;
+        let package = PackageMetadata::from_pyproject(pyproject, member_path, base_configuration)?;
 
         tracing::debug!(
             "Adding package '{}' at '{}'",
@@ -319,4 +354,469 @@ fn collect_packages(
 enum CollectedPackagesOrStandalone {
     Packages(Vec<PackageMetadata>),
     Standalone(PackageMetadata),
+}
+
+#[derive(Debug, Error)]
+pub enum WorkspaceDiscoveryError {
+    #[error("workspace path '{0}' is not a directory")]
+    NotADirectory(SystemPathBuf),
+
+    #[error("nested workspaces aren't supported but the package located at '{package_root}' defines a `knot.workspace` table")]
+    NestedWorkspaces { package_root: SystemPathBuf },
+
+    #[error("the workspace contains two packages named '{name}': '{first}' and '{second}'")]
+    DuplicatePackageNames {
+        name: Name,
+        first: SystemPathBuf,
+        second: SystemPathBuf,
+    },
+
+    #[error("the package '{package_name}' located at '{package_root}' is outside the workspace's root directory '{workspace_root}'")]
+    PackageOutsideWorkspace {
+        workspace_root: SystemPathBuf,
+        package_name: Name,
+        package_root: SystemPathBuf,
+    },
+
+    #[error(
+        "failed to read the `pyproject.toml` for the package located at '{package_root}': {source}"
+    )]
+    MemberFailedToReadPyProject {
+        package_root: SystemPathBuf,
+        source: std::io::Error,
+    },
+
+    #[error("{path} is not a valid `pyproject.toml`: {source}")]
+    InvalidPyProject {
+        source: PyProjectError,
+        path: SystemPathBuf,
+    },
+
+    #[error("invalid glob '{raw_glob}' in `tool.knot.workspace.members`: {source}")]
+    InvalidMembersPattern {
+        source: glob::PatternError,
+        raw_glob: String,
+    },
+
+    #[error("failed to match member glob: {error}")]
+    FailedToMatchGlob {
+        #[from]
+        error: GlobError,
+    },
+
+    #[error("the `[project]` is missing in the `pyproject.toml` for package '{package_path}'`")]
+    MissingProjectTable { package_path: SystemPathBuf },
+
+    #[error("the `project.name` is missing in the `pyproject.toml` for package '{package_path}'`")]
+    MissingPackageName { package_path: SystemPathBuf },
+}
+
+#[cfg(test)]
+mod tests {
+    //! Integration tests for workspace discovery
+
+    use anyhow::Context;
+    use insta::assert_debug_snapshot;
+    use ruff_db::system::{SystemPathBuf, TestSystem};
+
+    use crate::workspace::WorkspaceMetadata;
+
+    #[test]
+    fn package_without_pyproject() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([(root.join("src/foo.py"), ""), (root.join("src/bar.py"), "")])
+            .context("Failed to write files")?;
+
+        let workspace = WorkspaceMetadata::discover(&root, &system, None)
+            .context("Failed to discover workspace")?;
+
+        assert_eq!(workspace.root(), &*root);
+
+        assert_debug_snapshot!(&workspace);
+
+        Ok(())
+    }
+
+    #[test]
+    fn single_package() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "backend"
+            "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let workspace = WorkspaceMetadata::discover(&root, &system, None)
+            .context("Failed to discover workspace")?;
+
+        assert_eq!(workspace.root(), &*root);
+        assert_debug_snapshot!(&workspace);
+
+        // Discovering the same package from a subdirectory should give the same result
+        let from_src = WorkspaceMetadata::discover(&root.join("src"), &system, None)
+            .context("Failed to discover workspace from src sub-directory")?;
+
+        assert_eq!(from_src, workspace);
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_members() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "workspace-root"
+
+                [tool.knot.workspace]
+                members = ["members/*"]
+                exclude = ["members/excluded"]
+            "#,
+                ),
+                (
+                    root.join("members/a/pyproject.toml"),
+                    r#"
+                [project]
+                name = "member-a"
+                "#,
+                ),
+                (
+                    root.join("members/x/pyproject.toml"),
+                    r#"
+                [project]
+                name = "member-x"
+                "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let workspace = WorkspaceMetadata::discover(&root, &system, None)
+            .context("Failed to discover workspace")?;
+
+        assert_eq!(workspace.root(), &*root);
+        assert_debug_snapshot!(&workspace);
+
+        // Discovering the same package from a member should give the same result
+        let from_src = WorkspaceMetadata::discover(&root.join("members/a"), &system, None)
+            .context("Failed to discover workspace from src sub-directory")?;
+
+        assert_eq!(from_src, workspace);
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_excluded() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "workspace-root"
+
+                [tool.knot.workspace]
+                members = ["members/*"]
+                exclude = ["members/excluded"]
+            "#,
+                ),
+                (
+                    root.join("members/a/pyproject.toml"),
+                    r#"
+                [project]
+                name = "member-a"
+                "#,
+                ),
+                (
+                    root.join("members/excluded/pyproject.toml"),
+                    r#"
+                [project]
+                name = "member-x"
+                "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let workspace = WorkspaceMetadata::discover(&root, &system, None)
+            .context("Failed to discover workspace")?;
+
+        assert_eq!(workspace.root(), &*root);
+        assert_debug_snapshot!(&workspace);
+
+        // Discovering the `workspace` for `excluded` should discover a single-package workspace
+        let excluded_workspace =
+            WorkspaceMetadata::discover(&root.join("members/excluded"), &system, None)
+                .context("Failed to discover workspace from src sub-directory")?;
+
+        assert_ne!(excluded_workspace, workspace);
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_non_unique_member_names() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "workspace-root"
+
+                [tool.knot.workspace]
+                members = ["members/*"]
+            "#,
+                ),
+                (
+                    root.join("members/a/pyproject.toml"),
+                    r#"
+                [project]
+                name = "member"
+                "#,
+                ),
+                (
+                    root.join("members/b/pyproject.toml"),
+                    r#"
+                [project]
+                name = "member"
+                "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let error = WorkspaceMetadata::discover(&root, &system, None).expect_err(
+            "Discovery should error because the workspace contains two members with the same names.",
+        );
+
+        assert_eq!(
+            error.to_string(),
+            "the workspace contains two packages named 'member': '/app/members/a' and '/app/members/a'"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn nested_workspaces() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "workspace-root"
+
+                [tool.knot.workspace]
+                members = ["members/*"]
+            "#,
+                ),
+                (
+                    root.join("members/a/pyproject.toml"),
+                    r#"
+                [project]
+                name = "nested-workspace"
+
+                [tool.knot.workspace]
+                members = ["members/*"]
+                "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let error = WorkspaceMetadata::discover(&root, &system, None).expect_err(
+            "Discovery should error because the workspace has a member that itself is a workspace",
+        );
+
+        assert_eq!(
+            error.to_string(),
+            "nested workspaces aren't supported but the package located at '/app/members/a' defines a `knot.workspace` table"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn member_missing_pyproject_toml() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "workspace-root"
+
+                [tool.knot.workspace]
+                members = ["members/*"]
+            "#,
+                ),
+                (root.join("members/a/test.py"), ""),
+            ])
+            .context("Failed to write files")?;
+
+        let error = WorkspaceMetadata::discover(&root, &system, None)
+            .expect_err("Discovery should error because member `a` has no `pypyroject.toml`");
+
+        assert_eq!(
+            error.to_string(),
+            "failed to read the `pyproject.toml` for the package located at '/app/members/a': No such file or directory"
+        );
+
+        Ok(())
+    }
+
+    /// Folders that match the members pattern but don't have a pyproject.toml
+    /// aren't valid members and discovery fails. However, don't fail
+    /// if the folder name indicates that it is a hidden folder that might
+    /// have been crated by another tool
+    #[test]
+    fn member_pattern_matching_hidden_folder() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "workspace-root"
+
+                [tool.knot.workspace]
+                members = ["members/*"]
+            "#,
+                ),
+                (root.join("members/.hidden/a.py"), ""),
+            ])
+            .context("Failed to write files")?;
+
+        let workspace = WorkspaceMetadata::discover(&root, &system, None);
+
+        assert_debug_snapshot!(&workspace);
+
+        Ok(())
+    }
+
+    #[test]
+    fn member_pattern_matching_file() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "workspace-root"
+
+                [tool.knot.workspace]
+                members = ["members/*"]
+            "#,
+                ),
+                (root.join("members/.DS_STORE"), ""),
+            ])
+            .context("Failed to write files")?;
+
+        let workspace = WorkspaceMetadata::discover(&root, &system, None);
+
+        assert_debug_snapshot!(&workspace);
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_root_not_an_ancestor_of_member() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files([
+                (root.join("src/foo.py"), ""),
+                (root.join("src/bar.py"), ""),
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                [project]
+                name = "workspace-root"
+
+                [tool.knot.workspace]
+                members = ["../members/*"]
+            "#,
+                ),
+                (
+                    root.join("../members/a/pyproject.toml"),
+                    r#"
+                [project]
+                name = "a"
+                "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let error = WorkspaceMetadata::discover(&root, &system, None).expect_err(
+            "Discovery should error because member `a` is outside the workspace's directory`",
+        );
+
+        assert_eq!(
+            error.to_string(),
+            "the package 'a' located at '/members/a' is outside the workspace's root directory '/app'"
+        );
+
+        Ok(())
+    }
 }

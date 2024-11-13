@@ -1,6 +1,7 @@
 ---
-source: crates/red_knot_workspace/tests/discovery.rs
+source: crates/red_knot_workspace/src/workspace/metadata.rs
 expression: "&workspace"
+snapshot_kind: text
 ---
 WorkspaceMetadata {
     root: "/app",
@@ -21,6 +22,19 @@ WorkspaceMetadata {
         PackageMetadata {
             name: Name("member-a"),
             root: "/app/members/a",
+            configuration: Configuration {
+                target_version: None,
+                search_paths: SearchPathConfiguration {
+                    extra_paths: None,
+                    src_root: None,
+                    custom_typeshed: None,
+                    site_packages: None,
+                },
+            },
+        },
+        PackageMetadata {
+            name: Name("member-x"),
+            root: "/app/members/x",
             configuration: Configuration {
                 target_version: None,
                 search_paths: SearchPathConfiguration {

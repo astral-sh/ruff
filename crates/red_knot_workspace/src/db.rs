@@ -169,7 +169,7 @@ pub(crate) mod tests {
     use ruff_db::{Db as SourceDb, Upcast};
 
     use crate::db::Db;
-    use crate::workspace::Workspace;
+    use crate::workspace::{Workspace, WorkspaceMetadata};
 
     #[salsa::db]
     pub(crate) struct TestDb {
@@ -178,17 +178,23 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
+        workspace: Option<Workspace>,
     }
 
     impl TestDb {
-        pub(crate) fn new() -> Self {
-            Self {
+        pub(crate) fn new(workspace: WorkspaceMetadata) -> Self {
+            let mut db = Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
                 vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
-            }
+                workspace: None,
+            };
+
+            let workspace = Workspace::from_metadata(&db, workspace);
+            db.workspace = Some(workspace);
+            db
         }
     }
 
@@ -258,7 +264,7 @@ pub(crate) mod tests {
     #[salsa::db]
     impl Db for TestDb {
         fn workspace(&self) -> Workspace {
-            todo!()
+            self.workspace.unwrap()
         }
     }
 

@@ -1,12 +1,13 @@
 ---
-source: crates/red_knot_workspace/tests/discovery.rs
+source: crates/red_knot_workspace/src/workspace/metadata.rs
 expression: "&workspace"
+snapshot_kind: text
 ---
 WorkspaceMetadata {
     root: "/app",
     packages: [
         PackageMetadata {
-            name: Name("app"),
+            name: Name("backend"),
             root: "/app",
             configuration: Configuration {
                 target_version: None,

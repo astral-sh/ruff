@@ -4,6 +4,7 @@ use pep440_rs::{Version, VersionSpecifiers};
 use serde::Deserialize;
 use thiserror::Error;
 
+use crate::workspace::metadata::WorkspaceDiscoveryError;
 pub(crate) use package_name::PackageName;
 use ruff_db::system::SystemPath;
 
@@ -27,7 +28,7 @@ impl PyProject {
 }
 
 #[derive(Error, Debug)]
-pub(crate) enum PyProjectError {
+pub enum PyProjectError {
     #[error(transparent)]
     TomlSyntax(#[from] toml::de::Error),
 }
@@ -46,6 +47,9 @@ impl PyProject {
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct Project {
     /// The name of the project
+    ///
+    /// Note: Intentionally option to be more permissive during deserialization.
+    /// `PackageMetadata::from_pyproject` reports missing names.
     pub name: Option<PackageName>,
     /// The version of the project
     pub version: Option<Version>,
@@ -84,7 +88,7 @@ impl Workspace {
         &self,
         path: &SystemPath,
         workspace_root: &SystemPath,
-    ) -> Result<bool, glob::PatternError> {
+    ) -> Result<bool, WorkspaceDiscoveryError> {
         // If there's an explicit include, then that wins.
         if self
             .members()
@@ -95,7 +99,13 @@ impl Workspace {
         }
 
         for exclude in self.exclude() {
-            let full_glob = glob::Pattern::new(workspace_root.join(exclude).as_str())?;
+            let full_glob =
+                glob::Pattern::new(workspace_root.join(exclude).as_str()).map_err(|error| {
+                    WorkspaceDiscoveryError::InvalidMembersPattern {
+                        raw_glob: exclude.clone(),
+                        source: error,
+                    }
+                })?;
 
             if full_glob.matches_path(path.as_std_path()) {
                 return Ok(true);

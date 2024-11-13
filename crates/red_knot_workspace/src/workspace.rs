@@ -1,7 +1,7 @@
 use crate::db::Db;
 use crate::db::RootDatabase;
 use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};
-pub use metadata::{PackageMetadata, WorkspaceMetadata};
+pub use metadata::{PackageMetadata, WorkspaceDiscoveryError, WorkspaceMetadata};
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::SearchPathSettings;
 use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic, Severity};
@@ -178,9 +178,9 @@ impl Workspace {
     ///
     /// Returns `None` if the `path` is outside of any package or if `file` isn't a first-party file
     /// (e.g. third-party dependencies or `excluded`).
-    pub fn package(self, db: &dyn Db, path: &SystemPath) -> Option<Package> {
+    pub fn package(self, db: &dyn Db, path: impl AsRef<SystemPath>) -> Option<Package> {
         let packages = self.package_tree(db);
-        packages.get(path)
+        packages.get(path.as_ref())
     }
 
     /// Checks all open files in the workspace and its dependencies.
@@ -604,17 +604,20 @@ impl FusedIterator for PackageTreeIter<'_> {}
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDb;
-    use crate::workspace::check_file;
+    use crate::workspace::{check_file, WorkspaceMetadata};
     use red_knot_python_semantic::types::check_types;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
-    use ruff_db::system::{DbWithTestSystem, SystemPath};
+    use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_python_ast::name::Name;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
-        let mut db = TestDb::new();
+        let workspace =
+            WorkspaceMetadata::single_package(Name::new_static("test"), SystemPathBuf::from("/"));
+        let mut db = TestDb::new(workspace);
         let path = SystemPath::new("test.py");
 
         db.write_file(path, "x = 10")?;

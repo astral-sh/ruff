@@ -232,21 +232,28 @@ impl Drop for IndexedMut<'_> {
 mod tests {
     use rustc_hash::FxHashSet;
 
+    use crate::db::tests::TestDb;
+    use crate::db::Db;
+    use crate::workspace::files::Index;
+    use crate::workspace::WorkspaceMetadata;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_ast::name::Name;
 
-    use crate::db::tests::TestDb;
-    use crate::workspace::files::Index;
-    use crate::workspace::Package;
-
     #[test]
     fn re_entrance() -> anyhow::Result<()> {
-        let mut db = TestDb::new();
+        let metadata = WorkspaceMetadata::single_package(
+            Name::new_static("test"),
+            SystemPathBuf::from("/test"),
+        );
+        let mut db = TestDb::new(metadata);
 
         db.write_file("test.py", "")?;
 
-        let package = Package::new(&db, Name::new("test"), SystemPathBuf::from("/test"));
+        let package = db
+            .workspace()
+            .package(&db, "/test")
+            .expect("test package to exist");
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 
