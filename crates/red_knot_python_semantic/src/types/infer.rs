@@ -55,9 +55,8 @@ use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
     Boundness, Class, ClassLiteralType, FunctionType, InstanceType, IntersectionBuilder,
     IntersectionType, IterationOutcome, KnownClass, KnownFunction, KnownInstanceType,
-    MaybeDeferred, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol, Truthiness,
-    TupleType, Type, TypeArrayDisplay, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
-    UnionType,
+    MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol, Truthiness, TupleType, Type,
+    TypeArrayDisplay, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -201,43 +200,6 @@ pub(crate) enum InferenceRegion<'db> {
     Scope(ScopeId<'db>),
 }
 
-/// A set of definitions that are deferred either eagerly or lazily.
-#[derive(Debug, Default, Eq, PartialEq)]
-struct Deferred<'db> {
-    eager: FxHashSet<Definition<'db>>,
-    lazy: FxHashSet<Definition<'db>>,
-}
-
-impl<'db> Deferred<'db> {
-    /// Returns an iterator over all the definitions in this deferred set, including both eager and
-    /// lazy definitions.
-    fn iter(&self) -> impl Iterator<Item = &Definition<'db>> {
-        self.eager.iter().chain(self.lazy.iter())
-    }
-
-    /// Extends this deferred set with the definitions from another deferred set.
-    fn extend(&mut self, deferred: &Deferred<'db>) {
-        self.eager.extend(deferred.eager.iter().copied());
-        self.lazy.extend(deferred.lazy.iter().copied());
-    }
-
-    /// Returns the number of definitions in this deferred set, including both eager and lazy
-    /// definitions.
-    fn len(&self) -> usize {
-        self.eager.len() + self.lazy.len()
-    }
-
-    /// Returns true if this deferred set is empty, including both eager and lazy definitions.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    fn shrink_to_fit(&mut self) {
-        self.eager.shrink_to_fit();
-        self.lazy.shrink_to_fit();
-    }
-}
-
 /// The inferred types for a single region.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct TypeInference<'db> {
@@ -251,7 +213,7 @@ pub(crate) struct TypeInference<'db> {
     declarations: FxHashMap<Definition<'db>, Type<'db>>,
 
     /// The definitions that are deferred.
-    deferred: Deferred<'db>,
+    deferred: FxHashSet<Definition<'db>>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
@@ -266,7 +228,7 @@ impl<'db> TypeInference<'db> {
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
-            deferred: Deferred::default(),
+            deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
         }
@@ -289,10 +251,6 @@ impl<'db> TypeInference<'db> {
     #[track_caller]
     pub(crate) fn declaration_ty(&self, definition: Definition<'db>) -> Type<'db> {
         self.declarations[&definition]
-    }
-
-    pub(crate) fn is_eagerly_deferred(&self, definition: Definition<'db>) -> bool {
-        self.deferred.eager.contains(&definition)
     }
 
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
@@ -372,6 +330,8 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// The type inference results
     types: TypeInference<'db>,
 
+    deferred_state: DeferredState,
+
     diagnostics: TypeCheckDiagnosticsBuilder<'db>,
 }
 
@@ -401,6 +361,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             region,
             file,
+            deferred_state: DeferredState::None,
             types: TypeInference::empty(scope),
             diagnostics: TypeCheckDiagnosticsBuilder::new(db, file),
         }
@@ -414,7 +375,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .declarations
             .extend(inference.declarations.iter());
         self.types.expressions.extend(inference.expressions.iter());
-        self.types.deferred.extend(&inference.deferred);
+        self.types.deferred.extend(inference.deferred.iter());
         self.diagnostics.extend(&inference.diagnostics);
     }
 
@@ -430,7 +391,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Are we currently inferring deferred types?
     fn is_deferred(&self) -> bool {
-        matches!(self.region, InferenceRegion::Deferred(_))
+        matches!(self.region, InferenceRegion::Deferred(_)) || self.deferred_state.is_deferred()
     }
 
     /// Get the already-inferred type of an expression node.
@@ -484,7 +445,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if !self.types.deferred.is_empty() {
             let mut deferred_inference = Vec::with_capacity(self.types.deferred.len());
-            for definition in self.types.deferred.iter() {
+            for definition in &self.types.deferred {
                 deferred_inference.push(infer_deferred_types(self.db, *definition));
             }
             for deferred in deferred_inference {
@@ -714,9 +675,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         match definition.kind(self.db) {
             DefinitionKind::Function(function) => self.infer_function_deferred(function.node()),
             DefinitionKind::Class(class) => self.infer_class_deferred(class.node()),
-            DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
-                self.infer_annotated_assignment_deferred(annotated_assignment.node(), definition);
-            }
             _ => {}
         }
     }
@@ -956,14 +914,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         // `infer_function_type_params`, rather than here.
         if type_params.is_none() {
             if self.are_all_types_deferred() {
-                self.types.deferred.lazy.insert(definition);
+                self.types.deferred.insert(definition);
             } else {
-                if matches!(
-                    self.infer_optional_annotation_expression(returns.as_deref()),
-                    Some(MaybeDeferred::Deferred)
-                ) {
-                    self.types.deferred.lazy.insert(definition);
-                }
+                self.infer_optional_annotation_expression(returns.as_deref(), DeferredState::None);
                 self.infer_parameters(parameters);
             }
         }
@@ -1101,7 +1054,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Inference of bases deferred in stubs
             // TODO also defer stringified generic type parameters
             if self.are_all_types_deferred() {
-                self.types.deferred.lazy.insert(definition);
+                self.types.deferred.insert(definition);
             } else {
                 for base in class_node.bases() {
                     self.infer_expression(base);
@@ -1111,15 +1064,16 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
-        self.infer_optional_annotation_expression(function.returns.as_deref());
+        self.infer_optional_annotation_expression(
+            function.returns.as_deref(),
+            DeferredState::Deferred,
+        );
         self.infer_parameters(function.parameters.as_ref());
     }
 
     fn infer_class_deferred(&mut self, class: &ast::StmtClassDef) {
-        if self.are_all_types_deferred() {
-            for base in class.bases() {
-                self.infer_expression(base);
-            }
+        for base in class.bases() {
+            self.infer_expression(base);
         }
     }
 
@@ -1655,18 +1609,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 target,
                 simple: _,
             } = assignment;
-            self.infer_annotation_expression(annotation);
+            self.infer_annotation_expression(annotation, DeferredState::None);
             self.infer_optional_expression(value.as_deref());
             self.infer_expression(target);
         }
     }
 
     /// Infer the types in an annotated assignment definition.
-    ///
-    /// This will defer the inference of the annotation expression if:
-    /// - It is a string literal expression
-    /// - In a stub file
-    /// - The `__future__.annotations` feature is enabled
     fn infer_annotated_assignment_definition(
         &mut self,
         assignment: &ast::StmtAnnAssign,
@@ -1680,84 +1629,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             simple: _,
         } = assignment;
 
-        if self.are_all_types_deferred() {
-            self.types.deferred.eager.insert(definition);
-        } else {
-            match self.infer_annotation_expression(annotation) {
-                MaybeDeferred::Deferred => {
-                    self.types.deferred.eager.insert(definition);
-                }
-                MaybeDeferred::Type(annotation_ty) => {
-                    self.add_annotated_assignment_declaration(
-                        assignment,
-                        annotation_ty,
-                        definition,
-                    );
-                    self.infer_expression(target);
-                }
-            }
-        }
-    }
-
-    fn infer_annotated_assignment_deferred(
-        &mut self,
-        assignment: &ast::StmtAnnAssign,
-        definition: Definition<'db>,
-    ) {
-        let ast::StmtAnnAssign {
-            range: _,
-            target,
+        let mut annotation_ty = self.infer_annotation_expression(
             annotation,
-            value: _,
-            simple: _,
-        } = assignment;
+            DeferredState::from(self.are_all_types_deferred()),
+        );
 
-        // "Foo" -> Foo
-        // "SomeGeneric[Foo]" -> SomeGeneric[Foo]
-        // "'Foo'" -> 'Foo'
-        // "SomeGeneric['Foo']" -> SomeGeneric['Foo']
-
-        let annotation_ty = if let Some(string) = annotation.as_string_literal_expr() {
-            let annotation_ty = match parse_string_annotation(self.db, self.file, string) {
-                Ok(parsed) => match self.infer_annotation_expression_no_store(parsed.expr()) {
-                    MaybeDeferred::Type(ty) => ty,
-                    MaybeDeferred::Deferred => {
-                        debug_assert!(parsed.expr().is_string_literal_expr());
-                        self.diagnostics.add(
-                            parsed.expr().into(),
-                            "nested-string-annotation",
-                            format_args!("Nested string annotations are not supported"),
-                        );
-                        Type::Unknown
-                    }
-                },
-                Err(diagnostics) => {
-                    self.diagnostics.extend(&diagnostics);
-                    Type::Unknown
-                }
-            };
-
-            // We don't store the expression type when `infer_annotation_expression` is called for the
-            // first time because it would return `Deferred`. So, now as we're in the deferred region,
-            // we need to store it and we will do so on the original string expression instead of the
-            // parsed expression because the latter doesn't exists in the semantic index.
-            self.store_expression_type(annotation, annotation_ty);
-
-            annotation_ty
-        } else {
-            self.infer_annotation_expression(annotation).expect_type()
-        };
-
-        self.add_annotated_assignment_declaration(assignment, annotation_ty, definition);
-        self.infer_expression(target);
-    }
-
-    fn add_annotated_assignment_declaration(
-        &mut self,
-        assignment: &ast::StmtAnnAssign,
-        mut annotation_ty: Type<'db>,
-        definition: Definition<'db>,
-    ) {
         // Handle various singletons.
         if let Type::Instance(InstanceType { class }) = annotation_ty {
             if class.is_known(self.db, KnownClass::SpecialForm) {
@@ -1785,6 +1661,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             self.add_declaration(assignment.into(), definition, annotation_ty);
         }
+
+        self.infer_expression(target);
     }
 
     fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
@@ -2308,6 +2186,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         expression: &impl HasScopedAstId<Id = ScopedExpressionId>,
         ty: Type<'db>,
     ) {
+        if self.deferred_state.in_string_annotation() {
+            // Avoid storing the type of expressions that are part of a string annotation because
+            // the expression ids don't exists in the semantic index. Instead, we'll store the type
+            // on the string expression itself that represents the annotation.
+            return;
+        }
         let expr_id = expression.scoped_ast_id(self.db, self.scope());
         let previous = self.types.expressions.insert(expr_id, ty);
         assert_eq!(previous, None);
@@ -2792,12 +2676,16 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn lookup_name(&mut self, name_node: &ast::ExprName) -> Symbol<'db> {
         let ast::ExprName { id: name, .. } = name_node;
         let file_scope_id = self.scope().file_scope_id(self.db);
-        let is_bound = self
-            .index
-            .symbol_table(file_scope_id)
-            .symbol_by_name(name)
-            .expect("Symbol table should create a symbol for every Name node")
-            .is_bound();
+        let is_bound =
+            if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_by_name(name) {
+                symbol.is_bound()
+            } else {
+                assert!(
+                    self.deferred_state.in_string_annotation(),
+                    "Expected the symbol table to create a symbol for every Name node"
+                );
+                false
+            };
 
         // In function-like scopes, any local variable (symbol that is bound in this scope) can
         // only have a definition in this scope, or error; it never references another scope.
@@ -2869,26 +2757,28 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let file_scope_id = self.scope().file_scope_id(self.db);
         let use_def = self.index.use_def_map(file_scope_id);
-        let symbol = self
-            .index
-            .symbol_table(file_scope_id)
-            .symbol_id_by_name(id)
-            .expect("Expected the symbol table to create a symbol for every Name node");
-        // if we're inferring types of deferred expressions, always treat them as public symbols
-        let (definitions, boundness) = if self.is_deferred() {
-            (
-                use_def.public_bindings(symbol),
-                use_def.public_boundness(symbol),
-            )
+
+        // If we're inferring types of deferred expressions, always treat them as public symbols
+        let (bindings_ty, boundness) = if self.is_deferred() {
+            if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_id_by_name(id) {
+                (
+                    bindings_ty(self.db, use_def.public_bindings(symbol)),
+                    use_def.public_boundness(symbol),
+                )
+            } else {
+                assert!(
+                    self.deferred_state.in_string_annotation(),
+                    "Expected the symbol table to create a symbol for every Name node"
+                );
+                (None, Boundness::PossiblyUnbound)
+            }
         } else {
             let use_id = name.scoped_use_id(self.db, self.scope());
             (
-                use_def.bindings_at_use(use_id),
+                bindings_ty(self.db, use_def.bindings_at_use(use_id)),
                 use_def.use_boundness(use_id),
             )
         };
-
-        let bindings_ty = bindings_ty(self.db, definitions);
 
         if boundness == Boundness::PossiblyUnbound {
             match self.lookup_name(name) {
@@ -4188,31 +4078,39 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 /// Annotation expressions.
 impl<'db> TypeInferenceBuilder<'db> {
-    /// Infers the type of an expression used in an annotation context.
-    ///
-    /// This method updates the result to include the inferred type of the expression. Use
-    /// [`infer_annotation_expression_no_store`] if you want to infer the type without storing it.
-    ///
-    /// [`infer_annotation_expression_no_store`]: TypeInferenceBuilder::infer_annotation_expression_no_store
-    fn infer_annotation_expression(&mut self, expression: &ast::Expr) -> MaybeDeferred<'db> {
-        let outcome = self.infer_annotation_expression_no_store(expression);
-        if let MaybeDeferred::Type(annotation_ty) = outcome {
-            self.store_expression_type(expression, annotation_ty);
-        }
-        outcome
+    /// Infer the type of an annotation expression with the given [`DeferredState`].
+    fn infer_annotation_expression(
+        &mut self,
+        annotation: &ast::Expr,
+        deferred_state: DeferredState,
+    ) -> Type<'db> {
+        let previous_deferred_state = self.deferred_state;
+        self.deferred_state = deferred_state;
+        let annotation_ty = self.infer_annotation_expression_impl(annotation);
+        self.deferred_state = previous_deferred_state;
+        annotation_ty
     }
 
-    /// Infers the type of an expression used in an annotation context without storing the result.
-    fn infer_annotation_expression_no_store(
+    /// Similar to [`infer_annotation_expression`], but accepts an optional annotation expression
+    /// and returns [`None`] if the annotation is [`None`].
+    ///
+    /// [`infer_annotation_expression`]: TypeInferenceBuilder::infer_annotation_expression
+    fn infer_optional_annotation_expression(
         &mut self,
-        expression: &ast::Expr,
-    ) -> MaybeDeferred<'db> {
+        annotation: Option<&ast::Expr>,
+        deferred_state: DeferredState,
+    ) -> Option<Type<'db>> {
+        annotation.map(|expr| self.infer_annotation_expression(expr, deferred_state))
+    }
+
+    /// Implementation of [`infer_annotation_expression`].
+    ///
+    /// [`infer_annotation_expression`]: TypeInferenceBuilder::infer_annotation_expression
+    fn infer_annotation_expression_impl(&mut self, annotation: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
-        let annotation_ty = match expression {
+        let annotation_ty = match annotation {
             // String annotations: https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_) => {
-                return MaybeDeferred::Deferred;
-            }
+            ast::Expr::StringLiteral(string) => self.infer_string_annotation_expression(string),
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
@@ -4222,22 +4120,64 @@ impl<'db> TypeInferenceBuilder<'db> {
             type_expr => self.infer_type_expression_no_store(type_expr),
         };
 
-        MaybeDeferred::Type(annotation_ty)
+        self.store_expression_type(annotation, annotation_ty);
+
+        annotation_ty
     }
 
-    fn infer_optional_annotation_expression(
-        &mut self,
-        expr: Option<&ast::Expr>,
-    ) -> Option<MaybeDeferred<'db>> {
-        expr.map(|expr| self.infer_annotation_expression(expr))
+    /// Infer the type of a string annotation expression.
+    fn infer_string_annotation_expression(&mut self, string: &ast::ExprStringLiteral) -> Type<'db> {
+        match parse_string_annotation(self.db, self.file, string) {
+            Ok(parsed) => {
+                // String annotations are always evaluated in the deferred context.
+                self.infer_annotation_expression(parsed.expr(), DeferredState::InStringAnnotation)
+            }
+            Err(diagnostics) => {
+                self.diagnostics.extend(&diagnostics);
+                Type::Unknown
+            }
+        }
     }
 }
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db> {
+    /// Infer the type of a type expression.
+    fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let ty = self.infer_type_expression_no_store(expression);
+        self.store_expression_type(expression, ty);
+        ty
+    }
+
+    /// Similar to [`infer_type_expression`], but accepts an optional type expression and returns
+    /// [`None`] if the expression is [`None`].
+    ///
+    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
+    fn infer_optional_type_expression(
+        &mut self,
+        expression: Option<&ast::Expr>,
+    ) -> Option<Type<'db>> {
+        expression.map(|expr| self.infer_type_expression(expr))
+    }
+
+    /// Similar to [`infer_type_expression`], but accepts a [`DeferredState`].
+    ///
+    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
+    fn infer_type_expression_with_state(
+        &mut self,
+        expression: &ast::Expr,
+        deferred_state: DeferredState,
+    ) -> Type<'db> {
+        let previous_deferred_state = self.deferred_state;
+        self.deferred_state = deferred_state;
+        let annotation_ty = self.infer_type_expression(expression);
+        self.deferred_state = previous_deferred_state;
+        annotation_ty
+    }
+
+    /// Infer the type of a type expression without storing the result.
     fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
@@ -4257,9 +4197,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             ast::Expr::NoneLiteral(_literal) => Type::none(self.db),
 
-            // TODO: parse the expression and check whether it is a string annotation.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_literal) => Type::Todo,
+            ast::Expr::StringLiteral(string) => self.infer_string_type_expression(string),
 
             // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
             // expressions, but is meaningful in the context of a number of special forms.
@@ -4404,17 +4343,21 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let ty = self.infer_type_expression_no_store(expression);
-        self.store_expression_type(expression, ty);
-        ty
-    }
-
-    fn infer_optional_type_expression(
-        &mut self,
-        opt_expression: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
-        opt_expression.map(|expr| self.infer_type_expression(expr))
+    /// Infer the type of a string type expression.
+    fn infer_string_type_expression(&mut self, string: &ast::ExprStringLiteral) -> Type<'db> {
+        match parse_string_annotation(self.db, self.file, string) {
+            Ok(parsed) => {
+                // String annotations are always evaluated in the deferred context.
+                self.infer_type_expression_with_state(
+                    parsed.expr(),
+                    DeferredState::InStringAnnotation,
+                )
+            }
+            Err(diagnostics) => {
+                self.diagnostics.extend(&diagnostics);
+                Type::Unknown
+            }
+        }
     }
 
     /// Given the slice of a `tuple[]` annotation, return the type that the annotation represents
@@ -4599,6 +4542,37 @@ impl<'db> TypeInferenceBuilder<'db> {
                 return Err(vec![parameters]);
             }
         })
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+enum DeferredState {
+    #[default]
+    None,
+    Deferred,
+    InStringAnnotation,
+}
+
+impl DeferredState {
+    const fn is_deferred(self) -> bool {
+        matches!(
+            self,
+            DeferredState::Deferred | DeferredState::InStringAnnotation
+        )
+    }
+
+    const fn in_string_annotation(self) -> bool {
+        matches!(self, DeferredState::InStringAnnotation)
+    }
+}
+
+impl From<bool> for DeferredState {
+    fn from(value: bool) -> Self {
+        if value {
+            DeferredState::Deferred
+        } else {
+            DeferredState::None
+        }
     }
 }
 

@@ -183,21 +183,13 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
 /// Infer the type of a binding.
 pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    if inference.is_eagerly_deferred(definition) {
-        infer_deferred_types(db, definition).binding_ty(definition)
-    } else {
-        inference.binding_ty(definition)
-    }
+    inference.binding_ty(definition)
 }
 
 /// Infer the type of a declaration.
 fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    if inference.is_eagerly_deferred(definition) {
-        infer_deferred_types(db, definition).declaration_ty(definition)
-    } else {
-        inference.declaration_ty(definition)
-    }
+    inference.declaration_ty(definition)
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
@@ -2284,21 +2276,6 @@ impl<'db> IterationOutcome<'db> {
                 diagnostics.add_not_iterable_possibly_unbound(iterable_node, iterable_ty);
                 element_ty
             }
-        }
-    }
-}
-
-#[derive(Debug)]
-enum MaybeDeferred<'db> {
-    Type(Type<'db>),
-    Deferred,
-}
-
-impl<'db> MaybeDeferred<'db> {
-    fn expect_type(self) -> Type<'db> {
-        match self {
-            MaybeDeferred::Type(ty) => ty,
-            MaybeDeferred::Deferred => panic!("expected a type, but got a deferred annotation"),
         }
     }
 }
