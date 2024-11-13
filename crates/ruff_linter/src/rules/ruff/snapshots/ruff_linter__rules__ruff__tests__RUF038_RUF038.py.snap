@@ -9,7 +9,7 @@ RUF038.py:4:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `b
   |
   = help: Replace with `bool`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | from typing import Literal
 2 2 | 
 3 3 | 
@@ -27,7 +27,7 @@ RUF038.py:8:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `b
   |
   = help: Replace with `bool`
 
-ℹ Safe fix
+ℹ Unsafe fix
 5 5 |     ...
 6 6 | 
 7 7 | 
@@ -45,7 +45,7 @@ RUF038.py:12:16: RUF038 [*] `Literal[True, False]` can be replaced with a bare `
    |
    = help: Replace with `bool`
 
-ℹ Safe fix
+ℹ Unsafe fix
 9  9  |     ...
 10 10 | 
 11 11 | 
@@ -63,7 +63,7 @@ RUF038.py:16:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `
    |
    = help: Replace with `bool`
 
-ℹ Safe fix
+ℹ Unsafe fix
 13 13 |     ...
 14 14 | 
 15 15 | 
@@ -81,7 +81,7 @@ RUF038.py:20:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `
    |
    = help: Replace with `bool`
 
-ℹ Safe fix
+ℹ Unsafe fix
 17 17 |     ...
 18 18 | 
 19 19 | 

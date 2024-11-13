@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_literal;
@@ -17,10 +17,6 @@ use crate::checkers::ast::Checker;
 /// bare `bool` annotations. Static type checkers such as [mypy] treat them as
 /// equivalent.
 ///
-/// However, `bool` is not strictly equivalent to `Literal[True, False]`, as `bool` is
-/// a subclass of `int`, so this rule might not apply if the type annotations are used
-/// in a numerical context as well.
-///
 /// ## Example
 /// ```python
 /// Literal[True, False]
@@ -34,13 +30,23 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
-/// The fix for this rule is marked as unsafe when the `Literal` contains comments.
+/// The fix for this rule is marked as unsafe:
+///
+/// - The type annotation might be intentional when the type checker used does not
+/// treat `bool` as equivalent when overloading boolean arguments with `Literal[True]`
+/// and `Literal[False]`, e.g. see [#14764] and [#5421].
+/// - `bool` is not strictly equivalent to `Literal[True, False]`, as `bool` is
+/// a subclass of `int`, and this rule might not apply if the type annotations are used
+/// in a numerical context.
+/// - The `Literal` might contain comments.
 ///
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 /// - [Python documentation: Boolean type - `bool`](https://docs.python.org/3/library/stdtypes.html#boolean-type-bool)
 ///
 /// [mypy](https://github.com/python/mypy/blob/master/mypy/typeops.py#L985)
+/// [#14764](https://github.com/python/mypy/issues/14764)
+/// [#5421](https://github.com/microsoft/pyright/issues/5421)
 #[violation]
 pub struct RedundantBoolLiteral {
     seen_others: bool,
@@ -99,17 +105,10 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &mut Checker, literal_expr: &'
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.
     if !seen_others {
-        diagnostic.set_fix(Fix::applicable_edit(
-            Edit::range_replacement("bool".to_string(), literal_expr.range()),
-            if checker
-                .comment_ranges()
-                .has_comments(literal_expr, checker.source())
-            {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            },
-        ));
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            "bool".to_string(),
+            literal_expr.range(),
+        )));
     }
 
     checker.diagnostics.push(diagnostic);
