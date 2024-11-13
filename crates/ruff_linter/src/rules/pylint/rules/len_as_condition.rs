@@ -9,6 +9,8 @@ use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
 
 /// ## What it does
+/// Checks for usage of call of 'len' on sequences
+/// in boolean test context.
 ///
 /// ## Why is this bad?
 /// Empty sequences are considered false in a boolean context.
