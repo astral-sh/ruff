@@ -38,8 +38,11 @@ Not operator is inferred based on
 <https://docs.python.org/3/library/stdtypes.html#truth-value-testing>. An instance is True or False
 if the `__bool__` method says so.
 
-The `__len__` method on it's own will not determine the truthiness of an instance because `__bool__`
-method can override it.
+At runtime, the `__len__` method is a fallback for `__bool__`, but we can't make use of that.
+If we have a class that defines `__len__` but not `__bool__`, it is possible that any subclass
+could add a `__bool__` method that would invalidate whatever conclusion we drew from `__len__`.
+So classes without a `__bool__` method, with or without `__len__`, must be inferred as unknown
+truthiness.
 
 ```py
 class AlwaysTrue:
@@ -56,17 +59,21 @@ class AlwaysFalse:
 # revealed: Literal[True]
 reveal_type(not AlwaysFalse())
 
+# We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
 class BoolIsBool:
     __bool__ = bool
 
 # revealed: bool
 reveal_type(not BoolIsBool())
 
+# At runtime, no `__bool__` and no `__len__` means truthy, but we can't rely on that, because
+# a subclass could add a `__bool__` method.
 class NoBoolMethod: ...
 
 # revealed: bool
 reveal_type(not NoBoolMethod())
 
+# And we can't rely on `__len__` for the same reason: a subclass could add `__bool__`.
 class LenZero:
     def __len__(self) -> Literal[0]:
         return 0

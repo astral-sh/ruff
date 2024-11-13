@@ -1201,11 +1201,9 @@ impl<'db> Type<'db> {
                 if class.is_known(db, KnownClass::NoneType) {
                     Truthiness::AlwaysFalse
                 } else {
-                    // We only check the return value of __bool__ method for truth testing.
-                    // Since the __bool__ method can take priority over __len__ we cannot rely on
-                    // the value of __len__ alone. One example is when a class has a __len__ that
-                    // is 0 but a subclass overrides __bool__ in this case the subclass truth
-                    // testing should be true.
+                    // We only check the `__bool__` method for truth testing, even though at
+                    // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
+                    // and a subclass could add a `__bool__` method.
                     let bool_method = instance_ty.to_meta_type(db).member(db, "__bool__");
                     // Check if the class has `__bool__ = bool` in the definition and avoid
                     // recursion
