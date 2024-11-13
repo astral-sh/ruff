@@ -62,6 +62,8 @@ mod tests {
     #[test_case(Rule::UselessIfElse, Path::new("RUF034.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
     #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
+    #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.py"))]
+    #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
