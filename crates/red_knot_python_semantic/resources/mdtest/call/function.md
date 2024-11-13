@@ -64,3 +64,186 @@ def _(flag: bool):
     # error: [possibly-unresolved-reference]
     reveal_type(foo())  # revealed: int
 ```
+
+## Wrong argument type
+
+### Positional argument, positional-or-keyword parameter
+
+```py
+def f(x: int) -> int:
+    return 1
+
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `x` of type `int`"
+reveal_type(f("foo"))  # revealed: int
+```
+
+### Positional argument, positional-only parameter
+
+```py
+def f(x: int, /) -> int:
+    return 1
+
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `x` of type `int`"
+reveal_type(f("foo"))  # revealed: int
+```
+
+### Positional argument, variadic parameter
+
+```py
+def f(*args: int) -> int:
+    return 1
+
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `args` of type `int`"
+reveal_type(f("foo"))  # revealed: int
+```
+
+### Keyword argument, positional-or-keyword parameter
+
+```py
+def f(x: int) -> int:
+    return 1
+
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `x` of type `int`"
+reveal_type(f(x="foo"))  # revealed: int
+```
+
+### Keyword argument, keyword-only parameter
+
+```py
+def f(*, x: int) -> int:
+    return 1
+
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `x` of type `int`"
+reveal_type(f(x="foo"))  # revealed: int
+```
+
+### Keyword argument, keywords parameter
+
+```py
+def f(**kwargs: int) -> int:
+    return 1
+
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal["foo"]` to parameter `kwargs` of type `int`"
+reveal_type(f(x="foo"))  # revealed: int
+```
+
+### Correctly match keyword out-of-order
+
+```py
+def f(x: int = 1, y: str = "foo") -> int:
+    return 1
+
+# error: 15 [invalid-argument-type] "Cannot assign type `Literal[2]` to parameter `y` of type `str`"
+# error: 20 [invalid-argument-type] "Cannot assign type `Literal["bar"]` to parameter `x` of type `int`"
+reveal_type(f(y=2, x="bar"))  # revealed: int
+```
+
+## Too many positional arguments
+
+### One too many
+
+```py
+def f() -> int:
+    return 1
+
+# error: 15 [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
+reveal_type(f("foo"))  # revealed: int
+```
+
+### Two too many
+
+```py
+def f() -> int:
+    return 1
+
+# error: 15 [too-many-positional-arguments] "Too many positional arguments: expected 0, got 2"
+reveal_type(f("foo", "bar"))  # revealed: int
+```
+
+### No too-many-positional if variadic is taken
+
+```py
+def f(*args: int) -> int:
+    return 1
+
+reveal_type(f(1, 2, 3))  # revealed: int
+```
+
+## Missing arguments
+
+### No defaults or variadic
+
+```py
+def f(x: int) -> int:
+    return 1
+
+# error: 13 [missing-argument] "No argument provided for required parameter `x`"
+reveal_type(f())  # revealed: int
+```
+
+### With default
+
+```py
+def f(x: int, y: str = "foo") -> int:
+    return 1
+
+# error: 13 [missing-argument] "No argument provided for required parameter `x`"
+reveal_type(f())  # revealed: int
+```
+
+### Defaulted argument is not required
+
+```py
+def f(x: int = 1) -> int:
+    return 1
+
+reveal_type(f())  # revealed: int
+```
+
+### With variadic
+
+```py
+def f(x: int, *y: str) -> int:
+    return 1
+
+# error: 13 [missing-argument] "No argument provided for required parameter `x`"
+reveal_type(f())  # revealed: int
+```
+
+### Variadic argument is not required
+
+```py
+def f(*args: int) -> int:
+    return 1
+
+reveal_type(f())  # revealed: int
+```
+
+### Keywords argument is not required
+
+```py
+def f(**kwargs: int) -> int:
+    return 1
+
+reveal_type(f())  # revealed: int
+```
+
+## Unknown argument
+
+```py
+def f(x: int) -> int:
+    return 1
+
+# error: 20 [unknown-argument] "Argument `y` does not match any known parameter"
+reveal_type(f(x=1, y=2))  # revealed: int
+```
+
+## Parameter already assigned
+
+```py
+def f(x: int) -> int:
+    return 1
+
+# error: 18 [parameter-already-assigned] "Parameter `x` is already assigned"
+reveal_type(f(1, x=2))  # revealed: int
+```

@@ -40,9 +40,9 @@ class C:
         return 42
 
 x = C()
+# error: [invalid-argument-type]
 x -= 1
 
-# TODO: should error, once operand type check is implemented
 reveal_type(x)  # revealed: int
 ```
 
