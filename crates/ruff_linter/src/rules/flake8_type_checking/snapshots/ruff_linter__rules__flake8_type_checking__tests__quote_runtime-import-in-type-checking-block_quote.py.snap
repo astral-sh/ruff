@@ -21,19 +21,19 @@ quote.py:57:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in 
 61 61 | 
 62 62 | 
 
-quote.py:99:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in a type-checking block.
+quote.py:110:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in a type-checking block.
     |
- 98 |     if TYPE_CHECKING:
- 99 |         from pandas import DataFrame
+109 |     if TYPE_CHECKING:
+110 |         from pandas import DataFrame
     |                            ^^^^^^^^^ TCH004
-100 | 
-101 |     x: TypeAlias = DataFrame | None
+111 | 
+112 |     x: TypeAlias = DataFrame | None
     |
     = help: Quote references
 
 ℹ Unsafe fix
-98  98  |     if TYPE_CHECKING:
-99  99  |         from pandas import DataFrame
-100 100 | 
-101     |-    x: TypeAlias = DataFrame | None
-    101 |+    x: TypeAlias = "DataFrame | None"
+109 109 |     if TYPE_CHECKING:
+110 110 |         from pandas import DataFrame
+111 111 | 
+112     |-    x: TypeAlias = DataFrame | None
+    112 |+    x: TypeAlias = "DataFrame | None"

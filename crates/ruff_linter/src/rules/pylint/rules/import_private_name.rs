@@ -9,6 +9,7 @@ use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scop
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::package::PackageRoot;
 
 /// ## What it does
 /// Checks for import statements that import a private name (a name starting
@@ -106,6 +107,7 @@ pub(crate) fn import_private_name(
         // Ex) `from foo import _bar` within `foo/baz.py`
         if checker
             .package()
+            .map(PackageRoot::path)
             .is_some_and(|path| path.ends_with(root_module))
         {
             continue;

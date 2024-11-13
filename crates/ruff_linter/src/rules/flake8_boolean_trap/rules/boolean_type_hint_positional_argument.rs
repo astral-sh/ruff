@@ -27,6 +27,9 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// keyword-only argument, to force callers to be explicit when providing
 /// the argument.
 ///
+/// Dunder methods that define operators are exempt from this rule, as are
+/// setters and `@override` definitions.
+///
 /// In [preview], this rule will also flag annotations that include boolean
 /// variants, like `bool | int`.
 ///

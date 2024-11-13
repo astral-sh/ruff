@@ -2755,6 +2755,16 @@
     "RuffOptions": {
       "type": "object",
       "properties": {
+        "extend-markup-names": {
+          "description": "A list of additional callable names that behave like [`markupsafe.Markup`].\n\nExpects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than `literal`).\n\n[markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "parenthesize-tuple-in-subscript": {
           "description": "Whether to prefer accessing items keyed by tuples with parentheses around the tuple (see `RUF031`).",
           "type": [
@@ -3013,6 +3023,9 @@
         "DTZ01",
         "DTZ011",
         "DTZ012",
+        "DTZ9",
+        "DTZ90",
+        "DTZ901",
         "E",
         "E1",
         "E10",
@@ -3306,6 +3319,8 @@
         "LOG002",
         "LOG007",
         "LOG009",
+        "LOG01",
+        "LOG015",
         "N",
         "N8",
         "N80",
@@ -3601,6 +3616,7 @@
         "PLW15",
         "PLW150",
         "PLW1501",
+        "PLW1507",
         "PLW1508",
         "PLW1509",
         "PLW151",
@@ -3816,6 +3832,7 @@
         "RUF032",
         "RUF033",
         "RUF034",
+        "RUF035",
         "RUF1",
         "RUF10",
         "RUF100",

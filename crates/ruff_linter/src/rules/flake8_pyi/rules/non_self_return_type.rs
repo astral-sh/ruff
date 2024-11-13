@@ -191,7 +191,7 @@ fn add_diagnostic(
     /// Return an [`Edit`] that imports `typing.Self` from `typing` or `typing_extensions`.
     fn import_self(checker: &Checker, range: TextRange) -> Option<Edit> {
         let target_version = checker.settings.target_version.as_tuple();
-        let source_module = if checker.source_type.is_stub() || target_version >= (3, 11) {
+        let source_module = if target_version >= (3, 11) {
             "typing"
         } else {
             "typing_extensions"
@@ -200,10 +200,9 @@ fn add_diagnostic(
         let (importer, semantic) = (checker.importer(), checker.semantic());
         let request = ImportRequest::import_from(source_module, "Self");
 
-        let Ok((edit, ..)) = importer.get_or_import_symbol(&request, range.start(), semantic)
-        else {
-            return None;
-        };
+        let (edit, ..) = importer
+            .get_or_import_symbol(&request, range.start(), semantic)
+            .ok()?;
 
         Some(edit)
     }

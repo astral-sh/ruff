@@ -1,11 +1,10 @@
-use std::str::FromStr;
-
-use anyhow::{anyhow, Result};
-
+use anyhow::Result;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -33,26 +32,26 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct RedundantOpenModes {
-    replacement: Option<String>,
+    replacement: String,
 }
 
 impl AlwaysFixableViolation for RedundantOpenModes {
     #[derive_message_formats]
     fn message(&self) -> String {
-        match &self.replacement {
-            None => "Unnecessary open mode parameters".to_string(),
-            Some(replacement) => {
-                format!("Unnecessary open mode parameters, use \"{replacement}\"")
-            }
+        let RedundantOpenModes { replacement } = self;
+        if replacement.is_empty() {
+            "Unnecessary open mode parameters".to_string()
+        } else {
+            format!("Unnecessary open mode parameters, use \"{replacement}\"")
         }
     }
 
     fn fix_title(&self) -> String {
-        match &self.replacement {
-            None => "Remove open mode parameters".to_string(),
-            Some(replacement) => {
-                format!("Replace with \"{replacement}\"")
-            }
+        let RedundantOpenModes { replacement } = self;
+        if replacement.is_empty() {
+            "Remove open mode parameters".to_string()
+        } else {
+            format!("Replace with \"{replacement}\"")
         }
     }
 }
@@ -81,13 +80,17 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                         ..
                     }) = &keyword.value
                     {
-                        if let Ok(mode) = OpenMode::from_str(mode_param_value.to_str()) {
-                            checker.diagnostics.push(create_diagnostic(
-                                call,
-                                &keyword.value,
-                                mode.replacement_value(),
-                                checker.tokens(),
-                            ));
+                        if let Ok(mode) = OpenMode::from_chars(mode_param_value.chars()) {
+                            let reduced = mode.reduce();
+                            if reduced != mode {
+                                checker.diagnostics.push(create_diagnostic(
+                                    call,
+                                    &keyword.value,
+                                    reduced,
+                                    checker.tokens(),
+                                    checker.stylist(),
+                                ));
+                            }
                         }
                     }
                 }
@@ -95,57 +98,19 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
         }
         Some(mode_param) => {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param {
-                if let Ok(mode) = OpenMode::from_str(value.to_str()) {
-                    checker.diagnostics.push(create_diagnostic(
-                        call,
-                        mode_param,
-                        mode.replacement_value(),
-                        checker.tokens(),
-                    ));
+                if let Ok(mode) = OpenMode::from_chars(value.chars()) {
+                    let reduced = mode.reduce();
+                    if reduced != mode {
+                        checker.diagnostics.push(create_diagnostic(
+                            call,
+                            mode_param,
+                            reduced,
+                            checker.tokens(),
+                            checker.stylist(),
+                        ));
+                    }
                 }
             }
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-enum OpenMode {
-    U,
-    Ur,
-    Ub,
-    RUb,
-    R,
-    Rt,
-    Wt,
-}
-
-impl FromStr for OpenMode {
-    type Err = anyhow::Error;
-
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        match string {
-            "U" => Ok(Self::U),
-            "Ur" => Ok(Self::Ur),
-            "Ub" => Ok(Self::Ub),
-            "rUb" => Ok(Self::RUb),
-            "r" => Ok(Self::R),
-            "rt" => Ok(Self::Rt),
-            "wt" => Ok(Self::Wt),
-            _ => Err(anyhow!("Unknown open mode: {}", string)),
-        }
-    }
-}
-
-impl OpenMode {
-    fn replacement_value(self) -> Option<&'static str> {
-        match self {
-            Self::U => None,
-            Self::Ur => None,
-            Self::Ub => Some("\"rb\""),
-            Self::RUb => Some("\"rb\""),
-            Self::R => None,
-            Self::Rt => None,
-            Self::Wt => Some("\"w\""),
         }
     }
 }
@@ -153,24 +118,25 @@ impl OpenMode {
 fn create_diagnostic(
     call: &ast::ExprCall,
     mode_param: &Expr,
-    replacement_value: Option<&str>,
+    mode: OpenMode,
     tokens: &Tokens,
+    stylist: &Stylist,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
-            replacement: replacement_value.map(ToString::to_string),
+            replacement: mode.to_string(),
         },
         call.range(),
     );
 
-    if let Some(content) = replacement_value {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            content.to_string(),
-            mode_param.range(),
-        )));
-    } else {
+    if mode.is_empty() {
         diagnostic
             .try_set_fix(|| create_remove_param_fix(call, mode_param, tokens).map(Fix::safe_edit));
+    } else {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            format!("{}{mode}{}", stylist.quote(), stylist.quote()),
+            mode_param.range(),
+        )));
     }
 
     diagnostic

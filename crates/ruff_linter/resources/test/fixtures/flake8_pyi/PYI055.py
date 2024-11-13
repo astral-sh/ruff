@@ -30,6 +30,9 @@ def func():
     # PYI055
     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+    z: Union[  # comment
+        type[requests_mock.Mocker], # another comment
+        type[httpretty], type[str]] = requests_mock.Mocker
 
 
 def func():

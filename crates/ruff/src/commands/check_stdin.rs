@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
-
+use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
 use ruff_workspace::resolver::{match_exclusion, python_file_at_path, PyprojectConfig, Resolver};
@@ -42,6 +42,7 @@ pub(crate) fn check_stdin(
     let stdin = read_from_stdin()?;
     let package_root = filename.and_then(Path::parent).and_then(|path| {
         packaging::detect_package_root(path, &resolver.base_settings().linter.namespace_packages)
+            .map(PackageRoot::root)
     });
     let mut diagnostics = lint_stdin(
         filename,

@@ -1387,6 +1387,7 @@ impl Flake8ImportConventionsOptions {
         }
     }
 }
+
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3005,6 +3006,19 @@ pub struct RuffOptions {
         "#
     )]
     pub parenthesize_tuple_in_subscript: Option<bool>,
+
+    /// A list of additional callable names that behave like [`markupsafe.Markup`].
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
+    /// `literal`).
+    ///
+    /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
+    )]
+    pub extend_markup_names: Option<Vec<String>>,
 }
 
 impl RuffOptions {
@@ -3013,6 +3027,7 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
+            extend_markup_names: self.extend_markup_names.unwrap_or_default(),
         }
     }
 }

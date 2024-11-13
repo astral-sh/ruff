@@ -8,6 +8,7 @@ use std::process::Command;
 use std::str;
 
 use anyhow::Result;
+use assert_fs::fixture::{ChildPath, FileTouch, PathChild};
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
@@ -1224,10 +1225,7 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
     let ignored = tempdir.path().join("ignored.py");
     fs::write(ignored, "")?;
 
-    insta::with_settings!({filters => vec![
-        // Replace windows paths
-        (r"\\", "/"),
-    ]}, {
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
@@ -1916,5 +1914,60 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
 
     ----- stderr -----
     "###);
+    Ok(())
+}
+
+/// Verify that implicit namespace packages are detected even when they are nested.
+///
+/// See: <https://github.com/astral-sh/ruff/issues/13519>
+#[test]
+fn nested_implicit_namespace_package() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("foo").child("__init__.py").touch()?;
+    root.child("foo")
+        .child("bar")
+        .child("baz")
+        .child("__init__.py")
+        .touch()?;
+    root.child("foo")
+        .child("bar")
+        .child("baz")
+        .child("bop.py")
+        .touch()?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--select")
+        .arg("INP")
+        .current_dir(&tempdir)
+        , @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###);
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--select")
+            .arg("INP")
+            .arg("--preview")
+            .current_dir(&tempdir)
+            , @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+        Found 1 error.
+
+        ----- stderr -----
+        "###);
+    });
+
     Ok(())
 }

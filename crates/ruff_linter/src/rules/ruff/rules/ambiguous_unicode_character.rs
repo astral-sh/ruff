@@ -302,9 +302,9 @@ bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct WordFlags: u8 {
         /// The word contains at least one ASCII character (like `B`).
-        const ASCII = 0b0000_0001;
+        const ASCII = 1 << 0;
         /// The word contains at least one unambiguous unicode character (like `β`).
-        const UNAMBIGUOUS_UNICODE = 0b0000_0010;
+        const UNAMBIGUOUS_UNICODE = 1 << 1;
     }
 }
 

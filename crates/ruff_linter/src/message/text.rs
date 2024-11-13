@@ -22,11 +22,11 @@ bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
         /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS    = 0b0000_0001;
+        const SHOW_FIX_STATUS   = 1 << 0;
         /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF      = 0b0000_0010;
+        const SHOW_FIX_DIFF     = 1 << 1;
         /// Whether to show the source code of a diagnostic.
-        const SHOW_SOURCE        = 0b0000_0100;
+        const SHOW_SOURCE       = 1 << 2;
     }
 }
 

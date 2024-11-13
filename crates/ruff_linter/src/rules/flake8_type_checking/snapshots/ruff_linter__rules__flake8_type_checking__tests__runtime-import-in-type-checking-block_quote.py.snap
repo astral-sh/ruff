@@ -26,13 +26,13 @@ quote.py:57:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking b
 59 60 |     def func(value: DataFrame):
 60 61 |         ...
 
-quote.py:99:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
+quote.py:110:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
     |
- 98 |     if TYPE_CHECKING:
- 99 |         from pandas import DataFrame
+109 |     if TYPE_CHECKING:
+110 |         from pandas import DataFrame
     |                            ^^^^^^^^^ TCH004
-100 | 
-101 |     x: TypeAlias = DataFrame | None
+111 | 
+112 |     x: TypeAlias = DataFrame | None
     |
     = help: Move out of type-checking block
 
@@ -42,10 +42,10 @@ quote.py:99:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking b
 2   3   |     from pandas import DataFrame
 3   4   | 
 --------------------------------------------------------------------------------
-96  97  |     from typing import TypeAlias, TYPE_CHECKING
-97  98  | 
-98  99  |     if TYPE_CHECKING:
-99      |-        from pandas import DataFrame
-    100 |+        pass
-100 101 | 
-101 102 |     x: TypeAlias = DataFrame | None
+107 108 |     from typing import TypeAlias, TYPE_CHECKING
+108 109 | 
+109 110 |     if TYPE_CHECKING:
+110     |-        from pandas import DataFrame
+    111 |+        pass
+111 112 | 
+112 113 |     x: TypeAlias = DataFrame | None
