@@ -85,3 +85,14 @@ def f():
 
     def test_optional_literal_no_removal(arg: Optional[Literal["red", "blue"]]):
         pass
+
+
+def f():
+    from typing import Annotated
+
+    from fastapi import Depends
+
+    from .foo import get_foo
+
+    def test_annotated_non_typing_reference(user: Annotated[str, Depends(get_foo)]):
+        pass
