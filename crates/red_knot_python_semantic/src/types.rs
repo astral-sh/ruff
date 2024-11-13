@@ -1197,14 +1197,40 @@ impl<'db> Type<'db> {
                 // TODO: see above
                 Truthiness::Ambiguous
             }
-            Type::Instance(InstanceType { class }) => {
-                // TODO: lookup `__bool__` and `__len__` methods on the instance's class
-                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                // For now, we only special-case some builtin classes
+            instance_ty @ Type::Instance(InstanceType { class }) => {
                 if class.is_known(db, KnownClass::NoneType) {
                     Truthiness::AlwaysFalse
                 } else {
-                    Truthiness::Ambiguous
+                    // We only check the `__bool__` method for truth testing, even though at
+                    // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
+                    // and a subclass could add a `__bool__` method. We don't use
+                    // `Type::call_dunder` here because of the need to check for `__bool__ = bool`.
+
+                    // Don't trust a maybe-unbound `__bool__` method.
+                    let Symbol::Type(bool_method, Boundness::Bound) =
+                        instance_ty.to_meta_type(db).member(db, "__bool__")
+                    else {
+                        return Truthiness::Ambiguous;
+                    };
+
+                    // Check if the class has `__bool__ = bool` and avoid infinite recursion, since
+                    // `Type::call` on `bool` will call `Type::bool` on the argument.
+                    if bool_method
+                        .into_class_literal()
+                        .is_some_and(|ClassLiteralType { class }| {
+                            class.is_known(db, KnownClass::Bool)
+                        })
+                    {
+                        return Truthiness::Ambiguous;
+                    }
+
+                    if let Some(Type::BooleanLiteral(bool_val)) =
+                        bool_method.call(db, &[*instance_ty]).return_ty(db)
+                    {
+                        bool_val.into()
+                    } else {
+                        Truthiness::Ambiguous
+                    }
                 }
             }
             Type::KnownInstance(known_instance) => known_instance.bool(),
