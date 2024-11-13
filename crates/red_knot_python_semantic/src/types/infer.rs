@@ -2164,7 +2164,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
-            ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
+            ast::Expr::IpyEscapeCommand(_) => {
+                // TODO Implement Ipy escape command support
+                Type::Todo
+            }
         };
 
         self.store_expression_type(expression, ty);
