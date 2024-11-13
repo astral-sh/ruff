@@ -11,10 +11,6 @@ use crate::Db;
 type AnnotationParseResult = Result<Parsed<ModExpression>, TypeCheckDiagnostics>;
 
 /// Parses the given expression as a string annotation.
-///
-/// # Panics
-///
-/// Panics if the expression is not a string literal.
 pub(crate) fn parse_string_annotation(
     db: &dyn Db,
     file: File,
@@ -32,13 +28,11 @@ pub(crate) fn parse_string_annotation(
             diagnostics.add(
                 string_literal.into(),
                 "annotation-raw-string",
-                format_args!("Type expressions cannot be use raw string literal"),
+                format_args!("Type expressions cannot use raw string literal"),
             );
-        }
-
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
-        if raw_contents(node_text)
+        } else if raw_contents(node_text)
             .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
         {
             let range_excluding_quotes = string_literal
@@ -46,6 +40,13 @@ pub(crate) fn parse_string_annotation(
                 .add_start(string_literal.flags.opener_len())
                 .sub_end(string_literal.flags.closer_len());
 
+            // TODO: Support multiline strings like:
+            // ```py
+            // x: """
+            //     int
+            //     | float
+            // """ = 1
+            // ```
             match parse_expression_range(source.as_str(), range_excluding_quotes) {
                 Ok(parsed) => return Ok(parsed),
                 Err(parse_error) => diagnostics.add(

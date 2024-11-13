@@ -4115,6 +4115,24 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
 
+            ast::Expr::BytesLiteral(bytes) => {
+                self.diagnostics.add(
+                    bytes.into(),
+                    "annotation-byte-string",
+                    format_args!("Type expressions cannot use bytes literal"),
+                );
+                Type::Unknown
+            }
+
+            ast::Expr::FString(fstring) => {
+                self.diagnostics.add(
+                    fstring.into(),
+                    "annotation-f-string",
+                    format_args!("Type expressions cannot use f-strings"),
+                );
+                Type::Unknown
+            }
+
             // All other annotation expressions are (possibly) valid type expressions, so handle
             // them there instead.
             type_expr => self.infer_type_expression_no_store(type_expr),
