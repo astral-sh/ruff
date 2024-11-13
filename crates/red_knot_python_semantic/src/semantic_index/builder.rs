@@ -703,10 +703,7 @@ where
                 // See https://docs.python.org/3/library/ast.html#ast.AugAssign
                 if matches!(
                     **target,
-                    ast::Expr::Attribute(_)
-                        | ast::Expr::Subscript(_)
-                        | ast::Expr::Starred(_)
-                        | ast::Expr::Name(_)
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
                 ) {
                     self.push_assignment(aug_assign.into());
                     self.visit_expr(target);
