@@ -87,6 +87,11 @@ impl ResolvedReference {
             .intersects(SemanticModelFlags::DEFERRED_TYPE_DEFINITION)
     }
 
+    /// Return `true` if the context is in any kind of type definition.
+    pub const fn in_type_definition(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPE_DEFINITION)
+    }
+
     /// Return `true` if the context is in a type-checking block.
     pub const fn in_type_checking_block(&self) -> bool {
         self.flags

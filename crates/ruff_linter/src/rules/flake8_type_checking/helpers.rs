@@ -19,10 +19,13 @@ use crate::rules::flake8_type_checking::settings::Settings;
 /// context (with quoting enabled).
 pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
     reference.in_type_checking_block()
-        || reference.in_typing_only_annotation()
-        || reference.in_complex_string_type_definition()
-        || reference.in_simple_string_type_definition()
-        || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())
+        // if we're not in a type checking block, we necessarily need to be within a
+        // type definition to be considered a typing reference
+        || (reference.in_type_definition()
+            && (reference.in_typing_only_annotation()
+                || reference.in_complex_string_type_definition()
+                || reference.in_simple_string_type_definition()
+                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
