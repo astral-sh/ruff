@@ -4084,16 +4084,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
 
         match expression {
-            ast::Expr::Name(name) => {
-                debug_assert_eq!(name.ctx, ast::ExprContext::Load);
-                self.infer_name_expression(name).to_instance(self.db)
-            }
+            ast::Expr::Name(name) => match name.ctx {
+                ast::ExprContext::Load => self.infer_name_expression(name).to_instance(self.db),
+                ast::ExprContext::Invalid => Type::Unknown,
+                ast::ExprContext::Store | ast::ExprContext::Del => Type::Todo,
+            },
 
-            ast::Expr::Attribute(attribute_expression) => {
-                debug_assert_eq!(attribute_expression.ctx, ast::ExprContext::Load);
-                self.infer_attribute_expression(attribute_expression)
-                    .to_instance(self.db)
-            }
+            ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
+                ast::ExprContext::Load => self
+                    .infer_attribute_expression(attribute_expression)
+                    .to_instance(self.db),
+                ast::ExprContext::Invalid => Type::Unknown,
+                ast::ExprContext::Store | ast::ExprContext::Del => Type::Todo,
+            },
 
             ast::Expr::NoneLiteral(_literal) => Type::none(self.db),
 
