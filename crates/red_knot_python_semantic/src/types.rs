@@ -1209,13 +1209,14 @@ impl<'db> Type<'db> {
                     // infinite recursion, since `Type::call` on `bool` will call `Type::bool`
                     // on the argument.
                     let bool_method = instance_ty.to_meta_type(db).member(db, "__bool__");
-                    if bool_method.as_type().is_some_and(|method_ty| {
-                        method_ty
-                            .into_class_literal()
-                            .is_some_and(|ClassLiteralType { class }| {
-                                class.is_known(db, KnownClass::Bool)
-                            })
-                    }) {
+                    if bool_method
+                        .ignore_possibly_unbound()
+                        .is_some_and(|method_ty| {
+                            method_ty.into_class_literal().is_some_and(
+                                |ClassLiteralType { class }| class.is_known(db, KnownClass::Bool),
+                            )
+                        })
+                    {
                         return Truthiness::Ambiguous;
                     }
                     if let Some(bool_rt) = instance_ty

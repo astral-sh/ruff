@@ -198,4 +198,16 @@ class MethodBoolInvalid:
 
 # revealed: bool
 reveal_type(not MethodBoolInvalid())
+
+# Don't trust a possibly-unbound `__bool__` method:
+def get_flag() -> bool:
+    return True
+
+class PossiblyUnboundBool:
+    if get_flag():
+        def __bool__(self) -> Literal[False]:
+            return False
+
+# revealed: bool
+reveal_type(not PossiblyUnboundBool())
 ```
