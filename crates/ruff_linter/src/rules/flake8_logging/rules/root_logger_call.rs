@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// `debug`, `info`, `warn`, `warning`, `error`, `critical`, `log`, `exception`.
 ///
 /// ## Why is this bad?
-/// Using the root logger causes the messages have no source information,
+/// Using the root logger causes the messages to have no source information,
 /// making them less useful for debugging.
 ///
 /// ## Example
