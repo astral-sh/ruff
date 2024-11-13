@@ -2360,6 +2360,7 @@ dependencies = [
  "rayon",
  "red_knot_python_semantic",
  "red_knot_vendored",
+ "regex",
  "ruff_cache",
  "ruff_db",
  "ruff_python_ast",

@@ -5,11 +5,11 @@ snapshot_kind: text
 ---
 Ok(
     WorkspaceMetadata {
-        root: "/app",
+        root: "<ROOT>",
         packages: [
             PackageMetadata {
                 name: Name("workspace-root"),
-                root: "/app",
+                root: "<ROOT>",
                 configuration: Configuration {
                     target_version: None,
                     search_paths: SearchPathConfiguration {
@@ -29,7 +29,7 @@ Ok(
                 },
                 search_paths: SearchPathSettings {
                     extra_paths: [],
-                    workspace_root: "/app",
+                    workspace_root: "<ROOT>",
                     custom_typeshed: None,
                     site_packages: Known(
                         [],

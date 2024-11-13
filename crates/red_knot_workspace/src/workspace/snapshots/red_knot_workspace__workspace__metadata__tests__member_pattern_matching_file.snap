@@ -3,39 +3,37 @@ source: crates/red_knot_workspace/src/workspace/metadata.rs
 expression: "&workspace"
 snapshot_kind: text
 ---
-Ok(
-    WorkspaceMetadata {
-        root: "/app",
-        packages: [
-            PackageMetadata {
-                name: Name("workspace-root"),
-                root: "/app",
-                configuration: Configuration {
-                    target_version: None,
-                    search_paths: SearchPathConfiguration {
-                        extra_paths: None,
-                        src_root: None,
-                        custom_typeshed: None,
-                        site_packages: None,
-                    },
-                },
-            },
-        ],
-        settings: WorkspaceSettings {
-            program: ProgramSettings {
-                target_version: PythonVersion {
-                    major: 3,
-                    minor: 8,
-                },
-                search_paths: SearchPathSettings {
-                    extra_paths: [],
-                    workspace_root: "/app",
+WorkspaceMetadata {
+    root: "<ROOT>",
+    packages: [
+        PackageMetadata {
+            name: Name("workspace-root"),
+            root: "<ROOT>",
+            configuration: Configuration {
+                target_version: None,
+                search_paths: SearchPathConfiguration {
+                    extra_paths: None,
+                    src_root: None,
                     custom_typeshed: None,
-                    site_packages: Known(
-                        [],
-                    ),
+                    site_packages: None,
                 },
             },
         },
+    ],
+    settings: WorkspaceSettings {
+        program: ProgramSettings {
+            target_version: PythonVersion {
+                major: 3,
+                minor: 8,
+            },
+            search_paths: SearchPathSettings {
+                extra_paths: [],
+                workspace_root: "<ROOT>",
+                custom_typeshed: None,
+                site_packages: Known(
+                    [],
+                ),
+            },
+        },
     },
-)
+}

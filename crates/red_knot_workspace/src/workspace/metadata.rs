@@ -417,9 +417,23 @@ mod tests {
 
     use anyhow::Context;
     use insta::assert_debug_snapshot;
-    use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 
     use crate::workspace::WorkspaceMetadata;
+
+    /// Filter a path for use in snapshots; in particular, match the Windows debug representation
+    /// of a path.
+    ///
+    /// We replace backslashes to match the debug representation for paths, and match _either_
+    /// backslashes or forward slashes as the latter appear when constructing a path from a URL.
+    fn path_filter(path: &SystemPath) -> String {
+        regex::escape(path.as_str()).replace(r"\\", r"(\\\\|/)")
+    }
+
+    /// Return the insta filters for a given path.
+    fn path_filters(filter: &str) -> Vec<(&str, &str)> {
+        vec![(filter, "<ROOT>"), (r"\\\\", "/")]
+    }
 
     #[test]
     fn package_without_pyproject() -> anyhow::Result<()> {
@@ -436,7 +450,11 @@ mod tests {
 
         assert_eq!(workspace.root(), &*root);
 
-        assert_debug_snapshot!(&workspace);
+        insta::with_settings!({
+            filters => path_filters(&path_filter(workspace.root())),
+        }, {
+            assert_debug_snapshot!(&workspace);
+        });
 
         Ok(())
     }
@@ -454,9 +472,9 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "backend"
-            "#,
+                    [project]
+                    name = "backend"
+                    "#,
                 ),
             ])
             .context("Failed to write files")?;
@@ -465,7 +483,11 @@ mod tests {
             .context("Failed to discover workspace")?;
 
         assert_eq!(workspace.root(), &*root);
-        assert_debug_snapshot!(&workspace);
+        insta::with_settings!({
+            filters => path_filters(&path_filter(workspace.root())),
+        }, {
+            assert_debug_snapshot!(&workspace);
+        });
 
         // Discovering the same package from a subdirectory should give the same result
         let from_src = WorkspaceMetadata::discover(&root.join("src"), &system, None)
@@ -489,27 +511,27 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "workspace-root"
+                    [project]
+                    name = "workspace-root"
 
-                [tool.knot.workspace]
-                members = ["members/*"]
-                exclude = ["members/excluded"]
-            "#,
+                    [tool.knot.workspace]
+                    members = ["members/*"]
+                    exclude = ["members/excluded"]
+                    "#,
                 ),
                 (
                     root.join("members/a/pyproject.toml"),
                     r#"
-                [project]
-                name = "member-a"
-                "#,
+                    [project]
+                    name = "member-a"
+                    "#,
                 ),
                 (
                     root.join("members/x/pyproject.toml"),
                     r#"
-                [project]
-                name = "member-x"
-                "#,
+                    [project]
+                    name = "member-x"
+                    "#,
                 ),
             ])
             .context("Failed to write files")?;
@@ -518,7 +540,11 @@ mod tests {
             .context("Failed to discover workspace")?;
 
         assert_eq!(workspace.root(), &*root);
-        assert_debug_snapshot!(&workspace);
+        insta::with_settings!({
+            filters => path_filters(&path_filter(workspace.root())),
+        }, {
+            assert_debug_snapshot!(&workspace);
+        });
 
         // Discovering the same package from a member should give the same result
         let from_src = WorkspaceMetadata::discover(&root.join("members/a"), &system, None)
@@ -542,27 +568,27 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "workspace-root"
+                    [project]
+                    name = "workspace-root"
 
-                [tool.knot.workspace]
-                members = ["members/*"]
-                exclude = ["members/excluded"]
-            "#,
+                    [tool.knot.workspace]
+                    members = ["members/*"]
+                    exclude = ["members/excluded"]
+                    "#,
                 ),
                 (
                     root.join("members/a/pyproject.toml"),
                     r#"
-                [project]
-                name = "member-a"
-                "#,
+                    [project]
+                    name = "member-a"
+                    "#,
                 ),
                 (
                     root.join("members/excluded/pyproject.toml"),
                     r#"
-                [project]
-                name = "member-x"
-                "#,
+                    [project]
+                    name = "member-x"
+                    "#,
                 ),
             ])
             .context("Failed to write files")?;
@@ -571,7 +597,11 @@ mod tests {
             .context("Failed to discover workspace")?;
 
         assert_eq!(workspace.root(), &*root);
-        assert_debug_snapshot!(&workspace);
+        insta::with_settings!({
+            filters => path_filters(&path_filter(workspace.root())),
+        }, {
+            assert_debug_snapshot!(&workspace);
+        });
 
         // Discovering the `workspace` for `excluded` should discover a single-package workspace
         let excluded_workspace =
@@ -596,26 +626,26 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "workspace-root"
+                    [project]
+                    name = "workspace-root"
 
-                [tool.knot.workspace]
-                members = ["members/*"]
-            "#,
+                    [tool.knot.workspace]
+                    members = ["members/*"]
+                    "#,
                 ),
                 (
                     root.join("members/a/pyproject.toml"),
                     r#"
-                [project]
-                name = "member"
-                "#,
+                    [project]
+                    name = "member"
+                    "#,
                 ),
                 (
                     root.join("members/b/pyproject.toml"),
                     r#"
-                [project]
-                name = "member"
-                "#,
+                    [project]
+                    name = "member"
+                    "#,
                 ),
             ])
             .context("Failed to write files")?;
@@ -645,22 +675,22 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "workspace-root"
+                    [project]
+                    name = "workspace-root"
 
-                [tool.knot.workspace]
-                members = ["members/*"]
-            "#,
+                    [tool.knot.workspace]
+                    members = ["members/*"]
+                    "#,
                 ),
                 (
                     root.join("members/a/pyproject.toml"),
                     r#"
-                [project]
-                name = "nested-workspace"
+                    [project]
+                    name = "nested-workspace"
 
-                [tool.knot.workspace]
-                members = ["members/*"]
-                "#,
+                    [tool.knot.workspace]
+                    members = ["members/*"]
+                    "#,
                 ),
             ])
             .context("Failed to write files")?;
@@ -690,12 +720,12 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "workspace-root"
+                    [project]
+                    name = "workspace-root"
 
-                [tool.knot.workspace]
-                members = ["members/*"]
-            "#,
+                    [tool.knot.workspace]
+                    members = ["members/*"]
+                    "#,
                 ),
                 (root.join("members/a/test.py"), ""),
             ])
@@ -729,12 +759,12 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "workspace-root"
+                    [project]
+                    name = "workspace-root"
 
-                [tool.knot.workspace]
-                members = ["members/*"]
-            "#,
+                    [tool.knot.workspace]
+                    members = ["members/*"]
+                    "#,
                 ),
                 (root.join("members/.hidden/a.py"), ""),
             ])
@@ -742,7 +772,11 @@ mod tests {
 
         let workspace = WorkspaceMetadata::discover(&root, &system, None);
 
-        assert_debug_snapshot!(&workspace);
+        insta::with_settings!({
+            filters => path_filters(&path_filter(&root)),
+        }, {
+            assert_debug_snapshot!(&workspace);
+        });
 
         Ok(())
     }
@@ -760,20 +794,24 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "workspace-root"
+                    [project]
+                    name = "workspace-root"
 
-                [tool.knot.workspace]
-                members = ["members/*"]
-            "#,
+                    [tool.knot.workspace]
+                    members = ["members/*"]
+                    "#,
                 ),
                 (root.join("members/.DS_STORE"), ""),
             ])
             .context("Failed to write files")?;
 
-        let workspace = WorkspaceMetadata::discover(&root, &system, None);
+        let workspace = WorkspaceMetadata::discover(&root, &system, None)?;
 
-        assert_debug_snapshot!(&workspace);
+        insta::with_settings!({
+            filters => path_filters(&path_filter(workspace.root())),
+        }, {
+            assert_debug_snapshot!(&workspace);
+        });
 
         Ok(())
     }
@@ -791,19 +829,19 @@ mod tests {
                 (
                     root.join("pyproject.toml"),
                     r#"
-                [project]
-                name = "workspace-root"
+                    [project]
+                    name = "workspace-root"
 
-                [tool.knot.workspace]
-                members = ["../members/*"]
-            "#,
+                    [tool.knot.workspace]
+                    members = ["../members/*"]
+                    "#,
                 ),
                 (
                     root.join("../members/a/pyproject.toml"),
                     r#"
-                [project]
-                name = "a"
-                "#,
+                    [project]
+                    name = "a"
+                    "#,
                 ),
             ])
             .context("Failed to write files")?;

@@ -1,6 +1,6 @@
 use crate::db::{Db, RootDatabase};
 use crate::watch;
-use crate::watch::{CreatedKind, DeletedKind};
+use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::workspace::settings::Configuration;
 use crate::workspace::{Workspace, WorkspaceMetadata};
 use red_knot_python_semantic::Program;
@@ -57,7 +57,9 @@ impl RootDatabase {
                     // Changes to ignore files or settings can change the workspace structure or add/remove files
                     // from packages.
                     if let Some(package) = workspace.package(self, path) {
-                        if package.root(self) == workspace.root(self) {
+                        if package.root(self) == workspace.root(self)
+                            || matches!(change, ChangeEvent::Deleted { .. })
+                        {
                             workspace_change = true;
                         }
 

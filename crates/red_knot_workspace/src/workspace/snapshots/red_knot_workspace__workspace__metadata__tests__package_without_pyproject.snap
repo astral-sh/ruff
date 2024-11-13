@@ -4,11 +4,11 @@ expression: "&workspace"
 snapshot_kind: text
 ---
 WorkspaceMetadata {
-    root: "/app",
+    root: "<ROOT>",
     packages: [
         PackageMetadata {
             name: Name("app"),
-            root: "/app",
+            root: "<ROOT>",
             configuration: Configuration {
                 target_version: None,
                 search_paths: SearchPathConfiguration {
@@ -28,7 +28,7 @@ WorkspaceMetadata {
             },
             search_paths: SearchPathSettings {
                 extra_paths: [],
-                workspace_root: "/app",
+                workspace_root: "<ROOT>",
                 custom_typeshed: None,
                 site_packages: Known(
                     [],

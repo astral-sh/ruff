@@ -566,6 +566,12 @@ impl PackageTree {
         }
     }
 
+    // The package table should never be empty, that's why `is_empty` makes little sense
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn iter(&self) -> PackageTreeIter {
         PackageTreeIter(self.0.values())
     }
