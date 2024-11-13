@@ -1,7 +1,3 @@
-// TODO support untitled files for the LSP use case. Wrap a `str` and `String`
-//    The main question is how `as_std_path` would work for untitled files, that can only exist in the LSP case
-//    but there's no compile time guarantee that a [`OsSystem`] never gets an untitled file path.
-
 use camino::{Utf8Path, Utf8PathBuf};
 use std::borrow::Borrow;
 use std::fmt::Formatter;
@@ -21,6 +17,32 @@ impl SystemPath {
         // SAFETY: FsPath is marked as #[repr(transparent)] so the conversion from a
         // *const Utf8Path to a *const FsPath is valid.
         unsafe { &*(path as *const Utf8Path as *const SystemPath) }
+    }
+
+    /// Takes any path, and when possible, converts Windows UNC paths to regular paths.
+    /// If the path can't be converted, it's returned unmodified.
+    ///
+    /// On non-Windows this is no-op.
+    ///
+    /// `\\?\C:\Windows` will be converted to `C:\Windows`,
+    /// but `\\?\C:\COM` will be left as-is (due to a reserved filename).
+    ///
+    /// Use this to pass arbitrary paths to programs that may not be UNC-aware.
+    ///
+    /// It's generally safe to pass UNC paths to legacy programs, because
+    /// these paths contain a reserved prefix, so will gracefully fail
+    /// if used with legacy APIs that don't support UNC.
+    ///
+    /// This function does not perform any I/O.
+    ///
+    /// Currently paths with unpaired surrogates aren't converted even if they
+    /// could be, due to limitations of Rust's `OsStr` API.
+    ///
+    /// To check if a path remained as UNC, use `path.as_os_str().as_encoded_bytes().starts_with(b"\\\\")`.
+    #[inline]
+    pub fn simplified(&self) -> &SystemPath {
+        // SAFETY: simplified only trims the path, that means the returned path must be a valid UTF-8 path.
+        SystemPath::from_std_path(dunce::simplified(self.as_std_path())).unwrap()
     }
 
     /// Extracts the file extension, if possible.

@@ -7,6 +7,7 @@ use crate::workspace::pyproject::{PyProject, PyProjectError, Workspace};
 use crate::workspace::settings::{Configuration, WorkspaceSettings};
 
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct WorkspaceMetadata {
     pub(super) root: SystemPathBuf,
 
@@ -19,6 +20,7 @@ pub struct WorkspaceMetadata {
 
 /// A first-party package in a workspace.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct PackageMetadata {
     pub(super) name: Name,
 
@@ -79,7 +81,7 @@ impl WorkspaceMetadata {
                 let pyproject = PyProject::from_str(&pyproject_str).map_err(|error| {
                     WorkspaceDiscoveryError::InvalidPyProject {
                         path: pyproject_path,
-                        source: error,
+                        source: Box::new(error),
                     }
                 })?;
 
@@ -101,7 +103,7 @@ impl WorkspaceMetadata {
                         base_configuration,
                         system,
                     )? {
-                        CollectedPackagesOrStandalone::Packages(packages) => {
+                        CollectedPackagesOrStandalone::Packages(mut packages) => {
                             let mut by_name =
                                 FxHashMap::with_capacity_and_hasher(packages.len(), FxBuildHasher);
 
@@ -112,7 +114,7 @@ impl WorkspaceMetadata {
                                     return Err(WorkspaceDiscoveryError::DuplicatePackageNames {
                                         name: package.name().clone(),
                                         first: conflicting.root().to_path_buf(),
-                                        second: conflicting.root().to_path_buf(),
+                                        second: package.root().to_path_buf(),
                                     });
                                 }
 
@@ -133,6 +135,8 @@ impl WorkspaceMetadata {
                             let settings = workspace_package
                                 .configuration
                                 .to_workspace_settings(workspace_root, &packages);
+
+                            packages.sort_unstable_by(|a, b| a.root().cmp(b.root()));
 
                             return Ok(Self {
                                 root: workspace_root.to_path_buf(),
@@ -326,7 +330,7 @@ fn collect_packages(
 
         let pyproject = PyProject::from_str(&pyproject_str).map_err(|error| {
             WorkspaceDiscoveryError::InvalidPyProject {
-                source: error,
+                source: Box::new(error),
                 path: pyproject_path,
             }
         })?;
@@ -388,7 +392,7 @@ pub enum WorkspaceDiscoveryError {
 
     #[error("{path} is not a valid `pyproject.toml`: {source}")]
     InvalidPyProject {
-        source: PyProjectError,
+        source: Box<PyProjectError>,
         path: SystemPathBuf,
     },
 
@@ -415,25 +419,12 @@ pub enum WorkspaceDiscoveryError {
 mod tests {
     //! Integration tests for workspace discovery
 
+    use crate::snapshot_workspace;
     use anyhow::Context;
-    use insta::assert_debug_snapshot;
-    use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
+    use insta::assert_ron_snapshot;
+    use ruff_db::system::{SystemPathBuf, TestSystem};
 
-    use crate::workspace::WorkspaceMetadata;
-
-    /// Filter a path for use in snapshots; in particular, match the Windows debug representation
-    /// of a path.
-    ///
-    /// We replace backslashes to match the debug representation for paths, and match _either_
-    /// backslashes or forward slashes as the latter appear when constructing a path from a URL.
-    fn path_filter(path: &SystemPath) -> String {
-        regex::escape(path.as_str()).replace(r"\\", r"(\\\\|/)")
-    }
-
-    /// Return the insta filters for a given path.
-    fn path_filters(filter: &str) -> Vec<(&str, &str)> {
-        vec![(filter, "<ROOT>"), (r"\\\\", "/")]
-    }
+    use crate::workspace::{WorkspaceDiscoveryError, WorkspaceMetadata};
 
     #[test]
     fn package_without_pyproject() -> anyhow::Result<()> {
@@ -450,11 +441,7 @@ mod tests {
 
         assert_eq!(workspace.root(), &*root);
 
-        insta::with_settings!({
-            filters => path_filters(&path_filter(workspace.root())),
-        }, {
-            assert_debug_snapshot!(&workspace);
-        });
+        snapshot_workspace!(workspace);
 
         Ok(())
     }
@@ -483,11 +470,7 @@ mod tests {
             .context("Failed to discover workspace")?;
 
         assert_eq!(workspace.root(), &*root);
-        insta::with_settings!({
-            filters => path_filters(&path_filter(workspace.root())),
-        }, {
-            assert_debug_snapshot!(&workspace);
-        });
+        snapshot_workspace!(workspace);
 
         // Discovering the same package from a subdirectory should give the same result
         let from_src = WorkspaceMetadata::discover(&root.join("src"), &system, None)
@@ -515,19 +498,19 @@ mod tests {
                     name = "workspace-root"
 
                     [tool.knot.workspace]
-                    members = ["members/*"]
-                    exclude = ["members/excluded"]
+                    members = ["packages/*"]
+                    exclude = ["packages/excluded"]
                     "#,
                 ),
                 (
-                    root.join("members/a/pyproject.toml"),
+                    root.join("packages/a/pyproject.toml"),
                     r#"
                     [project]
                     name = "member-a"
                     "#,
                 ),
                 (
-                    root.join("members/x/pyproject.toml"),
+                    root.join("packages/x/pyproject.toml"),
                     r#"
                     [project]
                     name = "member-x"
@@ -540,14 +523,11 @@ mod tests {
             .context("Failed to discover workspace")?;
 
         assert_eq!(workspace.root(), &*root);
-        insta::with_settings!({
-            filters => path_filters(&path_filter(workspace.root())),
-        }, {
-            assert_debug_snapshot!(&workspace);
-        });
+
+        snapshot_workspace!(workspace);
 
         // Discovering the same package from a member should give the same result
-        let from_src = WorkspaceMetadata::discover(&root.join("members/a"), &system, None)
+        let from_src = WorkspaceMetadata::discover(&root.join("packages/a"), &system, None)
             .context("Failed to discover workspace from src sub-directory")?;
 
         assert_eq!(from_src, workspace);
@@ -572,19 +552,19 @@ mod tests {
                     name = "workspace-root"
 
                     [tool.knot.workspace]
-                    members = ["members/*"]
-                    exclude = ["members/excluded"]
+                    members = ["packages/*"]
+                    exclude = ["packages/excluded"]
                     "#,
                 ),
                 (
-                    root.join("members/a/pyproject.toml"),
+                    root.join("packages/a/pyproject.toml"),
                     r#"
                     [project]
                     name = "member-a"
                     "#,
                 ),
                 (
-                    root.join("members/excluded/pyproject.toml"),
+                    root.join("packages/excluded/pyproject.toml"),
                     r#"
                     [project]
                     name = "member-x"
@@ -597,15 +577,11 @@ mod tests {
             .context("Failed to discover workspace")?;
 
         assert_eq!(workspace.root(), &*root);
-        insta::with_settings!({
-            filters => path_filters(&path_filter(workspace.root())),
-        }, {
-            assert_debug_snapshot!(&workspace);
-        });
+        snapshot_workspace!(workspace);
 
         // Discovering the `workspace` for `excluded` should discover a single-package workspace
         let excluded_workspace =
-            WorkspaceMetadata::discover(&root.join("members/excluded"), &system, None)
+            WorkspaceMetadata::discover(&root.join("packages/excluded"), &system, None)
                 .context("Failed to discover workspace from src sub-directory")?;
 
         assert_ne!(excluded_workspace, workspace);
@@ -630,34 +606,31 @@ mod tests {
                     name = "workspace-root"
 
                     [tool.knot.workspace]
-                    members = ["members/*"]
+                    members = ["packages/*"]
                     "#,
                 ),
                 (
-                    root.join("members/a/pyproject.toml"),
+                    root.join("packages/a/pyproject.toml"),
                     r#"
                     [project]
-                    name = "member"
+                    name = "a"
                     "#,
                 ),
                 (
-                    root.join("members/b/pyproject.toml"),
+                    root.join("packages/b/pyproject.toml"),
                     r#"
                     [project]
-                    name = "member"
+                    name = "a"
                     "#,
                 ),
             ])
             .context("Failed to write files")?;
 
         let error = WorkspaceMetadata::discover(&root, &system, None).expect_err(
-            "Discovery should error because the workspace contains two members with the same names.",
+            "Discovery should error because the workspace contains two packages with the same names.",
         );
 
-        assert_eq!(
-            error.to_string(),
-            "the workspace contains two packages named 'member': '/app/members/a' and '/app/members/a'"
-        );
+        assert_error_eq(&error, "the workspace contains two packages named 'a': '/app/packages/a' and '/app/packages/b'");
 
         Ok(())
     }
@@ -679,30 +652,27 @@ mod tests {
                     name = "workspace-root"
 
                     [tool.knot.workspace]
-                    members = ["members/*"]
+                    members = ["packages/*"]
                     "#,
                 ),
                 (
-                    root.join("members/a/pyproject.toml"),
+                    root.join("packages/a/pyproject.toml"),
                     r#"
                     [project]
                     name = "nested-workspace"
 
                     [tool.knot.workspace]
-                    members = ["members/*"]
+                    members = ["packages/*"]
                     "#,
                 ),
             ])
             .context("Failed to write files")?;
 
         let error = WorkspaceMetadata::discover(&root, &system, None).expect_err(
-            "Discovery should error because the workspace has a member that itself is a workspace",
+            "Discovery should error because the workspace has a package that itself is a workspace",
         );
 
-        assert_eq!(
-            error.to_string(),
-            "nested workspaces aren't supported but the package located at '/app/members/a' defines a `knot.workspace` table"
-        );
+        assert_error_eq(&error, "nested workspaces aren't supported but the package located at '/app/packages/a' defines a `knot.workspace` table");
 
         Ok(())
     }
@@ -724,20 +694,17 @@ mod tests {
                     name = "workspace-root"
 
                     [tool.knot.workspace]
-                    members = ["members/*"]
+                    members = ["packages/*"]
                     "#,
                 ),
-                (root.join("members/a/test.py"), ""),
+                (root.join("packages/a/test.py"), ""),
             ])
             .context("Failed to write files")?;
 
         let error = WorkspaceMetadata::discover(&root, &system, None)
             .expect_err("Discovery should error because member `a` has no `pypyroject.toml`");
 
-        assert_eq!(
-            error.to_string(),
-            "failed to read the `pyproject.toml` for the package located at '/app/members/a': No such file or directory"
-        );
+        assert_error_eq(&error, "failed to read the `pyproject.toml` for the package located at '/app/packages/a': No such file or directory");
 
         Ok(())
     }
@@ -763,20 +730,16 @@ mod tests {
                     name = "workspace-root"
 
                     [tool.knot.workspace]
-                    members = ["members/*"]
+                    members = ["packages/*"]
                     "#,
                 ),
-                (root.join("members/.hidden/a.py"), ""),
+                (root.join("packages/.hidden/a.py"), ""),
             ])
             .context("Failed to write files")?;
 
-        let workspace = WorkspaceMetadata::discover(&root, &system, None);
+        let workspace = WorkspaceMetadata::discover(&root, &system, None)?;
 
-        insta::with_settings!({
-            filters => path_filters(&path_filter(&root)),
-        }, {
-            assert_debug_snapshot!(&workspace);
-        });
+        snapshot_workspace!(workspace);
 
         Ok(())
     }
@@ -798,20 +761,16 @@ mod tests {
                     name = "workspace-root"
 
                     [tool.knot.workspace]
-                    members = ["members/*"]
+                    members = ["packages/*"]
                     "#,
                 ),
-                (root.join("members/.DS_STORE"), ""),
+                (root.join("packages/.DS_STORE"), ""),
             ])
             .context("Failed to write files")?;
 
         let workspace = WorkspaceMetadata::discover(&root, &system, None)?;
 
-        insta::with_settings!({
-            filters => path_filters(&path_filter(workspace.root())),
-        }, {
-            assert_debug_snapshot!(&workspace);
-        });
+        snapshot_workspace!(&workspace);
 
         Ok(())
     }
@@ -833,11 +792,11 @@ mod tests {
                     name = "workspace-root"
 
                     [tool.knot.workspace]
-                    members = ["../members/*"]
+                    members = ["../packages/*"]
                     "#,
                 ),
                 (
-                    root.join("../members/a/pyproject.toml"),
+                    root.join("../packages/a/pyproject.toml"),
                     r#"
                     [project]
                     name = "a"
@@ -850,11 +809,28 @@ mod tests {
             "Discovery should error because member `a` is outside the workspace's directory`",
         );
 
-        assert_eq!(
-            error.to_string(),
-            "the package 'a' located at '/members/a' is outside the workspace's root directory '/app'"
-        );
+        assert_error_eq(&error, "the package 'a' located at '/packages/a' is outside the workspace's root directory '/app'");
 
         Ok(())
     }
+
+    #[track_caller]
+    fn assert_error_eq(error: &WorkspaceDiscoveryError, message: &str) {
+        assert_eq!(error.to_string().replace('\\', "/"), message);
+    }
+
+    /// Snapshots a workspace but with all paths using unix separators.
+    #[macro_export]
+    macro_rules! snapshot_workspace {
+    ($workspace:expr) => {{
+        assert_ron_snapshot!($workspace,{
+            ".root" => insta::dynamic_redaction(|content, _content_path| {
+                content.as_str().unwrap().replace("\\", "/")
+            }),
+            ".packages[].root" => insta::dynamic_redaction(|content, _content_path| {
+                content.as_str().unwrap().replace("\\", "/")
+            }),
+        });
+    }};
+}
 }

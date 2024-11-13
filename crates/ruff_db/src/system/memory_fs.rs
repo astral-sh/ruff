@@ -94,8 +94,11 @@ impl MemoryFileSystem {
         metadata(self, path.as_ref())
     }
 
-    pub fn canonicalize(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
-        SystemPathBuf::from_utf8_path_buf(self.normalize_path(path))
+    pub fn canonicalize(&self, path: impl AsRef<SystemPath>) -> Result<SystemPathBuf> {
+        let path = path.as_ref();
+        // Mimic the behavior of a real FS where canonicalize errors if the `path` doesn't exist
+        self.metadata(path)?;
+        Ok(SystemPathBuf::from_utf8_path_buf(self.normalize_path(path)))
     }
 
     pub fn is_file(&self, path: impl AsRef<SystemPath>) -> bool {

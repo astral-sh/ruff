@@ -54,6 +54,10 @@ pub trait System: Debug {
     /// * `path` does not exist.
     /// * A non-final component in `path` is not a directory.
     /// * the symlink target path is not valid Unicode.
+    ///
+    /// ## Windows long-paths
+    /// Unlike `std::fs::canonicalize`, this function does remove UNC prefixes if possible.
+    /// See [dunce::canonicalize] for more information.
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
 
     /// Reads the content of the file at `path` into a [`String`].
@@ -129,12 +133,17 @@ pub trait System: Debug {
     /// yields a single entry for that file.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
 
+    /// Return an iterator that produces all the `Path`s that match the given
+    /// pattern using default match options, which may be absolute or relative to
+    /// the current working directory.
+    ///
+    /// This may return an error if the pattern is invalid.
     fn glob(
         &self,
         pattern: &str,
     ) -> std::result::Result<
         Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
-        glob::PatternError,
+        PatternError,
     >;
 
     fn as_any(&self) -> &dyn std::any::Any;

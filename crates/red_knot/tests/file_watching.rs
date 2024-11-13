@@ -14,6 +14,7 @@ use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::testing::setup_logging;
 use ruff_db::Upcast;
 
 struct TestCase {
@@ -203,7 +204,9 @@ where
             .as_utf8_path()
             .canonicalize_utf8()
             .with_context(|| "Failed to canonicalize root path.")?,
-    );
+    )
+    .simplified()
+    .to_path_buf();
 
     let workspace_path = root_path.join("workspace");
 
@@ -1351,6 +1354,7 @@ fn nested_packages_delete_root() -> anyhow::Result<()> {
 
 #[test]
 fn added_package() -> anyhow::Result<()> {
+    let _ = setup_logging();
     let mut case = setup([
         (
             "pyproject.toml",

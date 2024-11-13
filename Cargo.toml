@@ -66,6 +66,7 @@ criterion = { version = "0.5.1", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
 dir-test = { version = "0.3.0" }
+dunce = { version = "1.0.5" }
 drop_bomb = { version = "0.1.5" }
 env_logger = { version = "0.11.0" }
 etcetera = { version = "0.8.0" }
@@ -81,7 +82,7 @@ hashbrown = { version = "0.15.0", default-features = false, features = [
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
-indexmap = {version = "2.6.0" }
+indexmap = { version = "2.6.0" }
 indicatif = { version = "0.17.8" }
 indoc = { version = "2.0.4" }
 insta = { version = "1.35.1" }

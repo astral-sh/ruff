@@ -226,7 +226,7 @@ impl System for WasmSystem {
     }
 
     fn canonicalize_path(&self, path: &SystemPath) -> ruff_db::system::Result<SystemPathBuf> {
-        Ok(self.fs.canonicalize(path))
+        self.fs.canonicalize(path)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {

@@ -6,6 +6,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 ///
 /// The main difference to [`Configuration`] is that default values are filled in.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct WorkspaceSettings {
     pub(super) program: ProgramSettings,
 }
@@ -18,6 +19,7 @@ impl WorkspaceSettings {
 
 /// The configuration for the workspace or a package.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Configuration {
     pub target_version: Option<PythonVersion>,
     pub search_paths: SearchPathConfiguration,
@@ -45,6 +47,7 @@ impl Configuration {
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct SearchPathConfiguration {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,

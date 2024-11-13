@@ -158,7 +158,7 @@ impl System for TestSystem {
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         match &self.inner {
             TestSystemInner::System(fs) => fs.canonicalize_path(path),
-            TestSystemInner::Stub(fs) => Ok(fs.canonicalize(path)),
+            TestSystemInner::Stub(fs) => fs.canonicalize(path),
         }
     }
 }

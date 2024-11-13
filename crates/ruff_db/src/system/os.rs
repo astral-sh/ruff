@@ -64,9 +64,11 @@ impl System for OsSystem {
     }
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
-        path.as_utf8_path()
-            .canonicalize_utf8()
-            .map(SystemPathBuf::from_utf8_path_buf)
+        path.as_utf8_path().canonicalize_utf8().map(|path| {
+            SystemPathBuf::from_utf8_path_buf(path)
+                .simplified()
+                .to_path_buf()
+        })
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
