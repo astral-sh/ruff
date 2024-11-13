@@ -3,10 +3,18 @@
 #ruff: foo-bar
 # flake8:foo-bar
 #  black:skip
-
+# fmt: foo
+# isort: skip_entire
+# ruff: isort: skipfile
+# yapf: off
 # FMT:OFF
 # isort: On
 # Type: ignore
+# yapf: Disable
+# Yapf: disable
+#yapf: enable
+#  yapf : enable
+# yapf:disable
 
 # noqa
 # noqa: A123
@@ -30,7 +38,8 @@
 # type: ignore
 # type: int
 # type: list[str]
-
+# yapf: enable
+# yapf: disable
 # noqa:A123
 #noqa:   A123
 #    type:ignore
@@ -44,6 +53,8 @@
 # ruff: isort:skip_file
 #    type:			ignore
 #	 	 	type:		 	int
+#	  	yapf: 	 	enable
+#		yapf: 		disable
 
 # NoQA: A123, B456
 # ruff: NoQA: A123, B456
@@ -70,5 +81,4 @@
 #isort:skip#noqa:A123
 
 # fmt:off#   noqa: A123
-
-# noqa:A123 - Lorem ipsum dolor sit amet
+# noqa:A123, B456 - Lorem ipsum dolor sit amet

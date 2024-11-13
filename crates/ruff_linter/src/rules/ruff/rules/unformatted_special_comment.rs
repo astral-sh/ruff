@@ -30,6 +30,8 @@ enum SpecialComment {
     RuffIsort(String),
     /// `# type: int`, `# type: ignore`
     Type(String),
+    /// `# yapf: enable`, `# yapf: disable`
+    Yapf(String),
 }
 
 impl SpecialComment {
@@ -57,6 +59,7 @@ impl SpecialComment {
             SpecialComment::Isort(rest) => format!("# isort: {rest}"),
             SpecialComment::RuffIsort(rest) => format!("# ruff: isort: {rest}"),
             SpecialComment::Type(rest) => format!("# type: {rest}"),
+            SpecialComment::Yapf(rest) => format!("# yapf: {rest}"),
         }
     }
 }
@@ -258,6 +261,14 @@ fn try_parse_type(text: &str) -> SpecialCommentDescriptor {
     try_parse_common!(PATTERN, text, SpecialComment::Type)
 }
 
+fn try_parse_yapf(text: &str) -> SpecialCommentDescriptor {
+    // https://github.com/astral-sh/ruff/blob/78e4753d74/crates/ruff_python_trivia/src/comments.rs#L18-L38
+    static PATTERN: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"#\s*(?<hint>yapf):\s*(?<rest>enable|disable)").unwrap());
+
+    try_parse_common!(PATTERN, text, SpecialComment::Yapf)
+}
+
 fn text_range(start: usize, end: usize) -> Option<TextRange> {
     let Ok(start) = TextSize::try_from(start) else {
         return None;
@@ -302,6 +313,7 @@ fn check_single_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, start_ind
     parse_and_handle_comment!(try_parse_isort, text, diagnostics, start_index);
     parse_and_handle_comment!(try_parse_ruff_isort, text, diagnostics, start_index);
     parse_and_handle_comment!(try_parse_type, text, diagnostics, start_index);
+    parse_and_handle_comment!(try_parse_yapf, text, diagnostics, start_index);
 }
 
 fn check_composite_comment(diagnostics: &mut Vec<Diagnostic>, text: &str, range_start: usize) {
@@ -385,6 +397,11 @@ mod tests {
         no_unformatted("# flake8:foo-bar");
 
         no_unformatted("#  black:skip");
+
+        no_unformatted("# fmt: foo");
+        no_unformatted("# isort: skip_entire");
+        no_unformatted("# ruff: isort: skipfile");
+        no_unformatted("# yapf: off");
     }
 
     #[test]
@@ -392,6 +409,15 @@ mod tests {
         no_unformatted("# FMT:OFF");
         no_unformatted("# isort: On");
         no_unformatted("# Type: ignore");
+        no_unformatted("# yapf: Disable");
+        no_unformatted("# Yapf: disable");
+    }
+
+    #[test]
+    fn incorrect_whitespace() {
+        no_unformatted("#yapf: enable");
+        no_unformatted("#  yapf : enable");
+        no_unformatted("# yapf:disable");
     }
 
     #[test]
@@ -418,15 +444,15 @@ mod tests {
         no_unformatted("# isort: skip");
         no_unformatted("# isort: skip_file");
 
-        no_unformatted("# nopycln: file");
-        no_unformatted("# nopycln: import");
-
         no_unformatted("# ruff: isort: on");
         no_unformatted("# ruff: isort: skip_file");
 
         no_unformatted("# type: ignore");
         no_unformatted("# type: int");
         no_unformatted("# type: list[str]");
+
+        no_unformatted("# yapf: enable");
+        no_unformatted("# yapf: disable");
     }
 
     #[test]
@@ -449,6 +475,9 @@ mod tests {
 
         has_unformatted("#    type:\t\t\tignore");
         has_unformatted("#\t \t \ttype:\t\t \tint");
+
+        has_unformatted("#\t  \tyapf: \t \tenable");
+        has_unformatted("#\t\tyapf: \t\tdisable");
     }
 
     #[test]
@@ -485,6 +514,6 @@ mod tests {
 
         composite_has_unformatted("# isort:skip#noqa:A123", 2);
         composite_has_unformatted("# fmt:off#   noqa: A123", 2);
-        composite_has_unformatted("# noqa:A123 - Lorem ipsum dolor sit amet", 1);
+        composite_has_unformatted("# noqa:A123, B456 - Lorem ipsum dolor sit amet", 1);
     }
 }
