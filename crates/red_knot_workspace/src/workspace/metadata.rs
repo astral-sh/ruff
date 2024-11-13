@@ -1,12 +1,12 @@
-use crate::workspace::pyproject::{PyProject, Workspace};
-use crate::workspace::settings::{Configuration, WorkspaceSettings};
 use anyhow::{anyhow, Context};
-
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
-#[derive(Debug)]
+use crate::workspace::pyproject::{PyProject, Workspace};
+use crate::workspace::settings::{Configuration, WorkspaceSettings};
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct WorkspaceMetadata {
     pub(super) root: SystemPathBuf,
 
@@ -18,7 +18,7 @@ pub struct WorkspaceMetadata {
 }
 
 /// A first-party package in a workspace.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageMetadata {
     pub(super) name: Name,
 
@@ -41,7 +41,6 @@ impl WorkspaceMetadata {
         );
         tracing::debug!("Searching for a workspace in '{path}'");
 
-        // TODO: Issue with this implementation: We have to skip the member if it is excluded.
         let mut closest_package: Option<PackageMetadata> = None;
 
         for ancestor in path.ancestors() {
@@ -50,7 +49,6 @@ impl WorkspaceMetadata {
                 let pyproject = PyProject::from_str(&pyproject_str)
                     .with_context(|| format!("Failed to parse '{pyproject_path}'"))?;
 
-                // TODO: Extract this into a workspace configuration?
                 let workspace_table = pyproject.workspace().cloned();
                 let package = PackageMetadata::from_pyproject(
                     pyproject,
@@ -86,6 +84,15 @@ impl WorkspaceMetadata {
 
                                 if package.root() == ancestor {
                                     workspace_package = Some(package);
+                                }
+
+                                if !package.root().starts_with(ancestor) {
+                                    anyhow::bail!(
+                                        "Workspace member '{member}' located at '{member_path} is outside the workspace '{workspace_path}'",
+                                        member = package.name(),
+                                        member_path=package.root(),
+                                        workspace_path=ancestor,
+                                    )
                                 }
                             }
 
@@ -137,7 +144,7 @@ impl WorkspaceMetadata {
         let packages = vec![package];
         let settings = packages[0]
             .configuration
-            .to_workspace_settings(path, &packages);
+            .to_workspace_settings(&root, &packages);
 
         Ok(Self {
             root,
@@ -199,8 +206,6 @@ impl PackageMetadata {
     }
 }
 
-// TODO: paths don't get normalized
-//   Adding package 'bar' at '/Users/micha/astral/test/./symlink/bar'
 fn collect_packages(
     workspace_package: PackageMetadata,
     workspace_table: &Workspace,
@@ -219,13 +224,14 @@ fn collect_packages(
             .with_context(|| format!("failed to parse members glob '{glob}'"))?
         {
             let path = result.context("failed to match glob")?;
+            let normalized = SystemPath::absolute(path, &workspace_root);
 
             // Skip over non-directory entry. E.g.finder might end up creating a `.DS_STORE` file
             // that ends up matching `/projects/*`.
-            if system.is_directory(&path) {
-                member_paths.insert(path);
+            if system.is_directory(&normalized) {
+                member_paths.insert(normalized);
             } else {
-                tracing::debug!("Ignoring non-directory workspace member '{path}'");
+                tracing::debug!("Ignoring non-directory workspace member '{normalized}'");
             }
         }
     }
@@ -257,6 +263,11 @@ fn collect_packages(
 
     // Add all remaining member paths
     for member_path in member_paths {
+        if workspace_table.is_excluded(&member_path, workspace_root.as_path())? {
+            tracing::debug!("Ignoring excluded member '{member_path}'");
+            continue;
+        }
+
         let pyproject_path = member_path.join("pyproject.toml");
 
         let pyproject_str = match system.read_to_string(&pyproject_path) {

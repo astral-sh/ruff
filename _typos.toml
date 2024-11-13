@@ -13,6 +13,7 @@ poit = "poit"
 BA = "BA" # acronym for "Bad Allowed", used in testing.
 jod = "jod" # e.g., `jod-thread`
 Numer = "Numer" # Library name 'NumerBlox' in "Who's Using Ruff?"
+"FrIeAndLy-._.-bArD" = "FrIeAndLy-._.-bArD"
 
 [default]
 extend-ignore-re = [

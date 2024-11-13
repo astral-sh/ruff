@@ -6,7 +6,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 
 use red_knot_python_semantic::{resolve_module, ModuleName, Program, PythonVersion, SitePackages};
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};
 use red_knot_workspace::workspace::settings::{Configuration, SearchPathConfiguration};
@@ -1309,4 +1309,43 @@ mod unix {
 
         Ok(())
     }
+}
+
+#[test]
+fn nested_packages_delete_root() -> anyhow::Result<()> {
+    let mut case = setup(|root: &SystemPath, workspace_root: &SystemPath| {
+        std::fs::write(
+            workspace_root.join("pyproject.toml").as_std_path(),
+            r#"
+            [project]
+            name = "inner"
+            "#,
+        )?;
+
+        std::fs::write(
+            root.join("pyproject.toml").as_std_path(),
+            r#"
+            [project]
+            name = "outer"
+            "#,
+        )?;
+
+        Ok(())
+    })?;
+
+    assert_eq!(
+        case.db().workspace().root(case.db()),
+        &*case.workspace_path("")
+    );
+
+    std::fs::remove_file(case.workspace_path("pyproject.toml").as_std_path())?;
+
+    let changes = case.stop_watch();
+
+    case.apply_changes(changes);
+
+    // It should now pick up the outer workspace.
+    assert_eq!(case.db().workspace().root(case.db()), case.root_path());
+
+    Ok(())
 }

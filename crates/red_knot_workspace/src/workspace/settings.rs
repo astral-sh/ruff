@@ -5,7 +5,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 /// The resolved configurations.
 ///
 /// The main difference to [`Configuration`] is that default values are filled in.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceSettings {
     pub(super) program: ProgramSettings,
 }
@@ -17,7 +17,7 @@ impl WorkspaceSettings {
 }
 
 /// The configuration for the workspace or a package.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Configuration {
     pub target_version: Option<PythonVersion>,
     pub search_paths: SearchPathConfiguration,

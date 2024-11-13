@@ -1,15 +1,14 @@
+use crate::db::{Db, RootDatabase};
+use crate::watch;
+use crate::watch::{CreatedKind, DeletedKind};
+use crate::workspace::settings::Configuration;
+use crate::workspace::{Workspace, WorkspaceMetadata};
 use red_knot_python_semantic::Program;
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::SystemPath;
-use ruff_db::Db;
+use ruff_db::Db as _;
 use rustc_hash::FxHashSet;
-
-use crate::db::RootDatabase;
-use crate::watch;
-use crate::watch::{CreatedKind, DeletedKind};
-use crate::workspace::settings::Configuration;
-use crate::workspace::WorkspaceMetadata;
 
 impl RootDatabase {
     #[tracing::instrument(level = "debug", skip(self, changes, base_configuration))]
@@ -18,7 +17,7 @@ impl RootDatabase {
         changes: Vec<watch::ChangeEvent>,
         base_configuration: Option<&Configuration>,
     ) {
-        let workspace = self.workspace();
+        let mut workspace = self.workspace();
         let workspace_path = workspace.root(self).to_path_buf();
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
@@ -58,6 +57,10 @@ impl RootDatabase {
                     // Changes to ignore files or settings can change the workspace structure or add/remove files
                     // from packages.
                     if let Some(package) = workspace.package(self, path) {
+                        if package.root(self) == workspace.root(self) {
+                            workspace_change = true;
+                        }
+
                         changed_packages.insert(package);
                     } else {
                         workspace_change = true;
@@ -153,12 +156,20 @@ impl RootDatabase {
         if workspace_change {
             match WorkspaceMetadata::discover(&workspace_path, self.system(), base_configuration) {
                 Ok(metadata) => {
-                    tracing::debug!("Reloading workspace after structural change");
-                    // TODO: Handle changes in the program settings.
-                    workspace.reload(self, metadata);
+                    if metadata.root() == workspace.root(self) {
+                        tracing::debug!("Reloading workspace after structural change");
+                        // TODO: Handle changes in the program settings.
+                        workspace.reload(self, metadata);
+                    } else {
+                        tracing::debug!("Replace workspace after structural change");
+                        workspace = Workspace::from_metadata(self, metadata);
+                        self.workspace = Some(workspace);
+                    }
                 }
                 Err(error) => {
-                    tracing::error!("Failed to load workspace, keep old workspace: {error}");
+                    tracing::error!(
+                        "Failed to load workspace, keeping old workspace configuration: {error}"
+                    );
                 }
             }
 
@@ -223,6 +234,3 @@ impl RootDatabase {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {}

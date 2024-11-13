@@ -15,7 +15,9 @@ use ruff_db::{Db as SourceDb, Upcast};
 mod changes;
 
 #[salsa::db]
-pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {}
+pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
+    fn workspace(&self) -> Workspace;
+}
 
 #[salsa::db]
 pub struct RootDatabase {
@@ -38,37 +40,11 @@ impl RootDatabase {
         };
 
         // Initialize the `Program` singleton
-
-        // TODO: Reasoning: We need to know the target version at this point to
-        // load the correct persistent cache so that running knot with
-        // different target versions doesn't result in 0 cache-reuse.
-        // But this does complicate things a bit because we need to have the
-        // resolved workspace settings at this point.
-        // But resolving the settings fits well into the workspace's responsibility.
-        // Should `Workspace` initialize the Program -> No, because we then need to create
-        // the program first.
-
-        // Metadata: Plain description of the workspace and the exact configuration (without doing any resolution)
-        // Workspace: Resolved workspace with all members, merged settings.
-        // Middle ground -> `metadata.resolve_settings(configuration)` returns the resolved
-        // `.workspace` configuration but it doesn't resolve any of the members configuration.
-        // The problem with this is that it makes the single project use case awkward. We should just
-        // resolve the program settings and defer everything else to later? But how does this work with
-        // with target versions that are inherited from the workspace?
-        // So this is somewhat awkward too :(
-        // The other option is that `WorkspaceMetadata` keeps working as it is today where it stores the
-        // resolved settings instead of the unresolved. I do thik that this would require another intermediate representation
-        // to not be awkward.
         Program::from_settings(&db, workspace.settings().program())?;
 
         db.workspace = Some(Workspace::from_metadata(&db, workspace));
 
         Ok(db)
-    }
-
-    pub fn workspace(&self) -> Workspace {
-        // SAFETY: The workspace is always initialized in `new`.
-        self.workspace.unwrap()
     }
 
     /// Checks all open files in the workspace and its dependencies.
@@ -174,7 +150,11 @@ impl salsa::Database for RootDatabase {
 }
 
 #[salsa::db]
-impl Db for RootDatabase {}
+impl Db for RootDatabase {
+    fn workspace(&self) -> Workspace {
+        self.workspace.unwrap()
+    }
+}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -189,6 +169,7 @@ pub(crate) mod tests {
     use ruff_db::{Db as SourceDb, Upcast};
 
     use crate::db::Db;
+    use crate::workspace::Workspace;
 
     #[salsa::db]
     pub(crate) struct TestDb {
@@ -275,7 +256,11 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl Db for TestDb {}
+    impl Db for TestDb {
+        fn workspace(&self) -> Workspace {
+            todo!()
+        }
+    }
 
     #[salsa::db]
     impl salsa::Database for TestDb {

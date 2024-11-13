@@ -239,7 +239,8 @@ impl MemoryFileSystem {
     > {
         // Very naive implementation that iterates over all files and collects all that match the given pattern.
 
-        let pattern = glob::Pattern::new(pattern)?;
+        let normalized = self.normalize_path(pattern);
+        let pattern = glob::Pattern::new(normalized.as_str())?;
         let matches = std::sync::Mutex::new(Vec::new());
 
         self.walk_directory("/").standard_filters(false).run(|| {

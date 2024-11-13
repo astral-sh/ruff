@@ -8,7 +8,7 @@ use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
 
-use crate::db::RootDatabase;
+use crate::db::{Db, RootDatabase};
 use crate::watch::Watcher;
 
 /// Wrapper around a [`Watcher`] that watches the relevant paths of a workspace.

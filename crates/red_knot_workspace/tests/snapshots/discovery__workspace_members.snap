@@ -1,0 +1,64 @@
+---
+source: crates/red_knot_workspace/tests/discovery.rs
+expression: "&workspace"
+---
+WorkspaceMetadata {
+    root: "/app",
+    packages: [
+        PackageMetadata {
+            name: Name("workspace-root"),
+            root: "/app",
+            configuration: Configuration {
+                target_version: None,
+                search_paths: SearchPathConfiguration {
+                    extra_paths: None,
+                    src_root: None,
+                    custom_typeshed: None,
+                    site_packages: None,
+                },
+            },
+        },
+        PackageMetadata {
+            name: Name("member-a"),
+            root: "/app/members/a",
+            configuration: Configuration {
+                target_version: None,
+                search_paths: SearchPathConfiguration {
+                    extra_paths: None,
+                    src_root: None,
+                    custom_typeshed: None,
+                    site_packages: None,
+                },
+            },
+        },
+        PackageMetadata {
+            name: Name("member-x"),
+            root: "/app/members/x",
+            configuration: Configuration {
+                target_version: None,
+                search_paths: SearchPathConfiguration {
+                    extra_paths: None,
+                    src_root: None,
+                    custom_typeshed: None,
+                    site_packages: None,
+                },
+            },
+        },
+    ],
+    settings: WorkspaceSettings {
+        program: ProgramSettings {
+            target_version: PythonVersion {
+                major: 3,
+                minor: 8,
+            },
+            search_paths: SearchPathSettings {
+                extra_paths: [],
+                workspace_root: "/app",
+                custom_typeshed: None,
+                site_packages: Known(
+                    [],
+                ),
+            },
+        },
+    },
+}
