@@ -31,7 +31,7 @@ use crate::semantic_index::{
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
 use crate::suppression::check_suppressions;
 use crate::symbol::{Boundness, Symbol};
-use crate::types::call::{CallDunderResult, CallOutcome};
+use crate::types::call::{bind_call, CallArguments, CallBinding, CallDunderResult, CallOutcome};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::mro::{Mro, MroError, MroIterator};
@@ -1681,8 +1681,9 @@ impl<'db> Type<'db> {
                         return Truthiness::Ambiguous;
                     }
 
-                    if let Some(Type::BooleanLiteral(bool_val)) =
-                        bool_method.call(db, &[*instance_ty]).return_ty(db)
+                    if let Some(Type::BooleanLiteral(bool_val)) = bool_method
+                        .call(db, &CallArguments::positional([*instance_ty]))
+                        .return_ty(db)
                     {
                         bool_val.into()
                     } else {
@@ -1753,7 +1754,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.call_dunder(db, "__len__", &[*self]) {
+        let return_ty = match self.call_dunder(db, "__len__", &CallArguments::positional([*self])) {
             // TODO: emit a diagnostic
             CallDunderResult::MethodNotAvailable => return None,
 
@@ -1767,49 +1768,51 @@ impl<'db> Type<'db> {
 
     /// Return the outcome of calling an object of this type.
     #[must_use]
-    fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
+    fn call(self, db: &'db dyn Db, arguments: &CallArguments<'db>) -> CallOutcome<'db> {
         match self {
-            // TODO validate typed call arguments vs callable signature
-            Type::FunctionLiteral(function_type) => match function_type.known(db) {
-                Some(KnownFunction::RevealType) => CallOutcome::revealed(
-                    function_type.signature(db).return_ty,
-                    *arg_types.first().unwrap_or(&Type::Unknown),
-                ),
+            Type::FunctionLiteral(function_type) => {
+                let mut binding = bind_call(db, arguments, function_type.signature(db));
+                match function_type.known(db) {
+                    Some(KnownFunction::RevealType) => {
+                        let revealed_ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        CallOutcome::revealed(binding, revealed_ty)
+                    }
 
-                Some(KnownFunction::Len) => {
-                    let normal_return_ty = function_type.signature(db).return_ty;
+                    Some(KnownFunction::Len) => {
+                        if let Some(first_arg) = binding.first_parameter() {
+                            if let Some(len_ty) = first_arg.len(db) {
+                                binding.set_return_ty(len_ty);
+                            }
+                        };
 
-                    let [only_arg] = arg_types else {
-                        // TODO: Emit a diagnostic
-                        return CallOutcome::callable(normal_return_ty);
-                    };
-                    let len_ty = only_arg.len(db);
+                        CallOutcome::callable(binding)
+                    }
 
-                    CallOutcome::callable(len_ty.unwrap_or(normal_return_ty))
+                    _ => CallOutcome::callable(binding),
                 }
-
-                _ => CallOutcome::callable(function_type.signature(db).return_ty),
-            },
+            }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
+            // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                CallOutcome::callable(match class.known(db) {
+                CallOutcome::callable(CallBinding::from_return_ty(match class.known(db) {
                     // If the class is the builtin-bool class (for example `bool(1)`), we try to
                     // return the specific truthiness value of the input arg, `Literal[True]` for
                     // the example above.
-                    Some(KnownClass::Bool) => arg_types
-                        .first()
+                    Some(KnownClass::Bool) => arguments
+                        .first_argument()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
                     _ => Type::Instance(InstanceType { class }),
-                })
+                }))
             }
 
             instance_ty @ Type::Instance(_) => {
-                let args = std::iter::once(self)
-                    .chain(arg_types.iter().copied())
-                    .collect::<Vec<_>>();
-                match instance_ty.call_dunder(db, "__call__", &args) {
+                match instance_ty.call_dunder(
+                    db,
+                    "__call__",
+                    &arguments.clone().with_self(instance_ty),
+                ) {
                     CallDunderResult::CallOutcome(CallOutcome::NotCallable { .. }) => {
                         // Turn "`<type of illegal '__call__'>` not callable" into
                         // "`X` not callable"
@@ -1836,17 +1839,21 @@ impl<'db> Type<'db> {
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Any | Type::Todo(_) | Type::Unknown => CallOutcome::callable(self),
+            Type::Any | Type::Todo(_) | Type::Unknown => {
+                CallOutcome::callable(CallBinding::from_return_ty(self))
+            }
 
             Type::Union(union) => CallOutcome::union(
                 self,
                 union
                     .elements(db)
                     .iter()
-                    .map(|elem| elem.call(db, arg_types)),
+                    .map(|elem| elem.call(db, arguments)),
             ),
 
-            Type::Intersection(_) => CallOutcome::callable(todo_type!("Type::Intersection.call()")),
+            Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_ty(
+                todo_type!("Type::Intersection.call()"),
+            )),
 
             _ => CallOutcome::not_callable(self),
         }
@@ -1857,14 +1864,14 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        arg_types: &[Type<'db>],
+        arguments: &CallArguments<'db>,
     ) -> CallDunderResult<'db> {
         match self.to_meta_type(db).member(db, name) {
             Symbol::Type(callable_ty, Boundness::Bound) => {
-                CallDunderResult::CallOutcome(callable_ty.call(db, arg_types))
+                CallDunderResult::CallOutcome(callable_ty.call(db, arguments))
             }
             Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
-                CallDunderResult::PossiblyUnbound(callable_ty.call(db, arg_types))
+                CallDunderResult::PossiblyUnbound(callable_ty.call(db, arguments))
             }
             Symbol::Unbound => CallDunderResult::MethodNotAvailable,
         }
@@ -1885,7 +1892,8 @@ impl<'db> Type<'db> {
             };
         }
 
-        let dunder_iter_result = self.call_dunder(db, "__iter__", &[self]);
+        let dunder_iter_result =
+            self.call_dunder(db, "__iter__", &CallArguments::positional([self]));
         match dunder_iter_result {
             CallDunderResult::CallOutcome(ref call_outcome)
             | CallDunderResult::PossiblyUnbound(ref call_outcome) => {
@@ -1896,7 +1904,7 @@ impl<'db> Type<'db> {
                 };
 
                 return if let Some(element_ty) = iterator_ty
-                    .call_dunder(db, "__next__", &[iterator_ty])
+                    .call_dunder(db, "__next__", &CallArguments::positional([iterator_ty]))
                     .return_ty(db)
                 {
                     if matches!(dunder_iter_result, CallDunderResult::PossiblyUnbound(..)) {
@@ -1923,7 +1931,11 @@ impl<'db> Type<'db> {
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
         if let Some(element_ty) = self
-            .call_dunder(db, "__getitem__", &[self, KnownClass::Int.to_instance(db)])
+            .call_dunder(
+                db,
+                "__getitem__",
+                &CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
+            )
             .return_ty(db)
         {
             IterationOutcome::Iterable { element_ty }
