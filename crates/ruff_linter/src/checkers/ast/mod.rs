@@ -171,7 +171,7 @@ impl ExpectedDocstringKind {
     /// Returns the semantic model flag that represents the current docstring state.
     const fn as_flag(self) -> SemanticModelFlags {
         match self {
-            ExpectedDocstringKind::Attribute => SemanticModelFlags::ATTRIBUTE_DOCSTRING,
+            ExpectedDocstringKind::Attribute => SemanticModelFlags::empty(),
             _ => SemanticModelFlags::PEP_257_DOCSTRING,
         }
     }
@@ -1794,7 +1794,6 @@ impl<'a> Checker<'a> {
         self.visit_expr(&generator.iter);
         self.semantic.push_scope(ScopeKind::Generator(kind));
 
-        self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
         self.visit_expr(&generator.target);
         self.semantic.flags = flags;
 
@@ -1805,7 +1804,6 @@ impl<'a> Checker<'a> {
         for generator in iterator {
             self.visit_expr(&generator.iter);
 
-            self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
             self.visit_expr(&generator.target);
             self.semantic.flags = flags;
 

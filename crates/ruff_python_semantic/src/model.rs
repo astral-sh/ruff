@@ -1593,12 +1593,6 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION)
     }
 
-    /// Return `true` if the context is in a runtime-required type annotation.
-    pub const fn in_runtime_required_annotation(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION)
-    }
-
     /// Return `true` if the model is in a type definition.
     pub const fn in_type_definition(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::TYPE_DEFINITION)
@@ -1611,13 +1605,6 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::STRING_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the model is visiting a "simple string type definition"
-    /// that was previously deferred when initially traversing the AST
-    pub const fn in_simple_string_type_definition(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
-    }
-
     /// Return `true` if the model is visiting a "complex string type definition"
     /// that was previously deferred when initially traversing the AST
     pub const fn in_complex_string_type_definition(&self) -> bool {
@@ -1627,7 +1614,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the model is visiting a "`__future__` type definition"
     /// that was previously deferred when initially traversing the AST
-    pub const fn in_future_type_definition(&self) -> bool {
+    const fn in_future_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
@@ -1654,7 +1641,7 @@ impl<'a> SemanticModel<'a> {
     /// cast("Thread", x)  # Forward reference
     /// cast(Thread, x)  # Non-forward reference
     /// ```
-    pub const fn in_forward_reference(&self) -> bool {
+    const fn in_forward_reference(&self) -> bool {
         self.in_string_type_definition()
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
@@ -1703,12 +1690,6 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::PEP_257_DOCSTRING)
     }
 
-    /// Return `true` if the model is in an attribute docstring.
-    pub const fn in_attribute_docstring(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::ATTRIBUTE_DOCSTRING)
-    }
-
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
@@ -1732,7 +1713,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the model is in a stub file (i.e., a file with a `.pyi` extension).
-    pub const fn in_stub_file(&self) -> bool {
+    const fn in_stub_file(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::STUB_FILE)
     }
 
@@ -1740,19 +1721,6 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_named_expression_assignment(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT)
-    }
-
-    /// Return `true` if the model is in a comprehension assignment (e.g., `_ for x in y`).
-    pub const fn in_comprehension_assignment(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::COMPREHENSION_ASSIGNMENT)
-    }
-
-    /// Return `true` if the model is visiting the r.h.s. of an `__all__` definition
-    /// (e.g. `"foo"` in `__all__ = ["foo"]`)
-    pub const fn in_dunder_all_definition(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
     }
 
     /// Return `true` if the model is visiting an item in a class's bases tuple
@@ -2141,14 +2109,6 @@ bitflags! {
         /// ```
         const NAMED_EXPRESSION_ASSIGNMENT = 1 << 19;
 
-        /// The model is in a comprehension variable assignment.
-        ///
-        /// For example, the model could be visiting `x` in:
-        /// ```python
-        /// [_ for x in range(10)]
-        /// ```
-        const COMPREHENSION_ASSIGNMENT = 1 << 20;
-
         /// The model is in a docstring as described in [PEP 257].
         ///
         /// For example, the model could be visiting either the module, class,
@@ -2168,7 +2128,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const PEP_257_DOCSTRING = 1 << 21;
+        const PEP_257_DOCSTRING = 1 << 20;
 
         /// The model is visiting the r.h.s. of a module-level `__all__` definition.
         ///
@@ -2180,7 +2140,7 @@ bitflags! {
         /// __all__ = ("bar",)
         /// __all__ += ("baz,")
         /// ```
-        const DUNDER_ALL_DEFINITION = 1 << 22;
+        const DUNDER_ALL_DEFINITION = 1 << 21;
 
         /// The model is in an f-string replacement field.
         ///
@@ -2189,7 +2149,7 @@ bitflags! {
         /// ```python
         /// f"first {x} second {y}"
         /// ```
-        const F_STRING_REPLACEMENT_FIELD = 1 << 23;
+        const F_STRING_REPLACEMENT_FIELD = 1 << 22;
 
         /// The model is visiting the bases tuple of a class.
         ///
@@ -2199,36 +2159,11 @@ bitflags! {
         /// class Baz(Foo, Bar):
         ///     pass
         /// ```
-        const CLASS_BASE = 1 << 24;
+        const CLASS_BASE = 1 << 23;
 
         /// The model is visiting a class base that was initially deferred
         /// while traversing the AST. (This only happens in stub files.)
-        const DEFERRED_CLASS_BASE = 1 << 25;
-
-        /// The model is in an attribute docstring.
-        ///
-        /// An attribute docstring is a string literal immediately following an assignment or an
-        /// annotated assignment statement. The context in which this is valid are:
-        /// 1. At the top level of a module
-        /// 2. At the top level of a class definition i.e., a class attribute
-        ///
-        /// For example:
-        /// ```python
-        /// a = 1
-        /// """This is an attribute docstring for `a` variable"""
-        ///
-        ///
-        /// class Foo:
-        ///     b = 1
-        ///     """This is an attribute docstring for `Foo.b` class variable"""
-        /// ```
-        ///
-        /// Unlike other kinds of docstrings as described in [PEP 257], attribute docstrings are
-        /// discarded at runtime. However, they are used by some documentation renderers and
-        /// static-analysis tools.
-        ///
-        /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const ATTRIBUTE_DOCSTRING = 1 << 26;
+        const DEFERRED_CLASS_BASE = 1 << 24;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

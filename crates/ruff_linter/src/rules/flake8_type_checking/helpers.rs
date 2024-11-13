@@ -23,8 +23,7 @@ pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Sett
         // type definition to be considered a typing reference
         || (reference.in_type_definition()
             && (reference.in_typing_only_annotation()
-                || reference.in_complex_string_type_definition()
-                || reference.in_simple_string_type_definition()
+                || reference.in_string_type_definition()
                 || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
 }
 
