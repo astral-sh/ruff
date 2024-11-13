@@ -56,6 +56,12 @@ class AlwaysFalse:
 # revealed: Literal[True]
 reveal_type(not AlwaysFalse())
 
+class BoolIsBool:
+    __bool__ = bool
+
+# revealed: bool
+reveal_type(not BoolIsBool())
+
 class NoBoolMethod: ...
 
 # revealed: bool

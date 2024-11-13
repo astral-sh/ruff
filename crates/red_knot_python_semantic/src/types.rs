@@ -1206,6 +1206,14 @@ impl<'db> Type<'db> {
                     // the value of __len__ alone. One example is when a class has a __len__ that
                     // is 0 but a subclass overrides __bool__ in this case the subclass truth
                     // testing should be true.
+                    let bool_method = instance_ty.to_meta_type(db).member(db, "__bool__");
+                    // Check if the class has `__bool__ = bool` in the definition and avoid
+                    // recursion
+                    if let Symbol::Type(t, _) = bool_method {
+                        if let Type::ClassLiteral(class) = t {
+                            return Truthiness::Ambiguous;
+                        }
+                    }
                     if let Some(bool_rt) = instance_ty
                         .call_dunder(db, "__bool__", &[*instance_ty])
                         .return_ty(db)
