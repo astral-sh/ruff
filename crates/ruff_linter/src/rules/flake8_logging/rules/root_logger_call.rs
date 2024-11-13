@@ -51,7 +51,7 @@ pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(&*call.func) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
         return;
     };
 
