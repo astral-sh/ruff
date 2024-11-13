@@ -21,7 +21,7 @@ use ruff_text_size::Ranged;
 /// ```python
 /// fruits = ["orange", "apple"]
 ///
-/// if len(fruits): #[len-as-condition]
+/// if len(fruits):
 ///     print(fruits)
 /// ```
 ///
