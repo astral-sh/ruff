@@ -10,17 +10,21 @@ use crate::checkers::ast::Checker;
 /// Checks for redundant `Literal[None]` annotations.
 ///
 /// ## Why is this bad?
-/// The `Literal[None]` annotation is equivalent to `None`, as the type `None` consists
-/// of just a single value.
+/// `Literal[None]` is legal as a type annotation, but means the same thing as `None`.
+/// For stylistic consistency, prefer using `None`, which is more concise. 
 ///
 /// ## Example
 /// ```python
+/// from typing import Literal
+///
 /// Literal[None]
 /// Literal[1, 2, 3, "foo", 5, None]
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import Literal
+///
 /// None
 /// Literal[1, 2, 3, "foo", 5] | None
 /// ```
