@@ -472,13 +472,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             .iter()
             .filter_map(|(definition, ty)| {
                 // Filter out class literals that result from imports
-                if matches!(definition.kind(self.db), DefinitionKind::Class(_)) {
-                    ty.into_class_literal()
+                if let DefinitionKind::Class(class) = definition.kind(self.db) {
+                    ty.into_class_literal().map(|ty| (ty.class, class.node()))
                 } else {
                     None
                 }
-            })
-            .map(|class_ty| (class_ty.class, class_ty.class.node(self.db)));
+            });
 
         // Iterate through all class definitions in this scope.
         for (class, class_node) in class_definitions {
