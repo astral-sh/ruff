@@ -29,11 +29,11 @@ use crate::checkers::ast::Checker;
 ///     return variable + 1
 /// ```
 #[violation]
-pub struct UseOfUnusedMarkedVariables {
+pub struct UnusedVariableIsUsed {
     name: String,
 }
 
-impl Violation for UseOfUnusedMarkedVariables {
+impl Violation for UnusedVariableIsUsed {
     #[derive_message_formats]
     fn message(&self) -> String {
         let name = &self.name;
@@ -47,10 +47,7 @@ impl Violation for UseOfUnusedMarkedVariables {
 }
 
 /// WPS121
-pub(crate) fn use_of_unused_marked_variables(
-    checker: &Checker,
-    binding: &Binding,
-) -> Option<Diagnostic> {
+pub(crate) fn unused_variable_is_used(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     // only used variables
     if binding.is_unused() || !binding.kind.is_assignment() {
         return None;
@@ -68,7 +65,7 @@ pub(crate) fn use_of_unused_marked_variables(
     }
 
     Some(Diagnostic::new(
-        UseOfUnusedMarkedVariables {
+        UnusedVariableIsUsed {
             name: name.to_string(),
         },
         binding.range(),
