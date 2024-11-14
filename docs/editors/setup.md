@@ -153,8 +153,11 @@ extension for [coc.nvim](https://github.com/neoclide/coc.nvim).
 " Linter
 let g:ale_linters = { "python": ["ruff"] }
 " Formatter
-let g:ale_fixers = { "python": ["ruff_format"] }
+let g:ale_fixers = { "python": ["ruff", "ruff_format"] }
 ```
+
+For the fixers, `ruff` will run `ruff check --fix` (to fix all auto-fixable problems) whereas
+`ruff_format` will run `ruff format`.
 
 </details>
 
