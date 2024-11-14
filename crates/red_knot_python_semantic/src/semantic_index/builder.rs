@@ -114,13 +114,11 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
+        // SAFETY: `node` is guaranteed to be a child of `self.module`
         #[allow(unsafe_code)]
-        let scope = Scope {
-            parent,
-            // SAFETY: `node` is guaranteed to be a child of `self.module`
-            node: unsafe { node.to_kind(self.module.clone()) },
-            descendents: children_start..children_start,
-        };
+        let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
+
+        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
@@ -142,7 +140,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let id = self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
-        scope.descendents = scope.descendents.start..children_end;
+        scope.extend_descendents(children_end);
         self.try_node_context_stack_manager.exit_scope();
         id
     }

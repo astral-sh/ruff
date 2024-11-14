@@ -175,13 +175,25 @@ impl FileScopeId {
 
 #[derive(Debug)]
 pub struct Scope {
-    pub(super) parent: Option<FileScopeId>,
-    pub(super) node: NodeWithScopeKind,
-    pub(super) descendents: Range<FileScopeId>,
+    parent: Option<FileScopeId>,
+    node: NodeWithScopeKind,
+    descendents: Range<FileScopeId>,
 }
 
 impl Scope {
-    pub fn parent(self) -> Option<FileScopeId> {
+    pub(super) fn new(
+        parent: Option<FileScopeId>,
+        node: NodeWithScopeKind,
+        descendents: Range<FileScopeId>,
+    ) -> Self {
+        Scope {
+            parent,
+            node,
+            descendents,
+        }
+    }
+
+    pub fn parent(&self) -> Option<FileScopeId> {
         self.parent
     }
 
@@ -192,6 +204,14 @@ impl Scope {
     pub fn kind(&self) -> ScopeKind {
         self.node().scope_kind()
     }
+
+    pub fn descendents(&self) -> &Range<FileScopeId> {
+        &self.descendents
+    }
+
+    pub(super) fn extend_descendents(&mut self, children_end: FileScopeId) {
+        self.descendents = self.descendents.start..children_end;
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -201,12 +221,6 @@ pub enum ScopeKind {
     Class,
     Function,
     Comprehension,
-}
-
-impl ScopeKind {
-    pub const fn is_comprehension(self) -> bool {
-        matches!(self, ScopeKind::Comprehension)
-    }
 }
 
 /// Symbol table for a specific [`Scope`].
