@@ -1,8 +1,7 @@
 use ruff_python_ast::Alias;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic as semantic;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -29,16 +28,28 @@ use crate::checkers::ast::Checker;
 /// import numpy
 /// ```
 #[violation]
-pub struct UselessImportAlias;
+pub struct UselessImportAlias {
+    required_import_conflict: bool,
+}
 
-impl AlwaysFixableViolation for UselessImportAlias {
+impl Violation for UselessImportAlias {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Import alias does not rename original package".to_string()
+        if !self.required_import_conflict {
+            "Import alias does not rename original package".to_string()
+        } else {
+            "Required import does not rename original package.".to_string()
+        }
     }
 
-    fn fix_title(&self) -> String {
-        "Remove import alias".to_string()
+    fn fix_title(&self) -> Option<String> {
+        if !self.required_import_conflict {
+            Some("Remove import alias".to_string())
+        } else {
+            Some("Change required import or disable rule.".to_string())
+        }
     }
 }
 
@@ -53,28 +64,29 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     if alias.name.as_str() != asname.as_str() {
         return;
     }
-
-    // While the fix is specified as always available,
-    // the presence of a user-specified required import (I002)
-    // with a useless alias causes an infinite loop. So
-    // in this case we keep the diagnostic but omit the fix.
+    // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
-    let required_imports = &checker.settings.isort.required_imports;
-    if !required_imports.is_empty() {
-        let semantic_alias = semantic::Alias {
-            name: alias.name.as_str().to_owned(),
-            as_name: Some(asname.as_str().to_owned()),
-        };
-        if required_imports.contains(&semantic::NameImport::Import(semantic::ModuleNameImport {
-            name: semantic_alias,
-        })) {
-            let diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
-            checker.diagnostics.push(diagnostic);
-            return;
-        }
+    if checker
+        .settings
+        .isort
+        .requires_module_import(alias.name.to_string(), Some(asname.to_string()))
+    {
+        let diagnostic = Diagnostic::new(
+            UselessImportAlias {
+                required_import_conflict: true,
+            },
+            alias.range(),
+        );
+        checker.diagnostics.push(diagnostic);
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
+    let mut diagnostic = Diagnostic::new(
+        UselessImportAlias {
+            required_import_conflict: false,
+        },
+        alias.range(),
+    );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         asname.to_string(),
         alias.range(),
@@ -98,32 +110,30 @@ pub(crate) fn useless_import_from_alias(
     if alias.name.as_str() != asname.as_str() {
         return;
     }
-
-    // While the fix is specified as always available,
-    // the presence of a user-specified required import (I002)
-    // with a useless alias causes an infinite loop. So
-    // in this case we keep the diagnostic but omit the fix.
+    // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
-    let required_imports = &checker.settings.isort.required_imports;
-    if !required_imports.is_empty() {
-        let semantic_alias = semantic::Alias {
-            name: alias.name.as_str().to_owned(),
-            as_name: Some(asname.as_str().to_owned()),
-        };
-        if required_imports.contains(&semantic::NameImport::ImportFrom(
-            semantic::MemberNameImport {
-                name: semantic_alias,
-                module: module.map(str::to_string),
-                level,
+    if checker.settings.isort.requires_member_import(
+        module.map(str::to_string),
+        alias.name.to_string(),
+        Some(asname.to_string()),
+        level,
+    ) {
+        let diagnostic = Diagnostic::new(
+            UselessImportAlias {
+                required_import_conflict: true,
             },
-        )) {
-            let diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
-            checker.diagnostics.push(diagnostic);
-            return;
-        }
+            alias.range(),
+        );
+        checker.diagnostics.push(diagnostic);
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
+    let mut diagnostic = Diagnostic::new(
+        UselessImportAlias {
+            required_import_conflict: false,
+        },
+        alias.range(),
+    );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         asname.to_string(),
         alias.range(),
