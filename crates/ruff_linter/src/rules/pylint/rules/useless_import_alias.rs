@@ -59,9 +59,6 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     let Some(asname) = &alias.asname else {
         return;
     };
-    if alias.name.contains('.') {
-        return;
-    }
     if alias.name.as_str() != asname.as_str() {
         return;
     }
@@ -97,9 +94,6 @@ pub(crate) fn useless_import_from_alias(
     let Some(asname) = &alias.asname else {
         return;
     };
-    if alias.name.contains('.') {
-        return;
-    }
     if alias.name.as_str() != asname.as_str() {
         return;
     }
