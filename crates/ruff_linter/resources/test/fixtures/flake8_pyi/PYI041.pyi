@@ -58,3 +58,5 @@ class Foo:
     def bad4(self, arg: Union[float | complex, int]) -> None: ...  # PYI041
 
     def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041
+
+    def bad6(self) -> int | (float | complex): ...  # PYI041

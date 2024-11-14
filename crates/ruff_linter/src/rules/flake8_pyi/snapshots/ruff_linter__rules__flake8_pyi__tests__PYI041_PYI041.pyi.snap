@@ -1,6 +1,25 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
+PYI041.pyi:11:18: PYI041 Use `float` instead of `int | float`
+   |
+ 9 | # Type aliases not flagged
+10 | TA0: TypeAlias = int
+11 | TA1: TypeAlias = int | float | bool
+   |                  ^^^^^^^^^^^^^^^^^^ PYI041
+12 | TA2: TypeAlias = Union[int, float, bool]
+   |
+   = help: Remove redundant type
+
+PYI041.pyi:12:18: PYI041 Use `float` instead of `int | float`
+   |
+10 | TA0: TypeAlias = int
+11 | TA1: TypeAlias = int | float | bool
+12 | TA2: TypeAlias = Union[int, float, bool]
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+   |
+   = help: Remove redundant type
+
 PYI041.pyi:21:14: PYI041 Use `float` instead of `int | float`
    |
 21 | def f0(arg1: float | int) -> None: ...  # PYI041
@@ -19,6 +38,13 @@ PYI041.pyi:27:28: PYI041 Use `float` instead of `int | float`
    |
 27 | def f2(arg1: int, /, arg2: int | int | float) -> None: ...  # PYI041
    |                            ^^^^^^^^^^^^^^^^^ PYI041
+   |
+   = help: Remove redundant type
+
+PYI041.pyi:30:32: PYI041 Use `float` instead of `int | float`
+   |
+30 | def f3(arg1: int, *args: Union[int | int | float]) -> None: ...  # PYI041
+   |                                ^^^^^^^^^^^^^^^^^ PYI041
    |
    = help: Remove redundant type
 
@@ -107,5 +133,16 @@ PYI041.pyi:60:25: PYI041 Use `complex` instead of `int | float | complex`
 59 | 
 60 |     def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041
    |                         ^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+61 | 
+62 |     def bad6(self) -> int | (float | complex): ...  # PYI041
+   |
+   = help: Remove redundant type
+
+PYI041.pyi:62:23: PYI041 Use `complex` instead of `int | float | complex`
+   |
+60 |     def bad5(self, arg: int | (float | complex)) -> None: ...  # PYI041
+61 | 
+62 |     def bad6(self) -> int | (float | complex): ...  # PYI041
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^ PYI041
    |
    = help: Remove redundant type

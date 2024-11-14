@@ -5,8 +5,7 @@ use anyhow::Result;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
-    name::Name, AnyParameterRef, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple,
-    Operator, Parameters,
+    name::Name, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple, Operator,
 };
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
@@ -81,13 +80,7 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parameters) {
-    for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
-        check_annotation(checker, annotation);
-    }
-}
-
-fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
+pub(crate) fn redundant_numeric_union<'a>(checker: &mut Checker, annotation: &'a Expr) {
     let mut numeric_flags = NumericFlags::empty();
 
     let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {

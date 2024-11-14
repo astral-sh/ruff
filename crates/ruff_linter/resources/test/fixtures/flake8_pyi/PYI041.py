@@ -74,3 +74,6 @@ class Foo:
 
     def bad5(self, arg: int | (float | complex)) -> None: 
         ...
+
+    def bad6(self) -> int | (float | complex):
+        ...

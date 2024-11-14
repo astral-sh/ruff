@@ -177,9 +177,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::BadExitAnnotation) {
                 flake8_pyi::rules::bad_exit_annotation(checker, function_def);
             }
-            if checker.enabled(Rule::RedundantNumericUnion) {
-                flake8_pyi::rules::redundant_numeric_union(checker, parameters);
-            }
             if checker.enabled(Rule::Pep484StylePositionalOnlyParameter) {
                 flake8_pyi::rules::pep_484_positional_parameter(checker, function_def);
             }
