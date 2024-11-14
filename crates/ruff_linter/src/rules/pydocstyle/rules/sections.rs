@@ -78,9 +78,6 @@ use crate::rules::pydocstyle::settings::Convention;
 ///         raise FasterThanLightError from exc
 /// ```
 ///
-/// ## Options
-/// - `lint.pydocstyle.convention`
-///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -260,9 +257,6 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
-///
-/// ## Options
-/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1049,9 +1043,6 @@ impl AlwaysFixableViolation for BlankLineAfterLastSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
-/// ## Options
-/// - `lint.pydocstyle.convention`
-///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -1293,9 +1284,6 @@ impl Violation for UndocumentedParam {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
-///
-/// ## Options
-/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
