@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
+use smallvec::SmallVec;
 
 use crate::checkers::ast::Checker;
 
@@ -41,7 +42,7 @@ impl Violation for NoneNotAtEndOfUnion {
 /// RUF036
 pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Expr) {
     let semantic = checker.semantic();
-    let mut none_exprs: Vec<&Expr> = Vec::new();
+    let mut none_exprs: SmallVec<[&Expr; 1]> = SmallVec::new();
 
     let mut last_expr: Option<&Expr> = None;
     let mut find_none = |expr: &'a Expr, _parent: &Expr| {
@@ -54,21 +55,23 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Exp
     // Walk through all type expressions in the union and keep track of `None` literals.
     traverse_union(&mut find_none, semantic, union);
 
-    if none_exprs.is_empty() {
+    let Some(last_expr) = last_expr else {
         return;
-    }
+    };
 
-    // There is guaranteed to be a `last_expr`;
-    let last_expr = last_expr.unwrap();
+    // The must be at least one `None` expression.
+    let Some(last_none) = none_exprs.last() else {
+        return;
+    };
 
     // If any of the `None` literals is last we do not emit.
-    if none_exprs.iter().any(|none_expr| *none_expr == last_expr) {
+    if *last_none == last_expr {
         return;
     }
 
     for none_expr in none_exprs {
         checker
             .diagnostics
-            .push(Diagnostic::new(NoneNotAtEndOfUnion {}, none_expr.range()));
+            .push(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
     }
 }
