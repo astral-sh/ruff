@@ -7,7 +7,7 @@ PYI041.py:22:14: PYI041 Use `float` instead of `int | float`
    |              ^^^^^^^^^^^ PYI041
 23 |     ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:26:30: PYI041 Use `complex` instead of `float | complex`
    |
@@ -15,7 +15,7 @@ PYI041.py:26:30: PYI041 Use `complex` instead of `float | complex`
    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 27 |     ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:30:28: PYI041 Use `float` instead of `int | float`
    |
@@ -23,7 +23,7 @@ PYI041.py:30:28: PYI041 Use `float` instead of `int | float`
    |                            ^^^^^^^^^^^^^^^^^ PYI041
 31 |     ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:38:24: PYI041 Use `float` instead of `int | float`
    |
@@ -31,7 +31,7 @@ PYI041.py:38:24: PYI041 Use `float` instead of `int | float`
    |                        ^^^^^^^^^^^^^^^^^ PYI041
 39 |     ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:43:10: PYI041 Use `complex` instead of `int | float | complex`
    |
@@ -44,7 +44,7 @@ PYI041.py:43:10: PYI041 Use `complex` instead of `int | float | complex`
 46 |       ) -> None: 
 47 |       ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:51:9: PYI041 Use `complex` instead of `int | float | complex`
    |
@@ -58,7 +58,7 @@ PYI041.py:51:9: PYI041 Use `complex` instead of `int | float | complex`
 54 |       )    
 55 |       ) -> None: 
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:63:24: PYI041 Use `complex` instead of `int | float | complex`
    |
@@ -68,7 +68,7 @@ PYI041.py:63:24: PYI041 Use `complex` instead of `int | float | complex`
    |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
 64 |         ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:66:25: PYI041 Use `complex` instead of `int | float | complex`
    |
@@ -78,7 +78,7 @@ PYI041.py:66:25: PYI041 Use `complex` instead of `int | float | complex`
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 67 |         ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:69:25: PYI041 Use `complex` instead of `int | float | complex`
    |
@@ -88,7 +88,7 @@ PYI041.py:69:25: PYI041 Use `complex` instead of `int | float | complex`
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 70 |         ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:72:25: PYI041 Use `complex` instead of `int | float | complex`
    |
@@ -98,7 +98,7 @@ PYI041.py:72:25: PYI041 Use `complex` instead of `int | float | complex`
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 73 |         ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
 
 PYI041.py:75:25: PYI041 Use `complex` instead of `int | float | complex`
    |
@@ -108,4 +108,4 @@ PYI041.py:75:25: PYI041 Use `complex` instead of `int | float | complex`
    |                         ^^^^^^^^^^^^^^^^^^^^^^^ PYI041
 76 |         ...
    |
-   = help: Remove duplicates
+   = help: Remove redundant type
