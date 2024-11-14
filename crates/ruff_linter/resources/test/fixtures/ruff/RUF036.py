@@ -37,3 +37,11 @@ def good_func2() -> int | None:
 def good_func3(arg: None): 
     ...
 
+
+def good_func4(arg: U[None]): 
+    ...
+
+
+def good_func5(arg: U[int]): 
+    ...
+
