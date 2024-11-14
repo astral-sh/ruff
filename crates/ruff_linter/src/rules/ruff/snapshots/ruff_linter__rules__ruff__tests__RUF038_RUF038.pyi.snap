@@ -113,4 +113,4 @@ RUF038.pyi:14:17: RUF038 `Literal[True, False, ...]` can be replaced with `Liter
 15 | 
 16 | # ok
    |
-   = help: Replace with `bool`
+   = help: Replace with `Literal[...] | bool`

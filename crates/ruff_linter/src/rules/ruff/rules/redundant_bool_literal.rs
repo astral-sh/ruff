@@ -65,7 +65,12 @@ impl Violation for RedundantBoolLiteral {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with `bool`".to_string())
+        let title = if self.seen_others {
+            "Replace with `Literal[...] | bool`"
+        } else {
+            "Replace with `bool`"
+        };
+        Some(title.to_string())
     }
 }
 

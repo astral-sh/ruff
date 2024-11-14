@@ -97,4 +97,4 @@ RUF038.py:24:17: RUF038 `Literal[True, False, ...]` can be replaced with `Litera
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF038
 25 |     ...
    |
-   = help: Replace with `bool`
+   = help: Replace with `Literal[...] | bool`
