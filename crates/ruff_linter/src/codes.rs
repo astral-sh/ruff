@@ -935,6 +935,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // wps-light
         (WpsLight, "116") => (RuleGroup::Preview, rules::wps_light::rules::ConsecutiveUnderscoresInName),
+        (WpsLight, "121") => (RuleGroup::Preview, rules::wps_light::rules::UseOfUnusedMarkedVariables),
 
         // ruff
         (Ruff, "001") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterString),
