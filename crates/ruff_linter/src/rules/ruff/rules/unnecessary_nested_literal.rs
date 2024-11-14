@@ -95,7 +95,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &mut Checker, literal_expr
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryNestedLiteral {}, literal_expr.range());
+    let mut diagnostic = Diagnostic::new(UnnecessaryNestedLiteral, literal_expr.range());
 
     // Create a [`Fix`] that flattens all nodes.
     if let Expr::Subscript(subscript) = literal_expr {
