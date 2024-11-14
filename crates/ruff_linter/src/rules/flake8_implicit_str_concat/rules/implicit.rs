@@ -34,6 +34,10 @@ use crate::Locator;
 /// ```python
 /// z = "The quick brown fox."
 /// ```
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent use of implicit string concatenation, making the rule redundant.
 #[violation]
 pub struct SingleLineImplicitStringConcatenation;
 
@@ -80,6 +84,10 @@ impl Violation for SingleLineImplicitStringConcatenation {
 ///
 /// ## Options
 /// - `lint.flake8-implicit-str-concat.allow-multiline`
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent use of implicit string concatenation, making the rule redundant.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
