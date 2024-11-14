@@ -52,8 +52,10 @@ import sys
 reveal_type(sys.version_info >= (3, 8, 1))  # revealed: bool
 reveal_type(sys.version_info >= (3, 8, 1, "final", 0))  # revealed: bool
 
-# TODO: this is an invalid comparison (`sys.version_info` is a tuple of length 5)
-# Should we issue a diagnostic here?
+# TODO: While this won't fail at runtime, the user has probably made a mistake
+# if they're comparing a tuple of length >5 with `sys.version_info`
+# (`sys.version_info` is a tuple of length 5). It might be worth
+# emitting a lint diagnostic of some kind warning them about the probable error?
 reveal_type(sys.version_info >= (3, 8, 1, "final", 0, 5))  # revealed: bool
 
 # TODO: this should be `Literal[False]`; see #14279
