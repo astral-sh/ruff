@@ -1,0 +1,100 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI061.py:4:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+  |
+4 | def func1(arg1: Literal[None]):
+  |                         ^^^^ PYI061
+5 |     ...
+  |
+  = help: Replace with `None`
+
+ℹ Safe fix
+1 1 | from typing import Literal
+2 2 | 
+3 3 | 
+4   |-def func1(arg1: Literal[None]):
+  4 |+def func1(arg1: None):
+5 5 |     ...
+6 6 | 
+7 7 | 
+
+PYI061.py:8:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+  |
+8 | def func2(arg1: Literal[None] | int):
+  |                         ^^^^ PYI061
+9 |     ...
+  |
+  = help: Replace with `None`
+
+ℹ Safe fix
+5 5 |     ...
+6 6 | 
+7 7 | 
+8   |-def func2(arg1: Literal[None] | int):
+  8 |+def func2(arg1: None | int):
+9 9 |     ...
+10 10 | 
+11 11 | 
+
+PYI061.py:12:24: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+   |
+12 | def func3() -> Literal[None]:
+   |                        ^^^^ PYI061
+13 |     ...
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+9  9  |     ...
+10 10 | 
+11 11 | 
+12    |-def func3() -> Literal[None]:
+   12 |+def func3() -> None:
+13 13 |     ...
+14 14 | 
+15 15 | 
+
+PYI061.py:16:30: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+16 | def func4(arg1: Literal[int, None, float]):
+   |                              ^^^^ PYI061
+17 |     ...
+   |
+   = help: Replace with `None`
+
+PYI061.py:20:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+   |
+20 | def func5(arg1: Literal[None, None]): 
+   |                         ^^^^ PYI061
+21 |     ...
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+17 17 |     ...
+18 18 | 
+19 19 | 
+20    |-def func5(arg1: Literal[None, None]): 
+   20 |+def func5(arg1: None): 
+21 21 |     ...
+22 22 | 
+23 23 | 
+
+PYI061.py:20:31: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+   |
+20 | def func5(arg1: Literal[None, None]): 
+   |                               ^^^^ PYI061
+21 |     ...
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+17 17 |     ...
+18 18 | 
+19 19 | 
+20    |-def func5(arg1: Literal[None, None]): 
+   20 |+def func5(arg1: None): 
+21 21 |     ...
+22 22 | 
+23 23 |
