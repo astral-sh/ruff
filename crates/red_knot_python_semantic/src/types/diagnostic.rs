@@ -1,3 +1,6 @@
+use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
+use crate::semantic_index::definition::DefinitionNodeKey;
+use crate::semantic_index::SemanticIndex;
 use crate::types::{ClassLiteralType, Type};
 use crate::Db;
 use ruff_db::diagnostic::{Diagnostic, Severity};
@@ -313,6 +316,36 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
             message: message.to_string(),
             range: node.range(),
         });
+    }
+
+    /// Adds a diagnostic for `expression`, but only if it is defined in the file represented by `index`.
+    pub(super) fn add_if_expression_in_same_file<'e, Expression>(
+        &mut self,
+        index: &SemanticIndex,
+        expression: &'e Expression,
+        rule: &str,
+        message: std::fmt::Arguments,
+    ) where
+        &'e Expression: Into<AnyNodeRef<'e>> + Into<ExpressionNodeKey>,
+    {
+        if index.contains_expression(expression) {
+            self.add(expression.into(), rule, message);
+        }
+    }
+
+    /// Adds a diagnostic for `definition`, but only if it is defined in the file represented by `index`.
+    pub(super) fn add_if_definition_in_same_file<'d, Definition>(
+        &mut self,
+        index: &SemanticIndex,
+        definition: &'d Definition,
+        rule: &str,
+        message: std::fmt::Arguments,
+    ) where
+        &'d Definition: Into<AnyNodeRef<'d>> + Into<DefinitionNodeKey>,
+    {
+        if index.contains_definition(definition) {
+            self.add(definition.into(), rule, message);
+        }
     }
 
     pub(super) fn extend(&mut self, diagnostics: &TypeCheckDiagnostics) {

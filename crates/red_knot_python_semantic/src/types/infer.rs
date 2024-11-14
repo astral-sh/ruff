@@ -477,8 +477,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         for class in class_definitions {
             // (1) Check that the class does not have a cyclic definition
             if class.is_cyclically_defined(self.db) {
-                self.diagnostics.add(
-                    class.node(self.db).into(),
+                self.diagnostics.add_if_definition_in_same_file(
+                    self.index,
+                    class.node(self.db),
                     "cyclic-class-def",
                     format_args!(
                         "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
@@ -497,8 +498,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::DuplicateBases(duplicates) => {
                         let base_nodes = class.node(self.db).bases();
                         for (index, duplicate) in duplicates {
-                            self.diagnostics.add(
-                                (&base_nodes[*index]).into(),
+                            self.diagnostics.add_if_expression_in_same_file(
+                                self.index,
+                                &base_nodes[*index],
                                 "duplicate-base",
                                 format_args!("Duplicate base class `{}`", duplicate.name(self.db)),
                             );
@@ -507,8 +509,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::InvalidBases(bases) => {
                         let base_nodes = class.node(self.db).bases();
                         for (index, base_ty) in bases {
-                            self.diagnostics.add(
-                                (&base_nodes[*index]).into(),
+                            self.diagnostics.add_if_expression_in_same_file(
+                                self.index,
+                                &base_nodes[*index],
                                 "invalid-base",
                                 format_args!(
                                     "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
@@ -517,8 +520,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                         }
                     }
-                    MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
-                        class.node(self.db).into(),
+                    MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add_if_definition_in_same_file(
+                        self.index,
+                        class.node(self.db),
                         "inconsistent-mro",
                         format_args!(
                             "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
@@ -545,9 +549,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                             },
                         candidate1_is_base_class,
                     } => {
-                        let node = class.node(self.db).into();
+                        let node = class.node(self.db);
                         if *candidate1_is_base_class {
-                            self.diagnostics.add(
+                            self.diagnostics.add_if_definition_in_same_file(
+                                self.index,
                                 node,
                                 "conflicting-metaclass",
                                 format_args!(
@@ -562,7 +567,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 )
                             );
                         } else {
-                            self.diagnostics.add(
+                            self.diagnostics.add_if_definition_in_same_file(
+                                self.index,
                                 node,
                                 "conflicting-metaclass",
                                 format_args!(
