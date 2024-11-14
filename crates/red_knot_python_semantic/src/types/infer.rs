@@ -469,16 +469,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         let class_definitions = self
             .types
             .declarations
-            .values()
-            .filter_map(|ty| ty.into_class_literal())
-            .map(|class_ty| class_ty.class);
+            .iter()
+            .filter_map(|(definition, ty)| {
+                // Filter out class literals that result from imports
+                if let DefinitionKind::Class(class) = definition.kind(self.db) {
+                    ty.into_class_literal().map(|ty| (ty.class, class.node()))
+                } else {
+                    None
+                }
+            });
 
         // Iterate through all class definitions in this scope.
-        for class in class_definitions {
+        for (class, class_node) in class_definitions {
             // (1) Check that the class does not have a cyclic definition
             if class.is_cyclically_defined(self.db) {
                 self.diagnostics.add(
-                    class.node(self.db).into(),
+                    class_node.into(),
                     "cyclic-class-def",
                     format_args!(
                         "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
@@ -495,7 +501,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Err(mro_error) = class.try_mro(self.db).as_ref() {
                 match mro_error.reason() {
                     MroErrorKind::DuplicateBases(duplicates) => {
-                        let base_nodes = class.node(self.db).bases();
+                        let base_nodes = class_node.bases();
                         for (index, duplicate) in duplicates {
                             self.diagnostics.add(
                                 (&base_nodes[*index]).into(),
@@ -505,7 +511,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     MroErrorKind::InvalidBases(bases) => {
-                        let base_nodes = class.node(self.db).bases();
+                        let base_nodes = class_node.bases();
                         for (index, base_ty) in bases {
                             self.diagnostics.add(
                                 (&base_nodes[*index]).into(),
@@ -518,7 +524,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
-                        class.node(self.db).into(),
+                        class_node.into(),
                         "inconsistent-mro",
                         format_args!(
                             "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
@@ -545,7 +551,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             },
                         candidate1_is_base_class,
                     } => {
-                        let node = class.node(self.db).into();
+                        let node = class_node.into();
                         if *candidate1_is_base_class {
                             self.diagnostics.add(
                                 node,
