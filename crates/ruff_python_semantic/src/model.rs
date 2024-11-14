@@ -2321,12 +2321,12 @@ bitflags! {
         /// The model is in the value expression of a [PEP 613] explicit type alias.
         ///
         /// [PEP 613]: https://peps.python.org/pep-0613/
-        const EXPLICIT_TYPE_ALIAS = 1 << 27;
+        const EXPLICIT_TYPE_ALIAS = 1 << 26;
 
         /// The model is in the value expression of a [PEP 695] type statement
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-        const GENERIC_TYPE_ALIAS = 1 << 28;
+        const GENERIC_TYPE_ALIAS = 1 << 27;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
