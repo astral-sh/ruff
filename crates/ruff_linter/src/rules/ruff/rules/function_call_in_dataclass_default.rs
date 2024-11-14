@@ -4,12 +4,14 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_semantic::analyze::typing::is_immutable_func;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
     is_class_var_annotation, is_dataclass, is_dataclass_field, is_descriptor_class,
 };
+use crate::rules::ruff::rules::is_attrs_dataclass;
 
 /// ## What it does
 /// Checks for function calls in dataclass attribute defaults.
@@ -74,7 +76,9 @@ pub(crate) fn function_call_in_dataclass_default(
     checker: &mut Checker,
     class_def: &ast::StmtClassDef,
 ) {
-    if !is_dataclass(class_def, checker.semantic()) {
+    let semantic = checker.semantic();
+
+    if !is_dataclass(class_def, semantic) && !is_attrs_dataclass(class_def, semantic) {
         return;
     }
 
@@ -87,26 +91,42 @@ pub(crate) fn function_call_in_dataclass_default(
         .collect();
 
     for statement in &class_def.body {
-        if let Stmt::AnnAssign(ast::StmtAnnAssign {
+        let Stmt::AnnAssign(ast::StmtAnnAssign {
             annotation,
             value: Some(expr),
             ..
         }) = statement
+        else {
+            continue;
+        };
+        let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() else {
+            continue;
+        };
+
+        if !is_class_var_annotation(annotation, checker.semantic())
+            && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
+            && !is_dataclass_field(func, checker.semantic())
+            && !is_attrs_field(func, checker.semantic())
+            && !is_descriptor_class(func, checker.semantic())
         {
-            if let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() {
-                if !is_class_var_annotation(annotation, checker.semantic())
-                    && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
-                    && !is_dataclass_field(func, checker.semantic())
-                    && !is_descriptor_class(func, checker.semantic())
-                {
-                    checker.diagnostics.push(Diagnostic::new(
-                        FunctionCallInDataclassDefaultArgument {
-                            name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
-                        },
-                        expr.range(),
-                    ));
-                }
-            }
+            let kind = FunctionCallInDataclassDefaultArgument {
+                name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
+            };
+            let diagnostic = Diagnostic::new(kind, expr.range());
+
+            checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+/// Whether the function call is either `attr.ib()` or `attr.field()`.
+fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+        return false;
+    };
+
+    matches!(
+        qualified_name.segments(),
+        ["attrs", "field"] | ["attr", "ib"]
+    )
 }

@@ -1,0 +1,43 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF009_attrs.py:22:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+   |
+20 | @attr.s
+21 | class A:
+22 |     hidden_mutable_default: list[int] = default_function()
+   |                                         ^^^^^^^^^^^^^^^^^^ RUF009
+23 |     class_variable: typing.ClassVar[list[int]] = default_function()
+24 |     another_class_var: ClassVar[list[int]] = default_function()
+   |
+
+RUF009_attrs.py:45:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+   |
+43 | @define
+44 | class B:
+45 |     hidden_mutable_default: list[int] = default_function()
+   |                                         ^^^^^^^^^^^^^^^^^^ RUF009
+46 |     another_dataclass: A = A()
+47 |     not_optimal: ImmutableType = ImmutableType(20)
+   |
+
+RUF009_attrs.py:46:28: RUF009 Do not perform function call `A` in dataclass defaults
+   |
+44 | class B:
+45 |     hidden_mutable_default: list[int] = default_function()
+46 |     another_dataclass: A = A()
+   |                            ^^^ RUF009
+47 |     not_optimal: ImmutableType = ImmutableType(20)
+48 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
+   |
+
+RUF009_attrs.py:47:34: RUF009 Do not perform function call `ImmutableType` in dataclass defaults
+   |
+45 |     hidden_mutable_default: list[int] = default_function()
+46 |     another_dataclass: A = A()
+47 |     not_optimal: ImmutableType = ImmutableType(20)
+   |                                  ^^^^^^^^^^^^^^^^^ RUF009
+48 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
+49 |     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
+   |

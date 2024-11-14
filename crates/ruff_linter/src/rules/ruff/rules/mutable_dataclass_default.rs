@@ -2,7 +2,9 @@ use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -66,25 +68,45 @@ impl Violation for MutableDataclassDefault {
 
 /// RUF008
 pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
-    if !is_dataclass(class_def, checker.semantic()) {
+    let semantic = checker.semantic();
+
+    if !is_dataclass(class_def, semantic) && !is_attrs_dataclass(class_def, semantic) {
         return;
-    }
+    };
 
     for statement in &class_def.body {
-        if let Stmt::AnnAssign(ast::StmtAnnAssign {
+        let Stmt::AnnAssign(ast::StmtAnnAssign {
             annotation,
             value: Some(value),
             ..
         }) = statement
+        else {
+            continue;
+        };
+
+        if is_mutable_expr(value, checker.semantic())
+            && !is_class_var_annotation(annotation, checker.semantic())
+            && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {
-            if is_mutable_expr(value, checker.semantic())
-                && !is_class_var_annotation(annotation, checker.semantic())
-                && !is_immutable_annotation(annotation, checker.semantic(), &[])
-            {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(MutableDataclassDefault, value.range()));
-            }
+            let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
+
+            checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+/// Whether the class is decorated by any dataclass transformers from `attrs`.
+pub(crate) fn is_attrs_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    class_def.decorator_list.iter().any(|decorator| {
+        let Some(qualified_name) =
+            semantic.resolve_qualified_name(map_callable(&decorator.expression))
+        else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            ["attrs", "define" | "frozen"] | ["attr", "s"]
+        )
+    })
 }
