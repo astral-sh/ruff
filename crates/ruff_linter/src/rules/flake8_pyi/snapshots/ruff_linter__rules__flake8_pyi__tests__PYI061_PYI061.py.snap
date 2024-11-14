@@ -61,7 +61,7 @@ PYI061.py:16:30: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] 
    |                              ^^^^ PYI061
 17 |     ...
    |
-   = help: Replace with `None`
+   = help: Replace with `Literal[...] | None`
 
 PYI061.py:20:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
    |
@@ -108,7 +108,7 @@ PYI061.py:26:5: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] |
 27 |     , "world"
 28 |     ]): 
    |
-   = help: Replace with `None`
+   = help: Replace with `Literal[...] | None`
 
 PYI061.py:33:5: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
    |
@@ -160,7 +160,7 @@ PYI061.py:45:15: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] 
 46 | 
 47 | ###
    |
-   = help: Replace with `None`
+   = help: Replace with `Literal[...] | None`
 
 PYI061.py:54:9: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
    |
@@ -211,7 +211,7 @@ PYI061.py:55:12: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] 
 56 | 
 57 | # ... but if Y061 and Y062 both apply
    |
-   = help: Replace with `None`
+   = help: Replace with `Literal[...] | None`
 
 PYI061.py:55:25: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
    |
@@ -222,7 +222,7 @@ PYI061.py:55:25: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] 
 56 | 
 57 | # ... but if Y061 and Y062 both apply
    |
-   = help: Replace with `None`
+   = help: Replace with `Literal[...] | None`
 
 PYI061.py:60:9: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
    |
@@ -231,7 +231,7 @@ PYI061.py:60:9: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] |
 60 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
    |         ^^^^ PYI061
    |
-   = help: Replace with `None`
+   = help: Replace with `Literal[...] | None`
 
 PYI061.py:60:21: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
    |
@@ -240,4 +240,4 @@ PYI061.py:60:21: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] 
 60 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
    |                     ^^^^ PYI061
    |
-   = help: Replace with `None`
+   = help: Replace with `Literal[...] | None`
