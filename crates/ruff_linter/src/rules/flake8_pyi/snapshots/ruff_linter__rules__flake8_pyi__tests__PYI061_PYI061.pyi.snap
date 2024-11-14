@@ -74,7 +74,7 @@ PYI061.pyi:16:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
    16 |+def func5(arg1: None): ...
 17 17 | 
 18 18 | 
-19 19 | # OK
+19 19 | def func6(arg1: Literal[
 
 PYI061.pyi:16:31: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
    |
@@ -91,4 +91,146 @@ PYI061.pyi:16:31: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
    16 |+def func5(arg1: None): ...
 17 17 | 
 18 18 | 
-19 19 | # OK
+19 19 | def func6(arg1: Literal[
+
+PYI061.pyi:21:5: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+19 | def func6(arg1: Literal[
+20 |     "hello",
+21 |     None  # Comment 1
+   |     ^^^^ PYI061
+22 |     , "world"
+23 |     ]): ...
+   |
+   = help: Replace with `None`
+
+PYI061.pyi:27:5: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+   |
+26 | def func7(arg1: Literal[
+27 |     None  # Comment 1
+   |     ^^^^ PYI061
+28 |     ]): ...
+   |
+   = help: Replace with `None`
+
+ℹ Unsafe fix
+23 23 |     ]): ...
+24 24 | 
+25 25 | 
+26    |-def func7(arg1: Literal[
+27    |-    None  # Comment 1
+28    |-    ]): ...
+   26 |+def func7(arg1: None): ...
+29 27 | 
+30 28 | 
+31 29 | # OK
+
+PYI061.pyi:36:9: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+   |
+35 | # From flake8-pyi
+36 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   |         ^^^^ PYI061
+37 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+33 33 | 
+34 34 | 
+35 35 | # From flake8-pyi
+36    |-Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   36 |+None  # Y061 None inside "Literal[]" expression. Replace with "None"
+37 37 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+38 38 | 
+39 39 | ###
+
+PYI061.pyi:37:15: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+35 | # From flake8-pyi
+36 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+37 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |               ^^^^ PYI061
+38 | 
+39 | ###
+   |
+   = help: Replace with `None`
+
+PYI061.pyi:46:9: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+   |
+44 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+45 | # only emit Y061...
+46 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   |         ^^^^ PYI061
+47 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+43 43 | 
+44 44 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+45 45 | # only emit Y061...
+46    |-Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   46 |+None  # Y061 None inside "Literal[]" expression. Replace with "None"
+47 47 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+48 48 | 
+49 49 | # ... but if Y061 and Y062 both apply
+
+PYI061.pyi:46:15: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+   |
+44 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+45 | # only emit Y061...
+46 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   |               ^^^^ PYI061
+47 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+43 43 | 
+44 44 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+45 45 | # only emit Y061...
+46    |-Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   46 |+None  # Y061 None inside "Literal[]" expression. Replace with "None"
+47 47 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+48 48 | 
+49 49 | # ... but if Y061 and Y062 both apply
+
+PYI061.pyi:47:12: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+45 | # only emit Y061...
+46 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+47 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   |            ^^^^ PYI061
+48 | 
+49 | # ... but if Y061 and Y062 both apply
+   |
+   = help: Replace with `None`
+
+PYI061.pyi:47:25: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+45 | # only emit Y061...
+46 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+47 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   |                         ^^^^ PYI061
+48 | 
+49 | # ... but if Y061 and Y062 both apply
+   |
+   = help: Replace with `None`
+
+PYI061.pyi:52:9: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+50 | # and there are no None members in the Literal[] slice,
+51 | # only emit Y062:
+52 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+   |         ^^^^ PYI061
+   |
+   = help: Replace with `None`
+
+PYI061.pyi:52:21: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+50 | # and there are no None members in the Literal[] slice,
+51 | # only emit Y062:
+52 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+   |                     ^^^^ PYI061
+   |
+   = help: Replace with `None`

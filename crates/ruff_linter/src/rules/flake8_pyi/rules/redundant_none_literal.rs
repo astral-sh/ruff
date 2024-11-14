@@ -1,8 +1,10 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, ExprNoneLiteral};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::Ranged;
+
+use smallvec::SmallVec;
 
 use crate::checkers::ast::Checker;
 
@@ -11,7 +13,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// `Literal[None]` is legal as a type annotation, but means the same thing as `None`.
-/// For stylistic consistency, prefer using `None`, which is more concise. 
+/// For stylistic consistency, prefer using `None`, which is more concise.
 ///
 /// ## Example
 /// ```python
@@ -33,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 #[violation]
 pub struct RedundantNoneLiteral {
-    seen_others: bool,
+    other_literal_elements_seen: bool,
 }
 
 impl Violation for RedundantNoneLiteral {
@@ -41,7 +43,7 @@ impl Violation for RedundantNoneLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        if self.seen_others {
+        if self.other_literal_elements_seen {
             "`Literal[None, ...]` can be replaced with `Literal[...] | None`".to_string()
         } else {
             "`Literal[None]` can be replaced with a bare `None`".to_string()
@@ -59,14 +61,14 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
         return;
     }
 
-    let mut none_exprs: Vec<&Expr> = Vec::new();
-    let mut seen_others = false;
+    let mut none_exprs: SmallVec<[&ExprNoneLiteral; 1]> = SmallVec::new();
+    let mut other_literal_elements_seen = false;
 
     let mut find_none = |expr: &'a Expr, _parent: &'a Expr| {
-        if matches!(expr, Expr::NoneLiteral(_)) {
-            none_exprs.push(expr);
+        if let Expr::NoneLiteral(none_expr) = expr {
+            none_exprs.push(none_expr);
         } else {
-            seen_others = true;
+            other_literal_elements_seen = true;
         }
     };
 
@@ -78,15 +80,12 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
 
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.
-    let fix = if seen_others {
+    let fix = if other_literal_elements_seen {
         None
     } else {
         Some(Fix::applicable_edit(
             Edit::range_replacement("None".to_string(), literal_expr.range()),
-            if checker
-                .comment_ranges()
-                .has_comments(literal_expr, checker.source())
-            {
+            if checker.comment_ranges().intersects(literal_expr.range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -95,8 +94,12 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     };
 
     for none_expr in none_exprs {
-        let mut diagnostic =
-            Diagnostic::new(RedundantNoneLiteral { seen_others }, none_expr.range());
+        let mut diagnostic = Diagnostic::new(
+            RedundantNoneLiteral {
+                other_literal_elements_seen,
+            },
+            none_expr.range(),
+        );
         if let Some(ref fix) = fix {
             diagnostic.set_fix(fix.clone());
         }
