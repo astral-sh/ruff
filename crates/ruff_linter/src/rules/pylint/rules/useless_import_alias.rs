@@ -67,31 +67,23 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     }
     // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
-    if checker
+    let required_import_conflict = checker
         .settings
         .isort
-        .requires_module_import(alias.name.to_string(), Some(asname.to_string()))
-    {
-        let diagnostic = Diagnostic::new(
-            UselessImportAlias {
-                required_import_conflict: true,
-            },
-            alias.range(),
-        );
-        checker.diagnostics.push(diagnostic);
-        return;
-    }
-
+        .requires_module_import(alias.name.to_string(), Some(asname.to_string()));
     let mut diagnostic = Diagnostic::new(
         UselessImportAlias {
-            required_import_conflict: false,
+            required_import_conflict,
         },
         alias.range(),
     );
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        asname.to_string(),
-        alias.range(),
-    )));
+    if !required_import_conflict {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            asname.to_string(),
+            alias.range(),
+        )));
+    }
+
     checker.diagnostics.push(diagnostic);
 }
 
@@ -113,31 +105,25 @@ pub(crate) fn useless_import_from_alias(
     }
     // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
-    if checker.settings.isort.requires_member_import(
+    let required_import_conflict = checker.settings.isort.requires_member_import(
         module.map(str::to_string),
         alias.name.to_string(),
         Some(asname.to_string()),
         level,
-    ) {
-        let diagnostic = Diagnostic::new(
-            UselessImportAlias {
-                required_import_conflict: true,
-            },
-            alias.range(),
-        );
-        checker.diagnostics.push(diagnostic);
-        return;
-    }
-
+    );
     let mut diagnostic = Diagnostic::new(
         UselessImportAlias {
-            required_import_conflict: false,
+            required_import_conflict,
         },
         alias.range(),
     );
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        asname.to_string(),
-        alias.range(),
-    )));
+
+    if !required_import_conflict {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            asname.to_string(),
+            alias.range(),
+        )));
+    }
+
     checker.diagnostics.push(diagnostic);
 }
