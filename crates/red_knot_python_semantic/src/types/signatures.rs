@@ -80,11 +80,11 @@ impl<'db> Parameters<'db> {
     fn todo() -> Self {
         Self {
             variadic: Some(Parameter {
-                name: Name::new_static("args"),
+                name: Some(Name::new_static("args")),
                 annotated_ty: Type::Todo,
             }),
             keywords: Some(Parameter {
-                name: Name::new_static("kwargs"),
+                name: Some(Name::new_static("kwargs")),
                 annotated_ty: Type::Todo,
             }),
             ..Default::default()
@@ -163,9 +163,8 @@ pub(super) struct Parameter<'db> {
     /// Parameter name.
     ///
     /// It is possible for signatures to be defined in ways that leave positional-only parameters
-    /// nameless (e.g. via `Callable` annotations). In these cases we will synthesize an
-    /// invalid-identifier name for the parameter (for example, `1`, `2`, `3`...).
-    name: Name,
+    /// nameless (e.g. via `Callable` annotations).
+    name: Option<Name>,
 
     /// Annotated type of the parameter (Unknown if no annotation.)
     annotated_ty: Type<'db>,
@@ -178,7 +177,7 @@ impl<'db> Parameter<'db> {
         parameter: &'db ast::Parameter,
     ) -> Self {
         Parameter {
-            name: parameter.name.id.clone(),
+            name: Some(parameter.name.id.clone()),
             annotated_ty: parameter
                 .annotation
                 .as_deref()
@@ -255,7 +254,7 @@ mod tests {
         expected_name: &'static str,
         expected_annotation_ty_display: &'static str,
     ) {
-        assert_eq!(param.name, expected_name);
+        assert_eq!(param.name.as_ref().unwrap(), expected_name);
         assert_eq!(
             param.annotated_ty.display(db).to_string(),
             expected_annotation_ty_display
