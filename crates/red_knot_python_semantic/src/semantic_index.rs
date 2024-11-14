@@ -160,11 +160,6 @@ impl<'db> SemanticIndex<'db> {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
-    /// Returns `true` if the `expression` is contained in this file.
-    pub(crate) fn contains_expression(&self, expression: impl Into<ExpressionNodeKey>) -> bool {
-        self.scopes_by_expression.contains_key(&expression.into())
-    }
-
     /// Returns the [`Scope`] with the given id.
     #[track_caller]
     pub(crate) fn scope(&self, id: FileScopeId) -> &Scope {
@@ -213,11 +208,6 @@ impl<'db> SemanticIndex<'db> {
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> Definition<'db> {
         self.definitions_by_node[&definition_key.into()]
-    }
-
-    /// Returns `true` if the `definition` is contained in this file.
-    pub(crate) fn contains_definition(&self, definition: impl Into<DefinitionNodeKey>) -> bool {
-        self.definitions_by_node.contains_key(&definition.into())
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.

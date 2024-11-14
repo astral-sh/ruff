@@ -469,17 +469,23 @@ impl<'db> TypeInferenceBuilder<'db> {
         let class_definitions = self
             .types
             .declarations
-            .values()
-            .filter_map(|ty| ty.into_class_literal())
+            .iter()
+            .filter_map(|(k, ty)| {
+                // Filter out class literals that result from imports
+                if matches!(k.kind(self.db), DefinitionKind::Class(_)) {
+                    ty.into_class_literal()
+                } else {
+                    None
+                }
+            })
             .map(|class_ty| class_ty.class);
 
         // Iterate through all class definitions in this scope.
         for class in class_definitions {
             // (1) Check that the class does not have a cyclic definition
             if class.is_cyclically_defined(self.db) {
-                self.diagnostics.add_if_definition_in_same_file(
-                    self.index,
-                    class.node(self.db),
+                self.diagnostics.add(
+                    class.node(self.db).into(),
                     "cyclic-class-def",
                     format_args!(
                         "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
@@ -498,9 +504,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::DuplicateBases(duplicates) => {
                         let base_nodes = class.node(self.db).bases();
                         for (index, duplicate) in duplicates {
-                            self.diagnostics.add_if_expression_in_same_file(
-                                self.index,
-                                &base_nodes[*index],
+                            self.diagnostics.add(
+                                (&base_nodes[*index]).into(),
                                 "duplicate-base",
                                 format_args!("Duplicate base class `{}`", duplicate.name(self.db)),
                             );
@@ -509,9 +514,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::InvalidBases(bases) => {
                         let base_nodes = class.node(self.db).bases();
                         for (index, base_ty) in bases {
-                            self.diagnostics.add_if_expression_in_same_file(
-                                self.index,
-                                &base_nodes[*index],
+                            self.diagnostics.add(
+                                (&base_nodes[*index]).into(),
                                 "invalid-base",
                                 format_args!(
                                     "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
@@ -520,9 +524,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                         }
                     }
-                    MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add_if_definition_in_same_file(
-                        self.index,
-                        class.node(self.db),
+                    MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
+                        class.node(self.db).into(),
                         "inconsistent-mro",
                         format_args!(
                             "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
@@ -549,10 +552,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             },
                         candidate1_is_base_class,
                     } => {
-                        let node = class.node(self.db);
+                        let node = class.node(self.db).into();
                         if *candidate1_is_base_class {
-                            self.diagnostics.add_if_definition_in_same_file(
-                                self.index,
+                            self.diagnostics.add(
                                 node,
                                 "conflicting-metaclass",
                                 format_args!(
@@ -567,8 +569,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 )
                             );
                         } else {
-                            self.diagnostics.add_if_definition_in_same_file(
-                                self.index,
+                            self.diagnostics.add(
                                 node,
                                 "conflicting-metaclass",
                                 format_args!(
