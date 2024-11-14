@@ -1041,9 +1041,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class_node))
             .to_scope_id(self.db, self.file);
 
-        let maybe_known_class = file_to_module(self.db, self.file)
-            .as_ref()
-            .and_then(|module| KnownClass::try_from_module(module, name.as_str()));
+        let maybe_known_class = KnownClass::try_from_file(self.db, self.file, name);
 
         let class = Class::new(self.db, &*name.id, body_scope, maybe_known_class);
         let class_ty = Type::class_literal(class);

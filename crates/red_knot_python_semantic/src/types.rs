@@ -6,6 +6,13 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
+pub(crate) use self::display::TypeArrayDisplay;
+pub(crate) use self::infer::{
+    infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
+};
+use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
@@ -21,13 +28,6 @@ use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program};
-
-pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
-pub(crate) use self::display::TypeArrayDisplay;
-pub(crate) use self::infer::{
-    infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
-};
 
 mod builder;
 mod diagnostic;
@@ -1720,7 +1720,7 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn try_from_module(module: &Module, class_name: &str) -> Option<Self> {
+    pub fn try_from_file(db: &dyn Db, file: File, class_name: &str) -> Option<Self> {
         // Note: if this becomes hard to maintain (as rust can't ensure at compile time that all
         // variants of `Self` are covered), we might use a macro (in-house or dependency)
         // See: https://stackoverflow.com/q/39070244
@@ -1747,7 +1747,8 @@ impl<'db> KnownClass {
             _ => return None,
         };
 
-        candidate.check_module(module).then_some(candidate)
+        let module = file_to_module(db, file)?;
+        candidate.check_module(&module).then_some(candidate)
     }
 
     /// Return `true` if the module of `self` matches `module_name`
