@@ -21,7 +21,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    /// Return the remaining input as a string slice.
+    /// Returns the remaining input as an iterator.
     pub fn chars(&self) -> Chars<'a> {
         self.chars.clone()
     }

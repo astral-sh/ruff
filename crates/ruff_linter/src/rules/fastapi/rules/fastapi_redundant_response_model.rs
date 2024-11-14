@@ -73,7 +73,7 @@ impl AlwaysFixableViolation for FastApiRedundantResponseModel {
     }
 }
 
-/// RUF102
+/// FAST001
 pub(crate) fn fastapi_redundant_response_model(
     checker: &mut Checker,
     function_def: &StmtFunctionDef,

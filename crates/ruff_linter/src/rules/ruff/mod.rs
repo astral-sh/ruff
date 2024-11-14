@@ -59,9 +59,9 @@ mod tests {
     #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
     #[test_case(Rule::IncorrectlyParenthesizedTupleInSubscript, Path::new("RUF031.py"))]
     #[test_case(Rule::DecimalFromFloatLiteral, Path::new("RUF032.py"))]
+    #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
     #[test_case(Rule::UselessIfElse, Path::new("RUF034.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
-    #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -388,6 +388,19 @@ mod tests {
 
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035.py"))]
+    #[test_case(Rule::UnformattedSpecialComment, Path::new("RUF037.py"))]
+    #[test_case(
+        Rule::UnformattedSpecialComment,
+        Path::new("RUF037_implicit_suppression.py")
+    )]
+    #[test_case(
+        Rule::UnformattedSpecialComment,
+        Path::new("RUF037_explicit_suppression.py")
+    )]
+    #[test_case(
+        Rule::UnformattedSpecialComment,
+        Path::new("RUF037_empty_suppressions.py")
+    )]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

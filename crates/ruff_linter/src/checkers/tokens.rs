@@ -191,6 +191,10 @@ pub(crate) fn check_tokens(
         pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens);
     }
 
+    if settings.rules.enabled(Rule::UnformattedSpecialComment) {
+        ruff::rules::unformatted_special_comment(&mut diagnostics, locator, comment_ranges);
+    }
+
     diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));
 
     diagnostics

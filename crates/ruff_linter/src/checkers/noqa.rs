@@ -51,8 +51,15 @@ pub(crate) fn check_noqa(
 
         match &exemption {
             FileExemption::All(_) => {
-                // If the file is exempted, ignore all diagnostics.
-                ignored_diagnostics.push(index);
+                // If the file is exempted, ignore all diagnostics,
+                // save for RUF037, which operates on `# noqa` comments
+                // and thus needs to be suppressed explicitly.
+                if !matches!(diagnostic.kind.rule(), Rule::UnformattedSpecialComment)
+                    || per_file_ignores.contains(Rule::UnformattedSpecialComment)
+                    || exemption.enumerates(Rule::UnformattedSpecialComment)
+                {
+                    ignored_diagnostics.push(index);
+                }
                 continue;
             }
             FileExemption::Codes(codes) => {
