@@ -398,10 +398,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                         let opposite_quote = &self.stylist.quote().opposite().as_char().to_string();
                         // If the quotes we are going to insert in this source already exists set the auto quote outcome
                         // to failed. Because this means we are inserting quotes that are in the string and they collect.
-                        if source.contains(opposite_quote)
-                            || source.contains('\n')
-                            || source.contains('\\')
-                        {
+                        if source.contains(opposite_quote) || source.contains('\\') {
                             self.failed = true;
                         }
                         source = source.replace(self.stylist.quote().as_char(), opposite_quote);
