@@ -1792,7 +1792,6 @@ impl<'a> Checker<'a> {
         self.visit_expr(&generator.iter);
         self.semantic.push_scope(ScopeKind::Generator(kind));
 
-        self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
         self.visit_expr(&generator.target);
         self.semantic.flags = flags;
 
@@ -1803,7 +1802,6 @@ impl<'a> Checker<'a> {
         for generator in iterator {
             self.visit_expr(&generator.iter);
 
-            self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
             self.visit_expr(&generator.target);
             self.semantic.flags = flags;
 
