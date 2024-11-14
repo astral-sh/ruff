@@ -38,6 +38,8 @@ use crate::Locator;
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent use of implicit string concatenation, making the rule redundant.
+///
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct SingleLineImplicitStringConcatenation;
 
@@ -90,6 +92,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// formatter enforces consistent use of implicit string concatenation, making the rule redundant.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct MultiLineImplicitStringConcatenation;
 
