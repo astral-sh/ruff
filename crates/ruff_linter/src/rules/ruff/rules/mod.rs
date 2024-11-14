@@ -18,6 +18,7 @@ pub(crate) use mutable_dataclass_default::*;
 pub(crate) use mutable_fromkeys_value::*;
 pub(crate) use never_union::*;
 pub(crate) use parenthesize_logical_operators::*;
+pub(crate) use post_init_default::*;
 pub(crate) use quadratic_list_summation::*;
 pub(crate) use redirected_noqa::*;
 pub(crate) use sort_dunder_all::*;
@@ -27,6 +28,7 @@ pub(crate) use static_key_dict_comprehension::*;
 pub(crate) use test_rules::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
+pub(crate) use unsafe_markup_use::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
 pub(crate) use useless_if_else::*;
@@ -54,6 +56,7 @@ mod mutable_dataclass_default;
 mod mutable_fromkeys_value;
 mod never_union;
 mod parenthesize_logical_operators;
+mod post_init_default;
 mod quadratic_list_summation;
 mod redirected_noqa;
 mod sequence_sorting;
@@ -65,6 +68,7 @@ mod suppression_comment_visitor;
 pub(crate) mod test_rules;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
+mod unsafe_markup_use;
 mod unused_async;
 mod unused_noqa;
 mod useless_if_else;
@@ -76,6 +80,3 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
-pub(crate) use post_init_default::*;
-
-mod post_init_default;

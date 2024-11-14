@@ -149,4 +149,5 @@ quote3.py:40:37: TCH002 [*] Move third-party import `django.contrib.auth.models`
 42    |-    def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
    45 |+    def test_attribute_typing_literal(arg: 'models.AbstractBaseUser[Literal["admin"]]'):
 43 46 |         pass
-44 47 |
+44 47 | 
+45 48 |

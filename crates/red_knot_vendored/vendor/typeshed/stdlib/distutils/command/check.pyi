@@ -1,3 +1,4 @@
+from _typeshed import Incomplete
 from typing import Any, ClassVar, Final, Literal
 from typing_extensions import TypeAlias
 
@@ -9,13 +10,13 @@ _Reporter: TypeAlias = Any  # really docutils.utils.Reporter
 # Depends on a third-party stub. Since distutils is deprecated anyway,
 # it's easier to just suppress the "any subclassing" error.
 class SilentReporter(_Reporter):
-    messages: Any
+    messages: Incomplete
     def __init__(
         self,
         source,
         report_level,
         halt_level,
-        stream: Any | None = ...,
+        stream: Incomplete | None = ...,
         debug: bool | Literal[0, 1] = 0,
         encoding: str = ...,
         error_handler: str = ...,

@@ -1,5 +1,5 @@
 import sys
-from _typeshed import ReadableBuffer, StrOrBytesPath
+from _typeshed import MaybeNone, ReadableBuffer, StrOrBytesPath
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from types import TracebackType
 from typing import IO, Any, AnyStr, Final, Generic, Literal, TypeVar, overload
@@ -1848,7 +1848,7 @@ class Popen(Generic[AnyStr]):
     stdout: IO[AnyStr] | None
     stderr: IO[AnyStr] | None
     pid: int
-    returncode: int | Any
+    returncode: int | MaybeNone
     universal_newlines: bool
 
     if sys.version_info >= (3, 11):

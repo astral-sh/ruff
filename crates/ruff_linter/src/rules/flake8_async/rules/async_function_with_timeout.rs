@@ -71,7 +71,7 @@ pub struct AsyncFunctionWithTimeout {
 impl Violation for AsyncFunctionWithTimeout {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async function definition with a `timeout` parameter")
+        "Async function definition with a `timeout` parameter".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

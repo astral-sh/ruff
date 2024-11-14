@@ -145,7 +145,7 @@ pub struct MissingTrailingComma;
 impl AlwaysFixableViolation for MissingTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing comma missing")
+        "Trailing comma missing".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -190,7 +190,7 @@ pub struct TrailingCommaOnBareTuple;
 impl Violation for TrailingCommaOnBareTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing comma on bare tuple prohibited")
+        "Trailing comma on bare tuple prohibited".to_string()
     }
 }
 
@@ -216,7 +216,7 @@ pub struct ProhibitedTrailingComma;
 impl AlwaysFixableViolation for ProhibitedTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing comma prohibited")
+        "Trailing comma prohibited".to_string()
     }
 
     fn fix_title(&self) -> String {

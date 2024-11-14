@@ -10,23 +10,28 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for imports of the`telnetlib` module.
+/// Checks for imports of the `telnetlib` module.
 ///
 /// ## Why is this bad?
-/// Telnet is considered insecure. Instead, use SSH or another encrypted
+/// Telnet is considered insecure. It is deprecated since version 3.11, and
+/// was removed in version 3.13. Instead, use SSH or another encrypted
 /// protocol.
 ///
 /// ## Example
 /// ```python
 /// import telnetlib
 /// ```
+///
+/// ## References
+/// - [Python documentation: `telnetlib` - Telnet client](https://docs.python.org/3.12/library/telnetlib.html#module-telnetlib)
+/// - [PEP 594: `telnetlib`](https://peps.python.org/pep-0594/#telnetlib)
 #[violation]
 pub struct SuspiciousTelnetlibImport;
 
 impl Violation for SuspiciousTelnetlibImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.")
+        "`telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.".to_string()
     }
 }
 
@@ -41,13 +46,16 @@ impl Violation for SuspiciousTelnetlibImport {
 /// ```python
 /// import ftplib
 /// ```
+///
+/// ## References
+/// - [Python documentation: `ftplib` - FTP protocol client](https://docs.python.org/3/library/ftplib.html)
 #[violation]
 pub struct SuspiciousFtplibImport;
 
 impl Violation for SuspiciousFtplibImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`ftplib` and related modules are considered insecure. Use SSH, SFTP, SCP, or another encrypted protocol.")
+        "`ftplib` and related modules are considered insecure. Use SSH, SFTP, SCP, or another encrypted protocol.".to_string()
     }
 }
 
@@ -63,15 +71,16 @@ impl Violation for SuspiciousFtplibImport {
 /// ```python
 /// import pickle
 /// ```
-/// /// ## References
-/// - [Python Docs](https://docs.python.org/3/library/pickle.html)
+///
+/// ## References
+/// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
 #[violation]
 pub struct SuspiciousPickleImport;
 
 impl Violation for SuspiciousPickleImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure")
+        "`pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure".to_string()
     }
 }
 
@@ -92,7 +101,7 @@ pub struct SuspiciousSubprocessImport;
 impl Violation for SuspiciousSubprocessImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`subprocess` module is possibly insecure")
+        "`subprocess` module is possibly insecure".to_string()
     }
 }
 
@@ -115,7 +124,7 @@ pub struct SuspiciousXmlEtreeImport;
 impl Violation for SuspiciousXmlEtreeImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.etree` methods are vulnerable to XML attacks")
+        "`xml.etree` methods are vulnerable to XML attacks".to_string()
     }
 }
 
@@ -138,7 +147,7 @@ pub struct SuspiciousXmlSaxImport;
 impl Violation for SuspiciousXmlSaxImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.sax` methods are vulnerable to XML attacks")
+        "`xml.sax` methods are vulnerable to XML attacks".to_string()
     }
 }
 
@@ -161,7 +170,7 @@ pub struct SuspiciousXmlExpatImport;
 impl Violation for SuspiciousXmlExpatImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.dom.expatbuilder` is vulnerable to XML attacks")
+        "`xml.dom.expatbuilder` is vulnerable to XML attacks".to_string()
     }
 }
 
@@ -184,7 +193,7 @@ pub struct SuspiciousXmlMinidomImport;
 impl Violation for SuspiciousXmlMinidomImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.dom.minidom` is vulnerable to XML attacks")
+        "`xml.dom.minidom` is vulnerable to XML attacks".to_string()
     }
 }
 
@@ -207,7 +216,7 @@ pub struct SuspiciousXmlPulldomImport;
 impl Violation for SuspiciousXmlPulldomImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.dom.pulldom` is vulnerable to XML attacks")
+        "`xml.dom.pulldom` is vulnerable to XML attacks".to_string()
     }
 }
 
@@ -237,7 +246,7 @@ pub struct SuspiciousLxmlImport;
 impl Violation for SuspiciousLxmlImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`lxml` is vulnerable to XML attacks")
+        "`lxml` is vulnerable to XML attacks".to_string()
     }
 }
 
@@ -260,7 +269,7 @@ pub struct SuspiciousXmlrpcImport;
 impl Violation for SuspiciousXmlrpcImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("XMLRPC is vulnerable to remote XML attacks")
+        "XMLRPC is vulnerable to remote XML attacks".to_string()
     }
 }
 
@@ -286,7 +295,7 @@ pub struct SuspiciousHttpoxyImport;
 impl Violation for SuspiciousHttpoxyImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided")
+        "`httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided".to_string()
     }
 }
 
@@ -311,9 +320,8 @@ pub struct SuspiciousPycryptoImport;
 impl Violation for SuspiciousPycryptoImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`pycrypto` library is known to have publicly disclosed buffer overflow vulnerability"
-        )
+        "`pycrypto` library is known to have publicly disclosed buffer overflow vulnerability"
+            .to_string()
     }
 }
 
@@ -337,7 +345,8 @@ pub struct SuspiciousPyghmiImport;
 impl Violation for SuspiciousPyghmiImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("An IPMI-related module is being imported. Prefer an encrypted protocol over IPMI.")
+        "An IPMI-related module is being imported. Prefer an encrypted protocol over IPMI."
+            .to_string()
     }
 }
 

@@ -1,14 +1,15 @@
+use crate::types::{ClassLiteralType, Type};
+use crate::Db;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::types::Type;
-use crate::Db;
-
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TypeCheckDiagnostic {
     // TODO: Don't use string keys for rules
     pub(super) rule: String,
@@ -28,6 +29,28 @@ impl TypeCheckDiagnostic {
 
     pub fn file(&self) -> File {
         self.file
+    }
+}
+
+impl Diagnostic for TypeCheckDiagnostic {
+    fn rule(&self) -> &str {
+        TypeCheckDiagnostic::rule(self)
+    }
+
+    fn message(&self) -> Cow<str> {
+        TypeCheckDiagnostic::message(self).into()
+    }
+
+    fn file(&self) -> File {
+        TypeCheckDiagnostic::file(self)
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        Some(Ranged::range(self))
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
     }
 }
 
@@ -141,6 +164,23 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         );
     }
 
+    /// Emit a diagnostic declaring that the object represented by `node` is not iterable
+    /// because its `__iter__` method is possibly unbound.
+    pub(super) fn add_not_iterable_possibly_unbound(
+        &mut self,
+        node: AnyNodeRef,
+        element_ty: Type<'db>,
+    ) {
+        self.add(
+            node,
+            "not-iterable",
+            format_args!(
+                "Object of type `{}` is not iterable because its `__iter__` method is possibly unbound",
+                element_ty.display(self.db)
+            ),
+        );
+    }
+
     /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
     pub(super) fn add_index_out_of_bounds(
         &mut self,
@@ -209,7 +249,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         assigned_ty: Type<'db>,
     ) {
         match declared_ty {
-            Type::ClassLiteral(class) => {
+            Type::ClassLiteral(ClassLiteralType { class }) => {
                 self.add(node, "invalid-assignment", format_args!(
                         "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                         class.name(self.db)));

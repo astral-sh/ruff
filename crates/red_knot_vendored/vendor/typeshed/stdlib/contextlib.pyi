@@ -58,9 +58,11 @@ class ContextDecorator:
     def _recreate_cm(self) -> Self: ...
     def __call__(self, func: _F) -> _F: ...
 
-class _GeneratorContextManager(AbstractContextManager[_T_co, bool | None], ContextDecorator):
+class _GeneratorContextManagerBase: ...
+
+class _GeneratorContextManager(_GeneratorContextManagerBase, AbstractContextManager[_T_co, bool | None], ContextDecorator):
     # __init__ and all instance attributes are actually inherited from _GeneratorContextManagerBase
-    # _GeneratorContextManagerBase is more trouble than it's worth to include in the stub; see #6676
+    # adding them there is more trouble than it's worth to include in the stub; see #6676
     def __init__(self, func: Callable[..., Iterator[_T_co]], args: tuple[Any, ...], kwds: dict[str, Any]) -> None: ...
     gen: Generator[_T_co, Any, Any]
     func: Callable[..., Generator[_T_co, Any, Any]]
@@ -84,9 +86,11 @@ if sys.version_info >= (3, 10):
         def _recreate_cm(self) -> Self: ...
         def __call__(self, func: _AF) -> _AF: ...
 
-    class _AsyncGeneratorContextManager(AbstractAsyncContextManager[_T_co, bool | None], AsyncContextDecorator):
+    class _AsyncGeneratorContextManager(
+        _GeneratorContextManagerBase, AbstractAsyncContextManager[_T_co, bool | None], AsyncContextDecorator
+    ):
         # __init__ and these attributes are actually defined in the base class _GeneratorContextManagerBase,
-        # which is more trouble than it's worth to include in the stub (see #6676)
+        # adding them there is more trouble than it's worth to include in the stub (see #6676)
         def __init__(self, func: Callable[..., AsyncIterator[_T_co]], args: tuple[Any, ...], kwds: dict[str, Any]) -> None: ...
         gen: AsyncGenerator[_T_co, Any]
         func: Callable[..., AsyncGenerator[_T_co, Any]]
@@ -97,7 +101,7 @@ if sys.version_info >= (3, 10):
         ) -> bool | None: ...
 
 else:
-    class _AsyncGeneratorContextManager(AbstractAsyncContextManager[_T_co, bool | None]):
+    class _AsyncGeneratorContextManager(_GeneratorContextManagerBase, AbstractAsyncContextManager[_T_co, bool | None]):
         def __init__(self, func: Callable[..., AsyncIterator[_T_co]], args: tuple[Any, ...], kwds: dict[str, Any]) -> None: ...
         gen: AsyncGenerator[_T_co, Any]
         func: Callable[..., AsyncGenerator[_T_co, Any]]

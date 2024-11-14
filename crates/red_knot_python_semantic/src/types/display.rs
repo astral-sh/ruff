@@ -6,7 +6,9 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::{IntersectionType, Type, UnionType};
+use crate::types::{
+    ClassLiteralType, InstanceType, IntersectionType, KnownClass, SubclassOfType, Type, UnionType,
+};
 use crate::Db;
 use rustc_hash::FxHashMap;
 
@@ -64,7 +66,14 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::None => f.write_str("None"),
+            Type::Instance(InstanceType { class }) => {
+                let representation = match class.known(self.db) {
+                    Some(KnownClass::NoneType) => "None",
+                    Some(KnownClass::NoDefaultType) => "NoDefault",
+                    _ => class.name(self.db),
+                };
+                f.write_str(representation)
+            }
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
             Type::Todo => f.write_str("@Todo"),
@@ -72,8 +81,11 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<module '{:?}'>", file.path(self.db))
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
-            Type::Instance(class) => f.write_str(class.name(self.db)),
+            Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),
+            Type::SubclassOf(SubclassOfType { class }) => {
+                write!(f, "type[{}]", class.name(self.db))
+            }
+            Type::KnownInstance(known_instance) => f.write_str(known_instance.as_str()),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
@@ -322,9 +334,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{
-        global_symbol, BytesLiteralType, SliceLiteralType, StringLiteralType, Type, UnionType,
-    };
+    use crate::types::{global_symbol, SliceLiteralType, Type, UnionType};
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -370,17 +380,17 @@ mod tests {
             Type::Unknown,
             Type::IntLiteral(-1),
             global_symbol(&db, mod_file, "A").expect_type(),
-            Type::StringLiteral(StringLiteralType::new(&db, "A")),
-            Type::BytesLiteral(BytesLiteralType::new(&db, [0u8].as_slice())),
-            Type::BytesLiteral(BytesLiteralType::new(&db, [7u8].as_slice())),
+            Type::string_literal(&db, "A"),
+            Type::bytes_literal(&db, &[0u8]),
+            Type::bytes_literal(&db, &[7u8]),
             Type::IntLiteral(0),
             Type::IntLiteral(1),
-            Type::StringLiteral(StringLiteralType::new(&db, "B")),
+            Type::string_literal(&db, "B"),
             global_symbol(&db, mod_file, "foo").expect_type(),
             global_symbol(&db, mod_file, "bar").expect_type(),
             global_symbol(&db, mod_file, "B").expect_type(),
             Type::BooleanLiteral(true),
-            Type::None,
+            Type::none(&db),
         ];
         let union = UnionType::from_elements(&db, union_elements).expect_union();
         let display = format!("{}", union.display(&db));

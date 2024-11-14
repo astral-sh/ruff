@@ -4,6 +4,7 @@ import types
 from _typeshed import ReadableBuffer, StrPath
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
+from importlib import _bootstrap_external
 from importlib.machinery import ModuleSpec
 from io import BufferedReader
 from typing import IO, Any, Literal, Protocol, overload, runtime_checkable
@@ -56,7 +57,7 @@ class ExecutionLoader(InspectLoader):
     @abstractmethod
     def get_filename(self, fullname: str) -> str: ...
 
-class SourceLoader(ResourceLoader, ExecutionLoader, metaclass=ABCMeta):
+class SourceLoader(_bootstrap_external.SourceLoader, ResourceLoader, ExecutionLoader, metaclass=ABCMeta):  # type: ignore[misc]  # incompatible definitions of source_to_code in the base classes
     def path_mtime(self, path: str) -> float: ...
     def set_data(self, path: str, data: bytes) -> None: ...
     def get_source(self, fullname: str) -> str | None: ...
@@ -101,7 +102,7 @@ else:
         # Not defined on the actual class, but expected to exist.
         def find_spec(self, fullname: str, target: types.ModuleType | None = ...) -> ModuleSpec | None: ...
 
-class FileLoader(ResourceLoader, ExecutionLoader, metaclass=ABCMeta):
+class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader, metaclass=ABCMeta):
     name: str
     path: str
     def __init__(self, fullname: str, path: str) -> None: ...

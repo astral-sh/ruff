@@ -47,11 +47,11 @@ impl Violation for UnnecessaryDictKwargs {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary `dict` kwargs")
+        "Unnecessary `dict` kwargs".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove unnecessary kwargs"))
+        Some("Remove unnecessary kwargs".to_string())
     }
 }
 

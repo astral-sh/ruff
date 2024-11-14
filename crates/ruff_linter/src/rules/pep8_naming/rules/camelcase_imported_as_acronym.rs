@@ -35,10 +35,10 @@ use crate::rules::pep8_naming::helpers;
 /// from example import MyClassName
 /// ```
 ///
-/// [PEP 8]: https://peps.python.org/pep-0008/
-///
 /// ## Options
 /// - `lint.flake8-import-conventions.aliases`
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/
 #[violation]
 pub struct CamelcaseImportedAsAcronym {
     name: String,

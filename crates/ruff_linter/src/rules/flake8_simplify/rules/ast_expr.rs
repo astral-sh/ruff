@@ -51,7 +51,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use capitalized environment variable `{expected}` instead of `{actual}`")
         } else {
-            format!("Use capitalized environment variable")
+            "Use capitalized environment variable".to_string()
         }
     }
 
@@ -99,7 +99,7 @@ impl AlwaysFixableViolation for DictGetWithNoneDefault {
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use `{expected}` instead of `{actual}`")
         } else {
-            format!("Use `dict.get()` without default value")
+            "Use `dict.get()` without default value".to_string()
         }
     }
 

@@ -35,7 +35,7 @@ impl AlwaysFixableViolation for MissingWhitespace {
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 

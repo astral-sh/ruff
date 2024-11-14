@@ -32,6 +32,6 @@ pub struct RuffStaticKeyDictComprehension;
 impl Violation for RuffStaticKeyDictComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Dictionary comprehension uses static key")
+        "Dictionary comprehension uses static key".to_string()
     }
 }

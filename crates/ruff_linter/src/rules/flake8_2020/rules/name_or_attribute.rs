@@ -41,7 +41,7 @@ pub struct SixPY3;
 impl Violation for SixPY3 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`six.PY3` referenced (python4), use `not six.PY2`")
+        "`six.PY3` referenced (python4), use `not six.PY2`".to_string()
     }
 }
 

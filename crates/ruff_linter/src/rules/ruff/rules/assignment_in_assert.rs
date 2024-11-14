@@ -39,7 +39,7 @@ pub struct AssignmentInAssert;
 impl Violation for AssignmentInAssert {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid assignment expressions in `assert` statements")
+        "Avoid assignment expressions in `assert` statements".to_string()
     }
 }
 

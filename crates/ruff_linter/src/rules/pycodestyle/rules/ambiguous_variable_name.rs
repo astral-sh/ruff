@@ -33,6 +33,7 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// of stubs: a well-written stub should aim to faithfully represent the
 /// interface of the equivalent .py file as it exists at runtime, including any
 /// ambiguously named variables in the runtime module.
+/// [preview]: https://docs.astral.sh/ruff/preview/
 
 #[violation]
 pub struct AmbiguousVariableName(pub String);

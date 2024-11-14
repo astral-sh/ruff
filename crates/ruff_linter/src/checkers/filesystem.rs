@@ -3,6 +3,7 @@ use std::path::Path;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_trivia::CommentRanges;
 
+use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::flake8_builtins::rules::builtin_module_shadowing;
 use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
@@ -12,7 +13,7 @@ use crate::Locator;
 
 pub(crate) fn check_file_path(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
@@ -28,6 +29,7 @@ pub(crate) fn check_file_path(
             comment_ranges,
             &settings.project_root,
             &settings.src,
+            settings.preview,
         ) {
             diagnostics.push(diagnostic);
         }

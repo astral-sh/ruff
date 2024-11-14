@@ -35,7 +35,8 @@ pub struct NumericLiteralTooLong;
 impl AlwaysFixableViolation for NumericLiteralTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Numeric literals with a string representation longer than ten characters are not permitted")
+        "Numeric literals with a string representation longer than ten characters are not permitted"
+            .to_string()
     }
 
     fn fix_title(&self) -> String {

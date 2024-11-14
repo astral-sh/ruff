@@ -67,23 +67,22 @@ impl Violation for UnnecessaryEnumerate {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryEnumerate { subset } = self;
-        match subset {
+        match self.subset {
             EnumerateSubset::Indices => {
-                format!("`enumerate` value is unused, use `for x in range(len(y))` instead")
+                "`enumerate` value is unused, use `for x in range(len(y))` instead".to_string()
             }
             EnumerateSubset::Values => {
-                format!("`enumerate` index is unused, use `for x in y` instead")
+                "`enumerate` index is unused, use `for x in y` instead".to_string()
             }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnnecessaryEnumerate { subset } = self;
-        match subset {
-            EnumerateSubset::Indices => Some("Replace with `range(len(...))`".to_string()),
-            EnumerateSubset::Values => Some("Remove `enumerate`".to_string()),
-        }
+        let title = match self.subset {
+            EnumerateSubset::Indices => "Replace with `range(len(...))`",
+            EnumerateSubset::Values => "Remove `enumerate`",
+        };
+        Some(title.to_string())
     }
 }
 

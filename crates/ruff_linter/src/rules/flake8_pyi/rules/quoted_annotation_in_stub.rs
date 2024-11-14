@@ -27,14 +27,14 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
+/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
 #[violation]
 pub struct QuotedAnnotationInStub;
 
 impl AlwaysFixableViolation for QuotedAnnotationInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Quoted annotations should not be included in stubs")
+        "Quoted annotations should not be included in stubs".to_string()
     }
 
     fn fix_title(&self) -> String {

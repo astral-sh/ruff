@@ -1,3 +1,4 @@
+import re
 import sys
 from _warnings import warn as warn, warn_explicit as warn_explicit
 from collections.abc import Sequence
@@ -25,7 +26,7 @@ if sys.version_info >= (3, 14):
     _ActionKind: TypeAlias = Literal["default", "error", "ignore", "always", "module", "once"]
 else:
     _ActionKind: TypeAlias = Literal["default", "error", "ignore", "always", "all", "module", "once"]
-filters: Sequence[tuple[str, str | None, type[Warning], str | None, int]]  # undocumented, do not mutate
+filters: Sequence[tuple[str, re.Pattern[str] | None, type[Warning], re.Pattern[str] | None, int]]  # undocumented, do not mutate
 
 def showwarning(
     message: Warning | str,

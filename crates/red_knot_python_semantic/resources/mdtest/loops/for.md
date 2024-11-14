@@ -238,7 +238,7 @@ class Test:
 def coinflip() -> bool:
     return True
 
-# TODO: we should emit a diagnostic here (it might not be iterable)
+# error: [not-iterable] "Object of type `Test | Literal[42]` is not iterable because its `__iter__` method is possibly unbound"
 for x in Test() if coinflip() else 42:
     reveal_type(x)  # revealed: int
 ```

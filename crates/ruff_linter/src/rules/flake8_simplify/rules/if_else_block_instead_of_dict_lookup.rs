@@ -36,7 +36,7 @@ pub struct IfElseBlockInsteadOfDictLookup;
 impl Violation for IfElseBlockInsteadOfDictLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a dictionary instead of consecutive `if` statements")
+        "Use a dictionary instead of consecutive `if` statements".to_string()
     }
 }
 /// SIM116

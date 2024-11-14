@@ -1,6 +1,7 @@
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
+use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -18,9 +19,9 @@ mod parser;
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &Path, title: &str) {
+pub fn run(path: &Path, long_title: &str, short_title: &str) {
     let source = std::fs::read_to_string(path).unwrap();
-    let suite = match test_parser::parse(title, &source) {
+    let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
             panic!("Error parsing `{}`: {err}", path.to_str().unwrap())
@@ -48,8 +49,8 @@ pub fn run(path: &Path, title: &str) {
                     for failure in failures {
                         let absolute_line_number =
                             backtick_line.checked_add(relative_line_number).unwrap();
-                        let line_info = format!("{title}:{absolute_line_number}").cyan();
-                        println!("    {line_info} {failure}");
+                        let line_info = format!("{long_title}:{absolute_line_number}").cyan();
+                        println!("  {line_info} {failure}");
                     }
                 }
             }
@@ -87,16 +88,24 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
         .filter_map(|test_file| {
             let parsed = parsed_module(db, test_file.file);
 
-            // TODO allow testing against code with syntax errors
-            assert!(
-                parsed.errors().is_empty(),
-                "Python syntax errors in {}, {}: {:?}",
-                test.name(),
-                test_file.file.path(db),
-                parsed.errors()
-            );
+            let mut diagnostics: Vec<Box<_>> = parsed
+                .errors()
+                .iter()
+                .cloned()
+                .map(|error| {
+                    let diagnostic: Box<dyn Diagnostic> =
+                        Box::new(ParseDiagnostic::new(test_file.file, error));
+                    diagnostic
+                })
+                .collect();
 
-            match matcher::match_file(db, test_file.file, check_types(db, test_file.file)) {
+            let type_diagnostics = check_types(db, test_file.file);
+            diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
+                let diagnostic: Box<dyn Diagnostic> = Box::new((*diagnostic).clone());
+                diagnostic
+            }));
+
+            match matcher::match_file(db, test_file.file, diagnostics) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offset: test_file.backtick_offset,

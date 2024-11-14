@@ -42,19 +42,19 @@ enum TypingTarget<'a> {
     ForwardReference(&'a Expr),
 
     /// A `typing.Union` type e.g., `Union[int, str]`.
-    Union(&'a Expr),
+    Union(Option<&'a Expr>),
 
     /// A PEP 604 union type e.g., `int | str`.
     PEP604Union(&'a Expr, &'a Expr),
 
     /// A `typing.Literal` type e.g., `Literal[1, 2, 3]`.
-    Literal(&'a Expr),
+    Literal(Option<&'a Expr>),
 
     /// A `typing.Optional` type e.g., `Optional[int]`.
-    Optional(&'a Expr),
+    Optional(Option<&'a Expr>),
 
     /// A `typing.Annotated` type e.g., `Annotated[int, ...]`.
-    Annotated(&'a Expr),
+    Annotated(Option<&'a Expr>),
 
     /// The `typing.Hashable` type.
     Hashable,
@@ -80,16 +80,16 @@ impl<'a> TypingTarget<'a> {
                     Some(TypingTarget::Unknown),
                     |qualified_name| {
                         if semantic.match_typing_qualified_name(&qualified_name, "Optional") {
-                            Some(TypingTarget::Optional(slice.as_ref()))
+                            Some(TypingTarget::Optional(Some(slice.as_ref())))
                         } else if semantic.match_typing_qualified_name(&qualified_name, "Literal") {
-                            Some(TypingTarget::Literal(slice.as_ref()))
+                            Some(TypingTarget::Literal(Some(slice.as_ref())))
                         } else if semantic.match_typing_qualified_name(&qualified_name, "Union") {
-                            Some(TypingTarget::Union(slice.as_ref()))
+                            Some(TypingTarget::Union(Some(slice.as_ref())))
                         } else if semantic.match_typing_qualified_name(&qualified_name, "Annotated")
                         {
-                            resolve_slice_value(slice.as_ref())
-                                .next()
-                                .map(TypingTarget::Annotated)
+                            Some(TypingTarget::Annotated(
+                                resolve_slice_value(slice.as_ref()).next(),
+                            ))
                         } else {
                             if is_known_type(&qualified_name, minor_version) {
                                 Some(TypingTarget::Known)
@@ -118,7 +118,15 @@ impl<'a> TypingTarget<'a> {
                 // same file, so we assume it's `Any` as it could be a type alias.
                 Some(TypingTarget::Unknown),
                 |qualified_name| {
-                    if semantic.match_typing_qualified_name(&qualified_name, "Any") {
+                    if semantic.match_typing_qualified_name(&qualified_name, "Optional") {
+                        Some(TypingTarget::Optional(None))
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "Literal") {
+                        Some(TypingTarget::Literal(None))
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "Union") {
+                        Some(TypingTarget::Union(None))
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "Annotated") {
+                        Some(TypingTarget::Annotated(None))
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "Any") {
                         Some(TypingTarget::Any)
                     } else if matches!(qualified_name.segments(), ["" | "builtins", "object"]) {
                         Some(TypingTarget::Object)
@@ -150,22 +158,26 @@ impl<'a> TypingTarget<'a> {
             | TypingTarget::Object
             | TypingTarget::Unknown => true,
             TypingTarget::Known => false,
-            TypingTarget::Literal(slice) => resolve_slice_value(slice).any(|element| {
-                // Literal can only contain `None`, a literal value, other `Literal`
-                // or an enum value.
-                match TypingTarget::try_from_expr(element, checker, minor_version) {
-                    None | Some(TypingTarget::None) => true,
-                    Some(new_target @ TypingTarget::Literal(_)) => {
-                        new_target.contains_none(checker, minor_version)
+            TypingTarget::Literal(slice) => slice.is_some_and(|slice| {
+                resolve_slice_value(slice).any(|element| {
+                    // Literal can only contain `None`, a literal value, other `Literal`
+                    // or an enum value.
+                    match TypingTarget::try_from_expr(element, checker, minor_version) {
+                        None | Some(TypingTarget::None) => true,
+                        Some(new_target @ TypingTarget::Literal(_)) => {
+                            new_target.contains_none(checker, minor_version)
+                        }
+                        _ => false,
                     }
-                    _ => false,
-                }
+                })
             }),
-            TypingTarget::Union(slice) => resolve_slice_value(slice).any(|element| {
-                TypingTarget::try_from_expr(element, checker, minor_version)
-                    .map_or(true, |new_target| {
-                        new_target.contains_none(checker, minor_version)
-                    })
+            TypingTarget::Union(slice) => slice.is_some_and(|slice| {
+                resolve_slice_value(slice).any(|element| {
+                    TypingTarget::try_from_expr(element, checker, minor_version)
+                        .map_or(true, |new_target| {
+                            new_target.contains_none(checker, minor_version)
+                        })
+                })
             }),
             TypingTarget::PEP604Union(left, right) => [left, right].iter().any(|element| {
                 TypingTarget::try_from_expr(element, checker, minor_version)
@@ -173,12 +185,12 @@ impl<'a> TypingTarget<'a> {
                         new_target.contains_none(checker, minor_version)
                     })
             }),
-            TypingTarget::Annotated(expr) => {
+            TypingTarget::Annotated(expr) => expr.is_some_and(|expr| {
                 TypingTarget::try_from_expr(expr, checker, minor_version)
                     .map_or(true, |new_target| {
                         new_target.contains_none(checker, minor_version)
                     })
-            }
+            }),
             TypingTarget::ForwardReference(expr) => {
                 TypingTarget::try_from_expr(expr, checker, minor_version)
                     .map_or(true, |new_target| {
@@ -199,11 +211,13 @@ impl<'a> TypingTarget<'a> {
             | TypingTarget::Object
             | TypingTarget::Known
             | TypingTarget::Unknown => false,
-            TypingTarget::Union(slice) => resolve_slice_value(slice).any(|element| {
-                TypingTarget::try_from_expr(element, checker, minor_version)
-                    .map_or(true, |new_target| {
-                        new_target.contains_any(checker, minor_version)
-                    })
+            TypingTarget::Union(slice) => slice.is_some_and(|slice| {
+                resolve_slice_value(slice).any(|element| {
+                    TypingTarget::try_from_expr(element, checker, minor_version)
+                        .map_or(true, |new_target| {
+                            new_target.contains_any(checker, minor_version)
+                        })
+                })
             }),
             TypingTarget::PEP604Union(left, right) => [left, right].iter().any(|element| {
                 TypingTarget::try_from_expr(element, checker, minor_version)
@@ -212,10 +226,12 @@ impl<'a> TypingTarget<'a> {
                     })
             }),
             TypingTarget::Annotated(expr) | TypingTarget::Optional(expr) => {
-                TypingTarget::try_from_expr(expr, checker, minor_version)
-                    .map_or(true, |new_target| {
-                        new_target.contains_any(checker, minor_version)
-                    })
+                expr.is_some_and(|expr| {
+                    TypingTarget::try_from_expr(expr, checker, minor_version)
+                        .map_or(true, |new_target| {
+                            new_target.contains_any(checker, minor_version)
+                        })
+                })
             }
             TypingTarget::ForwardReference(expr) => {
                 TypingTarget::try_from_expr(expr, checker, minor_version)
@@ -248,14 +264,13 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
         // is found nested inside another type, then the outer type should
         // be returned.
         Some(TypingTarget::Annotated(expr)) => {
-            type_hint_explicitly_allows_none(expr, checker, minor_version)
+            expr.and_then(|expr| type_hint_explicitly_allows_none(expr, checker, minor_version))
         }
         Some(target) => {
             if target.contains_none(checker, minor_version) {
-                None
-            } else {
-                Some(annotation)
+                return None;
             }
+            Some(annotation)
         }
     }
 }
@@ -269,13 +284,14 @@ pub(crate) fn type_hint_resolves_to_any(
     minor_version: u8,
 ) -> bool {
     match TypingTarget::try_from_expr(annotation, checker, minor_version) {
-        None |
-            // Short circuit on top level `Any`
-            Some(TypingTarget::Any) => true,
+        // Short circuit on top level `Any`
+        None | Some(TypingTarget::Any) => true,
+        // `Optional` is `Optional[Any]` which is `Any | None`.
+        Some(TypingTarget::Optional(None)) => true,
         // Top-level `Annotated` node should check if the inner type resolves
         // to `Any`.
         Some(TypingTarget::Annotated(expr)) => {
-            type_hint_resolves_to_any(expr, checker, minor_version)
+            expr.is_some_and(|expr| type_hint_resolves_to_any(expr, checker, minor_version))
         }
         Some(target) => target.contains_any(checker, minor_version),
     }

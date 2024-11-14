@@ -61,14 +61,12 @@ pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
 impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
-        let iterable = iterable.truncated_display();
+        let iterable = &self.iterable.truncated_display();
         format!("Prefer `next({iterable})` over single element slice")
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
-        let iterable = iterable.truncated_display();
+        let iterable = &self.iterable.truncated_display();
         format!("Replace with `next({iterable})`")
     }
 }

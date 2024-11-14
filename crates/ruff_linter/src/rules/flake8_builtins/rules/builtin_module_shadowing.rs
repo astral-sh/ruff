@@ -1,13 +1,13 @@
 use std::path::Path;
 
+use crate::package::PackageRoot;
+use crate::settings::types::PythonVersion;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
-
-use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for modules that use the same names as Python builtin modules.
@@ -39,7 +39,7 @@ impl Violation for BuiltinModuleShadowing {
 /// A005
 pub(crate) fn builtin_module_shadowing(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     allowed_modules: &[String],
     target_version: PythonVersion,
 ) -> Option<Diagnostic> {
@@ -49,7 +49,7 @@ pub(crate) fn builtin_module_shadowing(
 
     if let Some(package) = package {
         let module_name = if is_module_file(path) {
-            package.file_name().unwrap().to_string_lossy()
+            package.path().file_name().unwrap().to_string_lossy()
         } else {
             path.file_stem().unwrap().to_string_lossy()
         };

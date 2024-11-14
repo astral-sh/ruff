@@ -37,11 +37,11 @@ pub struct UnnecessaryListIndexLookup;
 impl AlwaysFixableViolation for UnnecessaryListIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("List index lookup in `enumerate()` loop")
+        "List index lookup in `enumerate()` loop".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Use the loop variable directly")
+        "Use the loop variable directly".to_string()
     }
 }
 

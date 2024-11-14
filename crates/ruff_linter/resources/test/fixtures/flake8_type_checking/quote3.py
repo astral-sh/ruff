@@ -42,3 +42,14 @@ def f():
     def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
         pass
 
+
+def f():
+    from typing import Annotated
+
+    from fastapi import Depends
+
+    from .foo import get_foo
+
+    def test_annotated_non_typing_reference(user: Annotated[str, Depends(get_foo)]):
+        pass
+

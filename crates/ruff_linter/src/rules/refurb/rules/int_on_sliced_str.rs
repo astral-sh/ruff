@@ -60,7 +60,7 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `base=0`")
+        "Replace with `base=0`".to_string()
     }
 }
 

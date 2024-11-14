@@ -9,6 +9,7 @@ use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scop
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::package::PackageRoot;
 
 /// ## What it does
 /// Checks for import statements that import a private name (a name starting
@@ -46,8 +47,8 @@ use crate::checkers::ast::Checker;
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 /// - [Semantic Versioning](https://semver.org/)
 ///
-/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/
-/// [PEP 420]: https://www.python.org/dev/peps/pep-0420/
+/// [PEP 8]: https://peps.python.org/pep-0008/
+/// [PEP 420]: https://peps.python.org/pep-0420/
 #[violation]
 pub struct ImportPrivateName {
     name: String,
@@ -106,6 +107,7 @@ pub(crate) fn import_private_name(
         // Ex) `from foo import _bar` within `foo/baz.py`
         if checker
             .package()
+            .map(PackageRoot::path)
             .is_some_and(|path| path.ends_with(root_module))
         {
             continue;
@@ -149,8 +151,7 @@ pub(crate) fn import_private_name(
 fn is_typing(reference: &ResolvedReference) -> bool {
     reference.in_type_checking_block()
         || reference.in_typing_only_annotation()
-        || reference.in_complex_string_type_definition()
-        || reference.in_simple_string_type_definition()
+        || reference.in_string_type_definition()
         || reference.in_runtime_evaluated_annotation()
 }
 

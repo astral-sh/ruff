@@ -39,7 +39,7 @@ pub struct BlockingOpenCallInAsyncFunction;
 impl Violation for BlockingOpenCallInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not open files with blocking methods like `open`")
+        "Async functions should not open files with blocking methods like `open`".to_string()
     }
 }
 

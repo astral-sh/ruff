@@ -27,7 +27,7 @@ pub struct ExecBuiltin;
 impl Violation for ExecBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `exec` detected")
+        "Use of `exec` detected".to_string()
     }
 }
 

@@ -40,14 +40,14 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## References
-/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
 #[violation]
 pub struct UnrecognizedPlatformCheck;
 
 impl Violation for UnrecognizedPlatformCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unrecognized `sys.platform` check")
+        "Unrecognized `sys.platform` check".to_string()
     }
 }
 
@@ -74,7 +74,7 @@ impl Violation for UnrecognizedPlatformCheck {
 /// ```
 ///
 /// ## References
-/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
 #[violation]
 pub struct UnrecognizedPlatformName {
     platform: String,

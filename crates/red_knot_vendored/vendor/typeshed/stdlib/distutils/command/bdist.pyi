@@ -1,6 +1,6 @@
-from _typeshed import Unused
+from _typeshed import Incomplete, Unused
 from collections.abc import Callable
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from ..cmd import Command
 
@@ -15,13 +15,13 @@ class bdist(Command):
     default_format: ClassVar[dict[str, str]]
     format_commands: ClassVar[list[str]]
     format_command: ClassVar[dict[str, tuple[str, str]]]
-    bdist_base: Any
-    plat_name: Any
-    formats: Any
-    dist_dir: Any
+    bdist_base: Incomplete
+    plat_name: Incomplete
+    formats: Incomplete
+    dist_dir: Incomplete
     skip_build: int
-    group: Any
-    owner: Any
+    group: Incomplete
+    owner: Incomplete
     def initialize_options(self) -> None: ...
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...

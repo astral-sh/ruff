@@ -53,9 +53,9 @@ use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
-    BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
-    StarImport, SubmoduleImport,
+    BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, GeneratorKind, Globals,
+    Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
+    SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{python_builtins, MAGIC_GLOBALS};
 use ruff_python_trivia::CommentRanges;
@@ -66,6 +66,7 @@ use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
+use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
@@ -186,7 +187,7 @@ pub(crate) struct Checker<'a> {
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
-    package: Option<&'a Path>,
+    package: Option<PackageRoot<'a>>,
     /// The module representation of the current file (e.g., `foo.bar`).
     module: Module<'a>,
     /// The [`PySourceType`] of the current file.
@@ -238,7 +239,7 @@ impl<'a> Checker<'a> {
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
         path: &'a Path,
-        package: Option<&'a Path>,
+        package: Option<PackageRoot<'a>>,
         module: Module<'a>,
         locator: &'a Locator,
         stylist: &'a Stylist,
@@ -247,7 +248,7 @@ impl<'a> Checker<'a> {
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
-        Checker {
+        Self {
             parsed,
             parsed_type_annotation: None,
             parsed_annotations_cache: ParsedAnnotationsCache::new(parsed_annotations_arena),
@@ -383,7 +384,7 @@ impl<'a> Checker<'a> {
     }
 
     /// The [`Path`] to the package containing the current file.
-    pub(crate) const fn package(&self) -> Option<&'a Path> {
+    pub(crate) const fn package(&self) -> Option<PackageRoot<'_>> {
         self.package
     }
 
@@ -1137,19 +1138,25 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 elt,
                 generators,
                 range: _,
-            })
-            | Expr::SetComp(ast::ExprSetComp {
+            }) => {
+                self.visit_generators(GeneratorKind::ListComprehension, generators);
+                self.visit_expr(elt);
+            }
+            Expr::SetComp(ast::ExprSetComp {
                 elt,
                 generators,
                 range: _,
-            })
-            | Expr::Generator(ast::ExprGenerator {
+            }) => {
+                self.visit_generators(GeneratorKind::SetComprehension, generators);
+                self.visit_expr(elt);
+            }
+            Expr::Generator(ast::ExprGenerator {
                 elt,
                 generators,
                 range: _,
                 parenthesized: _,
             }) => {
-                self.visit_generators(generators);
+                self.visit_generators(GeneratorKind::Generator, generators);
                 self.visit_expr(elt);
             }
             Expr::DictComp(ast::ExprDictComp {
@@ -1158,7 +1165,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 generators,
                 range: _,
             }) => {
-                self.visit_generators(generators);
+                self.visit_generators(GeneratorKind::DictComprehension, generators);
                 self.visit_expr(key);
                 self.visit_expr(value);
             }
@@ -1535,7 +1542,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         };
 
         // Step 4: Analysis
-        analyze::expression(expr, self);
         match expr {
             Expr::StringLiteral(string_literal) => {
                 analyze::string_like(string_literal.into(), self);
@@ -1546,6 +1552,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         self.semantic.flags = flags_snapshot;
+        analyze::expression(expr, self);
         self.semantic.pop_node();
     }
 
@@ -1748,7 +1755,7 @@ impl<'a> Checker<'a> {
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
-    fn visit_generators(&mut self, generators: &'a [Comprehension]) {
+    fn visit_generators(&mut self, kind: GeneratorKind, generators: &'a [Comprehension]) {
         let mut iterator = generators.iter();
 
         let Some(generator) = iterator.next() else {
@@ -1785,9 +1792,8 @@ impl<'a> Checker<'a> {
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
-        self.semantic.push_scope(ScopeKind::Generator);
+        self.semantic.push_scope(ScopeKind::Generator(kind));
 
-        self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
         self.visit_expr(&generator.target);
         self.semantic.flags = flags;
 
@@ -1798,7 +1804,6 @@ impl<'a> Checker<'a> {
         for generator in iterator {
             self.visit_expr(&generator.iter);
 
-            self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
             self.visit_expr(&generator.target);
             self.semantic.flags = flags;
 
@@ -2477,12 +2482,14 @@ pub(crate) fn check_ast(
     settings: &LinterSettings,
     noqa: flags::Noqa,
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
 ) -> Vec<Diagnostic> {
-    let module_path = package.and_then(|package| to_module_path(package, path));
+    let module_path = package
+        .map(PackageRoot::path)
+        .and_then(|package| to_module_path(package, path));
     let module = Module {
         kind: if path.ends_with("__init__.py") {
             ModuleKind::Package

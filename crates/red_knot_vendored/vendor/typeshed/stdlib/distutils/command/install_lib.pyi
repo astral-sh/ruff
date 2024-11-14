@@ -1,4 +1,5 @@
-from typing import Any, ClassVar, Final
+from _typeshed import Incomplete
+from typing import ClassVar, Final
 
 from ..cmd import Command
 
@@ -9,12 +10,12 @@ class install_lib(Command):
     user_options: ClassVar[list[tuple[str, str | None, str]]]
     boolean_options: ClassVar[list[str]]
     negative_opt: ClassVar[dict[str, str]]
-    install_dir: Any
-    build_dir: Any
+    install_dir: Incomplete
+    build_dir: Incomplete
     force: int
-    compile: Any
-    optimize: Any
-    skip_build: Any
+    compile: Incomplete
+    optimize: Incomplete
+    skip_build: Incomplete
     def initialize_options(self) -> None: ...
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...

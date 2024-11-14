@@ -74,11 +74,11 @@ impl Violation for PostInitDefault {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__post_init__` method with argument defaults")
+        "`__post_init__` method with argument defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Use `dataclasses.InitVar` instead"))
+        Some("Use `dataclasses.InitVar` instead".to_string())
     }
 }
 

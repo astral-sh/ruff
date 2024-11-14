@@ -32,7 +32,7 @@ pub struct RaiseLiteral;
 impl Violation for RaiseLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Cannot raise a literal. Did you intend to return it or raise an Exception?")
+        "Cannot raise a literal. Did you intend to return it or raise an Exception?".to_string()
     }
 }
 

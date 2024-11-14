@@ -35,7 +35,7 @@ pub struct PrePep570PositionalArgument;
 impl Violation for PrePep570PositionalArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use PEP 570 syntax for positional-only arguments")
+        "Use PEP 570 syntax for positional-only arguments".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

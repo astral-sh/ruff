@@ -39,7 +39,7 @@ pub struct DjangoLocalsInRenderFunction;
 impl Violation for DjangoLocalsInRenderFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid passing `locals()` as context to a `render` function")
+        "Avoid passing `locals()` as context to a `render` function".to_string()
     }
 }
 

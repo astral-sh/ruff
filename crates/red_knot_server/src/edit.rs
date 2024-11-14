@@ -6,7 +6,7 @@ mod text_document;
 
 use lsp_types::{PositionEncodingKind, Url};
 pub use notebook::NotebookDocument;
-pub(crate) use range::RangeExt;
+pub(crate) use range::{RangeExt, ToRangeExt};
 pub(crate) use text_document::DocumentVersion;
 pub use text_document::TextDocument;
 

@@ -40,7 +40,7 @@ pub struct PropertyWithParameters;
 impl Violation for PropertyWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Cannot have defined parameters for properties")
+        "Cannot have defined parameters for properties".to_string()
     }
 }
 

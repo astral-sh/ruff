@@ -28,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 257](https://peps.python.org/pep-0257/)
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: Formatted string literals](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[violation]
 pub struct FStringDocstring;
@@ -36,9 +36,7 @@ pub struct FStringDocstring;
 impl Violation for FStringDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "f-string used as docstring. Python will interpret this as a joined string, rather than a docstring."
-        )
+        "f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.".to_string()
     }
 }
 

@@ -48,7 +48,7 @@ pub struct OneBlankLineBeforeClass;
 impl AlwaysFixableViolation for OneBlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("1 blank line required before class docstring")
+        "1 blank line required before class docstring".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -100,7 +100,7 @@ pub struct OneBlankLineAfterClass;
 impl AlwaysFixableViolation for OneBlankLineAfterClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("1 blank line required after class docstring")
+        "1 blank line required after class docstring".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -147,7 +147,7 @@ pub struct BlankLineBeforeClass;
 impl AlwaysFixableViolation for BlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No blank lines allowed before class docstring")
+        "No blank lines allowed before class docstring".to_string()
     }
 
     fn fix_title(&self) -> String {

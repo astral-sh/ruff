@@ -52,7 +52,7 @@ impl Violation for BlankLineAfterSummary {
     fn message(&self) -> String {
         let BlankLineAfterSummary { num_lines } = self;
         if *num_lines == 0 {
-            format!("1 blank line required between summary line and description")
+            "1 blank line required between summary line and description".to_string()
         } else {
             format!(
                 "1 blank line required between summary line and description (found {num_lines})"

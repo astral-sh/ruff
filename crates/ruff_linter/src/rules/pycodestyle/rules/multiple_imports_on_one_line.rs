@@ -38,11 +38,11 @@ impl Violation for MultipleImportsOnOneLine {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple imports on one line")
+        "Multiple imports on one line".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Split imports"))
+        Some("Split imports".to_string())
     }
 }
 

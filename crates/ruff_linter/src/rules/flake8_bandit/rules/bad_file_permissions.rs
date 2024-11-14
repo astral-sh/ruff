@@ -47,7 +47,9 @@ impl Violation for BadFilePermissions {
             Reason::Permissive(mask) => {
                 format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory")
             }
-            Reason::Invalid => format!("`os.chmod` setting an invalid mask on file or directory"),
+            Reason::Invalid => {
+                "`os.chmod` setting an invalid mask on file or directory".to_string()
+            }
         }
     }
 }

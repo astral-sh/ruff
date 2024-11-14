@@ -145,11 +145,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FStringNumberFormat) {
                 refurb::rules::fstring_number_format(checker, subscript);
             }
-
             if checker.enabled(Rule::IncorrectlyParenthesizedTupleInSubscript) {
                 ruff::rules::subscript_with_parenthesized_tuple(checker, subscript);
             }
-
             if checker.enabled(Rule::NonPEP646Unpack) {
                 pyupgrade::rules::use_pep646_unpack(checker, subscript);
             }
@@ -341,6 +339,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
             }
+            if checker.enabled(Rule::DatetimeMinMax) {
+                flake8_datetimez::rules::datetime_max_min(checker, expr);
+            }
             if checker.enabled(Rule::BannedApi) {
                 flake8_tidy_imports::rules::banned_attribute_access(checker, expr);
             }
@@ -388,6 +389,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::StaticJoinToFString,
                 // refurb
                 Rule::HashlibDigestHex,
+                // flake8-simplify
+                Rule::SplitStaticString,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
@@ -402,6 +405,16 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 flynt::rules::static_join_to_fstring(
                                     checker,
                                     expr,
+                                    string_value.to_str(),
+                                );
+                            }
+                        } else if matches!(attr, "split" | "rsplit") {
+                            // "...".split(...) call
+                            if checker.enabled(Rule::SplitStaticString) {
+                                flake8_simplify::rules::split_static_string(
+                                    checker,
+                                    attr,
+                                    call,
                                     string_value.to_str(),
                                 );
                             }
@@ -807,6 +820,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BadStrStripCall) {
                 pylint::rules::bad_str_strip_call(checker, func, args);
             }
+            if checker.enabled(Rule::ShallowCopyEnviron) {
+                pylint::rules::shallow_copy_environ(checker, call);
+            }
             if checker.enabled(Rule::InvalidEnvvarDefault) {
                 pylint::rules::invalid_envvar_default(checker, call);
             }
@@ -978,6 +994,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
+            if checker.enabled(Rule::RootLoggerCall) {
+                flake8_logging::rules::root_logger_call(checker, call);
+            }
             if checker.enabled(Rule::IsinstanceTypeNone) {
                 refurb::rules::isinstance_type_none(checker, call);
             }
@@ -1016,6 +1035,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::IntOnSlicedStr) {
                 refurb::rules::int_on_sliced_str(checker, call);
+            }
+            if checker.enabled(Rule::UnsafeMarkupUse) {
+                ruff::rules::unsafe_markup_call(checker, call);
             }
         }
         Expr::Dict(dict) => {
@@ -1358,9 +1380,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SingleItemMembershipTest) {
                 refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
-            }
-            if checker.enabled(Rule::HardcodedStringCharset) {
-                refurb::rules::hardcoded_string_charset_comparison(checker, compare);
             }
         }
         Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {

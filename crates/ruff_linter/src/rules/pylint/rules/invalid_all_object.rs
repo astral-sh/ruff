@@ -31,7 +31,7 @@ pub struct InvalidAllObject;
 impl Violation for InvalidAllObject {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid object in `__all__`, must contain only strings")
+        "Invalid object in `__all__`, must contain only strings".to_string()
     }
 }
 

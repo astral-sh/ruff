@@ -46,7 +46,7 @@ pub struct NoSignature;
 impl Violation for NoSignature {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("First line should not be the function's signature")
+        "First line should not be the function's signature".to_string()
     }
 }
 

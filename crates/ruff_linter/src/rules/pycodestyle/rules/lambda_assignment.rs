@@ -44,7 +44,7 @@ impl Violation for LambdaAssignment {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not assign a `lambda` expression, use a `def`")
+        "Do not assign a `lambda` expression, use a `def`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

@@ -1,40 +1,40 @@
-from _typeshed import Unused
+from _typeshed import Incomplete, Unused
 from collections.abc import Callable
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from ..cmd import Command
 
-extension_name_re: Any
+extension_name_re: Incomplete
 
 def show_compilers() -> None: ...
 
 class build_ext(Command):
     description: str
-    sep_by: Any
+    sep_by: Incomplete
     user_options: ClassVar[list[tuple[str, str | None, str]]]
     boolean_options: ClassVar[list[str]]
     help_options: ClassVar[list[tuple[str, str | None, str, Callable[[], Unused]]]]
-    extensions: Any
-    build_lib: Any
-    plat_name: Any
-    build_temp: Any
+    extensions: Incomplete
+    build_lib: Incomplete
+    plat_name: Incomplete
+    build_temp: Incomplete
     inplace: int
-    package: Any
-    include_dirs: Any
-    define: Any
-    undef: Any
-    libraries: Any
-    library_dirs: Any
-    rpath: Any
-    link_objects: Any
-    debug: Any
-    force: Any
-    compiler: Any
-    swig: Any
-    swig_cpp: Any
-    swig_opts: Any
-    user: Any
-    parallel: Any
+    package: Incomplete
+    include_dirs: Incomplete
+    define: Incomplete
+    undef: Incomplete
+    libraries: Incomplete
+    library_dirs: Incomplete
+    rpath: Incomplete
+    link_objects: Incomplete
+    debug: Incomplete
+    force: Incomplete
+    compiler: Incomplete
+    swig: Incomplete
+    swig_cpp: Incomplete
+    swig_opts: Incomplete
+    user: Incomplete
+    parallel: Incomplete
     def initialize_options(self) -> None: ...
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...

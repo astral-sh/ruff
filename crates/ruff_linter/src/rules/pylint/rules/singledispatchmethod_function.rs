@@ -48,7 +48,7 @@ impl Violation for SingledispatchmethodFunction {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`@singledispatchmethod` decorator should not be used on non-method functions")
+        "`@singledispatchmethod` decorator should not be used on non-method functions".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

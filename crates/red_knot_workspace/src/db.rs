@@ -4,13 +4,13 @@ use std::sync::Arc;
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
 
+use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-
-use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 
 mod changes;
 
@@ -51,11 +51,11 @@ impl RootDatabase {
     }
 
     /// Checks all open files in the workspace and its dependencies.
-    pub fn check(&self) -> Result<Vec<String>, Cancelled> {
+    pub fn check(&self) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
         self.with_db(|db| db.workspace().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Vec<String>, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
         let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
 
         self.with_db(|db| check_file(db, file))

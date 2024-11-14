@@ -29,7 +29,7 @@ pub struct ExtraneousParentheses;
 impl AlwaysFixableViolation for ExtraneousParentheses {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid extraneous parentheses")
+        "Avoid extraneous parentheses".to_string()
     }
 
     fn fix_title(&self) -> String {

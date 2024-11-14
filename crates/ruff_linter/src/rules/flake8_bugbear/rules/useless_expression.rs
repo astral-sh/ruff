@@ -60,12 +60,11 @@ impl Violation for UselessExpression {
     fn message(&self) -> String {
         match self.kind {
             Kind::Expression => {
-                format!("Found useless expression. Either assign it to a variable or remove it.")
+                "Found useless expression. Either assign it to a variable or remove it.".to_string()
             }
             Kind::Attribute => {
-                format!(
-                    "Found useless attribute access. Either assign it to a variable or remove it."
-                )
+                "Found useless attribute access. Either assign it to a variable or remove it."
+                    .to_string()
             }
         }
     }

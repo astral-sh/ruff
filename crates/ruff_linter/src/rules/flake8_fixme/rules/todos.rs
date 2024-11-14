@@ -26,7 +26,7 @@ pub struct LineContainsTodo;
 impl Violation for LineContainsTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains TODO, consider resolving the issue")
+        "Line contains TODO, consider resolving the issue".to_string()
     }
 }
 
@@ -52,7 +52,7 @@ pub struct LineContainsFixme;
 impl Violation for LineContainsFixme {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains FIXME, consider resolving the issue")
+        "Line contains FIXME, consider resolving the issue".to_string()
     }
 }
 
@@ -75,7 +75,7 @@ pub struct LineContainsXxx;
 impl Violation for LineContainsXxx {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains XXX, consider resolving the issue")
+        "Line contains XXX, consider resolving the issue".to_string()
     }
 }
 
@@ -110,7 +110,7 @@ pub struct LineContainsHack;
 impl Violation for LineContainsHack {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains HACK, consider resolving the issue")
+        "Line contains HACK, consider resolving the issue".to_string()
     }
 }
 

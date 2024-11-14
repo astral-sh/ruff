@@ -40,7 +40,7 @@ pub struct InvalidBoolReturnType;
 impl Violation for InvalidBoolReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__bool__` does not return `bool`")
+        "`__bool__` does not return `bool`".to_string()
     }
 }
 

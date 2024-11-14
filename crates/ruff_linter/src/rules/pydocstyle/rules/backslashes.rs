@@ -49,11 +49,11 @@ impl Violation for EscapeSequenceInDocstring {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"Use `r"""` if any backslashes in a docstring"#)
+        r#"Use `r"""` if any backslashes in a docstring"#.to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!(r#"Add `r` prefix"#))
+        Some(r#"Add `r` prefix"#.to_string())
     }
 }
 

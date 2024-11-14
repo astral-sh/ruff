@@ -76,8 +76,8 @@ impl Violation for UnnecessaryComprehensionInCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.comprehension_kind {
-            ComprehensionKind::List => format!("Unnecessary list comprehension"),
-            ComprehensionKind::Set => format!("Unnecessary set comprehension"),
+            ComprehensionKind::List => "Unnecessary list comprehension".to_string(),
+            ComprehensionKind::Set => "Unnecessary set comprehension".to_string(),
         }
     }
 

@@ -40,7 +40,7 @@ pub struct InvalidBytesReturnType;
 impl Violation for InvalidBytesReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__bytes__` does not return `bytes`")
+        "`__bytes__` does not return `bytes`".to_string()
     }
 }
 

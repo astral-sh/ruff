@@ -19,7 +19,7 @@ pub struct MissingCopyrightNotice;
 impl Violation for MissingCopyrightNotice {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing copyright notice at top of file")
+        "Missing copyright notice at top of file".to_string()
     }
 }
 

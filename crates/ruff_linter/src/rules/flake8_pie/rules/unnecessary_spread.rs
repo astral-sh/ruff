@@ -36,11 +36,11 @@ impl Violation for UnnecessarySpread {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary spread `**`")
+        "Unnecessary spread `**`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove unnecessary dict"))
+        Some("Remove unnecessary dict".to_string())
     }
 }
 

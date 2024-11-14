@@ -38,11 +38,11 @@ pub struct DecimalFromFloatLiteral;
 impl AlwaysFixableViolation for DecimalFromFloatLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`Decimal()` called with float literal argument")
+        "`Decimal()` called with float literal argument".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Use a string literal instead".to_string()
+        "Replace with string literal".to_string()
     }
 }
 

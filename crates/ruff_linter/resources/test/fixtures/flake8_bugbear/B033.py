@@ -19,6 +19,7 @@ incorrect_set = {
     1,
     1,
 }
+incorrect_set = {False, 1, 0}
 
 ###
 # Non-errors.

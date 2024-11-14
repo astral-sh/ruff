@@ -1,11 +1,30 @@
+use super::notebook;
 use super::PositionEncoding;
-use ruff_source_file::LineIndex;
+use lsp_types as types;
+use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
+use ruff_source_file::{LineIndex, SourceLocation};
 use ruff_text_size::{TextRange, TextSize};
+
+pub(crate) struct NotebookRange {
+    pub(crate) cell: notebook::CellId,
+    pub(crate) range: types::Range,
+}
 
 pub(crate) trait RangeExt {
     fn to_text_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding)
         -> TextRange;
+}
+
+pub(crate) trait ToRangeExt {
+    fn to_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> types::Range;
+    fn to_notebook_range(
+        &self,
+        text: &str,
+        source_index: &LineIndex,
+        notebook_index: &NotebookIndex,
+        encoding: PositionEncoding,
+    ) -> NotebookRange;
 }
 
 fn u32_index_to_usize(index: u32) -> usize {
@@ -75,6 +94,61 @@ impl RangeExt for lsp_types::Range {
     }
 }
 
+impl ToRangeExt for TextRange {
+    fn to_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> types::Range {
+        types::Range {
+            start: source_location_to_position(&offset_to_source_location(
+                self.start(),
+                text,
+                index,
+                encoding,
+            )),
+            end: source_location_to_position(&offset_to_source_location(
+                self.end(),
+                text,
+                index,
+                encoding,
+            )),
+        }
+    }
+
+    fn to_notebook_range(
+        &self,
+        text: &str,
+        source_index: &LineIndex,
+        notebook_index: &NotebookIndex,
+        encoding: PositionEncoding,
+    ) -> NotebookRange {
+        let start = offset_to_source_location(self.start(), text, source_index, encoding);
+        let mut end = offset_to_source_location(self.end(), text, source_index, encoding);
+        let starting_cell = notebook_index.cell(start.row);
+
+        // weird edge case here - if the end of the range is where the newline after the cell got added (making it 'out of bounds')
+        // we need to move it one character back (which should place it at the end of the last line).
+        // we test this by checking if the ending offset is in a different (or nonexistent) cell compared to the cell of the starting offset.
+        if notebook_index.cell(end.row) != starting_cell {
+            end.row = end.row.saturating_sub(1);
+            end.column = offset_to_source_location(
+                self.end().checked_sub(1.into()).unwrap_or_default(),
+                text,
+                source_index,
+                encoding,
+            )
+            .column;
+        }
+
+        let start = source_location_to_position(&notebook_index.translate_location(&start));
+        let end = source_location_to_position(&notebook_index.translate_location(&end));
+
+        NotebookRange {
+            cell: starting_cell
+                .map(OneIndexed::to_zero_indexed)
+                .unwrap_or_default(),
+            range: types::Range { start, end },
+        }
+    }
+}
+
 /// Converts a UTF-16 code unit offset for a given line into a UTF-8 column number.
 fn utf8_column_offset(utf16_code_unit_offset: u32, line: &str) -> TextSize {
     let mut utf8_code_unit_offset = TextSize::new(0);
@@ -95,4 +169,47 @@ fn utf8_column_offset(utf16_code_unit_offset: u32, line: &str) -> TextSize {
     }
 
     utf8_code_unit_offset
+}
+
+fn offset_to_source_location(
+    offset: TextSize,
+    text: &str,
+    index: &LineIndex,
+    encoding: PositionEncoding,
+) -> SourceLocation {
+    match encoding {
+        PositionEncoding::UTF8 => {
+            let row = index.line_index(offset);
+            let column = offset - index.line_start(row, text);
+
+            SourceLocation {
+                column: OneIndexed::from_zero_indexed(column.to_usize()),
+                row,
+            }
+        }
+        PositionEncoding::UTF16 => {
+            let row = index.line_index(offset);
+
+            let column = if index.is_ascii() {
+                (offset - index.line_start(row, text)).to_usize()
+            } else {
+                let up_to_line = &text[TextRange::new(index.line_start(row, text), offset)];
+                up_to_line.encode_utf16().count()
+            };
+
+            SourceLocation {
+                column: OneIndexed::from_zero_indexed(column),
+                row,
+            }
+        }
+        PositionEncoding::UTF32 => index.source_location(offset, text),
+    }
+}
+
+fn source_location_to_position(location: &SourceLocation) -> types::Position {
+    types::Position {
+        line: u32::try_from(location.row.to_zero_indexed()).expect("row usize fits in u32"),
+        character: u32::try_from(location.column.to_zero_indexed())
+            .expect("character usize fits in u32"),
+    }
 }

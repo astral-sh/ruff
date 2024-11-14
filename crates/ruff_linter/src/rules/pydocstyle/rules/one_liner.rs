@@ -40,7 +40,7 @@ impl Violation for FitsOnOneLine {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("One-line docstring should fit on one line")
+        "One-line docstring should fit on one line".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

@@ -52,14 +52,14 @@ use crate::Locator;
 /// See [#10885](https://github.com/astral-sh/ruff/issues/10885) for more.
 ///
 /// ## References
-/// - [PEP 498](https://www.python.org/dev/peps/pep-0498/)
+/// - [PEP 498 – Literal String Interpolation](https://peps.python.org/pep-0498/)
 #[violation]
 pub struct FStringMissingPlaceholders;
 
 impl AlwaysFixableViolation for FStringMissingPlaceholders {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("f-string without any placeholders")
+        "f-string without any placeholders".to_string()
     }
 
     fn fix_title(&self) -> String {

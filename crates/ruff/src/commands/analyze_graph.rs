@@ -6,6 +6,7 @@ use log::{debug, warn};
 use path_absolutize::CWD;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
+use ruff_linter::package::PackageRoot;
 use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile};
@@ -49,7 +50,12 @@ pub(crate) fn analyze_graph(
                 .collect::<Vec<_>>(),
         )
         .into_iter()
-        .map(|(path, package)| (path.to_path_buf(), package.map(Path::to_path_buf)))
+        .map(|(path, package)| {
+            (
+                path.to_path_buf(),
+                package.map(PackageRoot::path).map(Path::to_path_buf),
+            )
+        })
         .collect::<FxHashMap<_, _>>();
 
     // Create a database from the source roots.

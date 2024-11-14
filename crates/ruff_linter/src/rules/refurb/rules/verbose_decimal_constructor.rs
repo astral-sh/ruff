@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
+use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
 
@@ -46,7 +47,7 @@ impl Violation for VerboseDecimalConstructor {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Verbose expression in `Decimal` constructor")
+        "Verbose expression in `Decimal` constructor".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -75,27 +76,48 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             value: str_literal, ..
         }) => {
             // Parse the inner string as an integer.
-            let trimmed = str_literal.to_str().trim_whitespace();
-
+            //
+            // For reference, a string argument to `Decimal` is parsed in CPython
+            // using this regex:
+            // https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
+            // _after_ trimming whitespace from the string and removing all occurrences of "_".
+            let mut trimmed = Cow::from(str_literal.to_str().trim_whitespace());
+            if memchr::memchr(b'_', trimmed.as_bytes()).is_some() {
+                trimmed = Cow::from(trimmed.replace('_', ""));
+            }
             // Extract the unary sign, if any.
             let (unary, rest) = if let Some(trimmed) = trimmed.strip_prefix('+') {
-                ("+", trimmed)
+                ("+", Cow::from(trimmed))
             } else if let Some(trimmed) = trimmed.strip_prefix('-') {
-                ("-", trimmed)
+                ("-", Cow::from(trimmed))
             } else {
                 ("", trimmed)
             };
+
+            // Early return if we now have an empty string
+            // or a very long string:
+            if (rest.len() > PYTHONINTMAXSTRDIGITS) || (rest.len() == 0) {
+                return;
+            }
 
             // Skip leading zeros.
             let rest = rest.trim_start_matches('0');
 
             // Verify that the rest of the string is a valid integer.
-            if !rest.chars().all(|c| c.is_ascii_digit()) {
+            if !rest.bytes().all(|c| c.is_ascii_digit()) {
                 return;
             };
 
             // If all the characters are zeros, then the value is zero.
-            let rest = if rest.is_empty() { "0" } else { rest };
+            let rest = match (unary, rest.is_empty()) {
+                // `Decimal("-0")` is not the same as `Decimal("0")`
+                // so we return early.
+                ("-", true) => {
+                    return;
+                }
+                (_, true) => "0",
+                _ => rest,
+            };
 
             let replacement = format!("{unary}{rest}");
             let mut diagnostic = Diagnostic::new(
@@ -159,3 +181,11 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
 
     checker.diagnostics.push(diagnostic);
 }
+
+// ```console
+// $ python
+// >>> import sys
+// >>> sys.int_info.str_digits_check_threshold
+// 640
+// ```
+const PYTHONINTMAXSTRDIGITS: usize = 640;

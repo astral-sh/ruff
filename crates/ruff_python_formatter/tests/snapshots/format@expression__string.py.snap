@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/string.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -144,6 +145,63 @@ a = f"""\x1F"""
 a = """\x1F"""
 a = """\\x1F"""
 a = """\\\x1F"""
+
+
+##############################################################################
+# Implicit concatenated strings
+##############################################################################
+
+# In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+# and that are multiline in the source.
+
+(
+    r"aaaaaaaaa"
+    r"bbbbbbbbbbbbbbbbbbbb"
+)
+
+(
+    r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccc"
+)
+
+(
+    """aaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbb"""
+)
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    fr"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+if (
+       r"aaaaaaaaa"
+       r"bbbbbbbbbbbbbbbbbbbb"
+   ) + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]: ...
+
+
+
+# In preview, keep implicit concatenated strings on a single line if they fit and are not separate by line breaks in the source
+(
+    r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+)
+
+r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+
+(
+    f"aaaa{
+    10}aaaaa" fr"bbbbbbbbbbbbbbbbbbbb"
+)
+
+(
+    r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+(
+    f"""aaaa{
+    10}aaaaa""" fr"""bbbbbbbbbbbbbbbbbbbb"""
+)
 ```
 
 ## Outputs
@@ -328,6 +386,49 @@ a = f"""\x1f"""
 a = """\x1f"""
 a = """\\x1F"""
 a = """\\\x1f"""
+
+
+##############################################################################
+# Implicit concatenated strings
+##############################################################################
+
+# In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+# and that are multiline in the source.
+
+(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb")
+
+(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb" "cccccccccccccccccccccc")
+
+("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
+    ...
+
+
+# In preview, keep implicit concatenated strings on a single line if they fit and are not separate by line breaks in the source
+(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb")
+
+r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+
+(
+    f"aaaa{
+    10}aaaaa"
+    rf"bbbbbbbbbbbbbbbbbbbb"
+)
+
+(r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
 ```
 
 
@@ -356,6 +457,63 @@ a = """\\\x1f"""
  
  
  # Regression test for https://github.com/astral-sh/ruff/issues/5893
+@@ -172,19 +172,31 @@
+ # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+ # and that are multiline in the source.
+ 
+-(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb")
++(
++    r"aaaaaaaaa"
++    r"bbbbbbbbbbbbbbbbbbbb"
++)
+ 
+-(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb" "cccccccccccccccccccccc")
++(
++    r"aaaaaaaaa"
++    r"bbbbbbbbbbbbbbbbbbbb"
++    "cccccccccccccccccccccc"
++)
+ 
+-("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
++(
++    """aaaaaaaaa"""
++    """bbbbbbbbbbbbbbbbbbbb"""
++)
+ 
+ (
+-    f"""aaaa{
+-    10}aaaaa"""
++    f"""aaaa{10}aaaaa"""
+     rf"""bbbbbbbbbbbbbbbbbbbb"""
+ )
+ 
+-if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
++if (
++    r"aaaaaaaaa"
++    r"bbbbbbbbbbbbbbbbbbbb"
++) + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
+     ...
+ 
+ 
+@@ -193,16 +205,8 @@
+ 
+ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+ 
+-(
+-    f"aaaa{
+-    10}aaaaa"
+-    rf"bbbbbbbbbbbbbbbbbbbb"
+-)
++(f"aaaa{10}aaaaa" rf"bbbbbbbbbbbbbbbbbbbb")
+ 
+ (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
+ 
+-(
+-    f"""aaaa{
+-    10}aaaaa"""
+-    rf"""bbbbbbbbbbbbbbbbbbbb"""
+-)
++(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 ```
 
 
@@ -540,6 +698,49 @@ a = f"""\x1f"""
 a = """\x1f"""
 a = """\\x1F"""
 a = """\\\x1f"""
+
+
+##############################################################################
+# Implicit concatenated strings
+##############################################################################
+
+# In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+# and that are multiline in the source.
+
+(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb')
+
+(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb' 'cccccccccccccccccccccc')
+
+("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
+
+if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
+    ...
+
+
+# In preview, keep implicit concatenated strings on a single line if they fit and are not separate by line breaks in the source
+(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb')
+
+r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
+
+(
+    f'aaaa{
+    10}aaaaa'
+    rf'bbbbbbbbbbbbbbbbbbbb'
+)
+
+(r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
+
+(
+    f"""aaaa{
+    10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
 ```
 
 
@@ -568,4 +769,61 @@ a = """\\\x1f"""
  
  
  # Regression test for https://github.com/astral-sh/ruff/issues/5893
+@@ -172,19 +172,31 @@
+ # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
+ # and that are multiline in the source.
+ 
+-(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb')
++(
++    r'aaaaaaaaa'
++    r'bbbbbbbbbbbbbbbbbbbb'
++)
+ 
+-(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb' 'cccccccccccccccccccccc')
++(
++    r'aaaaaaaaa'
++    r'bbbbbbbbbbbbbbbbbbbb'
++    'cccccccccccccccccccccc'
++)
+ 
+-("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
++(
++    """aaaaaaaaa"""
++    """bbbbbbbbbbbbbbbbbbbb"""
++)
+ 
+ (
+-    f"""aaaa{
+-    10}aaaaa"""
++    f"""aaaa{10}aaaaa"""
+     rf"""bbbbbbbbbbbbbbbbbbbb"""
+ )
+ 
+-if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
++if (
++    r'aaaaaaaaa'
++    r'bbbbbbbbbbbbbbbbbbbb'
++) + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
+     ...
+ 
+ 
+@@ -193,16 +205,8 @@
+ 
+ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
+ 
+-(
+-    f'aaaa{
+-    10}aaaaa'
+-    rf'bbbbbbbbbbbbbbbbbbbb'
+-)
++(f'aaaa{10}aaaaa' rf'bbbbbbbbbbbbbbbbbbbb')
+ 
+ (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
+ 
+-(
+-    f"""aaaa{
+-    10}aaaaa"""
+-    rf"""bbbbbbbbbbbbbbbbbbbb"""
+-)
++(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 ```

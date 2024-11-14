@@ -31,14 +31,15 @@ impl fmt::Display for DeferralKeyword {
 /// The use of `yield`, `yield from`, or `await` outside of a function will
 /// raise a `SyntaxError`.
 ///
-/// As an exception, `await` is allowed at the top level of a Jupyter notebook
-/// (see: [autoawait]).
-///
 /// ## Example
 /// ```python
 /// class Foo:
 ///     yield 1
 /// ```
+///
+/// ## Notebook behavior
+/// As an exception, `await` is allowed at the top level of a Jupyter notebook
+/// (see: [autoawait]).
 ///
 /// ## References
 /// - [Python documentation: `yield`](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)

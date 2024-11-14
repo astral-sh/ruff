@@ -25,11 +25,10 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
-use crate::types::{IntersectionType, Type, UnionType};
+
+use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
-
-use super::KnownClass;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
@@ -80,7 +79,6 @@ impl<'db> UnionBuilder<'db> {
                         to_remove.push(index);
                     }
                 }
-
                 match to_remove[..] {
                     [] => self.elements.push(to_add),
                     [index] => self.elements[index] = to_add,
@@ -103,7 +101,6 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
         }
-
         self
     }
 
@@ -249,8 +246,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
         } else {
             // ~Literal[True] & bool = Literal[False]
-            if let Type::Instance(class_type) = new_positive {
-                if class_type.is_known(db, KnownClass::Bool) {
+            if let Type::Instance(InstanceType { class }) = new_positive {
+                if class.is_known(db, KnownClass::Bool) {
                     if let Some(&Type::BooleanLiteral(value)) = self
                         .negative
                         .iter()
@@ -320,7 +317,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
                 // simplify the representation.
-                self.positive.insert(ty);
+                self.add_positive(db, ty);
             }
             // ~Literal[True] & bool = Literal[False]
             Type::BooleanLiteral(bool)
@@ -386,8 +383,9 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::stdlib::typing_symbol;
-    use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
+    use crate::types::{global_symbol, KnownClass, UnionBuilder};
     use crate::ProgramSettings;
+    use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use test_case::test_case;
 
@@ -595,6 +593,22 @@ mod tests {
     }
 
     #[test]
+    fn build_intersection_simplify_negative_any() {
+        let db = setup_db();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::Any)
+            .build();
+        assert_eq!(ty, Type::Any);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Never)
+            .add_negative(Type::Any)
+            .build();
+        assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
     fn intersection_distributes_over_union() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
@@ -675,8 +689,8 @@ mod tests {
     fn build_intersection_self_negation() {
         let db = setup_db();
         let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::None)
-            .add_negative(Type::None)
+            .add_positive(Type::none(&db))
+            .add_negative(Type::none(&db))
             .build();
 
         assert_eq!(ty, Type::Never);
@@ -686,18 +700,18 @@ mod tests {
     fn build_intersection_simplify_negative_never() {
         let db = setup_db();
         let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::None)
+            .add_positive(Type::none(&db))
             .add_negative(Type::Never)
             .build();
 
-        assert_eq!(ty, Type::None);
+        assert_eq!(ty, Type::none(&db));
     }
 
     #[test]
     fn build_intersection_simplify_positive_never() {
         let db = setup_db();
         let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::None)
+            .add_positive(Type::none(&db))
             .add_positive(Type::Never)
             .build();
 
@@ -709,14 +723,14 @@ mod tests {
         let db = setup_db();
 
         let ty = IntersectionBuilder::new(&db)
-            .add_negative(Type::None)
+            .add_negative(Type::none(&db))
             .add_positive(Type::IntLiteral(1))
             .build();
         assert_eq!(ty, Type::IntLiteral(1));
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(Type::IntLiteral(1))
-            .add_negative(Type::None)
+            .add_negative(Type::none(&db))
             .build();
         assert_eq!(ty, Type::IntLiteral(1));
     }
@@ -761,7 +775,7 @@ mod tests {
             .build();
         assert_eq!(ty, s);
 
-        let literal = Type::StringLiteral(StringLiteralType::new(&db, "a"));
+        let literal = Type::string_literal(&db, "a");
         let expected = IntersectionBuilder::new(&db)
             .add_positive(s)
             .add_negative(literal)
@@ -864,7 +878,7 @@ mod tests {
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(s)
-            .add_negative(Type::StringLiteral(StringLiteralType::new(&db, "a")))
+            .add_negative(Type::string_literal(&db, "a"))
             .add_negative(t)
             .build();
         assert_eq!(ty, Type::Never);
@@ -875,7 +889,7 @@ mod tests {
         let db = setup_db();
 
         let t1 = Type::IntLiteral(1);
-        let t2 = Type::None;
+        let t2 = Type::none(&db);
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t1)
@@ -898,7 +912,7 @@ mod tests {
         let db = setup_db();
 
         let t_p = KnownClass::Int.to_instance(&db);
-        let t_n = Type::StringLiteral(StringLiteralType::new(&db, "t_n"));
+        let t_n = Type::string_literal(&db, "t_n");
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t_p)
@@ -992,5 +1006,67 @@ mod tests {
             .add_positive(ty)
             .build();
         assert_eq!(result, ty);
+    }
+
+    #[test]
+    fn build_intersection_of_two_unions_simplify() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+            a = A()
+            b = B()
+        ",
+        )
+        .unwrap();
+
+        let file = system_path_to_file(&db, "src/module.py").expect("file to exist");
+
+        let a = global_symbol(&db, file, "a").expect_type();
+        let b = global_symbol(&db, file, "b").expect_type();
+        let union = UnionBuilder::new(&db).add(a).add(b).build();
+        assert_eq!(union.display(&db).to_string(), "A | B");
+        let reversed_union = UnionBuilder::new(&db).add(b).add(a).build();
+        assert_eq!(reversed_union.display(&db).to_string(), "B | A");
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(union)
+            .add_positive(reversed_union)
+            .build();
+        assert_eq!(intersection.display(&db).to_string(), "B | A");
+    }
+
+    #[test]
+    fn build_union_of_two_intersections_simplify() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+            a = A()
+            b = B()
+        ",
+        )
+        .unwrap();
+
+        let file = system_path_to_file(&db, "src/module.py").expect("file to exist");
+
+        let a = global_symbol(&db, file, "a").expect_type();
+        let b = global_symbol(&db, file, "b").expect_type();
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(a)
+            .add_positive(b)
+            .build();
+        let reversed_intersection = IntersectionBuilder::new(&db)
+            .add_positive(b)
+            .add_positive(a)
+            .build();
+        let union = UnionBuilder::new(&db)
+            .add(intersection)
+            .add(reversed_intersection)
+            .build();
+        assert_eq!(union.display(&db).to_string(), "A & B");
     }
 }

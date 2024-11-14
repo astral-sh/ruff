@@ -3,10 +3,10 @@ import io
 import ssl
 import sys
 import types
-from _typeshed import ReadableBuffer, SupportsRead, SupportsReadline, WriteableBuffer
+from _typeshed import MaybeNone, ReadableBuffer, SupportsRead, SupportsReadline, WriteableBuffer
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from socket import socket
-from typing import Any, BinaryIO, TypeVar, overload
+from typing import BinaryIO, TypeVar, overload
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -154,7 +154,7 @@ class HTTPConnection:
     timeout: float | None
     host: str
     port: int
-    sock: socket | Any  # can be `None` if `.connect()` was not called
+    sock: socket | MaybeNone  # can be `None` if `.connect()` was not called
     def __init__(
         self,
         host: str,
@@ -187,7 +187,7 @@ class HTTPConnection:
 
 class HTTPSConnection(HTTPConnection):
     # Can be `None` if `.connect()` was not called:
-    sock: ssl.SSLSocket | Any
+    sock: ssl.SSLSocket | MaybeNone
     if sys.version_info >= (3, 12):
         def __init__(
             self,

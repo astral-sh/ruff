@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 484](https://peps.python.org/pep-0484/)
+/// - [PEP 484 – Type Hints](https://peps.python.org/pep-0484/)
 #[violation]
 pub struct UnusedAnnotation {
     name: String,

@@ -37,8 +37,6 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct InDictKeys {
     operator: String,
@@ -52,8 +50,7 @@ impl AlwaysFixableViolation for InDictKeys {
     }
 
     fn fix_title(&self) -> String {
-        let InDictKeys { operator: _ } = self;
-        format!("Remove `.keys()`")
+        "Remove `.keys()`".to_string()
     }
 }
 

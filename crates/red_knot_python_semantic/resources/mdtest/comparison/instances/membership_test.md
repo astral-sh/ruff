@@ -93,13 +93,11 @@ class AlwaysFalse:
     def __contains__(self, item: int) -> Literal[""]:
         return ""
 
-# TODO: it should be Literal[True] and Literal[False]
-reveal_type(42 in AlwaysTrue())  # revealed: @Todo
-reveal_type(42 not in AlwaysTrue())  # revealed: @Todo
+reveal_type(42 in AlwaysTrue())  # revealed: Literal[True]
+reveal_type(42 not in AlwaysTrue())  # revealed: Literal[False]
 
-# TODO: it should be Literal[False] and Literal[True]
-reveal_type(42 in AlwaysFalse())  # revealed: @Todo
-reveal_type(42 not in AlwaysFalse())  # revealed: @Todo
+reveal_type(42 in AlwaysFalse())  # revealed: Literal[False]
+reveal_type(42 not in AlwaysFalse())  # revealed: Literal[True]
 ```
 
 ## No Fallback for `__contains__`

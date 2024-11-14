@@ -40,7 +40,7 @@ pub struct ReplaceUniversalNewlines;
 impl AlwaysFixableViolation for ReplaceUniversalNewlines {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`universal_newlines` is deprecated, use `text`")
+        "`universal_newlines` is deprecated, use `text`".to_string()
     }
 
     fn fix_title(&self) -> String {

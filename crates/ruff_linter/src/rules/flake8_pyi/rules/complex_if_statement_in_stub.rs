@@ -30,16 +30,15 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// The [typing documentation on stub files](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing documentation: Version and platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
 #[violation]
 pub struct ComplexIfStatementInStub;
 
 impl Violation for ComplexIfStatementInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`if` test must be a simple comparison against `sys.platform` or `sys.version_info`"
-        )
+        "`if` test must be a simple comparison against `sys.platform` or `sys.version_info`"
+            .to_string()
     }
 }
 

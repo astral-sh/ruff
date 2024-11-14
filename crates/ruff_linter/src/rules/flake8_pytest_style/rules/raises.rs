@@ -51,7 +51,7 @@ pub struct PytestRaisesWithMultipleStatements;
 impl Violation for PytestRaisesWithMultipleStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pytest.raises()` block should contain a single simple statement")
+        "`pytest.raises()` block should contain a single simple statement".to_string()
     }
 }
 
@@ -147,7 +147,7 @@ pub struct PytestRaisesWithoutException;
 impl Violation for PytestRaisesWithoutException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("set the expected exception in `pytest.raises()`")
+        "set the expected exception in `pytest.raises()`".to_string()
     }
 }
 
@@ -177,13 +177,12 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            let match_keyword = call.arguments.find_keyword("match");
-            if let Some(exception) = call.arguments.args.first() {
-                if let Some(match_keyword) = match_keyword {
-                    if is_empty_or_null_string(&match_keyword.value) {
-                        exception_needs_match(checker, exception);
-                    }
-                } else {
+            if let Some(exception) = call.arguments.find_argument("expected_exception", 0) {
+                if call
+                    .arguments
+                    .find_keyword("match")
+                    .map_or(true, |k| is_empty_or_null_string(&k.value))
+                {
                     exception_needs_match(checker, exception);
                 }
             }

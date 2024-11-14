@@ -25,12 +25,13 @@ use crate::semantic_index::symbol::{
 };
 use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
+use crate::unpack::Unpack;
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use super::definition::{
-    AssignmentKind, DefinitionCategory, ExceptHandlerDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
 };
 
 mod except_handlers;
@@ -46,6 +47,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     current_assignments: Vec<CurrentAssignment<'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
+
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
     /// Per-scope contexts regarding nested `try`/`except` statements
@@ -112,9 +114,11 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
+        #[allow(unsafe_code)]
         let scope = Scope {
             parent,
-            kind: node.scope_kind(),
+            // SAFETY: `node` is guaranteed to be a child of `self.module`
+            node: unsafe { node.to_kind(self.module.clone()) },
             descendents: children_start..children_start,
         };
         self.try_node_context_stack_manager.enter_nested_scope();
@@ -124,15 +128,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.use_def_maps.push(UseDefMapBuilder::new());
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::new());
 
-        #[allow(unsafe_code)]
-        // SAFETY: `node` is guaranteed to be a child of `self.module`
-        let scope_id = ScopeId::new(
-            self.db,
-            self.file,
-            file_scope_id,
-            unsafe { node.to_kind(self.module.clone()) },
-            countme::Count::default(),
-        );
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
 
         self.scope_ids_by_scope.push(scope_id);
         self.scopes_by_node.insert(node.node_key(), file_scope_id);
@@ -203,10 +199,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_symbol_table().mark_symbol_used(id);
     }
 
-    fn add_definition<'a>(
+    fn add_definition(
         &mut self,
         symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'a>>,
+        definition_node: impl Into<DefinitionNodeRef<'db>>,
     ) -> Definition<'db> {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
@@ -285,8 +281,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         debug_assert!(popped_assignment.is_some());
     }
 
-    fn current_assignment(&self) -> Option<&CurrentAssignment<'db>> {
-        self.current_assignments.last()
+    fn current_assignment(&self) -> Option<CurrentAssignment<'db>> {
+        self.current_assignments.last().copied()
+    }
+
+    fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'db>> {
+        self.current_assignments.last_mut()
     }
 
     fn add_pattern_constraint(
@@ -373,6 +373,11 @@ impl<'db> SemanticIndexBuilder<'db> {
                 if let Some(default) = default {
                     self.visit_expr(default);
                 }
+                match type_param {
+                    ast::TypeParam::TypeVar(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::ParamSpec(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::TypeVarTuple(node) => self.add_definition(symbol, node),
+                };
             }
         }
 
@@ -445,7 +450,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
     }
 
-    fn declare_parameter(&mut self, parameter: AnyParameterRef) {
+    fn declare_parameter(&mut self, parameter: AnyParameterRef<'db>) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
@@ -619,24 +624,48 @@ where
             }
             ast::Stmt::Assign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
+
                 self.visit_expr(&node.value);
-                self.add_standalone_expression(&node.value);
-                for (target_index, target) in node.targets.iter().enumerate() {
-                    let kind = match target {
-                        ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(AssignmentKind::Sequence),
-                        ast::Expr::Name(_) => Some(AssignmentKind::Name),
+                let value = self.add_standalone_expression(&node.value);
+
+                for target in &node.targets {
+                    // We only handle assignments to names and unpackings here, other targets like
+                    // attribute and subscript are handled separately as they don't create a new
+                    // definition.
+                    let current_assignment = match target {
+                        ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                            Some(CurrentAssignment::Assign {
+                                node,
+                                first: true,
+                                unpack: Some(Unpack::new(
+                                    self.db,
+                                    self.file,
+                                    self.current_scope(),
+                                    #[allow(unsafe_code)]
+                                    unsafe {
+                                        AstNodeRef::new(self.module.clone(), target)
+                                    },
+                                    value,
+                                    countme::Count::default(),
+                                )),
+                            })
+                        }
+                        ast::Expr::Name(_) => Some(CurrentAssignment::Assign {
+                            node,
+                            unpack: None,
+                            first: false,
+                        }),
                         _ => None,
                     };
-                    if let Some(kind) = kind {
-                        self.push_assignment(CurrentAssignment::Assign {
-                            assignment: node,
-                            target_index,
-                            kind,
-                        });
+
+                    if let Some(current_assignment) = current_assignment {
+                        self.push_assignment(current_assignment);
                     }
+
                     self.visit_expr(target);
-                    if kind.is_some() {
-                        // only need to pop in the case where we pushed something
+
+                    if current_assignment.is_some() {
+                        // Only need to pop in the case where we pushed something
                         self.pop_assignment();
                     }
                 }
@@ -647,9 +676,18 @@ where
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                 }
-                self.push_assignment(node.into());
-                self.visit_expr(&node.target);
-                self.pop_assignment();
+
+                // See https://docs.python.org/3/library/ast.html#ast.AnnAssign
+                if matches!(
+                    *node.target,
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
+                ) {
+                    self.push_assignment(node.into());
+                    self.visit_expr(&node.target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(&node.target);
+                }
             }
             ast::Stmt::AugAssign(
                 aug_assign @ ast::StmtAugAssign {
@@ -661,9 +699,18 @@ where
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(value);
-                self.push_assignment(aug_assign.into());
-                self.visit_expr(target);
-                self.pop_assignment();
+
+                // See https://docs.python.org/3/library/ast.html#ast.AugAssign
+                if matches!(
+                    **target,
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
+                ) {
+                    self.push_assignment(aug_assign.into());
+                    self.visit_expr(target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(target);
+                }
             }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
@@ -970,19 +1017,19 @@ where
                 }
 
                 if is_definition {
-                    match self.current_assignment().copied() {
+                    match self.current_assignment() {
                         Some(CurrentAssignment::Assign {
-                            assignment,
-                            target_index,
-                            kind,
+                            node,
+                            first,
+                            unpack,
                         }) => {
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
-                                    assignment,
-                                    target_index,
+                                    unpack,
+                                    value: &node.value,
                                     name: name_node,
-                                    kind,
+                                    first,
                                 },
                             );
                         }
@@ -1033,14 +1080,25 @@ where
                     }
                 }
 
+                if let Some(CurrentAssignment::Assign { first, .. }) = self.current_assignment_mut()
+                {
+                    *first = false;
+                }
+
                 walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
-                self.push_assignment(node.into());
-                self.visit_expr(&node.target);
-                self.pop_assignment();
+
+                // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
+                if node.target.is_name_expr() {
+                    self.push_assignment(node.into());
+                    self.visit_expr(&node.target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(&node.target);
+                }
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
@@ -1073,10 +1131,13 @@ where
                 // AST inspection, so we can't simplify here, need to record test expression for
                 // later checking)
                 self.visit_expr(test);
+                let constraint = self.record_expression_constraint(test);
                 let pre_if = self.flow_snapshot();
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
+
+                self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
             }
@@ -1229,9 +1290,9 @@ where
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CurrentAssignment<'a> {
     Assign {
-        assignment: &'a ast::StmtAssign,
-        target_index: usize,
-        kind: AssignmentKind,
+        node: &'a ast::StmtAssign,
+        first: bool,
+        unpack: Option<Unpack<'a>>,
     },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),

@@ -60,9 +60,8 @@ pub struct UnnecessaryReturnNone;
 impl AlwaysFixableViolation for UnnecessaryReturnNone {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Do not explicitly `return None` in function if it is the only possible return value"
-        )
+        "Do not explicitly `return None` in function if it is the only possible return value"
+            .to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -102,7 +101,7 @@ pub struct ImplicitReturnValue;
 impl AlwaysFixableViolation for ImplicitReturnValue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not implicitly `return None` in function able to return non-`None` value")
+        "Do not implicitly `return None` in function able to return non-`None` value".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -140,7 +139,8 @@ pub struct ImplicitReturn;
 impl AlwaysFixableViolation for ImplicitReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing explicit `return` at the end of function able to return non-`None` value")
+        "Missing explicit `return` at the end of function able to return non-`None` value"
+            .to_string()
     }
 
     fn fix_title(&self) -> String {
