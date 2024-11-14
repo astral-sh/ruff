@@ -49,7 +49,8 @@ use crate::checkers::ast::Checker;
 /// or assign the literal to a variable as in the first example.
 ///
 /// ## Fix safety
-/// The fix for this rule is marked as unsafe when the `Literal` contains comments.
+/// The fix for this rule is marked as unsafe when the `Literal` slice is split
+/// across multiple lines and some of the lines have trailing comments.
 ///
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
