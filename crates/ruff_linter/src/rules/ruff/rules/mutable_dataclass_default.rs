@@ -2,13 +2,11 @@ use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
+use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation};
 
 /// ## What it does
 /// Checks for mutable default values in dataclass attributes.
@@ -70,9 +68,13 @@ impl Violation for MutableDataclassDefault {
 pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    if !is_dataclass(class_def, semantic) && !is_attrs_dataclass(class_def, semantic) {
+    let Some(dataclass_kind) = dataclass_kind(class_def, semantic) else {
         return;
     };
+
+    if dataclass_kind.is_attrs() && checker.settings.preview.is_disabled() {
+        return;
+    }
 
     for statement in &class_def.body {
         let Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -93,20 +95,4 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::
             checker.diagnostics.push(diagnostic);
         }
     }
-}
-
-/// Whether the class is decorated by any dataclass transformers from `attrs`.
-pub(crate) fn is_attrs_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    class_def.decorator_list.iter().any(|decorator| {
-        let Some(qualified_name) =
-            semantic.resolve_qualified_name(map_callable(&decorator.expression))
-        else {
-            return false;
-        };
-
-        matches!(
-            qualified_name.segments(),
-            ["attrs", "define" | "frozen"] | ["attr", "s"]
-        )
-    })
 }
