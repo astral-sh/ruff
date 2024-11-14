@@ -1287,6 +1287,7 @@ impl<'a> SemanticModel<'a> {
             "trio" => self.seen.insert(Modules::TRIO),
             "typing" => self.seen.insert(Modules::TYPING),
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
+            "attr" | "attrs" => self.seen.insert(Modules::ATTRS),
             _ => {}
         }
     }
@@ -1856,6 +1857,7 @@ bitflags! {
         const COPY = 1 << 22;
         const MARKUPSAFE = 1 << 23;
         const FLASK = 1 << 24;
+        const ATTRS = 1 << 25;
     }
 }
 

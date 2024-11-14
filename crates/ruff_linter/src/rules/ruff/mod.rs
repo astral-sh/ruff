@@ -388,6 +388,11 @@ mod tests {
 
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035.py"))]
+    #[test_case(
+        Rule::FunctionCallInDataclassDefaultArgument,
+        Path::new("RUF009_attrs.py")
+    )]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

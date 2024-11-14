@@ -40,5 +40,3 @@ RUF009.py:45:34: RUF009 Do not perform function call `ImmutableType` in dataclas
 46 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
 47 |     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
    |
-
-

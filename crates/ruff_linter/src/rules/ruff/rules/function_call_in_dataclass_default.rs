@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
-    is_class_var_annotation, is_dataclass, is_dataclass_field, is_descriptor_class,
+    dataclass_kind, is_class_var_annotation, is_dataclass_field, is_descriptor_class,
 };
 
 /// ## What it does
@@ -74,7 +74,13 @@ pub(crate) fn function_call_in_dataclass_default(
     checker: &mut Checker,
     class_def: &ast::StmtClassDef,
 ) {
-    if !is_dataclass(class_def, checker.semantic()) {
+    let semantic = checker.semantic();
+
+    let Some(dataclass_kind) = dataclass_kind(class_def, semantic) else {
+        return;
+    };
+
+    if dataclass_kind.is_attrs() && checker.settings.preview.is_disabled() {
         return;
     }
 
@@ -87,26 +93,31 @@ pub(crate) fn function_call_in_dataclass_default(
         .collect();
 
     for statement in &class_def.body {
-        if let Stmt::AnnAssign(ast::StmtAnnAssign {
+        let Stmt::AnnAssign(ast::StmtAnnAssign {
             annotation,
             value: Some(expr),
             ..
         }) = statement
+        else {
+            continue;
+        };
+        let Expr::Call(ast::ExprCall { func, .. }) = &**expr else {
+            continue;
+        };
+
+        if is_class_var_annotation(annotation, checker.semantic())
+            || is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
+            || is_dataclass_field(func, checker.semantic(), dataclass_kind)
+            || is_descriptor_class(func, checker.semantic())
         {
-            if let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() {
-                if !is_class_var_annotation(annotation, checker.semantic())
-                    && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
-                    && !is_dataclass_field(func, checker.semantic())
-                    && !is_descriptor_class(func, checker.semantic())
-                {
-                    checker.diagnostics.push(Diagnostic::new(
-                        FunctionCallInDataclassDefaultArgument {
-                            name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
-                        },
-                        expr.range(),
-                    ));
-                }
-            }
+            continue;
         }
+
+        let kind = FunctionCallInDataclassDefaultArgument {
+            name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
+        };
+        let diagnostic = Diagnostic::new(kind, expr.range());
+
+        checker.diagnostics.push(diagnostic);
     }
 }
