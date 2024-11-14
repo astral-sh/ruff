@@ -2099,7 +2099,7 @@ pub struct IsortOptions {
     /// Use `-1` for automatic determination.
     ///
     /// Ruff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to
-    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).
+    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#blank-lines)).
     ///
     /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
     /// it enforces at least one empty and at most two empty lines after imports.
