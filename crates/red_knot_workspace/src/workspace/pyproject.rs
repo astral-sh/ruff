@@ -89,15 +89,6 @@ impl Workspace {
         path: &SystemPath,
         workspace_root: &SystemPath,
     ) -> Result<bool, WorkspaceDiscoveryError> {
-        // If there's an explicit include, then that wins.
-        if self
-            .members()
-            .iter()
-            .any(|member| workspace_root.join(member).starts_with(path))
-        {
-            return Ok(false);
-        }
-
         for exclude in self.exclude() {
             let full_glob =
                 glob::Pattern::new(workspace_root.join(exclude).as_str()).map_err(|error| {

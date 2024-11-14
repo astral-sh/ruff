@@ -38,8 +38,6 @@ red_knot_python_semantic = { workspace = true, features = ["serde"] }
 ruff_db = { workspace = true, features = ["testing"] }
 glob = { workspace = true }
 insta = { workspace = true, features = ["redactions", "ron"] }
-regex = { workspace = true }
-tempfile = { workspace = true }
 
 [features]
 default = ["zstd"]
