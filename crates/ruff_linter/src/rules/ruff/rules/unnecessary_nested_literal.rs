@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprContext, ExprSubscript, ExprTuple};
+use ruff_python_ast::{AnyNodeRef, Expr, ExprContext, ExprSubscript, ExprTuple};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -10,6 +10,8 @@ use crate::checkers::ast::Checker;
 /// Checks for unnecessary nested `Literal`.
 ///
 /// ## Why is this bad?
+/// Prefer using a single `Literal`, which is equivalent and more concise.
+///
 /// Parameterization of literals by other literals is supported as an ergonomic
 /// feature as proposed in [PEP 586], to enable patterns such as:
 /// ```python
@@ -79,7 +81,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &mut Checker, literal_expr
 
     let mut check_for_duplicate_members = |expr: &'a Expr, parent: &'a Expr| {
         // If the parent is not equal to the `literal_expr` then we know we are traversing recursively.
-        if parent != literal_expr {
+        if !AnyNodeRef::ptr_eq(parent.into(), literal_expr.into()) {
             is_nested = true;
         };
         nodes.push(expr);
