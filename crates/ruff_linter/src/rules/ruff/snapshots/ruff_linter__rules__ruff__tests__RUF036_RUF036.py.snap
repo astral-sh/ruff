@@ -1,0 +1,58 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF036.py:4:16: RUF036 `None` not at the end of the type annotation.
+  |
+4 | def func1(arg: None | int): 
+  |                ^^^^ RUF036
+5 |     ...
+  |
+
+RUF036.py:8:16: RUF036 `None` not at the end of the type annotation.
+  |
+8 | def func2() -> None | int: 
+  |                ^^^^ RUF036
+9 |     ...
+  |
+
+RUF036.py:12:16: RUF036 `None` not at the end of the type annotation.
+   |
+12 | def func3(arg: None | None | int): 
+   |                ^^^^ RUF036
+13 |     ...
+   |
+
+RUF036.py:12:23: RUF036 `None` not at the end of the type annotation.
+   |
+12 | def func3(arg: None | None | int): 
+   |                       ^^^^ RUF036
+13 |     ...
+   |
+
+RUF036.py:16:18: RUF036 `None` not at the end of the type annotation.
+   |
+16 | def func4(arg: U[None, int]): 
+   |                  ^^^^ RUF036
+17 |     ...
+   |
+
+RUF036.py:20:18: RUF036 `None` not at the end of the type annotation.
+   |
+20 | def func5() -> U[None, int]: 
+   |                  ^^^^ RUF036
+21 |     ...
+   |
+
+RUF036.py:24:18: RUF036 `None` not at the end of the type annotation.
+   |
+24 | def func6(arg: U[None, None, int]): 
+   |                  ^^^^ RUF036
+25 |     ...
+   |
+
+RUF036.py:24:24: RUF036 `None` not at the end of the type annotation.
+   |
+24 | def func6(arg: U[None, None, int]): 
+   |                        ^^^^ RUF036
+25 |     ...
+   |
