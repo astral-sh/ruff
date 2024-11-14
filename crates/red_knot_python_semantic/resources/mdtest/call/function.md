@@ -19,6 +19,15 @@ async def get_int_async() -> int:
 reveal_type(get_int_async())  # revealed: @Todo
 ```
 
+## Generic
+
+```py
+def get_int[T]() -> int:
+    return 42
+
+reveal_type(get_int())  # revealed: int
+```
+
 ## Decorated
 
 ```py
