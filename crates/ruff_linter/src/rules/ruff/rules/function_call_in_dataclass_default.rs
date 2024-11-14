@@ -127,6 +127,6 @@ fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
 
     matches!(
         qualified_name.segments(),
-        ["attrs", "field"] | ["attr", "ib"]
+        ["attrs", "field" | "Factory"] | ["attr", "ib"]
     )
 }

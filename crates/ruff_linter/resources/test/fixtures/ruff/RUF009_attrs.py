@@ -1,12 +1,13 @@
 import datetime
 import re
 import typing
+from collections import OrderedDict
 from fractions import Fraction
 from pathlib import Path
 from typing import ClassVar, NamedTuple
 
 import attr
-from attrs import define, field, frozen
+from attrs import Factory, define, field, frozen
 
 
 def default_function() -> list[int]:
@@ -49,6 +50,7 @@ class B:
     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
 
     fine_dataclass_function: list[int] = field(default_factory=list)
+    attrs_factory: dict[str, str] = Factory(OrderedDict)
 
 
 class IntConversionDescriptor:
