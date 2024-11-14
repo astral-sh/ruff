@@ -57,7 +57,7 @@ pub(crate) fn parse_string_annotation(
             }
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the
-            // case for annotations that contain escaped quotes.
+            // case for annotations that contain escape sequences.
             diagnostics.add(
                 string_expr.into(),
                 "annotation-escape-character",

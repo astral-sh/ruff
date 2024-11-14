@@ -330,7 +330,16 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// The type inference results
     types: TypeInference<'db>,
 
-    deferred_state: DeferredState,
+    /// The deferred state of inferring types of certain expressions within the region.
+    ///
+    /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
+    /// while this is relevant for specific expressions within the region itself and is updated
+    /// during the inference process.
+    ///
+    /// For example, when inferring the types of an annotated assignment, the type of an annotation
+    /// expression could be deferred if the file has `from __future__ import annotations` import or
+    /// is a stub file but we're still in a non-deferred region.
+    deferred_state: DeferredExpressionState,
 
     diagnostics: TypeCheckDiagnosticsBuilder<'db>,
 }
@@ -361,7 +370,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             region,
             file,
-            deferred_state: DeferredState::None,
+            deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
             diagnostics: TypeCheckDiagnosticsBuilder::new(db, file),
         }
@@ -443,15 +452,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        if !self.types.deferred.is_empty() {
-            let mut deferred_inference = Vec::with_capacity(self.types.deferred.len());
-            for definition in &self.types.deferred {
-                deferred_inference.push(infer_deferred_types(self.db, *definition));
-            }
-            for deferred in deferred_inference {
-                self.extend(deferred);
-            }
+        // Infer the deferred types for the definitions here to consider the end-of-scope
+        // semantics.
+        for definition in std::mem::take(&mut self.types.deferred) {
+            self.extend(infer_deferred_types(self.db, definition));
         }
+        assert!(
+            self.types.deferred.is_empty(),
+            "Inferring deferred types should not add more deferred definitions"
+        );
 
         // TODO: Only call this function when diagnostics are enabled.
         self.check_class_definitions();
@@ -672,6 +681,15 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_deferred(&mut self, definition: Definition<'db>) {
+        // N.B. We don't defer the types for an annotated assignment here because it is done in
+        // the same definition query. It utilizes the deferred expression state instead.
+        //
+        // This is because for partially stringified annotations like `a: tuple[int, "ForwardRef"]`,
+        // we need to defer the types of non-stringified expressions like `tuple` and `int` in the
+        // definition query while the stringified expression `"ForwardRef"` would need to deferred
+        // to use end-of-scope semantics. This would require custom and possibly a complex
+        // implementation to allow this "split" to happen.
+
         match definition.kind(self.db) {
             DefinitionKind::Function(function) => self.infer_function_deferred(function.node()),
             DefinitionKind::Class(class) => self.infer_class_deferred(class.node()),
@@ -916,7 +934,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             if self.are_all_types_deferred() {
                 self.types.deferred.insert(definition);
             } else {
-                self.infer_optional_annotation_expression(returns.as_deref(), DeferredState::None);
+                self.infer_optional_annotation_expression(
+                    returns.as_deref(),
+                    DeferredExpressionState::None,
+                );
                 self.infer_parameters(parameters);
             }
         }
@@ -1066,7 +1087,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
         self.infer_optional_annotation_expression(
             function.returns.as_deref(),
-            DeferredState::Deferred,
+            DeferredExpressionState::Deferred,
         );
         self.infer_parameters(function.parameters.as_ref());
     }
@@ -1609,7 +1630,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 target,
                 simple: _,
             } = assignment;
-            self.infer_annotation_expression(annotation, DeferredState::None);
+            self.infer_annotation_expression(annotation, DeferredExpressionState::None);
             self.infer_optional_expression(value.as_deref());
             self.infer_expression(target);
         }
@@ -1625,19 +1646,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             range: _,
             target,
             annotation,
-            value: _,
+            value,
             simple: _,
         } = assignment;
 
         let mut annotation_ty = self.infer_annotation_expression(
             annotation,
-            DeferredState::from(self.are_all_types_deferred()),
+            DeferredExpressionState::from(self.are_all_types_deferred()),
         );
 
         // Handle various singletons.
         if let Type::Instance(InstanceType { class }) = annotation_ty {
             if class.is_known(self.db, KnownClass::SpecialForm) {
-                if let Some(name_expr) = assignment.target.as_name_expr() {
+                if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = file_to_module(self.db, self.file)
                         .as_ref()
                         .and_then(|module| {
@@ -1650,7 +1671,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        if let Some(value) = assignment.value.as_deref() {
+        if let Some(value) = value.as_deref() {
             let value_ty = self.infer_expression(value);
             self.add_declaration_with_binding(
                 assignment.into(),
@@ -4082,10 +4103,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_annotation_expression(
         &mut self,
         annotation: &ast::Expr,
-        deferred_state: DeferredState,
+        deferred_state: DeferredExpressionState,
     ) -> Type<'db> {
-        let previous_deferred_state = self.deferred_state;
-        self.deferred_state = deferred_state;
+        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
         let annotation_ty = self.infer_annotation_expression_impl(annotation);
         self.deferred_state = previous_deferred_state;
         annotation_ty
@@ -4098,7 +4118,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_optional_annotation_expression(
         &mut self,
         annotation: Option<&ast::Expr>,
-        deferred_state: DeferredState,
+        deferred_state: DeferredExpressionState,
     ) -> Option<Type<'db>> {
         annotation.map(|expr| self.infer_annotation_expression(expr, deferred_state))
     }
@@ -4148,7 +4168,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         match parse_string_annotation(self.db, self.file, string) {
             Ok(parsed) => {
                 // String annotations are always evaluated in the deferred context.
-                self.infer_annotation_expression(parsed.expr(), DeferredState::InStringAnnotation)
+                self.infer_annotation_expression(
+                    parsed.expr(),
+                    DeferredExpressionState::InStringAnnotation,
+                )
             }
             Err(diagnostics) => {
                 self.diagnostics.extend(&diagnostics);
@@ -4184,10 +4207,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_type_expression_with_state(
         &mut self,
         expression: &ast::Expr,
-        deferred_state: DeferredState,
+        deferred_state: DeferredExpressionState,
     ) -> Type<'db> {
-        let previous_deferred_state = self.deferred_state;
-        self.deferred_state = deferred_state;
+        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
         let annotation_ty = self.infer_type_expression(expression);
         self.deferred_state = previous_deferred_state;
         annotation_ty
@@ -4368,7 +4390,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // String annotations are always evaluated in the deferred context.
                 self.infer_type_expression_with_state(
                     parsed.expr(),
-                    DeferredState::InStringAnnotation,
+                    DeferredExpressionState::InStringAnnotation,
                 )
             }
             Err(diagnostics) => {
@@ -4563,33 +4585,62 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 }
 
+/// The deferred state of a specific expression in an inference region.
 #[derive(Default, Debug, Clone, Copy)]
-enum DeferredState {
+enum DeferredExpressionState {
+    /// The expression is not deferred.
     #[default]
     None,
+
+    /// The expression is deferred.
+    ///
+    /// In the following example,
+    /// ```py
+    /// from __future__ import annotation
+    ///
+    /// a: tuple[int, "ForwardRef"] = ...
+    /// ```
+    ///
+    /// The expression `tuple` and `int` are deferred but `ForwardRef` (after parsing) is both
+    /// deferred and in a string annotation context.
     Deferred,
+
+    /// The expression is in a string annotation context.
+    ///
+    /// This is required to differentiate between a deferred annotation and a string annotation.
+    /// The former can occur when there's a `from __future__ import annotations` statement or we're
+    /// in a stub file.
+    ///
+    /// In the following example,
+    /// ```py
+    /// a: "List[int]" = ...
+    /// b: tuple[int, "ForwardRef"] = ...
+    /// ```
+    ///
+    /// The annotation of `a` is completely inside a string while for `b`, it's only partially
+    /// stringified.
     InStringAnnotation,
 }
 
-impl DeferredState {
+impl DeferredExpressionState {
     const fn is_deferred(self) -> bool {
         matches!(
             self,
-            DeferredState::Deferred | DeferredState::InStringAnnotation
+            DeferredExpressionState::Deferred | DeferredExpressionState::InStringAnnotation
         )
     }
 
     const fn in_string_annotation(self) -> bool {
-        matches!(self, DeferredState::InStringAnnotation)
+        matches!(self, DeferredExpressionState::InStringAnnotation)
     }
 }
 
-impl From<bool> for DeferredState {
+impl From<bool> for DeferredExpressionState {
     fn from(value: bool) -> Self {
         if value {
-            DeferredState::Deferred
+            DeferredExpressionState::Deferred
         } else {
-            DeferredState::None
+            DeferredExpressionState::None
         }
     }
 }
