@@ -1273,11 +1273,11 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_type) => {
                 if function_type.is_known(db, KnownFunction::RevealType) {
                     CallOutcome::revealed(
-                        function_type.external_signature(db).return_ty,
+                        function_type.signature(db).return_ty,
                         *arg_types.first().unwrap_or(&Type::Unknown),
                     )
                 } else {
-                    CallOutcome::callable(function_type.external_signature(db).return_ty)
+                    CallOutcome::callable(function_type.signature(db).return_ty)
                 }
             }
 
@@ -2344,7 +2344,8 @@ impl<'db> FunctionType<'db> {
 
     /// Typed externally-visible signature for this function.
     ///
-    /// This is the signature as seen by external callers, possibly modified by decorators.
+    /// This is the signature as seen by external callers, possibly modified by decorators and/or
+    /// overloaded.
     ///
     /// ## Why is this a salsa query?
     ///
@@ -2354,7 +2355,7 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
-    pub fn external_signature(self, db: &'db dyn Db) -> Signature<'db> {
+    pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let function_stmt_node = self.body_scope(db).node(db).expect_function();
         let internal_signature = self.internal_signature(db);
         if function_stmt_node.decorator_list.is_empty() {
@@ -2366,9 +2367,10 @@ impl<'db> FunctionType<'db> {
 
     /// Typed internally-visible signature for this function.
     ///
-    /// This represents the annotations on the function itself, unmodified by decorators.
+    /// This represents the annotations on the function itself, unmodified by decorators and
+    /// overloads.
     ///
-    /// These are the argument and return types that should be used for type checking the body of
+    /// These are the parameter and return types that should be used for type checking the body of
     /// the function.
     ///
     /// Don't call this when checking any other file; only when type-checking the function body

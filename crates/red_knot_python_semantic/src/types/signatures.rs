@@ -57,7 +57,7 @@ impl<'db> Signature<'db> {
 /// The ordering of parameters is always as given in this struct: first positional-only parameters,
 /// then positional-or-keyword, then optionally the variadic parameter, then keyword-only
 /// parameters, and last, optionally the variadic keywords parameter.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct Parameters<'db> {
     /// Parameters which may only be filled by positional arguments.
     positional_only: Box<[ParameterWithDefault<'db>]>,
@@ -79,17 +79,15 @@ impl<'db> Parameters<'db> {
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     fn todo() -> Self {
         Self {
-            positional_only: Box::default(),
-            positional_or_keyword: Box::default(),
             variadic: Some(Parameter {
                 name: Name::new_static("args"),
                 annotated_ty: Type::Todo,
             }),
-            keyword_only: Box::default(),
             keywords: Some(Parameter {
                 name: Name::new_static("kwargs"),
                 annotated_ty: Type::Todo,
             }),
+            ..Default::default()
         }
     }
 
@@ -98,27 +96,30 @@ impl<'db> Parameters<'db> {
         definition: Definition<'db>,
         parameters: &'db ast::Parameters,
     ) -> Self {
-        let positional_only = parameters
-            .posonlyargs
+        let ast::Parameters {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+            range: _,
+        } = parameters;
+        let positional_only = posonlyargs
             .iter()
             .map(|arg| ParameterWithDefault::from_node(db, definition, arg))
             .collect();
-        let positional_or_keyword = parameters
-            .args
+        let positional_or_keyword = args
             .iter()
             .map(|arg| ParameterWithDefault::from_node(db, definition, arg))
             .collect();
-        let variadic = parameters
-            .vararg
+        let variadic = vararg
             .as_ref()
             .map(|arg| Parameter::from_node(db, definition, arg));
-        let keyword_only = parameters
-            .kwonlyargs
+        let keyword_only = kwonlyargs
             .iter()
             .map(|arg| ParameterWithDefault::from_node(db, definition, arg))
             .collect();
-        let keywords = parameters
-            .kwarg
+        let keywords = kwarg
             .as_ref()
             .map(|arg| Parameter::from_node(db, definition, arg));
         Self {
@@ -454,7 +455,7 @@ mod tests {
         let expected_sig = func.internal_signature(&db);
 
         // With no decorators, internal and external signature are the same
-        assert_eq!(func.external_signature(&db), &expected_sig);
+        assert_eq!(func.signature(&db), &expected_sig);
     }
 
     #[test]
@@ -475,6 +476,6 @@ mod tests {
         let expected_sig = Signature::todo();
 
         // With no decorators, internal and external signature are the same
-        assert_eq!(func.external_signature(&db), &expected_sig);
+        assert_eq!(func.signature(&db), &expected_sig);
     }
 }
