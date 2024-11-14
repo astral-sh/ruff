@@ -50,7 +50,6 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
     "error[conflicting-declarations] /src/tomllib/_parser.py:590:9 Conflicting declared types for `char`: Unknown, str | None",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
-    "error[invalid-base] /src/tomllib/_parser.py:692:8354 Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
 ];
 
 fn get_test_file(name: &str) -> TestFile {
