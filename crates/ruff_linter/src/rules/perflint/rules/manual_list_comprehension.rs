@@ -249,6 +249,19 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         }
     };
 
+    // If the binding gets used in between the assignment and the for loop, a list comprehension is no longer safe
+    let binding_unused_between = binding_stmt.is_some_and(|binding_stmt| {
+        let from_assign_to_loop = binding_stmt.range.cover(for_stmt.range);
+        // count the number of references between the assignment and the for loop
+        let count = binding
+            .references()
+            .map(|ref_id| checker.semantic().reference(ref_id).range())
+            .filter(|text_range| from_assign_to_loop.contains_range(*text_range))
+            .count();
+        // if there's more than one, then it's been accessed in the middle somewhere, so it's not safe to change into a list comprehension
+        count < 2
+    });
+    
     // If the binding has multiple statements on its line, it gets more complicated to fix, so we use an extend
     // TODO: make this work
     let binding_only_stmt_on_line = binding_stmt.is_some_and(|_binding_stmt| true);
@@ -258,6 +271,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         && assignment_in_same_statement
         && binding_has_one_target
         && binding_only_stmt_on_line
+        && binding_unused_between
     {
         ComprehensionType::ListComprehension
     } else {

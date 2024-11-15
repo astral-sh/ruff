@@ -149,3 +149,10 @@ def f():
     result = [] # comment should be protected
     for i in range(10):
         result.append(i*2) # PERF401
+
+
+def f():
+    result = []
+    result.append(1)
+    for i in range(10):
+        result.append(i*2) # PERF401

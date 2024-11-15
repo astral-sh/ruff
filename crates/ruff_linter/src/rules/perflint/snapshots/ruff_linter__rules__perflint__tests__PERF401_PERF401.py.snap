@@ -114,3 +114,12 @@ PERF401.py:151:9: PERF401 Use a list comprehension to create a transformed list
     |         ^^^^^^^^^^^^^^^^^^ PERF401
     |
     = help: Replace for loop with list comprehension
+
+PERF401.py:158:9: PERF401 Use `list.extend` to create a transformed list
+    |
+156 |     result.append(1)
+157 |     for i in range(10):
+158 |         result.append(i*2) # PERF401
+    |         ^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
