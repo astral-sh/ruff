@@ -58,7 +58,12 @@ fn corpus_no_panic() -> anyhow::Result<()> {
         let (py_expected_to_fail, pyi_expected_to_fail) = KNOWN_FAILURES
             .iter()
             .find_map(|(path, py_fail, pyi_fail)| {
-                if Some(*path) == relative_path.to_str() {
+                if Some(*path)
+                    == relative_path
+                        .to_str()
+                        .map(|p| p.replace('\\', "/"))
+                        .as_deref()
+                {
                     Some((*py_fail, *pyi_fail))
                 } else {
                     None
@@ -88,6 +93,7 @@ fn corpus_no_panic() -> anyhow::Result<()> {
             };
             if let Err(err) = result {
                 if !expected_to_fail {
+                    println!("Check failed for {relative_path:?}. Consider fixing it or adding it to KNOWN_FAILURES");
                     std::panic::resume_unwind(err);
                 }
             } else {
