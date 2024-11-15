@@ -380,6 +380,10 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
 
         // Merge in the editor-specified configuration file, if it exists.
         let editor_configuration = if let Some(config_file_path) = configuration {
+            tracing::debug!(
+                "Combining settings from editor-specified configuration file at: {}",
+                config_file_path.display()
+            );
             match open_configuration_file(&config_file_path) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
                 Err(err) => {
@@ -406,7 +410,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
 fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
     ruff_workspace::resolver::resolve_configuration(
         config_path,
-        Relativity::Parent,
+        Relativity::Cwd,
         &IdentityTransformer,
     )
 }
