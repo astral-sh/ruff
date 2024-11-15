@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use red_knot_python_semantic::{HasTy, SemanticModel};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
@@ -15,8 +13,8 @@ fn setup_db(workspace_root: &SystemPath, system: TestSystem) -> anyhow::Result<R
     RootDatabase::new(workspace, system)
 }
 
-fn get_workspace_root() -> anyhow::Result<PathBuf> {
-    Ok(PathBuf::from(String::from_utf8(
+fn get_workspace_root() -> anyhow::Result<SystemPathBuf> {
+    Ok(SystemPathBuf::from(String::from_utf8(
         std::process::Command::new("cargo")
             .args(["locate-project", "--workspace", "--message-format", "plain"])
             .output()?
@@ -41,7 +39,7 @@ fn corpus_no_panic() -> anyhow::Result<()> {
 
     let crate_root = String::from(env!("CARGO_MANIFEST_DIR"));
     let workspace_root = get_workspace_root()?;
-    let workspace_root = workspace_root.to_str().unwrap();
+    let workspace_root = workspace_root.to_string();
 
     let corpus = vec![
         format!("{crate_root}/resources/test/corpus/**/*.py"),
@@ -55,7 +53,7 @@ fn corpus_no_panic() -> anyhow::Result<()> {
 
     for path in corpus {
         let path = path?;
-        let relative_path = path.strip_prefix(workspace_root)?;
+        let relative_path = path.strip_prefix(&workspace_root)?;
 
         let (py_expected_to_fail, pyi_expected_to_fail) = KNOWN_FAILURES
             .iter()
