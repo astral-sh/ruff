@@ -839,7 +839,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_deref()
             .expect("function type params scope without type params");
 
-        self.infer_optional_annotation_expression(function.returns.as_deref());
+        self.infer_optional_annotation_expression(
+            function.returns.as_deref(),
+            DeferredExpressionState::None,
+        );
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
     }
@@ -988,7 +991,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             default: _,
         } = parameter_with_default;
 
-        self.infer_optional_annotation_expression(parameter.annotation.as_deref());
+        self.infer_optional_annotation_expression(
+            parameter.annotation.as_deref(),
+            DeferredExpressionState::None,
+        );
     }
 
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
@@ -998,7 +1004,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             annotation,
         } = parameter;
 
-        self.infer_optional_annotation_expression(annotation.as_deref());
+        self.infer_optional_annotation_expression(
+            annotation.as_deref(),
+            DeferredExpressionState::None,
+        );
     }
 
     fn infer_parameter_with_default_definition(
@@ -4099,7 +4108,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
 /// Annotation expressions.
 impl<'db> TypeInferenceBuilder<'db> {
-    /// Infer the type of an annotation expression with the given [`DeferredState`].
+    /// Infer the type of an annotation expression with the given [`DeferredExpressionState`].
     fn infer_annotation_expression(
         &mut self,
         annotation: &ast::Expr,
@@ -4201,7 +4210,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         expression.map(|expr| self.infer_type_expression(expr))
     }
 
-    /// Similar to [`infer_type_expression`], but accepts a [`DeferredState`].
+    /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
     ///
     /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
     fn infer_type_expression_with_state(
