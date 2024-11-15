@@ -27,7 +27,7 @@ WorkspaceMetadata(
       ),
       search_paths: SearchPathSettings(
         extra_paths: [],
-        workspace_root: "/app",
+        src_root: "/app",
         custom_typeshed: None,
         site_packages: Known([]),
       ),

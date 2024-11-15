@@ -90,7 +90,7 @@ impl WorkspaceMetadata {
                     pyproject,
                     ancestor.to_path_buf(),
                     base_configuration,
-                )?;
+                );
 
                 if let Some(workspace_table) = workspace_table {
                     let workspace_root = ancestor;
@@ -168,7 +168,7 @@ impl WorkspaceMetadata {
 
             // Create a package with a default configuration
             PackageMetadata {
-                name: path.file_name().unwrap_or("<virtual>").into(),
+                name: path.file_name().unwrap_or("root").into(),
                 root: path.to_path_buf(),
                 // TODO create the configuration from the pyproject toml
                 configuration: base_configuration.cloned().unwrap_or_default(),
@@ -206,14 +206,11 @@ impl PackageMetadata {
         pyproject: PyProject,
         root: SystemPathBuf,
         base_configuration: Option<&Configuration>,
-    ) -> Result<Self, WorkspaceDiscoveryError> {
-        let Some(project) = pyproject.project else {
-            return Err(WorkspaceDiscoveryError::MissingProjectTable { package_path: root });
-        };
-
-        let Some(name) = project.name.as_ref() else {
-            return Err(WorkspaceDiscoveryError::MissingPackageName { package_path: root });
-        };
+    ) -> Self {
+        let name = pyproject.project.and_then(|project| project.name);
+        let name = name
+            .map(|name| Name::new(&*name))
+            .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
 
         // TODO: load configuration from pyrpoject.toml
         let mut configuration = Configuration::default();
@@ -222,11 +219,11 @@ impl PackageMetadata {
             configuration.extend(base_configuration.clone());
         }
 
-        Ok(PackageMetadata {
-            name: Name::from(name.as_str()),
+        PackageMetadata {
+            name,
             root,
             configuration,
-        })
+        }
     }
 
     pub fn name(&self) -> &Name {
@@ -341,7 +338,7 @@ fn collect_packages(
             });
         }
 
-        let package = PackageMetadata::from_pyproject(pyproject, member_path, base_configuration)?;
+        let package = PackageMetadata::from_pyproject(pyproject, member_path, base_configuration);
 
         tracing::debug!(
             "Adding package '{}' at '{}'",
@@ -407,12 +404,6 @@ pub enum WorkspaceDiscoveryError {
         #[from]
         error: GlobError,
     },
-
-    #[error("the `[project]` is missing in the `pyproject.toml` for package '{package_path}'`")]
-    MissingProjectTable { package_path: SystemPathBuf },
-
-    #[error("the `project.name` is missing in the `pyproject.toml` for package '{package_path}'`")]
-    MissingPackageName { package_path: SystemPathBuf },
 }
 
 #[cfg(test)]
@@ -433,7 +424,7 @@ mod tests {
 
         system
             .memory_file_system()
-            .write_files([(root.join("src/foo.py"), ""), (root.join("src/bar.py"), "")])
+            .write_files([(root.join("foo.py"), ""), (root.join("bar.py"), "")])
             .context("Failed to write files")?;
 
         let workspace = WorkspaceMetadata::discover(&root, &system, None)
@@ -454,8 +445,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -463,6 +452,7 @@ mod tests {
                     name = "backend"
                     "#,
                 ),
+                (root.join("db/__init__.py"), ""),
             ])
             .context("Failed to write files")?;
 
@@ -473,7 +463,7 @@ mod tests {
         snapshot_workspace!(workspace);
 
         // Discovering the same package from a subdirectory should give the same result
-        let from_src = WorkspaceMetadata::discover(&root.join("src"), &system, None)
+        let from_src = WorkspaceMetadata::discover(&root.join("db"), &system, None)
             .context("Failed to discover workspace from src sub-directory")?;
 
         assert_eq!(from_src, workspace);
@@ -489,8 +479,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -543,8 +531,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -597,8 +583,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -643,8 +627,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -685,8 +667,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -721,8 +701,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -752,8 +730,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -783,8 +759,6 @@ mod tests {
         system
             .memory_file_system()
             .write_files([
-                (root.join("src/foo.py"), ""),
-                (root.join("src/bar.py"), ""),
                 (
                     root.join("pyproject.toml"),
                     r#"

@@ -74,12 +74,12 @@ impl SearchPathConfiguration {
             .unwrap_or(SitePackages::Known(vec![]));
 
         SearchPathSettings {
-            extra_paths: self.clone().extra_paths.unwrap_or_default(),
-            workspace_root: self
+            extra_paths: self.extra_paths.clone().unwrap_or_default(),
+            src_root: self
                 .clone()
                 .src_root
                 .unwrap_or_else(|| workspace_root.to_path_buf()),
-            custom_typeshed: self.clone().custom_typeshed,
+            custom_typeshed: self.custom_typeshed.clone(),
             site_packages,
         }
     }
