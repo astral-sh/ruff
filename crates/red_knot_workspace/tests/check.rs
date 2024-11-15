@@ -1,7 +1,7 @@
 use red_knot_python_semantic::{HasTy, SemanticModel};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_db::files::{system_path_to_file, File, Files};
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::visitor::source_order;
@@ -74,7 +74,7 @@ fn corpus_no_panic() -> anyhow::Result<()> {
         let mut check_with_file_name = |path: &SystemPath| {
             memory_fs.remove_all();
             memory_fs.write_file(path, &code).unwrap();
-            Files::sync_all(&mut db);
+            File::sync_path(&mut db, path);
 
             // this test is only asserting that we can pull every expression type without a panic
             // (and some non-expressions that clearly define a single type)
