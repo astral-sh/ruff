@@ -732,7 +732,20 @@ mod tests {
         let system = TestSystem::default();
         assert!(matches!(
             VirtualEnvironment::new("/.venv", &system),
-            Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(_))
+            Err(SitePackagesDiscoveryError::VenvDirCanonicalizationError(..))
+        ));
+    }
+
+    #[test]
+    fn reject_venv_that_is_not_a_directory() {
+        let system = TestSystem::default();
+        system
+            .memory_file_system()
+            .write_file("/.venv", "")
+            .unwrap();
+        assert!(matches!(
+            VirtualEnvironment::new("/.venv", &system),
+            Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(..))
         ));
     }
 

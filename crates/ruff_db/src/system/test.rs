@@ -1,14 +1,14 @@
+use glob::PatternError;
+use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_trivia::textwrap;
 use std::any::Any;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use ruff_notebook::{Notebook, NotebookError};
-use ruff_python_trivia::textwrap;
-
 use crate::files::File;
 use crate::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath,
 };
 use crate::Db;
 
@@ -121,6 +121,22 @@ impl System for TestSystem {
         }
     }
 
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        PatternError,
+    > {
+        match &self.inner {
+            TestSystemInner::Stub(fs) => {
+                let iterator = fs.glob(pattern)?;
+                Ok(Box::new(iterator))
+            }
+            TestSystemInner::System(system) => system.glob(pattern),
+        }
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -142,7 +158,7 @@ impl System for TestSystem {
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         match &self.inner {
             TestSystemInner::System(fs) => fs.canonicalize_path(path),
-            TestSystemInner::Stub(fs) => Ok(fs.canonicalize(path)),
+            TestSystemInner::Stub(fs) => fs.canonicalize(path),
         }
     }
 }

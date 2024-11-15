@@ -54,6 +54,7 @@ impl Program {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
     pub target_version: PythonVersion,
     pub search_paths: SearchPathSettings,
@@ -61,6 +62,7 @@ pub struct ProgramSettings {
 
 /// Configures the search paths for module resolution.
 #[derive(Eq, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -91,6 +93,7 @@ impl SearchPathSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum SitePackages {
     Derived {
         venv_path: SystemPathBuf,
