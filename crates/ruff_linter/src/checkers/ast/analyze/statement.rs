@@ -555,6 +555,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ClassWithMixedTypeVars) {
                 ruff::rules::class_with_mixed_type_vars(checker, class_def);
             }
+            if checker.enabled(Rule::ImplicitClassVarInDataclass) {
+                ruff::rules::implicit_class_var_in_dataclass(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {
