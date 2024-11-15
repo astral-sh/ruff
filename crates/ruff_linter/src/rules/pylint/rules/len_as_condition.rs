@@ -14,15 +14,19 @@ use ruff_text_size::Ranged;
 ///
 /// ## Why is this bad?
 /// Empty sequences are considered false in a boolean context.
-/// You can either remove the call to 'len' (``if not x``)
-/// or compare the length against a scalar (``if len(x) > 0``).
+/// You can either remove the call to 'len'
+/// or compare the length against a scalar.
 ///
 /// ## Example
 /// ```python
 /// fruits = ["orange", "apple"]
+/// vegetables = []
 ///
 /// if len(fruits):
 ///     print(fruits)
+///
+/// if not len(vegetables):
+///     print(vegetables)
 /// ```
 ///
 /// Use instead:
@@ -31,7 +35,13 @@ use ruff_text_size::Ranged;
 ///
 /// if fruits:
 ///     print(fruits)
+///
+/// if not vegetables:
+///     print(vegetables)
 /// ```
+///
+/// ## References
+/// [PEP 8: Programming Recommendations](https://peps.python.org/pep-0008/#programming-recommendations)
 #[violation]
 pub struct LenAsCondition {
     expression: SourceCodeSnippet,
@@ -41,9 +51,9 @@ impl AlwaysFixableViolation for LenAsCondition {
     #[derive_message_formats]
     fn message(&self) -> String {
         if let Some(expression) = self.expression.full_display() {
-            format!("`len({expression})` without comparison used as condition")
+            format!("`len({expression})` used as condition without comparison")
         } else {
-            "`len(SEQUENCE)` without comparison used as condition".to_string()
+            "`len(SEQUENCE)` used as condition without comparison".to_string()
         }
     }
 
