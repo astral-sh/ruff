@@ -56,13 +56,10 @@ pub(crate) fn unshielded_await_for_try(
         let types = flattened_tuple(t, checker.semantic());
 
         // TODO i challenge you to make it worse than this
-        if ! types
-            .iter()
-            .any(|tt| {
-                format!("{tt}").as_str() == format!("{exception}").as_str()
-                    || format!("{tt}").as_str() == format!("{asyncio_cancelled_error}").as_str()
-            })
-        {
+        if !types.iter().any(|tt| {
+            format!("{tt}").as_str() == format!("{exception}").as_str()
+                || format!("{tt}").as_str() == format!("{asyncio_cancelled_error}").as_str()
+        }) {
             continue;
         }
 
@@ -70,10 +67,9 @@ pub(crate) fn unshielded_await_for_try(
         let mut visitor = PrunedAwaitVisitor { seen_await: false };
         visitor.visit_body(&handler.body);
         if visitor.seen_await {
-            checker.diagnostics.push(Diagnostic::new(
-                UnshieldedAwait {},
-                handler.range,
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(UnshieldedAwait {}, handler.range));
         }
     }
 
