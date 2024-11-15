@@ -1,5 +1,6 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
+use crate::checkers::ast::Checker;
 use anyhow::{anyhow, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,8 +10,6 @@ use ruff_python_semantic::{analyze::typing::is_list, Binding};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a list comprehension.
@@ -250,13 +249,20 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         }
     };
 
+    // If the binding has multiple statements on its line, it gets more complicated to fix, so we use an extend
+    // TODO: make this work
+    let binding_only_stmt_on_line = binding_stmt.is_some_and(|_binding_stmt| true);
+
     // A list extend works in every context, while a list comprehension only works when all the criteria are true
-    let comprehension_type =
-        if binding_is_empty_list && assignment_in_same_statement && binding_has_one_target {
-            ComprehensionType::ListComprehension
-        } else {
-            ComprehensionType::Extend
-        };
+    let comprehension_type = if binding_is_empty_list
+        && assignment_in_same_statement
+        && binding_has_one_target
+        && binding_only_stmt_on_line
+    {
+        ComprehensionType::ListComprehension
+    } else {
+        ComprehensionType::Extend
+    };
 
     let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
@@ -318,7 +324,7 @@ fn convert_to_list_extend(
 
     let variable_name = locator.slice(binding);
     let for_loop_inline_comments: Vec<&str> = comment_strings_in_range(for_stmt.range);
-    
+
     let newline = checker.stylist().line_ending().as_str();
     let indent_range = TextRange::new(
         locator.line_start(for_stmt.range.start()),
@@ -364,7 +370,7 @@ fn convert_to_list_extend(
 
             let comprehension_body =
                 format!("{leading_comments}{variable_name} = [{generator_str}]");
-            // TODO: protect comment from after assignment statement
+
             let binding_stmt_range = locator.full_lines_range(binding_stmt.range);
 
             Ok(Fix::unsafe_edits(
