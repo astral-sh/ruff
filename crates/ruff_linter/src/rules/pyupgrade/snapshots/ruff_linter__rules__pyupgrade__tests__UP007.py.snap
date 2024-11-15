@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP007.py:6:10: UP007 [*] Use `X | Y` for type annotations
   |
@@ -430,5 +431,3 @@ UP007.py:120:10: UP007 [*] Use `X | Y` for type annotations
 120     |-def f(x: Union[int, str, bytes]) -> None:
     120 |+def f(x: int | str | bytes) -> None:
 121 121 |     ...
-
-

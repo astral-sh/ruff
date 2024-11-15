@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |

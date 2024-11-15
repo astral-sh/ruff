@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM105_1.py:5:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
   |
@@ -23,5 +24,3 @@ SIM105_1.py:5:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
 6 7 |     math.sqrt(-1)
 7   |-except ValueError:
 8   |-    pass
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+snapshot_kind: text
 ---
 RET504.py:6:12: RET504 [*] Unnecessary assignment to `a` before `return` statement
   |

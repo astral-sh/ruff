@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT011.py:18:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
    |

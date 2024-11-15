@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B015.ipynb:5:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
   |
@@ -30,5 +31,3 @@ B015.ipynb:13:1: B015 Pointless comparison. Did you mean to assign a value? Othe
 14 | # Comments, newlines and whitespace
 15 | x == 1 # comment
    |
-
-

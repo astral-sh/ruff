@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI064.pyi:3:1: PYI064 [*] `Final[Literal[True]]` can be replaced with a bare `Final`
   |

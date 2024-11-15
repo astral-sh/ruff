@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB152.py:3:5: FURB152 [*] Replace `3.14` with `math.pi`
   |
@@ -376,5 +377,3 @@ FURB152.py:45:5: FURB152 [*] Replace `2.7182000000000001` with `math.e`
 44 45 | 
 45    |-e = 2.7182000000000001  # FURB152
    46 |+e = math.e  # FURB152
-
-

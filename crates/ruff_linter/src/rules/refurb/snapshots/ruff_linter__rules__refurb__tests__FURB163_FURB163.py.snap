@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB163.py:4:1: FURB163 [*] Prefer `math.log2(1)` over `math.log` with a redundant base
   |

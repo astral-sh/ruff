@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/comments/shebang.rs
 expression: "ShebangDirective::try_extract(source)"
+snapshot_kind: text
 ---
 None

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/same_line_body.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -56,6 +57,3 @@ if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd:
         "more content to make it exceed the 88 chars limit",
     )
 ```
-
-
-

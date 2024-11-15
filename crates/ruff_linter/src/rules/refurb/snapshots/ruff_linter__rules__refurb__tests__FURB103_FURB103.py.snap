@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB103.py:12:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text("test")`
    |

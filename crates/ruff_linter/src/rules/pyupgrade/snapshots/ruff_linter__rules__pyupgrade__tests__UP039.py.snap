@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP039.py:2:8: UP039 [*] Unnecessary parentheses after class definition
   |
@@ -93,5 +94,3 @@ UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition
 22 22 |     pass
 23 23 | 
 24 24 | # OK
-
-

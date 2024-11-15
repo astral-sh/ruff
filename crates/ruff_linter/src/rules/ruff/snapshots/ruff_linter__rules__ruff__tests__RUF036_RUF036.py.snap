@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF036.py:4:16: RUF036 `None` not at the end of the type annotation.
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM111.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
   |
@@ -345,5 +346,3 @@ SIM111.py:178:5: SIM110 [*] Use `return all(not x.isdigit() for x in "012ß9💣
 182 179 | 
 183 180 | 
 184 181 | def f():
-
-

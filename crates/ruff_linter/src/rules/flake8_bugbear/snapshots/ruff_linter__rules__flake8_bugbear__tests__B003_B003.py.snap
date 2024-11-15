@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B003.py:9:1: B003 Assigning to `os.environ` doesn't clear the environment
    |
@@ -9,5 +10,3 @@ B003.py:9:1: B003 Assigning to `os.environ` doesn't clear the environment
    | ^^^^^^^^^^ B003
 10 | environ = {}  # that's fine, assigning a new meaning to the module-level name
    |
-
-

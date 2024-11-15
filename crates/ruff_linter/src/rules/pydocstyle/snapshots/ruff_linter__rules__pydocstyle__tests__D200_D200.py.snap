@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D200.py:2:5: D200 One-line docstring should fit on one line
   |
@@ -41,5 +42,3 @@ D200.py:12:5: D200 One-line docstring should fit on one line
    | |_______^ D200
    |
    = help: Reformat to one line
-
-

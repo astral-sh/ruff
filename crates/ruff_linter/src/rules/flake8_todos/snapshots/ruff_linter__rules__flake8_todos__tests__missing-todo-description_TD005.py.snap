@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+snapshot_kind: text
 ---
 TD005.py:4:3: TD005 Missing issue description after `TODO`
   |
@@ -37,5 +38,3 @@ TD005.py:7:9: TD005 Missing issue description after `TODO`
 7 | # foo # TODO
   |         ^^^^ TD005
   |
-
-

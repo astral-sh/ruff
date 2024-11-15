@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF023.py:6:17: RUF023 [*] `Klass.__slots__` is not sorted
   |

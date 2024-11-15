@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S101.py:1:1: S101 Use of `assert` detected
   |
@@ -23,5 +24,3 @@ S101.py:7:5: S101 Use of `assert` detected
 7 |     assert x == 2  # S101
   |     ^^^^^^ S101
   |
-
-

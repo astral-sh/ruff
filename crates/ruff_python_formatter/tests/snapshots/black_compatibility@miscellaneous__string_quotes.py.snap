@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellaneous/string_quotes.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -206,5 +207,3 @@ f"{y * x} '{z}'"
 f"\"{b}\"{' ' * (long-len(b)+1)}: \"{sts}\",\n"
 f"\"{a}\"{'hello' * b}\"{c}\""
 ```
-
-

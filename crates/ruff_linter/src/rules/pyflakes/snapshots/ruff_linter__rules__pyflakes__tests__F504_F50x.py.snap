@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F50x.py:8:1: F504 [*] `%`-format string has unused named argument(s): baz
    |
@@ -21,5 +22,3 @@ F50x.py:8:1: F504 [*] `%`-format string has unused named argument(s): baz
 9 9 | '%(bar)s' % (1, 2, 3)  # F502
 10 10 | '%s %s' % {'k': 'v'}  # F503
 11 11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI050.pyi:6:24: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
   |

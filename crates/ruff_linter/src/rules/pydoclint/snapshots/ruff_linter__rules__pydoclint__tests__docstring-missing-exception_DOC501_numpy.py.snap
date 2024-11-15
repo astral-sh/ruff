@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+snapshot_kind: text
 ---
 DOC501_numpy.py:53:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |

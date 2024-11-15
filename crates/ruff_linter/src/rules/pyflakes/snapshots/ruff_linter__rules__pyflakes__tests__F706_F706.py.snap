@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F706.py:6:5: F706 `return` statement outside of a function/method
   |
@@ -13,5 +14,3 @@ F706.py:9:1: F706 `return` statement outside of a function/method
 9 | return 3
   | ^^^^^^^^ F706
   |
-
-

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_percent_precedence.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -95,5 +96,3 @@ await ("" % a)
 b[("" % a)]
 b(("" % a))
 ```
-
-

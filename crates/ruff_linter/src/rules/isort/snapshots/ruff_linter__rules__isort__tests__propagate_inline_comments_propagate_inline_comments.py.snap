@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 propagate_inline_comments.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -16,5 +17,3 @@ propagate_inline_comments.py:1:1: I001 [*] Import block is un-sorted or un-forma
 3   |-    items,
 4 3 | )
   4 |+from mypackage.subpackage import items  # long comment that seems to be a problem
-
-
