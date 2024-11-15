@@ -1,10 +1,10 @@
 use itertools::Itertools;
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use ast::ExprContext;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -51,9 +51,7 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         if let Some(expression) = self.expression.full_display() {
-            format!(
-                "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
-            )
+            format!("Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable.")
         } else {
             "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
                 .to_string()
@@ -121,6 +119,12 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                 continue;
             }
 
+            let mut seen_values =
+                FxHashSet::with_capacity_and_hasher(comparators.len(), FxBuildHasher);
+            let use_set = comparators.iter().all(|comparator| {
+                comparator.is_literal_expr() && seen_values.insert(HashableExpr::from(*comparator))
+            });
+
             let mut diagnostic = Diagnostic::new(
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
@@ -128,6 +132,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                         bool_op.op,
                         &comparators,
                         checker.locator(),
+                        use_set,
                     )),
                 },
                 bool_op.range(),
@@ -140,6 +145,20 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
             let before = bool_op.values.iter().take(*first).cloned();
             let after = bool_op.values.iter().skip(last + 1).cloned();
 
+            let comparator = if use_set {
+                Expr::Set(ast::ExprSet {
+                    elts: comparators.iter().copied().cloned().collect(),
+                    range: TextRange::default(),
+                })
+            } else {
+                Expr::Tuple(ast::ExprTuple {
+                    elts: comparators.iter().copied().cloned().collect(),
+                    range: TextRange::default(),
+                    ctx: ExprContext::Load,
+                    parenthesized: true,
+                })
+            };
+
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().expr(&Expr::BoolOp(ast::ExprBoolOp {
                     op: bool_op.op,
@@ -150,12 +169,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                                 BoolOp::Or => Box::from([CmpOp::In]),
                                 BoolOp::And => Box::from([CmpOp::NotIn]),
                             },
-                            comparators: Box::from([Expr::Tuple(ast::ExprTuple {
-                                elts: comparators.iter().copied().cloned().collect(),
-                                range: TextRange::default(),
-                                ctx: ExprContext::Load,
-                                parenthesized: true,
-                            })]),
+                            comparators: Box::from([comparator]),
                             range: bool_op.range(),
                         })))
                         .chain(after)
@@ -231,11 +245,13 @@ fn to_allowed_value<'a>(
 }
 
 /// Generate a string like `obj in (a, b, c)` or `obj not in (a, b, c)`.
+/// If `use_set` is `true`, the string will use a set instead of a tuple.
 fn merged_membership_test(
     left: &Expr,
     op: BoolOp,
     comparators: &[&Expr],
     locator: &Locator,
+    use_set: bool,
 ) -> String {
     let op = match op {
         BoolOp::Or => "in",
@@ -246,5 +262,10 @@ fn merged_membership_test(
         .iter()
         .map(|comparator| locator.slice(comparator))
         .join(", ");
+
+    if use_set {
+        return format!("{left} {op} {{{members}}}",);
+    }
+
     format!("{left} {op} ({members})",)
 }
