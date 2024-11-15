@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/wps_light/mod.rs
+snapshot_kind: text
 ---
 WPS121.py:52:5: WPS121 Local variable `_invalid_var` is marked as unused but is used
    |
