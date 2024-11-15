@@ -10,6 +10,9 @@ class C:
     field = field()
 
     # No errors
+    __slots__ = ("foo", "bar")
+    __radd__ = __add__
+
     with_annotation: str
     with_annotation_and_default: int = 42
     with_annotation_and_field_specifier: bytes = field()
@@ -21,4 +24,5 @@ class C:
     init_var_with_arguments: InitVar[str] = "ipsum"
 
     kw_only: KW_ONLY
-    multiple, targets = (0, 1)
+    tu, ple, [unp, ack, ing] = (0, 1, 2, [3, 4, 5])
+    mul, [ti, ple] = (a, ssign), ment =  {1: b"3", "2": 4}, [6j, 5]
