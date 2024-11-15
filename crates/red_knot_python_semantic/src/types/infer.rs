@@ -469,16 +469,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         let class_definitions = self
             .types
             .declarations
-            .values()
-            .filter_map(|ty| ty.into_class_literal())
-            .map(|class_ty| class_ty.class);
+            .iter()
+            .filter_map(|(definition, ty)| {
+                // Filter out class literals that result from imports
+                if let DefinitionKind::Class(class) = definition.kind(self.db) {
+                    ty.into_class_literal().map(|ty| (ty.class, class.node()))
+                } else {
+                    None
+                }
+            });
 
         // Iterate through all class definitions in this scope.
-        for class in class_definitions {
+        for (class, class_node) in class_definitions {
             // (1) Check that the class does not have a cyclic definition
             if class.is_cyclically_defined(self.db) {
                 self.diagnostics.add(
-                    class.node(self.db).into(),
+                    class_node.into(),
                     "cyclic-class-def",
                     format_args!(
                         "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
@@ -495,7 +501,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Err(mro_error) = class.try_mro(self.db).as_ref() {
                 match mro_error.reason() {
                     MroErrorKind::DuplicateBases(duplicates) => {
-                        let base_nodes = class.node(self.db).bases();
+                        let base_nodes = class_node.bases();
                         for (index, duplicate) in duplicates {
                             self.diagnostics.add(
                                 (&base_nodes[*index]).into(),
@@ -505,7 +511,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     MroErrorKind::InvalidBases(bases) => {
-                        let base_nodes = class.node(self.db).bases();
+                        let base_nodes = class_node.bases();
                         for (index, base_ty) in bases {
                             self.diagnostics.add(
                                 (&base_nodes[*index]).into(),
@@ -518,7 +524,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
-                        class.node(self.db).into(),
+                        class_node.into(),
                         "inconsistent-mro",
                         format_args!(
                             "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
@@ -545,7 +551,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             },
                         candidate1_is_base_class,
                     } => {
-                        let node = class.node(self.db).into();
+                        let node = class_node.into();
                         if *candidate1_is_base_class {
                             self.diagnostics.add(
                                 node,
@@ -816,8 +822,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_deref()
             .expect("function type params scope without type params");
 
-        // TODO: defer annotation resolution in stubs, with __future__.annotations, or stringified
-        self.infer_optional_expression(function.returns.as_deref());
+        self.infer_optional_annotation_expression(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
     }
@@ -909,13 +914,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
         if type_params.is_none() {
-            self.infer_parameters(parameters);
-
-            // TODO: this should also be applied to parameter annotations.
             if self.are_all_types_deferred() {
                 self.types.has_deferred = true;
             } else {
                 self.infer_optional_annotation_expression(returns.as_deref());
+                self.infer_parameters(parameters);
             }
         }
 
@@ -965,7 +968,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default: _,
         } = parameter_with_default;
 
-        self.infer_optional_expression(parameter.annotation.as_deref());
+        self.infer_optional_annotation_expression(parameter.annotation.as_deref());
     }
 
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
@@ -975,7 +978,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             annotation,
         } = parameter;
 
-        self.infer_optional_expression(annotation.as_deref());
+        self.infer_optional_annotation_expression(annotation.as_deref());
     }
 
     fn infer_parameter_with_default_definition(
@@ -1035,9 +1038,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class_node))
             .to_scope_id(self.db, self.file);
 
-        let maybe_known_class = file_to_module(self.db, self.file)
-            .as_ref()
-            .and_then(|module| KnownClass::try_from_module(module, name.as_str()));
+        let maybe_known_class = KnownClass::try_from_file(self.db, self.file, name);
 
         let class = Class::new(self.db, &*name.id, body_scope, maybe_known_class);
         let class_ty = Type::class_literal(class);
@@ -1065,6 +1066,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
         self.infer_optional_annotation_expression(function.returns.as_deref());
+        self.infer_parameters(function.parameters.as_ref());
     }
 
     fn infer_class_deferred(&mut self, class: &ast::StmtClassDef) {
@@ -4095,7 +4097,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match expression {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => self.infer_name_expression(name).to_instance(self.db),
+                ast::ExprContext::Load => {
+                    self.infer_name_expression(name).in_type_expression(self.db)
+                }
                 ast::ExprContext::Invalid => Type::Unknown,
                 ast::ExprContext::Store | ast::ExprContext::Del => Type::Todo,
             },
@@ -4103,7 +4107,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
-                    .to_instance(self.db),
+                    .in_type_expression(self.db),
                 ast::ExprContext::Invalid => Type::Unknown,
                 ast::ExprContext::Store | ast::ExprContext::Del => Type::Todo,
             },
@@ -5015,24 +5019,8 @@ mod tests {
             ",
         )?;
 
-        // TODO: sys.version_info, and need to understand @final and @type_check_only
-        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | Unknown");
-
-        Ok(())
-    }
-
-    #[test]
-    fn function_return_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("src/a.py", "def example() -> int: return 42")?;
-
-        let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
-        let function = global_symbol(&db, mod_file, "example")
-            .expect_type()
-            .expect_function_literal();
-        let returns = function.return_ty(&db);
-        assert_eq!(returns.display(&db).to_string(), "int");
+        // TODO: sys.version_info
+        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | ellipsis");
 
         Ok(())
     }
@@ -5247,7 +5235,7 @@ mod tests {
     fn deferred_annotations_regular_source_fails() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        // In (regular) source files, deferred annotations are *not* resolved
+        // In (regular) source files, annotations are *not* deferred
         // Also tests imports from `__future__` that are not annotations
         db.write_dedented(
             "/src/source.py",

@@ -62,6 +62,8 @@ mod tests {
     #[test_case(Rule::UselessIfElse, Path::new("RUF034.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
     #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
+    #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.py"))]
+    #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -388,6 +390,11 @@ mod tests {
 
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035.py"))]
+    #[test_case(
+        Rule::FunctionCallInDataclassDefaultArgument,
+        Path::new("RUF009_attrs.py")
+    )]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

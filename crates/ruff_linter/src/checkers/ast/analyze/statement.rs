@@ -1028,7 +1028,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                     if !checker.source_type.is_stub() {
                         if checker.enabled(Rule::UselessImportAlias) {
-                            pylint::rules::useless_import_alias(checker, alias);
+                            pylint::rules::useless_import_from_alias(checker, alias, module, level);
                         }
                     }
                 }
