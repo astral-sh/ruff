@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+snapshot_kind: text
 ---
 auto_return_type.py:1:5: ANN201 [*] Missing return type annotation for public function `func`
   |
@@ -872,5 +873,3 @@ auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public 
 300 300 |     match x:
 301 301 |         case [1, 2, 3]:
 302 302 |             return 1
-
-

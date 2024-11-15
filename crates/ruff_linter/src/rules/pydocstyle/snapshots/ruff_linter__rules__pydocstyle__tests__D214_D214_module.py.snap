@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D214_module.py:3:5: D214 [*] Section is over-indented ("Returns")
   |

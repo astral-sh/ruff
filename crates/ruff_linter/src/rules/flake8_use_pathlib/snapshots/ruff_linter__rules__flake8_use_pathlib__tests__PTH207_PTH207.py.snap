@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+snapshot_kind: text
 ---
 PTH207.py:9:1: PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
    |
@@ -26,5 +27,3 @@ PTH207.py:11:1: PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
 11 | search("*.png")
    | ^^^^^^ PTH207
    |
-
-

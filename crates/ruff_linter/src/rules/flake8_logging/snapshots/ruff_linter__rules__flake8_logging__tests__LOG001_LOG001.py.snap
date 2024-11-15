@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
+snapshot_kind: text
 ---
 LOG001.py:3:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers
   |
@@ -36,5 +37,3 @@ LOG001.py:4:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers
 4   |-logging.Logger()
   4 |+logging.getLogger()
 5 5 | logging.getLogger(__name__)
-
-

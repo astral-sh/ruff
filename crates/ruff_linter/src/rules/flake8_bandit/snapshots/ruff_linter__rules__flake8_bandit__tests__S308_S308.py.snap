@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S308.py:5:12: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
   |
@@ -30,5 +31,3 @@ S308.py:20:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabil
 21 | def some_func():
 22 |     return '<script>alert("evil!")</script>'
    |
-
-

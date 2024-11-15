@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT014.py:4:35: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
   |

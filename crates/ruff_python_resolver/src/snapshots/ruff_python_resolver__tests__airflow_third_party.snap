@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_resolver/src/lib.rs
 expression: result
+snapshot_kind: text
 ---
 ImportResult {
     is_relative: false,

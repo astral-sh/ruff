@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 too_many_arguments_params.py:3:5: PLR0913 Too many arguments in function definition (6 > 4)
   |
@@ -18,5 +19,3 @@ too_many_arguments_params.py:9:5: PLR0913 Too many arguments in function definit
    |     ^ PLR0913
 10 |     pass
    |
-
-

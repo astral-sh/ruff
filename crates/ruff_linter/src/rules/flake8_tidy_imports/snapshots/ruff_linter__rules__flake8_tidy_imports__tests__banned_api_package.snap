@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+snapshot_kind: text
 ---
 application.py:3:8: TID251 `attrs` is banned: The attrs module is deprecated.
   |
@@ -27,5 +28,3 @@ application.py:10:1: TID251 `my_package.sublib.protocol` is banned: The protocol
 10 | from ..protocol.UpperCaseModule import some_function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID251
    |
-
-

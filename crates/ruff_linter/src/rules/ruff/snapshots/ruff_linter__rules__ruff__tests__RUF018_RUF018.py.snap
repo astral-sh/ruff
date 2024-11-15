@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF018.py:2:9: RUF018 Avoid assignment expressions in `assert` statements
   |
@@ -18,5 +19,3 @@ RUF018.py:3:12: RUF018 Avoid assignment expressions in `assert` statements
 4 | 
 5 | # OK
   |
-
-

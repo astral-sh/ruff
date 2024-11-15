@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_form_feeds.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -454,5 +455,3 @@ a = []
 
 # form feeds at the very end get removed.
 ```
-
-

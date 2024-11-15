@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 line_ending_lf.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -18,6 +19,4 @@ line_ending_lf.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   5 |+    member_three,
   6 |+    member_two,
   7 |+)
-2 8 | 
-
-
+2 8 |

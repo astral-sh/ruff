@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_characters.py:30:16: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
    |

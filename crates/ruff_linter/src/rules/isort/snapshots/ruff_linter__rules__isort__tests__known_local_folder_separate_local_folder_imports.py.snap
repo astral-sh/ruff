@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 separate_local_folder_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |

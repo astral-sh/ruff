@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+snapshot_kind: text
 ---
 TD001.py:7:3: TD001 Invalid TODO tag: `XXX`
   |
@@ -26,5 +27,3 @@ TD001.py:9:9: TD001 Invalid TODO tag: `XXX`
 9 | # foo # XXX: this isn't fine either
   |         ^^^ TD001
   |
-
-

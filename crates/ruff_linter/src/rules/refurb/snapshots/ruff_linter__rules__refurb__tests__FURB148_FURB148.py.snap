@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB148.py:14:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
    |
@@ -439,5 +440,3 @@ FURB148.py:83:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
 84 84 |     print(book)
 85 85 | 
 86 86 | # OK
-
-

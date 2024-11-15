@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI063.py:6:9: PYI063 Use PEP 570 syntax for positional-only arguments
   |

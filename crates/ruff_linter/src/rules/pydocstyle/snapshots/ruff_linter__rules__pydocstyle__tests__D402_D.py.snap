@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:378:5: D402 First line should not be the function's signature
     |
@@ -8,5 +9,3 @@ D.py:378:5: D402 First line should not be the function's signature
 378 |     """Signature: foobar()."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D402
     |
-
-

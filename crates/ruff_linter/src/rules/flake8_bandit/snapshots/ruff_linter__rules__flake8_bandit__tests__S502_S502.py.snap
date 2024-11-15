@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S502.py:6:13: S502 Call made with insecure SSL protocol: `PROTOCOL_SSLv3`
   |
@@ -68,5 +69,3 @@ S502.py:12:9: S502 Call made with insecure SSL protocol: `TLSv1_METHOD`
 13 | 
 14 | wrap_socket(ssl_version=ssl.PROTOCOL_TLS_CLIENT)  # OK
    |
-
-

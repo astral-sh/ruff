@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM112.py:4:12: SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
   |
@@ -114,6 +115,4 @@ SIM112.py:19:22: SIM112 [*] Use capitalized environment variable `FOO` instead o
    19 |+if env := os.environ['FOO']:
 20 20 |     pass
 21 21 | 
-22 22 | 
-
-
+22 22 |

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/carriage_return/string.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -21,6 +22,3 @@ backslashes or newline characters."
 String \"
 """
 ```
-
-
-

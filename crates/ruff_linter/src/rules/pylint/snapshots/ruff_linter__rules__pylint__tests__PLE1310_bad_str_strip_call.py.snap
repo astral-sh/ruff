@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 bad_str_strip_call.py:2:21: PLE1310 String `strip` call contains duplicate characters
   |
@@ -156,5 +157,3 @@ bad_str_strip_call.py:67:12: PLE1310 String `rstrip` call contains duplicate cha
 68 | 
 69 | # OK
    |
-
-

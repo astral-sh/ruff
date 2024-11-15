@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+snapshot_kind: text
 ---
 YTT101.py:6:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
   |
@@ -28,5 +29,3 @@ YTT101.py:8:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.versio
  9 | 
 10 | # the tool is timid and only flags certain numeric slices
    |
-
-

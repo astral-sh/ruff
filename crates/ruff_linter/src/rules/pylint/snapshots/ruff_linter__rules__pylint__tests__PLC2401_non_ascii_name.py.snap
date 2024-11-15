@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 non_ascii_name.py:1:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character
   |

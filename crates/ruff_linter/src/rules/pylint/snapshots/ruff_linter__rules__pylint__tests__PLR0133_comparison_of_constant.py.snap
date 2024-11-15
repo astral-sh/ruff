@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 comparison_of_constant.py:3:4: PLR0133 Two constants compared in a comparison, consider replacing `100 == 100`
   |
@@ -89,5 +90,3 @@ comparison_of_constant.py:58:4: PLR0133 Two constants compared in a comparison, 
    |    ^^^^ PLR0133
 59 |     pass
    |
-
-

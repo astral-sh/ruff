@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+snapshot_kind: text
 ---
 A006.py:1:8: A006 Lambda argument `print` is shadowing a Python builtin
   |

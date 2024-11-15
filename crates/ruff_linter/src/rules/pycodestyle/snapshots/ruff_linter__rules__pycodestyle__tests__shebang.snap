@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 shebang.py:3:1: E265 [*] Block comment should start with `# `
   |
@@ -17,5 +18,3 @@ shebang.py:3:1: E265 [*] Block comment should start with `# `
 3   |-#!
   3 |+# !
 4 4 | #:
-
-
