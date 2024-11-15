@@ -81,30 +81,9 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
 }
 
-/// Cycle recovery for [`infer_definition_types()`]: for now, just [`Type::Unknown`]
-/// TODO fixpoint iteration
-fn infer_definition_types_cycle_recovery<'db>(
-    db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    input: Definition<'db>,
-) -> TypeInference<'db> {
-    tracing::trace!("infer_definition_types_cycle_recovery");
-    let mut inference = TypeInference::empty(input.scope(db));
-    let category = input.category(db);
-    if category.is_declaration() {
-        inference.declarations.insert(input, Type::Unknown);
-    }
-    if category.is_binding() {
-        inference.bindings.insert(input, Type::Unknown);
-    }
-    // TODO we don't fill in expression types for the cycle-participant definitions, which can
-    // later cause a panic when looking up an expression type.
-    inference
-}
-
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a symbol name use or public type of a symbol.
-#[salsa::tracked(return_ref, recovery_fn=infer_definition_types_cycle_recovery)]
+#[salsa::tracked(return_ref, cycle_fn=cycle_recover, cycle_initial=cycle_initial)]
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -120,6 +99,20 @@ pub(crate) fn infer_definition_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index).finish()
+}
+
+fn cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    count: u32,
+    _definition: Definition<'db>,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    assert!(count < 10, "cycle did not converge within 10 iterations");
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn cycle_initial<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeInference<'db> {
+    TypeInference::empty(definition.scope(db), Some(Type::Never))
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
@@ -218,12 +211,15 @@ pub(crate) struct TypeInference<'db> {
     /// Are there deferred type expressions in this region?
     has_deferred: bool,
 
-    /// The scope belong to this region.
+    /// The scope this region is part of.
     scope: ScopeId<'db>,
+
+    /// The fallback type for all expressions/bindings/declarations.
+    fallback_ty: Option<Type<'db>>,
 }
 
 impl<'db> TypeInference<'db> {
-    pub(crate) fn empty(scope: ScopeId<'db>) -> Self {
+    pub(crate) fn empty(scope: ScopeId<'db>, fallback_ty: Option<Type<'db>>) -> Self {
         Self {
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
@@ -231,12 +227,17 @@ impl<'db> TypeInference<'db> {
             diagnostics: TypeCheckDiagnostics::default(),
             has_deferred: false,
             scope,
+            fallback_ty,
         }
     }
 
     #[track_caller]
     pub(crate) fn expression_ty(&self, expression: ScopedExpressionId) -> Type<'db> {
-        self.expressions[&expression]
+        if let Some(fallback) = self.fallback_ty {
+            self.try_expression_ty(expression).unwrap_or(fallback)
+        } else {
+            self.expressions[&expression]
+        }
     }
 
     pub(crate) fn try_expression_ty(&self, expression: ScopedExpressionId) -> Option<Type<'db>> {
@@ -245,12 +246,23 @@ impl<'db> TypeInference<'db> {
 
     #[track_caller]
     pub(crate) fn binding_ty(&self, definition: Definition<'db>) -> Type<'db> {
-        self.bindings[&definition]
+        if let Some(fallback) = self.fallback_ty {
+            self.bindings.get(&definition).copied().unwrap_or(fallback)
+        } else {
+            self.bindings[&definition]
+        }
     }
 
     #[track_caller]
     pub(crate) fn declaration_ty(&self, definition: Definition<'db>) -> Type<'db> {
-        self.declarations[&definition]
+        if let Some(fallback) = self.fallback_ty {
+            self.declarations
+                .get(&definition)
+                .copied()
+                .unwrap_or(fallback)
+        } else {
+            self.declarations[&definition]
+        }
     }
 
     pub(crate) fn diagnostics(&self) -> &[std::sync::Arc<TypeCheckDiagnostic>] {
@@ -358,7 +370,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             region,
             file,
-            types: TypeInference::empty(scope),
+            types: TypeInference::empty(scope, None),
             diagnostics: TypeCheckDiagnosticsBuilder::new(db, file),
         }
     }
