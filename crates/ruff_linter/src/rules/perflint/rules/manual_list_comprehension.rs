@@ -315,22 +315,20 @@ fn convert_to_list_extend(
             .map(|range| locator.slice(range).trim_whitespace_start())
             .collect()
     };
-    let for_stmt_end = for_stmt.range.end();
+
+    let variable_name = locator.slice(binding);
     let for_loop_inline_comments: Vec<&str> = comment_strings_in_range(for_stmt.range);
-    let for_loop_trailing_comment =
-        comment_strings_in_range(TextRange::new(for_stmt_end, locator.line_end(for_stmt_end)));
+    
     let newline = checker.stylist().line_ending().as_str();
+    let indent_range = TextRange::new(
+        locator.line_start(for_stmt.range.start()),
+        for_stmt.range.start(),
+    );
 
     match fix_type {
         ComprehensionType::Extend => {
-            let variable_name = checker.locator().slice(binding.range);
-
             let comprehension_body = format!("{variable_name}.extend({generator_str})");
 
-            let indent_range = TextRange::new(
-                locator.line_start(for_stmt.range.start()),
-                for_stmt.range.start(),
-            );
             let indentation = if for_loop_inline_comments.is_empty() {
                 String::new()
             } else {
@@ -352,40 +350,26 @@ fn convert_to_list_extend(
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
-            let empty_list_to_replace = binding_stmt.value.as_list_expr().ok_or(anyhow!(
-                "Assignment value must be an empty list literal in order to replace with a list comprehension"
-            ))?;
 
-            let comprehension_body = format!("[{generator_str}]");
+            let mut comments_to_move =
+                comment_strings_in_range(locator.full_lines_range(binding_stmt.range));
+            comments_to_move.extend(for_loop_inline_comments);
 
-            let indent_range = TextRange::new(
-                locator.line_start(binding_stmt.range.start()),
-                binding_stmt.range.start(),
-            );
-
-            let mut for_loop_comments = for_loop_inline_comments;
-            for_loop_comments.extend(for_loop_trailing_comment);
-
-            let indentation = if for_loop_comments.is_empty() {
+            let indentation = if comments_to_move.is_empty() {
                 String::new()
             } else {
                 format!("{newline}{}", locator.slice(indent_range))
             };
-            let leading_comments = format!("{}{indentation}", for_loop_comments.join(&indentation));
+            let leading_comments = format!("{}{indentation}", comments_to_move.join(&indentation));
 
-            let mut additional_fixes = vec![Edit::range_deletion(
-                locator.full_lines_range(for_stmt.range),
-            )];
-            // if comments are empty, trying to insert them panics
-            if !leading_comments.is_empty() {
-                additional_fixes.push(Edit::insertion(
-                    leading_comments,
-                    binding_stmt.range.start(),
-                ));
-            }
+            let comprehension_body =
+                format!("{leading_comments}{variable_name} = [{generator_str}]");
+            // TODO: protect comment from after assignment statement
+            let binding_stmt_range = locator.full_lines_range(binding_stmt.range);
+
             Ok(Fix::unsafe_edits(
-                Edit::range_replacement(comprehension_body, empty_list_to_replace.range),
-                additional_fixes,
+                Edit::range_deletion(binding_stmt_range),
+                [Edit::range_replacement(comprehension_body, for_stmt.range)],
             ))
         }
     }

@@ -125,3 +125,27 @@ def f(param):
         new_layers = []
         for value in param:
             new_layers.append(value * 3)
+
+def f():
+    result = []
+    var = 1
+    for _ in range(10):
+        result.append(var + 1) # PERF401
+
+def f():
+    # make sure that `tmp` is not deleted
+    tmp = 1; result = [] # commment should be protected
+    for i in range(10):
+        result.append(i + 1) # PERF401
+
+def f():
+    # make sure that `tmp` is not deleted
+    result = []; tmp = 1 # commment should be protected
+    for i in range(10):
+        result.append(i + 1) # PERF401
+
+
+def f():
+    result = [] # comment should be protected
+    for i in range(10):
+        result.append(i*2) # PERF401
