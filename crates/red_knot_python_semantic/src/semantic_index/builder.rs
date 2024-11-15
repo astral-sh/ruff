@@ -99,11 +99,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         builder
     }
 
+    #[track_caller]
     fn current_scope(&self) -> FileScopeId {
         *self
             .scope_stack
             .last()
-            .expect("Always to have a root scope")
+            .expect("Should always have a root scope")
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
@@ -137,12 +138,49 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
-        let id = self.scope_stack.pop().expect("Root scope to be present");
-        let children_end = self.scopes.next_index();
-        let scope = &mut self.scopes[id];
-        scope.extend_descendents(children_end);
         self.try_node_context_stack_manager.exit_scope();
-        id
+
+        let popped_scope_id = self
+            .scope_stack
+            .pop()
+            .expect("Root scope should be present");
+
+        let mut scopes = std::mem::take(&mut self.scopes);
+        let children_end = scopes.next_index();
+        let popped_scope = &mut scopes[popped_scope_id];
+        popped_scope.extend_descendents(children_end);
+
+        // We might have just popped the root scope off the stack, so this might be an empty stack!
+        if let Some(outer_scope) = self.scope_stack.last() {
+            let outer_scope = *outer_scope;
+            let mut use_def_maps = std::mem::take(&mut self.use_def_maps);
+            let current_use_def_map = &mut use_def_maps[outer_scope];
+
+            if let Some(eager_nested_scope) = popped_scope.node().as_eager_nested_scope() {
+                let eager_nested_scope_id = self
+                    .current_ast_ids()
+                    .record_eager_nested_scope(eager_nested_scope);
+
+                for symbol in self.symbol_tables[popped_scope_id].symbols() {
+                    let current_symbol_table = &self.symbol_tables[outer_scope];
+                    if let Some(symbol_id) = current_symbol_table.symbol_id_by_name(symbol.name()) {
+                        let symbol = current_symbol_table.symbol(symbol_id);
+                        if symbol.is_bound() || symbol.is_declared() {
+                            current_use_def_map.snapshot_symbol_state_for_eager_nested_scope(
+                                eager_nested_scope_id,
+                                symbol_id,
+                            );
+                        }
+                    }
+                }
+            }
+
+            self.use_def_maps = use_def_maps;
+        }
+
+        self.scopes = scopes;
+
+        popped_scope_id
     }
 
     fn current_symbol_table(&mut self) -> &mut SymbolTableBuilder {

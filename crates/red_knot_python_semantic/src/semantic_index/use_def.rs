@@ -225,7 +225,7 @@ use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
-use crate::semantic_index::ast_ids::ScopedUseId;
+use crate::semantic_index::ast_ids::{ScopedEagerNestedScopeId, ScopedUseId};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::symbol::Boundness;
@@ -248,6 +248,11 @@ pub(crate) struct UseDefMap<'db> {
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
+
+    /// Mapping providing information on bindings available to nested scopes executed eagerly.
+    ///
+    /// See [`EagerNestedScopeBindingsMap`] for more details.
+    bindings_by_eager_nested_scope: EagerNestedScopeBindingsMap,
 
     /// [`SymbolBindings`] or [`SymbolDeclarations`] reaching a given [`Definition`].
     ///
@@ -358,6 +363,15 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
+/// Mapping of `{key: value}` in which:
+/// - The key is an `(x, y)` tuple:
+///   - The element `x` identifies an eager nested scope
+///   - The element `y` identifies a symbol referenced in that nested scope
+/// - The value represents the bindings of the symbol `y` in `x`'s outer scope
+///   available at the point in the control flow where the eager nested scope `x` is defined.
+type EagerNestedScopeBindingsMap =
+    FxHashMap<(ScopedEagerNestedScopeId, ScopedSymbolId), SymbolBindings>;
+
 /// Either live bindings or live declarations for a symbol.
 #[derive(Debug, PartialEq, Eq)]
 enum SymbolDefinitions {
@@ -448,6 +462,11 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Constraint`].
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
+    /// Mapping providing information on bindings available to nested scopes executed eagerly.
+    ///
+    /// See [`EagerNestedScopeBindingsMap`] for more details.
+    bindings_by_eager_nested_scope: EagerNestedScopeBindingsMap,
+
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
 
@@ -516,6 +535,18 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(use_id, new_use);
     }
 
+    pub(super) fn snapshot_symbol_state_for_eager_nested_scope(
+        &mut self,
+        nested_scope: ScopedEagerNestedScopeId,
+        symbol: ScopedSymbolId,
+    ) {
+        let existing_entry = self.bindings_by_eager_nested_scope.insert(
+            (nested_scope, symbol),
+            self.symbol_states[symbol].bindings().clone(),
+        );
+        debug_assert_eq!(existing_entry, None);
+    }
+
     /// Take a snapshot of the current visible-symbols state.
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
@@ -562,19 +593,30 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn finish(mut self) -> UseDefMap<'db> {
-        self.all_definitions.shrink_to_fit();
-        self.all_constraints.shrink_to_fit();
-        self.symbol_states.shrink_to_fit();
-        self.bindings_by_use.shrink_to_fit();
-        self.definitions_by_definition.shrink_to_fit();
+    pub(super) fn finish(self) -> UseDefMap<'db> {
+        let UseDefMapBuilder {
+            mut all_definitions,
+            mut all_constraints,
+            mut bindings_by_eager_nested_scope,
+            mut bindings_by_use,
+            mut definitions_by_definition,
+            mut symbol_states,
+        } = self;
+
+        all_definitions.shrink_to_fit();
+        all_constraints.shrink_to_fit();
+        symbol_states.shrink_to_fit();
+        bindings_by_eager_nested_scope.shrink_to_fit();
+        bindings_by_use.shrink_to_fit();
+        definitions_by_definition.shrink_to_fit();
 
         UseDefMap {
-            all_definitions: self.all_definitions,
-            all_constraints: self.all_constraints,
-            bindings_by_use: self.bindings_by_use,
-            public_symbols: self.symbol_states,
-            definitions_by_definition: self.definitions_by_definition,
+            all_definitions,
+            all_constraints,
+            bindings_by_use,
+            bindings_by_eager_nested_scope,
+            public_symbols: symbol_states,
+            definitions_by_definition,
         }
     }
 }

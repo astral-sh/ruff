@@ -1,5 +1,5 @@
 use std::hash::{Hash, Hasher};
-use std::ops::Range;
+use std::ops::{Deref, Range};
 
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
@@ -14,6 +14,8 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
+
+use super::ast_ids::EagerNestedScopeRef;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
@@ -331,6 +333,14 @@ impl SymbolTableBuilder {
     }
 }
 
+impl Deref for SymbolTableBuilder {
+    type Target = SymbolTable;
+
+    fn deref(&self) -> &Self::Target {
+        &self.table
+    }
+}
+
 /// Reference to a node that introduces a new scope.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum NodeWithScopeRef<'a> {
@@ -346,7 +356,7 @@ pub(crate) enum NodeWithScopeRef<'a> {
     GeneratorExpression(&'a ast::ExprGenerator),
 }
 
-impl NodeWithScopeRef<'_> {
+impl<'a> NodeWithScopeRef<'a> {
     /// Converts the unowned reference to an owned [`NodeWithScopeKind`].
     ///
     /// # Safety
@@ -444,6 +454,29 @@ impl NodeWithScopeKind {
             | Self::SetComprehension(_)
             | Self::DictComprehension(_)
             | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
+        }
+    }
+
+    pub(super) fn as_eager_nested_scope(&self) -> Option<EagerNestedScopeRef> {
+        match self {
+            Self::Class(class) => Some(EagerNestedScopeRef::Class(class)),
+            Self::DictComprehension(dict_comp) => {
+                Some(EagerNestedScopeRef::DictComprehension(dict_comp))
+            }
+            Self::GeneratorExpression(generator) => {
+                Some(EagerNestedScopeRef::GeneratorExpression(generator))
+            }
+            Self::ListComprehension(list_comp) => {
+                Some(EagerNestedScopeRef::ListComprehension(list_comp))
+            }
+            Self::SetComprehension(set_comp) => {
+                Some(EagerNestedScopeRef::SetComprehension(set_comp))
+            }
+            Self::Lambda(_)
+            | Self::Module
+            | Self::Function(_)
+            | Self::FunctionTypeParameters(_)
+            | Self::ClassTypeParameters(_) => None,
         }
     }
 
