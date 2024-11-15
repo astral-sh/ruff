@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, Stmt, StmtAssign, StmtClassDef};
+use ruff_python_ast::helpers::is_dunder;
+use ruff_python_ast::{Expr, ExprName, Stmt, StmtAssign, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -75,8 +76,11 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
         }
 
         let target = targets.first().unwrap();
+        let Expr::Name(ExprName { id, .. }) = target else {
+            continue;
+        };
 
-        if !matches!(target, Expr::Name(..)) {
+        if is_dunder(id.as_str()) {
             continue;
         }
 
