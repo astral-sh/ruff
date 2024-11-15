@@ -72,7 +72,6 @@ fn corpus_no_panic() -> anyhow::Result<()> {
         let code = std::fs::read_to_string(source)?;
 
         let mut check_with_file_name = |path: &SystemPath| {
-            memory_fs.remove_all();
             memory_fs.write_file(path, &code).unwrap();
             File::sync_path(&mut db, path);
 
@@ -94,6 +93,9 @@ fn corpus_no_panic() -> anyhow::Result<()> {
             } else {
                 assert!(!expected_to_fail, "Expected to panic, but did not. Consider removing this path from KNOWN_FAILURES");
             }
+
+            memory_fs.remove_all();
+            file.sync(&mut db);
         };
 
         if source.extension().map(|e| e == "pyi").unwrap_or(false) {
