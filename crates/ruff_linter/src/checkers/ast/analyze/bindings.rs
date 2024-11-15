@@ -16,7 +16,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnconventionalImportAlias,
         Rule::UnsortedDunderSlots,
         Rule::UnusedVariable,
-        Rule::UnusedVariableIsUsed,
+        Rule::UnusedVariableAccessed,
     ]) {
         return;
     }
@@ -86,8 +86,8 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        if checker.enabled(Rule::UnusedVariableIsUsed) {
-            if let Some(diagnostic) = wps_light::rules::unused_variable_is_used(checker, binding) {
+        if checker.enabled(Rule::UnusedVariableAccessed) {
+            if let Some(diagnostic) = wps_light::rules::unused_variable_accessed(checker, binding) {
                 checker.diagnostics.push(diagnostic);
             }
         }

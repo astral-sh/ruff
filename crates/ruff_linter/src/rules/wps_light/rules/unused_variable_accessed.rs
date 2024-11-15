@@ -29,11 +29,11 @@ use crate::checkers::ast::Checker;
 ///     return variable + 1
 /// ```
 #[violation]
-pub struct UnusedVariableIsUsed {
+pub struct UnusedVariableAccessed {
     name: String,
 }
 
-impl Violation for UnusedVariableIsUsed {
+impl Violation for UnusedVariableAccessed {
     #[derive_message_formats]
     fn message(&self) -> String {
         let name = &self.name;
@@ -47,7 +47,7 @@ impl Violation for UnusedVariableIsUsed {
 }
 
 /// WPS121
-pub(crate) fn unused_variable_is_used(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn unused_variable_accessed(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     // only used variables
     if binding.is_unused() || !binding.kind.is_assignment() {
         return None;
@@ -65,7 +65,7 @@ pub(crate) fn unused_variable_is_used(checker: &Checker, binding: &Binding) -> O
     }
 
     Some(Diagnostic::new(
-        UnusedVariableIsUsed {
+        UnusedVariableAccessed {
             name: name.to_string(),
         },
         binding.range(),
