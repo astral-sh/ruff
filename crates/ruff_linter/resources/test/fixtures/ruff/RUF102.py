@@ -15,7 +15,7 @@ async def pass_shielded():
     try:
         await asyncio.sleep(1)
     except Exception as e:
-        with anyio.shield():
+        with anyio.CancelScope(shield=True):
             await asyncio.sleep(1)
             print(f"{e}")
             raise

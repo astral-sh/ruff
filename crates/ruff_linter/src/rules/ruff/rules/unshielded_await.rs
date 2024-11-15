@@ -126,10 +126,10 @@ impl Visitor<'_> for PrunedAwaitVisitor {
                 ..
             }) => {
                 for item in items {
-                    // TODO resolved name...  what about x = y(); with y:?
                     if let Expr::Call(ExprCall { ref func, .. }) = item.context_expr {
                         if let Expr::Attribute(ExprAttribute { attr, .. }) = &**func {
-                            if attr.id.as_str() == "shield" {
+                            // TODO resolved name...  what about x = y(); with y:? check the shield argument, etc
+                            if attr.id.as_str() == "CancelScope" {
                                 return;
                             }
                         }
