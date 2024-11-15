@@ -30,7 +30,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
-tempfile = { workspace = true }
+glob = { workspace = true }
 
 [features]
 default = ["zstd"]

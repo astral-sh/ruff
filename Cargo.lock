@@ -2353,6 +2353,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossbeam",
+ "glob",
  "notify",
  "rayon",
  "red_knot_python_semantic",
@@ -2363,7 +2364,6 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash 2.0.0",
  "salsa",
- "tempfile",
  "tracing",
 ]
 

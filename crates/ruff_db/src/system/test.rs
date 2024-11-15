@@ -21,7 +21,7 @@ use super::walk_directory::WalkDirectoryBuilder;
 ///
 /// ## Warning
 /// Don't use this system for production code. It's intended for testing only.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct TestSystem {
     inner: TestSystemInner,
 }
@@ -229,7 +229,7 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum TestSystemInner {
     Stub(MemoryFileSystem),
     System(Arc<dyn System + RefUnwindSafe + Send + Sync>),

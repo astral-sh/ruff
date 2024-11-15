@@ -491,6 +491,12 @@ impl From<&str> for SystemPathBuf {
     }
 }
 
+impl From<String> for SystemPathBuf {
+    fn from(value: String) -> Self {
+        SystemPathBuf::from_utf8_path_buf(Utf8PathBuf::from(value))
+    }
+}
+
 impl Default for SystemPathBuf {
     fn default() -> Self {
         Self::new()
