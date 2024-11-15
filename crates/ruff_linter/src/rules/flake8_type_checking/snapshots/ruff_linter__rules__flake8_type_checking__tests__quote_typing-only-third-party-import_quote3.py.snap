@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
 quote3.py:4:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   |
@@ -164,13 +163,13 @@ quote3.py:59:29: TCH002 Move third-party import `third_party.Type` into a type-c
    |
    = help: Move into type-checking block
 
-quote3.py:66:29: TCH002 Move third-party import `third_party.Type` into a type-checking block
+quote3.py:67:29: TCH002 Move third-party import `third_party.Type` into a type-checking block
    |
-64 | def f():
-65 |     from typing import Literal
-66 |     from third_party import Type
+65 | def f():
+66 |     from typing import Literal
+67 |     from third_party import Type
    |                             ^^^^ TCH002
-67 | 
-68 |     def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
+68 | 
+69 |     def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
    |
    = help: Move into type-checking block
