@@ -4755,6 +4755,7 @@ enum ModuleNameResolutionError {
 ///
 /// If the formatted string contains an expression (with a representation unknown at compile time),
 /// infers an instance of `builtins.str`.
+#[derive(Debug)]
 struct StringPartsCollector {
     concatenated: Option<String>,
     expression: bool,

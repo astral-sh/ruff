@@ -210,7 +210,7 @@ impl ScopeKind {
 }
 
 /// Symbol table for a specific [`Scope`].
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SymbolTable {
     /// The symbols in this scope.
     symbols: IndexVec<ScopedSymbolId, Symbol>,
@@ -220,13 +220,6 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
-    fn new() -> Self {
-        Self {
-            symbols: IndexVec::new(),
-            symbols_by_name: SymbolMap::default(),
-        }
-    }
-
     fn shrink_to_fit(&mut self) {
         self.symbols.shrink_to_fit();
     }
@@ -278,18 +271,12 @@ impl PartialEq for SymbolTable {
 
 impl Eq for SymbolTable {}
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(super) struct SymbolTableBuilder {
     table: SymbolTable,
 }
 
 impl SymbolTableBuilder {
-    pub(super) fn new() -> Self {
-        Self {
-            table: SymbolTable::new(),
-        }
-    }
-
     pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(&name);
         let entry = self

@@ -47,7 +47,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     tracing::debug!("Checking file '{path}'", path = file.path(db));
 
     let index = semantic_index(db, file);
-    let mut diagnostics = TypeCheckDiagnostics::new();
+    let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
         let result = infer_scope_types(db, scope_id);
