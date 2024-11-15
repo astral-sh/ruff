@@ -17,6 +17,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.12"
+  RUST_BACKTRACE: 1
 
 jobs:
   determine_changes:
