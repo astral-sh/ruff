@@ -8,7 +8,6 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
-use std::ops::Deref;
 
 /// ## What it does
 /// TODO
@@ -23,14 +22,12 @@ use std::ops::Deref;
 /// ## References
 /// TODO
 #[violation]
-pub struct UnshieldedAwait {
-    s: String,
-}
+pub struct UnshieldedAwait;
 
 impl Violation for UnshieldedAwait {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("shield it! {}", self.s)
+        "shield it!".to_string()
     }
 }
 
@@ -38,7 +35,7 @@ impl Violation for UnshieldedAwait {
 pub(crate) fn unshielded_await_for_try(
     checker: &mut Checker,
     handlers: &Vec<ExceptHandler>,
-    finalbody: &Vec<Stmt>,
+    finalbody: &[Stmt],
 ) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(handler) = handler;
@@ -59,13 +56,12 @@ pub(crate) fn unshielded_await_for_try(
         let types = flattened_tuple(t, checker.semantic());
 
         // TODO i challenge you to make it worse than this
-        if types
+        if ! types
             .iter()
-            .find(|tt| {
+            .any(|tt| {
                 format!("{tt}").as_str() == format!("{exception}").as_str()
                     || format!("{tt}").as_str() == format!("{asyncio_cancelled_error}").as_str()
             })
-            .is_none()
         {
             continue;
         }
@@ -75,9 +71,7 @@ pub(crate) fn unshielded_await_for_try(
         visitor.visit_body(&handler.body);
         if visitor.seen_await {
             checker.diagnostics.push(Diagnostic::new(
-                UnshieldedAwait {
-                    s: format!("{types:?}"),
-                },
+                UnshieldedAwait {},
                 handler.range,
             ));
         }
@@ -85,10 +79,10 @@ pub(crate) fn unshielded_await_for_try(
 
     // If there are no awaits then there is nothing to shield
     let mut visitor = PrunedAwaitVisitor { seen_await: false };
-    visitor.visit_body(&finalbody);
+    visitor.visit_body(finalbody);
     if visitor.seen_await {
         checker.diagnostics.push(Diagnostic::new(
-            UnshieldedAwait { s: format!("") },
+            UnshieldedAwait {},
             // TODO yeah not sure where to get the finally range itself
             finalbody[0].range(),
         ));
@@ -101,17 +95,17 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Qual
     match t {
         Expr::Tuple(t) => {
             for e in t {
-                f.append(&mut flattened_tuple(e, semantic))
+                f.append(&mut flattened_tuple(e, semantic));
             }
         }
         Expr::Name(..) | Expr::Attribute(..) => {
             if let Some(name) = semantic.resolve_qualified_name(t) {
                 f.push(name);
             } else {
-                panic!("inside unable to handle {:?}", t);
+                panic!("inside unable to handle {t:?}");
             };
         }
-        _ => panic!("outside unable to handle {:?}", t),
+        _ => panic!("outside unable to handle {t:?}"),
     }
 
     f
@@ -138,7 +132,7 @@ impl Visitor<'_> for PrunedAwaitVisitor {
                 for item in items {
                     // TODO resolved name...  what about x = y(); with y:?
                     if let Expr::Call(ExprCall { ref func, .. }) = item.context_expr {
-                        if let Expr::Attribute(ExprAttribute { attr, .. }) = func.deref() {
+                        if let Expr::Attribute(ExprAttribute { attr, .. }) = &**func {
                             if attr.id.as_str() == "shield" {
                                 return;
                             }
