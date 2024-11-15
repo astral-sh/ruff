@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S610.py:4:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
   |

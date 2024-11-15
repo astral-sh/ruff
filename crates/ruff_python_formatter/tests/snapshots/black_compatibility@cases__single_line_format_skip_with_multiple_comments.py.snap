@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/single_line_format_skip_with_multiple_comments.py
+snapshot_kind: text
 ---
 ## Input
 

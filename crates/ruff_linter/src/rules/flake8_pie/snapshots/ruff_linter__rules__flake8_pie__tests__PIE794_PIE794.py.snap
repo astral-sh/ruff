@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
+snapshot_kind: text
 ---
 PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
   |
@@ -109,5 +110,3 @@ PIE794.py:52:5: PIE794 [*] Class field `name` is defined multiple times
 50 50 |     name: str = "Foo"
 51 51 |     name: str = name + " Bar"
 52    |-    name: str = "Bar"  # PIE794
-
-

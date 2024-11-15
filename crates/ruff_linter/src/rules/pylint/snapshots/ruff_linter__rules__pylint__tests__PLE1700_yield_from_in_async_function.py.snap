@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 yield_from_in_async_function.py:7:5: PLE1700 `yield from` statement in async function; use `async for` instead
   |
@@ -8,5 +9,3 @@ yield_from_in_async_function.py:7:5: PLE1700 `yield from` statement in async fun
 7 |     yield from l
   |     ^^^^^^^^^^^^ PLE1700
   |
-
-

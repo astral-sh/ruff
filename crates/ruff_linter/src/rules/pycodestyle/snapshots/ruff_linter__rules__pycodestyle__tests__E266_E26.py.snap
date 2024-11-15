@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E26.py:19:5: E266 [*] Too many leading `#` before block comment
    |
@@ -102,6 +103,4 @@ E26.py:82:1: E266 [*] Too many leading `#` before block comment
    82 |+# Foo
 83 83 | 
 84 84 | a = 1  ## Foo
-85 85 | 
-
-
+85 85 |

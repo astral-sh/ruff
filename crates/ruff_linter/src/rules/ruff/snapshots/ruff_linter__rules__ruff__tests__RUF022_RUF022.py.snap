@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF022.py:5:11: RUF022 [*] `__all__` is not sorted
   |
@@ -1076,5 +1077,3 @@ RUF022.py:253:11: RUF022 [*] `__all__` is not sorted
 263 263 |     # strange multiline comment comment 2a
 264 264 |     # strange multiline comment 2b
 265 265 |     ,
-
-

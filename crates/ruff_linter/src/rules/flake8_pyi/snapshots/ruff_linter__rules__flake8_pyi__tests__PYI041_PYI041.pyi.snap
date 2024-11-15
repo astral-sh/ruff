@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI041.pyi:21:14: PYI041 Use `float` instead of `int | float`
    |
@@ -40,5 +41,3 @@ PYI041.pyi:39:24: PYI041 Use `complex` instead of `int | complex`
 39 |     def bad(self, arg: int | float | complex) -> None: ...  # PYI041
    |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF020.py:3:7: RUF020 [*] `Union[Never, T]` is equivalent to `T`
   |
@@ -133,5 +134,3 @@ RUF020.py:8:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
 7 7 | Union[Union[Never, int], Union[NoReturn, int]]
 8   |-Union[NoReturn, int, float]
   8 |+Union[int, float]
-
-

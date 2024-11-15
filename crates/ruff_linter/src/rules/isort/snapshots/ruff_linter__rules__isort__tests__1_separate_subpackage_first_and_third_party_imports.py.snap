@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 separate_subpackage_first_and_third_party_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -29,5 +30,3 @@ separate_subpackage_first_and_third_party_imports.py:1:1: I001 [*] Import block 
 6     |-import foo
 7     |-import foo.bar
 8     |-import foo.bar.baz
-
-

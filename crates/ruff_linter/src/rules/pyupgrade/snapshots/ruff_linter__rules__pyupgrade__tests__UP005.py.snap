@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
   |
@@ -76,5 +77,3 @@ UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotR
 9  9  |         self.failUnlessAlmostEqual(1, 1.1)
 10    |-        self.assertNotRegexpMatches("a", "b")
    10 |+        self.assertNotRegex("a", "b")
-
-

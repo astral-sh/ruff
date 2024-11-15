@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 eq_without_hash.py:1:7: PLW1641 Object does not implement `__hash__` method
   |
@@ -8,5 +9,3 @@ eq_without_hash.py:1:7: PLW1641 Object does not implement `__hash__` method
 2 |     def __init__(self):
 3 |         self.name = "monty"
   |
-
-

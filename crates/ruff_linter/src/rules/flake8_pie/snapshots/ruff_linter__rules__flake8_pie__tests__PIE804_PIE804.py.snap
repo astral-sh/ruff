@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
+snapshot_kind: text
 ---
 PIE804.py:1:5: PIE804 [*] Unnecessary `dict` kwargs
   |

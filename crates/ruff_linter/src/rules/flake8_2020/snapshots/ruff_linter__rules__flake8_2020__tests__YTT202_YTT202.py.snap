@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+snapshot_kind: text
 ---
 YTT202.py:4:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
   |
@@ -19,5 +20,3 @@ YTT202.py:6:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
   |    ^^^ YTT202
 7 |     print("3")
   |
-
-

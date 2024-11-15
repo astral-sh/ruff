@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B006_extended.py:17:55: B006 [*] Do not use mutable data structures for argument defaults
    |

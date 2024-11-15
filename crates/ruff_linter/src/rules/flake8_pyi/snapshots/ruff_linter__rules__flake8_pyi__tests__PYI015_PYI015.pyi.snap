@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI015.pyi:44:23: PYI015 [*] Only simple default values allowed for assignments
    |
@@ -229,5 +230,3 @@ PYI015.pyi:55:11: PYI015 [*] Only simple default values allowed for assignments
 56 56 | 
 57 57 | # We shouldn't emit Y015 within functions
 58 58 | def f():
-
-

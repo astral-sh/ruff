@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 non_augmented_assignment.py:16:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |

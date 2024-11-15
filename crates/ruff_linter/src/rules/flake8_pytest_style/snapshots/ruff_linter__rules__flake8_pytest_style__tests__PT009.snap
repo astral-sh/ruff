@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT009.py:11:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
@@ -659,5 +660,3 @@ PT009.py:98:2: PT009 [*] Use a regular `assert` instead of unittest-style `asser
 99    |-    "piAx_piAy_beta[r][x][y] = {17}".format(
 100    |-        self.model.piAx_piAy_beta[r][x][y])))
    98 |+assert "piAx_piAy_beta[r][x][y] = {17}".format(self.model.piAx_piAy_beta[r][x][y])
-
-

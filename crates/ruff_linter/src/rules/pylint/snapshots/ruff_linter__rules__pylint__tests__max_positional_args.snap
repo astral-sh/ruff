@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 too_many_positional_params.py:3:5: PLR0917 Too many positional arguments (7/4)
   |
@@ -18,5 +19,3 @@ too_many_positional_params.py:9:5: PLR0917 Too many positional arguments (7/4)
    |     ^ PLR0917
 10 |     pass
    |
-
-

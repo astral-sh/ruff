@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type annotation
    |
@@ -19,5 +20,3 @@ future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type ann
 35 35 |     y = List[int]()
 36 36 |     y.append(x)
 37 37 |     return y
-
-

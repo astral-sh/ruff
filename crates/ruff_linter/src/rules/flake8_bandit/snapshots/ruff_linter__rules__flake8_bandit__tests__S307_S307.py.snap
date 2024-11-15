@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S307.py:3:7: S307 Use of possibly insecure function; consider using `ast.literal_eval`
   |
@@ -16,5 +17,3 @@ S307.py:4:7: S307 Use of possibly insecure function; consider using `ast.literal
 4 | print(eval("os.getcwd()"))  # S307
   |       ^^^^^^^^^^^^^^^^^^^ S307
   |
-
-

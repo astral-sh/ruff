@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S602.py:4:1: S602 `subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`
   |

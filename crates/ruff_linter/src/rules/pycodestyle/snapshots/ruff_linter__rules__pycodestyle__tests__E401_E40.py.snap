@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E40.py:2:1: E401 [*] Multiple imports on one line
   |
@@ -176,5 +177,3 @@ E40.py:80:14: E401 [*] Multiple imports on one line
 79 79 | 
 80    |-    if True: import re as regex, string
    80 |+    if True: import re as regex; import string
-
-

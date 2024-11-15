@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+snapshot_kind: text
 ---
 DOC402_numpy.py:11:5: DOC402 `yield` is not documented in docstring
    |

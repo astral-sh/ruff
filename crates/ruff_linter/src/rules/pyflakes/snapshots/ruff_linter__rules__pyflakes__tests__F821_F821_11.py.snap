@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_11.py:18:28: F821 Undefined name `os`
    |
@@ -14,5 +15,3 @@ F821_11.py:23:14: F821 Undefined name `Baz`
 23 | f(Callable[["Baz"], None])
    |              ^^^ F821
    |
-
-

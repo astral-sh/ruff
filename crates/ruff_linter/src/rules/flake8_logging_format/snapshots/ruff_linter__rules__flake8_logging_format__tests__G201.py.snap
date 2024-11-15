@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+snapshot_kind: text
 ---
 G201.py:8:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
    |
@@ -40,5 +41,3 @@ G201.py:33:5: G201 Logging `.exception(...)` should be used instead of `.error(.
 34 | 
 35 | # OK
    |
-
-
