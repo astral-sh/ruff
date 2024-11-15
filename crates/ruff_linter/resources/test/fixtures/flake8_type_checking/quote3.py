@@ -53,3 +53,18 @@ def f():
     def test_annotated_non_typing_reference(user: Annotated[str, Depends(get_foo)]):
         pass
 
+
+def f():
+    from typing import Literal
+    from third_party import Type
+
+    def test_string_contains_opposite_quote_do_not_fix(self, type1: Type[Literal["'"]], type2: Type[Literal["\'"]]):
+        pass
+
+
+def f():
+    from typing import Literal
+    from third_party import Type
+
+    def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
+        pass

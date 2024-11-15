@@ -1,6 +1,11 @@
 [files]
 # https://github.com/crate-ci/typos/issues/868
-extend-exclude = ["crates/red_knot_vendored/vendor/**/*", "**/resources/**/*", "**/snapshots/**/*"]
+extend-exclude = [
+  "crates/red_knot_vendored/vendor/**/*",
+  "**/resources/**/*",
+  "**/snapshots/**/*",
+  "crates/red_knot_workspace/src/workspace/pyproject/package_name.rs"
+]
 
 [default.extend-words]
 "arange" = "arange"  # e.g. `numpy.arange`
