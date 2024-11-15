@@ -954,7 +954,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let function_ty = Type::FunctionLiteral(FunctionType::new(
             self.db,
-            &*name.id,
+            &name.id,
             function_kind,
             body_scope,
             decorator_tys,
@@ -1069,7 +1069,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let maybe_known_class = KnownClass::try_from_file(self.db, self.file, name);
 
-        let class = Class::new(self.db, &*name.id, body_scope, maybe_known_class);
+        let class = Class::new(self.db, &name.id, body_scope, maybe_known_class);
         let class_ty = Type::class_literal(class);
 
         self.add_declaration_with_binding(class_node.into(), definition, class_ty, class_ty);
