@@ -395,6 +395,7 @@ mod tests {
         Path::new("RUF009_attrs.py")
     )]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
+    #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
