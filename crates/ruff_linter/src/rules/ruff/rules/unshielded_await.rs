@@ -1,12 +1,14 @@
-use std::ops::Deref;
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprAttribute, ExprCall, Stmt};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{
+    self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprAttribute, ExprCall, Stmt,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
+use std::ops::Deref;
 
 /// ## What it does
 /// TODO
@@ -57,7 +59,14 @@ pub(crate) fn unshielded_await_for_try(
         let types = flattened_tuple(t, checker.semantic());
 
         // TODO i challenge you to make it worse than this
-        if types.iter().find(|tt| format!("{tt}").as_str() == format!("{exception}").as_str() || format!("{tt}").as_str() == format!("{asyncio_cancelled_error}").as_str()).is_none() {
+        if types
+            .iter()
+            .find(|tt| {
+                format!("{tt}").as_str() == format!("{exception}").as_str()
+                    || format!("{tt}").as_str() == format!("{asyncio_cancelled_error}").as_str()
+            })
+            .is_none()
+        {
             continue;
         }
 
@@ -79,9 +88,7 @@ pub(crate) fn unshielded_await_for_try(
     visitor.visit_body(&finalbody);
     if visitor.seen_await {
         checker.diagnostics.push(Diagnostic::new(
-            UnshieldedAwait {
-                s: format!(""),
-            },
+            UnshieldedAwait { s: format!("") },
             // TODO yeah not sure where to get the finally range itself
             finalbody[0].range(),
         ));
@@ -97,19 +104,18 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Qual
                 f.append(&mut flattened_tuple(e, semantic))
             }
         }
-        Expr::Name( .. ) | Expr::Attribute( .. ) => {
+        Expr::Name(..) | Expr::Attribute(..) => {
             if let Some(name) = semantic.resolve_qualified_name(t) {
                 f.push(name);
             } else {
                 panic!("inside unable to handle {:?}", t);
             };
-        },
+        }
         _ => panic!("outside unable to handle {:?}", t),
     }
 
     f
 }
-
 
 /// A [`Visitor`] that detects the presence of `await` expressions in the current scope.
 #[derive(Debug, Default)]
@@ -124,12 +130,18 @@ impl Visitor<'_> for PrunedAwaitVisitor {
             Stmt::With(ast::StmtWith { is_async: true, .. }) => {
                 self.seen_await = true;
             }
-            Stmt::With(ast::StmtWith { is_async: false, items, .. }) => {
+            Stmt::With(ast::StmtWith {
+                is_async: false,
+                items,
+                ..
+            }) => {
                 for item in items {
                     // TODO resolved name...  what about x = y(); with y:?
-                    if let Expr::Call(ExprCall{ref func, ..}) = item.context_expr {
-                        if let Expr::Attribute(ExprAttribute{ attr, .. }) = func.deref() {
-                            if attr.id.as_str() == "shield" { return}
+                    if let Expr::Call(ExprCall { ref func, .. }) = item.context_expr {
+                        if let Expr::Attribute(ExprAttribute { attr, .. }) = func.deref() {
+                            if attr.id.as_str() == "shield" {
+                                return;
+                            }
                         }
                     }
                 }
