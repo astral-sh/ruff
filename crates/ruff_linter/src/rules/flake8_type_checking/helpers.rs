@@ -396,7 +396,7 @@ impl<'a> SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                 let Some((first, remaining)) = elts.split_first() else {
                     return;
                 };
-                self.annotation.push_str("[");
+                self.annotation.push('[');
                 self.visit_expr(first);
                 if let Some(last) = self.state.last_mut() {
                     if *last == QuoteAnnotatorState::AnnotatedFirst {
@@ -407,7 +407,7 @@ impl<'a> SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                     self.annotation.push_str(", ");
                     self.visit_expr(expr);
                 }
-                self.annotation.push_str("]");
+                self.annotation.push(']');
                 self.state.pop();
             }
             Expr::BinOp(ast::ExprBinOp {
