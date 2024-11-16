@@ -45,11 +45,10 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe for most cases; however, the fix will
-/// flatten nested unions type expressions into a single top-level union.
+/// This rule's fix is marked as safe, unless the type annotation contains comments.
 ///
-/// The fix is marked as unsafe when comments are present within the type
-/// expression.
+/// Note that while the fix may flatten nested unions into a single top-level union,
+/// the semantics of the annotation will remain unchanged.
 ///
 /// ## References
 /// - [Python documentation: The numeric tower](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
