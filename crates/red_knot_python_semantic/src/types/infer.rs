@@ -2211,11 +2211,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
-    fn store_expression_type(
-        &mut self,
-        expression: &impl HasScopedAstId<Id = ScopedExpressionId>,
-        ty: Type<'db>,
-    ) {
+    fn store_expression_type(&mut self, expression: &impl HasScopedAstId, ty: Type<'db>) {
         if self.deferred_state.in_string_annotation() {
             // Avoid storing the type of expressions that are part of a string annotation because
             // the expression ids don't exists in the semantic index. Instead, we'll store the type
