@@ -256,6 +256,7 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI052.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI055.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI055.py", true, true),
+    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI061.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI062.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI062.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI063.py", true, true),
