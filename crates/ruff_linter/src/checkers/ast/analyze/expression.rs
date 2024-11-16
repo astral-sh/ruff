@@ -80,6 +80,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateUnionMember,
                 Rule::RedundantLiteralUnion,
                 Rule::UnnecessaryTypeUnion,
+                Rule::NoneNotAtEndOfUnion,
             ]) {
                 // Avoid duplicate checks if the parent is a union, since these rules already
                 // traverse nested unions.
@@ -95,6 +96,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::UnnecessaryTypeUnion) {
                         flake8_pyi::rules::unnecessary_type_union(checker, expr);
+                    }
+                    if checker.enabled(Rule::NoneNotAtEndOfUnion) {
+                        ruff::rules::none_not_at_end_of_union(checker, expr);
                     }
                 }
             }
@@ -1281,6 +1285,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::RuntimeStringUnion) {
                     flake8_type_checking::rules::runtime_string_union(checker, expr);
+                }
+                if checker.enabled(Rule::NoneNotAtEndOfUnion) {
+                    ruff::rules::none_not_at_end_of_union(checker, expr);
                 }
             }
         }

@@ -155,20 +155,13 @@ impl HasScopedAstId for ast::ExpressionRef<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(super) struct AstIdsBuilder {
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIdsBuilder {
-    pub(super) fn new() -> Self {
-        Self {
-            expressions_map: FxHashMap::default(),
-            uses_map: FxHashMap::default(),
-        }
-    }
-
     /// Adds `expr` to the expression ids map and returns its id.
     pub(super) fn record_expression(&mut self, expr: &ast::Expr) -> ScopedExpressionId {
         let expression_id = self.expressions_map.len().into();

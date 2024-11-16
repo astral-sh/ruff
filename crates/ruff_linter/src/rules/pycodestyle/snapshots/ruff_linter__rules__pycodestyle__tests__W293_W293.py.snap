@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 W293.py:4:1: W293 [*] Blank line contains whitespace
   |
@@ -80,5 +81,3 @@ W293.py:18:1: W293 [*] Blank line contains whitespace
 18    |- 
    18 |+
 19 19 | inside a multiline string'''
-
-

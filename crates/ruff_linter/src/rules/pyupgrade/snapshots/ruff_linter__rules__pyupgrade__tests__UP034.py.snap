@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP034.py:2:7: UP034 [*] Avoid extraneous parentheses
   |
@@ -205,5 +206,3 @@ UP034.py:39:7: UP034 [*] Avoid extraneous parentheses
 40 40 | 
 41 41 | # OK
 42 42 | print("foo")
-
-

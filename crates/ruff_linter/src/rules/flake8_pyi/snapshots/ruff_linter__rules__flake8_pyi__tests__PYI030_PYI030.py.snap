@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI030.py:9:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |

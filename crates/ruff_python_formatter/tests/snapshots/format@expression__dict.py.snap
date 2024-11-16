@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/dict.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -256,6 +257,3 @@ query = {
     ): [clause for kf_pair in queries for clause in kf_pair["fragment"]]
 }
 ```
-
-
-

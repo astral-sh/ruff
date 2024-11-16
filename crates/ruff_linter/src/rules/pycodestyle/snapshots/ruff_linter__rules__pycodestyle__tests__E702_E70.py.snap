@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E70.py:6:10: E702 Multiple statements on one line (semicolon)
   |
@@ -70,5 +71,3 @@ E70.py:65:4: E702 Multiple statements on one line (semicolon)
 66 | #: E703:2:1
 67 | 0\
    |
-
-

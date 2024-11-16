@@ -34,6 +34,7 @@ tracing-tree = { workspace = true }
 [dev-dependencies]
 filetime = { workspace = true }
 tempfile = { workspace = true }
+ruff_db = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

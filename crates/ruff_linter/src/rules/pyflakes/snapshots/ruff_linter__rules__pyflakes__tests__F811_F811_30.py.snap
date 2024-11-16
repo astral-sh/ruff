@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F811_30.py:12:9: F811 Redefinition of unused `bar` from line 10
    |

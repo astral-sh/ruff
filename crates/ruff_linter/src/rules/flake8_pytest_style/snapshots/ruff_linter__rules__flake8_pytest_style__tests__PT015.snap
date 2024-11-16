@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT015.py:9:5: PT015 Assertion always fails, replace with `pytest.fail()`
    |
@@ -166,5 +167,3 @@ PT015.py:25:5: PT015 Assertion always fails, replace with `pytest.fail()`
 25 |     assert tuple("")
    |     ^^^^^^^^^^^^^^^^ PT015
    |
-
-

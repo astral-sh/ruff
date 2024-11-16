@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP025.py:1:1: UP025 [*] Remove unicode literals from strings
   |
@@ -298,5 +299,3 @@ UP025.py:28:8: UP025 [*] Remove unicode literals from strings
 27 27 | f"foo"u"bar"  # OK
 28    |-f"foo" u"bar"  # OK
    28 |+f"foo" "bar"  # OK
-
-

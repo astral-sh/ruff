@@ -1,9 +1,12 @@
-use std::fmt::Debug;
-
+pub use glob::PatternError;
 pub use memory_fs::MemoryFileSystem;
 #[cfg(feature = "os")]
 pub use os::OsSystem;
 use ruff_notebook::{Notebook, NotebookError};
+use std::error::Error;
+use std::fmt::Debug;
+use std::path::{Path, PathBuf};
+use std::{fmt, io};
 pub use test::{DbWithTestSystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
@@ -51,6 +54,10 @@ pub trait System: Debug {
     /// * `path` does not exist.
     /// * A non-final component in `path` is not a directory.
     /// * the symlink target path is not valid Unicode.
+    ///
+    /// ## Windows long-paths
+    /// Unlike `std::fs::canonicalize`, this function does remove UNC prefixes if possible.
+    /// See [dunce::canonicalize] for more information.
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
 
     /// Reads the content of the file at `path` into a [`String`].
@@ -125,6 +132,19 @@ pub trait System: Debug {
     /// It is allowed to pass a `path` that points to a file. In this case, the walker
     /// yields a single entry for that file.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
+
+    /// Return an iterator that produces all the `Path`s that match the given
+    /// pattern using default match options, which may be absolute or relative to
+    /// the current working directory.
+    ///
+    /// This may return an error if the pattern is invalid.
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        PatternError,
+    >;
 
     fn as_any(&self) -> &dyn std::any::Any;
 
@@ -203,4 +223,60 @@ impl DirectoryEntry {
     pub fn file_type(&self) -> FileType {
         self.file_type
     }
+}
+
+/// A glob iteration error.
+///
+/// This is typically returned when a particular path cannot be read
+/// to determine if its contents match the glob pattern. This is possible
+/// if the program lacks the appropriate permissions, for example.
+#[derive(Debug)]
+pub struct GlobError {
+    path: PathBuf,
+    error: GlobErrorKind,
+}
+
+impl GlobError {
+    /// The Path that the error corresponds to.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn kind(&self) -> &GlobErrorKind {
+        &self.error
+    }
+}
+
+impl Error for GlobError {}
+
+impl fmt::Display for GlobError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.error {
+            GlobErrorKind::IOError(error) => {
+                write!(
+                    f,
+                    "attempting to read `{}` resulted in an error: {error}",
+                    self.path.display(),
+                )
+            }
+            GlobErrorKind::NonUtf8Path => {
+                write!(f, "`{}` is not a valid UTF-8 path", self.path.display(),)
+            }
+        }
+    }
+}
+
+impl From<glob::GlobError> for GlobError {
+    fn from(value: glob::GlobError) -> Self {
+        Self {
+            path: value.path().to_path_buf(),
+            error: GlobErrorKind::IOError(value.into_error()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum GlobErrorKind {
+    IOError(io::Error),
+    NonUtf8Path,
 }

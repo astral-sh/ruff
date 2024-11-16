@@ -6,6 +6,14 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
+pub(crate) use self::display::TypeArrayDisplay;
+pub(crate) use self::infer::{
+    infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
+};
+pub(crate) use self::signatures::Signature;
+use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
@@ -22,19 +30,14 @@ use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program};
 
-pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
-pub(crate) use self::display::TypeArrayDisplay;
-pub(crate) use self::infer::{
-    infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
-};
-
 mod builder;
 mod diagnostic;
 mod display;
 mod infer;
 mod mro;
 mod narrow;
+mod signatures;
+mod string_annotation;
 mod unpacker;
 
 #[salsa::tracked(return_ref)]
@@ -44,7 +47,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     tracing::debug!("Checking file '{path}'", path = file.path(db));
 
     let index = semantic_index(db, file);
-    let mut diagnostics = TypeCheckDiagnostics::new();
+    let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
         let result = infer_scope_types(db, scope_id);
@@ -56,7 +59,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Symbol<'db> {
-    let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
+    let _span = tracing::trace_span!("symbol_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
 
@@ -1271,11 +1274,11 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_type) => {
                 if function_type.is_known(db, KnownFunction::RevealType) {
                     CallOutcome::revealed(
-                        function_type.return_ty(db),
+                        function_type.signature(db).return_ty,
                         *arg_types.first().unwrap_or(&Type::Unknown),
                     )
                 } else {
-                    CallOutcome::callable(function_type.return_ty(db))
+                    CallOutcome::callable(function_type.signature(db).return_ty)
                 }
             }
 
@@ -1458,6 +1461,24 @@ impl<'db> Type<'db> {
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::LiteralString => Type::Unknown,
+        }
+    }
+
+    /// If we see a value of this type used as a type expression, what type does it name?
+    ///
+    /// For example, the builtin `int` as a value expression is of type
+    /// `Type::ClassLiteral(builtins.int)`, that is, it is the `int` class itself. As a type
+    /// expression, it names the type `Type::Instance(builtins.int)`, that is, all objects whose
+    /// `__class__` is `int`.
+    #[must_use]
+    pub fn in_type_expression(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::ClassLiteral(_) | Type::SubclassOf(_) => self.to_instance(db),
+            Type::Union(union) => union.map(db, |element| element.in_type_expression(db)),
+            Type::Unknown => Type::Unknown,
+            // TODO map this to a new `Type::TypeVar` variant
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => *self,
+            _ => Type::Todo,
         }
     }
 
@@ -1720,7 +1741,7 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn try_from_module(module: &Module, class_name: &str) -> Option<Self> {
+    pub fn try_from_file(db: &dyn Db, file: File, class_name: &str) -> Option<Self> {
         // Note: if this becomes hard to maintain (as rust can't ensure at compile time that all
         // variants of `Self` are covered), we might use a macro (in-house or dependency)
         // See: https://stackoverflow.com/q/39070244
@@ -1747,7 +1768,8 @@ impl<'db> KnownClass {
             _ => return None,
         };
 
-        candidate.check_module(module).then_some(candidate)
+        let module = file_to_module(db, file)?;
+        candidate.check_module(&module).then_some(candidate)
     }
 
     /// Return `true` if the module of `self` matches `module_name`
@@ -2321,7 +2343,10 @@ impl<'db> FunctionType<'db> {
         self.decorators(db).contains(&decorator)
     }
 
-    /// inferred return type for this function
+    /// Typed externally-visible signature for this function.
+    ///
+    /// This is the signature as seen by external callers, possibly modified by decorators and/or
+    /// overloaded.
     ///
     /// ## Why is this a salsa query?
     ///
@@ -2330,34 +2355,32 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked]
-    pub fn return_ty(self, db: &'db dyn Db) -> Type<'db> {
+    #[salsa::tracked(return_ref)]
+    pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
+        let function_stmt_node = self.body_scope(db).node(db).expect_function();
+        let internal_signature = self.internal_signature(db);
+        if function_stmt_node.decorator_list.is_empty() {
+            return internal_signature;
+        }
+        // TODO process the effect of decorators on the signature
+        Signature::todo()
+    }
+
+    /// Typed internally-visible signature for this function.
+    ///
+    /// This represents the annotations on the function itself, unmodified by decorators and
+    /// overloads.
+    ///
+    /// These are the parameter and return types that should be used for type checking the body of
+    /// the function.
+    ///
+    /// Don't call this when checking any other file; only when type-checking the function body
+    /// scope.
+    fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
-
-        // TODO if a function `bar` is decorated by `foo`,
-        // where `foo` is annotated as returning a type `X` that is a subtype of `Callable`,
-        // we need to infer the return type from `X`'s return annotation
-        // rather than from `bar`'s return annotation
-        // in order to determine the type that `bar` returns
-        if !function_stmt_node.decorator_list.is_empty() {
-            return Type::Todo;
-        }
-
-        function_stmt_node
-            .returns
-            .as_ref()
-            .map(|returns| {
-                if function_stmt_node.is_async {
-                    // TODO: generic `types.CoroutineType`!
-                    Type::Todo
-                } else {
-                    let definition =
-                        semantic_index(db, scope.file(db)).definition(function_stmt_node);
-                    definition_expression_ty(db, definition, returns.as_ref())
-                }
-            })
-            .unwrap_or(Type::Unknown)
+        let definition = semantic_index(db, scope.file(db)).definition(function_stmt_node);
+        Signature::from_function(db, definition, function_stmt_node)
     }
 
     pub fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {

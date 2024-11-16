@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 <filename>:4:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   |
@@ -16,5 +17,3 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 3 3 | x = pd.DataFrame()
 4   |-x.drop(["a"], axis=1, inplace=True)
   4 |+x = x.drop(["a"], axis=1)
-
-

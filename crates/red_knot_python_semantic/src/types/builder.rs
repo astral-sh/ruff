@@ -128,7 +128,7 @@ impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
-            intersections: vec![InnerIntersectionBuilder::new()],
+            intersections: vec![InnerIntersectionBuilder::default()],
         }
     }
 
@@ -231,10 +231,6 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
-    fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, new_positive: Type<'db>) {
         if let Type::Intersection(other) = new_positive {
@@ -253,7 +249,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         .iter()
                         .find(|element| element.is_boolean_literal())
                     {
-                        *self = Self::new();
+                        *self = Self::default();
                         self.positive.insert(Type::BooleanLiteral(!value));
                         return;
                     }
@@ -272,7 +268,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
                 // A & B = Never    if A and B are disjoint
                 if new_positive.is_disjoint_from(db, *existing_positive) {
-                    *self = Self::new();
+                    *self = Self::default();
                     self.positive.insert(Type::Never);
                     return;
                 }
@@ -285,7 +281,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             for (index, existing_negative) in self.negative.iter().enumerate() {
                 // S & ~T = Never    if S <: T
                 if new_positive.is_subtype_of(db, *existing_negative) {
-                    *self = Self::new();
+                    *self = Self::default();
                     self.positive.insert(Type::Never);
                     return;
                 }
@@ -326,7 +322,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .iter()
                     .any(|pos| *pos == KnownClass::Bool.to_instance(db)) =>
             {
-                *self = Self::new();
+                *self = Self::default();
                 self.positive.insert(Type::BooleanLiteral(!bool));
             }
             _ => {
@@ -348,7 +344,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for existing_positive in &self.positive {
                     // S & ~T = Never    if S <: T
                     if existing_positive.is_subtype_of(db, new_negative) {
-                        *self = Self::new();
+                        *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;
                     }

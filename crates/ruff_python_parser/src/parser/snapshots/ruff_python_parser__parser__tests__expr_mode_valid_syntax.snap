@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests.rs
 expression: parsed.expr()
+snapshot_kind: text
 ---
 Name(
     ExprName {

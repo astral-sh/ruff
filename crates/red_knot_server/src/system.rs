@@ -7,8 +7,8 @@ use lsp_types::Url;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, FileType, Metadata, OsSystem, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath, SystemVirtualPathBuf,
+    DirectoryEntry, FileType, GlobError, Metadata, OsSystem, PatternError, Result, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
 };
 use ruff_notebook::{Notebook, NotebookError};
 
@@ -196,6 +196,16 @@ impl System for LSPSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.os_system.walk_directory(path)
+    }
+
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        PatternError,
+    > {
+        self.os_system.glob(pattern)
     }
 
     fn as_any(&self) -> &dyn Any {

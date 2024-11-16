@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI010.pyi:6:5: PYI010 [*] Function body must contain only `...`
   |
@@ -60,5 +61,3 @@ PYI010.pyi:12:5: PYI010 [*] Function body must contain only `...`
 13 13 | 
 14 14 | def foo3():
 15 15 |     pass  # OK, pass is handled by another rule
-
-

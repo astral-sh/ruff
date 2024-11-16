@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP036_1.py:3:4: UP036 [*] Version block is outdated for minimum Python version
   |
@@ -291,5 +292,3 @@ UP036_1.py:75:10: UP036 [*] Version block is outdated for minimum Python version
 75    |-    elif sys.version_info > (3,):
    75 |+    else:
 76 76 |         print(3)
-
-

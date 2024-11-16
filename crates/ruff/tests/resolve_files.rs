@@ -29,7 +29,7 @@ fn check_project_include_defaults() {
         filters => TEST_FILTERS.to_vec()
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r###"
+        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -41,7 +41,7 @@ fn check_project_include_defaults() {
         ----- stderr -----
         warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `nested-project/pyproject.toml`:
           - 'select' -> 'lint.select'
-        "###);
+        ");
     });
 }
 
@@ -53,14 +53,14 @@ fn check_project_respects_direct_paths() {
         filters => TEST_FILTERS.to_vec()
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files", "b.py"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r###"
+        .args(["check", "--show-files", "b.py"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r"
         success: true
         exit_code: 0
         ----- stdout -----
         [BASEPATH]/include-test/b.py
 
         ----- stderr -----
-        "###);
+        ");
     });
 }
 
@@ -72,14 +72,14 @@ fn check_project_respects_subdirectory_includes() {
         filters => TEST_FILTERS.to_vec()
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files", "subdirectory"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r###"
+        .args(["check", "--show-files", "subdirectory"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r"
         success: true
         exit_code: 0
         ----- stdout -----
         [BASEPATH]/include-test/subdirectory/c.py
 
         ----- stderr -----
-        "###);
+        ");
     });
 }
 
@@ -91,13 +91,13 @@ fn check_project_from_project_subdirectory_respects_includes() {
         filters => TEST_FILTERS.to_vec()
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test/subdirectory")), @r###"
+        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test/subdirectory")), @r"
         success: true
         exit_code: 0
         ----- stdout -----
         [BASEPATH]/include-test/subdirectory/c.py
 
         ----- stderr -----
-        "###);
+        ");
     });
 }

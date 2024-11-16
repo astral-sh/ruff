@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
 ---
 ASYNC110.py:7:5: ASYNC110 Use `trio.Event` instead of awaiting `trio.sleep` in a `while` loop
   |

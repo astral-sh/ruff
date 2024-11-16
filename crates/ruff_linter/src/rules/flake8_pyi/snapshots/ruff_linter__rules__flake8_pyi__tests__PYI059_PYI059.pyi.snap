@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI059.pyi:8:17: PYI059 [*] `Generic[]` should always be the last base class
    |

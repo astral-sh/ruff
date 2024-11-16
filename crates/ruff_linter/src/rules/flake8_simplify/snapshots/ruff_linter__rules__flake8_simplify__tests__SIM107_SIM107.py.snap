@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM107.py:9:9: SIM107 Don't use `return` in `try`-`except` and `finally`
   |
@@ -8,5 +9,3 @@ SIM107.py:9:9: SIM107 Don't use `return` in `try`-`except` and `finally`
 9 |         return "3"
   |         ^^^^^^^^^^ SIM107
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F50x.py:4:1: F509 `%`-format string has unsupported format character `j`
   |
@@ -10,5 +11,3 @@ F50x.py:4:1: F509 `%`-format string has unsupported format character `j`
 5 | '%s %s' % (1,)  # F507
 6 | '%s %s' % (1, 2, 3)  # F507
   |
-
-

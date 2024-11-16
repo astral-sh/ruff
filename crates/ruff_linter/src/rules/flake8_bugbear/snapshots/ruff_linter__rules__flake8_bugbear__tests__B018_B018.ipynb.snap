@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B018.ipynb:5:1: B018 Found useless expression. Either assign it to a variable or remove it.
   |
@@ -30,5 +31,3 @@ B018.ipynb:13:1: B018 Found useless expression. Either assign it to a variable o
 14 | # Comments, newlines and whitespace
 15 | x  # comment
    |
-
-

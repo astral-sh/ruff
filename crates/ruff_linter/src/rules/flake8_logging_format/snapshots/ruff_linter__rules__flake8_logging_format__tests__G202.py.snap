@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+snapshot_kind: text
 ---
 G202.py:8:38: G202 Logging statement has redundant `exc_info`
    |
@@ -40,5 +41,3 @@ G202.py:33:30: G202 Logging statement has redundant `exc_info`
 34 | 
 35 | # OK
    |
-
-

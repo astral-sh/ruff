@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F811_23.py:4:15: F811 Redefinition of unused `foo` from line 3
   |

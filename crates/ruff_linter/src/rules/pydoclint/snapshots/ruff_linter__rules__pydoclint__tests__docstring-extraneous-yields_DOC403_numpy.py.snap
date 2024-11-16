@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+snapshot_kind: text
 ---
 DOC403_numpy.py:24:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
    |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E23.py:2:7: E231 [*] Missing whitespace after ','
   |

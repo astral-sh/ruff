@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 W29.py:4:6: W291 [*] Trailing whitespace
   |
@@ -63,5 +64,3 @@ W29.py:13:6: W291 [*] Trailing whitespace
 14 14 | #: W191 W292 noeol
 15 15 | if False:
 16 16 | 	pass  # indented with tabs
-
-

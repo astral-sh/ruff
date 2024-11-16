@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B004.py:3:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT016.py:19:5: PT016 No message passed to `pytest.fail()`
    |
@@ -67,5 +68,3 @@ PT016.py:25:5: PT016 No message passed to `pytest.fail()`
 25 |     pytest.fail(reason=f"")
    |     ^^^^^^^^^^^ PT016
    |
-
-

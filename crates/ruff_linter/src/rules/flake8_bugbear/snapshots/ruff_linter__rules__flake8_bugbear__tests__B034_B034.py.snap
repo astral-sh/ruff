@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B034.py:5:1: B034 `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
   |
@@ -98,5 +99,3 @@ B034.py:14:1: B034 `re.sub` should pass `count` and `flags` as keyword arguments
 15 | 
 16 | # OK
    |
-
-

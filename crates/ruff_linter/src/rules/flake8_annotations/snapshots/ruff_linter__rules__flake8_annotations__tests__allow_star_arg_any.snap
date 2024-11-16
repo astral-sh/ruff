@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+snapshot_kind: text
 ---
 allow_star_arg_any.py:10:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
    |
@@ -32,5 +33,3 @@ allow_star_arg_any.py:44:67: ANN401 Dynamically typed expressions (typing.Any) a
    |                                                                   ^^^ ANN401
 45 |         pass
    |
-
-

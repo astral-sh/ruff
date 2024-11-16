@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF010.py:9:4: RUF010 [*] Use explicit conversion flag
    |
@@ -244,6 +245,4 @@ RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
    35 |+    f" that flows {obj!r} of type {type(obj)}.{additional_message}"  # RUF010
 36 36 | )
 37 37 | 
-38 38 | 
-
-
+38 38 |

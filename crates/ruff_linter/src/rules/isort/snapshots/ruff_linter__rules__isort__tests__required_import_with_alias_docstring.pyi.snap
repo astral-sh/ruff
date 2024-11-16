@@ -1,4 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 
