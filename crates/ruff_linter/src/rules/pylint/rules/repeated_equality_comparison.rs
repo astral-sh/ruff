@@ -28,6 +28,10 @@ use crate::Locator;
 /// If the items are hashable, use a `set` for efficiency; otherwise, use a
 /// `tuple`.
 ///
+/// In [preview], this rule will try to determine if the values are hashable
+/// and the fix will use a `set` if they are. If unable to determine, the fix
+/// will use a `tuple` and continue to suggest the use of a `set`.
+///
 /// ## Example
 /// ```python
 /// foo == "bar" or foo == "baz" or foo == "qux"
@@ -42,6 +46,8 @@ use crate::Locator;
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
@@ -127,19 +133,21 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                 continue;
             }
 
-            let mut seen_values =
-                FxHashSet::with_capacity_and_hasher(comparators.len(), FxBuildHasher);
-
             // if we can determine that all the values are hashable, we can use a set
             // TODO: improve with type inference
-            let all_hashable = comparators
-                .iter()
-                .all(|comparator| comparator.is_literal_expr());
-
-            let use_set = all_hashable
+            let all_hashable = checker.settings.preview.is_enabled()
                 && comparators
                     .iter()
-                    .all(|comparator| seen_values.insert(HashableExpr::from(*comparator)));
+                    .all(|comparator| comparator.is_literal_expr());
+
+            let use_set = all_hashable && {
+                let mut seen_values =
+                    FxHashSet::with_capacity_and_hasher(comparators.len(), FxBuildHasher);
+
+                comparators
+                    .iter()
+                    .all(|comparator| seen_values.insert(HashableExpr::from(*comparator)))
+            };
 
             let mut diagnostic = Diagnostic::new(
                 RepeatedEqualityComparison {
