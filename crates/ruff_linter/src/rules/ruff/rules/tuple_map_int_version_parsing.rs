@@ -69,7 +69,7 @@ fn tuple_like_call_with_single_argument<'a>(
     semantic: &SemanticModel,
     call: &'a ExprCall,
 ) -> Option<&'a Expr> {
-    let Some((func, positionals)) = func_and_positionals(call)?;
+    let (func, positionals) = func_and_positionals(call)?;
     let func_is = |symbol: &str| semantic.match_builtin_expr(func, symbol);
 
     if !func_is("tuple") && !func_is("list") || positionals.len() != 1 {
@@ -83,7 +83,7 @@ fn map_call_with_two_arguments<'a>(
     semantic: &SemanticModel,
     call: &'a ExprCall,
 ) -> Option<(&'a Expr, &'a Expr)> {
-    let Some((func, positionals)) = func_and_positionals(call)?;
+    let (func, positionals) = func_and_positionals(call)?;
 
     if !semantic.match_builtin_expr(func, "map") || positionals.len() != 2 {
         return None;
