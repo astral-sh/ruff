@@ -45,16 +45,24 @@ use crate::Locator;
 #[violation]
 pub struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
+    all_hashable: bool,
 }
 
 impl AlwaysFixableViolation for RepeatedEqualityComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        if let Some(expression) = self.expression.full_display() {
-            format!("Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable.")
-        } else {
-            "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
-                .to_string()
+        match (self.expression.full_display(), self.all_hashable) {
+            (Some(expression), false) => {
+                format!("Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable.")
+            }
+            (Some(expression), true) => {
+                format!("Consider merging multiple comparisons: `{expression}`.")
+            }
+            (None, false) => {
+                "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
+                    .to_string()
+            }
+            (None, true) => "Consider merging multiple comparisons.".to_string(),
         }
     }
 
@@ -121,9 +129,17 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
 
             let mut seen_values =
                 FxHashSet::with_capacity_and_hasher(comparators.len(), FxBuildHasher);
-            let use_set = comparators.iter().all(|comparator| {
-                comparator.is_literal_expr() && seen_values.insert(HashableExpr::from(*comparator))
-            });
+
+            // if we can determine that all the values are hashable, we can use a set
+            // TODO: improve with type inference
+            let all_hashable = comparators
+                .iter()
+                .all(|comparator| comparator.is_literal_expr());
+
+            let use_set = all_hashable
+                && comparators
+                    .iter()
+                    .all(|comparator| seen_values.insert(HashableExpr::from(*comparator)));
 
             let mut diagnostic = Diagnostic::new(
                 RepeatedEqualityComparison {
@@ -134,6 +150,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                         checker.locator(),
                         use_set,
                     )),
+                    all_hashable,
                 },
                 bool_op.range(),
             );
