@@ -2,96 +2,143 @@
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 snapshot_kind: text
 ---
-DOC201_numpy.py:11:5: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:3:5: DOC201 `return` is not documented in docstring
    |
- 9 |         A number
-10 |     """
-11 |     return 'test'
-   |     ^^^^^^^^^^^^^ DOC201
+ 1 |   # DOC201
+ 2 |   def foo(num: int) -> str:
+ 3 |       """
+   |  _____^
+ 4 | |     Do something
+ 5 | | 
+ 6 | |     Parameters
+ 7 | |     ----------
+ 8 | |     num : int
+ 9 | |         A number
+10 | |     """
+   | |_______^ DOC201
+11 |       return 'test'
    |
    = help: Add a "Returns" section to the docstring
 
-DOC201_numpy.py:62:9: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:54:9: DOC201 `return` is not documented in docstring
    |
-60 |             A number
-61 |         """
-62 |         return 'test'
-   |         ^^^^^^^^^^^^^ DOC201
+52 |       # DOC201
+53 |       def bar(self) -> str:
+54 |           """
+   |  _________^
+55 | |         Do something
+56 | | 
+57 | |         Parameters
+58 | |         ----------
+59 | |         num : int
+60 | |             A number
+61 | |         """
+   | |___________^ DOC201
+62 |           return 'test'
    |
    = help: Add a "Returns" section to the docstring
 
-DOC201_numpy.py:87:9: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:86:9: DOC201 `return` is not documented in docstring
    |
+84 |     @abc.abstractmethod
 85 |     def f(self):
 86 |         """Lorem ipsum."""
+   |         ^^^^^^^^^^^^^^^^^^ DOC201
 87 |         return True
-   |         ^^^^^^^^^^^ DOC201
    |
    = help: Add a "Returns" section to the docstring
 
-DOC201_numpy.py:160:9: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:152:5: DOC201 `return` is not documented in docstring
     |
-158 |     """
-159 |     if x < 0:
-160 |         return None
-    |         ^^^^^^^^^^^ DOC201
-161 |     else:
-162 |         return x
-    |
-    = help: Add a "Returns" section to the docstring
-
-DOC201_numpy.py:175:9: DOC201 `return` is not documented in docstring
-    |
-173 |     """
-174 |     if x < 0:
-175 |         return None
-    |         ^^^^^^^^^^^ DOC201
-176 |     else:
-177 |         return x
+150 |   # DOC201 - non-early return explicit None
+151 |   def foo(x: int) -> int | None:
+152 |       """A very helpful docstring.
+    |  _____^
+153 | | 
+154 | |     Parameters
+155 | |     ----------
+156 | |     x : int
+157 | |         An interger.
+158 | |     """
+    | |_______^ DOC201
+159 |       if x < 0:
+160 |           return None
     |
     = help: Add a "Returns" section to the docstring
 
-DOC201_numpy.py:189:5: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:167:5: DOC201 `return` is not documented in docstring
     |
-187 |         A string.
-188 |     """
-189 |     return None
-    |     ^^^^^^^^^^^ DOC201
+165 |   # DOC201 - non-early return explicit None w/o useful type annotations
+166 |   def foo(x):
+167 |       """A very helpful docstring.
+    |  _____^
+168 | | 
+169 | |     Parameters
+170 | |     ----------
+171 | |     x : int
+172 | |         An interger.
+173 | |     """
+    | |_______^ DOC201
+174 |       if x < 0:
+175 |           return None
     |
     = help: Add a "Returns" section to the docstring
 
-DOC201_numpy.py:195:5: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:182:5: DOC201 `return` is not documented in docstring
     |
+180 |   # DOC201 - only returns None, but return annotation is not None
+181 |   def foo(s: str) -> str | None:
+182 |       """A very helpful docstring.
+    |  _____^
+183 | | 
+184 | |     Parameters
+185 | |     ----------
+186 | |     x : str
+187 | |         A string.
+188 | |     """
+    | |_______^ DOC201
+189 |       return None
+    |
+    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:194:5: DOC201 `return` is not documented in docstring
+    |
+192 | # DOC201
 193 | def bar() -> int | None:
 194 |     """Bar-y method"""
+    |     ^^^^^^^^^^^^^^^^^^ DOC201
 195 |     return
-    |     ^^^^^^ DOC201
     |
     = help: Add a "Returns" section to the docstring
 
-DOC201_numpy.py:222:5: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:220:5: DOC201 `return` is not documented in docstring
     |
+218 | # indicates it could sometimes return `int`
+219 | def generator_function_3() -> Generator[str, None, int | None]:
 220 |     """Generate some strings"""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ DOC201
 221 |     yield from "abc"
 222 |     return
-    |     ^^^^^^ DOC201
     |
     = help: Add a "Returns" section to the docstring
 
-DOC201_numpy.py:230:5: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:228:5: DOC201 `return` is not documented in docstring
     |
+226 | # indicates it could sometimes return `int`
+227 | def generator_function_4():
 228 |     """Generate some strings"""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ DOC201
 229 |     yield from "abc"
 230 |     return 42
-    |     ^^^^^^^^^ DOC201
     |
     = help: Add a "Returns" section to the docstring
 
-DOC201_numpy.py:236:5: DOC201 `return` is not documented in docstring
+DOC201_numpy.py:235:5: DOC201 `return` is not documented in docstring
     |
+233 | # DOC201 -- no `yield` expressions, so not a generator function
 234 | def not_a_generator() -> Iterator[int]:
 235 |     """"No returns documented here, oh no"""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DOC201
 236 |     return (x for x in range(42))
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DOC201
     |
     = help: Add a "Returns" section to the docstring
