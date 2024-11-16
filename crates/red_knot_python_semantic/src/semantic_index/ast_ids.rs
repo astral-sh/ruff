@@ -76,23 +76,23 @@ impl HasScopedUseId for ast::ExpressionRef<'_> {
 #[newtype_index]
 pub struct ScopedExpressionId;
 
-pub trait HasScopedAstId {
+pub trait HasScopedExpressionId {
     /// Returns the ID that uniquely identifies the node in `scope`.
-    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId;
+    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId;
 }
 
-impl<T: HasScopedAstId> HasScopedAstId for Box<T> {
-    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
-        self.as_ref().scoped_ast_id(db, scope)
+impl<T: HasScopedExpressionId> HasScopedExpressionId for Box<T> {
+    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
+        self.as_ref().scoped_expression_id(db, scope)
     }
 }
 
 macro_rules! impl_has_scoped_expression_id {
     ($ty: ty) => {
-        impl HasScopedAstId for $ty {
-            fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
+        impl HasScopedExpressionId for $ty {
+            fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
                 let expression_ref = ExpressionRef::from(self);
-                expression_ref.scoped_ast_id(db, scope)
+                expression_ref.scoped_expression_id(db, scope)
             }
         }
     };
@@ -132,8 +132,8 @@ impl_has_scoped_expression_id!(ast::ExprSlice);
 impl_has_scoped_expression_id!(ast::ExprIpyEscapeCommand);
 impl_has_scoped_expression_id!(ast::Expr);
 
-impl HasScopedAstId for ast::ExpressionRef<'_> {
-    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
+impl HasScopedExpressionId for ast::ExpressionRef<'_> {
+    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.expression_id(*self)
     }
