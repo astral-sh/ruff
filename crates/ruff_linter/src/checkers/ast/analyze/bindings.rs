@@ -8,7 +8,6 @@ use crate::rules::{flake8_import_conventions, flake8_pyi, pyflakes, pylint, ruff
 /// Run lint rules over the [`Binding`]s.
 pub(crate) fn bindings(checker: &mut Checker) {
     if !checker.any_enabled(&[
-        Rule::ConsecutiveUnderscoresInName,
         Rule::InvalidAllFormat,
         Rule::InvalidAllObject,
         Rule::NonAsciiName,
@@ -76,13 +75,6 @@ pub(crate) fn bindings(checker: &mut Checker) {
         }
         if checker.enabled(Rule::UnsortedDunderSlots) {
             if let Some(diagnostic) = ruff::rules::sort_dunder_slots(checker, binding) {
-                checker.diagnostics.push(diagnostic);
-            }
-        }
-        if checker.enabled(Rule::ConsecutiveUnderscoresInName) {
-            if let Some(diagnostic) =
-                wps_light::rules::consecutive_underscores_in_name(checker.locator(), binding)
-            {
                 checker.diagnostics.push(diagnostic);
             }
         }

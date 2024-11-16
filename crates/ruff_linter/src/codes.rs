@@ -934,7 +934,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydoclint, "502") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousException),
 
         // wps-light
-        (WpsLight, "116") => (RuleGroup::Preview, rules::wps_light::rules::ConsecutiveUnderscoresInName),
         (WpsLight, "121") => (RuleGroup::Preview, rules::wps_light::rules::UnusedVariableAccessed),
 
         // ruff
