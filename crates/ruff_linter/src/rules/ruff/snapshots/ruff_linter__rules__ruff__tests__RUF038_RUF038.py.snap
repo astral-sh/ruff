@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF038.py:4:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `bool`
+RUF038.py:4:17: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
   |
 4 | def func1(arg1: Literal[True, False]): 
   |                 ^^^^^^^^^^^^^^^^^^^^ RUF038
@@ -19,7 +19,7 @@ RUF038.py:4:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `b
 6 6 | 
 7 7 | 
 
-RUF038.py:8:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `bool`
+RUF038.py:8:17: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
   |
 8 | def func2(arg1: Literal[True, False, True]): 
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF038
@@ -37,7 +37,7 @@ RUF038.py:8:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `b
 10 10 | 
 11 11 | 
 
-RUF038.py:12:16: RUF038 [*] `Literal[True, False]` can be replaced with a bare `bool`
+RUF038.py:12:16: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
    |
 12 | def func3() -> Literal[True, False]: 
    |                ^^^^^^^^^^^^^^^^^^^^ RUF038
@@ -55,7 +55,7 @@ RUF038.py:12:16: RUF038 [*] `Literal[True, False]` can be replaced with a bare `
 14 14 | 
 15 15 | 
 
-RUF038.py:16:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `bool`
+RUF038.py:16:17: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
    |
 16 | def func4(arg1: Literal[True, False] | bool): 
    |                 ^^^^^^^^^^^^^^^^^^^^ RUF038
@@ -73,7 +73,7 @@ RUF038.py:16:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `
 18 18 | 
 19 19 | 
 
-RUF038.py:20:17: RUF038 [*] `Literal[True, False]` can be replaced with a bare `bool`
+RUF038.py:20:17: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
    |
 20 | def func5(arg1: Literal[False, True]):
    |                 ^^^^^^^^^^^^^^^^^^^^ RUF038

@@ -51,9 +51,9 @@ use crate::checkers::ast::Checker;
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 /// - [Python documentation: Boolean type - `bool`](https://docs.python.org/3/library/stdtypes.html#boolean-type-bool)
 ///
-/// [mypy](https://github.com/python/mypy/blob/master/mypy/typeops.py#L985)
-/// [#14764](https://github.com/python/mypy/issues/14764)
-/// [#5421](https://github.com/microsoft/pyright/issues/5421)
+/// [mypy]: https://github.com/python/mypy/blob/master/mypy/typeops.py#L985
+/// [#14764]: https://github.com/python/mypy/issues/14764
+/// [#5421]: https://github.com/microsoft/pyright/issues/5421
 #[violation]
 pub struct RedundantBoolLiteral {
     seen_others: bool,
@@ -67,17 +67,16 @@ impl Violation for RedundantBoolLiteral {
         if self.seen_others {
             "`Literal[True, False, ...]` can be replaced with `Literal[...] | bool`".to_string()
         } else {
-            "`Literal[True, False]` can be replaced with a bare `bool`".to_string()
+            "`Literal[True, False]` can be replaced with `bool`".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let title = if self.seen_others {
-            "Replace with `Literal[...] | bool`"
+        Some(if self.seen_others {
+            "Replace with `Literal[...] | bool`".to_string()
         } else {
-            "Replace with `bool`"
-        };
-        Some(title.to_string())
+            "Replace with `bool`".to_string()
+        })
     }
 }
 
@@ -117,10 +116,12 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &mut Checker, literal_expr: &'
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.
     if !seen_others {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            "bool".to_string(),
-            literal_expr.range(),
-        )));
+        if checker.semantic().has_builtin_binding("bool") {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                "bool".to_string(),
+                literal_expr.range(),
+            )));
+        }
     }
 
     checker.diagnostics.push(diagnostic);
