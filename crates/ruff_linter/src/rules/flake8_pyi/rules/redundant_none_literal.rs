@@ -12,8 +12,8 @@ use crate::checkers::ast::Checker;
 /// Checks for redundant `Literal[None]` annotations.
 ///
 /// ## Why is this bad?
-/// `Literal[None]` is legal as a type annotation, but means the same thing as `None`.
-/// For stylistic consistency, prefer using `None`, which is more concise.
+/// While `Literal[None]` is a valid type annotation, it is semantically equivalent to `None`.
+/// Prefer `None` over `Literal[None]` for both consistency and readability.
 ///
 /// ## Example
 /// ```python
