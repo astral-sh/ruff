@@ -878,7 +878,7 @@ pub(crate) fn check_docstring(
         {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
-                if let Some(body_return) = body_entries.returns.first() {
+                if body_entries.returns.first().is_some() {
                     match function_def.returns.as_deref() {
                         Some(returns) => {
                             // Ignore it if it's annotated as returning `None`
@@ -893,7 +893,7 @@ pub(crate) fn check_docstring(
                             {
                                 diagnostics.push(Diagnostic::new(
                                     DocstringMissingReturns,
-                                    body_return.range(),
+                                    docstring.range(),
                                 ));
                             }
                         }
@@ -902,10 +902,8 @@ pub(crate) fn check_docstring(
                             .iter()
                             .any(|entry| !entry.is_none_return()) =>
                         {
-                            diagnostics.push(Diagnostic::new(
-                                DocstringMissingReturns,
-                                body_return.range(),
-                            ));
+                            diagnostics
+                                .push(Diagnostic::new(DocstringMissingReturns, docstring.range()));
                         }
                         _ => {}
                     }
@@ -917,7 +915,7 @@ pub(crate) fn check_docstring(
     // DOC402
     if checker.enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
-            if let Some(body_yield) = body_entries.yields.first() {
+            if body_entries.yields.first().is_some() {
                 match function_def.returns.as_deref() {
                     Some(returns)
                         if !generator_annotation_arguments(returns, semantic).is_some_and(
@@ -925,11 +923,11 @@ pub(crate) fn check_docstring(
                         ) =>
                     {
                         diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
+                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
                     }
                     None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
                         diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
+                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
                     }
                     _ => {}
                 }
@@ -960,7 +958,7 @@ pub(crate) fn check_docstring(
                     DocstringMissingException {
                         id: (*name).to_string(),
                     },
-                    body_raise.range(),
+                    docstring.range(),
                 );
                 diagnostics.push(diagnostic);
             }
@@ -972,12 +970,11 @@ pub(crate) fn check_docstring(
     if !visibility::is_abstract(&function_def.decorator_list, semantic) {
         // DOC202
         if checker.enabled(Rule::DocstringExtraneousReturns) {
-            if let Some(ref docstring_returns) = docstring_sections.returns {
+            if docstring_sections.returns.is_some() {
                 if body_entries.returns.is_empty()
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
                 {
-                    let diagnostic =
-                        Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
+                    let diagnostic = Diagnostic::new(DocstringExtraneousReturns, docstring.range());
                     diagnostics.push(diagnostic);
                 }
             }
@@ -985,10 +982,9 @@ pub(crate) fn check_docstring(
 
         // DOC403
         if checker.enabled(Rule::DocstringExtraneousYields) {
-            if let Some(docstring_yields) = docstring_sections.yields {
+            if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
-                    let diagnostic =
-                        Diagnostic::new(DocstringExtraneousYields, docstring_yields.range());
+                    let diagnostic = Diagnostic::new(DocstringExtraneousYields, docstring.range());
                     diagnostics.push(diagnostic);
                 }
             }
@@ -1013,7 +1009,7 @@ pub(crate) fn check_docstring(
                         DocstringExtraneousException {
                             ids: extraneous_exceptions,
                         },
-                        docstring_raises.range(),
+                        docstring.range(),
                     );
                     diagnostics.push(diagnostic);
                 }

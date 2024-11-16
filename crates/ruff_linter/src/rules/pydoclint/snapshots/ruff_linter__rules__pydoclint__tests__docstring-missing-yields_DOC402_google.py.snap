@@ -2,58 +2,80 @@
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 snapshot_kind: text
 ---
-DOC402_google.py:9:5: DOC402 `yield` is not documented in docstring
+DOC402_google.py:3:5: DOC402 `yield` is not documented in docstring
   |
-7 |         num (int): A number
-8 |     """
-9 |     yield 'test'
-  |     ^^^^^^^^^^^^ DOC402
+1 |   # DOC402
+2 |   def foo(num: int) -> str:
+3 |       """
+  |  _____^
+4 | |     Do something
+5 | | 
+6 | |     Args:
+7 | |         num (int): A number
+8 | |     """
+  | |_______^ DOC402
+9 |       yield 'test'
   |
   = help: Add a "Yields" section to the docstring
 
-DOC402_google.py:50:9: DOC402 `yield` is not documented in docstring
+DOC402_google.py:44:9: DOC402 `yield` is not documented in docstring
    |
-48 |             num (int): A number
-49 |         """
-50 |         yield 'test'
-   |         ^^^^^^^^^^^^ DOC402
+42 |       # DOC402
+43 |       def bar(self) -> str:
+44 |           """
+   |  _________^
+45 | |         Do something
+46 | | 
+47 | |         Args:
+48 | |             num (int): A number
+49 | |         """
+   | |___________^ DOC402
+50 |           yield 'test'
    |
    = help: Add a "Yields" section to the docstring
 
-DOC402_google.py:59:9: DOC402 `yield` is not documented in docstring
+DOC402_google.py:58:9: DOC402 `yield` is not documented in docstring
    |
+56 |     # DOC402
 57 |     def nested():
 58 |         """Do something nested."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ DOC402
 59 |         yield 5
-   |         ^^^^^^^ DOC402
-60 | 
-61 |     print("I never yield")
    |
    = help: Add a "Yields" section to the docstring
 
-DOC402_google.py:67:5: DOC402 `yield` is not documented in docstring
+DOC402_google.py:66:5: DOC402 `yield` is not documented in docstring
    |
+64 | # DOC402
 65 | def test():
 66 |     """Do something."""
+   |     ^^^^^^^^^^^^^^^^^^^ DOC402
 67 |     yield from range(10)
-   |     ^^^^^^^^^^^^^^^^^^^^ DOC402
    |
    = help: Add a "Yields" section to the docstring
 
-DOC402_google.py:100:5: DOC402 `yield` is not documented in docstring
+DOC402_google.py:97:5: DOC402 `yield` is not documented in docstring
     |
- 98 |     Do something
- 99 |     """
-100 |     yield
-    |     ^^^^^ DOC402
+ 95 |   # DOC402
+ 96 |   def foo() -> collections.abc.Generator[int | None, None, None]:
+ 97 |       """
+    |  _____^
+ 98 | |     Do something
+ 99 | |     """
+    | |_______^ DOC402
+100 |       yield
     |
     = help: Add a "Yields" section to the docstring
 
-DOC402_google.py:108:5: DOC402 `yield` is not documented in docstring
+DOC402_google.py:105:5: DOC402 `yield` is not documented in docstring
     |
-106 |     Do something
-107 |     """
-108 |     yield
-    |     ^^^^^ DOC402
+103 |   # DOC402
+104 |   def bar() -> collections.abc.Iterator[int | None]:
+105 |       """
+    |  _____^
+106 | |     Do something
+107 | |     """
+    | |_______^ DOC402
+108 |       yield
     |
     = help: Add a "Yields" section to the docstring
