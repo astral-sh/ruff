@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S103.py:6:25: S103 `os.chmod` setting a permissive mask `0o227` on file or directory
   |
@@ -136,5 +137,3 @@ S103.py:23:25: S103 `os.chmod` setting an invalid mask on file or directory
 23 | os.chmod("/etc/passwd", 0o100000000)  # Error
    |                         ^^^^^^^^^^^ S103
    |
-
-

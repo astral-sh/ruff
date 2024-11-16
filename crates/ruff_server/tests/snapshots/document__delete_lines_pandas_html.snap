@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_server/tests/document.rs
 expression: document.contents()
+snapshot_kind: text
 ---
 # +------------------------------------------------------------+
 # | Code adopted from:                                         |
@@ -1230,4 +1231,3 @@ def read_html(
         dtype_backend=dtype_backend,
         storage_options=storage_options,
     )
-

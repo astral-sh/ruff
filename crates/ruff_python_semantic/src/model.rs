@@ -1287,6 +1287,7 @@ impl<'a> SemanticModel<'a> {
             "trio" => self.seen.insert(Modules::TRIO),
             "typing" => self.seen.insert(Modules::TYPING),
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
+            "attr" | "attrs" => self.seen.insert(Modules::ATTRS),
             _ => {}
         }
     }
@@ -1742,12 +1743,6 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT)
     }
 
-    /// Return `true` if the model is in a comprehension assignment (e.g., `_ for x in y`).
-    pub const fn in_comprehension_assignment(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::COMPREHENSION_ASSIGNMENT)
-    }
-
     /// Return `true` if the model is visiting the r.h.s. of an `__all__` definition
     /// (e.g. `"foo"` in `__all__ = ["foo"]`)
     pub const fn in_dunder_all_definition(&self) -> bool {
@@ -1862,6 +1857,7 @@ bitflags! {
         const COPY = 1 << 22;
         const MARKUPSAFE = 1 << 23;
         const FLASK = 1 << 24;
+        const ATTRS = 1 << 25;
     }
 }
 
@@ -2141,14 +2137,6 @@ bitflags! {
         /// ```
         const NAMED_EXPRESSION_ASSIGNMENT = 1 << 19;
 
-        /// The model is in a comprehension variable assignment.
-        ///
-        /// For example, the model could be visiting `x` in:
-        /// ```python
-        /// [_ for x in range(10)]
-        /// ```
-        const COMPREHENSION_ASSIGNMENT = 1 << 20;
-
         /// The model is in a docstring as described in [PEP 257].
         ///
         /// For example, the model could be visiting either the module, class,
@@ -2168,7 +2156,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const PEP_257_DOCSTRING = 1 << 21;
+        const PEP_257_DOCSTRING = 1 << 20;
 
         /// The model is visiting the r.h.s. of a module-level `__all__` definition.
         ///
@@ -2180,7 +2168,7 @@ bitflags! {
         /// __all__ = ("bar",)
         /// __all__ += ("baz,")
         /// ```
-        const DUNDER_ALL_DEFINITION = 1 << 22;
+        const DUNDER_ALL_DEFINITION = 1 << 21;
 
         /// The model is in an f-string replacement field.
         ///
@@ -2189,7 +2177,7 @@ bitflags! {
         /// ```python
         /// f"first {x} second {y}"
         /// ```
-        const F_STRING_REPLACEMENT_FIELD = 1 << 23;
+        const F_STRING_REPLACEMENT_FIELD = 1 << 22;
 
         /// The model is visiting the bases tuple of a class.
         ///
@@ -2199,11 +2187,11 @@ bitflags! {
         /// class Baz(Foo, Bar):
         ///     pass
         /// ```
-        const CLASS_BASE = 1 << 24;
+        const CLASS_BASE = 1 << 23;
 
         /// The model is visiting a class base that was initially deferred
         /// while traversing the AST. (This only happens in stub files.)
-        const DEFERRED_CLASS_BASE = 1 << 25;
+        const DEFERRED_CLASS_BASE = 1 << 24;
 
         /// The model is in an attribute docstring.
         ///
@@ -2228,7 +2216,7 @@ bitflags! {
         /// static-analysis tools.
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const ATTRIBUTE_DOCSTRING = 1 << 26;
+        const ATTRIBUTE_DOCSTRING = 1 << 25;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

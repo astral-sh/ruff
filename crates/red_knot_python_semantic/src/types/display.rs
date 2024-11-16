@@ -1,13 +1,14 @@
 //! Display implementations for types.
 
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Display, Formatter, Write};
 
 use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::{
-    ClassLiteralType, InstanceType, IntersectionType, KnownClass, SubclassOfType, Type, UnionType,
+    ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
+    SubclassOfType, Type, UnionType,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -85,15 +86,13 @@ impl Display for DisplayRepresentation<'_> {
             Type::SubclassOf(SubclassOfType { class }) => {
                 write!(f, "type[{}]", class.name(self.db))
             }
-            Type::KnownInstance(known_instance) => f.write_str(known_instance.as_str()),
+            Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),
             Type::BooleanLiteral(boolean) => f.write_str(if boolean { "True" } else { "False" }),
-            Type::StringLiteral(string) => {
-                write!(f, r#""{}""#, string.value(self.db).replace('"', r#"\""#))
-            }
+            Type::StringLiteral(string) => string.display(self.db).fmt(f),
             Type::LiteralString => f.write_str("LiteralString"),
             Type::BytesLiteral(bytes) => {
                 let escape =
@@ -328,13 +327,40 @@ impl<'db> Display for DisplayTypeArray<'_, 'db> {
     }
 }
 
+impl<'db> StringLiteralType<'db> {
+    fn display(&'db self, db: &'db dyn Db) -> DisplayStringLiteralType<'db> {
+        DisplayStringLiteralType { db, ty: self }
+    }
+}
+
+struct DisplayStringLiteralType<'db> {
+    ty: &'db StringLiteralType<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayStringLiteralType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let value = self.ty.value(self.db);
+        f.write_char('"')?;
+        for ch in value.chars() {
+            match ch {
+                // `escape_debug` will escape even single quotes, which is not necessary for our
+                // use case as we are already using double quotes to wrap the string.
+                '\'' => f.write_char('\'')?,
+                _ => write!(f, "{}", ch.escape_debug())?,
+            }
+        }
+        f.write_char('"')
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{global_symbol, SliceLiteralType, Type, UnionType};
+    use crate::types::{global_symbol, SliceLiteralType, StringLiteralType, Type, UnionType};
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -449,6 +475,30 @@ mod tests {
                 .display(&db)
                 .to_string(),
             "slice[None, None, Literal[2]]"
+        );
+    }
+
+    #[test]
+    fn string_literal_display() {
+        let db = setup_db();
+
+        assert_eq!(
+            Type::StringLiteral(StringLiteralType::new(&db, r"\n"))
+                .display(&db)
+                .to_string(),
+            r#"Literal["\\n"]"#
+        );
+        assert_eq!(
+            Type::StringLiteral(StringLiteralType::new(&db, "'"))
+                .display(&db)
+                .to_string(),
+            r#"Literal["'"]"#
+        );
+        assert_eq!(
+            Type::StringLiteral(StringLiteralType::new(&db, r#"""#))
+                .display(&db)
+                .to_string(),
+            r#"Literal["\""]"#
         );
     }
 }

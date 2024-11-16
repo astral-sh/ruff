@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_characters.py:15:6: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |

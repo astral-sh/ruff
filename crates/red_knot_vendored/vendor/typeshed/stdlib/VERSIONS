@@ -24,18 +24,22 @@ _asyncio: 3.0-
 _bisect: 3.0-
 _blake2: 3.6-
 _bootlocale: 3.4-3.9
+_bz2: 3.3-
 _codecs: 3.0-
 _collections_abc: 3.3-
 _compat_pickle: 3.1-
 _compression: 3.5-
+_contextvars: 3.7-
 _csv: 3.0-
 _ctypes: 3.0-
 _curses: 3.0-
+_dbm: 3.0-
 _decimal: 3.3-
 _dummy_thread: 3.0-3.8
 _dummy_threading: 3.0-3.8
 _frozen_importlib: 3.0-
 _frozen_importlib_external: 3.5-
+_gdbm: 3.0-
 _heapq: 3.0-
 _imp: 3.0-
 _interpchannels: 3.13-
@@ -45,6 +49,7 @@ _io: 3.0-
 _json: 3.0-
 _locale: 3.0-
 _lsprof: 3.0-
+_lzma: 3.3-
 _markupbase: 3.0-
 _msi: 3.0-3.12
 _operator: 3.4-
@@ -52,12 +57,14 @@ _osx_support: 3.0-
 _posixsubprocess: 3.2-
 _py_abc: 3.7-
 _pydecimal: 3.5-
+_queue: 3.7-
 _random: 3.0-
 _sitebuiltins: 3.4-
 _socket: 3.0-  # present in 3.0 at runtime, but not in typeshed
 _sqlite3: 3.0-
 _ssl: 3.0-
 _stat: 3.4-
+_struct: 3.0-
 _thread: 3.0-
 _threading_local: 3.0-
 _tkinter: 3.0-

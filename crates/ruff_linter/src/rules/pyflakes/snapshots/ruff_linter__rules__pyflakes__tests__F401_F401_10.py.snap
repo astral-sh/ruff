@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F401_10.py:6:16: F401 `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
   |
@@ -22,5 +23,3 @@ F401_10.py:15:16: F401 `orjson` imported but unused; consider using `importlib.u
 17 |         return True
    |
    = help: Remove unused import: `orjson`
-
-

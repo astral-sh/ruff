@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 literal_membership.py:2:6: PLR6201 [*] Use a set literal when testing for membership
   |

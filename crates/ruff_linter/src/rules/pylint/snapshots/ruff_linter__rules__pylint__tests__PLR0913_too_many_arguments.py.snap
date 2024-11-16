@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 too_many_arguments.py:1:5: PLR0913 Too many arguments in function definition (8 > 5)
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+snapshot_kind: text
 ---
 docstring_doubles_function.py:2:5: Q002 [*] Double quote docstring found but single quotes preferred
   |
@@ -62,5 +63,3 @@ docstring_doubles_function.py:27:5: Q002 [*] Double quote docstring found but si
 28 28 | 
 29 29 | 
 30 30 | def double_inside_single(a):
-
-

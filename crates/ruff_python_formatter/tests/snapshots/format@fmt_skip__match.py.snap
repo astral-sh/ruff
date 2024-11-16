@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/match.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -158,6 +159,3 @@ match point:
     case Point(x, y):
         print(f"Point is not on the diagonal.")
 ```
-
-
-

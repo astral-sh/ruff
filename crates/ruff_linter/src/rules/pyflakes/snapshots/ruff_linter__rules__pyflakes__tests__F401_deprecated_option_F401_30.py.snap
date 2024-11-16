@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F401_30.py:6:19: F401 [*] `.main.MaμToMan` imported but unused
   |

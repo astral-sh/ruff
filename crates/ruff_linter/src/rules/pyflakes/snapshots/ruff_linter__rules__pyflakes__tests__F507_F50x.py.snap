@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F50x.py:5:1: F507 `%`-format string has 2 placeholder(s) but 1 substitution(s)
   |
@@ -20,5 +21,3 @@ F50x.py:6:1: F507 `%`-format string has 2 placeholder(s) but 3 substitution(s)
 7 | '%(bar)s' % {}  # F505
 8 | '%(bar)s' % {'bar': 1, 'baz': 2}  # F504
   |
-
-

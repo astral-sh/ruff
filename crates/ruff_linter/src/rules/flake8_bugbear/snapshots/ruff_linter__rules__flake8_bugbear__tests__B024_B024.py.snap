@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B024.py:18:7: B024 `Base_1` is an abstract base class, but it has no abstract methods
    |

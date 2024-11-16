@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N804.py:5:27: N804 [*] First argument of a class method should be named `cls`
   |

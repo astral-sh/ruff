@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 no_method_decorator.py:15:5: PLR0203 [*] Static method defined without decorator
    |

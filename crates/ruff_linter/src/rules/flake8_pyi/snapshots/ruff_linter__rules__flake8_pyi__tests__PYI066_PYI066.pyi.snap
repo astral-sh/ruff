@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI066.pyi:3:4: PYI066 Use `>=` when using `if`-`else` with `sys.version_info` comparisons
   |

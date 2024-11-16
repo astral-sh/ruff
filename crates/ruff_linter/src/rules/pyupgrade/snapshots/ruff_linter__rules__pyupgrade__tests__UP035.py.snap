@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
   |

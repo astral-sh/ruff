@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 too_many_nested_blocks.py:2:5: PLR1702 Too many nested blocks (6 > 5)
    |
@@ -16,5 +17,3 @@ too_many_nested_blocks.py:2:5: PLR1702 Too many nested blocks (6 > 5)
    | |_______________________________________^ PLR1702
 10 |       return False
    |
-
-

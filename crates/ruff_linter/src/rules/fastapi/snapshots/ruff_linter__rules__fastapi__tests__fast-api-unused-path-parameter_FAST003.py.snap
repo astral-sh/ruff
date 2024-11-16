@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
+snapshot_kind: text
 ---
 FAST003.py:9:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
    |

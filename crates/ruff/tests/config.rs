@@ -8,7 +8,7 @@ const BIN_NAME: &str = "ruff";
 #[test]
 fn lint_select() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME)).arg("config").arg("lint.select"), @r###"
+        Command::new(get_cargo_bin(BIN_NAME)).arg("config").arg("lint.select"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -29,14 +29,14 @@ fn lint_select() {
     ```
 
     ----- stderr -----
-    "###
+    "#
     );
 }
 
 #[test]
 fn lint_select_json() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME)).arg("config").arg("lint.select").arg("--output-format").arg("json"), @r###"
+        Command::new(get_cargo_bin(BIN_NAME)).arg("config").arg("lint.select").arg("--output-format").arg("json"), @r##"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -50,6 +50,6 @@ fn lint_select_json() {
     }
 
     ----- stderr -----
-    "###
+    "##
     );
 }

@@ -1284,9 +1284,7 @@ class property:
 
 @final
 class _NotImplementedType(Any):
-    # A little weird, but typing the __call__ as NotImplemented makes the error message
-    # for NotImplemented() much better
-    __call__: NotImplemented  # type: ignore[valid-type]  # pyright: ignore[reportInvalidTypeForm]
+    __call__: None
 
 NotImplemented: _NotImplementedType
 
@@ -1917,7 +1915,7 @@ class StopIteration(Exception):
 
 class OSError(Exception):
     errno: int | None
-    strerror: str
+    strerror: str | None
     # filename, filename2 are actually str | bytes | None
     filename: Any
     filename2: Any

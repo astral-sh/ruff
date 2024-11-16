@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 type_bivariance.py:5:5: PLC0131 `TypeVar` "T" cannot be both covariant and contravariant
   |
@@ -36,5 +37,3 @@ type_bivariance.py:9:5: PLC0131 `ParamSpec` "T" cannot be both covariant and con
 10 | 
 11 | # Non-errors.
    |
-
-

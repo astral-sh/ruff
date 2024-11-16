@@ -1,4 +1,4 @@
-use crate::semantic_index::ast_ids::HasScopedAstId;
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
@@ -291,7 +291,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             {
                 // SAFETY: we should always have a symbol for every Name node.
                 let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-                let rhs_ty = inference.expression_ty(right.scoped_ast_id(self.db, scope));
+                let rhs_ty = inference.expression_ty(right.scoped_expression_id(self.db, scope));
 
                 match if is_positive { *op } else { op.negate() } {
                     ast::CmpOp::IsNot => {
@@ -336,7 +336,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match inference
-            .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
+            .expression_ty(expr_call.func.scoped_expression_id(self.db, scope))
             .into_function_literal()
             .and_then(|f| f.known(self.db))
             .and_then(KnownFunction::constraint_function)
@@ -348,7 +348,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
                     let class_info_ty =
-                        inference.expression_ty(class_info.scoped_ast_id(self.db, scope));
+                        inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
 
                     let to_constraint = match function {
                         KnownConstraintFunction::IsInstance => {
@@ -414,7 +414,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             // filter our arms with statically known truthiness
             .filter(|expr| {
                 inference
-                    .expression_ty(expr.scoped_ast_id(self.db, scope))
+                    .expression_ty(expr.scoped_expression_id(self.db, scope))
                     .bool(self.db)
                     != match expr_bool_op.op {
                         BoolOp::And => Truthiness::AlwaysTrue,

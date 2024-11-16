@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+snapshot_kind: text
 ---
 G001.py:4:14: G001 Logging statement uses `str.format`
   |
@@ -142,5 +143,3 @@ G001.py:27:9: G001 Logging statement uses `str.format`
 27 | log(msg="Hello {}".format("World!"), level=logging.INFO)
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
    |
-
-

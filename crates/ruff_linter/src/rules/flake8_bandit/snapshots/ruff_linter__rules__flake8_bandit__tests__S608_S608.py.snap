@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S608.py:2:10: S608 Possible SQL injection vector through string-based query construction
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+snapshot_kind: text
 ---
 YTT102.py:4:12: YTT102 `sys.version[2]` referenced (python3.10), use `sys.version_info`
   |
@@ -16,5 +17,3 @@ YTT102.py:5:12: YTT102 `sys.version[2]` referenced (python3.10), use `sys.versio
 5 | py_minor = version[2]
   |            ^^^^^^^ YTT102
   |
-
-

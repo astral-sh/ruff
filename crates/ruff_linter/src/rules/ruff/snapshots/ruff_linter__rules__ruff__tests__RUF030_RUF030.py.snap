@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF030.py:6:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
   |

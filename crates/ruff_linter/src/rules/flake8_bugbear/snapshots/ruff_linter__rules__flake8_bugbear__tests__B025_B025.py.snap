@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B025.py:19:8: B025 try-except block with duplicate exception `ValueError`
    |
@@ -37,5 +38,3 @@ B025.py:37:18: B025 try-except block with duplicate exception `TypeError`
    |                  ^^^^^^^^^ B025
 38 |     a = 2
    |
-
-

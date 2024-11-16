@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/remove_for_brackets.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -105,5 +106,3 @@ for (
 for k, v in d.items():
     print(k, v)
 ```
-
-

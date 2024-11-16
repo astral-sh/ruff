@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_raise/mod.rs
+snapshot_kind: text
 ---
 RSE102.py:5:21: RSE102 [*] Unnecessary parentheses on raised exception
   |

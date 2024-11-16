@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C414.py:2:1: C414 [*] Unnecessary `list` call within `list()`
   |
@@ -513,5 +514,3 @@ C414.py:44:27: C414 [*] Unnecessary `list` call within `sorted()`
    45 |+    x_xxxx_xxxxxxxxxxx_xxxxx.xxxx(),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
 46 46 |     key=lambda xxxxx: xxxxx or "",
 47 47 | )
-
-

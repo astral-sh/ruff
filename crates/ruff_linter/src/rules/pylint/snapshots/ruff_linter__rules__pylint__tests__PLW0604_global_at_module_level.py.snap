@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 global_at_module_level.py:1:1: PLW0604 `global` at module level is redundant
   |
@@ -17,5 +18,3 @@ global_at_module_level.py:6:5: PLW0604 `global` at module level is redundant
 7 | 
 8 | def no_error():
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F502.py:6:1: F502 `%`-format string expected mapping but got sequence
   |
@@ -67,5 +68,3 @@ F502.py:13:1: F502 `%`-format string expected mapping but got sequence
 13 | "%(bob)s" % {"bob" for _ in range(1)}  # F202
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F502
    |
-
-

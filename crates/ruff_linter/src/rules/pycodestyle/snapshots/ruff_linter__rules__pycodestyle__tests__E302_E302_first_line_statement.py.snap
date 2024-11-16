@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E302_first_line_statement.py:3:1: E302 [*] Expected 2 blank lines, found 1
   |

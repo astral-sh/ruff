@@ -150,11 +150,14 @@ extension for [coc.nvim](https://github.com/neoclide/coc.nvim).
 <summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for Vim or Neovim.</summary>
 
 ```vim
-" Linter
+" Linters
 let g:ale_linters = { "python": ["ruff"] }
-" Formatter
-let g:ale_fixers = { "python": ["ruff_format"] }
+" Fixers
+let g:ale_fixers = { "python": ["ruff", "ruff_format"] }
 ```
+
+For the fixers, `ruff` will run `ruff check --fix` (to fix all auto-fixable problems) whereas
+`ruff_format` will run `ruff format`.
 
 </details>
 

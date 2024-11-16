@@ -1,7 +1,41 @@
 from _compression import BaseStream
+from _lzma import (
+    CHECK_CRC32 as CHECK_CRC32,
+    CHECK_CRC64 as CHECK_CRC64,
+    CHECK_ID_MAX as CHECK_ID_MAX,
+    CHECK_NONE as CHECK_NONE,
+    CHECK_SHA256 as CHECK_SHA256,
+    CHECK_UNKNOWN as CHECK_UNKNOWN,
+    FILTER_ARM as FILTER_ARM,
+    FILTER_ARMTHUMB as FILTER_ARMTHUMB,
+    FILTER_DELTA as FILTER_DELTA,
+    FILTER_IA64 as FILTER_IA64,
+    FILTER_LZMA1 as FILTER_LZMA1,
+    FILTER_LZMA2 as FILTER_LZMA2,
+    FILTER_POWERPC as FILTER_POWERPC,
+    FILTER_SPARC as FILTER_SPARC,
+    FILTER_X86 as FILTER_X86,
+    FORMAT_ALONE as FORMAT_ALONE,
+    FORMAT_AUTO as FORMAT_AUTO,
+    FORMAT_RAW as FORMAT_RAW,
+    FORMAT_XZ as FORMAT_XZ,
+    MF_BT2 as MF_BT2,
+    MF_BT3 as MF_BT3,
+    MF_BT4 as MF_BT4,
+    MF_HC3 as MF_HC3,
+    MF_HC4 as MF_HC4,
+    MODE_FAST as MODE_FAST,
+    MODE_NORMAL as MODE_NORMAL,
+    PRESET_DEFAULT as PRESET_DEFAULT,
+    PRESET_EXTREME as PRESET_EXTREME,
+    LZMACompressor as LZMACompressor,
+    LZMADecompressor as LZMADecompressor,
+    LZMAError as LZMAError,
+    _FilterChain,
+    is_check_supported as is_check_supported,
+)
 from _typeshed import ReadableBuffer, StrOrBytesPath
-from collections.abc import Mapping, Sequence
-from typing import IO, Any, Final, Literal, TextIO, final, overload
+from typing import IO, Literal, TextIO, overload
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -47,62 +81,6 @@ _OpenBinaryWritingMode: TypeAlias = Literal["w", "wb", "x", "xb", "a", "ab"]
 _OpenTextWritingMode: TypeAlias = Literal["wt", "xt", "at"]
 
 _PathOrFile: TypeAlias = StrOrBytesPath | IO[bytes]
-
-_FilterChain: TypeAlias = Sequence[Mapping[str, Any]]
-
-FORMAT_AUTO: Final = 0
-FORMAT_XZ: Final = 1
-FORMAT_ALONE: Final = 2
-FORMAT_RAW: Final = 3
-CHECK_NONE: Final = 0
-CHECK_CRC32: Final = 1
-CHECK_CRC64: Final = 4
-CHECK_SHA256: Final = 10
-CHECK_ID_MAX: Final = 15
-CHECK_UNKNOWN: Final = 16
-FILTER_LZMA1: int  # v big number
-FILTER_LZMA2: Final = 33
-FILTER_DELTA: Final = 3
-FILTER_X86: Final = 4
-FILTER_IA64: Final = 6
-FILTER_ARM: Final = 7
-FILTER_ARMTHUMB: Final = 8
-FILTER_SPARC: Final = 9
-FILTER_POWERPC: Final = 5
-MF_HC3: Final = 3
-MF_HC4: Final = 4
-MF_BT2: Final = 18
-MF_BT3: Final = 19
-MF_BT4: Final = 20
-MODE_FAST: Final = 1
-MODE_NORMAL: Final = 2
-PRESET_DEFAULT: Final = 6
-PRESET_EXTREME: int  # v big number
-
-# from _lzma.c
-@final
-class LZMADecompressor:
-    def __init__(self, format: int | None = ..., memlimit: int | None = ..., filters: _FilterChain | None = ...) -> None: ...
-    def decompress(self, data: ReadableBuffer, max_length: int = -1) -> bytes: ...
-    @property
-    def check(self) -> int: ...
-    @property
-    def eof(self) -> bool: ...
-    @property
-    def unused_data(self) -> bytes: ...
-    @property
-    def needs_input(self) -> bool: ...
-
-# from _lzma.c
-@final
-class LZMACompressor:
-    def __init__(
-        self, format: int | None = ..., check: int = ..., preset: int | None = ..., filters: _FilterChain | None = ...
-    ) -> None: ...
-    def compress(self, data: ReadableBuffer, /) -> bytes: ...
-    def flush(self) -> bytes: ...
-
-class LZMAError(Exception): ...
 
 class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible definitions of writelines in the base classes
     def __init__(
@@ -194,4 +172,3 @@ def compress(
 def decompress(
     data: ReadableBuffer, format: int = 0, memlimit: int | None = None, filters: _FilterChain | None = None
 ) -> bytes: ...
-def is_check_supported(check_id: int, /) -> bool: ...

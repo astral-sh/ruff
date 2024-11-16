@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/decorator_missing_expression.py
+snapshot_kind: text
 ---
 ## AST
 

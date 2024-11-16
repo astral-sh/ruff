@@ -706,6 +706,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Datetimez, "007") => (RuleGroup::Stable, rules::flake8_datetimez::rules::CallDatetimeStrptimeWithoutZone),
         (Flake8Datetimez, "011") => (RuleGroup::Stable, rules::flake8_datetimez::rules::CallDateToday),
         (Flake8Datetimez, "012") => (RuleGroup::Stable, rules::flake8_datetimez::rules::CallDateFromtimestamp),
+        (Flake8Datetimez, "901") => (RuleGroup::Preview, rules::flake8_datetimez::rules::DatetimeMinMax),
 
         // pygrep-hooks
         (PygrepHooks, "001") => (RuleGroup::Removed, rules::pygrep_hooks::rules::Eval),
@@ -785,6 +786,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
         (Flake8Pyi, "057") => (RuleGroup::Stable, rules::flake8_pyi::rules::ByteStringUsage),
         (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
+        (Flake8Pyi, "061") => (RuleGroup::Preview, rules::flake8_pyi::rules::RedundantNoneLiteral),
         (Flake8Pyi, "062") => (RuleGroup::Stable, rules::flake8_pyi::rules::DuplicateLiteralMember),
         (Flake8Pyi, "063") => (RuleGroup::Preview, rules::flake8_pyi::rules::PrePep570PositionalArgument),
         (Flake8Pyi, "064") => (RuleGroup::Preview, rules::flake8_pyi::rules::RedundantFinalLiteral),
@@ -967,6 +969,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "033") => (RuleGroup::Preview, rules::ruff::rules::PostInitDefault),
         (Ruff, "034") => (RuleGroup::Preview, rules::ruff::rules::UselessIfElse),
         (Ruff, "035") => (RuleGroup::Preview, rules::ruff::rules::UnsafeMarkupUse),
+        (Ruff, "036") => (RuleGroup::Preview, rules::ruff::rules::NoneNotAtEndOfUnion),
         (Ruff, "038") => (RuleGroup::Preview, rules::ruff::rules::RedundantBoolLiteral),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
@@ -1083,6 +1086,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "002") => (RuleGroup::Stable, rules::flake8_logging::rules::InvalidGetLoggerArgument),
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
+        (Flake8Logging, "015") => (RuleGroup::Preview, rules::flake8_logging::rules::RootLoggerCall),
 
         _ => return None,
     })

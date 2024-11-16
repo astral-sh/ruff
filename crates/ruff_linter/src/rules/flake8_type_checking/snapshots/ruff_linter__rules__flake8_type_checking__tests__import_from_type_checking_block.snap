@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
 ---
 <filename>:7:5: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   |
@@ -26,5 +27,3 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 12 14 |     import os
 13 15 | 
 14 16 | def f(x: DataFrame):
-
-

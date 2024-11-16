@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+snapshot_kind: text
 ---
 ignore_fully_untyped.py:24:5: ANN201 [*] Missing return type annotation for public function `error_partially_typed_1`
    |
@@ -68,5 +69,3 @@ ignore_fully_untyped.py:43:9: ANN201 [*] Missing return type annotation for publ
 43    |-    def error_typed_self(self: X):
    43 |+    def error_typed_self(self: X) -> None:
 44 44 |         pass
-
-

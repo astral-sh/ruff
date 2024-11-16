@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
   |
@@ -251,5 +252,3 @@ UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 43    |-MyType = TypedDict("MyType", dict())
    43 |+class MyType(TypedDict):
    44 |+    pass
-
-

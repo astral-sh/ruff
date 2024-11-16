@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S403.py:1:8: S403 `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
   |
@@ -74,5 +75,3 @@ S403.py:8:6: S403 `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly
 8 | from pickle import load
   |      ^^^^^^ S403
   |
-
-
