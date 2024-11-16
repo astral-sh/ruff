@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Context};
 use red_knot_python_semantic::{HasTy, SemanticModel};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
@@ -27,8 +28,55 @@ fn get_workspace_root() -> anyhow::Result<SystemPathBuf> {
 
 /// Test that all snippets in testcorpus can be checked without panic (except for [`KNOWN_FAILURES`])
 #[test]
-#[allow(clippy::print_stdout)]
 fn corpus_no_panic() -> anyhow::Result<()> {
+    let crate_root = String::from(env!("CARGO_MANIFEST_DIR"));
+    run_corpus_tests(&format!("{crate_root}/resources/test/corpus/**/*.py"))
+}
+
+#[test]
+fn parser_no_panic() -> anyhow::Result<()> {
+    let workspace_root = get_workspace_root()?;
+    run_corpus_tests(&format!(
+        "{workspace_root}/crates/ruff_python_parser/resources/**/*.py"
+    ))
+}
+
+#[test]
+fn linter_af_no_panic() -> anyhow::Result<()> {
+    let workspace_root = get_workspace_root()?;
+    run_corpus_tests(&format!(
+        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[a-f]*/**/*.py"
+    ))
+}
+
+#[test]
+fn linter_gz_no_panic() -> anyhow::Result<()> {
+    let workspace_root = get_workspace_root()?;
+    run_corpus_tests(&format!(
+        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[g-z]*/**/*.py"
+    ))
+}
+
+#[test]
+#[ignore = "Enable running once there are fewer failures"]
+fn linter_stubs_no_panic() -> anyhow::Result<()> {
+    let workspace_root = get_workspace_root()?;
+    run_corpus_tests(&format!(
+        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/**/*.pyi"
+    ))
+}
+
+#[test]
+#[ignore = "Enable running over typeshed stubs once there are fewer failures"]
+fn typeshed_no_panic() -> anyhow::Result<()> {
+    let workspace_root = get_workspace_root()?;
+    run_corpus_tests(&format!(
+        "{workspace_root}/crates/red_knot_vendored/vendor/typeshed/**/*.pyi"
+    ))
+}
+
+#[allow(clippy::print_stdout)]
+fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     let root = SystemPathBuf::from("/src");
 
     let system = TestSystem::default();
@@ -37,33 +85,26 @@ fn corpus_no_panic() -> anyhow::Result<()> {
 
     let mut db = setup_db(&root, system.clone())?;
 
-    let crate_root = String::from(env!("CARGO_MANIFEST_DIR"));
     let workspace_root = get_workspace_root()?;
     let workspace_root = workspace_root.to_string();
 
-    let corpus = vec![
-        format!("{crate_root}/resources/test/corpus/**/*.py"),
-        format!("{workspace_root}/crates/ruff_python_parser/resources/**/*.py"),
-        format!("{workspace_root}/crates/ruff_linter/resources/**/*.py"),
-        // TODO: Enable running over typeshed stubs once there are fewer failures:
-        // format!("{workspace_root}/crates/red_knot_vendored/vendor/typeshed/**/*.pyi"),
-    ]
-    .into_iter()
-    .flat_map(|pattern| glob::glob(&pattern).unwrap());
+    let corpus = glob::glob(pattern).context("Failed to compile pattern")?;
 
     for path in corpus {
-        let path = path?;
+        let path = path.context("Failed to glob path")?;
+        let path = SystemPathBuf::from_path_buf(path).map_err(|path| {
+            anyhow!(
+                "Failed to convert path '{path}' to system path",
+                path = path.display()
+            )
+        })?;
+
         let relative_path = path.strip_prefix(&workspace_root)?;
 
         let (py_expected_to_fail, pyi_expected_to_fail) = KNOWN_FAILURES
             .iter()
             .find_map(|(path, py_fail, pyi_fail)| {
-                if Some(*path)
-                    == relative_path
-                        .to_str()
-                        .map(|p| p.replace('\\', "/"))
-                        .as_deref()
-                {
+                if *path == relative_path.as_str().replace('\\', "/") {
                     Some((*py_fail, *pyi_fail))
                 } else {
                     None
@@ -72,7 +113,7 @@ fn corpus_no_panic() -> anyhow::Result<()> {
             .unwrap_or((false, false));
 
         let source = path.as_path();
-        let source_filename = source.file_name().unwrap().to_str().unwrap();
+        let source_filename = source.file_name().unwrap();
 
         let code = std::fs::read_to_string(source)?;
 
@@ -100,24 +141,25 @@ fn corpus_no_panic() -> anyhow::Result<()> {
                 assert!(!expected_to_fail, "Expected to panic, but did not. Consider removing this path from KNOWN_FAILURES");
             }
 
-            memory_fs.remove_all();
+            memory_fs.remove_file(path).unwrap();
             file.sync(&mut db);
         };
 
-        if source.extension().map(|e| e == "pyi").unwrap_or(false) {
-            println!("checking {relative_path:?}");
+        if source.extension() == Some("pyi") {
+            println!("checking {relative_path}");
             let pyi_dest = root.join(source_filename);
             check_with_file_name(&pyi_dest);
         } else {
-            println!("checking {relative_path:?}");
+            println!("checking {relative_path}");
             let py_dest = root.join(source_filename);
             check_with_file_name(&py_dest);
 
             let pyi_dest = root.join(format!("{source_filename}i"));
-            println!("re-checking as stub file: {pyi_dest:?}");
+            println!("re-checking as stub file: {pyi_dest}");
             check_with_file_name(&pyi_dest);
         }
     }
+
     Ok(())
 }
 
@@ -223,90 +265,57 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // Probably related to missing support for type aliases / type params:
     ("crates/ruff_python_parser/resources/inline/err/type_param_invalid_bound_expr.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/err/type_param_type_var_invalid_default_expr.py", true, true),
     ("crates/ruff_python_parser/resources/inline/err/type_param_param_spec_invalid_default_expr.py", true, true),
+    ("crates/ruff_python_parser/resources/inline/err/type_param_type_var_invalid_default_expr.py", true, true),
     ("crates/ruff_python_parser/resources/inline/err/type_param_type_var_missing_default.py", true, true),
     ("crates/ruff_python_parser/resources/inline/err/type_param_type_var_tuple_invalid_default_expr.py", true, true),
     ("crates/ruff_python_parser/resources/inline/ok/type_param_param_spec.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/ok/type_param_type_var.py", true, true),
     ("crates/ruff_python_parser/resources/inline/ok/type_param_type_var_tuple.py", true, true),
+    ("crates/ruff_python_parser/resources/inline/ok/type_param_type_var.py", true, true),
     ("crates/ruff_python_parser/resources/valid/statement/type.py", true, true),
     // Fails for unknown reasons:
-    ("crates/ruff_python_parser/resources/valid/expressions/f_string.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_future_annotations/no_future_import_uses_union_inner.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI011.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI015.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI016.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI019.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI020.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI020.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI030.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI030.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI034.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI034.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI035.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI035.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI036.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI036.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI041.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI041.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI051.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI051.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI052.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI052.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI055.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI055.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI061.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI062.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI062.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI063.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI063.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI064.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_pyi/PYI064.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/TCH004_13.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/TCH004_13.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/TCH004_15.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/TCH004_15.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/quote.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/quote.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/quote2.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/quote2.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/quote3.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/quote3.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_19.py", true, true),
+    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/TCH004_13.py", true, true),
+    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/TCH004_15.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_19.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F541.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F541.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F632.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F632.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F811_19.py", true, false),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_0.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_0.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_14.py", false, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_17.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_17.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_2.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_2.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_20.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_20.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, false),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/project/foo/bar.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/project/foo/bar.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/project/foo/bop/baz.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/project/foo/bop/baz.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pylint/single_string_slots.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pylint/single_string_slots.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP037_0.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP037_0.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP039.py", true, false),
     ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP044.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP044.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/ruff/RUF013_0.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/ruff/RUF013_0.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/ruff/RUF013_3.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/ruff/RUF013_3.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/ruff/RUF022.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/ruff/RUF022.py", true, true),
+    ("crates/ruff_python_parser/resources/valid/expressions/f_string.py", true, true),
 ];
