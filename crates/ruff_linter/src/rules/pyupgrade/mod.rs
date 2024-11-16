@@ -83,7 +83,6 @@ mod tests {
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010.py"))]
-    #[test_case(Rule::UnpackedListComprehension, Path::new("UP027.py"))]
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"))]
     #[test_case(Rule::UselessObjectInheritance, Path::new("UP004.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"))]
