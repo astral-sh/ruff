@@ -12,33 +12,40 @@ use crate::checkers::ast::Checker;
 /// Checks for `Literal[True, False]` type annotations.
 ///
 /// ## Why is this bad?
-/// The `bool` type has exactly two constant instances: `True` and `False`. Writing
-/// `Literal[True, False]` in the context of type annotations could be replaced by a
-/// bare `bool` annotations. Static type checkers such as [mypy] treat them as
-/// equivalent.
+/// `Literal[True, False]` can be replaced with `bool` in type annotations,
+/// which has the same semantic meaning but is more concise and readable.
+///
+/// `bool` type has exactly two constant instances: `True` and `False`. Static
+/// type checkers such as [mypy] treat `Literal[True, False]` as equivalent to
+/// `bool` in a type annotation.
 ///
 /// ## Example
 /// ```python
-/// Literal[True, False]
-/// Literal[True, False, "hello", "world"]
+/// from typing import Literal
+///
+/// x: Literal[True, False]
+/// y: Literal[True, False, "hello", "world"]
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// bool
-/// Literal["hello", "world"] | bool
+/// from typing import Literal
+///
+/// x: bool
+/// y: Literal["hello", "world"] | bool
 /// ```
 ///
 /// ## Fix safety
-/// The fix for this rule is marked as unsafe:
+/// The fix for this rule is marked as unsafe, as it may change the semantics of the code.
+/// Specifically:
 ///
-/// - The type annotation might be intentional when the type checker used does not
-/// treat `bool` as equivalent when overloading boolean arguments with `Literal[True]`
-/// and `Literal[False]`, e.g. see [#14764] and [#5421].
+/// - Type checkers may not treat `bool` as equivalent when overloading boolean arguments
+///   with `Literal[True]` and `Literal[False]` (see, e.g., [#14764] and [#5421]).
 /// - `bool` is not strictly equivalent to `Literal[True, False]`, as `bool` is
-/// a subclass of `int`, and this rule might not apply if the type annotations are used
-/// in a numerical context.
-/// - The `Literal` might contain comments.
+///   a subclass of `int`, and this rule may not apply if the type annotations are used
+///   in a numeric context.
+///
+/// Further, the `Literal` slice may contain trailing-line comments which the fix would remove.
 ///
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
