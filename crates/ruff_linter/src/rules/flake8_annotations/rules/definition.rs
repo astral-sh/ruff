@@ -110,9 +110,8 @@ impl Violation for MissingTypeKwargs {
     }
 }
 
-/// ## Deprecation
-/// This rule is commonly disabled because type checkers can infer this type without annotation.
-/// It will be removed in a future release.
+/// ## Removed
+/// This rule has been removed because type checkers can infer this type without annotation.
 ///
 /// ## What it does
 /// Checks that instance method `self` arguments have type annotations.
@@ -139,21 +138,20 @@ impl Violation for MissingTypeKwargs {
 ///     def bar(self: "Foo"): ...
 /// ```
 #[violation]
-pub struct MissingTypeSelf {
-    name: String,
-}
+pub struct MissingTypeSelf;
 
 impl Violation for MissingTypeSelf {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { name } = self;
-        format!("Missing type annotation for `{name}` in method")
+        unreachable!("ANN101 has been removed");
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["Missing type annotation for `{name}` in method"]
     }
 }
 
-/// ## Deprecation
-/// This rule is commonly disabled because type checkers can infer this type without annotation.
-/// It will be removed in a future release.
+/// ## Removed
+/// This rule has been removed because type checkers can infer this type without annotation.
 ///
 /// ## What it does
 /// Checks that class method `cls` arguments have type annotations.
@@ -182,15 +180,15 @@ impl Violation for MissingTypeSelf {
 ///     def bar(cls: Type["Foo"]): ...
 /// ```
 #[violation]
-pub struct MissingTypeCls {
-    name: String,
-}
+pub struct MissingTypeCls;
 
 impl Violation for MissingTypeCls {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { name } = self;
-        format!("Missing type annotation for `{name}` in classmethod")
+        unreachable!("ANN102 has been removed")
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["Missing type annotation for `{name}` in classmethod"]
     }
 }
 
@@ -594,7 +592,6 @@ pub(crate) fn definition(
     // Keep track of whether we've seen any typed arguments or return values.
     let mut has_any_typed_arg = false; // Any argument has been typed?
     let mut has_typed_return = false; // Return value has been typed?
-    let mut has_typed_self_or_cls = false; // Has a typed `self` or `cls` argument?
 
     // Temporary storage for diagnostics; we emit them at the end
     // unless configured to suppress ANN* for declarations that are fully untyped.
@@ -693,43 +690,6 @@ pub(crate) fn definition(
                         arg.range(),
                     ));
                 }
-            }
-        }
-    }
-
-    // ANN101, ANN102
-    if is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()) {
-        if let Some(ParameterWithDefault {
-            parameter,
-            default: _,
-            range: _,
-        }) = parameters
-            .posonlyargs
-            .first()
-            .or_else(|| parameters.args.first())
-        {
-            if parameter.annotation.is_none() {
-                if visibility::is_classmethod(decorator_list, checker.semantic()) {
-                    if checker.enabled(Rule::MissingTypeCls) {
-                        diagnostics.push(Diagnostic::new(
-                            MissingTypeCls {
-                                name: parameter.name.to_string(),
-                            },
-                            parameter.range(),
-                        ));
-                    }
-                } else {
-                    if checker.enabled(Rule::MissingTypeSelf) {
-                        diagnostics.push(Diagnostic::new(
-                            MissingTypeSelf {
-                                name: parameter.name.to_string(),
-                            },
-                            parameter.range(),
-                        ));
-                    }
-                }
-            } else {
-                has_typed_self_or_cls = true;
             }
         }
     }
@@ -927,13 +887,25 @@ pub(crate) fn definition(
             }
         }
     }
+
+    if !checker.settings.flake8_annotations.ignore_fully_untyped {
+        return diagnostics;
+    }
+
     // If settings say so, don't report any of the
     // diagnostics gathered here if there were no type annotations at all.
-    if checker.settings.flake8_annotations.ignore_fully_untyped
-        && !(has_any_typed_arg || has_typed_self_or_cls || has_typed_return)
+    if has_any_typed_arg
+        || has_typed_return
+        || (is_method
+            && !visibility::is_staticmethod(decorator_list, checker.semantic())
+            && parameters
+                .posonlyargs
+                .first()
+                .or_else(|| parameters.args.first())
+                .is_some_and(|first_param| first_param.parameter.annotation.is_some()))
     {
-        vec![]
-    } else {
         diagnostics
+    } else {
+        vec![]
     }
 }
