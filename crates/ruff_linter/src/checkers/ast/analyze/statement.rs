@@ -1560,9 +1560,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker, stmt, targets, value,
                 );
             }
-            if checker.enabled(Rule::UnpackedListComprehension) {
-                pyupgrade::rules::unpacked_list_comprehension(checker, targets, value);
-            }
             if checker.enabled(Rule::PandasDfVariableName) {
                 if let Some(diagnostic) = pandas_vet::rules::assignment_to_df(targets) {
                     checker.diagnostics.push(diagnostic);
