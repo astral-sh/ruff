@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flynt/mod.rs
+snapshot_kind: text
 ---
 FLY002.py:5:7: FLY002 [*] Consider `f"{a}  World"` instead of string join
   |
@@ -140,5 +141,3 @@ FLY002.py:23:11: FLY002 [*] Consider `f"{url}{filename}"` instead of string join
 22 22 | def create_file_public_url(url, filename):
 23    |-    return''.join([url, filename])
    23 |+    return f"{url}{filename}"
-
-

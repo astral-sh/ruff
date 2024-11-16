@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E30.pyi:17:1: E303 [*] Too many blank lines (2)
    |

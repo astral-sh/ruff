@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
    |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP029.py:1:1: UP029 [*] Unnecessary builtin import: `*`
   |
@@ -74,5 +75,3 @@ UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`
 6 5 | import io
 7 6 | import six
 8 7 | import six.moves
-
-

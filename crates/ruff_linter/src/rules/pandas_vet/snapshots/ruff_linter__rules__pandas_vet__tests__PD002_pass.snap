@@ -1,4 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 

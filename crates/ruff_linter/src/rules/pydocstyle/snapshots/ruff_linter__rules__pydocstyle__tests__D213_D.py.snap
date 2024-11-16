@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:200:5: D213 [*] Multi-line docstring summary should start at the second line
     |
@@ -701,5 +702,3 @@ D.py:721:5: D213 [*] Multi-line docstring summary should start at the second lin
 722 723 | 
 723 724 |        Returns:
 724 725 |     """
-
-

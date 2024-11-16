@@ -18,6 +18,9 @@ def test_error_no_argument_given():
     with pytest.raises(ValueError):
         raise ValueError("Can't divide 1 by 0")
 
+    with pytest.raises(expected_exception=ValueError):
+        raise ValueError("Can't divide 1 by 0")
+
     with pytest.raises(socket.error):
         raise ValueError("Can't divide 1 by 0")
 

@@ -81,7 +81,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 returns,
                 parameters,
                 body,
-                type_params,
+                type_params: _,
                 range: _,
             },
         ) => {
@@ -160,14 +160,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
-                flake8_pyi::rules::custom_type_var_return_type(
-                    checker,
-                    name,
-                    decorator_list,
-                    returns.as_ref().map(AsRef::as_ref),
-                    parameters,
-                    type_params.as_deref(),
-                );
+                flake8_pyi::rules::custom_type_var_return_type(checker, function_def);
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
@@ -1035,7 +1028,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                     if !checker.source_type.is_stub() {
                         if checker.enabled(Rule::UselessImportAlias) {
-                            pylint::rules::useless_import_alias(checker, alias);
+                            pylint::rules::useless_import_from_alias(checker, alias, module, level);
                         }
                     }
                 }

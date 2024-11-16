@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-assertion_line: 74
+snapshot_kind: text
 ---
 B015.py:3:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
   |

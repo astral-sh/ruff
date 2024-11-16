@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+snapshot_kind: text
 ---
 DOC502_numpy.py:22:1: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
    |

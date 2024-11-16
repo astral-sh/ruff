@@ -8,32 +8,38 @@ use crate::Db;
 
 /// Enumeration of various core stdlib modules, for which we have dedicated Salsa queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CoreStdlibModule {
+pub(crate) enum CoreStdlibModule {
     Builtins,
     Types,
     Typeshed,
     TypingExtensions,
     Typing,
+    Sys,
 }
 
 impl CoreStdlibModule {
-    fn name(self) -> ModuleName {
-        let module_name = match self {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
             Self::Builtins => "builtins",
             Self::Types => "types",
             Self::Typing => "typing",
             Self::Typeshed => "_typeshed",
             Self::TypingExtensions => "typing_extensions",
-        };
-        ModuleName::new_static(module_name)
-            .unwrap_or_else(|| panic!("{module_name} should be a valid module name!"))
+            Self::Sys => "sys",
+        }
+    }
+
+    pub(crate) fn name(self) -> ModuleName {
+        let self_as_str = self.as_str();
+        ModuleName::new_static(self_as_str)
+            .unwrap_or_else(|| panic!("{self_as_str} should be a valid module name!"))
     }
 }
 
 /// Lookup the type of `symbol` in a given core module
 ///
 /// Returns `Symbol::Unbound` if the given core module cannot be resolved for some reason
-fn core_module_symbol<'db>(
+pub(crate) fn core_module_symbol<'db>(
     db: &'db dyn Db,
     core_module: CoreStdlibModule,
     symbol: &str,
@@ -51,28 +57,13 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> Symbol<'db>
     core_module_symbol(db, CoreStdlibModule::Builtins, symbol)
 }
 
-/// Lookup the type of `symbol` in the `types` module namespace.
-///
-/// Returns `Symbol::Unbound` if the `types` module isn't available for some reason.
-#[inline]
-pub(crate) fn types_symbol<'db>(db: &'db dyn Db, symbol: &str) -> Symbol<'db> {
-    core_module_symbol(db, CoreStdlibModule::Types, symbol)
-}
-
 /// Lookup the type of `symbol` in the `typing` module namespace.
 ///
 /// Returns `Symbol::Unbound` if the `typing` module isn't available for some reason.
 #[inline]
-#[allow(dead_code)] // currently only used in tests
+#[cfg(test)]
 pub(crate) fn typing_symbol<'db>(db: &'db dyn Db, symbol: &str) -> Symbol<'db> {
     core_module_symbol(db, CoreStdlibModule::Typing, symbol)
-}
-/// Lookup the type of `symbol` in the `_typeshed` module namespace.
-///
-/// Returns `Symbol::Unbound` if the `_typeshed` module isn't available for some reason.
-#[inline]
-pub(crate) fn typeshed_symbol<'db>(db: &'db dyn Db, symbol: &str) -> Symbol<'db> {
-    core_module_symbol(db, CoreStdlibModule::Typeshed, symbol)
 }
 
 /// Lookup the type of `symbol` in the `typing_extensions` module namespace.

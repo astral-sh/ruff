@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 match_case.py:3:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -40,5 +41,3 @@ match_case.py:6:1: I001 [*] Import block is un-sorted or un-formatted
   6 |+        import abc
 6 7 |         import collections
 7   |-        import abc
-
-

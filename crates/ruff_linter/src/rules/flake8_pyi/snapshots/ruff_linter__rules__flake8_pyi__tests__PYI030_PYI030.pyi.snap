@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI030.pyi:9:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -526,5 +527,3 @@ PYI030.pyi:89:10: PYI030 [*] Multiple literal members in a union. Use a single l
 88 88 | # Should use the first literal subscript attribute when fixing
 89    |-field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
    89 |+field25: typing.Union[typing_extensions.Literal[1, 2, 3, 4], str]  # Error
-
-

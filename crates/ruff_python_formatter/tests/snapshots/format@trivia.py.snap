@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/trivia.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -75,6 +76,3 @@ while b == 20:
 
 e = 50  # one empty line before
 ```
-
-
-

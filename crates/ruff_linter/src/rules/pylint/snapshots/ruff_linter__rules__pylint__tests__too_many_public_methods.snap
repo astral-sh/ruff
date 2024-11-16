@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 too_many_public_methods.py:1:1: PLR0904 Too many public methods (10 > 7)
    |
@@ -42,5 +43,3 @@ too_many_public_methods.py:1:1: PLR0904 Too many public methods (10 > 7)
 36 |   
 37 |   class Small:
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 all.py:1:1: D100 Missing docstring in public module
 all.py:1:5: D103 Missing docstring in public function

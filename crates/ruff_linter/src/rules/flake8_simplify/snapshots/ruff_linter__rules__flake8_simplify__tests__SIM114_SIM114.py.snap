@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM114.py:2:1: SIM114 [*] Combine `if` branches using logical `or` operator
   |

@@ -5,6 +5,7 @@ use std::fmt;
 /// Unlike the `TargetVersion` enums in the CLI crates,
 /// this does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,

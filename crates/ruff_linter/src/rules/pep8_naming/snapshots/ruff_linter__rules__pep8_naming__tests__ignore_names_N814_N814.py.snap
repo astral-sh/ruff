@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N814.py:2:8: N814 Camelcase `StillBad` imported as constant `STILLBAD`
   |
@@ -25,5 +26,3 @@ N814.py:8:17: N814 Camelcase `StillBad` imported as constant `STILL_BAD`
 8 | from mod import StillBad as STILL_BAD
   |                 ^^^^^^^^^^^^^^^^^^^^^ N814
   |
-
-

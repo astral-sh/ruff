@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F401_31.py:12:33: F401 [*] `hvplot.pandas_alias.scatter_matrix` imported but unused
    |

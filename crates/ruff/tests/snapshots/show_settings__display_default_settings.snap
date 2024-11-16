@@ -6,6 +6,7 @@ info:
     - check
     - "--show-settings"
     - unformatted.py
+snapshot_kind: text
 ---
 success: true
 exit_code: 0
@@ -375,6 +376,7 @@ linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
+linter.ruff.extend_markup_names = []
 
 # Formatter Settings
 formatter.exclude = []

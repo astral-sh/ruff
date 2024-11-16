@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/eradicate/mod.rs
+snapshot_kind: text
 ---
 ERA001.py:1:1: ERA001 Found commented-out code
   |

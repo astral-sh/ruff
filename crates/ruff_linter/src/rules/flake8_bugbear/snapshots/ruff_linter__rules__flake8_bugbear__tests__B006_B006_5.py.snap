@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B006_5.py:5:49: B006 [*] Do not use mutable data structures for argument defaults
   |
@@ -309,5 +310,3 @@ B006_5.py:73:49: B006 Do not use mutable data structures for argument defaults
 74 |     import os
    |
    = help: Replace with `None`; initialize within function
-
-

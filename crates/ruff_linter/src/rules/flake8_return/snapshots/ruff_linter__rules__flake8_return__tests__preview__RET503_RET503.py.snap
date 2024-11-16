@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+snapshot_kind: text
 ---
 RET503.py:20:1: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |

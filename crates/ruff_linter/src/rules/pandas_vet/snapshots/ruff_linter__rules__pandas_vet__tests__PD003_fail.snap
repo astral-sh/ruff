@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 <filename>:3:9: PD003 `.isna` is preferred to `.isnull`; functionality is equivalent
   |
@@ -7,5 +8,3 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 3 | nulls = pd.isnull(val)
   |         ^^^^^^^^^ PD003
   |
-
-

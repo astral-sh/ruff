@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: double_dedent_with_eol(WINDOWS_EOL)
+snapshot_kind: text
 ---
 ## Tokens
 ```

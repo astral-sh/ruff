@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP022.py:4:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   |
@@ -215,5 +216,3 @@ UP022.py:46:10: UP022 Prefer `capture_output` over sending `stdout` and `stderr`
 50 |   # OK
    |
    = help: Replace with `capture_output` keyword argument
-
-

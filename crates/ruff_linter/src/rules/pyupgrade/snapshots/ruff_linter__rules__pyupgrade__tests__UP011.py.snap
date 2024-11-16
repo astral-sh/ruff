@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP011.py:5:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
   |
@@ -77,5 +78,3 @@ UP011.py:21:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
 22 22 | @other_decorator
 23 23 | def fixme():
 24 24 |     pass
-
-

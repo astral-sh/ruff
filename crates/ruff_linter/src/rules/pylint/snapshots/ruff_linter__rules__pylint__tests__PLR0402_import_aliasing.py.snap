@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 import_aliasing.py:9:8: PLR0402 [*] Use `from os import path` in lieu of alias
    |
@@ -53,5 +54,3 @@ import_aliasing.py:12:8: PLR0402 Use `from foo.bar import foobar` in lieu of ali
 14 | import os as OS
    |
    = help: Replace with `from foo.bar import foobar`
-
-

@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-assertion_line: 81
+snapshot_kind: text
 ---
 S113.py:46:1: S113 Probable use of `requests` call without timeout
    |

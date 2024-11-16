@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/boolean_operation.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -401,6 +402,3 @@ if (
 ):
     pass
 ```
-
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B909.py:12:5: B909 Mutation to loop iterable `some_list` during iteration
    |

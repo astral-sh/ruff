@@ -102,6 +102,9 @@ else:
 ### Handling of `None`
 
 ```py
+# TODO: this error should ideally go away once we (1) understand `sys.version_info` branches,
+# and (2) set the target Python version for this test to 3.10.
+# error: [possibly-unbound-import] "Member `NoneType` of module `types` is possibly unbound"
 from types import NoneType
 
 def flag() -> bool: ...

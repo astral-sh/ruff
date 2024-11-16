@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F50x.py:9:1: F502 `%`-format string expected mapping but got sequence
    |
@@ -10,5 +11,3 @@ F50x.py:9:1: F502 `%`-format string expected mapping but got sequence
 10 | '%s %s' % {'k': 'v'}  # F503
 11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
    |
-
-

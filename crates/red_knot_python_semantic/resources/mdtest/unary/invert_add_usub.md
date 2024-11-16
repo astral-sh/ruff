@@ -1,4 +1,6 @@
-# Unary Operations
+# Invert, UAdd, USub
+
+## Instance
 
 ```py
 from typing import Literal

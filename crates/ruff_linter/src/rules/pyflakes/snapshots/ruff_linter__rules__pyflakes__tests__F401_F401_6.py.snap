@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F401_6.py:7:25: F401 [*] `.background.BackgroundTasks` imported but unused
   |
@@ -71,5 +72,3 @@ F401_6.py:19:26: F401 [*] `datastructures` imported but unused
 17 17 | 
 18 18 | # F401 `datastructures` imported but unused
 19    |-import datastructures as structures
-
-

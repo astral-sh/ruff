@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
@@ -392,5 +393,3 @@ UP018.py:61:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 60 60 | float(+1.0)
 61    |-float(-1.0)
    61 |+-1.0
-
-

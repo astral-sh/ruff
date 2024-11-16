@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT003.py:14:17: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
@@ -160,5 +161,3 @@ PT003.py:66:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
 70 66 |     name2=name, name3="my_fixture", **kwargs
 71 67 | )
 72 68 | def error_multiple_args():
-
-
