@@ -164,5 +164,5 @@ fn func_and_positionals(expr: &ExprCall) -> Option<(&Expr, &[Expr])> {
         return None;
     }
 
-    Some((func.deref(), arguments.args.deref()))
+    Some((func.as_ref(), arguments.args.as_ref()))
 }
