@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF101.py:1:15: RUF101 [*] `RUF940` is a redirect to `RUF950`
   |

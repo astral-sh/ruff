@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+snapshot_kind: text
 ---
 DOC202_google.py:20:1: DOC202 Docstring should not have a returns section because the function doesn't return anything
    |

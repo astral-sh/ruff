@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E501_1.py:1:89: E501 Line too long (149 > 88)
   |
@@ -74,5 +75,3 @@ E501_1.py:8:89: E501 Line too long (159 > 88)
 8 | # FIXME(charlie): comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
   |
-
-

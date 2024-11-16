@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 <filename>:4:10: PD011 Use `.to_numpy()` instead of `.values`
   |
@@ -8,5 +9,3 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 4 | result = x.values
   |          ^^^^^^^^ PD011
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM110.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
   |
@@ -349,5 +350,3 @@ SIM110.py:191:5: SIM110 [*] Use `return any(check(x) for x in await iterable)` i
 195 192 | 
 196 193 | def f():
 197 194 |     # OK (can't turn this into any() because the yield would end up inside a genexp)
-
-

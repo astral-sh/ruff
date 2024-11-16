@@ -10,7 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
-use super::helpers::is_dataclass;
+use super::helpers::{dataclass_kind, DataclassKind};
 
 /// ## What it does
 /// Checks for `__post_init__` dataclass methods with parameter defaults.
@@ -91,7 +91,10 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
     let current_scope = checker.semantic().current_scope();
     match current_scope.kind {
         ScopeKind::Class(class_def) => {
-            if !is_dataclass(class_def, checker.semantic()) {
+            if !matches!(
+                dataclass_kind(class_def, checker.semantic()),
+                Some(DataclassKind::Stdlib)
+            ) {
                 return;
             }
         }

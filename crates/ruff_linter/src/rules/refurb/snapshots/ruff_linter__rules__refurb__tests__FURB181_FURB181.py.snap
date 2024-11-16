@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB181.py:19:1: FURB181 [*] Use of hashlib's `.digest().hex()`
    |
@@ -335,5 +336,3 @@ FURB181.py:38:1: FURB181 [*] Use of hashlib's `.digest().hex()`
 39 39 | 
 40 40 | # not yet supported
 41 41 | h = sha256()
-
-

@@ -110,3 +110,29 @@ c: builtins.tuple[builtins.tuple[builtins.int, builtins.int], builtins.int] = ((
 # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `tuple[tuple[int, int], int]`"
 c: builtins.tuple[builtins.tuple[builtins.int, builtins.int], builtins.int] = "foo"
 ```
+
+## Future annotations are deferred
+
+```py
+from __future__ import annotations
+
+x: Foo
+
+class Foo:
+    pass
+
+x = Foo()
+reveal_type(x)  # revealed: Foo
+```
+
+## Annotations in stub files are deferred
+
+```pyi path=main.pyi
+x: Foo
+
+class Foo:
+    pass
+
+x = Foo()
+reveal_type(x)  # revealed: Foo
+```

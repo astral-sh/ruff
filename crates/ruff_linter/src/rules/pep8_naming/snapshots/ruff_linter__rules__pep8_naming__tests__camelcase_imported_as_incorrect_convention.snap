@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N817.py:1:8: N817 CamelCase `CaMel` imported as acronym `CM`
   |

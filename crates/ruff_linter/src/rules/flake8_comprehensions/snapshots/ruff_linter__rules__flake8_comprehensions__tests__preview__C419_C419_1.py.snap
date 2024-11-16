@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C419_1.py:1:5: C419 [*] Unnecessary list comprehension
   |

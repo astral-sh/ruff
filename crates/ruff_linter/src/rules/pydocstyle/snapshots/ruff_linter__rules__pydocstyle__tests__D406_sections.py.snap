@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
    |

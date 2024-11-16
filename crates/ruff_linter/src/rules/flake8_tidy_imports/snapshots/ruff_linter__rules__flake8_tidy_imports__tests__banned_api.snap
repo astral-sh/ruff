@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+snapshot_kind: text
 ---
 TID251.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
   |
@@ -116,5 +117,3 @@ TID251.py:33:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.Typed
 34 | 
 35 | # relative imports are respected
    |
-
-

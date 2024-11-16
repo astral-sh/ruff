@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S501.py:5:47: S501 Probable use of `requests` call with `verify=False` disabling SSL certificate checks
   |
@@ -176,5 +177,3 @@ S501.py:40:19: S501 Probable use of `httpx` call with `verify=False` disabling S
 40 | httpx.AsyncClient(verify=False)
    |                   ^^^^^^^^^^^^ S501
    |
-
-

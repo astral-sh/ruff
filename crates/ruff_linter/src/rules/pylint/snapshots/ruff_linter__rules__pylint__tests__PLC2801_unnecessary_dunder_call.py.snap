@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
   |
@@ -1081,5 +1082,3 @@ unnecessary_dunder_call.py:92:16: PLC2801 Unnecessary dunder call to `__getattri
 94 |     def use_descriptor(self, item):
    |
    = help: Access attribute directly or use getattr built-in function
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+snapshot_kind: text
 ---
 A002.py:1:11: A002 Function argument `str` is shadowing a Python builtin
   |

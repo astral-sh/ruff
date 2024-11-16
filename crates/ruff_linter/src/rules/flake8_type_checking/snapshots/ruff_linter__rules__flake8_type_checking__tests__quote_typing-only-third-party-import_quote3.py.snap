@@ -54,7 +54,7 @@ quote3.py:13:44: TCH002 [*] Move third-party import `django.contrib.auth.models.
 13    |-    from django.contrib.auth.models import AbstractBaseUser
 14 17 | 
 15    |-    def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
-   18 |+    def test_callable_literal_mixed_quotes(callable_fn: 'AbstractBaseUser[Callable[[int, Literal[admin, user]], bool]]'):
+   18 |+    def test_callable_literal_mixed_quotes(callable_fn: 'AbstractBaseUser[Callable[[int, Literal["admin", "user"]], bool]]'):
 16 19 |         pass
 17 20 | 
 18 21 | 
@@ -85,7 +85,7 @@ quote3.py:22:44: TCH002 [*] Move third-party import `django.contrib.auth.models.
 22    |-    from django.contrib.auth.models import AbstractBaseUser
 23 26 | 
 24    |-    def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], bool]]):
-   27 |+    def test_callable_annotated_literal(callable_fn: 'AbstractBaseUser[Callable[[int, Annotated[str, Literal[active, inactive]]], bool]]'):
+   27 |+    def test_callable_annotated_literal(callable_fn: 'AbstractBaseUser[Callable[[int, Annotated[str, Literal["active", "inactive"]]], bool]]'):
 25 28 |         pass
 26 29 | 
 27 30 | 
@@ -149,4 +149,27 @@ quote3.py:40:37: TCH002 [*] Move third-party import `django.contrib.auth.models`
 42    |-    def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
    45 |+    def test_attribute_typing_literal(arg: 'models.AbstractBaseUser[Literal["admin"]]'):
 43 46 |         pass
-44 47 |
+44 47 | 
+45 48 | 
+
+quote3.py:59:29: TCH002 Move third-party import `third_party.Type` into a type-checking block
+   |
+57 | def f():
+58 |     from typing import Literal
+59 |     from third_party import Type
+   |                             ^^^^ TCH002
+60 | 
+61 |     def test_string_contains_opposite_quote_do_not_fix(self, type1: Type[Literal["'"]], type2: Type[Literal["\'"]]):
+   |
+   = help: Move into type-checking block
+
+quote3.py:67:29: TCH002 Move third-party import `third_party.Type` into a type-checking block
+   |
+65 | def f():
+66 |     from typing import Literal
+67 |     from third_party import Type
+   |                             ^^^^ TCH002
+68 | 
+69 |     def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
+   |
+   = help: Move into type-checking block

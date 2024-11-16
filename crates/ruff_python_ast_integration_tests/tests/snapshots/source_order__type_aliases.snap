@@ -1,6 +1,7 @@
 ---
-source: crates/ruff_python_ast_integration_tests/tests/preorder.rs
+source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
 expression: trace
+snapshot_kind: text
 ---
 - ModModule
   - StmtTypeAlias

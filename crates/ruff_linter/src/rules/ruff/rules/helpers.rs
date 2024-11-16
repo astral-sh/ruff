@@ -18,15 +18,40 @@ pub(super) fn is_special_attribute(value: &Expr) -> bool {
     }
 }
 
-/// Returns `true` if the given [`Expr`] is a `dataclasses.field` call.
-pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
-    if !semantic.seen_module(Modules::DATACLASSES) {
-        return false;
-    }
-
+/// Returns `true` if the given [`Expr`] is a stdlib `dataclasses.field` call.
+fn is_stdlib_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["dataclasses", "field"]))
+}
+
+/// Returns `true` if the given [`Expr`] is a call to `attr.ib()` or `attrs.field()`.
+fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["attrs", "field" | "Factory"] | ["attr", "ib"]
+            )
+        })
+}
+
+/// Return `true` if `func` represents a `field()` call corresponding to the `dataclass_kind` variant passed in.
+///
+/// I.e., if `DataclassKind::Attrs` is passed in,
+/// return `true` if `func` represents a call to `attr.ib()` or `attrs.field()`;
+/// if `DataclassKind::Stdlib` is passed in,
+/// return `true` if `func` represents a call to `dataclasse.field()`.
+pub(super) fn is_dataclass_field(
+    func: &Expr,
+    semantic: &SemanticModel,
+    dataclass_kind: DataclassKind,
+) -> bool {
+    match dataclass_kind {
+        DataclassKind::Attrs => is_attrs_field(func, semantic),
+        DataclassKind::Stdlib => is_stdlib_dataclass_field(func, semantic),
+    }
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
@@ -51,19 +76,49 @@ pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -
     semantic.match_typing_expr(map_subscript(annotation), "Final")
 }
 
-/// Returns `true` if the given class is a dataclass.
-pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    if !semantic.seen_module(Modules::DATACLASSES) {
-        return false;
+/// Enumeration of various kinds of dataclasses recognised by Ruff
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum DataclassKind {
+    /// dataclasses created by the stdlib `dataclasses` module
+    Stdlib,
+    /// dataclasses created by the third-party `attrs` library
+    Attrs,
+}
+
+impl DataclassKind {
+    pub(super) const fn is_stdlib(self) -> bool {
+        matches!(self, DataclassKind::Stdlib)
     }
 
-    class_def.decorator_list.iter().any(|decorator| {
-        semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
-            })
-    })
+    pub(super) const fn is_attrs(self) -> bool {
+        matches!(self, DataclassKind::Attrs)
+    }
+}
+
+/// Return the kind of dataclass this class definition is (stdlib or `attrs`), or `None` if the class is not a dataclass.
+pub(super) fn dataclass_kind(
+    class_def: &ast::StmtClassDef,
+    semantic: &SemanticModel,
+) -> Option<DataclassKind> {
+    if !(semantic.seen_module(Modules::DATACLASSES) || semantic.seen_module(Modules::ATTRS)) {
+        return None;
+    }
+
+    for decorator in &class_def.decorator_list {
+        let Some(qualified_name) =
+            semantic.resolve_qualified_name(map_callable(&decorator.expression))
+        else {
+            continue;
+        };
+
+        match qualified_name.segments() {
+            ["attrs", "define" | "frozen"] | ["attr", "s"] => return Some(DataclassKind::Attrs),
+            ["dataclasses", "dataclass"] => return Some(DataclassKind::Stdlib),
+            _ => continue,
+        }
+    }
+
+    None
 }
 
 /// Returns `true` if the given class has "default copy" semantics.

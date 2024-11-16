@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:142:5: D202 [*] No blank lines allowed after function docstring (found 1)
     |
@@ -87,6 +88,4 @@ D.py:568:5: D202 [*] No blank lines allowed after function docstring (found 1)
 572     |-
 573 572 |     pass
 574 573 | 
-575 574 | 
-
-
+575 574 |

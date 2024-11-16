@@ -11,15 +11,21 @@ use crate::edit::Edit;
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Applicability {
     /// The fix is unsafe and should only be displayed for manual application by the user.
+    ///
     /// The fix is likely to be incorrect or the resulting code may have invalid syntax.
     DisplayOnly,
 
     /// The fix is unsafe and should only be applied with user opt-in.
-    /// The fix may be what the user intended, but it is uncertain; the resulting code will have valid syntax.
+    ///
+    /// The fix may be what the user intended, but it is uncertain. The resulting code will have
+    /// valid syntax, but may lead to a change in runtime behavior, the removal of user comments,
+    /// or both.
     Unsafe,
 
     /// The fix is safe and can always be applied.
-    /// The fix is definitely what the user intended, or it maintains the exact meaning of the code.
+    ///
+    /// The fix is definitely what the user intended, or maintains the exact meaning of the code.
+    /// User comments are preserved, unless the fix removes an entire statement or expression.
     Safe,
 }
 

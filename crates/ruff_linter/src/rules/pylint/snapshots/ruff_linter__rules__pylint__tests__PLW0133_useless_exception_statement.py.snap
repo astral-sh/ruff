@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 useless_exception_statement.py:7:5: PLW0133 [*] Missing `raise` statement on exception
   |

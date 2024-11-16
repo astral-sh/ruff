@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N812.py:1:8: N812 Lowercase `lowercase` imported as non-lowercase `Lower`
   |
@@ -24,5 +25,3 @@ N812.py:3:17: N812 Lowercase `another_lowercase` imported as non-lowercase `Anot
 3 | from mod import another_lowercase as AnotherLowercase
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N812
   |
-
-

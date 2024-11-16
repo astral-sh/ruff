@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 bad_dunder_method_name.py:5:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
   |

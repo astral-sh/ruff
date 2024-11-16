@@ -80,6 +80,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateUnionMember,
                 Rule::RedundantLiteralUnion,
                 Rule::UnnecessaryTypeUnion,
+                Rule::NoneNotAtEndOfUnion,
             ]) {
                 // Avoid duplicate checks if the parent is a union, since these rules already
                 // traverse nested unions.
@@ -95,6 +96,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::UnnecessaryTypeUnion) {
                         flake8_pyi::rules::unnecessary_type_union(checker, expr);
+                    }
+                    if checker.enabled(Rule::NoneNotAtEndOfUnion) {
+                        ruff::rules::none_not_at_end_of_union(checker, expr);
                     }
                 }
             }
@@ -343,6 +347,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
+            }
+            if checker.enabled(Rule::DatetimeMinMax) {
+                flake8_datetimez::rules::datetime_max_min(checker, expr);
             }
             if checker.enabled(Rule::BannedApi) {
                 flake8_tidy_imports::rules::banned_attribute_access(checker, expr);
@@ -996,6 +1003,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
+            if checker.enabled(Rule::RootLoggerCall) {
+                flake8_logging::rules::root_logger_call(checker, call);
+            }
             if checker.enabled(Rule::IsinstanceTypeNone) {
                 refurb::rules::isinstance_type_none(checker, call);
             }
@@ -1280,6 +1290,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::RuntimeStringUnion) {
                     flake8_type_checking::rules::runtime_string_union(checker, expr);
+                }
+                if checker.enabled(Rule::NoneNotAtEndOfUnion) {
+                    ruff::rules::none_not_at_end_of_union(checker, expr);
                 }
             }
         }

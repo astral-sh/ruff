@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
+snapshot_kind: text
 ---
 PERF403.py:5:9: PERF403 Use a dictionary comprehension instead of a for-loop
   |

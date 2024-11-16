@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 self_or_cls_assignment.py:4:9: PLW0642 Reassigned `cls` variable in class method
   |

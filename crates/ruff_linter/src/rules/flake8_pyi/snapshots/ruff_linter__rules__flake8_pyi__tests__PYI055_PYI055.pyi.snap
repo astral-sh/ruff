@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
@@ -127,7 +128,7 @@ PYI055.pyi:10:15: PYI055 [*] Multiple `type` members in a union. Combine them in
 
 PYI055.pyi:20:7: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty]`.
    |
-19 | # OK
+19 | # PYI055
 20 | item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
 21 | 
@@ -138,7 +139,7 @@ PYI055.pyi:20:7: PYI055 [*] Multiple `type` members in a union. Combine them int
 ℹ Safe fix
 17 17 | def func(arg: type[int, float] | str) -> None: ...
 18 18 | 
-19 19 | # OK
+19 19 | # PYI055
 20    |-item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
    20 |+item: type[requests_mock.Mocker | httpretty] = requests_mock.Mocker
 21 21 | 
@@ -152,6 +153,7 @@ PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them in
 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+26 |     item3: Union[  # comment
    |
    = help: Combine multiple `type` members
 
@@ -162,6 +164,8 @@ PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them in
 24    |-    item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
    24 |+    item: type[requests_mock.Mocker | httpretty | str] = requests_mock.Mocker
 25 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+26 26 |     item3: Union[  # comment
+27 27 |         type[requests_mock.Mocker], # another comment
 
 PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
@@ -169,6 +173,8 @@ PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them in
 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+26 |     item3: Union[  # comment
+27 |         type[requests_mock.Mocker], # another comment
    |
    = help: Combine multiple `type` members
 
@@ -178,5 +184,27 @@ PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them in
 24 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
 25    |-    item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
    25 |+    item2: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
+26 26 |     item3: Union[  # comment
+27 27 |         type[requests_mock.Mocker], # another comment
+28 28 |         type[httpretty], type[str]] = requests_mock.Mocker
 
+PYI055.pyi:26:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+   |
+24 |       item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+25 |       item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+26 |       item3: Union[  # comment
+   |  ____________^
+27 | |         type[requests_mock.Mocker], # another comment
+28 | |         type[httpretty], type[str]] = requests_mock.Mocker
+   | |___________________________________^ PYI055
+   |
+   = help: Combine multiple `type` members
 
+ℹ Unsafe fix
+23 23 |     # PYI055
+24 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+25 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+26    |-    item3: Union[  # comment
+27    |-        type[requests_mock.Mocker], # another comment
+28    |-        type[httpretty], type[str]] = requests_mock.Mocker
+   26 |+    item3: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker

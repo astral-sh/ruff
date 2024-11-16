@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+snapshot_kind: text
 ---
 TD003.py:9:3: TD003 Missing issue link on the line following this TODO
    |
@@ -46,5 +47,3 @@ TD003.py:31:3: TD003 Missing issue link on the line following this TODO
 31 | # TODO: here's a TODO on the last line with no link
    |   ^^^^ TD003
    |
-
-

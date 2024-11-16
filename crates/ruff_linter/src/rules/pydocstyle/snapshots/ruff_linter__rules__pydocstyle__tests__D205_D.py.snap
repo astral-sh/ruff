@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:200:5: D205 1 blank line required between summary line and description
     |
@@ -37,5 +38,3 @@ D.py:210:5: D205 [*] 1 blank line required between summary line and description 
 213 212 |     Description.
 214 213 | 
 215 214 |     """
-
-

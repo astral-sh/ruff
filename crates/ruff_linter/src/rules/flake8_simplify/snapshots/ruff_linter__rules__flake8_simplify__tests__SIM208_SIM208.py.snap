@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM208.py:1:4: SIM208 [*] Use `a` instead of `not (not a)`
   |
@@ -95,5 +96,3 @@ SIM208.py:20:9: SIM208 [*] Use `a` instead of `not (not a)`
 20    |-if 1 + (not (not a)):  # SIM208
    20 |+if 1 + (bool(a)):  # SIM208
 21 21 |     pass
-
-

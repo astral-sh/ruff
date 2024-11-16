@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_5.pyi:4:27: F821 Undefined name `InnerClass`
   |

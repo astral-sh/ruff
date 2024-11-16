@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT005.py:41:5: PT005 Fixture `_my_fixture` returns a value, remove leading underscore
    |
@@ -26,5 +27,3 @@ PT005.py:52:5: PT005 Fixture `_activate_context` returns a value, remove leading
 53 |     if some_condition:
 54 |         with get_context() as context:
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 empty_comment.py:3:1: PLR2044 [*] Line with empty comment
   |
@@ -129,5 +130,3 @@ empty_comment.py:58:2: PLR2044 [*] Line with empty comment
 57 57 | α = 1
 58    |-α#
    58 |+α
-
-

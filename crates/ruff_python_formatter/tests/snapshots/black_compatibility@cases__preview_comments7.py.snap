@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_comments7.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -596,5 +597,3 @@ square = Square(4)  # type: Optional[Square]
     ),
 ]
 ```
-
-

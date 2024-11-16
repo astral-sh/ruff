@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E22.py:131:6: E228 [*] Missing whitespace around modulo operator
     |
@@ -62,5 +63,3 @@ E22.py:135:26: E228 [*] Missing whitespace around modulo operator
 136 136 | #:
 137 137 | 
 138 138 | #: Okay
-
-

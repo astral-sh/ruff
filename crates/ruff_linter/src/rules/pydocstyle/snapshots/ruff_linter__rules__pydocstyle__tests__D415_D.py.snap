@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:355:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
@@ -310,6 +311,4 @@ D.py:664:5: D415 [*] First line should end with a period, question mark, or excl
     665 |+    but continuations shouldn't be considered multi-line."
 666 666 | 
 667 667 | 
-668 668 | 
-
-
+668 668 |

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/delete.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -232,6 +233,3 @@ del (  # dangling end of line comment
     # dangling own line comment
 )  # trailing statement comment
 ```
-
-
-

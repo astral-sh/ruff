@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S324.py:7:13: S324 Probable use of insecure hash functions in `hashlib`: `md5`
   |
