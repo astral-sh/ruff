@@ -46,18 +46,6 @@ mod tests {
         "PT003"
     )]
     #[test_case(
-        Rule::PytestMissingFixtureNameUnderscore,
-        Path::new("PT004.py"),
-        Settings::default(),
-        "PT004"
-    )]
-    #[test_case(
-        Rule::PytestIncorrectFixtureNameUnderscore,
-        Path::new("PT005.py"),
-        Settings::default(),
-        "PT005"
-    )]
-    #[test_case(
         Rule::PytestParametrizeNamesWrongType,
         Path::new("PT006.py"),
         Settings::default(),

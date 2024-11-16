@@ -1,7 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -167,8 +166,8 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     }
 }
 
-/// ## Deprecation
-/// Marking fixtures that do not return a value with an underscore
+/// ## Removal
+/// This rule has been removed because marking fixtures that do not return a value with an underscore
 /// isn't a practice recommended by the pytest community.
 ///
 /// ## What it does
@@ -216,20 +215,22 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
-pub struct PytestMissingFixtureNameUnderscore {
-    function: String,
-}
+#[deprecated(note = "PT004 has been removed")]
+pub struct PytestMissingFixtureNameUnderscore;
 
+#[allow(deprecated)]
 impl Violation for PytestMissingFixtureNameUnderscore {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestMissingFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` does not return anything, add leading underscore")
+        unreachable!("PT004 has been removed");
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["Fixture `{function}` does not return anything, add leading underscore"]
     }
 }
 
-/// ## Deprecation
-/// Marking fixtures that do not return a value with an underscore
+/// ## Removal
+/// This rule has been removed becausae marking fixtures that do not return a value with an underscore
 /// isn't a practice recommended by the pytest community.
 ///
 /// ## What it does
@@ -279,15 +280,17 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
-pub struct PytestIncorrectFixtureNameUnderscore {
-    function: String,
-}
+#[deprecated(note = "PT005 has been removed")]
+pub struct PytestIncorrectFixtureNameUnderscore;
 
+#[allow(deprecated)]
 impl Violation for PytestIncorrectFixtureNameUnderscore {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestIncorrectFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` returns a value, remove leading underscore")
+        unreachable!("PT005 has been removed");
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["Fixture `{function}` returns a value, remove leading underscore"]
     }
 }
 
@@ -749,41 +752,12 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
     }
 }
 
-/// PT004, PT005, PT022
-fn check_fixture_returns(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    name: &str,
-    body: &[Stmt],
-    returns: Option<&Expr>,
-) {
+/// PT022
+fn check_fixture_returns(checker: &mut Checker, name: &str, body: &[Stmt], returns: Option<&Expr>) {
     let mut visitor = SkipFunctionsVisitor::default();
 
     for stmt in body {
         visitor.visit_stmt(stmt);
-    }
-
-    if checker.enabled(Rule::PytestIncorrectFixtureNameUnderscore)
-        && visitor.has_return_with_value
-        && name.starts_with('_')
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            PytestIncorrectFixtureNameUnderscore {
-                function: name.to_string(),
-            },
-            stmt.identifier(),
-        ));
-    } else if checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
-        && !visitor.has_return_with_value
-        && !visitor.has_yield_from
-        && !name.starts_with('_')
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            PytestMissingFixtureNameUnderscore {
-                function: name.to_string(),
-            },
-            stmt.identifier(),
-        ));
     }
 
     if checker.enabled(Rule::PytestUselessYieldFixture) {
@@ -904,7 +878,6 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
 
 pub(crate) fn fixture(
     checker: &mut Checker,
-    stmt: &Stmt,
     name: &str,
     parameters: &Parameters,
     returns: Option<&Expr>,
@@ -924,12 +897,10 @@ pub(crate) fn fixture(
             check_fixture_decorator_name(checker, decorator);
         }
 
-        if (checker.enabled(Rule::PytestMissingFixtureNameUnderscore)
-            || checker.enabled(Rule::PytestIncorrectFixtureNameUnderscore)
-            || checker.enabled(Rule::PytestUselessYieldFixture))
+        if checker.enabled(Rule::PytestUselessYieldFixture)
             && !is_abstract(decorators, checker.semantic())
         {
-            check_fixture_returns(checker, stmt, name, body, returns);
+            check_fixture_returns(checker, name, body, returns);
         }
 
         if checker.enabled(Rule::PytestFixtureFinalizerCallback) {
