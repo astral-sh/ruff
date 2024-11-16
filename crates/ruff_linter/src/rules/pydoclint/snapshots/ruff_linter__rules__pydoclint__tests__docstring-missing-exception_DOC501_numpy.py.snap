@@ -2,61 +2,146 @@
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 snapshot_kind: text
 ---
-DOC501_numpy.py:53:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_numpy.py:35:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
-51 |         return distance / time
-52 |     except ZeroDivisionError as exc:
-53 |         raise FasterThanLightError from exc
-   |               ^^^^^^^^^^^^^^^^^^^^ DOC501
+33 |   # DOC501
+34 |   def calculate_speed(distance: float, time: float) -> float:
+35 |       """
+   |  _____^
+36 | |     Calculate speed as distance divided by time.
+37 | | 
+38 | |     Parameters
+39 | |     ----------
+40 | |     distance : float
+41 | |         Distance traveled.
+42 | |     time : float
+43 | |         Time spent traveling.
+44 | | 
+45 | |     Returns
+46 | |     -------
+47 | |     float
+48 | |         Speed as distance divided by time.
+49 | |     """
+   | |_______^ DOC501
+50 |       try:
+51 |           return distance / time
    |
    = help: Add `FasterThanLightError` to the docstring
 
-DOC501_numpy.py:76:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_numpy.py:58:5: DOC501 Raised exception `ValueError` missing from docstring
    |
-74 |         return distance / time
-75 |     except ZeroDivisionError as exc:
-76 |         raise FasterThanLightError from exc
-   |               ^^^^^^^^^^^^^^^^^^^^ DOC501
-77 |     except:
-78 |         raise ValueError
-   |
-   = help: Add `FasterThanLightError` to the docstring
-
-DOC501_numpy.py:78:15: DOC501 Raised exception `ValueError` missing from docstring
-   |
-76 |         raise FasterThanLightError from exc
-77 |     except:
-78 |         raise ValueError
-   |               ^^^^^^^^^^ DOC501
+56 |   # DOC501
+57 |   def calculate_speed(distance: float, time: float) -> float:
+58 |       """
+   |  _____^
+59 | |     Calculate speed as distance divided by time.
+60 | | 
+61 | |     Parameters
+62 | |     ----------
+63 | |     distance : float
+64 | |         Distance traveled.
+65 | |     time : float
+66 | |         Time spent traveling.
+67 | | 
+68 | |     Returns
+69 | |     -------
+70 | |     float
+71 | |         Speed as distance divided by time.
+72 | |     """
+   | |_______^ DOC501
+73 |       try:
+74 |           return distance / time
    |
    = help: Add `ValueError` to the docstring
 
-DOC501_numpy.py:111:9: DOC501 Raised exception `TypeError` missing from docstring
+DOC501_numpy.py:58:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+   |
+56 |   # DOC501
+57 |   def calculate_speed(distance: float, time: float) -> float:
+58 |       """
+   |  _____^
+59 | |     Calculate speed as distance divided by time.
+60 | | 
+61 | |     Parameters
+62 | |     ----------
+63 | |     distance : float
+64 | |         Distance traveled.
+65 | |     time : float
+66 | |         Time spent traveling.
+67 | | 
+68 | |     Returns
+69 | |     -------
+70 | |     float
+71 | |         Speed as distance divided by time.
+72 | |     """
+   | |_______^ DOC501
+73 |       try:
+74 |           return distance / time
+   |
+   = help: Add `FasterThanLightError` to the docstring
+
+DOC501_numpy.py:83:5: DOC501 Raised exception `TypeError` missing from docstring
     |
-109 |     except TypeError:
-110 |         print("Not a number? Shame on you!")
-111 |         raise
-    |         ^^^^^ DOC501
+ 81 |   # DOC501
+ 82 |   def calculate_speed(distance: float, time: float) -> float:
+ 83 |       """Calculate speed as distance divided by time.
+    |  _____^
+ 84 | | 
+ 85 | |     ACalculate speed as distance divided by time.
+ 86 | | 
+ 87 | |     Parameters
+ 88 | |     ----------
+ 89 | |     distance : float
+ 90 | |         Distance traveled.
+ 91 | |     time : float
+ 92 | |         Time spent traveling.
+ 93 | | 
+ 94 | |     Returns
+ 95 | |     -------
+ 96 | |     float
+ 97 | |         Speed as distance divided by time.
+ 98 | | 
+ 99 | |     Raises
+100 | |     ------
+101 | |     ZeroDivisionError
+102 | |         If attempting to divide by zero.
+103 | |     """
+    | |_______^ DOC501
+104 |       try:
+105 |           return distance / time
     |
     = help: Add `TypeError` to the docstring
 
-DOC501_numpy.py:147:15: DOC501 Raised exception `TypeError` missing from docstring
+DOC501_numpy.py:139:5: DOC501 Raised exception `TypeError` missing from docstring
     |
-145 |     """
-146 |     if True:
-147 |         raise TypeError  # DOC501
-    |               ^^^^^^^^^ DOC501
-148 |     else:
-149 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+138 |   def foo():
+139 |       """Foo.
+    |  _____^
+140 | | 
+141 | |     Returns
+142 | |     -------
+143 | |     int
+144 | |         42
+145 | |     """
+    | |_______^ DOC501
+146 |       if True:
+147 |           raise TypeError  # DOC501
     |
     = help: Add `TypeError` to the docstring
 
-DOC501_numpy.py:150:11: DOC501 Raised exception `ValueError` missing from docstring
+DOC501_numpy.py:139:5: DOC501 Raised exception `ValueError` missing from docstring
     |
-148 |     else:
-149 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
-150 |     raise ValueError  # DOC501
-    |           ^^^^^^^^^^ DOC501
-151 |     return 42
+138 |   def foo():
+139 |       """Foo.
+    |  _____^
+140 | | 
+141 | |     Returns
+142 | |     -------
+143 | |     int
+144 | |         42
+145 | |     """
+    | |_______^ DOC501
+146 |       if True:
+147 |           raise TypeError  # DOC501
     |
     = help: Add `ValueError` to the docstring
