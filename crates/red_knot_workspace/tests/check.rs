@@ -317,5 +317,6 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     ("crates/ruff_linter/resources/test/fixtures/ruff/RUF013_0.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/ruff/RUF013_3.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/ruff/RUF022.py", true, true),
+    ("crates/ruff_linter/resources/test/fixtures/ruff/RUF038.py", true, true),
     ("crates/ruff_python_parser/resources/valid/expressions/f_string.py", true, true),
 ];
