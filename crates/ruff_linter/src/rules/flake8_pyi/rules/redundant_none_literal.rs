@@ -46,17 +46,16 @@ impl Violation for RedundantNoneLiteral {
         if self.other_literal_elements_seen {
             "`Literal[None, ...]` can be replaced with `Literal[...] | None`".to_string()
         } else {
-            "`Literal[None]` can be replaced with a bare `None`".to_string()
+            "`Literal[None]` can be replaced with `None`".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let title = if self.other_literal_elements_seen {
-            "Replace with `Literal[...] | None`"
+        Some(if self.other_literal_elements_seen {
+            "Replace with `Literal[...] | None`".to_string()
         } else {
-            "Replace with `None`"
-        };
-        Some(title.to_string())
+            "Replace with `None`".to_string()
+        })
     }
 }
 

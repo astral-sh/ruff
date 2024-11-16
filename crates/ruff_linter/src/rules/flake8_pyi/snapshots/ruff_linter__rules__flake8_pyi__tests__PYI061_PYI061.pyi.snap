@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI061.pyi:4:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+PYI061.pyi:4:25: PYI061 [*] `Literal[None]` can be replaced with `None`
   |
 4 | def func1(arg1: Literal[None]): ...
   |                         ^^^^ PYI061
@@ -18,7 +18,7 @@ PYI061.pyi:4:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
 6 6 | 
 7 7 | def func2(arg1: Literal[None] | int): ...
 
-PYI061.pyi:7:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+PYI061.pyi:7:25: PYI061 [*] `Literal[None]` can be replaced with `None`
   |
 7 | def func2(arg1: Literal[None] | int): ...
   |                         ^^^^ PYI061
@@ -35,7 +35,7 @@ PYI061.pyi:7:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
 9 9 | 
 10 10 | def func3() -> Literal[None]: ...
 
-PYI061.pyi:10:24: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+PYI061.pyi:10:24: PYI061 [*] `Literal[None]` can be replaced with `None`
    |
 10 | def func3() -> Literal[None]: ...
    |                        ^^^^ PYI061
@@ -59,7 +59,7 @@ PYI061.pyi:13:30: PYI061 `Literal[None, ...]` can be replaced with `Literal[...]
    |
    = help: Replace with `Literal[...] | None`
 
-PYI061.pyi:16:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+PYI061.pyi:16:25: PYI061 [*] `Literal[None]` can be replaced with `None`
    |
 16 | def func5(arg1: Literal[None, None]): ...
    |                         ^^^^ PYI061
@@ -76,7 +76,7 @@ PYI061.pyi:16:25: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
 18 18 | 
 19 19 | def func6(arg1: Literal[
 
-PYI061.pyi:16:31: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+PYI061.pyi:16:31: PYI061 [*] `Literal[None]` can be replaced with `None`
    |
 16 | def func5(arg1: Literal[None, None]): ...
    |                               ^^^^ PYI061
@@ -104,7 +104,7 @@ PYI061.pyi:21:5: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] 
    |
    = help: Replace with `Literal[...] | None`
 
-PYI061.pyi:27:5: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+PYI061.pyi:27:5: PYI061 [*] `Literal[None]` can be replaced with `None`
    |
 26 | def func7(arg1: Literal[
 27 |     None  # Comment 1
@@ -125,7 +125,7 @@ PYI061.pyi:27:5: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
 30 28 | 
 31 29 | # OK
 
-PYI061.pyi:36:9: PYI061 [*] `Literal[None]` can be replaced with a bare `None`
+PYI061.pyi:36:9: PYI061 [*] `Literal[None]` can be replaced with `None`
    |
 35 | # From flake8-pyi
 36 | Literal[None]  # PYI061 None inside "Literal[]" expression. Replace with "None"
