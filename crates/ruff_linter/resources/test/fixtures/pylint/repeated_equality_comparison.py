@@ -66,10 +66,10 @@ foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
 
 foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
 
-foo == 1 or foo == True # Different types, same hashed value, Tuple expected
+foo == 1 or foo == True # Different types, same hashed value
 
-foo == 1 or foo == 1.0 # Different types, same hashed value, Tuple expected
+foo == 1 or foo == 1.0 # Different types, same hashed value
 
-foo == False or foo == 0 # Different types, same hashed value, Tuple expected
+foo == False or foo == 0 # Different types, same hashed value
 
-foo == 0.0 or foo == 0j # Different types, same hashed value, Tuple expected
+foo == 0.0 or foo == 0j # Different types, same hashed value
