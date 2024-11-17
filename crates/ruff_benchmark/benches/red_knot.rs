@@ -123,15 +123,9 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn setup() -> Case {
         let case = setup_case();
 
-        let result: Vec<_> = case
-            .db
-            .check()
-            .unwrap()
-            .into_iter()
-            .map(|diagnostic| diagnostic.display(&case.db).to_string())
-            .collect();
+        let result: Vec<_> = case.db.check().unwrap();
 
-        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+        assert_diagnostics(&case.db, result);
 
         case.fs
             .write_file(
@@ -174,18 +168,28 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_case,
             |case| {
                 let Case { db, .. } = case;
-                let result: Vec<_> = db
-                    .check()
-                    .unwrap()
-                    .into_iter()
-                    .map(|diagnostic| diagnostic.display(db).to_string())
-                    .collect();
+                let result: Vec<_> = db.check().unwrap();
 
-                assert_eq!(result, EXPECTED_DIAGNOSTICS);
+                assert_diagnostics(db, result);
             },
             BatchSize::SmallInput,
         );
     });
+}
+
+#[track_caller]
+fn assert_diagnostics(db: &dyn Db, diagnostics: Vec<Box<dyn Diagnostic>>) {
+    let normalized: Vec<_> = diagnostics
+        .into_iter()
+        .map(|diagnostic| {
+            diagnostic
+                .display(db.upcast())
+                .to_string()
+                .replace('\\', "/")
+        })
+        .collect();
+
+    assert_eq!(&normalized, EXPECTED_DIAGNOSTICS);
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
