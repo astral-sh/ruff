@@ -21,13 +21,12 @@ use crate::Locator;
 /// Some Unicode characters are visually similar to ASCII characters, but have
 /// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
 /// is visually similar, but not identical, to the ASCII character `A`.
+/// More generally, some Unicode characters are
+/// confusable with other, non-preferred Unicode characters. For example, the
+/// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
 /// bugs, and even make malicious code look harmless.
-///
-/// In [preview], this rule will also flag Unicode characters that are
-/// confusable with other, non-preferred Unicode characters. For example, the
-/// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
 /// [`lint.allowed-confusables`] setting.
@@ -45,7 +44,6 @@ use crate::Locator;
 /// ## Options
 /// - `lint.allowed-confusables`
 ///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct AmbiguousUnicodeCharacterString {
     confusable: char,
@@ -70,17 +68,17 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// ## What it does
 /// Checks for ambiguous Unicode characters in docstrings.
 ///
+///
 /// ## Why is this bad?
 /// Some Unicode characters are visually similar to ASCII characters, but have
 /// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
 /// is visually similar, but not identical, to the ASCII character `A`.
+/// More generally, some Unicode characters are
+/// confusable with other, non-preferred Unicode characters. For example, the
+/// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
 /// bugs, and even make malicious code look harmless.
-///
-/// In [preview], this rule will also flag Unicode characters that are
-/// confusable with other, non-preferred Unicode characters. For example, the
-/// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
 /// [`lint.allowed-confusables`] setting.
@@ -98,7 +96,6 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// ## Options
 /// - `lint.allowed-confusables`
 ///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
@@ -123,17 +120,17 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// ## What it does
 /// Checks for ambiguous Unicode characters in comments.
 ///
+///
 /// ## Why is this bad?
 /// Some Unicode characters are visually similar to ASCII characters, but have
 /// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
 /// is visually similar, but not identical, to the ASCII character `A`.
+/// More generally, some Unicode characters are
+/// confusable with other, non-preferred Unicode characters. For example, the
+/// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
 /// bugs, and even make malicious code look harmless.
-///
-/// In [preview], this rule will also flag Unicode characters that are
-/// confusable with other, non-preferred Unicode characters. For example, the
-/// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
 /// [`lint.allowed-confusables`] setting.
@@ -151,7 +148,6 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// ## Options
 /// - `lint.allowed-confusables`
 ///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct AmbiguousUnicodeCharacterComment {
     confusable: char,
@@ -254,9 +250,7 @@ fn ambiguous_unicode_character(
             // Check if the boundary character is itself an ambiguous unicode character, in which
             // case, it's always included as a diagnostic.
             if !current_char.is_ascii() {
-                if let Some(representant) = confusable(current_char as u32)
-                    .filter(|representant| settings.preview.is_enabled() || representant.is_ascii())
-                {
+                if let Some(representant) = confusable(current_char as u32) {
                     let candidate = Candidate::new(
                         TextSize::try_from(relative_offset).unwrap() + range.start(),
                         current_char,
@@ -270,9 +264,7 @@ fn ambiguous_unicode_character(
         } else if current_char.is_ascii() {
             // The current word contains at least one ASCII character.
             word_flags |= WordFlags::ASCII;
-        } else if let Some(representant) = confusable(current_char as u32)
-            .filter(|representant| settings.preview.is_enabled() || representant.is_ascii())
-        {
+        } else if let Some(representant) = confusable(current_char as u32) {
             // The current word contains an ambiguous unicode character.
             word_candidates.push(Candidate::new(
                 TextSize::try_from(relative_offset).unwrap() + range.start(),
