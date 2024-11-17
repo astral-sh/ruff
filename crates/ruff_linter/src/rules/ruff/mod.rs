@@ -395,8 +395,8 @@ mod tests {
         Path::new("RUF009_attrs.py")
     )]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
-    #[test_case(Rule::TupleMapIntVersionParsing, Path::new("RUF048.py"))]
-    #[test_case(Rule::TupleMapIntVersionParsing, Path::new("RUF048_1.py"))]
+    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
+    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

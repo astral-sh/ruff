@@ -2,18 +2,18 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF048.py:4:1: RUF048 `__version__` may contain non-integral-like elements
+RUF048.py:4:7: RUF048 `__version__` may contain non-integral-like elements
   |
 4 | tuple(map(int, __version__.split(".")))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
 5 | list(map(int, __version__.split(".")))
   |
 
-RUF048.py:5:1: RUF048 `__version__` may contain non-integral-like elements
+RUF048.py:5:6: RUF048 `__version__` may contain non-integral-like elements
   |
 4 | tuple(map(int, __version__.split(".")))
 5 | list(map(int, __version__.split(".")))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
 6 | 
 7 | # Comma
   |

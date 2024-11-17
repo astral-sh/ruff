@@ -7,19 +7,19 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for calls of the form `tuple(map(int, __version__.split(".")))`.
+/// Checks for calls of the form `map(int, __version__.split("."))`.
 ///
 /// ## Why is this bad?
 /// `__version__` does not always contain integral-like elements.
 ///
 /// ```python
-/// import matplotlib  # 3.9.1.post-1
+/// import matplotlib  # `__version__ == "3.9.1.post-1"` in our environment
 ///
 /// # ValueError: invalid literal for int() with base 10: 'post1'
 /// tuple(map(int, matplotlib.__version__.split(".")))
 /// ```
 ///
-/// See also [PEP 440].
+/// See also [*Version specifiers* | Packaging spec][version-specifier].
 ///
 /// ## Example
 /// ```python
@@ -33,11 +33,11 @@ use crate::checkers::ast::Checker;
 /// version.parse(matplotlib.__version__)
 /// ```
 ///
-/// [PEP 440]: https://peps.python.org/pep-0440/
+/// [version-specifier]: https://packaging.python.org/en/latest/specifications/version-specifiers/#version-specifiers
 #[violation]
-pub struct TupleMapIntVersionParsing;
+pub struct MapIntVersionParsing;
 
-impl Violation for TupleMapIntVersionParsing {
+impl Violation for MapIntVersionParsing {
     #[derive_message_formats]
     fn message(&self) -> String {
         "`__version__` may contain non-integral-like elements".to_string()
@@ -45,14 +45,10 @@ impl Violation for TupleMapIntVersionParsing {
 }
 
 /// RUF048
-pub(crate) fn tuple_map_int_version_parsing(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
-    let Some(Expr::Call(child_call)) = tuple_like_call_with_single_argument(semantic, call) else {
-        return;
-    };
-
-    let Some((first, second)) = map_call_with_two_arguments(semantic, child_call) else {
+    let Some((first, second)) = map_call_with_two_arguments(semantic, call) else {
         return;
     };
 
@@ -60,23 +56,9 @@ pub(crate) fn tuple_map_int_version_parsing(checker: &mut Checker, call: &ExprCa
         return;
     }
 
-    let diagnostic = Diagnostic::new(TupleMapIntVersionParsing, call.range());
+    let diagnostic = Diagnostic::new(MapIntVersionParsing, call.range());
 
     checker.diagnostics.push(diagnostic);
-}
-
-fn tuple_like_call_with_single_argument<'a>(
-    semantic: &SemanticModel,
-    call: &'a ExprCall,
-) -> Option<&'a Expr> {
-    let (func, positionals) = func_and_positionals(call)?;
-    let func_is = |symbol: &str| semantic.match_builtin_expr(func, symbol);
-
-    if !func_is("tuple") && !func_is("list") || positionals.len() != 1 {
-        return None;
-    };
-
-    positionals.first()
 }
 
 fn map_call_with_two_arguments<'a>(
@@ -85,11 +67,15 @@ fn map_call_with_two_arguments<'a>(
 ) -> Option<(&'a Expr, &'a Expr)> {
     let (func, positionals) = func_and_positionals(call)?;
 
-    if !semantic.match_builtin_expr(func, "map") || positionals.len() != 2 {
+    if !semantic.match_builtin_expr(func, "map") {
         return None;
     };
 
-    Some((positionals.first().unwrap(), positionals.last().unwrap()))
+    let [first, second] = positionals else {
+        return None;
+    };
+
+    Some((first, second))
 }
 
 /// Whether `expr` has the form `__version__.split(".")` or `something.__version__.split(".")`.
@@ -100,9 +86,8 @@ fn is_dunder_version_split_dot(expr: &Expr) -> bool {
     let Some((func, arguments)) = func_and_positionals(call) else {
         return false;
     };
-    let argument = if arguments.len() == 1 {
-        arguments.first().unwrap()
-    } else {
+
+    let [argument] = arguments else {
         return false;
     };
 
@@ -115,7 +100,7 @@ fn is_dunder_version_split(func: &Expr) -> bool {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = func else {
         return false;
     };
-    if attr.as_str() != "split" {
+    if attr != "split" {
         return false;
     }
 
@@ -124,7 +109,7 @@ fn is_dunder_version_split(func: &Expr) -> bool {
 
 fn is_dunder_version(expr: &Expr) -> bool {
     if let Expr::Name(ExprName { id, .. }) = expr {
-        return id.as_str() == "__version__";
+        return id == "__version__";
     }
 
     // foo.__version__.split(".")

@@ -2,38 +2,38 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF048_1.py:5:1: RUF048 `__version__` may contain non-integral-like elements
+RUF048_1.py:5:7: RUF048 `__version__` may contain non-integral-like elements
   |
 5 | tuple(map(int, __version__.split(".")))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
 6 | list(map(int, __version__.split(".")))
 7 | tuple(map(int, bar.__version__.split(".")))
   |
 
-RUF048_1.py:6:1: RUF048 `__version__` may contain non-integral-like elements
+RUF048_1.py:6:6: RUF048 `__version__` may contain non-integral-like elements
   |
 5 | tuple(map(int, __version__.split(".")))
 6 | list(map(int, __version__.split(".")))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
 7 | tuple(map(int, bar.__version__.split(".")))
 8 | list(map(int, bar.__version__.split(".")))
   |
 
-RUF048_1.py:7:1: RUF048 `__version__` may contain non-integral-like elements
+RUF048_1.py:7:7: RUF048 `__version__` may contain non-integral-like elements
   |
 5 | tuple(map(int, __version__.split(".")))
 6 | list(map(int, __version__.split(".")))
 7 | tuple(map(int, bar.__version__.split(".")))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
 8 | list(map(int, bar.__version__.split(".")))
   |
 
-RUF048_1.py:8:1: RUF048 `__version__` may contain non-integral-like elements
+RUF048_1.py:8:6: RUF048 `__version__` may contain non-integral-like elements
    |
  6 | list(map(int, __version__.split(".")))
  7 | tuple(map(int, bar.__version__.split(".")))
  8 | list(map(int, bar.__version__.split(".")))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
  9 | 
 10 | # Comma
    |
