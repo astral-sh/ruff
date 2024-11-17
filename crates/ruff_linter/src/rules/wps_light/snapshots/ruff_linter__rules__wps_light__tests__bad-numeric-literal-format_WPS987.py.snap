@@ -36,7 +36,7 @@ WPS987.py:2:1: WPS987 [*] The numeric literal `1.` has a bad format. Consider re
 4 4 | 1E-1
 5 5 | 1.E+1
 
-WPS987.py:3:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider replacing it with `1e+1`.
+WPS987.py:3:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider replacing it with `1e1`.
   |
 1 | .1
 2 | 1. 
@@ -51,7 +51,7 @@ WPS987.py:3:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider 
 1 1 | .1
 2 2 | 1. 
 3   |-1E+1
-  3 |+1e+1
+  3 |+1e1
 4 4 | 1E-1
 5 5 | 1.E+1
 6 6 | 1.0E+1
@@ -77,7 +77,7 @@ WPS987.py:4:1: WPS987 [*] The numeric literal `1E-1` has a bad format. Consider 
 6 6 | 1.0E+1
 7 7 | 1.1E+1
 
-WPS987.py:5:1: WPS987 [*] The numeric literal `1.E+1` has a bad format. Consider replacing it with `1.0e+1`.
+WPS987.py:5:1: WPS987 [*] The numeric literal `1.E+1` has a bad format. Consider replacing it with `1.0e1`.
   |
 3 | 1E+1
 4 | 1E-1
@@ -93,12 +93,12 @@ WPS987.py:5:1: WPS987 [*] The numeric literal `1.E+1` has a bad format. Consider
 3 3 | 1E+1
 4 4 | 1E-1
 5   |-1.E+1
-  5 |+1.0e+1
+  5 |+1.0e1
 6 6 | 1.0E+1
 7 7 | 1.1E+1
 8 8 | 
 
-WPS987.py:6:1: WPS987 [*] The numeric literal `1.0E+1` has a bad format. Consider replacing it with `1.0e+1`.
+WPS987.py:6:1: WPS987 [*] The numeric literal `1.0E+1` has a bad format. Consider replacing it with `1.0e1`.
   |
 4 | 1E-1
 5 | 1.E+1
@@ -113,12 +113,12 @@ WPS987.py:6:1: WPS987 [*] The numeric literal `1.0E+1` has a bad format. Conside
 4 4 | 1E-1
 5 5 | 1.E+1
 6   |-1.0E+1
-  6 |+1.0e+1
+  6 |+1.0e1
 7 7 | 1.1E+1
 8 8 | 
 9 9 | 123456789
 
-WPS987.py:7:1: WPS987 [*] The numeric literal `1.1E+1` has a bad format. Consider replacing it with `1.1e+1`.
+WPS987.py:7:1: WPS987 [*] The numeric literal `1.1E+1` has a bad format. Consider replacing it with `1.1e1`.
   |
 5 | 1.E+1
 6 | 1.0E+1
@@ -134,7 +134,7 @@ WPS987.py:7:1: WPS987 [*] The numeric literal `1.1E+1` has a bad format. Conside
 5 5 | 1.E+1
 6 6 | 1.0E+1
 7   |-1.1E+1
-  7 |+1.1e+1
+  7 |+1.1e1
 8 8 | 
 9 9 | 123456789
 10 10 | 123456
@@ -181,7 +181,7 @@ WPS987.py:12:1: WPS987 [*] The numeric literal `1.` has a bad format. Consider r
 14 14 | 1E-1
 15 15 | 1.E+1
 
-WPS987.py:13:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider replacing it with `1e+1`.
+WPS987.py:13:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider replacing it with `1e1`.
    |
 11 | .1
 12 | 1. 
@@ -197,7 +197,7 @@ WPS987.py:13:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider
 11 11 | .1
 12 12 | 1. 
 13    |-1E+1
-   13 |+1e+1
+   13 |+1e1
 14 14 | 1E-1
 15 15 | 1.E+1
 16 16 | 1.0E+1
@@ -223,7 +223,7 @@ WPS987.py:14:1: WPS987 [*] The numeric literal `1E-1` has a bad format. Consider
 16 16 | 1.0E+1
 17 17 | 1.1E+1
 
-WPS987.py:15:1: WPS987 [*] The numeric literal `1.E+1` has a bad format. Consider replacing it with `1.0e+1`.
+WPS987.py:15:1: WPS987 [*] The numeric literal `1.E+1` has a bad format. Consider replacing it with `1.0e1`.
    |
 13 | 1E+1
 14 | 1E-1
@@ -239,12 +239,12 @@ WPS987.py:15:1: WPS987 [*] The numeric literal `1.E+1` has a bad format. Conside
 13 13 | 1E+1
 14 14 | 1E-1
 15    |-1.E+1
-   15 |+1.0e+1
+   15 |+1.0e1
 16 16 | 1.0E+1
 17 17 | 1.1E+1
 18 18 | 1.000_000_01
 
-WPS987.py:16:1: WPS987 [*] The numeric literal `1.0E+1` has a bad format. Consider replacing it with `1.0e+1`.
+WPS987.py:16:1: WPS987 [*] The numeric literal `1.0E+1` has a bad format. Consider replacing it with `1.0e1`.
    |
 14 | 1E-1
 15 | 1.E+1
@@ -260,12 +260,12 @@ WPS987.py:16:1: WPS987 [*] The numeric literal `1.0E+1` has a bad format. Consid
 14 14 | 1E-1
 15 15 | 1.E+1
 16    |-1.0E+1
-   16 |+1.0e+1
+   16 |+1.0e1
 17 17 | 1.1E+1
 18 18 | 1.000_000_01
 19 19 | 123456789.123456789
 
-WPS987.py:17:1: WPS987 [*] The numeric literal `1.1E+1` has a bad format. Consider replacing it with `1.1e+1`.
+WPS987.py:17:1: WPS987 [*] The numeric literal `1.1E+1` has a bad format. Consider replacing it with `1.1e1`.
    |
 15 | 1.E+1
 16 | 1.0E+1
@@ -281,12 +281,12 @@ WPS987.py:17:1: WPS987 [*] The numeric literal `1.1E+1` has a bad format. Consid
 15 15 | 1.E+1
 16 16 | 1.0E+1
 17    |-1.1E+1
-   17 |+1.1e+1
+   17 |+1.1e1
 18 18 | 1.000_000_01
 19 19 | 123456789.123456789
 20 20 | 123456789.123456789E123456789
 
-WPS987.py:20:1: WPS987 [*] The numeric literal `123456789.123456789E123456789` has a bad format. Consider replacing it with `123456789.123456789e+123456789`.
+WPS987.py:20:1: WPS987 [*] The numeric literal `123456789.123456789E123456789` has a bad format. Consider replacing it with `123456789.123456789e123456789`.
    |
 18 | 1.000_000_01
 19 | 123456789.123456789
@@ -302,12 +302,12 @@ WPS987.py:20:1: WPS987 [*] The numeric literal `123456789.123456789E123456789` h
 18 18 | 1.000_000_01
 19 19 | 123456789.123456789
 20    |-123456789.123456789E123456789
-   20 |+123456789.123456789e+123456789
+   20 |+123456789.123456789e123456789
 21 21 | 123456789E123456789
 22 22 | 123456789J
 23 23 | 123456789.123456789J
 
-WPS987.py:21:1: WPS987 [*] The numeric literal `123456789E123456789` has a bad format. Consider replacing it with `123456789e+123456789`.
+WPS987.py:21:1: WPS987 [*] The numeric literal `123456789E123456789` has a bad format. Consider replacing it with `123456789e123456789`.
    |
 19 | 123456789.123456789
 20 | 123456789.123456789E123456789
@@ -323,7 +323,7 @@ WPS987.py:21:1: WPS987 [*] The numeric literal `123456789E123456789` has a bad f
 19 19 | 123456789.123456789
 20 20 | 123456789.123456789E123456789
 21    |-123456789E123456789
-   21 |+123456789e+123456789
+   21 |+123456789e123456789
 22 22 | 123456789J
 23 23 | 123456789.123456789J
 24 24 | 0XB1ACC
@@ -454,7 +454,7 @@ WPS987.py:31:1: WPS987 [*] The numeric literal `1.` has a bad format. Consider r
 33 33 | 1E-1.real
 34 34 | 123456789.123456789.hex()
 
-WPS987.py:32:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider replacing it with `1e+1`.
+WPS987.py:32:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider replacing it with `1e1`.
    |
 31 | 1. .imag
 32 | 1E+1.imag
@@ -469,7 +469,7 @@ WPS987.py:32:1: WPS987 [*] The numeric literal `1E+1` has a bad format. Consider
 30 30 | 
 31 31 | 1. .imag
 32    |-1E+1.imag
-   32 |+1e+1.imag
+   32 |+1e1.imag
 33 33 | 1E-1.real
 34 34 | 123456789.123456789.hex()
 35 35 | 123456789.123456789E123456789 .real
@@ -495,7 +495,7 @@ WPS987.py:33:1: WPS987 [*] The numeric literal `1E-1` has a bad format. Consider
 35 35 | 123456789.123456789E123456789 .real
 36 36 | 123456789E123456789 .conjugate()
 
-WPS987.py:35:1: WPS987 [*] The numeric literal `123456789.123456789E123456789` has a bad format. Consider replacing it with `123456789.123456789e+123456789`.
+WPS987.py:35:1: WPS987 [*] The numeric literal `123456789.123456789E123456789` has a bad format. Consider replacing it with `123456789.123456789e123456789`.
    |
 33 | 1E-1.real
 34 | 123456789.123456789.hex()
@@ -511,12 +511,12 @@ WPS987.py:35:1: WPS987 [*] The numeric literal `123456789.123456789E123456789` h
 33 33 | 1E-1.real
 34 34 | 123456789.123456789.hex()
 35    |-123456789.123456789E123456789 .real
-   35 |+123456789.123456789e+123456789 .real
+   35 |+123456789.123456789e123456789 .real
 36 36 | 123456789E123456789 .conjugate()
 37 37 | 123456789J.real
 38 38 | 123456789.123456789J.__add__(0b1011.bit_length())
 
-WPS987.py:36:1: WPS987 [*] The numeric literal `123456789E123456789` has a bad format. Consider replacing it with `123456789e+123456789`.
+WPS987.py:36:1: WPS987 [*] The numeric literal `123456789E123456789` has a bad format. Consider replacing it with `123456789e123456789`.
    |
 34 | 123456789.123456789.hex()
 35 | 123456789.123456789E123456789 .real
@@ -532,7 +532,7 @@ WPS987.py:36:1: WPS987 [*] The numeric literal `123456789E123456789` has a bad f
 34 34 | 123456789.123456789.hex()
 35 35 | 123456789.123456789E123456789 .real
 36    |-123456789E123456789 .conjugate()
-   36 |+123456789e+123456789 .conjugate()
+   36 |+123456789e123456789 .conjugate()
 37 37 | 123456789J.real
 38 38 | 123456789.123456789J.__add__(0b1011.bit_length())
 39 39 | 0XB1ACC.conjugate()
@@ -703,27 +703,6 @@ WPS987.py:62:1: WPS987 [*] The numeric literal `0xffff_ffff` has a bad format. C
 63 63 | 0o5_7_7
 64 64 | 1_00_00.5
 65 65 | 1e1_0
-
-WPS987.py:65:1: WPS987 [*] The numeric literal `1e1_0` has a bad format. Consider replacing it with `1e+1_0`.
-   |
-63 | 0o5_7_7
-64 | 1_00_00.5
-65 | 1e1_0
-   | ^^^^^ WPS987
-66 | .1_4
-67 | 0x_f
-   |
-   = help: Replace with properly formatted numeric literal
-
-ℹ Safe fix
-62 62 | 0xffff_ffff
-63 63 | 0o5_7_7
-64 64 | 1_00_00.5
-65    |-1e1_0
-   65 |+1e+1_0
-66 66 | .1_4
-67 67 | 0x_f
-68 68 | 0o_5
 
 WPS987.py:66:1: WPS987 [*] The numeric literal `.1_4` has a bad format. Consider replacing it with `0.1_4`.
    |
