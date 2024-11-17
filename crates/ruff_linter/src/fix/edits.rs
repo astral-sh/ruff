@@ -22,18 +22,18 @@ use crate::fix::codemods::CodegenStylist;
 use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
 use crate::Locator;
 
-/// Return the `Fix` to use when deleting a `Stmt`.
+/// Return the [`Edit`] to use when deleting a [`Stmt`].
 ///
-/// In some cases, this is as simple as deleting the `Range` of the `Stmt`
+/// In some cases, this is as simple as deleting the [`TextRange`] of the [`Stmt`]
 /// itself. However, there are a few exceptions:
-/// - If the `Stmt` is _not_ the terminal statement in a multi-statement line,
+/// - If the [`Stmt`] is _not_ the terminal statement in a multi-statement line,
 ///   we need to delete up to the start of the next statement (and avoid
 ///   deleting any content that precedes the statement).
-/// - If the `Stmt` is the terminal statement in a multi-statement line, we need
+/// - If the [`Stmt`] is the terminal statement in a multi-statement line, we need
 ///   to avoid deleting any content that precedes the statement.
-/// - If the `Stmt` has no trailing and leading content, then it's convenient to
+/// - If the [`Stmt`] has no trailing and leading content, then it's convenient to
 ///   remove the entire start and end lines.
-/// - If the `Stmt` is the last statement in its parent body, replace it with a
+/// - If the [`Stmt`] is the last statement in its parent body, replace it with a
 ///   `pass` instead.
 pub(crate) fn delete_stmt(
     stmt: &Stmt,
