@@ -26,6 +26,7 @@ SNIPPED_RE = re.compile(
 # example.
 KNOWN_FORMATTING_VIOLATIONS = [
     "avoidable-escaped-quote",
+    "bad-numeric-literal-format"
     "bad-quotes-docstring",
     "bad-quotes-inline-string",
     "bad-quotes-multiline-string",
