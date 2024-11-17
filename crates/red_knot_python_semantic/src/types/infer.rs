@@ -4524,6 +4524,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Unknown
                 }
             },
+            KnownInstanceType::Optional => {
+                let param_type = self.infer_type_expression(parameters);
+                UnionType::from_elements(self.db, [param_type, Type::none(self.db)])
+            }
             KnownInstanceType::TypeVar(_) => Type::Todo,
         }
     }
