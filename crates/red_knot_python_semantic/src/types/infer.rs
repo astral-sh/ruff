@@ -4567,6 +4567,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let param_type = self.infer_type_expression(parameters);
                 UnionType::from_elements(self.db, [param_type, Type::none(self.db)])
             }
+            KnownInstanceType::Union => {
+                let mut builder = UnionBuilder::new(self.db);
+                match parameters {
+                    ast::Expr::Name(_) => {
+                        builder =
+                            builder.add(self.infer_annotation_expression(
+                                parameters,
+                                DeferredExpressionState::None,
+                            ))
+                    }
+                    ast::Expr::Tuple(t) => {
+                        for elt in t.elts.iter() {
+                            builder =
+                                builder.add(self.infer_annotation_expression(
+                                    &elt,
+                                    DeferredExpressionState::None,
+                                ))
+                        }
+                    }
+                    _ => {}
+                }
+                builder.build()
+            }
             KnownInstanceType::TypeVar(_) => Type::Todo,
         }
     }
