@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import logging
 ///
-/// logger = logging.getLogger(__file__)
+/// logger = logging.getLogger(__name__)
 /// logger.info("Foobar")
 /// ```
 #[violation]
