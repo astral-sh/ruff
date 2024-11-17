@@ -388,7 +388,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
     #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035.py"))]
     #[test_case(
         Rule::FunctionCallInDataclassDefaultArgument,
