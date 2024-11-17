@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 named_expr_without_context.py:2:2: PLW0131 Named expression used without context
   |
@@ -24,5 +25,3 @@ named_expr_without_context.py:8:6: PLW0131 Named expression used without context
 8 |     (c := 1)
   |      ^^^^^^ PLW0131
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E711.py:2:11: E711 [*] Comparison to `None` should be `cond is None`
   |
@@ -204,5 +205,3 @@ E711.py:26:17: E711 [*] Comparison to `None` should be `cond is not None`
 27 27 |     pass
 28 28 | 
 29 29 | #: Okay
-
-

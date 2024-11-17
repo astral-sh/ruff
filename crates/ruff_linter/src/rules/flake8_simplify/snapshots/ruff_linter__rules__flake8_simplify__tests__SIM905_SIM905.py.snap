@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM905.py:6:1: SIM905 [*] Consider using a list literal instead of `str.split`
    |

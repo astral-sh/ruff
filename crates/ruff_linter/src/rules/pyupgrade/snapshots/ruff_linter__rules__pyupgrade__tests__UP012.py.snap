@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP012.py:2:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |

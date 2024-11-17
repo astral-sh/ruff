@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B002.py:18:9: B002 Python does not support the unary prefix increment operator (`++`)
    |
@@ -32,5 +33,3 @@ B002.py:24:17: B002 Python does not support the unary prefix decrement operator 
 24 |     return ++n, --n
    |                 ^^^ B002
    |
-
-

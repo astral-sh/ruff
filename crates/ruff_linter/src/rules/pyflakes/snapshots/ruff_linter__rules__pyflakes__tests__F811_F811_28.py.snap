@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F811_28.py:4:22: F811 Redefinition of unused `datetime` from line 3
   |

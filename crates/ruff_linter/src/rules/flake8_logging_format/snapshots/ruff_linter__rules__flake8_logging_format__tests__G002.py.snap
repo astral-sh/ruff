@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+snapshot_kind: text
 ---
 G002.py:3:14: G002 Logging statement uses `%`
   |
@@ -34,5 +35,3 @@ G002.py:9:19: G002 Logging statement uses `%`
 9 | log(logging.INFO, "Hello %s" % "World!")
   |                   ^^^^^^^^^^^^^^^^^^^^^ G002
   |
-
-

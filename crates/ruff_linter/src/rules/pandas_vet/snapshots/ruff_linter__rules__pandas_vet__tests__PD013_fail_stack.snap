@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 <filename>:4:5: PD013 `.melt` is preferred to `.stack`; provides same functionality
   |
@@ -8,5 +9,3 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 4 | y = x.stack(level=-1, dropna=True)
   |     ^^^^^^^ PD013
   |
-
-

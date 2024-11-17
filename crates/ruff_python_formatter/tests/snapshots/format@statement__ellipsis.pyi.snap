@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/ellipsis.pyi
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -197,6 +198,3 @@ try: ...  # comment
 except: ...  # comment
 finally: ...  # comment
 ```
-
-
-

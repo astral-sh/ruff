@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_ast_integration_tests/tests/visitor.rs
 expression: trace
+snapshot_kind: text
 ---
 - StmtExpr
   - ExprFString

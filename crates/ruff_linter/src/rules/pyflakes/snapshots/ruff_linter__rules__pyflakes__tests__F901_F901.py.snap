@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
   |

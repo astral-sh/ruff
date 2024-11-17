@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
 ---
 ASYNC230.py:6:5: ASYNC230 Async functions should not open files with blocking methods like `open`
   |

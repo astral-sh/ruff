@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
    |
@@ -101,5 +102,3 @@ B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`
 89    |-except(re.error, re.error):
    89 |+except re.error:
 90 90 |     p
-
-

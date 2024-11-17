@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E22.py:54:11: E225 [*] Missing whitespace around operator
    |
@@ -251,5 +252,3 @@ E22.py:96:2: E225 [*] Missing whitespace around operator
 97 97 | #: E225 E226
 98 98 | c = (a +b)*(a - b)
 99 99 | #: E225 E226
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB188.py:7:5: FURB188 [*] Prefer `removesuffix` over conditionally replacing with slice.
    |

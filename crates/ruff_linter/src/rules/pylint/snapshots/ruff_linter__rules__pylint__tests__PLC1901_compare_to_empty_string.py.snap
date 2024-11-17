@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 compare_to_empty_string.py:7:13: PLC1901 `x is ""` can be simplified to `not x` as an empty string is falsey
   |
@@ -43,5 +44,3 @@ compare_to_empty_string.py:13:8: PLC1901 `"" != z` can be simplified to `z` as a
    |        ^^ PLC1901
 14 |         print("z is an empty string")
    |
-
-

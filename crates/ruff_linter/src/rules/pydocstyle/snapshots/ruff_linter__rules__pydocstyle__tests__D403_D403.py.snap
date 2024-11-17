@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D403.py:2:5: D403 [*] First word of the first line should be capitalized: `this` -> `This`
   |

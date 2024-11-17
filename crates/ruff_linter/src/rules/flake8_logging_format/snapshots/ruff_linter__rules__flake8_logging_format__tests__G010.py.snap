@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+snapshot_kind: text
 ---
 G010.py:6:9: G010 [*] Logging statement uses `warn` instead of `warning`
   |
@@ -82,5 +83,3 @@ G010.py:13:1: G010 [*] Logging statement uses `warn` instead of `warning`
 14 13 | warning("foo")
    14 |+warning("foo")
 15 15 | exception("foo")
-
-

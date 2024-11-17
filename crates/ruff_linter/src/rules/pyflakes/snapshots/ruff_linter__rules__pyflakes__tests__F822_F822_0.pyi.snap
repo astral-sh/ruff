@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F822_0.pyi:4:22: F822 Undefined name `c` in `__all__`
   |

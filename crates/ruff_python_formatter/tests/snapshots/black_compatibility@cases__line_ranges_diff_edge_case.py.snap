@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/line_ranges_diff_edge_case.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -70,5 +71,3 @@ print("format me")
 print("format me")
 print("format me")
 ```
-
-

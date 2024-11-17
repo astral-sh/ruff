@@ -1,11 +1,11 @@
-use anyhow::Result;
-use ast::visitor::source_order;
-use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use std::cmp::Reverse;
+
+use anyhow::Result;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
@@ -221,8 +221,8 @@ pub(crate) fn is_singledispatch_implementation(
 /// This requires more than just wrapping the reference itself in quotes. For example:
 /// - When quoting `Series` in `Series[pd.Timestamp]`, we want `"Series[pd.Timestamp]"`.
 /// - When quoting `kubernetes` in `kubernetes.SecurityContext`, we want `"kubernetes.SecurityContext"`.
-/// - When quoting `Series` in `Series["pd.Timestamp"]`, we want `"Series[pd.Timestamp]"`. (This is currently unsupported.)
-/// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`. (This is currently unsupported.)
+/// - When quoting `Series` in `Series["pd.Timestamp"]`, we want `"Series[pd.Timestamp]"`.
+/// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
 ///
 /// In general, when expanding a component of a call chain, we want to quote the entire call chain.
 pub(crate) fn quote_annotation(
@@ -272,7 +272,7 @@ pub(crate) fn quote_annotation(
     let quote = stylist.quote();
     let mut quote_annotator = QuoteAnnotator::new(semantic, stylist);
     quote_annotator.visit_expr(expr);
-    let annotation = quote_annotator.into_annotation();
+    let annotation = quote_annotator.into_annotation()?;
 
     Ok(Edit::range_replacement(
         format!("{quote}{annotation}{quote}"),
@@ -313,6 +313,7 @@ pub(crate) struct QuoteAnnotator<'a> {
     semantic: &'a SemanticModel<'a>,
     state: Vec<QuoteAnnotatorState>,
     annotation: String,
+    cannot_fix: bool,
 }
 
 impl<'a> QuoteAnnotator<'a> {
@@ -322,15 +323,30 @@ impl<'a> QuoteAnnotator<'a> {
             semantic,
             state: Vec::new(),
             annotation: String::new(),
+            cannot_fix: false,
         }
     }
 
-    fn into_annotation(self) -> String {
-        self.annotation
+    fn into_annotation(self) -> Result<String> {
+        if self.cannot_fix {
+            Err(anyhow::anyhow!(
+                "Cannot quote annotation because it already contains opposite quote or escape character"
+            ))
+        } else {
+            Ok(self.annotation)
+        }
     }
 }
 
-impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
+impl<'a> SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
+    fn enter_node(&mut self, _node: ast::AnyNodeRef<'a>) -> TraversalSignal {
+        if self.cannot_fix {
+            TraversalSignal::Skip
+        } else {
+            TraversalSignal::Traverse
+        }
+    }
+
     fn visit_expr(&mut self, expr: &'a Expr) {
         let generator = Generator::from(self.stylist);
 
@@ -376,6 +392,24 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                 }
                 self.state.pop();
             }
+            Expr::List(ast::ExprList { elts, .. }) => {
+                let Some((first, remaining)) = elts.split_first() else {
+                    return;
+                };
+                self.annotation.push('[');
+                self.visit_expr(first);
+                if let Some(last) = self.state.last_mut() {
+                    if *last == QuoteAnnotatorState::AnnotatedFirst {
+                        *last = QuoteAnnotatorState::AnnotatedRest;
+                    }
+                }
+                for expr in remaining {
+                    self.annotation.push_str(", ");
+                    self.visit_expr(expr);
+                }
+                self.annotation.push(']');
+                self.state.pop();
+            }
             Expr::BinOp(ast::ExprBinOp {
                 left, op, right, ..
             }) => {
@@ -388,10 +422,13 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                 let source = match self.state.last().copied() {
                     Some(QuoteAnnotatorState::Literal | QuoteAnnotatorState::AnnotatedRest) => {
                         let mut source = generator.expr(expr);
-                        source = source.replace(
-                            self.stylist.quote().as_char(),
-                            &self.stylist.quote().opposite().as_char().to_string(),
-                        );
+                        let opposite_quote = &self.stylist.quote().opposite().as_char().to_string();
+                        // If the quotes we are going to insert in this source already exists set the auto quote outcome
+                        // to failed. Because this means we are inserting quotes that are in the string and they collect.
+                        if source.contains(opposite_quote) || source.contains('\\') {
+                            self.cannot_fix = true;
+                        }
+                        source = source.replace(self.stylist.quote().as_char(), opposite_quote);
                         source
                     }
                     None

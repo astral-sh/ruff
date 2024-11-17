@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF028.py:3:9: RUF028 [*] This suppression comment is invalid because it cannot be in an expression, pattern, argument list, or other non-statement
   |

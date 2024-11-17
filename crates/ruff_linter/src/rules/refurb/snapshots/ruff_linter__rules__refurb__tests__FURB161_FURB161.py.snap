@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB161.py:6:9: FURB161 [*] Use of `bin(x).count('1')`
   |
@@ -187,5 +188,3 @@ FURB161.py:14:9: FURB161 [*] Use of `bin("10" "15").count('1')`
 15 15 | 
 16 16 | count = x.bit_count()  # OK
 17 17 | count = (10).bit_count()  # OK
-
-

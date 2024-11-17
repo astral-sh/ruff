@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B905.py:4:1: B905 [*] `zip()` without an explicit `strict=` parameter
   |

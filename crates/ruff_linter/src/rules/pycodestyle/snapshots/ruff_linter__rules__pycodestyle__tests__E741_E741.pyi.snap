@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E741.pyi:3:1: E741 Ambiguous variable name: `l`
   |

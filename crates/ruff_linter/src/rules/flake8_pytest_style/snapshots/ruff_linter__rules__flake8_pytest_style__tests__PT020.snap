@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT020.py:14:1: PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
    |

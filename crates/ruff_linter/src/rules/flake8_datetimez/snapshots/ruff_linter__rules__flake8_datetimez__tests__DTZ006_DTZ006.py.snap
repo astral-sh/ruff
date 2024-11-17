@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
+snapshot_kind: text
 ---
 DTZ006.py:4:1: DTZ006 `datetime.datetime.fromtimestamp()` called without a `tz` argument
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 <filename>:3:1: PD901 Avoid using the generic variable name `df` for DataFrames
   |
@@ -7,5 +8,3 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 3 | df = pd.DataFrame()
   | ^^ PD901
   |
-
-
