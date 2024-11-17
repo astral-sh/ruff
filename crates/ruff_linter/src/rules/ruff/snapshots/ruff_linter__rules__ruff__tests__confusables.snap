@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 confusables.py:1:6: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
   |
@@ -154,6 +153,14 @@ confusables.py:46:62: RUF003 Comment contains ambiguous `᜵` (PHILIPPINE SINGLE
 46 | foo # And here's a comment with an unusual punctuation mark: ᜵
    |                                                              ^ RUF003
 47 | }"
+   |
+
+confusables.py:55:28: RUF001 String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+   |
+55 | assert getattr(Labware(), "µL") == 1.5
+   |                            ^ RUF001
+56 | 
+57 | # Implicit string concatenation
    |
 
 confusables.py:58:6: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
