@@ -142,24 +142,6 @@ mod tests {
     }
 
     #[test]
-    fn preview_confusables() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("ruff/confusables.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
-                ..settings::LinterSettings::for_rules(vec![
-                    Rule::AmbiguousUnicodeCharacterString,
-                    Rule::AmbiguousUnicodeCharacterDocstring,
-                    Rule::AmbiguousUnicodeCharacterComment,
-                ])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
     fn noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/noqa.py"),
