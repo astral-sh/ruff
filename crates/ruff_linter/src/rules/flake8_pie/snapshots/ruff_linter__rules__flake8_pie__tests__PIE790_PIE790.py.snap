@@ -688,7 +688,7 @@ PIE790.py:241:5: PIE790 [*] Unnecessary `pass` statement
     = help: Remove unnecessary `pass`
 
 ℹ Unsafe fix
-238 238 |
+238 238 | 
 239 239 | # https://github.com/astral-sh/ruff/issues/12616
 240 240 | class PotentialDocstring1:
 241     |-    pass
@@ -706,8 +706,8 @@ PIE790.py:248:5: PIE790 [*] Unnecessary `...` literal
     = help: Remove unnecessary `...`
 
 ℹ Unsafe fix
-245 245 |
-246 246 |
+245 245 | 
+246 246 | 
 247 247 | class PotentialDocstring2:
 248     |-    ...
 249 248 |     'Lorem ipsum dolor sit amet.'
