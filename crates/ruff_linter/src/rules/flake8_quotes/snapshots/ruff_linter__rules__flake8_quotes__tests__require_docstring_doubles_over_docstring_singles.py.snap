@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+snapshot_kind: text
 ---
 docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred
   |
@@ -74,6 +75,4 @@ docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quot
    28 |+        """
 29 29 | 
 30 30 |         some_expression = 'hello world'
-31 31 | 
-
-
+31 31 |

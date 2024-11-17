@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the type annotation contains comments.
 ///
-/// Note that the fix will flatten nested literals into a single top-level
-/// literal.
+/// Note that while the fix may flatten nested literals into a single top-level literal,
+/// the semantics of the annotation will remain unchanged.
 ///
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)

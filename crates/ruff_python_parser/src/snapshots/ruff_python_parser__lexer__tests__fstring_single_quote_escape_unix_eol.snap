@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: fstring_single_quote_escape_eol(UNIX_EOL)
+snapshot_kind: text
 ---
 ## Tokens
 ```

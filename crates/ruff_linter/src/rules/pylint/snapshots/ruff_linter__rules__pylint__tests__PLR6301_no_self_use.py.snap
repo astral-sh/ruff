@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 no_self_use.py:7:9: PLR6301 Method `developer_greeting` could be a function, class method, or static method
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB169.py:5:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
   |
@@ -251,6 +252,4 @@ FURB169.py:27:1: FURB169 [*] Compare the identities of `None` and `None` instead
    27 |+None is not None
 28 28 | 
 29 29 | # Ok.
-30 30 | 
-
-
+30 30 |

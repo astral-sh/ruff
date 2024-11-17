@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F50x.py:11:1: F508 `%`-format string `*` specifier requires sequence
    |
@@ -10,5 +11,3 @@ F50x.py:11:1: F508 `%`-format string `*` specifier requires sequence
 12 | 
 13 | # ok: single %s with mapping
    |
-
-

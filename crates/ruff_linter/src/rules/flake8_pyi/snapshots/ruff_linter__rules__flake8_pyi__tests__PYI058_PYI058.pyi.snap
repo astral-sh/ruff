@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI058.pyi:5:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
   |
@@ -186,5 +187,3 @@ PYI058.pyi:56:13: PYI058 [*] Use `AsyncIterator` as the return value for simple 
 57 57 | 
 58 58 | def scope():
 59 59 |     from typing import Iterator
-
-

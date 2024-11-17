@@ -1,26 +1,28 @@
-use rustc_hash::{FxBuildHasher, FxHashSet};
-use salsa::{Durability, Setter as _};
-use std::borrow::Cow;
-use std::{collections::BTreeMap, sync::Arc};
-
 use crate::db::Db;
 use crate::db::RootDatabase;
 use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};
-pub use metadata::{PackageMetadata, WorkspaceMetadata};
+pub use metadata::{PackageMetadata, WorkspaceDiscoveryError, WorkspaceMetadata};
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::SearchPathSettings;
 use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic, Severity};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
+use ruff_db::system::FileType;
 use ruff_db::{
     files::{system_path_to_file, File},
     system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
 };
 use ruff_python_ast::{name::Name, PySourceType};
 use ruff_text_size::TextRange;
+use rustc_hash::{FxBuildHasher, FxHashSet};
+use salsa::{Durability, Setter as _};
+use std::borrow::Cow;
+use std::iter::FusedIterator;
+use std::{collections::BTreeMap, sync::Arc};
 
 mod files;
 mod metadata;
+mod pyproject;
 pub mod settings;
 
 /// The project workspace as a Salsa ingredient.
@@ -81,7 +83,7 @@ pub struct Workspace {
 
     /// The (first-party) packages in this workspace.
     #[return_ref]
-    package_tree: BTreeMap<SystemPathBuf, Package>,
+    package_tree: PackageTree,
 
     /// The unresolved search path configuration.
     #[return_ref]
@@ -106,7 +108,6 @@ pub struct Package {
 }
 
 impl Workspace {
-    /// Discovers the closest workspace at `path` and returns its metadata.
     pub fn from_metadata(db: &dyn Db, metadata: WorkspaceMetadata) -> Self {
         let mut packages = BTreeMap::new();
 
@@ -114,10 +115,12 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
+        let program_settings = metadata.settings.program;
+
         Workspace::builder(
             metadata.root,
-            packages,
-            metadata.settings.program.search_paths,
+            PackageTree(packages),
+            program_settings.search_paths,
         )
         .durability(Durability::MEDIUM)
         .open_fileset_durability(Durability::LOW)
@@ -128,15 +131,11 @@ impl Workspace {
         self.root_buf(db)
     }
 
-    pub fn packages(self, db: &dyn Db) -> impl Iterator<Item = Package> + '_ {
-        self.package_tree(db).values().copied()
-    }
-
     pub fn reload(self, db: &mut dyn Db, metadata: WorkspaceMetadata) {
         tracing::debug!("Reloading workspace");
         assert_eq!(self.root(db), metadata.root());
 
-        let mut old_packages = self.package_tree(db).clone();
+        let mut old_packages = self.package_tree(db).0.clone();
         let mut new_packages = BTreeMap::new();
 
         for package_metadata in metadata.packages {
@@ -157,13 +156,13 @@ impl Workspace {
                 .to(metadata.settings.program.search_paths);
         }
 
-        self.set_package_tree(db).to(new_packages);
+        self.set_package_tree(db).to(PackageTree(new_packages));
     }
 
     pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
         let path = metadata.root().to_path_buf();
 
-        if let Some(package) = self.package_tree(db).get(&path).copied() {
+        if let Some(package) = self.package_tree(db).get(&path) {
             package.update(db, metadata);
             Ok(())
         } else {
@@ -171,20 +170,17 @@ impl Workspace {
         }
     }
 
+    pub fn packages(self, db: &dyn Db) -> &PackageTree {
+        self.package_tree(db)
+    }
+
     /// Returns the closest package to which the first-party `path` belongs.
     ///
     /// Returns `None` if the `path` is outside of any package or if `file` isn't a first-party file
     /// (e.g. third-party dependencies or `excluded`).
-    pub fn package(self, db: &dyn Db, path: &SystemPath) -> Option<Package> {
+    pub fn package(self, db: &dyn Db, path: impl AsRef<SystemPath>) -> Option<Package> {
         let packages = self.package_tree(db);
-
-        let (package_path, package) = packages.range(..=path.to_path_buf()).next_back()?;
-
-        if path.starts_with(package_path) {
-            Some(*package)
-        } else {
-            None
-        }
+        packages.get(path.as_ref())
     }
 
     /// Checks all open files in the workspace and its dependencies.
@@ -342,7 +338,7 @@ impl Package {
                 let _entered =
                     tracing::debug_span!("index_package_files", package = %self.name(db)).entered();
 
-                let files = discover_package_files(db, self.root(db));
+                let files = discover_package_files(db, self);
                 tracing::info!("Found {} files in package `{}`", files.len(), self.name(db));
                 vacant.set(files)
             }
@@ -407,23 +403,33 @@ pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
     diagnostics
 }
 
-fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
+fn discover_package_files(db: &dyn Db, package: Package) -> FxHashSet<File> {
     let paths = std::sync::Mutex::new(Vec::new());
+    let packages = db.workspace().packages(db);
 
-    db.system().walk_directory(path).run(|| {
+    db.system().walk_directory(package.root(db)).run(|| {
         Box::new(|entry| {
             match entry {
                 Ok(entry) => {
                     // Skip over any non python files to avoid creating too many entries in `Files`.
-                    if entry.file_type().is_file()
-                        && entry
-                            .path()
-                            .extension()
-                            .and_then(PySourceType::try_from_extension)
-                            .is_some()
-                    {
-                        let mut paths = paths.lock().unwrap();
-                        paths.push(entry.into_path());
+                    match entry.file_type() {
+                        FileType::File => {
+                            if entry
+                                .path()
+                                .extension()
+                                .and_then(PySourceType::try_from_extension)
+                                .is_some()
+                            {
+                                let mut paths = paths.lock().unwrap();
+                                paths.push(entry.into_path());
+                            }
+                        }
+                        FileType::Directory | FileType::Symlink => {
+                            // Don't traverse into nested packages (the workspace-package is an ancestor of all other packages)
+                            if packages.get(entry.path()) != Some(package) {
+                                return WalkState::Skip;
+                            }
+                        }
                     }
                 }
                 Err(error) => {
@@ -464,6 +470,7 @@ impl<'a> WorkspaceFiles<'a> {
             WorkspaceFiles::PackageFiles(
                 workspace
                     .packages(db)
+                    .iter()
                     .map(|package| package.files(db))
                     .collect(),
             )
@@ -545,20 +552,78 @@ impl Diagnostic for IOErrorDiagnostic {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct PackageTree(BTreeMap<SystemPathBuf, Package>);
+
+impl PackageTree {
+    pub fn get(&self, path: &SystemPath) -> Option<Package> {
+        let (package_path, package) = self.0.range(..=path.to_path_buf()).next_back()?;
+
+        if path.starts_with(package_path) {
+            Some(*package)
+        } else {
+            None
+        }
+    }
+
+    // The package table should never be empty, that's why `is_empty` makes little sense
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn iter(&self) -> PackageTreeIter {
+        PackageTreeIter(self.0.values())
+    }
+}
+
+impl<'a> IntoIterator for &'a PackageTree {
+    type Item = Package;
+    type IntoIter = PackageTreeIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct PackageTreeIter<'a>(std::collections::btree_map::Values<'a, SystemPathBuf, Package>);
+
+impl Iterator for PackageTreeIter<'_> {
+    type Item = Package;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().copied()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.0.next_back().copied()
+    }
+}
+
+impl ExactSizeIterator for PackageTreeIter<'_> {}
+impl FusedIterator for PackageTreeIter<'_> {}
+
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDb;
-    use crate::workspace::check_file;
+    use crate::workspace::{check_file, WorkspaceMetadata};
     use red_knot_python_semantic::types::check_types;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
-    use ruff_db::system::{DbWithTestSystem, SystemPath};
+    use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_python_ast::name::Name;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
-        let mut db = TestDb::new();
+        let workspace =
+            WorkspaceMetadata::single_package(Name::new_static("test"), SystemPathBuf::from("/"));
+        let mut db = TestDb::new(workspace);
         let path = SystemPath::new("test.py");
 
         db.write_file(path, "x = 10")?;

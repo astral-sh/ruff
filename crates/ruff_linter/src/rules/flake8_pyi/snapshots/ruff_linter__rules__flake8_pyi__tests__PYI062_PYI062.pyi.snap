@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI062.pyi:5:25: PYI062 [*] Duplicate literal member `True`
   |

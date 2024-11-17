@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
+snapshot_kind: text
 ---
 NPY201_2.py:4:5: NPY201 `np.obj2sctype` will be removed without replacement in NumPy 2.0
   |

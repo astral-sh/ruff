@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
+snapshot_kind: text
 ---
 no_future_import_uses_lowercase.py:6:14: FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
   |

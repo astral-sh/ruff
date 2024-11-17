@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+snapshot_kind: text
 ---
 annotation_presence.py:5:5: ANN201 [*] Missing return type annotation for public function `foo`
   |
@@ -332,5 +333,3 @@ annotation_presence.py:165:18: ANN101 Missing type annotation for `self` in meth
     |                  ^^^^ ANN101
 166 |         print(f"{self.attr=}")
     |
-
-

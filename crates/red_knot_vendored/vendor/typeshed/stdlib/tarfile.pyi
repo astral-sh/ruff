@@ -1,7 +1,7 @@
 import bz2
 import io
 import sys
-from _typeshed import StrOrBytesPath, StrPath
+from _typeshed import StrOrBytesPath, StrPath, SupportsRead
 from builtins import list as _list  # aliases to avoid name clashes with fields named "type" or "list"
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from gzip import _ReadableFileobj as _GzipReadableFileobj, _WritableFileobj as _GzipWritableFileobj
@@ -481,7 +481,7 @@ class TarFile:
         *,
         filter: Callable[[TarInfo], TarInfo | None] | None = None,
     ) -> None: ...
-    def addfile(self, tarinfo: TarInfo, fileobj: IO[bytes] | None = None) -> None: ...
+    def addfile(self, tarinfo: TarInfo, fileobj: SupportsRead[bytes] | None = None) -> None: ...
     def gettarinfo(
         self, name: StrOrBytesPath | None = None, arcname: str | None = None, fileobj: IO[bytes] | None = None
     ) -> TarInfo: ...

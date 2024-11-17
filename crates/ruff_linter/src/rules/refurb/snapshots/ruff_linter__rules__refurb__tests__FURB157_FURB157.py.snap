@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB157.py:5:9: FURB157 [*] Verbose expression in `Decimal` constructor
   |

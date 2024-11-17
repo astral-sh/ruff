@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S605.py:8:1: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP031_0.py:4:7: UP031 [*] Use format specifiers instead of percent format
   |

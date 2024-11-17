@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E712.py:2:4: E712 [*] Avoid equality comparisons to `True`; use `if res:` for truth checks
   |

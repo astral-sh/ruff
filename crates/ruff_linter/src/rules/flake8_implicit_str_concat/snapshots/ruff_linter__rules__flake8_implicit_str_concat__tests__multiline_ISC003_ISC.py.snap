@@ -1,4 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+snapshot_kind: text
 ---
 

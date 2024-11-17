@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 W29.py:7:1: W293 [*] Blank line contains whitespace
   |
@@ -21,5 +22,3 @@ W29.py:7:1: W293 [*] Blank line contains whitespace
 8 8 |     bang = 12
 9 9 | #: W291:2:35
 10 10 | '''multiline
-
-

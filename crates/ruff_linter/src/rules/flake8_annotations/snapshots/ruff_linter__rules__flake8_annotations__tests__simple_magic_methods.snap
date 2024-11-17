@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+snapshot_kind: text
 ---
 simple_magic_methods.py:2:9: ANN204 [*] Missing return type annotation for special method `__str__`
   |
@@ -275,5 +276,3 @@ simple_magic_methods.py:41:9: ANN204 [*] Missing return type annotation for spec
 41    |-    def __index__(self):
    41 |+    def __index__(self) -> int:
 42 42 |         ...
-
-

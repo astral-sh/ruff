@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB177.py:5:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   |

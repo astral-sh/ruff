@@ -73,10 +73,6 @@ pub struct TypeCheckDiagnostics {
 }
 
 impl TypeCheckDiagnostics {
-    pub fn new() -> Self {
-        Self { inner: Vec::new() }
-    }
-
     pub(super) fn push(&mut self, diagnostic: TypeCheckDiagnostic) {
         self.inner.push(Arc::new(diagnostic));
     }
@@ -148,7 +144,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         Self {
             db,
             file,
-            diagnostics: TypeCheckDiagnostics::new(),
+            diagnostics: TypeCheckDiagnostics::default(),
         }
     }
 

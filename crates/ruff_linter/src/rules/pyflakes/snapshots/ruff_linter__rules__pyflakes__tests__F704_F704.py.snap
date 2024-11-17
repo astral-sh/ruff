@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F704.py:6:5: F704 `yield` statement outside of a function
   |
@@ -31,5 +32,3 @@ F704.py:11:1: F704 `await` statement outside of a function
 11 | await f()
    | ^^^^^^^^^ F704
    |
-
-

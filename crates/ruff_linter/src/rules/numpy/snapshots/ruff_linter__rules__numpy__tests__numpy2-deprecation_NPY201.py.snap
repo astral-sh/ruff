@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
+snapshot_kind: text
 ---
 NPY201.py:4:5: NPY201 [*] `np.add_docstring` will be removed in NumPy 2.0. Use `numpy.lib.add_docstring` instead.
   |

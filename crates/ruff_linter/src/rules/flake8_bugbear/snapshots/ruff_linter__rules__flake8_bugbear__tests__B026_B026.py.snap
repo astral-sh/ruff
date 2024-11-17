@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B026.py:16:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
    |
@@ -66,5 +67,3 @@ B026.py:21:26: B026 Star-arg unpacking after a keyword argument is strongly disc
 21 | foo(*["bar"], bam="bam", *["baz"])
    |                          ^^^^^^^^ B026
    |
-
-

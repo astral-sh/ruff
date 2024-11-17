@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
+snapshot_kind: text
 ---
 PERF401.py:6:13: PERF401 Use a list comprehension to create a transformed list
   |

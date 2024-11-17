@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
   |
@@ -192,5 +193,3 @@ C404.py:16:14: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16    |-saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
    16 |+saved.append({k: v for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]})
-
-

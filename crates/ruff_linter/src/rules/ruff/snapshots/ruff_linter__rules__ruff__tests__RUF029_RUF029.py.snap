@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF029.py:38:11: RUF029 Function `fail_1a` is declared `async`, but doesn't `await` or use `async` features.
    |

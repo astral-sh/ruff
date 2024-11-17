@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:333:5: D301 [*] Use `r"""` if any backslashes in a docstring
     |
@@ -19,5 +20,3 @@ D.py:333:5: D301 [*] Use `r"""` if any backslashes in a docstring
 334 334 | 
 335 335 | 
 336 336 | @expect('D301: Use r""" if any backslashes in a docstring')
-
-

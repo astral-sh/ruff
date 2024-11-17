@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB105.py:3:1: FURB105 [*] Unnecessary empty string passed to `print`
   |

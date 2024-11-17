@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB113.py:23:1: FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
    |
@@ -345,5 +346,3 @@ FURB113.py:128:5: FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly cal
     | |__________________^ FURB113
     |
     = help: Replace with `nums.extend((1, 2, 3))`
-
-

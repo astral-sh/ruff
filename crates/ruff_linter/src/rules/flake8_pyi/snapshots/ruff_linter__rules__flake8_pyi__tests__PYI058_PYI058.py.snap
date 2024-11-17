@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI058.py:5:13: PYI058 [*] Use `Iterator` as the return value for simple `__iter__` methods
   |
@@ -159,6 +160,4 @@ PYI058.py:73:13: PYI058 [*] Use `AsyncIterator` as the return value for simple `
    73 |+        def __aiter__(self, /) -> collections.abc.AsyncIterator[str]:
 74 74 |             ...  # PYI058 (Use `AsyncIterator`)
 75 75 | 
-76 76 | 
-
-
+76 76 |

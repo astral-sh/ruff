@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT007.py:12:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `list`
    |

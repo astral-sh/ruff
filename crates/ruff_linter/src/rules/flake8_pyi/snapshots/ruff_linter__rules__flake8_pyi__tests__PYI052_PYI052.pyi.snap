@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI052.pyi:14:10: PYI052 Need type annotation for `field5`
    |
@@ -137,5 +138,3 @@ PYI052.pyi:114:11: PYI052 Need type annotation for `WIZ`
 114 |     WIZ = 4
     |           ^ PYI052
     |
-
-

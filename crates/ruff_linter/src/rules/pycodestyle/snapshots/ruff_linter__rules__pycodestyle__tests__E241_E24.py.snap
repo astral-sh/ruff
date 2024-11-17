@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E24.py:2:8: E241 [*] Multiple spaces after comma
   |
@@ -72,5 +73,3 @@ E24.py:13:18: E241 [*] Multiple spaces after comma
 12 12 |                ef,  +h,
 13    |-               c,   -d]
    13 |+               c, -d]
-
-

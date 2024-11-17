@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/import.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -187,6 +188,3 @@ import os
 # comment
 x = 1
 ```
-
-
-

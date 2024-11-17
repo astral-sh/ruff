@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions
   |

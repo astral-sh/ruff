@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_commas/mod.rs
+snapshot_kind: text
 ---
 COM81_syntax_error.py:3:5: SyntaxError: Starred expression cannot be used here
   |

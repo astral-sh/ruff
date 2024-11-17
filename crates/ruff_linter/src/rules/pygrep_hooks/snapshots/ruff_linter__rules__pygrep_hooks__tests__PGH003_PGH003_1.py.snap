@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
+snapshot_kind: text
 ---
 PGH003_1.py:1:8: PGH003 Use specific rule codes when ignoring type issues
   |
@@ -26,5 +27,3 @@ PGH003_1.py:3:41: PGH003 Use specific rule codes when ignoring type issues
 4 | 
 5 | x = 1
   |
-
-

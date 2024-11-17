@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E25.py:2:12: E251 [*] Unexpected spaces around keyword / parameter equals
   |
@@ -231,5 +232,3 @@ E25.py:23:10: E251 [*] Unexpected spaces around keyword / parameter equals
 24 24 |     )
 25 25 | #: Okay
 26 26 | foo(bar=(1 == 1))
-
-

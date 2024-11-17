@@ -1,5 +1,5 @@
 from _typeshed import BytesPath, StrPath, Unused
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from distutils.file_util import _BytesPathT, _StrPathT
 from typing import Literal, overload
 from typing_extensions import TypeAlias, TypeVarTuple, Unpack
@@ -63,7 +63,7 @@ class CCompiler:
     def set_executables(self, **args: str) -> None: ...
     def compile(
         self,
-        sources: list[str],
+        sources: Sequence[StrPath],
         output_dir: str | None = None,
         macros: list[_Macro] | None = None,
         include_dirs: list[str] | None = None,

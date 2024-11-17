@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 no_method_decorator.py:9:5: PLR0202 [*] Class method defined without decorator
    |

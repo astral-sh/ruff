@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
    |
@@ -105,5 +106,3 @@ E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
    71 |+  5
 72 72 | #:
 73 73 | with x(y) as z: ...
-
-

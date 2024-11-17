@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+snapshot_kind: text
 ---
 TRY301.py:14:13: TRY301 Abstract `raise` to an inner function
    |
@@ -60,5 +61,3 @@ TRY301.py:39:17: TRY301 Abstract `raise` to an inner function
 40 |         except* Exception:
 41 |             logger.exception("something failed")
    |
-
-

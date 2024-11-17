@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 PD002.py:5:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   |
@@ -178,5 +179,3 @@ PD002.py:33:24: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
 34 34 | 
 35 35 | # This method doesn't take exist in Pandas, so ignore it.
 36 36 | x.rotate_z(45, inplace=True)
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C401.py:2:13: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |

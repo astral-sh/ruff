@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+snapshot_kind: text
 ---
 RET505.py:8:5: RET505 [*] Unnecessary `elif` after `return` statement
    |

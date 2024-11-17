@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 import_outside_top_level.py:10:5: PLC0415 `import` should be at the top-level of a file
    |
@@ -72,5 +73,3 @@ import_outside_top_level.py:22:9: PLC0415 `import` should be at the top-level of
 22 |         import trace  # [import-outside-toplevel]
    |         ^^^^^^^^^^^^ PLC0415
    |
-
-

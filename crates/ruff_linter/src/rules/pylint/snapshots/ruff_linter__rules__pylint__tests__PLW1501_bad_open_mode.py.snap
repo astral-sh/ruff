@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 bad_open_mode.py:11:12: PLW1501 `rwx` is not a valid mode for `open`
    |

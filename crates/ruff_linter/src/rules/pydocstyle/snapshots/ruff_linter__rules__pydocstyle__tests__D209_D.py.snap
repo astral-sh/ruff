@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
     |
@@ -46,5 +47,3 @@ D.py:588:5: D209 [*] Multi-line docstring closing quotes should be on a separate
 591 592 | 
 592 593 | 
 593 594 | @expect('D200: One-line docstring should fit on one line with quotes '
-
-

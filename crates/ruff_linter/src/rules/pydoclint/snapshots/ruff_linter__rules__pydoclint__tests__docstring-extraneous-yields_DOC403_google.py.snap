@@ -1,26 +1,41 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+snapshot_kind: text
 ---
-DOC403_google.py:20:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+DOC403_google.py:14:5: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
    |
-18 |           num (int): A number
-19 |   
-20 | /     Yields:
+12 |   # DOC403
+13 |   def foo(num: int) -> str:
+14 |       """
+   |  _____^
+15 | |     Do something
+16 | | 
+17 | |     Args:
+18 | |         num (int): A number
+19 | | 
+20 | |     Yields:
 21 | |         str: A string
 22 | |     """
-   | |____^ DOC403
+   | |_______^ DOC403
 23 |       print('test')
    |
    = help: Remove the "Yields" section
 
-DOC403_google.py:36:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+DOC403_google.py:30:9: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
    |
-34 |               num (int): A number
-35 |   
-36 | /         Yields:
+28 |       # DOC403
+29 |       def foo(self) -> str:
+30 |           """
+   |  _________^
+31 | |         Do something
+32 | | 
+33 | |         Args:
+34 | |             num (int): A number
+35 | | 
+36 | |         Yields:
 37 | |             str: A string
 38 | |         """
-   | |________^ DOC403
+   | |___________^ DOC403
 39 |           print('test')
    |
    = help: Remove the "Yields" section

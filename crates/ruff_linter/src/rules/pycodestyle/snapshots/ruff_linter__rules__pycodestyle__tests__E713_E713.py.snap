@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E713.py:2:8: E713 [*] Test for membership should be `not in`
   |
@@ -117,5 +118,3 @@ E713.py:40:12: E713 [*] Test for membership should be `not in`
 39 39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
 40    |-assert not('name' in request)or not request['name']
    40 |+assert 'name' not in request or not request['name']
-
-

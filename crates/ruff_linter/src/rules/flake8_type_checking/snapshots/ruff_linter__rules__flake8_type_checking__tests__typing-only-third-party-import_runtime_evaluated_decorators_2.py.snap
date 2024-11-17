@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
 ---
 runtime_evaluated_decorators_2.py:10:8: TCH002 [*] Move third-party import `numpy` into a type-checking block
    |
@@ -22,5 +23,3 @@ runtime_evaluated_decorators_2.py:10:8: TCH002 [*] Move third-party import `nump
 11 14 | 
 12 15 | 
 13 16 | @attrs.define(auto_attribs=True)
-
-

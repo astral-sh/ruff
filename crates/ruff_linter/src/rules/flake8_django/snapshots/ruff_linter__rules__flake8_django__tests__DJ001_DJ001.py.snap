@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+snapshot_kind: text
 ---
 DJ001.py:7:17: DJ001 Avoid using `null=True` on string-based fields such as `CharField`
   |
@@ -168,5 +169,3 @@ DJ001.py:30:16: DJ001 Avoid using `null=True` on string-based fields such as `UR
 30 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ001
    |
-
-

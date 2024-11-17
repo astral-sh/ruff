@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S701.py:9:57: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
    |
@@ -47,5 +48,3 @@ S701.py:29:36: S701 Using jinja2 templates with `autoescape=False` is dangerous 
 29 | Environment(loader=templateLoader, autoescape=fake_func())  # S701
    |                                    ^^^^^^^^^^^^^^^^^^^^^^ S701
    |
-
-

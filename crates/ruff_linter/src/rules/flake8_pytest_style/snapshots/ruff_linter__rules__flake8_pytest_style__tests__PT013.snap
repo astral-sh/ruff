@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT013.py:11:1: PT013 Incorrect import of `pytest`; use `import pytest` instead
    |

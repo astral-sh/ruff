@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_4.py:4:11: F821 Undefined name `Model`
   |
@@ -40,5 +41,3 @@ F821_4.py:24:20: F821 Undefined name `Model`
 24 | _ = abc.ItemsView["Model"]
    |                    ^^^^^ F821
    |
-
-

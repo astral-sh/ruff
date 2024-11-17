@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 nested_min_max.py:2:1: PLW3301 [*] Nested `min` calls can be flattened
   |

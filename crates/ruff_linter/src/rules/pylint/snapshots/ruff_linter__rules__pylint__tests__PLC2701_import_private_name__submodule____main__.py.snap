@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 __main__.py:2:16: PLC2701 Private name import `_a`
   |
@@ -68,5 +69,3 @@ __main__.py:8:24: PLC2701 Private name import `_ddd` from external module `bbb.c
  9 | 
 10 | # Non-errors.
    |
-
-

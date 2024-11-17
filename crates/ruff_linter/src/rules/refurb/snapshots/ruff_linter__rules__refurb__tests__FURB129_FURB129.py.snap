@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB129.py:7:18: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
   |

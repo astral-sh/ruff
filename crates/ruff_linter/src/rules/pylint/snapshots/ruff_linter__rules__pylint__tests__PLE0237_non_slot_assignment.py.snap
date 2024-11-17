@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 non_slot_assignment.py:6:9: PLE0237 Attribute `surname` is not defined in class's `__slots__`
   |
@@ -27,5 +28,3 @@ non_slot_assignment.py:42:9: PLE0237 Attribute `middle_name` is not defined in c
    |         ^^^^^^^^^^^^^^^^ PLE0237
 43 |         self.setup()
    |
-
-

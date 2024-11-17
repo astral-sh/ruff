@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM223.py:1:4: SIM223 [*] Use `False` instead of `... and False`
   |
@@ -1023,5 +1024,3 @@ SIM223.py:154:7: SIM223 [*] Use `f"{''}{''}"` instead of `f"{''}{''}" and ...`
 154     |-print(f"{''}{''}" and "bar")
     154 |+print(f"{''}{''}")
 155 155 | print(f"{1}{''}" and "bar")
-
-

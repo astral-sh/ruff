@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF021.py:12:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |

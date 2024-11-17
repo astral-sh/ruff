@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:64:9: D105 Missing docstring in magic method
    |
@@ -8,5 +9,3 @@ D.py:64:9: D105 Missing docstring in magic method
    |         ^^^^^^^ D105
 65 |         pass
    |
-
-

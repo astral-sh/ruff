@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 unexpected_special_method_signature.py:5:9: PLE0302 The special method `__bool__` expects 1 parameter, 2 were given
   |
@@ -71,5 +72,3 @@ unexpected_special_method_signature.py:65:9: PLE0302 The special method `__round
    |         ^^^^^^^^^ PLE0302
 66 |         ...
    |
-
-

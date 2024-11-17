@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_linter/src/message/grouped.rs
 expression: content
+snapshot_kind: text
 ---
 fib.py:
   1:8 F401 `os` imported but unused
@@ -27,5 +28,3 @@ undef.py:
   1 | if a == 1: pass
     |    ^ F821
     |
-  
-

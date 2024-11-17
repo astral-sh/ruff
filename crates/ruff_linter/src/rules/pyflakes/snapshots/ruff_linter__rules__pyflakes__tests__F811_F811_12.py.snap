@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F811_12.py:6:20: F811 Redefinition of unused `mixer` from line 2
   |

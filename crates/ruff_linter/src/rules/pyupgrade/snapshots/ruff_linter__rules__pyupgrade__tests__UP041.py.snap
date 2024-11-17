@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP041.py:5:8: UP041 [*] Replace aliased errors with `TimeoutError`
   |
@@ -140,5 +141,3 @@ UP041.py:42:8: UP041 [*] Replace aliased errors with `TimeoutError`
 43 43 |     pass
 44 44 | 
 45 45 | # These should not change
-
-

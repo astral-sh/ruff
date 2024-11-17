@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
   |
@@ -67,5 +68,3 @@ F401_5.py:5:15: F401 [*] `j.k` imported but unused
 3 3 | from d.e import f as g
 4 4 | import h.i
 5   |-import j.k as l
-
-

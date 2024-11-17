@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI054.pyi:2:16: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
   |
@@ -157,5 +158,3 @@ PYI054.pyi:20:20: PYI054 [*] Numeric literals with a string representation longe
 19 19 | field16: complex = -1e1234567j
 20    |-field17: complex = 1e123456789j  # Error: PYI054
    20 |+field17: complex = ...  # Error: PYI054
-
-

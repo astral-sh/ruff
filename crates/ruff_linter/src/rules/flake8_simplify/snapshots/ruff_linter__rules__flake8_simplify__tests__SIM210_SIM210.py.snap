@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM210.py:1:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
   |
@@ -85,5 +86,3 @@ SIM210.py:19:11: SIM210 [*] Remove unnecessary `True if ... else False`
 20    |-                                   psl.privatesuffix(src.netloc)) else False
    19 |+samesld = (psl.privatesuffix(urlparse(response.url).netloc) ==
    20 |+                                   psl.privatesuffix(src.netloc))
-
-

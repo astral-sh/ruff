@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F401_17.py:12:27: F401 [*] `threading.Thread` imported but unused
    |
@@ -38,5 +39,3 @@ F401_17.py:20:27: F401 [*] `threading.Thread` imported but unused
 21 20 | 
 22 21 |     # The `Thread` on the left-hand side should resolve to the `Thread` imported at the
 23 22 |     # top level.
-
-

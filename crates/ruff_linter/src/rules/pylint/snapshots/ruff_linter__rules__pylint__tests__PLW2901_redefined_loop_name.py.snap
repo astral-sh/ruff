@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 redefined_loop_name.py:6:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
   |
@@ -248,5 +249,3 @@ redefined_loop_name.py:180:5: PLW2901 `for` loop variable `a.i` overwritten by a
 180 |     a.i = 2  # error
     |     ^^^ PLW2901
     |
-
-

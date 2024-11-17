@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D400.py:2:5: D400 [*] First line should end with a period
   |
@@ -270,5 +271,3 @@ D400.py:97:5: D400 [*] First line should end with a period
 99 99 |     ==========
 100 100 | 
 101 101 |     My example explanation
-
-

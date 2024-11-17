@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP042.py:4:7: UP042 [*] Class A inherits from both `str` and `enum.Enum`
   |

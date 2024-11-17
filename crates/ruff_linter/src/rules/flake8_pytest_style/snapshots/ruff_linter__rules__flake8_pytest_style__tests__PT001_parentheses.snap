@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT001.py:9:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |

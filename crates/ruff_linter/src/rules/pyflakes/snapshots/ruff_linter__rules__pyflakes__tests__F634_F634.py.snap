@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F634.py:1:4: F634 If test is a tuple, which is always `True`
   |
@@ -27,5 +28,3 @@ F634.py:12:10: F634 If test is a tuple, which is always `True`
 13 |         pass
 14 |     elif ():
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 iteration_over_set.py:3:13: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
   |
@@ -168,6 +169,4 @@ iteration_over_set.py:23:27: PLC0208 [*] Use a sequence type instead of a `set` 
    23 |+numbers_gen = (i for i in (1, 2, 3))  # flags sets in generator expressions
 24 24 | 
 25 25 | # Non-errors
-26 26 | 
-
-
+26 26 |

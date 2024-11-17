@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+snapshot_kind: text
 ---
 A003.py:17:31: A003 Python builtin is shadowed by method `str` from line 14
    |
@@ -9,5 +10,3 @@ A003.py:17:31: A003 Python builtin is shadowed by method `str` from line 14
    |                               ^^^ A003
 18 |         pass
    |
-
-

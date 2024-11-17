@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
+snapshot_kind: text
 ---
 NPY003.py:4:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
   |
@@ -221,5 +222,3 @@ NPY003.py:18:5: NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
 17 18 |     sometrue(np.random.rand(5, 5))
 18    |-    alltrue(np.random.rand(5, 5))
    19 |+    all(np.random.rand(5, 5))
-
-

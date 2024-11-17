@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
+snapshot_kind: text
 ---
 import_typing.py:5:13: FA100 Add `from __future__ import annotations` to simplify `typing.List`
   |

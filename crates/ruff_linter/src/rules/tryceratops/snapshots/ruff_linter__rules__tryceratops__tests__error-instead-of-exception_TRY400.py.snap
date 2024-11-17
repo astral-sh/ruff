@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+snapshot_kind: text
 ---
 TRY400.py:13:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |

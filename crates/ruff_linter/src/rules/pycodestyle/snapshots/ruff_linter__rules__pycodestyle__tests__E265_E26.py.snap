@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E26.py:10:1: E265 [*] Block comment should start with `# `
    |
@@ -124,5 +125,3 @@ E26.py:78:1: E265 [*] Block comment should start with `# `
 79 79 | 
 80 80 | # We should strip the space, but preserve the hashes.
 81 81 | #: E266:1:3
-
-

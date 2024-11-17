@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S607.py:9:11: S607 Starting a process with a partial executable path
    |
@@ -219,5 +220,3 @@ S607.py:37:14: S607 Starting a process with a partial executable path
 38 | 
 39 | # Check it does not fail for full paths.
    |
-
-

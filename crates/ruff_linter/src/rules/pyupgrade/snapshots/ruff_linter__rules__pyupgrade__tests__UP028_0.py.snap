@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |

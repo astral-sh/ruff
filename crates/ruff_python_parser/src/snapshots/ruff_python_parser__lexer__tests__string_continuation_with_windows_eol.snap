@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
 expression: string_continuation_with_eol(WINDOWS_EOL)
+snapshot_kind: text
 ---
 ## Tokens
 ```

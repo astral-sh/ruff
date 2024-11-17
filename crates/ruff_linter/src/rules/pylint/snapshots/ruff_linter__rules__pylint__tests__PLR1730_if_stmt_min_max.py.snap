@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 if_stmt_min_max.py:8:1: PLR1730 [*] Replace `if` statement with `value = max(value, 10)`
    |

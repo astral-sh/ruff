@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F633.py:4:1: F633 Use of `>>` is invalid with `print` function
   |
@@ -8,5 +9,3 @@ F633.py:4:1: F633 Use of `>>` is invalid with `print` function
 4 | print >> sys.stderr, "Hello"
   | ^^^^^ F633
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_print/mod.rs
+snapshot_kind: text
 ---
 T201.py:4:1: T201 [*] `print` found
   |
@@ -78,5 +79,3 @@ T201.py:7:1: T201 [*] `print` found
 8 7 | 
 9 8 | with tempfile.NamedTemporaryFile() as fp:
 10 9 |     print("Hello, world!", file=fp)  # OK
-
-

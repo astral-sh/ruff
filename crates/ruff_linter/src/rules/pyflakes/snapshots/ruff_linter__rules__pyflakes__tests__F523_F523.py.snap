@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F523.py:2:1: F523 [*] `.format` call has unused arguments at position(s): 1
   |
@@ -263,5 +264,3 @@ F523.py:32:2: F523 [*] `.format` call has unused arguments at position(s): 0
 32 32 | (''
 33    |-.format(2))
    33 |+.format())
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB132.py:12:1: FURB132 [*] Use `s.discard("x")` instead of check and `remove`
    |
@@ -80,5 +81,3 @@ FURB132.py:32:1: FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check an
 34 33 | 
 35 34 | 
 36 35 | def identity(x):
-
-

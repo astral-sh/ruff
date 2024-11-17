@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N811.py:2:8: N811 Constant `STILL_BAD` imported as non-constant `stillBad`
   |
@@ -16,5 +17,3 @@ N811.py:5:17: N811 Constant `STILL_BAD` imported as non-constant `stillBad`
 5 | from mod import STILL_BAD as stillBad
   |                 ^^^^^^^^^^^^^^^^^^^^^ N811
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
+snapshot_kind: text
 ---
 ARG.py:28:8: ARG005 Unused lambda argument: `x`
    |
@@ -10,5 +11,3 @@ ARG.py:28:8: ARG005 Unused lambda argument: `x`
 29 | 
 30 | lambda: print("Hello, world!")
    |
-
-

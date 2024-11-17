@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+snapshot_kind: text
 ---
 DJ012.py:28:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
    |
@@ -61,5 +62,3 @@ DJ012.py:146:5: DJ012 Order of model's inner classes, methods, and fields does n
 146 |     first_name = models.CharField(max_length=32)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012
     |
-
-

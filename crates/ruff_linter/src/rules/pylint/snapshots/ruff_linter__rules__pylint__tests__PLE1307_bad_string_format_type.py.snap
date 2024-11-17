@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 bad_string_format_type.py:2:7: PLE1307 Format type does not match argument type
   |
@@ -127,5 +128,3 @@ bad_string_format_type.py:16:1: PLE1307 Format type does not match argument type
 17 | 
 18 | # False negatives
    |
-
-

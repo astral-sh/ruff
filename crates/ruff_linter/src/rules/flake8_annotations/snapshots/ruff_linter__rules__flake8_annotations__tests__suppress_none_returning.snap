@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+snapshot_kind: text
 ---
 suppress_none_returning.py:45:5: ANN201 [*] Missing return type annotation for public function `foo`
    |
@@ -47,5 +48,3 @@ suppress_none_returning.py:59:9: ANN001 Missing type annotation for function arg
    |         ^ ANN001
 60 |     a = 2 + 2
    |
-
-

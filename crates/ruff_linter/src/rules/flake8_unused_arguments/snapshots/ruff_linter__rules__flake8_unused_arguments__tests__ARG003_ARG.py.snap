@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
+snapshot_kind: text
 ---
 ARG.py:47:16: ARG003 Unused class method argument: `x`
    |
@@ -8,5 +9,3 @@ ARG.py:47:16: ARG003 Unused class method argument: `x`
    |                ^ ARG003
 48 |         print("Hello, world!")
    |
-
-

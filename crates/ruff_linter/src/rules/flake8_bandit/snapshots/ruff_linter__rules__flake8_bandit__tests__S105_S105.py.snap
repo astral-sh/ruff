@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S105.py:13:12: S105 Possible hardcoded password assigned to: "password"
    |
@@ -373,5 +374,3 @@ S105.py:64:13: S105 Possible hardcoded password assigned to: "token"
    |             ^^^^^^ S105
 65 |     pass
    |
-
-

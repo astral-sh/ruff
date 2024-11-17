@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B021.py:1:1: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   |
@@ -76,5 +77,3 @@ B021.py:74:5: B021 f-string used as docstring. Python will interpret this as a j
 75 |     print(f"""I'm a normal string""")
 76 |     f"""Don't detect me!"""
    |
-
-

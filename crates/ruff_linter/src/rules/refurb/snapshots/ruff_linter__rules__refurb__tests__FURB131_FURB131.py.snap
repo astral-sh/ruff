@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB131.py:11:1: FURB131 [*] Prefer `clear` over deleting a full slice
    |

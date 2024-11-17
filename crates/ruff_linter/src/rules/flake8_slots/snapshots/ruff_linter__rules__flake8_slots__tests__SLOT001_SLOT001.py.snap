@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_slots/mod.rs
+snapshot_kind: text
 ---
 SLOT001.py:1:7: SLOT001 Subclasses of `tuple` should define `__slots__`
   |

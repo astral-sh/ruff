@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF009.py:20:41: RUF009 Do not perform function call `default_function` in dataclass defaults
    |

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/reason.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -27,6 +28,3 @@ x = 1  # fmt: skip reason
 x = 1  # fmt: skip - reason
 x = 1  # fmt: skip; noqa
 ```
-
-
-

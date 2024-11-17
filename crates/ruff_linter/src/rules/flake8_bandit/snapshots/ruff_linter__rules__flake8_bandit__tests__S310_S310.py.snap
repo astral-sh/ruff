@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S310.py:6:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
   |

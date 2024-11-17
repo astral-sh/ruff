@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:23:9: D102 Missing docstring in public method
    |
@@ -42,5 +43,3 @@ D.py:659:9: D102 Missing docstring in public method
     |         ^^^^^^^^^^^^^ D102
 660 |         pass
     |
-
-

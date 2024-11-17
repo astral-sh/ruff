@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F702.py:4:5: F702 `continue` not properly in loop
   |
@@ -31,5 +32,3 @@ F702.py:23:1: F702 `continue` not properly in loop
 23 | continue
    | ^^^^^^^^ F702
    |
-
-

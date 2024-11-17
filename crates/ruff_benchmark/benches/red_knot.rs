@@ -2,7 +2,7 @@
 
 use rayon::ThreadPoolBuilder;
 use red_knot_python_semantic::PythonVersion;
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
@@ -75,10 +75,10 @@ fn setup_case() -> Case {
     .unwrap();
 
     let src_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::from_path(
+    let metadata = WorkspaceMetadata::discover(
         src_root,
         &system,
-        Some(Configuration {
+        Some(&Configuration {
             target_version: Some(PythonVersion::PY312),
             ..Configuration::default()
         }),

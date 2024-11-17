@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
 ---
 quote.py:57:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
    |

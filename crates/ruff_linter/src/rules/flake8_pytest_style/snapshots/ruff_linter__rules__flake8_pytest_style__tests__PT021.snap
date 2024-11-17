@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT021.py:49:5: PT021 Use `yield` instead of `request.addfinalizer`
    |
@@ -19,5 +20,3 @@ PT021.py:56:5: PT021 Use `yield` instead of `request.addfinalizer`
 57 |     yield resource
 58 |     resource  # prevent PT022
    |
-
-

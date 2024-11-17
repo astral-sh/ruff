@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 misplaced_bare_raise.py:30:5: PLE0704 Bare `raise` statement is not inside an exception handler
    |
@@ -86,5 +87,3 @@ misplaced_bare_raise.py:71:5: PLE0704 Bare `raise` statement is not inside an ex
 71 |     raise # [misplaced-bare-raise]
    |     ^^^^^ PLE0704
    |
-
-

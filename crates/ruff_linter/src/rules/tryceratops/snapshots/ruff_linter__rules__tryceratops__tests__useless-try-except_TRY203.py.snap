@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+snapshot_kind: text
 ---
 TRY203.py:12:5: TRY203 Remove exception handler; error is immediately re-raised
    |

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/parentheses.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -36,6 +37,3 @@ def format_range_after_inserted_parens   ():
     a and item.sizing_mode is None and item.width_policy == "auto" and item.height_policy == "automatic"
     print("Format this")
 ```
-
-
-

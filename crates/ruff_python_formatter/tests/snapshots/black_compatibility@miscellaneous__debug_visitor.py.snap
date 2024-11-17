@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellaneous/debug_visitor.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -150,5 +151,3 @@ class DebugVisitor(Visitor[T]):
         v: DebugVisitor[None] = DebugVisitor()
         list(v.visit(lib2to3_parse(code)))
 ```
-
-

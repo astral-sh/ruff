@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C416.py:6:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
   |
@@ -139,5 +140,3 @@ C416.py:24:70: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`
 23 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
 24    |-any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
    24 |+any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in list(SymbolType))
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E721.py:2:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
   |

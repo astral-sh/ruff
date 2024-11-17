@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F632.py:1:4: F632 [*] Use `==` to compare constant literals
   |

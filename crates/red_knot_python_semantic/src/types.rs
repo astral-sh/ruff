@@ -14,7 +14,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::signatures::Signature;
 use crate::module_resolver::file_to_module;
-use crate::semantic_index::ast_ids::HasScopedAstId;
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -37,6 +37,7 @@ mod infer;
 mod mro;
 mod narrow;
 mod signatures;
+mod string_annotation;
 mod unpacker;
 
 #[salsa::tracked(return_ref)]
@@ -46,7 +47,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     tracing::debug!("Checking file '{path}'", path = file.path(db));
 
     let index = semantic_index(db, file);
-    let mut diagnostics = TypeCheckDiagnostics::new();
+    let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
         let result = infer_scope_types(db, scope_id);
@@ -58,7 +59,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Symbol<'db> {
-    let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
+    let _span = tracing::trace_span!("symbol_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
 
@@ -206,7 +207,7 @@ fn definition_expression_ty<'db>(
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
-    let expr_id = expression.scoped_ast_id(db, scope);
+    let expr_id = expression.scoped_expression_id(db, scope);
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);

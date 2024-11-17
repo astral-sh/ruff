@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
+snapshot_kind: text
 ---
 DTZ005.py:4:1: DTZ005 `datetime.datetime.now()` called without a `tz` argument
   |

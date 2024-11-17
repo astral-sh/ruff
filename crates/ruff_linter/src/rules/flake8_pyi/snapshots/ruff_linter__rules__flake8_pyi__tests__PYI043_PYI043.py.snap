@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI043.py:10:1: PYI043 Private type alias `_PrivateAliasT` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)
    |
@@ -37,5 +38,3 @@ PYI043.py:26:6: PYI043 Private type alias `_FooT` should not be suffixed with `T
    |      ^^^^^ PYI043
 27 | type Foo = str | int
    |
-
-

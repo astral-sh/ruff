@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/set_comp.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -123,6 +124,3 @@ selected_choices = {
     if str(v) not in self.choices.field.empty_values
 }
 ```
-
-
-

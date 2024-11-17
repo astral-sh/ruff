@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 continue_in_finally.py:5:9: PLE0116 `continue` not supported inside `finally` clause
   |
@@ -124,5 +125,3 @@ continue_in_finally.py:95:17: PLE0116 `continue` not supported inside `finally` 
 95 |                 continue  # [continue-in-finally]
    |                 ^^^^^^^^ PLE0116
    |
-
-

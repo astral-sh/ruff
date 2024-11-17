@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S405.py:1:8: S405 `xml.etree` methods are vulnerable to XML attacks
   |
@@ -34,5 +35,3 @@ S405.py:4:6: S405 `xml.etree` methods are vulnerable to XML attacks
 4 | from xml.etree import ElementTree  # S405
   |      ^^^^^^^^^ S405
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 global_statement.py:17:12: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
@@ -98,5 +99,3 @@ global_statement.py:80:12: PLW0603 Using the global statement to update `CONSTAN
 81 |     CONSTANT = 1
 82 |     CONSTANT = 2
    |
-
-

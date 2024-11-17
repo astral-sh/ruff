@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S609.py:4:10: S609 Possible wildcard injection in call due to `*` usage
   |

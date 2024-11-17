@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S504.py:4:1: S504 `ssl.wrap_socket` called without an `ssl_version``
   |
@@ -18,5 +19,3 @@ S504.py:5:1: S504 `ssl.wrap_socket` called without an `ssl_version``
   | ^^^^^^^^^^^^^ S504
 6 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1_2)  # OK
   |
-
-

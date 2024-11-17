@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF031_prefer_parens.py:8:5: RUF031 [*] Use parentheses for tuples in subscripts
    |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C410.py:1:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
   |
@@ -116,5 +117,3 @@ C410.py:11:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the
 12 12 |     1, 2
 13    |-])
    13 |+]
-
-

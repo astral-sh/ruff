@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI035.pyi:1:1: PYI035 `__all__` in a stub file must have a value, as it has the same semantics as `__all__` at runtime
   |
@@ -27,5 +28,3 @@ PYI035.pyi:8:5: PYI035 `__slots__` in a stub file must have a value, as it has t
  9 | 
 10 | class Bar:
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 <filename>:5:12: F401 [*] `os` imported but unused
   |
@@ -20,5 +21,3 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 6 6 | 
 7 7 | # Despite this `del`, `import os` in `f` should still be flagged as shadowing an unused
 8 8 | # import. (This is a false negative, but is consistent with Pyflakes.)
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF016.py:20:13: RUF016 Indexed access to type `str` uses type `str` instead of an integer or slice
    |
@@ -375,5 +376,3 @@ RUF016.py:94:17: RUF016 Indexed access to type `list` uses type `str` instead of
 95 | 
 96 | # Cannot emit on invalid access using variable in index
    |
-
-

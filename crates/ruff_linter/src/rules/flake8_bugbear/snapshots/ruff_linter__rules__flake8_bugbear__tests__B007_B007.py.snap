@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B007.py:6:5: B007 Loop control variable `i` not used within loop body
   |
@@ -182,5 +183,3 @@ B007.py:98:5: B007 Loop control variable `line_` not used within loop body
    |     ^^^^^ B007
 99 |     fp.readline()
    |
-
-

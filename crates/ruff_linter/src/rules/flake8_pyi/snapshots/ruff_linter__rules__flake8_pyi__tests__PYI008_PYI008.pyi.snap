@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI008.pyi:3:20: PYI008 Unrecognized platform `linus`
   |
@@ -10,5 +11,3 @@ PYI008.pyi:3:20: PYI008 Unrecognized platform `linus`
 4 | 
 5 | if sys.platform != "linux": ...  # OK
   |
-
-

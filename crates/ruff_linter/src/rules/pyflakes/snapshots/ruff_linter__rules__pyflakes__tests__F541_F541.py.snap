@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F541.py:6:5: F541 [*] f-string without any placeholders
   |
@@ -408,5 +409,3 @@ F541.py:44:1: F541 [*] f-string without any placeholders
 43 43 | f"{v:{f"0.2f"}}"
 44    |-f"\{{x}}"
    44 |+"\{x}"
-
-

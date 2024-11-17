@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP006_2.py:7:10: UP006 Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
   |
@@ -8,5 +9,3 @@ UP006_2.py:7:10: UP006 Use `collections.defaultdict` instead of `typing.DefaultD
 8 |     ...
   |
   = help: Replace with `collections.defaultdict`
-
-

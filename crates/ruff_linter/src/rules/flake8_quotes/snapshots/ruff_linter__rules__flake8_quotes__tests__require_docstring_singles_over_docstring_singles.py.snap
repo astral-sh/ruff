@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+snapshot_kind: text
 ---
 docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quotes preferred
   |
@@ -154,5 +155,3 @@ docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quo
 39    |-            '''
    39 |+            """
 40 40 |             pass
-
-

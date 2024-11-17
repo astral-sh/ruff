@@ -1,7 +1,11 @@
+from collections.abc import Iterable
+
 __all__ = ["GetoptError", "error", "getopt", "gnu_getopt"]
 
-def getopt(args: list[str], shortopts: str, longopts: list[str] = []) -> tuple[list[tuple[str, str]], list[str]]: ...
-def gnu_getopt(args: list[str], shortopts: str, longopts: list[str] = []) -> tuple[list[tuple[str, str]], list[str]]: ...
+def getopt(args: list[str], shortopts: str, longopts: Iterable[str] | str = []) -> tuple[list[tuple[str, str]], list[str]]: ...
+def gnu_getopt(
+    args: list[str], shortopts: str, longopts: Iterable[str] | str = []
+) -> tuple[list[tuple[str, str]], list[str]]: ...
 
 class GetoptError(Exception):
     msg: str

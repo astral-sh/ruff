@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F525.py:1:1: F525 `.format` string mixes automatic and manual numbering
   |
@@ -14,5 +15,3 @@ F525.py:2:1: F525 `.format` string mixes automatic and manual numbering
 2 | "{0} {}".format(1, 2)  # F523, F525
   | ^^^^^^^^^^^^^^^^^^^^^ F525
   |
-
-

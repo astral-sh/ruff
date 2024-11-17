@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI001.pyi:3:5: PYI001 Name of private `TypeVar` must start with `_`
   |
@@ -30,5 +31,3 @@ PYI001.pyi:7:5: PYI001 Name of private `ParamSpec` must start with `_`
 8 | 
 9 | _T = TypeVar("_T")  # OK
   |
-
-

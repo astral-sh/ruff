@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
+snapshot_kind: text
 ---
 LOG009.py:4:5: LOG009 [*] Use of undocumented `logging.WARN` constant
   |

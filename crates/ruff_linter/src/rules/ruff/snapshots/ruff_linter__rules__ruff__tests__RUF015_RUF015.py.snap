@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
   |

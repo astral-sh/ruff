@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 potential_index_error.py:1:17: PLE0643 Expression is likely to raise `IndexError`
   |

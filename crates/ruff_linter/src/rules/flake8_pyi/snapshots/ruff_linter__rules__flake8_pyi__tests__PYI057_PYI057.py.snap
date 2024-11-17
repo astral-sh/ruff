@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI057.py:4:20: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
   |

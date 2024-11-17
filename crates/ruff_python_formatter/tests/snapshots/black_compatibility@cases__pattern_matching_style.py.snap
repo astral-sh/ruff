@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/pattern_matching_style.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -182,5 +183,3 @@ match match():
     ):
         pass
 ```
-
-

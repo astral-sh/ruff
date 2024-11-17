@@ -4,7 +4,7 @@ use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
+use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
 use crate::types::{Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
 use crate::Db;
@@ -29,7 +29,7 @@ impl<'db> Unpacker<'db> {
         match target {
             ast::Expr::Name(target_name) => {
                 self.targets
-                    .insert(target_name.scoped_ast_id(self.db, scope), value_ty);
+                    .insert(target_name.scoped_expression_id(self.db, scope), value_ty);
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.unpack(value, value_ty, scope);

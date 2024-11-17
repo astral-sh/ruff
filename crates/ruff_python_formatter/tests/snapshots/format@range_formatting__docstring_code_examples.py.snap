@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/docstring_code_examples.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -386,6 +387,3 @@ if True:
         foo, bar, quux = this_is_a_long_line(lion, giraffe, hippo, zeba, lemur, penguin, monkey)
 
 ```
-
-
-

@@ -1,10 +1,12 @@
+use crate::workspace::PackageMetadata;
 use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings, SitePackages};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 
 /// The resolved configurations.
 ///
 /// The main difference to [`Configuration`] is that default values are filled in.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct WorkspaceSettings {
     pub(super) program: ProgramSettings,
 }
@@ -16,7 +18,8 @@ impl WorkspaceSettings {
 }
 
 /// The configuration for the workspace or a package.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct Configuration {
     pub target_version: Option<PythonVersion>,
     pub search_paths: SearchPathConfiguration,
@@ -29,17 +32,22 @@ impl Configuration {
         self.search_paths.extend(with.search_paths);
     }
 
-    pub fn into_workspace_settings(self, workspace_root: &SystemPath) -> WorkspaceSettings {
+    pub fn to_workspace_settings(
+        &self,
+        workspace_root: &SystemPath,
+        _packages: &[PackageMetadata],
+    ) -> WorkspaceSettings {
         WorkspaceSettings {
             program: ProgramSettings {
                 target_version: self.target_version.unwrap_or_default(),
-                search_paths: self.search_paths.into_settings(workspace_root),
+                search_paths: self.search_paths.to_settings(workspace_root),
             },
         }
     }
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub struct SearchPathConfiguration {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -59,15 +67,19 @@ pub struct SearchPathConfiguration {
 }
 
 impl SearchPathConfiguration {
-    pub fn into_settings(self, workspace_root: &SystemPath) -> SearchPathSettings {
-        let site_packages = self.site_packages.unwrap_or(SitePackages::Known(vec![]));
+    pub fn to_settings(&self, workspace_root: &SystemPath) -> SearchPathSettings {
+        let site_packages = self
+            .site_packages
+            .clone()
+            .unwrap_or(SitePackages::Known(vec![]));
 
         SearchPathSettings {
-            extra_paths: self.extra_paths.unwrap_or_default(),
+            extra_paths: self.extra_paths.clone().unwrap_or_default(),
             src_root: self
+                .clone()
                 .src_root
                 .unwrap_or_else(|| workspace_root.to_path_buf()),
-            custom_typeshed: self.custom_typeshed,
+            custom_typeshed: self.custom_typeshed.clone(),
             site_packages,
         }
     }

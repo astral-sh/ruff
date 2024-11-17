@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C418.py:1:1: C418 [*] Unnecessary `dict` literal passed to `dict()` (remove the outer call to `dict()`)
   |
@@ -79,5 +80,3 @@ C418.py:4:1: C418 [*] Unnecessary `dict` comprehension passed to `dict()` (remov
 7 5 | 
 8 6 | dict({}, a=1)
 9 7 | dict({x: 1 for x in range(1)}, a=1)
-
-

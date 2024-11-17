@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C406.py:1:6: C406 [*] Unnecessary `list` literal (rewrite as a `dict` literal)
   |
@@ -71,5 +72,3 @@ C406.py:4:6: C406 [*] Unnecessary `tuple` literal (rewrite as a `dict` literal)
 4   |-d4 = dict(())
   4 |+d4 = {}
 5 5 | d5 = dict()
-
-

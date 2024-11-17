@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F50x.py:1:1: F501 `%`-format string has invalid format string: incomplete format
   |
@@ -8,5 +9,3 @@ F50x.py:1:1: F501 `%`-format string has invalid format string: incomplete format
 2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
 3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
   |
-
-

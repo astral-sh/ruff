@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 ruff_noqa_invalid.py:1:8: F401 [*] `os` imported but unused
   |
@@ -28,5 +29,3 @@ ruff_noqa_invalid.py:5:5: F841 [*] Local variable `x` is assigned to but never u
 4 4 | def f():
 5   |-    x = 1
   5 |+    pass
-
-

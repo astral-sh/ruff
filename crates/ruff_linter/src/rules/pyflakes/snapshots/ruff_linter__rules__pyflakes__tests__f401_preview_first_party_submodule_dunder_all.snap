@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 __init__.py:2:8: F401 [*] `submodule.a` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   |

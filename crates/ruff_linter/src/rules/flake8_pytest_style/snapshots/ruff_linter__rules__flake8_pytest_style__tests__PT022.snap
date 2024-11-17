@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
@@ -60,5 +61,3 @@ PT022.py:43:5: PT022 [*] No teardown in fixture `error`, use `return` instead of
 42 42 |     resource = acquire_resource()
 43    |-    yield resource
    43 |+    return resource
-
-

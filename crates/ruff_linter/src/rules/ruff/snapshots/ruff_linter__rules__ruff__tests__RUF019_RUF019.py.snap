@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF019.py:3:4: RUF019 [*] Unnecessary key check before dictionary access
   |

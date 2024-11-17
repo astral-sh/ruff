@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 <filename>:4:9: PD008 Use `.loc` instead of `.at`. If speed is important, use NumPy.
   |
@@ -8,5 +9,3 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 4 | index = x.at[:, ["B", "A"]]
   |         ^^^^^^^^^^^^^^^^^^^ PD008
   |
-
-

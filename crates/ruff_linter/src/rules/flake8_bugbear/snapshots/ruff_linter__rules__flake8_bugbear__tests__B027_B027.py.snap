@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B027.py:18:5: B027 `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
    |
@@ -52,5 +53,3 @@ B027.py:28:5: B027 `AbstractClass.empty_4` is an empty method in an abstract bas
 34 |   
 35 |       @notabstract
    |
-
-

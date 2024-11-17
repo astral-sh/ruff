@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
+snapshot_kind: text
 ---
 NPY002.py:12:8: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
    |
@@ -514,5 +515,3 @@ NPY002.py:67:1: NPY002 Replace legacy `np.random.zipf` call with `np.random.Gene
 67 | numpy.random.zipf()
    | ^^^^^^^^^^^^^^^^^ NPY002
    |
-
-

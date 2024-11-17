@@ -459,10 +459,6 @@ pub(super) struct UseDefMapBuilder<'db> {
 }
 
 impl<'db> UseDefMapBuilder<'db> {
-    pub(super) fn new() -> Self {
-        Self::default()
-    }
-
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
         let new_symbol = self.symbol_states.push(SymbolState::undefined());
         debug_assert_eq!(symbol, new_symbol);

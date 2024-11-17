@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
+snapshot_kind: text
 ---
 PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
   |
@@ -674,5 +675,3 @@ PIE790.py:209:9: PIE790 [*] Unnecessary `...` literal
 210 209 | 
 211 210 | 
 212 211 | class Repro(Protocol[int]):
-
-

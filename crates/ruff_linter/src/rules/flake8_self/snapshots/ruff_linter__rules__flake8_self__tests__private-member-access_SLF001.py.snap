@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_self/mod.rs
+snapshot_kind: text
 ---
 SLF001.py:34:12: SLF001 Private member accessed: `_private`
    |
@@ -107,5 +108,3 @@ SLF001.py:68:7: SLF001 Private member accessed: `_private_thing__`
 69 | 
 70 | print(foo.public_thing)
    |
-
-

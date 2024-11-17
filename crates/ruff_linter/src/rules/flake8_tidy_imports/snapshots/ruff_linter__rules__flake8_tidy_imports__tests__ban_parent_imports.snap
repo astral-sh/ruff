@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+snapshot_kind: text
 ---
 TID252.py:9:1: TID252 Prefer absolute imports over relative imports from parent modules
    |
@@ -143,5 +144,3 @@ TID252.py:28:1: TID252 Prefer absolute imports over relative imports from parent
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID252
    |
    = help: Replace relative imports from parent modules with absolute imports
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP024_1.py:5:8: UP024 [*] Replace aliased errors with `OSError`
   |
@@ -68,5 +69,3 @@ UP024_1.py:12:8: UP024 [*] Replace aliased errors with `OSError`
 16    |-):
    12 |+except OSError:
 17 13 |     pass
-
-

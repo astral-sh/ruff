@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP037_1.py:9:8: UP037 [*] Remove quotes from type annotation
    |

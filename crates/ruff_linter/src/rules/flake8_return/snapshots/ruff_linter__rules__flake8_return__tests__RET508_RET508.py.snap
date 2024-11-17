@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+snapshot_kind: text
 ---
 RET508.py:8:9: RET508 [*] Unnecessary `elif` after `break` statement
    |

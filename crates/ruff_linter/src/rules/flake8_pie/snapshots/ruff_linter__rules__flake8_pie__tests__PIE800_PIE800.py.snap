@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
+snapshot_kind: text
 ---
 PIE800.py:1:14: PIE800 [*] Unnecessary spread `**`
   |
@@ -129,6 +130,4 @@ PIE800.py:19:19: PIE800 [*] Unnecessary spread `**`
    19 |+{**foo, **buzz, bar: 10}  # PIE800
 20 20 | 
 21 21 | {**foo,    "bar": True  }  # OK
-22 22 | 
-
-
+22 22 |

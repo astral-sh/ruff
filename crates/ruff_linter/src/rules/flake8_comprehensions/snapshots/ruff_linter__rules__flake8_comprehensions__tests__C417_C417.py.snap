@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C417.py:3:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
   |
@@ -363,5 +364,3 @@ C417.py:49:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
 48 48 | map(lambda x: x, (y if y else z))
 49    |-map(lambda x: x, (x, y, z))
    49 |+(x for x in (x, y, z))
-
-

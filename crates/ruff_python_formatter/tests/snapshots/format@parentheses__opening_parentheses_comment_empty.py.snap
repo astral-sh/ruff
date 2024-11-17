@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/opening_parentheses_comment_empty.py
+snapshot_kind: text
 ---
 ## Input
 ```python

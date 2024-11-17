@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_docstring_no_string_normalization.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -64,5 +65,3 @@ def do_not_touch_this_prefix2():
 def do_not_touch_this_prefix3():
     u'''There was a bug where docstring prefixes would be normalized even with -S.'''
 ```
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F404_1.py:5:1: F404 `from __future__` imports must occur at the beginning of the file
   |
@@ -8,5 +9,3 @@ F404_1.py:5:1: F404 `from __future__` imports must occur at the beginning of the
 5 | from __future__ import absolute_import
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F404
   |
-
-

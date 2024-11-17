@@ -1,0 +1,152 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI061.pyi:4:25: PYI061 [*] `Literal[None]` can be replaced with `None`
+  |
+4 | def func1(arg1: Literal[None]): ...
+  |                         ^^^^ PYI061
+  |
+  = help: Replace with `None`
+
+ℹ Safe fix
+1 1 | from typing import Literal
+2 2 | 
+3 3 | 
+4   |-def func1(arg1: Literal[None]): ...
+  4 |+def func1(arg1: None): ...
+5 5 | 
+6 6 | 
+7 7 | def func2(arg1: Literal[None] | int): ...
+
+PYI061.pyi:7:25: PYI061 [*] `Literal[None]` can be replaced with `None`
+  |
+7 | def func2(arg1: Literal[None] | int): ...
+  |                         ^^^^ PYI061
+  |
+  = help: Replace with `None`
+
+ℹ Safe fix
+4 4 | def func1(arg1: Literal[None]): ...
+5 5 | 
+6 6 | 
+7   |-def func2(arg1: Literal[None] | int): ...
+  7 |+def func2(arg1: None | int): ...
+8 8 | 
+9 9 | 
+10 10 | def func3() -> Literal[None]: ...
+
+PYI061.pyi:10:24: PYI061 [*] `Literal[None]` can be replaced with `None`
+   |
+10 | def func3() -> Literal[None]: ...
+   |                        ^^^^ PYI061
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+7  7  | def func2(arg1: Literal[None] | int): ...
+8  8  | 
+9  9  | 
+10    |-def func3() -> Literal[None]: ...
+   10 |+def func3() -> None: ...
+11 11 | 
+12 12 | 
+13 13 | def func4(arg1: Literal[int, None, float]): ...
+
+PYI061.pyi:13:30: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+13 | def func4(arg1: Literal[int, None, float]): ...
+   |                              ^^^^ PYI061
+   |
+   = help: Replace with `Literal[...] | None`
+
+PYI061.pyi:16:25: PYI061 [*] `Literal[None]` can be replaced with `None`
+   |
+16 | def func5(arg1: Literal[None, None]): ...
+   |                         ^^^^ PYI061
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+13 13 | def func4(arg1: Literal[int, None, float]): ...
+14 14 | 
+15 15 | 
+16    |-def func5(arg1: Literal[None, None]): ...
+   16 |+def func5(arg1: None): ...
+17 17 | 
+18 18 | 
+19 19 | def func6(arg1: Literal[
+
+PYI061.pyi:16:31: PYI061 [*] `Literal[None]` can be replaced with `None`
+   |
+16 | def func5(arg1: Literal[None, None]): ...
+   |                               ^^^^ PYI061
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+13 13 | def func4(arg1: Literal[int, None, float]): ...
+14 14 | 
+15 15 | 
+16    |-def func5(arg1: Literal[None, None]): ...
+   16 |+def func5(arg1: None): ...
+17 17 | 
+18 18 | 
+19 19 | def func6(arg1: Literal[
+
+PYI061.pyi:21:5: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+19 | def func6(arg1: Literal[
+20 |     "hello",
+21 |     None  # Comment 1
+   |     ^^^^ PYI061
+22 |     , "world"
+23 | ]): ...
+   |
+   = help: Replace with `Literal[...] | None`
+
+PYI061.pyi:27:5: PYI061 [*] `Literal[None]` can be replaced with `None`
+   |
+26 | def func7(arg1: Literal[
+27 |     None  # Comment 1
+   |     ^^^^ PYI061
+28 | ]): ...
+   |
+   = help: Replace with `None`
+
+ℹ Unsafe fix
+23 23 | ]): ...
+24 24 | 
+25 25 | 
+26    |-def func7(arg1: Literal[
+27    |-    None  # Comment 1
+28    |-]): ...
+   26 |+def func7(arg1: None): ...
+29 27 | 
+30 28 | 
+31 29 | # OK
+
+PYI061.pyi:36:9: PYI061 [*] `Literal[None]` can be replaced with `None`
+   |
+35 | # From flake8-pyi
+36 | Literal[None]  # PYI061 None inside "Literal[]" expression. Replace with "None"
+   |         ^^^^ PYI061
+37 | Literal[True, None]  # PYI061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+33 33 | 
+34 34 | 
+35 35 | # From flake8-pyi
+36    |-Literal[None]  # PYI061 None inside "Literal[]" expression. Replace with "None"
+   36 |+None  # PYI061 None inside "Literal[]" expression. Replace with "None"
+37 37 | Literal[True, None]  # PYI061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+
+PYI061.pyi:37:15: PYI061 `Literal[None, ...]` can be replaced with `Literal[...] | None`
+   |
+35 | # From flake8-pyi
+36 | Literal[None]  # PYI061 None inside "Literal[]" expression. Replace with "None"
+37 | Literal[True, None]  # PYI061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |               ^^^^ PYI061
+   |
+   = help: Replace with `Literal[...] | None`

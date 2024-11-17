@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF033.py:19:35: RUF033 `__post_init__` method with argument defaults
    |

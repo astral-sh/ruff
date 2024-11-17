@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT012.py:42:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
@@ -85,5 +86,3 @@ PT012.py:71:5: PT012 `pytest.raises()` block should contain a single simple stat
 75 | |             raise
    | |_________________^ PT012
    |
-
-

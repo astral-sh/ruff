@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
 ---
 ASYNC100.py:8:5: ASYNC100 A `with trio.fail_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   |

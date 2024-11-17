@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F841_1.py:6:5: F841 [*] Local variable `x` is assigned to but never used
   |
@@ -132,5 +133,3 @@ F841_1.py:24:18: F841 [*] Local variable `y` is assigned to but never used
 23 23 | def f():
 24    |-    (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
    24 |+    (a, b) = (x, _y) = 1, 2  # this triggers F841 on everything
-
-

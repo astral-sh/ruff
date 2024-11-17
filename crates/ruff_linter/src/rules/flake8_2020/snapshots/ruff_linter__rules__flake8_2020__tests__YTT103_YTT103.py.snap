@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+snapshot_kind: text
 ---
 YTT103.py:4:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
   |
@@ -46,5 +47,3 @@ YTT103.py:8:1: YTT103 `sys.version` compared to string (python3.10), use `sys.ve
 8 | sys.version >= "3.5"
   | ^^^^^^^^^^^ YTT103
   |
-
-

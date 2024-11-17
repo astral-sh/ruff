@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F842.py:2:5: F842 Local variable `name` is annotated but never used
   |
@@ -16,5 +17,3 @@ F842.py:3:5: F842 Local variable `age` is annotated but never used
 3 |     age: int
   |     ^^^ F842
   |
-
-

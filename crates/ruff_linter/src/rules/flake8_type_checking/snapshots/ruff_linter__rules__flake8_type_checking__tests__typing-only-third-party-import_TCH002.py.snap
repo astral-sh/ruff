@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
 ---
 TCH002.py:5:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
   |
@@ -248,6 +249,4 @@ TCH002.py:172:24: TCH002 [*] Move third-party import `module.Member` into a type
 172     |-    from module import Member
 173 176 | 
 174 177 |     x: Member = 1
-175 178 | 
-
-
+175 178 |

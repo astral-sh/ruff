@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
+snapshot_kind: text
 ---
 DTZ004.py:4:1: DTZ004 `datetime.datetime.utcfromtimestamp()` used
   |

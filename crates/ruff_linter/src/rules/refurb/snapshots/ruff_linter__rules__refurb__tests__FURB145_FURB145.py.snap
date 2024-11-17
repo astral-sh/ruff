@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB145.py:4:5: FURB145 [*] Prefer `copy` method over slicing
   |
@@ -124,5 +125,3 @@ FURB145.py:9:7: FURB145 [*] Prefer `copy` method over slicing
 10 10 | 
 11 11 | # False negatives.
 12 12 | aa = a[:]  # Type inference.
-
-

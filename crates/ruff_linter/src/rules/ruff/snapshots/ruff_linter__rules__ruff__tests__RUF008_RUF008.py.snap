@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF008.py:10:34: RUF008 Do not use mutable default values for dataclass attributes
    |
@@ -20,5 +21,3 @@ RUF008.py:20:34: RUF008 Do not use mutable default values for dataclass attribut
 21 |     immutable_annotation: Sequence[int] = []
 22 |     without_annotation = []
    |
-
-

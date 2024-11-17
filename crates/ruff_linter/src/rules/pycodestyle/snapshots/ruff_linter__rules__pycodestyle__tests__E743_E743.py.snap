@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E743.py:1:5: E743 Ambiguous function name: `l`
   |
@@ -22,5 +23,3 @@ E743.py:10:9: E743 Ambiguous function name: `O`
    |         ^ E743
 11 |         pass
    |
-
-

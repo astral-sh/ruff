@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F841_4.py:12:5: F841 [*] Local variable `a` is assigned to but never used
    |
@@ -57,5 +58,3 @@ F841_4.py:13:8: F841 [*] Local variable `c` is assigned to but never used
 14 14 | 
 15 15 | 
 16 16 | def baz():
-
-

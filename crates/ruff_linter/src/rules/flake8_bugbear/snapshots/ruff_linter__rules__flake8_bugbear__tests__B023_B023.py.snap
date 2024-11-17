@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B023.py:12:30: B023 Function definition does not bind loop variable `x`
    |
@@ -220,5 +221,3 @@ B023.py:174:29: B023 Function definition does not bind loop variable `i`
 174 |             return [lambda: i for i in range(3)]  # error
     |                             ^ B023
     |
-
-

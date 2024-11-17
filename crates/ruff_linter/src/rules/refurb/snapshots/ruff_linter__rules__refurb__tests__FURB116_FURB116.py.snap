@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB116.py:6:7: FURB116 [*] Replace `oct` call with `f"{num:o}"`
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 <filename>:10:5: F821 Undefined name `x`
    |
@@ -17,5 +18,3 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
    |     ^ F841
    |
    = help: Remove assignment to unused variable `x`
-
-

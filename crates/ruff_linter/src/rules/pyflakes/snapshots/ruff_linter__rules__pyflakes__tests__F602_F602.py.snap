@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F602.py:5:5: F602 Dictionary key `a` repeated
   |
@@ -241,5 +242,3 @@ F602.py:45:18: F602 [*] Dictionary key `a` repeated
 44 44 | x = {a: 1, a: 1}
 45    |-x = {a: 1, b: 2, a: 1}
    45 |+x = {a: 1, b: 2}
-
-

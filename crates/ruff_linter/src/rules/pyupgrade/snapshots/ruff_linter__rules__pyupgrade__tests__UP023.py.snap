@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP023.py:2:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
   |
@@ -204,5 +205,3 @@ UP023.py:24:32: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
 25 25 | 
 26 26 | # The below items should NOT be changed.
 27 27 | import xml.etree.cElementTree
-
-

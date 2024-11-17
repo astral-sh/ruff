@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP033_1.py:4:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
   |
@@ -71,5 +72,3 @@ UP033_1.py:15:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
 16 16 | @other_decorator
 17 17 | def fixme():
 18 18 |     pass
-
-

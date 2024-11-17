@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E40.py:56:1: E402 Module level import not at top of file
    |
@@ -56,5 +57,3 @@ E40.py:68:8: E402 Module level import not at top of file
 68 | x = 1; import re as regex, string
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
    |
-
-

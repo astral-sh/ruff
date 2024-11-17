@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP019.py:7:22: UP019 [*] `typing.Text` is deprecated, use `str`
   |
@@ -70,5 +71,3 @@ UP019.py:19:29: UP019 [*] `typing.Text` is deprecated, use `str`
 19    |-def print_fourth_word(word: Goodbye) -> None:
    19 |+def print_fourth_word(word: str) -> None:
 20 20 |     print(word)
-
-

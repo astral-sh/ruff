@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_missing_guard_expr.py
+snapshot_kind: text
 ---
 ## AST
 

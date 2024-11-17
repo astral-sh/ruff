@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 repeated_keyword_argument.py:16:21: PLE1132 Repeated keyword argument: `c`
    |
@@ -76,5 +77,3 @@ repeated_keyword_argument.py:20:30: PLE1132 Repeated keyword argument: `c`
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
    |                              ^^^ PLE1132
    |
-
-

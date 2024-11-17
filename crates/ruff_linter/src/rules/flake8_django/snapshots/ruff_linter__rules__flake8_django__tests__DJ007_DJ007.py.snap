@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+snapshot_kind: text
 ---
 DJ007.py:6:9: DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead
   |
@@ -16,5 +17,3 @@ DJ007.py:11:9: DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead
 11 |         fields = b"__all__"
    |         ^^^^^^^^^^^^^^^^^^^ DJ007
    |
-
-

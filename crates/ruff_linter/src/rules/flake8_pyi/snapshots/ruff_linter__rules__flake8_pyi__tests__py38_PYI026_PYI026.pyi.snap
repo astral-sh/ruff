@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI026.pyi:3:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g., `NewAny: TypeAlias = Any`
   |

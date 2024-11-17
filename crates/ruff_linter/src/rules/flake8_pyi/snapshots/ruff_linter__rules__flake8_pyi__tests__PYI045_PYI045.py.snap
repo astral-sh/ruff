@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI045.py:12:27: PYI045 `__iter__` methods should return an `Iterator`, not an `Iterable`
    |
@@ -56,5 +57,3 @@ PYI045.py:84:28: PYI045 `__aiter__` methods should return an `AsyncIterator`, no
    |                            ^^^^^^^^^^^^^^^^^^^^ PYI045
 85 |         ...
    |
-
-

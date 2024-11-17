@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB168.py:5:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
   |
@@ -158,6 +159,4 @@ FURB168.py:27:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if 
    27 |+if foo is None:
 28 28 |     pass
 29 29 | 
-30 30 | 
-
-
+30 30 |

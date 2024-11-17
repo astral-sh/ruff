@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E714.py:2:8: E714 [*] Test for object identity should be `is not`
   |
@@ -54,5 +55,3 @@ E714.py:39:13: E714 [*] Test for object identity should be `is not`
 38 38 | assert [42, not foo] in bar
 39    |-assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
    39 |+assert re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is not None
-
-

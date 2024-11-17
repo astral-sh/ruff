@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 PD101.py:7:1: PD101 Using `series.nunique()` for checking that a series is constant is inefficient
   |
@@ -118,5 +119,3 @@ PD101.py:18:1: PD101 Using `series.nunique()` for checking that a series is cons
 19 | 
 20 | # No violation of this rule
    |
-
-

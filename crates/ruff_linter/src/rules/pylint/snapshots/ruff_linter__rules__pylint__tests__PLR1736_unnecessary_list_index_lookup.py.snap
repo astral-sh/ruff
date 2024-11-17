@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 unnecessary_list_index_lookup.py:7:6: PLR1736 [*] List index lookup in `enumerate()` loop
   |

@@ -183,10 +183,10 @@ fn run() -> anyhow::Result<ExitStatus> {
 
     let system = OsSystem::new(cwd.clone());
     let cli_configuration = args.to_configuration(&cwd);
-    let workspace_metadata = WorkspaceMetadata::from_path(
+    let workspace_metadata = WorkspaceMetadata::discover(
         system.current_directory(),
         &system,
-        Some(cli_configuration.clone()),
+        Some(&cli_configuration),
     )?;
 
     // TODO: Use the `program_settings` to compute the key for the database's persistent

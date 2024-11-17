@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
+snapshot_kind: text
 ---
 FAST001.py:17:22: FAST001 [*] FastAPI route with redundant `response_model` argument
    |

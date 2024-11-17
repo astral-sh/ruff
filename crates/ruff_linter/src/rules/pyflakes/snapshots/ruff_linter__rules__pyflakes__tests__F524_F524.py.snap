@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F524.py:1:1: F524 `.format` call is missing argument(s) for placeholder(s): 1
   |
@@ -64,5 +65,3 @@ F524.py:7:1: F524 `.format` call is missing argument(s) for placeholder(s): 8
 7 | "{1} {8}".format(0, 1)
   | ^^^^^^^^^^^^^^^^^^^^^^ F524
   |
-
-

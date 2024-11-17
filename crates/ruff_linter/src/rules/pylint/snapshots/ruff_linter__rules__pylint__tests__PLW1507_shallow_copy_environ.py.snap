@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 shallow_copy_environ.py:4:14: PLW1507 [*] Shallow copy of `os.environ` via `copy.copy(os.environ)`
   |

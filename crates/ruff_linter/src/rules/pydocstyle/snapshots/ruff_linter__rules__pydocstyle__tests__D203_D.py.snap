@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:161:5: D203 [*] 1 blank line required before class docstring
     |
@@ -117,5 +118,3 @@ D.py:658:5: D203 [*] 1 blank line required before class docstring
 658 659 |     "After this docstring there's a comment."  # priorities=1
 659 660 |     def sort_services(self):
 660 661 |         pass
-
-

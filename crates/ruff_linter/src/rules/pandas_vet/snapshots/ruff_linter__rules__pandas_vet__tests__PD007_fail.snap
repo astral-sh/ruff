@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 <filename>:4:5: PD007 `.ix` is deprecated; use more explicit `.loc` or `.iloc`
   |
@@ -8,5 +9,3 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 4 | y = x.ix[[0, 2], "A"]
   |     ^^^^^^^^^^^^^^^^^ PD007
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_envvar_default.py:3:29: PLW1508 Invalid type for environment variable default; expected `str` or `None`
   |
@@ -48,5 +49,3 @@ invalid_envvar_default.py:14:17: PLW1508 Invalid type for environment variable d
 14 | os.getenv("AA", 1 if Z else "BAR")  # [invalid-envvar-default]
    |                 ^^^^^^^^^^^^^^^^^ PLW1508
    |
-
-

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/blank_line_before_class_docstring.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -92,6 +93,3 @@ class DocstringWithComment4:
 
     """This is a docstring."""
 ```
-
-
-

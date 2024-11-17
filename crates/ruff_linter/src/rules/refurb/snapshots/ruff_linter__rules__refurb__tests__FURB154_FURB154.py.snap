@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB154.py:4:5: FURB154 [*] Use of repeated consecutive `global`
   |

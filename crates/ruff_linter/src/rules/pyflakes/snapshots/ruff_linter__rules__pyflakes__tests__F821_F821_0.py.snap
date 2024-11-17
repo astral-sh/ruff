@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_0.py:2:12: F821 Undefined name `self`
   |
@@ -113,5 +114,3 @@ F821_0.py:123:22: F821 Undefined name `bar`
 124 |         123,
 125 |     ]
     |
-
-

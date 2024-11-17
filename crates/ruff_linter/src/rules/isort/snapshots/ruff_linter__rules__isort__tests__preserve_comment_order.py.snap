@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 preserve_comment_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted
    |
@@ -29,5 +30,3 @@ preserve_comment_order.py:1:1: I001 [*] Import block is un-sorted or un-formatte
 9  11 | # EIEIO
 10 12 | from errno import EIO
 11    |-import abc
-
-

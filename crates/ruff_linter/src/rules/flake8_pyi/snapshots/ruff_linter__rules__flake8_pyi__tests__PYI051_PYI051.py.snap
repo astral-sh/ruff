@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI051.py:4:18: PYI051 `Literal["foo"]` is redundant in a union with `str`
   |
@@ -86,5 +87,3 @@ PYI051.py:9:53: PYI051 `Literal[3.14]` is redundant in a union with `float`
 10 | 
 11 | # OK
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B035.py:17:2: B035 Dictionary comprehension uses static key: `"key"`
    |
@@ -86,5 +87,3 @@ B035.py:25:2: B035 Dictionary comprehension uses static key: `tokens`
 25 | {tokens: token for token in tokens}
    |  ^^^^^^ B035
    |
-
-

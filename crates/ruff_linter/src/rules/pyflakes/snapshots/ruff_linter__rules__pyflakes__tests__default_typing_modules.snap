@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 typing_modules.py:6:36: F821 Undefined name `db`
   |
@@ -7,5 +8,3 @@ typing_modules.py:6:36: F821 Undefined name `db`
   |                                    ^^ F821
 7 | y = Optional["Class"]
   |
-
-

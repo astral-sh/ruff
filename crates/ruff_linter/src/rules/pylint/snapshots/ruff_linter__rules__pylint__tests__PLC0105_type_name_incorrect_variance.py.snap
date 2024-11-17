@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 type_name_incorrect_variance.py:5:5: PLC0105 `TypeVar` name "T" does not reflect its covariance; consider renaming it to "T_co"
   |
@@ -314,5 +315,3 @@ type_name_incorrect_variance.py:38:12: PLC0105 `ParamSpec` name "P_contra" does 
 39 | 
 40 | # Non-errors.
    |
-
-

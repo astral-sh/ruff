@@ -1,4 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 __init__.py:1:1: D104 Missing docstring in public package

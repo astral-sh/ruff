@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C403.py:1:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
   |
@@ -232,5 +233,3 @@ C403.py:21:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comp
 22 22 |     x for x in range(3)
 23    |-])
    23 |+}
-
-

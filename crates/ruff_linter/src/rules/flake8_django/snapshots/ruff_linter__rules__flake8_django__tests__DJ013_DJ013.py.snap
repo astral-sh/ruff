@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
+snapshot_kind: text
 ---
 DJ013.py:15:1: DJ013 `@receiver` decorator must be on top of all the other decorators
    |
@@ -19,5 +20,3 @@ DJ013.py:35:1: DJ013 `@receiver` decorator must be on top of all the other decor
 36 | def incorrect_multiple():
 37 |     pass
    |
-
-

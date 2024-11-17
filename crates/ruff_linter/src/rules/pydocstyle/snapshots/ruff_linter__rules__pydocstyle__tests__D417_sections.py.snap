@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 sections.py:292:9: D417 Missing argument description in the docstring for `bar`: `y`
     |
@@ -99,5 +100,3 @@ sections.py:498:9: D417 Missing argument description in the docstring for `test_
     |         ^^^^^^^^^^^^^^^^^^^^^ D417
 499 |         """Reproducing issue #437.
     |
-
-

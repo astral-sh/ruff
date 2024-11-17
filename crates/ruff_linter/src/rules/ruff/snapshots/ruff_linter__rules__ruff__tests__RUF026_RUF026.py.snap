@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF026.py:11:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
    |
@@ -264,6 +265,4 @@ RUF026.py:75:5: RUF026 [*] `default_factory` is a positional-only argument to `d
    76 |+        tuple, member=1,
 78 77 |     )  # RUF026
 79 78 | 
-80 79 | 
-
-
+80 79 |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
 ---
 ASYNC116.py:11:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
    |

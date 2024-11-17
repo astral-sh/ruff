@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 this_this.py:1:8: PLC0414 Required import does not rename original package.
   |

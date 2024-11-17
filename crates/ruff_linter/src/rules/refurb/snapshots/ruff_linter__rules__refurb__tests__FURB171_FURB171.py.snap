@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB171.py:3:4: FURB171 [*] Membership test against single-item container
   |
@@ -119,5 +120,3 @@ FURB171.py:18:8: FURB171 [*] Membership test against single-item container
 19 19 |     print("Check the negated membership test")
 20 20 | 
 21 21 | # Non-errors.
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT004.py:51:5: PT004 Fixture `patch_something` does not return anything, add leading underscore
    |
@@ -17,5 +18,3 @@ PT004.py:56:5: PT004 Fixture `activate_context` does not return anything, add le
 57 |     with context:
 58 |         yield
    |
-
-

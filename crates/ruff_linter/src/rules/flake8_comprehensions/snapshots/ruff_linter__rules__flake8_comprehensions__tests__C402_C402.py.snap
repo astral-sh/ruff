@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C402.py:1:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
   |
@@ -265,5 +266,3 @@ C402.py:21:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
 22 22 | 
 23 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458940
 24 24 | dict((*v, k) for k, v in enumerate(calendar.month_abbr))
-
-

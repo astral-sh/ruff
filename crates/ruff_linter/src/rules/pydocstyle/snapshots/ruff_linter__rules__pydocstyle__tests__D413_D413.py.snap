@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D413.py:7:1: D413 [*] Missing blank line after last section ("Returns")
   |

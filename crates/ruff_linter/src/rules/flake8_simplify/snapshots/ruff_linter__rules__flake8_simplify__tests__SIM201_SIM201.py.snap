@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM201.py:2:4: SIM201 [*] Use `a != b` instead of `not a == b`
   |
@@ -55,5 +56,3 @@ SIM201.py:10:4: SIM201 [*] Use `a + b != c` instead of `not a + b == c`
 11 11 |     pass
 12 12 | 
 13 13 | # OK
-
-

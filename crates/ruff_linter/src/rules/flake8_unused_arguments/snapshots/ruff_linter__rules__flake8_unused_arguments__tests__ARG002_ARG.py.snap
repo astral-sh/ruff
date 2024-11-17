@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
+snapshot_kind: text
 ---
 ARG.py:37:17: ARG002 Unused method argument: `x`
    |

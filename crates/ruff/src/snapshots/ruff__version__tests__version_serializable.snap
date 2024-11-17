@@ -1,6 +1,7 @@
 ---
 source: crates/ruff/src/version.rs
 expression: version
+snapshot_kind: text
 ---
 {
   "version": "0.0.0",

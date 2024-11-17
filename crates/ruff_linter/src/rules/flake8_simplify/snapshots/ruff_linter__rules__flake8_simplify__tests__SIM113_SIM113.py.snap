@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM113.py:6:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
   |
@@ -43,5 +44,3 @@ SIM113.py:44:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
    |         ^^^^^^^^ SIM113
 45 |         h(x)
    |
-
-

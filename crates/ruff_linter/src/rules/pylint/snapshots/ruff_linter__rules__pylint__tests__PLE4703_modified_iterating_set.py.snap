@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is modified within the `for` loop
   |

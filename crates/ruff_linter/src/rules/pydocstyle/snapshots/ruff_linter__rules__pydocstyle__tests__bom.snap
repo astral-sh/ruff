@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 bom.py:1:1: D300 [*] Use triple double quotes `"""`
   |
@@ -11,5 +12,3 @@ bom.py:1:1: D300 [*] Use triple double quotes `"""`
 ℹ Safe fix
 1   |-﻿''' SAM macro definitions '''
   1 |+﻿""" SAM macro definitions """
-
-

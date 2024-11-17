@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 sections.py:159:9: D215 [*] Section underline is over-indented ("Returns")
     |

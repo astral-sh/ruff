@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB142.py:5:1: FURB142 [*] Use of `set.add()` in a for loop
   |

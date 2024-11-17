@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
+snapshot_kind: text
 ---
 PIE807.py:3:44: PIE807 [*] Prefer `list` over useless lambda
   |
@@ -114,5 +115,3 @@ PIE807.py:14:36: PIE807 [*] Prefer `dict` over useless lambda
 15 15 | 
 16 16 | 
 17 17 | @dataclass
-
-

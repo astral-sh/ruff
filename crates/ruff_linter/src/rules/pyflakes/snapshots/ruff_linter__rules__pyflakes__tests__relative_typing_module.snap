@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 bar.py:26:17: F821 Undefined name `foo`
    |
@@ -7,5 +8,3 @@ bar.py:26:17: F821 Undefined name `foo`
 26 |     x: Literal["foo"]
    |                 ^^^ F821
    |
-
-

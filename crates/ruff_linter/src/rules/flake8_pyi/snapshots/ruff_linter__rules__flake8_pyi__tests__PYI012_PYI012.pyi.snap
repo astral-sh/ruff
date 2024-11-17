@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI012.pyi:5:5: PYI012 [*] Class body must not contain `pass`
   |
@@ -116,5 +117,3 @@ PYI012.pyi:28:5: PYI012 [*] Class body must not contain `pass`
 29 28 | 
 30 29 |     def __init__():
 31 30 |         pass
-
-

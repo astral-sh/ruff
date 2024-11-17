@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/module.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -29,6 +30,3 @@ print("still in range")
 
 print("After range end"  )
 ```
-
-
-

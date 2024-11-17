@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM401.py:6:1: SIM401 [*] Use `var = a_dict.get(key, "default1")` instead of an `if` block
    |
@@ -198,5 +199,3 @@ SIM401.py:126:7: SIM401 [*] Use `a_dict.get(key, "default-1")` instead of an `if
 127 127 | 
 128 128 | # OK (default contains effect)
 129 129 | var = a_dict[key] if key in a_dict else val1 + val2
-
-

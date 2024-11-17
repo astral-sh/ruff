@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
    |

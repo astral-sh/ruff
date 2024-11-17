@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
 ---
 AIR001.py:11:1: AIR001 Task variable name should match the `task_id`: "my_task"
    |
@@ -18,5 +19,3 @@ AIR001.py:12:1: AIR001 Task variable name should match the `task_id`: "my_task_2
 13 | 
 14 | from my_module import MyClass
    |
-
-

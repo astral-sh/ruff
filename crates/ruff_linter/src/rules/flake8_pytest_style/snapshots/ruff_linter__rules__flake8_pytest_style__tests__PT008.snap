@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT008.py:35:1: PT008 Use `return_value=` instead of patching with `lambda`
    |
@@ -112,5 +113,3 @@ PT008.py:48:1: PT008 Use `return_value=` instead of patching with `lambda`
 48 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
    |
-
-

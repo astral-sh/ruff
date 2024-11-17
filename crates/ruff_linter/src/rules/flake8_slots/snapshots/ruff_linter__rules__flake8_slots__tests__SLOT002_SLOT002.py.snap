@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_slots/mod.rs
+snapshot_kind: text
 ---
 SLOT002.py:6:7: SLOT002 Subclasses of `collections.namedtuple()` should define `__slots__`
   |

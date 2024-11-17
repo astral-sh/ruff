@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E70.py:2:5: E701 Multiple statements on one line (colon)
   |
@@ -139,5 +140,3 @@ E70.py:59:12: E701 Multiple statements on one line (colon)
 60 | #:
 61 | class Foo:
    |
-
-

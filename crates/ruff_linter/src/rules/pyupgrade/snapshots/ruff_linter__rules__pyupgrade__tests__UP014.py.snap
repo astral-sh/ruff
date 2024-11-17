@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
   |
@@ -108,5 +109,3 @@ UP014.py:20:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class 
 21 23 | 
 22 24 | # unfixable
 23 25 | MyType = typing.NamedTuple("MyType", [("a", int)], [("b", str)])
-
-

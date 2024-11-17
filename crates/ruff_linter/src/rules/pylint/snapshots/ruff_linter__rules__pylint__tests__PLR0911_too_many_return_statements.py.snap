@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 too_many_return_statements.py:4:5: PLR0911 Too many return statements (11 > 6)
   |
@@ -10,5 +11,3 @@ too_many_return_statements.py:4:5: PLR0911 Too many return statements (11 > 6)
 5 |     if arg == 1:
 6 |         return 1
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
+snapshot_kind: text
 ---
 NPY001.py:6:1: NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
   |

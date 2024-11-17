@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E21.py:2:5: E211 [*] Whitespace before '('
   |
@@ -141,5 +142,3 @@ E21.py:27:27: E211 [*] Whitespace before '('
 28 28 |         if sys.argv[i] == "--name" :
 29 29 |             return sys.argv[i + 1]
 30 30 |     return None
-
-

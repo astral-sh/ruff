@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+snapshot_kind: text
 ---
 singles_escaped_unnecessary.py:1:26: Q004 [*] Unnecessary escape on inner quote character
   |

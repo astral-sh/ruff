@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI042.py:10:1: PYI042 Type alias `just_literals_pipe_union` should be CamelCase
    |
@@ -36,5 +37,3 @@ PYI042.py:27:6: PYI042 Type alias `foo_bar` should be CamelCase
    |      ^^^^^^^ PYI042
 28 | type FooBar = int | str
    |
-
-

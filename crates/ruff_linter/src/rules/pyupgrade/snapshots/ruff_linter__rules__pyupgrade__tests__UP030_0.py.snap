@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
   |
@@ -499,5 +500,3 @@ UP030_0.py:61:1: UP030 [*] Use implicit references for positional format fields
 60 60 | 
 61    |-"{1}_{0}".format(1, 2)
    61 |+"{}_{}".format(2, 1)
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+snapshot_kind: text
 ---
 ISC.py:1:5: ISC001 [*] Implicitly concatenated string literals on one line
   |

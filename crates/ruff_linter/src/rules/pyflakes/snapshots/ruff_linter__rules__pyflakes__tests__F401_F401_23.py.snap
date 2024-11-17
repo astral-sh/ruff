@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F401_23.py:4:16: F401 [*] `re.RegexFlag` imported but unused
   |

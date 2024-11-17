@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D401.py:10:5: D401 First line of docstring should be in imperative mood: "Returns foo."
    |
@@ -63,5 +64,3 @@ D401.py:74:9: D401 First line of docstring should be in imperative mood: "This m
 75 | 
 76 |     @property
    |
-
-

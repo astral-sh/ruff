@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type annotation
    |
@@ -71,5 +72,3 @@ future_annotations.py:42:38: UP006 [*] Use `list` instead of `List` for type ann
 41 41 | 
 42    |-MyList: TypeAlias = Union[List[int], List[str]]
    42 |+MyList: TypeAlias = Union[List[int], list[str]]
-
-

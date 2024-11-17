@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N802.py:6:5: N802 Function name `stillBad` should be lowercase
   |
@@ -18,5 +19,3 @@ N802.py:13:9: N802 Function name `stillBad` should be lowercase
    |         ^^^^^^^^ N802
 14 |         return super().tearDown()
    |
-
-

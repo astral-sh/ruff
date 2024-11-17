@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+snapshot_kind: text
 ---
 A001.py:1:16: A001 Variable `sum` is shadowing a Python builtin
   |
@@ -183,5 +184,3 @@ A001.py:30:8: A001 Variable `sum` is shadowing a Python builtin
 30 | [0 for sum in ()]
    |        ^^^ A001
    |
-
-

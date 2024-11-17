@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 load_before_global_declaration.py:5:11: PLE0118 Name `x` is used prior to global declaration on line 7
   |
@@ -123,5 +124,3 @@ load_before_global_declaration.py:113:14: PLE0118 Name `x` is used prior to glob
     |              ^ PLE0118
 114 |     global x
     |
-
-

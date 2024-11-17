@@ -210,7 +210,15 @@ impl Debouncer {
         }
 
         let kind = event.kind;
-        let path = match SystemPathBuf::from_path_buf(event.paths.into_iter().next().unwrap()) {
+
+        // There are cases where paths can be empty.
+        // https://github.com/astral-sh/ruff/issues/14222
+        let Some(path) = event.paths.into_iter().next() else {
+            tracing::debug!("Ignoring change event with kind '{kind:?}' without a path",);
+            return;
+        };
+
+        let path = match SystemPathBuf::from_path_buf(path) {
             Ok(path) => path,
             Err(path) => {
                 tracing::debug!(

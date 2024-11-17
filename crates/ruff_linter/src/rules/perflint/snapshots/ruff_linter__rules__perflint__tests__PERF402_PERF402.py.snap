@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
+snapshot_kind: text
 ---
 PERF402.py:5:9: PERF402 Use `list` or `list.copy` to create a copy of a list
   |
@@ -8,5 +9,3 @@ PERF402.py:5:9: PERF402 Use `list` or `list.copy` to create a copy of a list
 5 |         result.append(i)  # PERF402
   |         ^^^^^^^^^^^^^^^^ PERF402
   |
-
-

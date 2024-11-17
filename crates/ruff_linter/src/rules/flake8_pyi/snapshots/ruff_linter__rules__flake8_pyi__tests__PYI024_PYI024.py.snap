@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI024.py:3:9: PYI024 Use `typing.NamedTuple` instead of `collections.namedtuple`
   |
@@ -33,5 +34,3 @@ PYI024.py:9:10: PYI024 Use `typing.NamedTuple` instead of `collections.namedtupl
 11 | )  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
    |
    = help: Replace with `typing.NamedTuple`
-
-

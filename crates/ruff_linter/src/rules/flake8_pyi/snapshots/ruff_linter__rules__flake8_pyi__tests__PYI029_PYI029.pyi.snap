@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI029.pyi:10:9: PYI029 [*] Defining `__str__` in a stub is almost always redundant
    |
@@ -58,5 +59,3 @@ PYI029.pyi:14:9: PYI029 [*] Defining `__str__` in a stub is almost always redund
 15 14 | 
 16 15 | class NoReturnSpecified:
 17 16 |     def __str__(self): ...
-
-

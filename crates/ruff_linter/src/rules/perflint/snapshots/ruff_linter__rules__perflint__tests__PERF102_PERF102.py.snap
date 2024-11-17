@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
+snapshot_kind: text
 ---
 PERF102.py:5:21: PERF102 [*] When using only the values of a dict use the `values()` method
   |
@@ -227,5 +228,3 @@ PERF102.py:106:16: PERF102 [*] When using only the keys of a dict use the `keys(
 106     |-    for(B,D)in A.items():
     106 |+    for B in A.keys():
 107 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
-
-

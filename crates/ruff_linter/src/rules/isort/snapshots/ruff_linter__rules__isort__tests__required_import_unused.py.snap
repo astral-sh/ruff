@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 unused.py:5:8: F401 [*] `sys` imported but unused
   |

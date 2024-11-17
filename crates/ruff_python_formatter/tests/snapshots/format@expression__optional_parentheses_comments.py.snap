@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/optional_parentheses_comments.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -419,6 +420,3 @@ def test6():
     # 89 characters parenthesized (collapse)
     return aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvv  # c
 ```
-
-
-

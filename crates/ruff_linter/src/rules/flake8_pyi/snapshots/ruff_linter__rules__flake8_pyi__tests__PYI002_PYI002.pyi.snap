@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI002.pyi:3:4: PYI002 `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
   |
@@ -36,5 +37,3 @@ PYI002.pyi:6:4: PYI002 `if` test must be a simple comparison against `sys.platfo
 6 | if sys.maxsize == 42: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
   |    ^^^^^^^^^^^^^^^^^ PYI002
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+snapshot_kind: text
 ---
 RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
   |

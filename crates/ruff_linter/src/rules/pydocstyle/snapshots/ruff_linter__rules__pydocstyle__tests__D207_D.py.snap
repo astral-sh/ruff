@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:232:1: D207 [*] Docstring is under-indented
     |
@@ -78,5 +79,3 @@ D.py:441:1: D207 [*] Docstring is under-indented
 442 442 | 
 443 443 | 
 444 444 | def function_with_lambda_arg(x=lambda y: y):
-
-

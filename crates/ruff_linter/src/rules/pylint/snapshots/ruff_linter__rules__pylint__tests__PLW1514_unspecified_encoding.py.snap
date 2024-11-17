@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 unspecified_encoding.py:8:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |

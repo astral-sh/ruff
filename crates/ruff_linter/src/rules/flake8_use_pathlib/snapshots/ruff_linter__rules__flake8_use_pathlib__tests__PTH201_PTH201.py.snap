@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+snapshot_kind: text
 ---
 PTH201.py:5:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |
@@ -82,5 +83,3 @@ PTH201.py:8:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 9 9 | 
 10 10 | # no match
 11 11 | _ = Path()
-
-

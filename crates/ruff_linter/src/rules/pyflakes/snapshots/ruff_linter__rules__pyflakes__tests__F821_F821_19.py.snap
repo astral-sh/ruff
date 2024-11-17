@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_19.py:21:7: F821 Undefined name `y`
    |
@@ -8,5 +9,3 @@ F821_19.py:21:7: F821 Undefined name `y`
 21 | print(y)
    |       ^ F821
    |
-
-

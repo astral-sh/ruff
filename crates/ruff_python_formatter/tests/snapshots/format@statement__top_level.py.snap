@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/top_level.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -102,6 +103,3 @@ def quux():
 def quuz():
     """Some docstring."""
 ```
-
-
-

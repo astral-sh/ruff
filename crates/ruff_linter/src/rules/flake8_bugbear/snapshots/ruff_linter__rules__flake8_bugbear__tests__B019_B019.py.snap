@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B019.py:78:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_fixme/mod.rs
+snapshot_kind: text
 ---
 T00.py:5:3: FIX004 Line contains HACK, consider resolving the issue
   |
@@ -20,5 +21,3 @@ T00.py:6:3: FIX004 Line contains HACK, consider resolving the issue
 7 | # FIXME: fixme
 8 | # fixme: fixme
   |
-
-

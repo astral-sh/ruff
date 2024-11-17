@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 boolean_chained_comparison.py:8:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+snapshot_kind: text
 ---
 ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |

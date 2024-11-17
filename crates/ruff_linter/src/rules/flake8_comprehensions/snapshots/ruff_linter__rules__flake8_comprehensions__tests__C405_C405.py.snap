@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C405.py:1:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
   |
@@ -409,5 +410,3 @@ C405.py:26:25: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
 25 25 | f"a {set(['a', 'b']) - set(['a'])} b"
 26    |-f"a { set(['a', 'b']) - set(['a']) } b"
    26 |+f"a { set(['a', 'b']) - {'a'} } b"
-
-

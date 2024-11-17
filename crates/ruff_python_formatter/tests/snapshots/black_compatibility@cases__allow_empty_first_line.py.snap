@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/allow_empty_first_line.py
+snapshot_kind: text
 ---
 ## Input
 

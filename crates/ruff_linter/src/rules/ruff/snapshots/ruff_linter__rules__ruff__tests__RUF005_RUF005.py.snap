@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF005.py:4:1: RUF005 Consider `[*foo]` instead of concatenation
   |
@@ -353,5 +354,3 @@ RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
 62 62 | 
 63 63 | ###
 64 64 | # Non-errors.
-
-

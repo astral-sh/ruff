@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
   |
@@ -238,5 +239,3 @@ F841_0.py:127:21: F841 Local variable `value` is assigned to but never used
 128 |         print(key)
     |
     = help: Remove assignment to unused variable `value`
-
-

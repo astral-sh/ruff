@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E30_syntax_error.py:4:15: SyntaxError: Expected ']', found '('
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 bad_staticmethod_argument.py:3:13: PLW0211 First argument of a static method should not be named `self`
   |

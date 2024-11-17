@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT006.py:9:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
    |

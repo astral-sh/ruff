@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF008_attrs.py:13:34: RUF008 Do not use mutable default values for dataclass attributes
    |

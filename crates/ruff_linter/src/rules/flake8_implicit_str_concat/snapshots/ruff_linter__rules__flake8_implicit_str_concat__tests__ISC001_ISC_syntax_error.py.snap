@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+snapshot_kind: text
 ---
 ISC_syntax_error.py:2:5: SyntaxError: missing closing quote in string literal
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB101.py:12:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |

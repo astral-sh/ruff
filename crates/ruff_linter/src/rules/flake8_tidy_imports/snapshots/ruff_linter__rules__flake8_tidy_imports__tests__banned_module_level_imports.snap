@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+snapshot_kind: text
 ---
 TID253.py:2:8: TID253 `torch` is banned at the module level
   |
@@ -77,5 +78,3 @@ TID253.py:18:1: TID253 `torch` is banned at the module level
 19 | 
 20 | # unlike TID251, inline imports are *not* banned
    |
-
-

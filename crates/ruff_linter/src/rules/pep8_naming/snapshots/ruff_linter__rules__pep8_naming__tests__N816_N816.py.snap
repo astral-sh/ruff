@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N816.py:7:1: N816 Variable `mixedCase` in global scope should not be mixedCase
   |
@@ -30,5 +31,3 @@ N816.py:9:1: N816 Variable `mixed_Case` in global scope should not be mixedCase
 10 | myObj1 = collections.namedtuple("MyObj1", ["a", "b"])
 11 | myObj2 = namedtuple("MyObj2", ["a", "b"])
    |
-
-

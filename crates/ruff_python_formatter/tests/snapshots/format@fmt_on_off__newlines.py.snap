@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/newlines.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -85,6 +86,3 @@ def func():
 def func():
     pass
 ```
-
-
-

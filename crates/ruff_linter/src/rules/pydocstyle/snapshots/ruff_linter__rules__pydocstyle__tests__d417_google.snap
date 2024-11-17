@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D417.py:1:5: D417 Missing argument descriptions in the docstring for `f`: `y`, `z`
   |
@@ -71,5 +72,3 @@ D417.py:155:5: D417 Missing argument description in the docstring for `select_da
 156 |     query: str,
 157 |     args: tuple,
     |
-
-

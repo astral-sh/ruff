@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B032.py:9:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
@@ -74,5 +75,3 @@ B032.py:19:1: B032 Possible unintentional type annotation (using `:`). Did you m
 20 | 
 21 | # Do not flag below
    |
-
-

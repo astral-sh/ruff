@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 dict_iter_missing_items.py:13:13: PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |

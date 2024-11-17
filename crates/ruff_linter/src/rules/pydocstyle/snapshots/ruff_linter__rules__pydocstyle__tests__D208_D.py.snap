@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:252:1: D208 [*] Docstring is over-indented
     |
@@ -428,5 +429,3 @@ D.py:723:1: D208 [*] Docstring is over-indented
 723     |-       Returns:
     723 |+    Returns:
 724 724 |     """
-
-

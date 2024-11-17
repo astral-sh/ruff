@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E501.py:5:89: E501 Line too long (123 > 88)
   |
@@ -55,5 +56,3 @@ E501.py:83:89: E501 Line too long (147 > 88)
    |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
 84 |     """
    |
-
-

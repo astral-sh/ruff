@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 length_sort_non_ascii_members.py:1:1: I001 [*] Import block is un-sorted or un-formatted
    |
@@ -33,5 +34,3 @@ length_sort_non_ascii_members.py:1:1: I001 [*] Import block is un-sorted or un-f
 10 9  |     λοοοοοοοοοοοοοονγ,
    10 |+    looooooooooooooong,
 11 11 | )
-
-

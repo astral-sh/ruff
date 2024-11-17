@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 redefined_argument_from_local.py:41:9: PLR1704 Redefining argument with the local name `a`
    |

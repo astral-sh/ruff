@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_all_object.py:1:1: PLE0604 Invalid object in `__all__`, must contain only strings
   |
@@ -16,5 +17,3 @@ invalid_all_object.py:7:1: PLE0604 Invalid object in `__all__`, must contain onl
 7 | __all__ = list([None, "Fruit", "Worm"])  # [invalid-all-object]
   | ^^^^^^^ PLE0604
   |
-
-

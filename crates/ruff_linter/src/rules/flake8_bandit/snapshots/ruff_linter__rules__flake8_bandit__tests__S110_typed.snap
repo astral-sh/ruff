@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S110.py:3:1: S110 `try`-`except`-`pass` detected, consider logging the exception
   |
@@ -31,5 +32,3 @@ S110.py:13:1: S110 `try`-`except`-`pass` detected, consider logging the exceptio
 14 | |     pass
    | |________^ S110
    |
-
-

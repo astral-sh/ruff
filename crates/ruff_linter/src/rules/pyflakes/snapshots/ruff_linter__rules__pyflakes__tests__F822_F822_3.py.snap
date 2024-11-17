@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F822_3.py:12:5: F822 Undefined name `ExponentialFamily` in `__all__`
    |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI033.pyi:6:22: PYI033 Don't use type comments in stub file
   |
@@ -102,5 +103,3 @@ PYI033.pyi:32:26: PYI033 Don't use type comments in stub file
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
 33 |     # This whole line is commented out and indented # type: str
    |
-
-

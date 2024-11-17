@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C415.py:2:5: C415 Unnecessary subscript reversal of iterable within `set()`
   |
@@ -39,5 +40,3 @@ C415.py:5:5: C415 Unnecessary subscript reversal of iterable within `sorted()`
 6 | e = set(lst[2:-1])
 7 | f = set(lst[:1:-1])
   |
-
-

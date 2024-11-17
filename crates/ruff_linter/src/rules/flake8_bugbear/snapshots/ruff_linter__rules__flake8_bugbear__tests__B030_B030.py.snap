@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B030.py:12:8: B030 `except` handlers should only be exception classes or tuples of exception classes
    |

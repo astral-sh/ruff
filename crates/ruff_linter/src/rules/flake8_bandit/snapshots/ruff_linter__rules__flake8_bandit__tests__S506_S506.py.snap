@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S506.py:10:9: S506 Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`.
    |
@@ -18,5 +19,3 @@ S506.py:24:24: S506 Probable use of unsafe loader `Loader` with `yaml.load`. All
 25 | 
 26 | # no issue should be found
    |
-
-

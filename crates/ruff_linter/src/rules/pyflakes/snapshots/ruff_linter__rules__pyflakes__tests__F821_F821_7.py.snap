@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_7.py:11:22: F821 Undefined name `Undefined`
    |
@@ -26,5 +27,3 @@ F821_7.py:13:22: F821 Undefined name `Undefined`
 13 | _ = DefaultNamedArg("Undefined", "some_prop_name")
    |                      ^^^^^^^^^ F821
    |
-
-

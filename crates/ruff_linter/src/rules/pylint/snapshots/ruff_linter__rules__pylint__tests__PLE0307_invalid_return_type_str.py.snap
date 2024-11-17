@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_return_type_str.py:6:16: PLE0307 `__str__` does not return `str`
   |

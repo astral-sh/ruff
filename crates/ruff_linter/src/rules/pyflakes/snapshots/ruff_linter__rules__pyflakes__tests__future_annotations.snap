@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 future_annotations.py:8:5: F401 [*] `models.Nut` imported but unused
   |
@@ -27,5 +28,3 @@ future_annotations.py:26:19: F821 Undefined name `Bar`
    |                   ^^^ F821
 27 |         return cls(x=0, y=0)
    |
-
-

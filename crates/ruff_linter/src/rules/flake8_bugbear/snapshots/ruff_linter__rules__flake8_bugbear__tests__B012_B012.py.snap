@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B012.py:5:9: B012 `return` inside `finally` blocks cause exceptions to be silenced
   |
@@ -100,5 +101,3 @@ B012.py:118:17: B012 `break` inside `finally` blocks cause exceptions to be sile
 118 |                 break  # warning
     |                 ^^^^^ B012
     |
-
-

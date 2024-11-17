@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 assert_on_string_literal.py:3:12: PLW0129 Asserting on a non-empty string literal will always pass
   |
@@ -95,5 +96,3 @@ assert_on_string_literal.py:23:8: PLW0129 Asserting on a non-empty string litera
    |        ^^^^^^^^^^^^^ PLW0129
 24 | assert 12, "ok here"
    |
-
-

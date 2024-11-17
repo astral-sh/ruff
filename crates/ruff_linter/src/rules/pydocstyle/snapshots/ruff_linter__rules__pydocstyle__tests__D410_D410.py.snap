@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D410.py:4:5: D410 [*] Missing blank line after section ("Parameters")
   |

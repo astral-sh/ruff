@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
    |
@@ -35,5 +36,3 @@ B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), 
 9  9  | assert 1 != 2, "message"
 10    |-assert False, "message"
    10 |+raise AssertionError("message")
-
-

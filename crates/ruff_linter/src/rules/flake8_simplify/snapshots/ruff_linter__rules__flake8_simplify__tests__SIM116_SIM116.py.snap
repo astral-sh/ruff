@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM116.py:5:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
@@ -108,5 +109,3 @@ SIM116.py:79:1: SIM116 Use a dictionary instead of consecutive `if` statements
 87 |   
 88 |   # OK
    |
-
-

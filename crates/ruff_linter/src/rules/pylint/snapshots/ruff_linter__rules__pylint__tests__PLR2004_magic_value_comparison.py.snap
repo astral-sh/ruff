@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 magic_value_comparison.py:5:4: PLR2004 Magic value used in comparison, consider replacing `10` with a constant variable
   |
@@ -72,5 +73,3 @@ magic_value_comparison.py:86:21: PLR2004 Magic value used in comparison, conside
    |                     ^^^ PLR2004
 87 |     pass
    |
-
-

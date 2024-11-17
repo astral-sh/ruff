@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 nan_comparison.py:11:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
    |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP036_4.py:4:8: UP036 [*] Version block is outdated for minimum Python version
   |
@@ -169,5 +170,3 @@ UP036_4.py:42:8: UP036 [*] Version block is outdated for minimum Python version
 44    |-    elif foo:
    42 |+    if foo:
 45 43 |         cmd = [sys.executable, "-m", "test", "-j0"]
-
-

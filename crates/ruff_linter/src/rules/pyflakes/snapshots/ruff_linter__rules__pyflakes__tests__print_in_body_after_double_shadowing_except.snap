@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 <filename>:7:26: F841 [*] Local variable `x` is assigned to but never used
   |
@@ -41,5 +42,3 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 10 10 |         pass
 11 11 | 
 12 12 |     # No error here, though it should arguably be an F821 error. `x` will
-
-

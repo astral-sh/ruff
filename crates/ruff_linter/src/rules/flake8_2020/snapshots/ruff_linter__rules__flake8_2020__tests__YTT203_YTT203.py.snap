@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+snapshot_kind: text
 ---
 YTT203.py:4:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
   |
@@ -16,5 +17,3 @@ YTT203.py:5:1: YTT203 `sys.version_info[1]` compared to integer (python4), compa
 5 | version_info[1] < 6
   | ^^^^^^^^^^^^^^^ YTT203
   |
-
-

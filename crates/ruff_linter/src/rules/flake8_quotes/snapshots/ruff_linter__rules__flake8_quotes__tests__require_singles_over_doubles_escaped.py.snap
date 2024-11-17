@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+snapshot_kind: text
 ---
 doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
   |
@@ -252,5 +253,3 @@ doubles_escaped.py:41:1: Q003 [*] Change outer quotes to avoid escaping inner qu
 40 40 | f'\'normal\' {f'\'nested\' {'other'} normal'} "double quotes"'  # Q003
 41    |-f'\'normal\' {f'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
    41 |+f"'normal' {f'\'nested\' {'other'} "double quotes"'} normal"  # Q00l
-
-

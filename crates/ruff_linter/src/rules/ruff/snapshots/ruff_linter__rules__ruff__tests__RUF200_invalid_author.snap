@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 pyproject.toml:6:84: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
   |
@@ -9,5 +10,3 @@ pyproject.toml:6:84: RUF200 Failed to parse pyproject.toml: invalid type: intege
   |                               ^ RUF200
 7 | ]
   |
-
-

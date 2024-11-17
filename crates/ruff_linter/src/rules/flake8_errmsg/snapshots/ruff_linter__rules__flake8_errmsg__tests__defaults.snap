@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_errmsg/mod.rs
+snapshot_kind: text
 ---
 EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variable first
   |
@@ -346,5 +347,3 @@ EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    91 |+    raise RuntimeError(
    92 |+        msg
    93 |+    )
-
-

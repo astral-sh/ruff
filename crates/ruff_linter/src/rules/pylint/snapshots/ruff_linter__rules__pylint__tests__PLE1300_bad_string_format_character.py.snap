@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 bad_string_format_character.py:5:1: PLE1300 Unsupported format character 'z'
   |
@@ -60,5 +61,3 @@ bad_string_format_character.py:19:1: PLE1300 Unsupported format character 'y'
 20 | "{0:.{prec}g}".format(1.23, prec=15)  # OK (cannot validate after nested placeholder)
 21 | "{0:.{foo}{bar}{foobar}y}".format(...)  # OK (cannot validate after nested placeholders)
    |
-
-

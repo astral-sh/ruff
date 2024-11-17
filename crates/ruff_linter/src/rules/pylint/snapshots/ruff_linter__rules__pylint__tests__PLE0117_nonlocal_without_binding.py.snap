@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 nonlocal_without_binding.py:5:14: PLE0117 Nonlocal name `x` found without binding
   |
@@ -21,5 +22,3 @@ nonlocal_without_binding.py:19:18: PLE0117 Nonlocal name `y` found without bindi
 19 |         nonlocal y
    |                  ^ PLE0117
    |
-
-

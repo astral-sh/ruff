@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 useless_with_lock.py:5:6: PLW2101 Threading lock directly created in `with` statement has no effect
   |
@@ -97,5 +98,3 @@ useless_with_lock.py:35:6: PLW2101 Threading lock directly created in `with` sta
    |      ^^^^^^^^^^^^^^^^^^ PLW2101
 36 |     ...
    |
-
-

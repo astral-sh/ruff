@@ -26,7 +26,6 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
-salsa = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
@@ -39,7 +38,6 @@ serde = [
   "dep:ruff_cache",
   "compact_str/serde",
 ]
-salsa = ["dep:salsa"]
 
 [lints]
 workspace = true

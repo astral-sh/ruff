@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_hug_parens_with_braces_and_square_brackets_no_ll1.py
+snapshot_kind: text
 ---
 ## Input
 

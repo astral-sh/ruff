@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B039_extended.py:7:26: B039 Do not use mutable data structures for `ContextVar` defaults
   |

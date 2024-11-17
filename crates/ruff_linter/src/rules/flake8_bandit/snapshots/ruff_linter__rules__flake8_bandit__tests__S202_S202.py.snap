@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S202.py:8:5: S202 Uses of `tarfile.extractall()`
   |
@@ -45,5 +46,3 @@ S202.py:38:5: S202 Uses of `tarfile.extractall()`
    |     ^^^^^^^^^^^^^^^^^^ S202
 39 |     tar.close()
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+snapshot_kind: text
 ---
 <filename>:3:13: PD004 `.notna` is preferred to `.notnull`; functionality is equivalent
   |
@@ -7,5 +8,3 @@ source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
 3 | not_nulls = pd.notnull(val)
   |             ^^^^^^^^^^ PD004
   |
-
-

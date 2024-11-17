@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 too_many_boolean_expressions.py:11:6: PLR0916 Too many Boolean expressions (6 > 5)
    |
@@ -210,5 +211,3 @@ too_many_boolean_expressions.py:51:6: PLR0916 Too many Boolean expressions (26 >
 52 |     ...
 53 | else:
    |
-
-

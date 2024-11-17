@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+snapshot_kind: text
 ---
 TRY004.py:12:9: TRY004 Prefer `TypeError` exception for invalid type
    |
@@ -295,5 +296,3 @@ TRY004.py:316:9: TRY004 Prefer `TypeError` exception for invalid type
 316 |         raise Exception(f"Unknown object type: {obj.__class__.__name__}")
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
-
-

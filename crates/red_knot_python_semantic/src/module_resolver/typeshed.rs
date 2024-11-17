@@ -459,11 +459,11 @@ foo: 3.8-   # trailing comment
 ";
         let parsed_versions = TypeshedVersions::from_str(VERSIONS).unwrap();
         assert_eq!(parsed_versions.len(), 3);
-        assert_snapshot!(parsed_versions.to_string(), @r###"
+        assert_snapshot!(parsed_versions.to_string(), @r"
         bar: 2.7-3.10
         bar.baz: 3.1-3.9
         foo: 3.8-
-        "###
+        "
         );
     }
 

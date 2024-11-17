@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/linter.rs
+snapshot_kind: text
 ---
 isort.ipynb:cell 1:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -85,5 +86,3 @@ isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
    15 |+import abc
 15 16 | import math
 16    |-import abc
-
-

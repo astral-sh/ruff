@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB166.py:3:5: FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
   |

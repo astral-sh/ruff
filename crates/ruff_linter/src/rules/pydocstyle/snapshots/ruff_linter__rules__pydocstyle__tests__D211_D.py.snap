@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:170:5: D211 [*] No blank lines allowed before class docstring
     |
@@ -36,6 +37,4 @@ D.py:181:5: D211 [*] No blank lines allowed before class docstring
 180     |-
 181 180 |     """TrailingSpace."""
 182 181 |     pass
-183 182 | 
-
-
+183 182 |

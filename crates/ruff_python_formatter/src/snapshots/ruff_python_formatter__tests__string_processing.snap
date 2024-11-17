@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/src/lib.rs
 expression: "output.print().expect(\"Printing to succeed\").as_code()"
+snapshot_kind: text
 ---
 "aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h"
 (

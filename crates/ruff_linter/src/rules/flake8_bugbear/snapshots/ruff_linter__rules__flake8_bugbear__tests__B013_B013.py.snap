@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B013.py:5:8: B013 [*] A length-one tuple literal is redundant in exception handlers
   |

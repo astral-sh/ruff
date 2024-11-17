@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
 ---
 ASYNC22x.py:8:5: ASYNC221 Async functions should not run processes with blocking methods
   |

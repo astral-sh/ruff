@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+snapshot_kind: text
 ---
 C408.py:1:5: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
   |
@@ -139,5 +140,3 @@ C408.py:28:1: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
 28    |-tuple(  # comment
    28 |+(  # comment
 29 29 | )
-
-

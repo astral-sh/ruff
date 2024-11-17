@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_envvar_value.py:3:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
   |
@@ -50,5 +51,3 @@ invalid_envvar_value.py:14:11: PLE1507 Invalid type for initial `os.getenv` argu
 15 | 
 16 | AA = "aa"
    |
-
-

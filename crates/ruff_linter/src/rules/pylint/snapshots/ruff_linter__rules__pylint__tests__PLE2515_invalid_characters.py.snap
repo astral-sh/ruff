@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_characters.py:44:13: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |

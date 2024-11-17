@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E703.ipynb:5:2: E703 [*] Statement ends with an unnecessary semicolon
   |
@@ -42,5 +43,3 @@ E703.ipynb:9:6: E703 [*] Statement ends with an unnecessary semicolon
 10 10 | # Semicolons with multiple expressions
 11 11 | x; x;
 12 12 | # Comments, newlines and whitespace
-
-

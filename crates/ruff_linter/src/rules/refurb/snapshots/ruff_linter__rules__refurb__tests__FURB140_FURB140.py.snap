@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB140.py:7:1: FURB140 [*] Use `itertools.starmap` instead of the generator
   |
@@ -193,6 +194,4 @@ FURB140.py:31:1: FURB140 [*] Use `itertools.starmap` instead of the generator
    31 |+set(sm(foo, [(85, 60), (100, 80)]))
 32 32 | 
 33 33 | # Non-errors.
-34 34 | 
-
-
+34 34 |

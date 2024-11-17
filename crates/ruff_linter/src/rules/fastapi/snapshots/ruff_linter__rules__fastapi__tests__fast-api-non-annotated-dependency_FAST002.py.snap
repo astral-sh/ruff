@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
+snapshot_kind: text
 ---
 FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
    |

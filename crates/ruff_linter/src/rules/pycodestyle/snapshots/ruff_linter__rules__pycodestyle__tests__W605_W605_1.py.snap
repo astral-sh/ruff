@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 W605_1.py:4:11: W605 [*] Invalid escape sequence: `\.`
   |

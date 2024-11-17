@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 type_param_name_mismatch.py:5:5: PLC0132 `TypeVar` name `T` does not match assigned variable name `X`
   |
@@ -72,5 +73,3 @@ type_param_name_mismatch.py:15:6: PLC0132 `TypeVarTuple` name `Ts` does not matc
 16 | 
 17 | # Non-errors.
    |
-
-

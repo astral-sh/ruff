@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 sphinx.py:13:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
    |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+snapshot_kind: text
 ---
 doubles_all.py:5:30: Q001 [*] Double quote multiline found but single quotes preferred
   |

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP027.py:2:17: UP027 [*] Replace unpacked list comprehension with a generator expression
   |

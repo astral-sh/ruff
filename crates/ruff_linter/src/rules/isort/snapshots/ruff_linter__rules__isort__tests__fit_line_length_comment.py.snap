@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 fit_line_length_comment.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -32,5 +33,3 @@ fit_line_length_comment.py:1:1: I001 [*] Import block is un-sorted or un-formatt
    13 |+from h import (
    14 |+    i,  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9
    15 |+)
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:34:9: D418 Function decorated with `@overload` shouldn't contain a docstring
    |
@@ -27,5 +28,3 @@ D.py:110:5: D418 Function decorated with `@overload` shouldn't contain a docstri
 111 |     """Foo bar documentation."""
 112 |     ...
     |
-
-

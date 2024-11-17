@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
+snapshot_kind: text
 ---
 NPY201_3.py:4:5: NPY201 [*] `np.DTypePromotionError` will be removed in NumPy 2.0. Use `numpy.exceptions.DTypePromotionError` instead.
   |

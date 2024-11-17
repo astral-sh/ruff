@@ -6,7 +6,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 
 use red_knot_python_semantic::{resolve_module, ModuleName, Program, PythonVersion, SitePackages};
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::watch;
 use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};
 use red_knot_workspace::workspace::settings::{Configuration, SearchPathConfiguration};
@@ -14,6 +14,7 @@ use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::testing::setup_logging;
 use ruff_db::Upcast;
 
 struct TestCase {
@@ -69,7 +70,6 @@ impl TestCase {
         Some(all_events)
     }
 
-    #[cfg(unix)]
     fn take_watch_changes(&self) -> Vec<watch::ChangeEvent> {
         self.try_take_watch_changes(Duration::from_secs(10))
             .expect("Expected watch changes but observed none")
@@ -110,8 +110,8 @@ impl TestCase {
     ) -> anyhow::Result<()> {
         let program = Program::get(self.db());
 
-        self.configuration.search_paths = configuration.clone();
-        let new_settings = configuration.into_settings(self.db.workspace().root(&self.db));
+        let new_settings = configuration.to_settings(self.db.workspace().root(&self.db));
+        self.configuration.search_paths = configuration;
 
         program.update_search_paths(&mut self.db, &new_settings)?;
 
@@ -204,7 +204,9 @@ where
             .as_utf8_path()
             .canonicalize_utf8()
             .with_context(|| "Failed to canonicalize root path.")?,
-    );
+    )
+    .simplified()
+    .to_path_buf();
 
     let workspace_path = root_path.join("workspace");
 
@@ -241,8 +243,7 @@ where
         search_paths,
     };
 
-    let workspace =
-        WorkspaceMetadata::from_path(&workspace_path, &system, Some(configuration.clone()))?;
+    let workspace = WorkspaceMetadata::discover(&workspace_path, &system, Some(&configuration))?;
 
     let db = RootDatabase::new(workspace, system)?;
 
@@ -1310,4 +1311,139 @@ mod unix {
 
         Ok(())
     }
+}
+
+#[test]
+fn nested_packages_delete_root() -> anyhow::Result<()> {
+    let mut case = setup(|root: &SystemPath, workspace_root: &SystemPath| {
+        std::fs::write(
+            workspace_root.join("pyproject.toml").as_std_path(),
+            r#"
+            [project]
+            name = "inner"
+            "#,
+        )?;
+
+        std::fs::write(
+            root.join("pyproject.toml").as_std_path(),
+            r#"
+            [project]
+            name = "outer"
+            "#,
+        )?;
+
+        Ok(())
+    })?;
+
+    assert_eq!(
+        case.db().workspace().root(case.db()),
+        &*case.workspace_path("")
+    );
+
+    std::fs::remove_file(case.workspace_path("pyproject.toml").as_std_path())?;
+
+    let changes = case.stop_watch();
+
+    case.apply_changes(changes);
+
+    // It should now pick up the outer workspace.
+    assert_eq!(case.db().workspace().root(case.db()), case.root_path());
+
+    Ok(())
+}
+
+#[test]
+fn added_package() -> anyhow::Result<()> {
+    let _ = setup_logging();
+    let mut case = setup([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "inner"
+
+            [tool.knot.workspace]
+            members = ["packages/*"]
+            "#,
+        ),
+        (
+            "packages/a/pyproject.toml",
+            r#"
+            [project]
+            name = "a"
+            "#,
+        ),
+    ])?;
+
+    assert_eq!(case.db().workspace().packages(case.db()).len(), 2);
+
+    std::fs::create_dir(case.workspace_path("packages/b").as_std_path())
+        .context("failed to create folder for package 'b'")?;
+
+    // It seems that the file watcher won't pick up on file changes shortly after the folder
+    // was created... I suspect this is because most file watchers don't support recursive
+    // file watching. Instead, file-watching libraries manually implement recursive file watching
+    // by setting a watcher for each directory. But doing this obviously "lags" behind.
+    case.take_watch_changes();
+
+    std::fs::write(
+        case.workspace_path("packages/b/pyproject.toml")
+            .as_std_path(),
+        r#"
+            [project]
+            name = "b"
+            "#,
+    )
+    .context("failed to write pyproject.toml for package b")?;
+
+    let changes = case.stop_watch();
+
+    case.apply_changes(changes);
+
+    assert_eq!(case.db().workspace().packages(case.db()).len(), 3);
+
+    Ok(())
+}
+
+#[test]
+fn removed_package() -> anyhow::Result<()> {
+    let mut case = setup([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "inner"
+
+            [tool.knot.workspace]
+            members = ["packages/*"]
+            "#,
+        ),
+        (
+            "packages/a/pyproject.toml",
+            r#"
+            [project]
+            name = "a"
+            "#,
+        ),
+        (
+            "packages/b/pyproject.toml",
+            r#"
+            [project]
+            name = "b"
+            "#,
+        ),
+    ])?;
+
+    assert_eq!(case.db().workspace().packages(case.db()).len(), 3);
+
+    std::fs::remove_dir_all(case.workspace_path("packages/b").as_std_path())
+        .context("failed to remove package 'b'")?;
+
+    let changes = case.stop_watch();
+
+    case.apply_changes(changes);
+
+    assert_eq!(case.db().workspace().packages(case.db()).len(), 2);
+
+    Ok(())
 }

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/mccabe/mod.rs
+snapshot_kind: text
 ---
 C901.py:73:5: C901 `try_else` is too complex (4 > 3)
    |
@@ -19,5 +20,3 @@ C901.py:113:9: C901 `handle` is too complex (9 > 3)
 114 |         if args:
 115 |             return
     |
-
-

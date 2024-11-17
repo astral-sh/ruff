@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
+snapshot_kind: text
 ---
 FBT.py:4:5: FBT001 Boolean-typed positional argument in function definition
   |

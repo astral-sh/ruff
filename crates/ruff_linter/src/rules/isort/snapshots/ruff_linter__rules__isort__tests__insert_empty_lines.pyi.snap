@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 insert_empty_lines.pyi:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -63,5 +64,3 @@ insert_empty_lines.pyi:14:1: I001 [*] Import block is un-sorted or un-formatted
 16 17 | """Docstring"""
 17 18 | 
 18 19 | if True:
-
-

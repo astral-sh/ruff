@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+snapshot_kind: text
 ---
 TRY300.py:20:9: TRY300 Consider moving this statement to an `else` block
    |
@@ -10,5 +11,3 @@ TRY300.py:20:9: TRY300 Consider moving this statement to an `else` block
 21 |     except MyException:
 22 |         logger.exception("process failed")
    |
-
-

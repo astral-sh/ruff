@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_all_format.py:1:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
   |
@@ -128,5 +129,3 @@ invalid_all_format.py:23:12: PLE0605 Invalid format for `__all__`, must be `tupl
 24 | 
 25 | __all__ = ["Hello"]
    |
-
-

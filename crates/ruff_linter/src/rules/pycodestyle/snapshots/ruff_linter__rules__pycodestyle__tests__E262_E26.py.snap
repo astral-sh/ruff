@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E26.py:4:12: E262 [*] Inline comment should start with `# `
   |
@@ -141,5 +142,3 @@ E26.py:86:8: E262 [*] Inline comment should start with `# `
 85 85 | 
 86    |-a = 1  #:Foo
    86 |+a = 1  #: Foo
-
-
