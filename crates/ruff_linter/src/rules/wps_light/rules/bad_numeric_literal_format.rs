@@ -6,16 +6,25 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
+/// Checks for numeric literals in wrong format.
 ///
 /// ## Why is this bad?
+/// Unformatted numeric literals can make the code harder to read and understand.
+/// Inconsistent use of scientific notation or non-decimal-base number formats may lead to confusion
+/// about the actual value or precision of the literal.
 ///
 /// ## Example
 /// ```python
+/// 123456789.123456789E123456789
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// 123456789.123456789e123456789
 /// ```
+///
+/// ## References
+/// [PEP 327: Decimal data type](https://peps.python.org/pep-0327/)
 #[violation]
 pub struct BadNumericLiteralFormat {
     source: String,
@@ -39,11 +48,11 @@ impl AlwaysFixableViolation for BadNumericLiteralFormat {
 }
 
 /// WPS987
-pub(crate) fn bad_numeric_literal_format(checker: &mut Checker, number_literal: &ExprNumberLiteral) {
-    let ExprNumberLiteral {
-        range,
-        ..
-    } = number_literal;
+pub(crate) fn bad_numeric_literal_format(
+    checker: &mut Checker,
+    number_literal: &ExprNumberLiteral,
+) {
+    let ExprNumberLiteral { range, .. } = number_literal;
     let text = &checker.locator().contents()[number_literal.range()];
     let mut normalized = text.to_lowercase();
 
@@ -59,7 +68,7 @@ pub(crate) fn bad_numeric_literal_format(checker: &mut Checker, number_literal: 
         normalized = format_float_or_int_string(&normalized);
     }
 
-    if normalized != text {
+    if normalized == text {
         return;
     }
     checker.diagnostics.push(
@@ -70,17 +79,13 @@ pub(crate) fn bad_numeric_literal_format(checker: &mut Checker, number_literal: 
             },
             *range,
         )
-        .with_fix(Fix::safe_edit(Edit::range_replacement(
-            normalized,
-            *range
-        ))),
+        .with_fix(Fix::safe_edit(Edit::range_replacement(normalized, *range))),
     );
 }
 
-
 fn format_hex(text: &str) -> String {
-    let (before, after) = text.split_at(2); // Split at the "0x" prefix.
-    format!("{}{}", before, after.to_uppercase())
+    let (_, after) = text.split_at(2);
+    format!("0x{}", after.to_uppercase())
 }
 
 /// Formats a numeric string utilizing scientific notation.
@@ -89,9 +94,9 @@ fn format_scientific_notation(text: &str) -> String {
         let (sign, exponent) = if after.starts_with('-') {
             ("-", after.strip_prefix('-'))
         } else if after.starts_with('+') {
-            ("", after.strip_prefix('+'))
+            ("+", after.strip_prefix('+'))
         } else {
-            ("", Some(after))
+            ("+", Some(after))
         };
 
         format!(
