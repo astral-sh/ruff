@@ -57,7 +57,7 @@ pub(crate) fn bad_numeric_literal_format(
     let mut normalized = text.to_lowercase();
 
     if normalized.starts_with("0o") || normalized.starts_with("0b") {
-        // Leave octal and binary literals alone.
+        // skip
     } else if normalized.starts_with("0x") {
         normalized = format_hex(&normalized);
     } else if normalized.contains('e') {
@@ -88,15 +88,14 @@ fn format_hex(text: &str) -> String {
     format!("0x{}", after.to_uppercase())
 }
 
-/// Formats a numeric string utilizing scientific notation.
 fn format_scientific_notation(text: &str) -> String {
     if let Some((before, after)) = text.split_once('e') {
         let (sign, exponent) = if after.starts_with('-') {
             ("-", after.strip_prefix('-'))
         } else if after.starts_with('+') {
-            ("+", after.strip_prefix('+'))
+            ("", after.strip_prefix('+'))
         } else {
-            ("+", Some(after))
+            ("", Some(after))
         };
 
         format!(
@@ -110,14 +109,12 @@ fn format_scientific_notation(text: &str) -> String {
     }
 }
 
-/// Formats a complex number string like "10j".
 fn format_complex_number(text: &str) -> String {
     let number = &text[..text.len() - 1]; // All but the last character.
     let suffix = &text[text.len() - 1..]; // The last character.
     format!("{}{}", format_float_or_int_string(number), suffix)
 }
 
-/// Formats a float or integer string like "1.0".
 fn format_float_or_int_string(text: &str) -> String {
     if let Some((before, after)) = text.split_once('.') {
         let before = if before.is_empty() { "0" } else { before };
