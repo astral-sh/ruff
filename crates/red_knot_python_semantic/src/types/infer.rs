@@ -4525,10 +4525,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             },
             KnownInstanceType::Optional => {
-                let param_type = self.infer_annotation_expression(
-                    parameters,
-                    DeferredExpressionState::from(self.are_all_types_deferred()),
-                );
+                let param_type = self.infer_type_expression(parameters);
                 UnionType::from_elements(self.db, [param_type, Type::none(self.db)])
             }
             KnownInstanceType::TypeVar(_) => Type::Todo,
