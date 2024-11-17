@@ -1826,8 +1826,7 @@ impl<'db> KnownInstanceType<'db> {
     /// Evaluate the known instance in boolean context
     pub const fn bool(self) -> Truthiness {
         match self {
-            Self::Literal | Self::Optional => Truthiness::AlwaysTrue,
-            Self::TypeVar(_) => Truthiness::AlwaysTrue,
+            Self::Literal | Self::Optional | Self::TypeVar(_) => Truthiness::AlwaysTrue,
         }
     }
 
