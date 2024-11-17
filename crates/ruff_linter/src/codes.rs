@@ -933,6 +933,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydoclint, "501") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingException),
         (Pydoclint, "502") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringExtraneousException),
 
+        // wps-light
+        (WpsLight, "987") => (RuleGroup::Preview, rules::wps_light::rules::BadNumericLiteralFormat),
+
         // ruff
         (Ruff, "001") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterString),
         (Ruff, "002") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterDocstring),
