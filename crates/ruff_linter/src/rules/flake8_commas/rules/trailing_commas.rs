@@ -139,6 +139,12 @@ impl Context {
 ///     "baz": 2,
 /// }
 /// ```
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent use of trailing commas, making the rule redundant.
+///
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct MissingTrailingComma;
 
@@ -210,6 +216,12 @@ impl Violation for TrailingCommaOnBareTuple {
 /// ```python
 /// foo = (1, 2, 3)
 /// ```
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent use of trailing commas, making the rule redundant.
+///
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct ProhibitedTrailingComma;
 

@@ -36,6 +36,9 @@ use crate::rules::pydocstyle::settings::Convention;
 /// indentation of the docstring's opening quotes, and the body should be
 /// indented one level further.
 ///
+/// This rule is enabled when using the `numpy` and `google` conventions, and
+/// disabled when using the `pep257` convention.
+///
 /// ## Example
 /// ```python
 /// def calculate_speed(distance: float, time: float) -> float:
@@ -218,6 +221,9 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// Multiline docstrings are typically composed of a summary line, followed by
 /// a blank line, followed by a series of sections. Each section typically has
 /// a header and a body.
+///
+/// This rule is enabled when using the `numpy` and `google` conventions, and
+/// disabled when using the `pep257` convention.
 ///
 /// ## Example
 /// ```python
@@ -1049,9 +1055,6 @@ impl AlwaysFixableViolation for BlankLineAfterLastSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
-/// ## Options
-/// - `lint.pydocstyle.convention`
-///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -1293,9 +1296,6 @@ impl Violation for UndocumentedParam {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
-///
-/// ## Options
-/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
