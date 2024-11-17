@@ -144,23 +144,27 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
         // Generate the flattened fix once.
         let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
             // Generate a [`Fix`] for a single type expression, e.g. `int`.
-            Fix::applicable_edit(
+            Some(Fix::applicable_edit(
                 Edit::range_replacement(checker.generator().expr(edit_expr), annotation.range()),
                 applicability,
-            )
+            ))
         } else {
             match union_type {
-                UnionKind::PEP604 => {
-                    generate_pep604_fix(checker, necessary_nodes, annotation, applicability)
-                }
+                UnionKind::PEP604 => Some(generate_pep604_fix(
+                    checker,
+                    necessary_nodes,
+                    annotation,
+                    applicability,
+                )),
                 UnionKind::TypingUnion => {
-                    generate_union_fix(checker, necessary_nodes, annotation, applicability)
-                        .ok()
-                        .unwrap()
+                    generate_union_fix(checker, necessary_nodes, annotation, applicability).ok()
                 }
             }
         };
-        diagnostic.set_fix(fix);
+
+        if let Some(fix) = fix {
+            diagnostic.set_fix(fix);
+        }
     };
 
     checker.diagnostics.push(diagnostic);
@@ -224,7 +228,7 @@ enum UnionKind {
     PEP604,
 }
 
-// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
+/// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
 fn generate_pep604_fix(
     checker: &Checker,
     nodes: Vec<&Expr>,
@@ -255,7 +259,7 @@ fn generate_pep604_fix(
     )
 }
 
-// Generate a [`Fix`] for two or more type expresisons, e.g. `typing.Union[int, float, complex]`.
+/// Generate a [`Fix`] for two or more type expresisons, e.g. `typing.Union[int, float, complex]`.
 fn generate_union_fix(
     checker: &Checker,
     nodes: Vec<&Expr>,

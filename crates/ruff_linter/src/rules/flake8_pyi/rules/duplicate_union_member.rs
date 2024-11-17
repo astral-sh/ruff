@@ -142,7 +142,7 @@ enum UnionKind {
     PEP604,
 }
 
-// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
+/// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
 fn generate_pep604_fix(
     checker: &Checker,
     nodes: Vec<&Expr>,
@@ -173,7 +173,7 @@ fn generate_pep604_fix(
     )
 }
 
-// Generate a [`Fix`] for two or more type expresisons, e.g. `typing.Union[int, float, complex]`.
+/// Generate a [`Fix`] for two or more type expresisons, e.g. `typing.Union[int, float, complex]`.
 fn generate_union_fix(
     checker: &Checker,
     nodes: Vec<&Expr>,
