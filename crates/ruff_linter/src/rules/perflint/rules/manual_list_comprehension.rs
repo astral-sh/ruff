@@ -252,7 +252,6 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         ast::Stmt::Assign(assign) => Some(&assign.value),
         _ => None,
     });
-    dbg!(binding_value);
     // If the variable is an empty list literal, then we might be able to replace it with a full list comprehension
     // otherwise, it has to be replaced with a `list.extend`
     let binding_is_empty_list =
@@ -413,8 +412,16 @@ fn convert_to_list_extend(
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
-            let mut comments_to_move =
-                comment_strings_in_range(binding_stmt_range);
+
+            let annotations = match binding
+                .statement(checker.semantic())
+                .and_then(|stmt| stmt.as_ann_assign_stmt())
+            {
+                Some(assign) => format!(": {}", locator.slice(assign.annotation.range())),
+                None => String::new(),
+            };
+
+            let mut comments_to_move = comment_strings_in_range(binding_stmt_range);
             comments_to_move.extend(for_loop_inline_comments);
 
             let indentation = if comments_to_move.is_empty() {
@@ -425,7 +432,7 @@ fn convert_to_list_extend(
             let leading_comments = format!("{}{indentation}", comments_to_move.join(&indentation));
 
             let comprehension_body =
-                format!("{leading_comments}{variable_name} = [{generator_str}]");
+                format!("{leading_comments}{variable_name}{annotations} = [{generator_str}]");
 
             Ok(Fix::unsafe_edits(
                 Edit::range_deletion(binding_stmt_range),

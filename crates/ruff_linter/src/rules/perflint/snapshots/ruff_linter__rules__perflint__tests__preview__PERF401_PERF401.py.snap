@@ -330,6 +330,8 @@ PERF401.py:175:9: PERF401 [*] Use a list comprehension to create a transformed l
 180 | |             )
 181 | |         ) # PERF401
     | |_________^ PERF401
+182 |   
+183 |   def f():
     |
     = help: Replace for loop with list comprehension
 
@@ -348,3 +350,24 @@ PERF401.py:175:9: PERF401 [*] Use a list comprehension to create a transformed l
 180     |-            )
 181     |-        ) # PERF401
     177 |+            ) for i in range(2)] # PERF401
+182 178 | 
+183 179 | def f():
+184 180 |     result: list[int] = []
+
+PERF401.py:186:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+184 |     result: list[int] = []
+185 |     for i in range(10):
+186 |         result.append(i*2) # PERF401
+    |         ^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+181 181 |         ) # PERF401
+182 182 | 
+183 183 | def f():
+184     |-    result: list[int] = []
+185     |-    for i in range(10):
+186     |-        result.append(i*2) # PERF401
+    184 |+    result: list[int] = [i*2 for i in range(10)] # PERF401
