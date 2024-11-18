@@ -71,7 +71,7 @@ pub(crate) fn await_in_finally_or_cancelled(
         let bare_except = vec!["", "", "bare except"];
 
         // location is selected based on the first matching item
-        let interesting_exception_types: Vec<Vec<&str>> = vec![
+        let interesting_exception_types = [
             bare_except.clone(),
             vec!["", "BaseException"],
             vec!["", "", "cancelled"],
@@ -185,7 +185,7 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                     }) = &item.context_expr
                     {
                         if let Some(name) = self.semantic.resolve_qualified_name(func) {
-                            let managers: Vec<Vec<&str>> = vec![
+                            let managers = [
                                 vec!["anyio", "CancelScope"],
                                 vec!["anyio", "move_on_after"],
                                 vec!["anyio", "fail_after"],
@@ -227,7 +227,7 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
         if let Expr::Await(ast::ExprAwait { value, .. }) = expr {
             if let Expr::Call(ExprCall { ref func, .. }) = **value {
                 if let Some(name) = self.semantic.resolve_qualified_name(func) {
-                    let allowed_async_calls: Vec<Vec<&str>> = vec![
+                    let allowed_async_calls = [
                         vec!["anyio", "aclose_forcefully"],
                         vec!["trio", "aclose_forcefully"],
                     ];
