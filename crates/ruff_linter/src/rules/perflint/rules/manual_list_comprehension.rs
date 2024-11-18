@@ -360,6 +360,8 @@ fn convert_to_list_extend(
             .comment_ranges()
             .comments_in_range(range)
             .iter()
+            // Ignore comments inside of the append, since these are preserved
+            .filter(|comment| !to_append.range().contains_range(**comment))
             .map(|range| locator.slice(range).trim_whitespace_start())
             .collect()
     };
@@ -398,7 +400,6 @@ fn convert_to_list_extend(
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
-
             let mut comments_to_move =
                 comment_strings_in_range(locator.full_lines_range(binding_stmt.range));
             comments_to_move.extend(for_loop_inline_comments);

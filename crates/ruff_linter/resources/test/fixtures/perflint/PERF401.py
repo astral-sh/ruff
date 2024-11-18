@@ -168,3 +168,14 @@ def f():
     for val in range(5):
         result.append(val * 2) # Ok
     print(val)
+
+def f():
+    result = []
+    for i in range(2):
+        result.append(
+            (
+                i+1,
+                # Comment should not be duplicated
+                2
+            )
+        ) # PERF401

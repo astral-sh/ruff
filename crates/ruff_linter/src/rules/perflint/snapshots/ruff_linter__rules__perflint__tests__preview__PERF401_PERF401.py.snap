@@ -314,3 +314,37 @@ PERF401.py:169:9: PERF401 [*] Use a list comprehension to create a transformed l
 169     |-        result.append(val * 2) # Ok
     167 |+    result = [val * 2 for val in range(5)] # Ok
 170 168 |     print(val)
+171 169 | 
+172 170 | def f():
+
+PERF401.py:175:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+173 |       result = []
+174 |       for i in range(2):
+175 |           result.append(
+    |  _________^
+176 | |             (
+177 | |                 i+1,
+178 | |                 # Comment should not be duplicated
+179 | |                 2
+180 | |             )
+181 | |         ) # PERF401
+    | |_________^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+170 170 |     print(val)
+171 171 | 
+172 172 | def f():
+173     |-    result = []
+174     |-    for i in range(2):
+175     |-        result.append(
+176     |-            (
+    173 |+    result = [(
+177 174 |                 i+1,
+178 175 |                 # Comment should not be duplicated
+179 176 |                 2
+180     |-            )
+181     |-        ) # PERF401
+    177 |+            ) for i in range(2)] # PERF401
