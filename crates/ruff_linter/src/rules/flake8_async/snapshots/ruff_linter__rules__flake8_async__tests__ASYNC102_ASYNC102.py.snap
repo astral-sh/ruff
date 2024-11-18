@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 snapshot_kind: text
 ---
-ASYNC102.py:33:9: ASYNC102 shield it!
+ASYNC102.py:33:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 31 |         pass
 32 |     finally:
@@ -12,7 +12,7 @@ ASYNC102.py:33:9: ASYNC102 shield it!
 35 |     try:
    |
 
-ASYNC102.py:39:13: ASYNC102 shield it!
+ASYNC102.py:39:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 37 |     finally:
 38 |         with trio.move_on_after(30) as s:
@@ -22,7 +22,7 @@ ASYNC102.py:39:13: ASYNC102 shield it!
 41 |     try:
    |
 
-ASYNC102.py:45:13: ASYNC102 shield it!
+ASYNC102.py:45:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 43 |     finally:
 44 |         with trio.move_on_after(30):
@@ -32,7 +32,7 @@ ASYNC102.py:45:13: ASYNC102 shield it!
 47 |     bar = 10
    |
 
-ASYNC102.py:71:13: ASYNC102 shield it!
+ASYNC102.py:71:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 69 |             await foo()  # noqa: ASYNC102 - fixthis
 70 |             s.shield = False
@@ -42,7 +42,7 @@ ASYNC102.py:71:13: ASYNC102 shield it!
 73 |             await foo()  # noqa: ASYNC102 - fixthis
    |
 
-ASYNC102.py:79:13: ASYNC102 shield it!
+ASYNC102.py:79:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 77 |     finally:
 78 |         with open("bar"):
@@ -52,7 +52,7 @@ ASYNC102.py:79:13: ASYNC102 shield it!
 81 |         pass
    |
 
-ASYNC102.py:89:13: ASYNC102 shield it!
+ASYNC102.py:89:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 87 |     finally:
 88 |         with trio.move_on_after():
@@ -62,7 +62,7 @@ ASYNC102.py:89:13: ASYNC102 shield it!
 91 |         pass
    |
 
-ASYNC102.py:94:13: ASYNC102 shield it!
+ASYNC102.py:94:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 92 |     finally:
 93 |         with trio.move_on_after(foo=bar):
@@ -72,7 +72,7 @@ ASYNC102.py:94:13: ASYNC102 shield it!
 96 |         pass
    |
 
-ASYNC102.py:109:13: ASYNC102 shield it!
+ASYNC102.py:109:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 107 |     finally:
 108 |         with trio.CancelScope(deadline=30):
@@ -82,7 +82,7 @@ ASYNC102.py:109:13: ASYNC102 shield it!
 111 |         pass
     |
 
-ASYNC102.py:114:13: ASYNC102 shield it!
+ASYNC102.py:114:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 112 |     finally:
 113 |         with trio.CancelScope(deadline=30, shield=(1 == 1)):
@@ -92,7 +92,7 @@ ASYNC102.py:114:13: ASYNC102 shield it!
 116 |         pass
     |
 
-ASYNC102.py:122:13: ASYNC102 shield it!
+ASYNC102.py:122:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 120 |             cs.shield = myvar
 121 |             # safe in theory, but we don't track variable values
@@ -102,7 +102,7 @@ ASYNC102.py:122:13: ASYNC102 shield it!
 124 |         pass
     |
 
-ASYNC102.py:148:13: ASYNC102 shield it!
+ASYNC102.py:148:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 146 |             pass
 147 |         finally:
@@ -110,7 +110,7 @@ ASYNC102.py:148:13: ASYNC102 shield it!
     |             ^^^^^^^^^^^ ASYNC102
     |
 
-ASYNC102.py:158:9: ASYNC102 shield it!
+ASYNC102.py:158:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 156 |         yield 1
 157 |     finally:
@@ -118,7 +118,7 @@ ASYNC102.py:158:9: ASYNC102 shield it!
     |         ^^^^^^^^^^^ ASYNC102
     |
 
-ASYNC102.py:169:13: ASYNC102 shield it!
+ASYNC102.py:169:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 167 |             await foo()  # safe  # noqa: ASYNC102 - fixthis
 168 |         with trio.move_on_after(30) as s, trio.fail_after(5):
@@ -128,7 +128,7 @@ ASYNC102.py:169:13: ASYNC102 shield it!
 171 |             await foo()  # safe
     |
 
-ASYNC102.py:174:13: ASYNC102 shield it!
+ASYNC102.py:174:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 172 |         with trio.fail_after(5), trio.move_on_after(30) as s:
 173 |             s.shield = True
@@ -136,7 +136,7 @@ ASYNC102.py:174:13: ASYNC102 shield it!
     |             ^^^^^^^^^^^ ASYNC102
     |
 
-ASYNC102.py:183:9: ASYNC102 shield it!
+ASYNC102.py:183:9: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 181 |         await foo()
 182 |     except BaseException:
@@ -146,7 +146,7 @@ ASYNC102.py:183:9: ASYNC102 shield it!
 185 |         await foo()
     |
 
-ASYNC102.py:211:9: ASYNC102 shield it!
+ASYNC102.py:211:9: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 209 |         ...
 210 |     except BaseException:
@@ -156,7 +156,7 @@ ASYNC102.py:211:9: ASYNC102 shield it!
 213 |         await foo()  # error: 8, Statement("try/finally", lineno-5)
     |
 
-ASYNC102.py:213:9: ASYNC102 shield it!
+ASYNC102.py:213:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 211 |         await foo()  # error: 8, Statement("BaseException", lineno-1)
 212 |     finally:
@@ -166,7 +166,7 @@ ASYNC102.py:213:9: ASYNC102 shield it!
 215 |     try:
     |
 
-ASYNC102.py:218:9: ASYNC102 shield it!
+ASYNC102.py:218:9: ASYNC102 await inside bare except must have shielded cancel scope with a timeout
     |
 216 |         ...
 217 |     except:
@@ -176,7 +176,7 @@ ASYNC102.py:218:9: ASYNC102 shield it!
 220 |         await foo()  # error: 8, Statement("try/finally", lineno-5)
     |
 
-ASYNC102.py:220:9: ASYNC102 shield it!
+ASYNC102.py:220:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 218 |         await foo()  # error: 8, Statement("bare except", lineno-1)
 219 |     finally:
@@ -186,7 +186,7 @@ ASYNC102.py:220:9: ASYNC102 shield it!
 222 |     try:
     |
 
-ASYNC102.py:225:9: ASYNC102 shield it!
+ASYNC102.py:225:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 223 |         ...
 224 |     finally:
@@ -194,7 +194,7 @@ ASYNC102.py:225:9: ASYNC102 shield it!
     |         ^^^^^^^^^^^ ASYNC102
     |
 
-ASYNC102.py:234:13: ASYNC102 shield it!
+ASYNC102.py:234:13: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 232 |         ...
 233 |     except BaseException:
@@ -203,7 +203,7 @@ ASYNC102.py:234:13: ASYNC102 shield it!
 235 | # fmt: on
     |
 
-ASYNC102.py:234:26: ASYNC102 shield it!
+ASYNC102.py:234:26: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 232 |         ...
 233 |     except BaseException:
@@ -212,7 +212,7 @@ ASYNC102.py:234:26: ASYNC102 shield it!
 235 | # fmt: on
     |
 
-ASYNC102.py:244:9: ASYNC102 shield it!
+ASYNC102.py:244:9: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 242 |         await foo()
 243 |     except BaseException:
@@ -222,7 +222,7 @@ ASYNC102.py:244:9: ASYNC102 shield it!
 246 |             await foo()  # error: 12, Statement("BaseException", lineno-3)
     |
 
-ASYNC102.py:246:13: ASYNC102 shield it!
+ASYNC102.py:246:13: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 244 |         await foo()  # error: 8, Statement("BaseException", lineno-1)
 245 |         try:
@@ -232,7 +232,7 @@ ASYNC102.py:246:13: ASYNC102 shield it!
 248 |             await foo()  # error: 12, Statement("BaseException", lineno-5)
     |
 
-ASYNC102.py:248:13: ASYNC102 shield it!
+ASYNC102.py:248:13: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 246 |             await foo()  # error: 12, Statement("BaseException", lineno-3)
 247 |         except BaseException:
@@ -242,7 +242,7 @@ ASYNC102.py:248:13: ASYNC102 shield it!
 250 |             # unsafe, because we're waiting inside the parent baseexception
     |
 
-ASYNC102.py:248:13: ASYNC102 shield it!
+ASYNC102.py:248:13: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 246 |             await foo()  # error: 12, Statement("BaseException", lineno-3)
 247 |         except BaseException:
@@ -252,7 +252,7 @@ ASYNC102.py:248:13: ASYNC102 shield it!
 250 |             # unsafe, because we're waiting inside the parent baseexception
     |
 
-ASYNC102.py:251:13: ASYNC102 shield it!
+ASYNC102.py:251:13: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 249 |         except:
 250 |             # unsafe, because we're waiting inside the parent baseexception
@@ -262,7 +262,7 @@ ASYNC102.py:251:13: ASYNC102 shield it!
 253 |     except:
     |
 
-ASYNC102.py:252:9: ASYNC102 shield it!
+ASYNC102.py:252:9: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 250 |             # unsafe, because we're waiting inside the parent baseexception
 251 |             await foo()  # error: 12, Statement("BaseException", lineno-8)
@@ -272,7 +272,7 @@ ASYNC102.py:252:9: ASYNC102 shield it!
 254 |         await foo()
     |
 
-ASYNC102.py:258:13: ASYNC102 shield it!
+ASYNC102.py:258:13: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
     |
 256 |             await foo()
 257 |         except BaseException:
@@ -282,7 +282,7 @@ ASYNC102.py:258:13: ASYNC102 shield it!
 260 |             await foo()
     |
 
-ASYNC102.py:295:17: ASYNC102 shield it!
+ASYNC102.py:295:17: ASYNC102 await inside bare except must have shielded cancel scope with a timeout
     |
 293 |         with trio.CancelScope(deadline=10) as cs1:
 294 |             with trio.CancelScope(deadline=10) as cs2:
@@ -292,7 +292,7 @@ ASYNC102.py:295:17: ASYNC102 shield it!
 297 |                 await foo()  # noqa: ASYNC102 - fixthis
     |
 
-ASYNC102.py:299:17: ASYNC102 shield it!
+ASYNC102.py:299:17: ASYNC102 await inside bare except must have shielded cancel scope with a timeout
     |
 297 |                 await foo()  # noqa: ASYNC102 - fixthis
 298 |                 cs1.shield = False
@@ -302,7 +302,7 @@ ASYNC102.py:299:17: ASYNC102 shield it!
 301 |                 await foo()  # noqa: ASYNC102 - fixthis
     |
 
-ASYNC102.py:302:13: ASYNC102 shield it!
+ASYNC102.py:302:13: ASYNC102 await inside bare except must have shielded cancel scope with a timeout
     |
 300 |                 cs2.shield = True
 301 |                 await foo()  # noqa: ASYNC102 - fixthis
@@ -312,7 +312,7 @@ ASYNC102.py:302:13: ASYNC102 shield it!
 304 |             await foo()  # error: 12, Statement("bare except", lineno-12)
     |
 
-ASYNC102.py:304:13: ASYNC102 shield it!
+ASYNC102.py:304:13: ASYNC102 await inside bare except must have shielded cancel scope with a timeout
     |
 302 |             await foo()  # error: 12, Statement("bare except", lineno-10)
 303 |             cs2.shield = True

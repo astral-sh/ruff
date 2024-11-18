@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 snapshot_kind: text
 ---
-ASYNC102_aclose.py:22:9: ASYNC102 shield it!
+ASYNC102_aclose.py:22:9: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
    |
 20 |         ...
 21 |     except BaseException:
@@ -12,7 +12,7 @@ ASYNC102_aclose.py:22:9: ASYNC102 shield it!
 24 |     finally:
    |
 
-ASYNC102_aclose.py:23:9: ASYNC102 shield it!
+ASYNC102_aclose.py:23:9: ASYNC102 await inside BaseException must have shielded cancel scope with a timeout
    |
 21 |     except BaseException:
 22 |         await x.aclose()  # ASYNC102: 8, Statement("BaseException", lineno-1)
@@ -22,7 +22,7 @@ ASYNC102_aclose.py:23:9: ASYNC102 shield it!
 25 |         await x.aclose()  # ASYNC102: 8, Statement("try/finally", lineno-6)
    |
 
-ASYNC102_aclose.py:25:9: ASYNC102 shield it!
+ASYNC102_aclose.py:25:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 23 |         await x.y.aclose()  # ASYNC102: 8, Statement("BaseException", lineno-2)
 24 |     finally:
@@ -31,7 +31,7 @@ ASYNC102_aclose.py:25:9: ASYNC102 shield it!
 26 |         await x.y.aclose()  # ASYNC102: 8, Statement("try/finally", lineno-7)
    |
 
-ASYNC102_aclose.py:26:9: ASYNC102 shield it!
+ASYNC102_aclose.py:26:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
    |
 24 |     finally:
 25 |         await x.aclose()  # ASYNC102: 8, Statement("try/finally", lineno-6)

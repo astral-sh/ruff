@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 snapshot_kind: text
 ---
-ASYNC102_trio.py:14:9: ASYNC102 shield it!
+ASYNC102_trio.py:14:9: ASYNC102 await inside trio.Cancelled must have shielded cancel scope with a timeout
    |
 12 |         ...
 13 |     except trio.Cancelled:
@@ -12,7 +12,7 @@ ASYNC102_trio.py:14:9: ASYNC102 shield it!
 16 |         await foo()  # safe, since after trio.Cancelled
    |
 
-ASYNC102_trio.py:21:9: ASYNC102 shield it!
+ASYNC102_trio.py:21:9: ASYNC102 await inside trio.Cancelled must have shielded cancel scope with a timeout
    |
 19 |         ...
 20 |     except trio.Cancelled:

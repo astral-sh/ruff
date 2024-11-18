@@ -44,12 +44,17 @@ use ruff_text_size::{Ranged, TextRange};
 /// ## References
 /// - [AnyIO shielding](https://anyio.readthedocs.io/en/stable/cancellation.html#shielding)
 #[violation]
-pub struct AwaitInFinallyOrCancelled;
+pub struct AwaitInFinallyOrCancelled {
+    range: TextRange,
+    location: String,
+}
 
 impl Violation for AwaitInFinallyOrCancelled {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "shield it!".to_string()
+        let location = &self.location;
+
+        format!("await inside {location} must have shielded cancel scope with a timeout")
     }
 }
 
@@ -59,32 +64,44 @@ pub(crate) fn await_in_finally_or_cancelled(
     handlers: &Vec<ExceptHandler>,
     finalbody: &[Stmt],
 ) {
-    let mut unshielded_async_ranges: Vec<TextRange> = vec![];
+    let mut concerns: Vec<AwaitInFinallyOrCancelled> = vec![];
 
     for handler in handlers {
         let ExceptHandler::ExceptHandler(handler) = handler;
+        let bare_except = vec!["", "", "bare except"];
 
+        // location is selected based on the first matching item
         let interesting_exception_types: Vec<Vec<&str>> = vec![
+            bare_except.clone(),
             vec!["", "BaseException"],
+            vec!["", "", "cancelled"],
             // TODO only for 3.7+, in case we care about older
-            vec!["", "Exception"],
             // TODO asyncio.CancelledError vs. CancelledError
             vec!["asyncio", "CancelledError"],
             // TODO only dependent on configuration?
             vec!["trio", "Cancelled"],
+            vec!["", "Exception"],
         ];
 
         let types = match handler.type_.as_deref() {
             Some(t) => flattened_tuple(t, checker.semantic()),
-            None => vec![interesting_exception_types[0].clone()],
+            None => vec![bare_except.clone()],
         };
 
-        if !types
+        let Some(type_segments) = interesting_exception_types
             .iter()
-            .any(|tt| interesting_exception_types.contains(tt))
-        {
+            .find(|iet| types.contains(iet))
+        else {
             continue;
-        }
+        };
+
+        let location = {
+            use itertools::Itertools;
+            type_segments
+                .iter()
+                .filter(|segment| !segment.is_empty())
+                .join(".")
+        };
 
         // If there is no async then there is nothing to shield
         let mut visitor = PrunedAsyncVisitor {
@@ -92,7 +109,12 @@ pub(crate) fn await_in_finally_or_cancelled(
             async_ranges: vec![],
         };
         visitor.visit_body(&handler.body);
-        unshielded_async_ranges.extend(visitor.async_ranges);
+        for concern in visitor.async_ranges {
+            concerns.push(AwaitInFinallyOrCancelled {
+                range: concern,
+                location: location.clone(),
+            });
+        }
         break;
     }
 
@@ -102,12 +124,16 @@ pub(crate) fn await_in_finally_or_cancelled(
         async_ranges: vec![],
     };
     visitor.visit_body(finalbody);
-    unshielded_async_ranges.extend(visitor.async_ranges);
+    for concern in visitor.async_ranges {
+        concerns.push(AwaitInFinallyOrCancelled {
+            range: concern,
+            location: "finally".to_string(),
+        });
+    }
 
-    for range in unshielded_async_ranges {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(AwaitInFinallyOrCancelled {}, range));
+    for concern in concerns {
+        let range = concern.range;
+        checker.diagnostics.push(Diagnostic::new(concern, range));
     }
 }
 
@@ -128,8 +154,7 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Vec<
         Expr::Call(call) => {
             if let Some(name) = semantic.resolve_qualified_name(&call.func) {
                 if name.segments() == ["anyio", "get_cancelled_exc_class"] {
-                    // TODO kinda hacking here by just picking a thing we'll detect as of interest
-                    f.push(vec!["", "BaseException"]);
+                    f.push(vec!["", "", "cancelled"]);
                 }
             }
         }
