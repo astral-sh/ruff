@@ -1055,6 +1055,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnsafeMarkupUse) {
                 ruff::rules::unsafe_markup_call(checker, call);
             }
+            if checker.enabled(Rule::MapIntVersionParsing) {
+                ruff::rules::map_int_version_parsing(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
