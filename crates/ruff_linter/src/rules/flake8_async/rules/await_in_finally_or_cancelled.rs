@@ -64,24 +64,45 @@ pub(crate) fn await_in_finally_or_cancelled(
     handlers: &Vec<ExceptHandler>,
     finalbody: &[Stmt],
 ) {
+    let managers = vec![
+        vec!["anyio", "CancelScope"],
+        vec!["anyio", "move_on_after"],
+        vec!["anyio", "fail_after"],
+        vec!["trio", "CancelScope"],
+        vec!["trio", "move_on_after"],
+    ];
+
+    let allowed_async_calls = vec![
+        vec!["anyio", "aclose_forcefully"],
+        vec!["trio", "aclose_forcefully"],
+    ];
+
+    let mut visitor = PrunedAsyncVisitor {
+        semantic: checker.semantic(),
+        async_ranges: vec![],
+        managers: &managers,
+        allowed_async_calls: &allowed_async_calls,
+    };
+
+    let bare_except = vec!["", "", "bare except"];
+
+    // location is selected based on the first matching item
+    let interesting_exception_types = [
+        bare_except.clone(),
+        vec!["", "BaseException"],
+        vec!["", "", "cancelled"],
+        // TODO only for 3.7+, in case we care about older
+        // TODO asyncio.CancelledError vs. CancelledError
+        vec!["asyncio", "CancelledError"],
+        // TODO only dependent on configuration?
+        vec!["trio", "Cancelled"],
+        vec!["", "Exception"],
+    ];
+
     let mut concerns: Vec<AwaitInFinallyOrCancelled> = vec![];
 
     for handler in handlers {
         let ExceptHandler::ExceptHandler(handler) = handler;
-        let bare_except = vec!["", "", "bare except"];
-
-        // location is selected based on the first matching item
-        let interesting_exception_types = [
-            bare_except.clone(),
-            vec!["", "BaseException"],
-            vec!["", "", "cancelled"],
-            // TODO only for 3.7+, in case we care about older
-            // TODO asyncio.CancelledError vs. CancelledError
-            vec!["asyncio", "CancelledError"],
-            // TODO only dependent on configuration?
-            vec!["trio", "Cancelled"],
-            vec!["", "Exception"],
-        ];
 
         let types = match handler.type_.as_deref() {
             Some(t) => flattened_tuple(t, checker.semantic()),
@@ -104,10 +125,6 @@ pub(crate) fn await_in_finally_or_cancelled(
         };
 
         // If there is no async then there is nothing to shield
-        let mut visitor = PrunedAsyncVisitor {
-            semantic: checker.semantic(),
-            async_ranges: vec![],
-        };
         visitor.visit_body(&handler.body);
         for concern in visitor.async_ranges {
             concerns.push(AwaitInFinallyOrCancelled {
@@ -119,10 +136,7 @@ pub(crate) fn await_in_finally_or_cancelled(
     }
 
     // If there is no async then there is nothing to shield
-    let mut visitor = PrunedAsyncVisitor {
-        semantic: checker.semantic(),
-        async_ranges: vec![],
-    };
+    visitor.async_ranges = vec![];
     visitor.visit_body(finalbody);
     for concern in visitor.async_ranges {
         concerns.push(AwaitInFinallyOrCancelled {
@@ -168,6 +182,8 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Vec<
 struct PrunedAsyncVisitor<'a> {
     async_ranges: Vec<TextRange>,
     semantic: &'a SemanticModel<'a>,
+    managers: &'a Vec<Vec<&'static str>>,
+    allowed_async_calls: &'a Vec<Vec<&'static str>>,
 }
 
 impl Visitor<'_> for PrunedAsyncVisitor<'_> {
@@ -185,16 +201,8 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                     }) = &item.context_expr
                     {
                         if let Some(name) = self.semantic.resolve_qualified_name(func) {
-                            let managers = [
-                                vec!["anyio", "CancelScope"],
-                                vec!["anyio", "move_on_after"],
-                                vec!["anyio", "fail_after"],
-                                vec!["trio", "CancelScope"],
-                                vec!["trio", "move_on_after"],
-                            ];
-
                             let segments = &Vec::from(name.segments());
-                            if managers.contains(segments) {
+                            if self.managers.contains(segments) {
                                 for keyword in &arguments.keywords {
                                     if let Some(Identifier { id: name, .. }) = &keyword.arg {
                                         if name.as_str() == "shield"
@@ -227,12 +235,8 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
         if let Expr::Await(ast::ExprAwait { value, .. }) = expr {
             if let Expr::Call(ExprCall { ref func, .. }) = **value {
                 if let Some(name) = self.semantic.resolve_qualified_name(func) {
-                    let allowed_async_calls = [
-                        vec!["anyio", "aclose_forcefully"],
-                        vec!["trio", "aclose_forcefully"],
-                    ];
                     let segments = &Vec::from(name.segments());
-                    if allowed_async_calls.contains(segments) {
+                    if self.allowed_async_calls.contains(segments) {
                         return;
                     }
                 }
