@@ -102,6 +102,21 @@ else:
     reveal_type(x)  # revealed: str | int
 ```
 
+## No narrowing for keyword arguments
+
+`type` can't be used with a keyword argument:
+
+```py
+def get_str_or_int() -> str | int:
+    return "test"
+
+x = get_str_or_int()
+
+# TODO: we could issue a diagnostic here
+if type(object=x) is str:
+    reveal_type(x)  # revealed: str | int
+```
+
 ## Narrowing if `type` is aliased
 
 ```py
