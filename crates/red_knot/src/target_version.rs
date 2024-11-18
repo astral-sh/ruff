@@ -4,8 +4,8 @@
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
 pub enum TargetVersion {
     Py37,
-    #[default]
     Py38,
+    #[default]
     Py39,
     Py310,
     Py311,
@@ -44,5 +44,19 @@ impl From<TargetVersion> for red_knot_python_semantic::PythonVersion {
             TargetVersion::Py312 => Self::PY312,
             TargetVersion::Py313 => Self::PY313,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::target_version::TargetVersion;
+    use red_knot_python_semantic::PythonVersion;
+
+    #[test]
+    fn same_default_as_python_version() {
+        assert_eq!(
+            PythonVersion::from(TargetVersion::default()),
+            PythonVersion::default()
+        );
     }
 }
