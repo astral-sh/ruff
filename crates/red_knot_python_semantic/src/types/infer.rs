@@ -4443,20 +4443,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                     element_types.push(element_ty);
                 }
 
-                if return_todo {
-                    self.store_expression_type(tuple_slice, Type::Todo);
-
+                let ty = if return_todo {
                     Type::Todo
                 } else {
-                    let tuple_type = Type::tuple(self.db, &element_types);
+                    Type::tuple(self.db, &element_types)
+                };
 
-                    // Here, we store the type for the inner `int, str` tuple-expression,
-                    // while the type for the outer `tuple[int, str]` slice-expression is
-                    // stored in the outer `infer_type_expression` call:
-                    self.store_expression_type(tuple_slice, tuple_type);
+                // Here, we store the type for the inner `int, str` tuple-expression,
+                // while the type for the outer `tuple[int, str]` slice-expression is
+                // stored in the surrounding `infer_type_expression` call:
+                self.store_expression_type(tuple_slice, ty);
 
-                    tuple_type
-                }
+                ty
             }
             single_element => {
                 let single_element_ty = self.infer_type_expression(single_element);
