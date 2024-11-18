@@ -70,7 +70,7 @@ pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
         _ => return,
     };
 
-    if followed_by_replace_tzinfo(checker.semantic()) {
+    if usage_is_safe(checker.semantic()) {
         return;
     }
 
@@ -79,8 +79,8 @@ pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
         .push(Diagnostic::new(DatetimeMinMax { min_max }, expr.range()));
 }
 
-/// Check if the current expression has the pattern `foo.replace(tzinfo=bar)`.
-fn followed_by_replace_tzinfo(semantic: &SemanticModel) -> bool {
+/// Check if the current expression has the pattern `foo.replace(tzinfo=bar)` or `foo.time()`.
+fn usage_is_safe(semantic: &SemanticModel) -> bool {
     let Some(parent) = semantic.current_expression_parent() else {
         return false;
     };
@@ -90,7 +90,7 @@ fn followed_by_replace_tzinfo(semantic: &SemanticModel) -> bool {
 
     match (parent, grandparent) {
         (Expr::Attribute(ExprAttribute { attr, .. }), Expr::Call(ExprCall { arguments, .. })) => {
-            attr.as_str() == "replace" && arguments.find_keyword("tzinfo").is_some()
+            attr == "time" || (attr == "replace" && arguments.find_keyword("tzinfo").is_some())
         }
         _ => false,
     }
