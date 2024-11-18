@@ -335,8 +335,27 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 ast::Expr::Call(ast::ExprCall {
                     range: _,
                     func: callable,
-                    arguments,
-                }) if arguments.args.len() == 1 && arguments.keywords.len() == 0 => {
+                    arguments:
+                        ast::Arguments {
+                            args,
+                            keywords,
+                            range: _,
+                        },
+                }) if rhs_ty.is_class_literal() && keywords.is_empty() => {
+                    let [ast::Expr::Name(ast::ExprName { id, .. })] = &**args else {
+                        continue;
+                    };
+
+                    let is_valid_constraint = if is_positive {
+                        op == &ast::CmpOp::Is
+                    } else {
+                        op == &ast::CmpOp::IsNot
+                    };
+
+                    if !is_valid_constraint {
+                        continue;
+                    }
+
                     let callable_ty =
                         inference.expression_ty(callable.scoped_expression_id(self.db, scope));
 
@@ -344,17 +363,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         .into_class_literal()
                         .is_some_and(|c| c.class.is_known(self.db, KnownClass::Type))
                     {
-                        if let Some(id) = arguments.args[0].as_name_expr().map(|name| &name.id) {
-                            let symbol = self
-                                .symbols()
-                                .symbol_id_by_name(id)
-                                .expect("Should always have a symbol for every Name node");
-                            if ast::CmpOp::Is == if is_positive { *op } else { op.negate() } {
-                                if rhs_ty.is_class_literal() {
-                                    constraints.insert(symbol, rhs_ty.to_instance(self.db));
-                                }
-                            }
-                        }
+                        let symbol = self
+                            .symbols()
+                            .symbol_id_by_name(id)
+                            .expect("Should always have a symbol for every Name node");
+                        constraints.insert(symbol, rhs_ty.to_instance(self.db));
                     }
                 }
                 _ => {}
