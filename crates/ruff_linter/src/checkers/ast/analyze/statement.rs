@@ -1520,7 +1520,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
             }
             if checker.enabled(Rule::UnshieldedAsync) {
-                ruff::rules::unshielded_aasync_for_try(checker, handlers, finalbody);
+                ruff::rules::unshielded_async_for_try(checker, handlers, finalbody);
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {

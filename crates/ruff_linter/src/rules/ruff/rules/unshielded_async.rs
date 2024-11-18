@@ -55,7 +55,7 @@ impl Violation for UnshieldedAsync {
 }
 
 /// RUF102
-pub(crate) fn unshielded_aasync_for_try(
+pub(crate) fn unshielded_async_for_try(
     checker: &mut Checker,
     handlers: &Vec<ExceptHandler>,
     finalbody: &[Stmt],
