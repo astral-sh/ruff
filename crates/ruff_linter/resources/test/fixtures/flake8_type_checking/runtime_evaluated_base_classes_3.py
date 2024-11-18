@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import pathlib
-from uuid import UUID  # TCH003
+from uuid import UUID  # TC003
 
 import pydantic
 from pydantic import BaseModel
