@@ -2292,11 +2292,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 if !conversion.is_none() {
                                     collector.add_expression();
                                 } else if let Some(ref format_spec) = format_spec {
-                                    for element in &format_spec.elements {
-                                        if let ast::FStringElement::Expression(expression) = element
-                                        {
-                                            self.infer_expression(&expression.expression);
-                                        }
+                                    for element in format_spec.elements.expressions() {
+                                        self.infer_expression(&element.expression);
                                     }
 
                                     collector.add_expression();
