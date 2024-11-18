@@ -96,7 +96,7 @@ enum Action {
     Ignore,
 }
 
-/// TCH004
+/// TC004
 pub(crate) fn runtime_import_in_type_checking_block(
     checker: &Checker,
     scope: &Scope,

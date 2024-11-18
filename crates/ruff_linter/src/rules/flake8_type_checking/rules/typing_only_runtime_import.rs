@@ -243,7 +243,7 @@ impl Violation for TypingOnlyStandardLibraryImport {
     }
 }
 
-/// TCH001, TCH002, TCH003
+/// TC001, TC002, TC003
 pub(crate) fn typing_only_runtime_import(
     checker: &Checker,
     scope: &Scope,
