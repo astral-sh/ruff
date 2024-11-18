@@ -257,12 +257,26 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        fn is_narrowing_target_candidate(expr: &ast::Expr) -> bool {
+            matches!(expr, ast::Expr::Name(_) | ast::Expr::Call(_))
+        }
+
         let ast::ExprCompare {
             range: _,
             left,
             ops,
             comparators,
         } = expr_compare;
+
+        // Performance optimization: early return if there are no potential narrowing targets.
+        if !is_narrowing_target_candidate(left)
+            && comparators
+                .iter()
+                .all(|c| !is_narrowing_target_candidate(c))
+        {
+            return None;
+        }
+
         if !is_positive && comparators.len() > 1 {
             // We can't negate a constraint made by a multi-comparator expression, since we can't
             // know which comparison part is the one being negated.
