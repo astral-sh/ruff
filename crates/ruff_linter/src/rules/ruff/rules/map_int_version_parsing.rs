@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall, ExprName};
+use ruff_python_ast as ast;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -45,14 +45,14 @@ impl Violation for MapIntVersionParsing {
 }
 
 /// RUF048
-pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     let Some((first, second)) = map_call_with_two_arguments(semantic, call) else {
         return;
     };
 
-    if semantic.match_builtin_expr(first, "int") && is_dunder_version_split_dot(second) {
+    if is_dunder_version_split_dot(second) && semantic.match_builtin_expr(first, "int") {
         checker
             .diagnostics
             .push(Diagnostic::new(MapIntVersionParsing, call.range()));
@@ -61,15 +61,28 @@ pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ExprCall) {
 
 fn map_call_with_two_arguments<'a>(
     semantic: &SemanticModel,
-    call: &'a ExprCall,
-) -> Option<(&'a Expr, &'a Expr)> {
-    let (func, positionals) = func_and_positionals(call)?;
+    call: &'a ast::ExprCall,
+) -> Option<(&'a ast::Expr, &'a ast::Expr)> {
+    let ast::ExprCall {
+        func,
+        arguments:
+            ast::Arguments {
+                args,
+                keywords,
+                range: _,
+            },
+        range: _,
+    } = call;
 
-    if !semantic.match_builtin_expr(func, "map") {
+    if !keywords.is_empty() {
+        return None;
+    }
+
+    let [first, second] = &**args else {
         return None;
     };
 
-    let [first, second] = positionals else {
+    if !semantic.match_builtin_expr(func, "map") {
         return None;
     };
 
@@ -77,68 +90,53 @@ fn map_call_with_two_arguments<'a>(
 }
 
 /// Whether `expr` has the form `__version__.split(".")` or `something.__version__.split(".")`.
-fn is_dunder_version_split_dot(expr: &Expr) -> bool {
-    let Expr::Call(call) = expr else {
-        return false;
-    };
-    let Some((func, arguments)) = func_and_positionals(call) else {
-        return false;
-    };
-
-    let [argument] = arguments else {
+fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
+    let ast::Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
         return false;
     };
 
-    is_dunder_version_split(func) && is_single_dot_string(argument)
+    if arguments.len() != 1 {
+        return false;
+    }
+
+    let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ })) =
+        arguments.find_argument("sep", 0)
+    else {
+        return false;
+    };
+
+    if value.to_str() != "." {
+        return false;
+    }
+
+    is_dunder_version_split(func)
 }
 
-fn is_dunder_version_split(func: &Expr) -> bool {
+fn is_dunder_version_split(func: &ast::Expr) -> bool {
     // foo.__version__.split(".")
     // ---- value ---- ^^^^^ attr
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func else {
+    let ast::Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
         return false;
     };
     if attr != "split" {
         return false;
     }
-
     is_dunder_version(value)
 }
 
-fn is_dunder_version(expr: &Expr) -> bool {
-    if let Expr::Name(ExprName { id, .. }) = expr {
+fn is_dunder_version(expr: &ast::Expr) -> bool {
+    if let ast::Expr::Name(ast::ExprName { id, .. }) = expr {
         return id == "__version__";
     }
 
     // foo.__version__.split(".")
     //     ^^^^^^^^^^^ attr
-    let Expr::Attribute(ExprAttribute { attr, .. }) = expr else {
+    let ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr else {
         return false;
     };
 
     attr == "__version__"
-}
-
-fn is_single_dot_string(argument: &Expr) -> bool {
-    let Some(string) = argument.as_string_literal_expr() else {
-        return false;
-    };
-
-    let mut string_chars = string.value.chars();
-    let (first, second) = (string_chars.next(), string_chars.next());
-
-    matches!((first, second), (Some('.'), None))
-}
-
-/// Extracts the function being called and its positional arguments.
-/// Returns `None` if there are keyword arguments.
-fn func_and_positionals(expr: &ExprCall) -> Option<(&Expr, &[Expr])> {
-    let func = &expr.func;
-    let arguments = &expr.arguments;
-
-    if !arguments.keywords.is_empty() {
-        return None;
-    }
-
-    Some((func.as_ref(), arguments.args.as_ref()))
 }

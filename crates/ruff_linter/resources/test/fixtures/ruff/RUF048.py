@@ -4,6 +4,10 @@ __version__ = (0, 1, 0)
 tuple(map(int, __version__.split(".")))
 list(map(int, __version__.split(".")))
 
+# `sep` passed as keyword argument
+for part in map(int, __version__.split(sep=".")):
+    print(part)
+
 # Comma
 tuple(map(int, __version__.split(",")))
 list(map(int, __version__.split(",")))

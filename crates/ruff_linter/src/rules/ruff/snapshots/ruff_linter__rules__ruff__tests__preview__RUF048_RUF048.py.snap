@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF048.py:4:7: RUF048 `__version__` may contain non-integral-like elements
   |
@@ -15,5 +14,13 @@ RUF048.py:5:6: RUF048 `__version__` may contain non-integral-like elements
 5 | list(map(int, __version__.split(".")))
   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
 6 | 
-7 | # Comma
+7 | # `sep` passed as keyword argument
+  |
+
+RUF048.py:8:13: RUF048 `__version__` may contain non-integral-like elements
+  |
+7 | # `sep` passed as keyword argument
+8 | for part in map(int, __version__.split(sep=".")):
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF048
+9 |     print(part)
   |
