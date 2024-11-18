@@ -47,8 +47,8 @@ If left unspecified, Ruff's default configuration is equivalent to:
     line-length = 88
     indent-width = 4
 
-    # Assume Python 3.8
-    target-version = "py38"
+    # Assume Python 3.9
+    target-version = "py39"
 
     [tool.ruff.lint]
     # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
@@ -129,8 +129,8 @@ If left unspecified, Ruff's default configuration is equivalent to:
     line-length = 88
     indent-width = 4
 
-    # Assume Python 3.8
-    target-version = "py38"
+    # Assume Python 3.9
+    target-version = "py39"
 
     [lint]
     # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
