@@ -286,8 +286,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     id,
                     ctx: _,
                 }) => {
-                    // SAFETY: we should always have a symbol for every Name node.
-                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                    let symbol = self
+                        .symbols()
+                        .symbol_id_by_name(id)
+                        .expect("Should always have a symbol for every Name node");
 
                     match if is_positive { *op } else { op.negate() } {
                         ast::CmpOp::IsNot => {
@@ -326,12 +328,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                     if callable_ty
                         .into_class_literal()
-                        .map(|c| c.class.is_known(self.db, KnownClass::Type))
-                        .unwrap_or(false)
+                        .is_some_and(|c| c.class.is_known(self.db, KnownClass::Type))
                         && arguments.len() == 1
                     {
                         if let Some(id) = arguments.args[0].as_name_expr().map(|name| &name.id) {
-                            let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                            let symbol = self
+                                .symbols()
+                                .symbol_id_by_name(id)
+                                .expect("Should always have a symbol for every Name node");
                             if ast::CmpOp::Is == if is_positive { *op } else { op.negate() } {
                                 if rhs_ty.is_class_literal() {
                                     constraints.insert(symbol, rhs_ty.to_instance(self.db));
