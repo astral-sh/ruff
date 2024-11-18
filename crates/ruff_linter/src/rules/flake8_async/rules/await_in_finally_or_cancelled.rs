@@ -129,7 +129,7 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Vec<
             if let Some(name) = semantic.resolve_qualified_name(&call.func) {
                 if name.segments() == ["anyio", "get_cancelled_exc_class"] {
                     // TODO kinda hacking here by just picking a thing we'll detect as of interest
-                    f.push(vec!["", "BaseException"])
+                    f.push(vec!["", "BaseException"]);
                 }
             }
         }
@@ -207,7 +207,7 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                         vec!["trio", "aclose_forcefully"],
                     ];
                     let segments = &Vec::from(name.segments());
-                    if allowed_async_calls.contains(&segments) {
+                    if allowed_async_calls.contains(segments) {
                         return;
                     }
                 }
