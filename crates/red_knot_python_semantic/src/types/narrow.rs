@@ -322,7 +322,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     range: _,
                     func: callable,
                     arguments,
-                }) if arguments.len() == 1 => {
+                }) if arguments.args.len() == 1 && arguments.keywords.len() == 0 => {
                     let callable_ty =
                         inference.expression_ty(callable.scoped_expression_id(self.db, scope));
 
