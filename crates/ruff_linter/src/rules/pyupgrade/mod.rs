@@ -99,19 +99,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
-    fn preview(rule_code: Rule, path: &Path) -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade").join(path),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
     #[test]
     fn async_timeout_error_alias_not_applied_py310() -> Result<()> {
         let diagnostics = test_path(
