@@ -512,6 +512,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
                 ruff::rules::function_call_in_dataclass_default(checker, class_def);
             }
+            if checker.enabled(Rule::ImplicitClassVarInDataclass) {
+                ruff::rules::implicit_class_var_in_dataclass(checker, class_def);
+            }
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
