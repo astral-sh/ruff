@@ -44,9 +44,9 @@ use ruff_text_size::{Ranged, TextRange};
 /// ## References
 /// - [AnyIO shielding](https://anyio.readthedocs.io/en/stable/cancellation.html#shielding)
 #[violation]
-pub struct UnshieldedAsync;
+pub struct AwaitInFinallyOrCancelled;
 
-impl Violation for UnshieldedAsync {
+impl Violation for AwaitInFinallyOrCancelled {
     #[derive_message_formats]
     fn message(&self) -> String {
         "shield it!".to_string()
@@ -54,7 +54,7 @@ impl Violation for UnshieldedAsync {
 }
 
 /// RUF102
-pub(crate) fn unshielded_async_for_try(
+pub(crate) fn await_in_finally_or_cancelled(
     checker: &mut Checker,
     handlers: &Vec<ExceptHandler>,
     finalbody: &[Stmt],
@@ -107,7 +107,7 @@ pub(crate) fn unshielded_async_for_try(
     for range in unshielded_async_ranges {
         checker
             .diagnostics
-            .push(Diagnostic::new(UnshieldedAsync {}, range));
+            .push(Diagnostic::new(AwaitInFinallyOrCancelled {}, range));
     }
 }
 
