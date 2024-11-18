@@ -26,8 +26,8 @@ mod tests {
     #[test_case(Rule::AmbiguousClassName, Path::new("E742.py"))]
     #[test_case(Rule::AmbiguousFunctionName, Path::new("E743.py"))]
     #[test_case(Rule::AmbiguousVariableName, Path::new("E741.py"))]
-    // E741 has different behaviour for `.pyi` files in preview mode;
-    // this test case checks it still has the old behaviour in stable mode
+    // E741 is disapplied for `.pyi` files (see #13119 for rationale);
+    // this fixture tests that we emit no errors there
     #[test_case(Rule::AmbiguousVariableName, Path::new("E741.pyi"))]
     #[test_case(Rule::LambdaAssignment, Path::new("E731.py"))]
     #[test_case(Rule::BareExcept, Path::new("E722.py"))]
