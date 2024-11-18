@@ -51,6 +51,11 @@ use crate::fix;
 ///     """Placeholder docstring."""
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe in the rare case that the `pass` or ellipsis
+/// is followed by a string literal, since removal of the placeholder would convert the
+/// subsequent string literal into a docstring.
+///
 /// ## References
 /// - [Python documentation: The `pass` statement](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
 #[violation]
@@ -108,7 +113,7 @@ pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-#[inline]
+/// Add a diagnostic for the given statement.
 fn add_diagnostic(
     checker: &mut Checker,
     stmt: &Stmt,
