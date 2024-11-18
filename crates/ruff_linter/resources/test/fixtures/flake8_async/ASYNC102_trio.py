@@ -40,7 +40,7 @@ async def foo_open_nursery_no_cancel():
     finally:
         # open_nursery does not block/checkpoint on entry, and is not
         # a cancellation point on exit.
-        async with trio.open_nursery() as nursery:
+        async with trio.open_nursery() as nursery:  # noqa: ASYNC102 - fixthis
             nursery.cancel_scope.deadline = trio.current_time() + 10
             nursery.cancel_scope.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis

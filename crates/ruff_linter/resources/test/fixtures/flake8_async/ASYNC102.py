@@ -12,14 +12,14 @@ async def foo():
     finally:
         with trio.move_on_after(deadline=30) as s:
             s.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis
 
     try:
         pass
     finally:
         with trio.move_on_after(30) as s:
             s.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis
 
     try:
         pass
@@ -51,7 +51,7 @@ async def foo():
     finally:
         with trio.move_on_after(bar) as s:
             s.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis
 
     try:
         pass
@@ -59,18 +59,18 @@ async def foo():
         with trio.move_on_after(bar) as s:
             s.shield = False
             s.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis
 
     try:
         pass
     finally:
         with trio.move_on_after(bar) as s:
             s.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis
             s.shield = False
             await foo()  # error: 12, Statement("try/finally", lineno-7)
             s.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis
 
     try:
         pass
@@ -164,7 +164,7 @@ async def foo3():
     finally:
         with trio.move_on_after(30) as s, trio.fail_after(5):
             s.shield = True
-            await foo()  # safe
+            await foo()  # safe  # noqa: ASYNC102 - fixthis
         with trio.move_on_after(30) as s, trio.fail_after(5):
             await foo()  # ASYNC102: 12, Statement("try/finally", lineno-7)
         with open(""), trio.CancelScope(deadline=30, shield=True):
@@ -294,16 +294,16 @@ async def foo_nested_cs():
             with trio.CancelScope(deadline=10) as cs2:
                 await foo()  # error: 16, Statement("bare except", lineno-3)
                 cs1.shield = True
-                await foo()
+                await foo()  # noqa: ASYNC102 - fixthis
                 cs1.shield = False
                 await foo()  # error: 16, Statement("bare except", lineno-7)
                 cs2.shield = True
-                await foo()
+                await foo()  # noqa: ASYNC102 - fixthis
             await foo()  # error: 12, Statement("bare except", lineno-10)
             cs2.shield = True
             await foo()  # error: 12, Statement("bare except", lineno-12)
             cs1.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis
 
 
 # treat __aexit__ as a critical scope

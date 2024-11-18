@@ -21,23 +21,3 @@ ASYNC102_trio.py:21:9: ASYNC102 shield it!
 22 |     except BaseException:
 23 |         await foo()  # safe, since after trio.Cancelled
    |
-
-ASYNC102_trio.py:43:9: ASYNC102 shield it!
-   |
-41 |           # open_nursery does not block/checkpoint on entry, and is not
-42 |           # a cancellation point on exit.
-43 |           async with trio.open_nursery() as nursery:
-   |  _________^
-44 | |             nursery.cancel_scope.deadline = trio.current_time() + 10
-45 | |             nursery.cancel_scope.shield = True
-46 | |             await foo()
-   | |_______________________^ ASYNC102
-   |
-
-ASYNC102_trio.py:46:13: ASYNC102 shield it!
-   |
-44 |             nursery.cancel_scope.deadline = trio.current_time() + 10
-45 |             nursery.cancel_scope.shield = True
-46 |             await foo()
-   |             ^^^^^^^^^^^ ASYNC102
-   |

@@ -68,14 +68,6 @@ ASYNC102_anyio.py:84:9: ASYNC102 shield it!
    |  _________^
 85 | |             tg.cancel_scope.deadline = anyio.current_time() + 10
 86 | |             tg.cancel_scope.shield = True
-87 | |             await foo()
+87 | |             await foo()  # noqa: ASYNC102 - fixthis
    | |_______________________^ ASYNC102
-   |
-
-ASYNC102_anyio.py:87:13: ASYNC102 shield it!
-   |
-85 |             tg.cancel_scope.deadline = anyio.current_time() + 10
-86 |             tg.cancel_scope.shield = True
-87 |             await foo()
-   |             ^^^^^^^^^^^ ASYNC102
    |

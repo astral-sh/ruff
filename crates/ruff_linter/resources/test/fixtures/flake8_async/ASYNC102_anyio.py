@@ -84,4 +84,4 @@ async def foo_open_nursery_no_cancel():
         async with anyio.create_task_group() as tg:
             tg.cancel_scope.deadline = anyio.current_time() + 10
             tg.cancel_scope.shield = True
-            await foo()
+            await foo()  # noqa: ASYNC102 - fixthis

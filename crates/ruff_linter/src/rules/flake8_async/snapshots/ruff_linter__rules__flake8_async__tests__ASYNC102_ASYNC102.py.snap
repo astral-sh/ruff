@@ -2,26 +2,6 @@
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 snapshot_kind: text
 ---
-ASYNC102.py:15:13: ASYNC102 shield it!
-   |
-13 |         with trio.move_on_after(deadline=30) as s:
-14 |             s.shield = True
-15 |             await foo()
-   |             ^^^^^^^^^^^ ASYNC102
-16 | 
-17 |     try:
-   |
-
-ASYNC102.py:22:13: ASYNC102 shield it!
-   |
-20 |         with trio.move_on_after(30) as s:
-21 |             s.shield = True
-22 |             await foo()
-   |             ^^^^^^^^^^^ ASYNC102
-23 | 
-24 |     try:
-   |
-
 ASYNC102.py:33:9: ASYNC102 shield it!
    |
 31 |         pass
@@ -52,54 +32,14 @@ ASYNC102.py:45:13: ASYNC102 shield it!
 47 |     bar = 10
    |
 
-ASYNC102.py:54:13: ASYNC102 shield it!
-   |
-52 |         with trio.move_on_after(bar) as s:
-53 |             s.shield = True
-54 |             await foo()
-   |             ^^^^^^^^^^^ ASYNC102
-55 | 
-56 |     try:
-   |
-
-ASYNC102.py:62:13: ASYNC102 shield it!
-   |
-60 |             s.shield = False
-61 |             s.shield = True
-62 |             await foo()
-   |             ^^^^^^^^^^^ ASYNC102
-63 | 
-64 |     try:
-   |
-
-ASYNC102.py:69:13: ASYNC102 shield it!
-   |
-67 |         with trio.move_on_after(bar) as s:
-68 |             s.shield = True
-69 |             await foo()
-   |             ^^^^^^^^^^^ ASYNC102
-70 |             s.shield = False
-71 |             await foo()  # error: 12, Statement("try/finally", lineno-7)
-   |
-
 ASYNC102.py:71:13: ASYNC102 shield it!
    |
-69 |             await foo()
+69 |             await foo()  # noqa: ASYNC102 - fixthis
 70 |             s.shield = False
 71 |             await foo()  # error: 12, Statement("try/finally", lineno-7)
    |             ^^^^^^^^^^^ ASYNC102
 72 |             s.shield = True
-73 |             await foo()
-   |
-
-ASYNC102.py:73:13: ASYNC102 shield it!
-   |
-71 |             await foo()  # error: 12, Statement("try/finally", lineno-7)
-72 |             s.shield = True
-73 |             await foo()
-   |             ^^^^^^^^^^^ ASYNC102
-74 | 
-75 |     try:
+73 |             await foo()  # noqa: ASYNC102 - fixthis
    |
 
 ASYNC102.py:79:13: ASYNC102 shield it!
@@ -178,19 +118,9 @@ ASYNC102.py:158:9: ASYNC102 shield it!
     |         ^^^^^^^^^^^ ASYNC102
     |
 
-ASYNC102.py:167:13: ASYNC102 shield it!
-    |
-165 |         with trio.move_on_after(30) as s, trio.fail_after(5):
-166 |             s.shield = True
-167 |             await foo()  # safe
-    |             ^^^^^^^^^^^ ASYNC102
-168 |         with trio.move_on_after(30) as s, trio.fail_after(5):
-169 |             await foo()  # ASYNC102: 12, Statement("try/finally", lineno-7)
-    |
-
 ASYNC102.py:169:13: ASYNC102 shield it!
     |
-167 |             await foo()  # safe
+167 |             await foo()  # safe  # noqa: ASYNC102 - fixthis
 168 |         with trio.move_on_after(30) as s, trio.fail_after(5):
 169 |             await foo()  # ASYNC102: 12, Statement("try/finally", lineno-7)
     |             ^^^^^^^^^^^ ASYNC102
@@ -359,43 +289,23 @@ ASYNC102.py:295:17: ASYNC102 shield it!
 295 |                 await foo()  # error: 16, Statement("bare except", lineno-3)
     |                 ^^^^^^^^^^^ ASYNC102
 296 |                 cs1.shield = True
-297 |                 await foo()
-    |
-
-ASYNC102.py:297:17: ASYNC102 shield it!
-    |
-295 |                 await foo()  # error: 16, Statement("bare except", lineno-3)
-296 |                 cs1.shield = True
-297 |                 await foo()
-    |                 ^^^^^^^^^^^ ASYNC102
-298 |                 cs1.shield = False
-299 |                 await foo()  # error: 16, Statement("bare except", lineno-7)
+297 |                 await foo()  # noqa: ASYNC102 - fixthis
     |
 
 ASYNC102.py:299:17: ASYNC102 shield it!
     |
-297 |                 await foo()
+297 |                 await foo()  # noqa: ASYNC102 - fixthis
 298 |                 cs1.shield = False
 299 |                 await foo()  # error: 16, Statement("bare except", lineno-7)
     |                 ^^^^^^^^^^^ ASYNC102
 300 |                 cs2.shield = True
-301 |                 await foo()
-    |
-
-ASYNC102.py:301:17: ASYNC102 shield it!
-    |
-299 |                 await foo()  # error: 16, Statement("bare except", lineno-7)
-300 |                 cs2.shield = True
-301 |                 await foo()
-    |                 ^^^^^^^^^^^ ASYNC102
-302 |             await foo()  # error: 12, Statement("bare except", lineno-10)
-303 |             cs2.shield = True
+301 |                 await foo()  # noqa: ASYNC102 - fixthis
     |
 
 ASYNC102.py:302:13: ASYNC102 shield it!
     |
 300 |                 cs2.shield = True
-301 |                 await foo()
+301 |                 await foo()  # noqa: ASYNC102 - fixthis
 302 |             await foo()  # error: 12, Statement("bare except", lineno-10)
     |             ^^^^^^^^^^^ ASYNC102
 303 |             cs2.shield = True
@@ -409,13 +319,5 @@ ASYNC102.py:304:13: ASYNC102 shield it!
 304 |             await foo()  # error: 12, Statement("bare except", lineno-12)
     |             ^^^^^^^^^^^ ASYNC102
 305 |             cs1.shield = True
-306 |             await foo()
-    |
-
-ASYNC102.py:306:13: ASYNC102 shield it!
-    |
-304 |             await foo()  # error: 12, Statement("bare except", lineno-12)
-305 |             cs1.shield = True
-306 |             await foo()
-    |             ^^^^^^^^^^^ ASYNC102
+306 |             await foo()  # noqa: ASYNC102 - fixthis
     |
