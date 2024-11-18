@@ -6,7 +6,8 @@
 class A: ...
 class B: ...
 
-def get_a_or_b() -> A | B: ...
+def get_a_or_b() -> A | B:
+    return A()
 
 x = get_a_or_b()
 
@@ -25,7 +26,8 @@ else:
 class A: ...
 class B: ...
 
-def get_a_or_b() -> A | B: ...
+def get_a_or_b() -> A | B:
+    return A()
 
 x = get_a_or_b()
 
@@ -52,7 +54,8 @@ class IsEqualToEverything(type):
 class A(metaclass=IsEqualToEverything): ...
 class B(metaclass=IsEqualToEverything): ...
 
-def get_a_or_b() -> A | B: ...
+def get_a_or_b() -> A | B:
+    return B()
 
 x = get_a_or_b()
 
@@ -72,7 +75,8 @@ class B: ...
 def type(x):
     return int
 
-def get_a_or_b() -> A | B: ...
+def get_a_or_b() -> A | B:
+    return A()
 
 x = get_a_or_b()
 
@@ -87,7 +91,8 @@ else:
 No narrowing should occur if `type` is used to dynamically create a class:
 
 ```py
-def get_str_or_int() -> str | int: ...
+def get_str_or_int() -> str | int:
+    return "test"
 
 x = get_str_or_int()
 
@@ -105,7 +110,8 @@ class B: ...
 
 alias_for_type = type
 
-def get_a_or_b() -> A | B: ...
+def get_a_or_b() -> A | B:
+    return A()
 
 x = get_a_or_b()
 
@@ -119,7 +125,8 @@ if alias_for_type(x) is A:
 class Base: ...
 class Derived(Base): ...
 
-def get_base() -> Base: ...
+def get_base() -> Base:
+    return Base()
 
 x = get_base()
 
