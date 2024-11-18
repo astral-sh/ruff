@@ -263,11 +263,6 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             ops,
             comparators,
         } = expr_compare;
-        if !left.is_name_expr() && comparators.iter().all(|c| !c.is_name_expr()) {
-            // If none of the comparators are name expressions,
-            // we have no symbol to narrow down the type of.
-            return None;
-        }
         if !is_positive && comparators.len() > 1 {
             // We can't negate a constraint made by a multi-comparator expression, since we can't
             // know which comparison part is the one being negated.
@@ -283,42 +278,69 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
         let mut constraints = NarrowingConstraints::default();
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
-            if let ast::Expr::Name(ast::ExprName {
-                range: _,
-                id,
-                ctx: _,
-            }) = left
-            {
-                // SAFETY: we should always have a symbol for every Name node.
-                let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-                let rhs_ty = inference.expression_ty(right.scoped_expression_id(self.db, scope));
+            let rhs_ty = inference.expression_ty(right.scoped_expression_id(self.db, scope));
 
-                match if is_positive { *op } else { op.negate() } {
-                    ast::CmpOp::IsNot => {
-                        if rhs_ty.is_singleton(self.db) {
-                            let ty = IntersectionBuilder::new(self.db)
-                                .add_negative(rhs_ty)
-                                .build();
-                            constraints.insert(symbol, ty);
-                        } else {
-                            // Non-singletons cannot be safely narrowed using `is not`
+            match left {
+                ast::Expr::Name(ast::ExprName {
+                    range: _,
+                    id,
+                    ctx: _,
+                }) => {
+                    // SAFETY: we should always have a symbol for every Name node.
+                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+
+                    match if is_positive { *op } else { op.negate() } {
+                        ast::CmpOp::IsNot => {
+                            if rhs_ty.is_singleton(self.db) {
+                                let ty = IntersectionBuilder::new(self.db)
+                                    .add_negative(rhs_ty)
+                                    .build();
+                                constraints.insert(symbol, ty);
+                            } else {
+                                // Non-singletons cannot be safely narrowed using `is not`
+                            }
                         }
-                    }
-                    ast::CmpOp::Is => {
-                        constraints.insert(symbol, rhs_ty);
-                    }
-                    ast::CmpOp::NotEq => {
-                        if rhs_ty.is_single_valued(self.db) {
-                            let ty = IntersectionBuilder::new(self.db)
-                                .add_negative(rhs_ty)
-                                .build();
-                            constraints.insert(symbol, ty);
+                        ast::CmpOp::Is => {
+                            constraints.insert(symbol, rhs_ty);
                         }
-                    }
-                    _ => {
-                        // TODO other comparison types
+                        ast::CmpOp::NotEq => {
+                            if rhs_ty.is_single_valued(self.db) {
+                                let ty = IntersectionBuilder::new(self.db)
+                                    .add_negative(rhs_ty)
+                                    .build();
+                                constraints.insert(symbol, ty);
+                            }
+                        }
+                        _ => {
+                            // TODO other comparison types
+                        }
                     }
                 }
+                ast::Expr::Call(ast::ExprCall {
+                    range: _,
+                    func: callable,
+                    arguments,
+                }) => {
+                    let callable_ty =
+                        inference.expression_ty(callable.scoped_expression_id(self.db, scope));
+
+                    if callable_ty
+                        .into_class_literal()
+                        .map(|c| c.class.is_known(self.db, KnownClass::Type))
+                        .unwrap_or(false)
+                        && arguments.len() == 1
+                    {
+                        if let Some(id) = arguments.args[0].as_name_expr().map(|name| &name.id) {
+                            let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                            if ast::CmpOp::Is == if is_positive { *op } else { op.negate() } {
+                                if rhs_ty.is_class_literal() {
+                                    constraints.insert(symbol, rhs_ty.to_instance(self.db));
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
         Some(constraints)
