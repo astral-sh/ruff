@@ -6,7 +6,7 @@ from anyio import CancelScope as CS
 
 async def pass_no_await():
     try:
-        await asyncio.sleep(1)
+        pass
     except Exception as e:
         print(f"{e}")
         raise
@@ -14,7 +14,7 @@ async def pass_no_await():
 
 async def pass_shielded():
     try:
-        await asyncio.sleep(1)
+        pass
     except Exception as e:
         with anyio.CancelScope(shield=True):
             await asyncio.sleep(1)
@@ -32,7 +32,7 @@ async def pass_shielded():
 
 async def pass_just_value_error():
     try:
-        await asyncio.sleep(1)
+        pass
     except ValueError as e:
         await asyncio.sleep(1)
         print(f"{e}")
@@ -41,7 +41,7 @@ async def pass_just_value_error():
 
 async def fail_exception():
     try:
-        await asyncio.sleep(1)
+        pass
     except Exception as e:
         await asyncio.sleep(1)
         print(f"{e}")
@@ -50,7 +50,7 @@ async def fail_exception():
 
 async def fail_cancelled_error():
     try:
-        await asyncio.sleep(1)
+        pass
     except asyncio.CancelledError as e:
         await asyncio.sleep(1)
         print(f"{e}")
@@ -59,7 +59,7 @@ async def fail_cancelled_error():
 
 async def fail_nested_exception():
     try:
-        await asyncio.sleep(1)
+        pass
     except ((ZeroDivisionError, Exception), ValueError) as e:
         await asyncio.sleep(1)
         print(f"{e}")
@@ -68,7 +68,7 @@ async def fail_nested_exception():
 
 async def fail_finally():
     try:
-        await asyncio.sleep(1)
+        pass
     finally:
         await asyncio.sleep(1)
         print(f"{e}")
@@ -76,7 +76,7 @@ async def fail_finally():
 
 async def fail_async_with():
     try:
-        await asyncio.sleep(1)
+        pass
     finally:
         async with anyio.create_task_group() as tg:
             pass
