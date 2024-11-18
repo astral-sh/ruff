@@ -218,6 +218,34 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         return;
     }
 
+    // Avoid if the for-loop target is used outside of the for loop, e.g.,
+    //
+    // ```python
+    // for x in y:
+    //     filtered.append(x)
+    // print(x)
+    // ```
+    //
+    // If this were a comprehension, x would no longer have the correct scope:
+    //
+    // ```python
+    // filtered = [x for x in y]
+    // print(x)
+    // ```
+    let for_loop_target = checker
+        .semantic()
+        .lookup_symbol(id.as_str())
+        .map(|id| checker.semantic().binding(id))
+        .expect("for loop target must exist");
+    // TODO: this currently does not properly find usages outside the for loop; figure out why
+    if for_loop_target
+        .references()
+        .map(|id| checker.semantic().reference(id))
+        .any(|reference| !for_stmt.range.contains_range(reference.range()))
+    {
+        return;
+    }
+
     let binding_stmt = binding
         .statement(checker.semantic())
         .and_then(|stmt| stmt.as_assign_stmt());
@@ -261,7 +289,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         // if there's more than one, then it's been accessed in the middle somewhere, so it's not safe to change into a list comprehension
         count < 2
     });
-    
+
     // If the binding has multiple statements on its line, it gets more complicated to fix, so we use an extend
     // TODO: make this work
     let binding_only_stmt_on_line = binding_stmt.is_some_and(|_binding_stmt| true);

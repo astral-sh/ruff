@@ -279,6 +279,8 @@ PERF401.py:158:9: PERF401 [*] Use `list.extend` to create a transformed list
 157 |     for i in range(10):
 158 |         result.append(i*2) # PERF401
     |         ^^^^^^^^^^^^^^^^^^ PERF401
+159 | 
+160 | def f():
     |
     = help: Replace for loop with list.extend
 
@@ -289,3 +291,26 @@ PERF401.py:158:9: PERF401 [*] Use `list.extend` to create a transformed list
 157     |-    for i in range(10):
 158     |-        result.append(i*2) # PERF401
     157 |+    result.extend(i*2 for i in range(10)) # PERF401
+159 158 | 
+160 159 | def f():
+161 160 |     result = []
+
+PERF401.py:169:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+167 |     result = []
+168 |     for val in range(5):
+169 |         result.append(val * 2) # Ok
+    |         ^^^^^^^^^^^^^^^^^^^^^^ PERF401
+170 |     print(val)
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+164 164 |         result.append(i*2) # PERF401
+165 165 | 
+166 166 | def f():
+167     |-    result = []
+168     |-    for val in range(5):
+169     |-        result.append(val * 2) # Ok
+    167 |+    result = [val * 2 for val in range(5)] # Ok
+170 168 |     print(val)

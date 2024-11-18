@@ -156,3 +156,15 @@ def f():
     result.append(1)
     for i in range(10):
         result.append(i*2) # PERF401
+
+def f():
+    result = []
+    result += [1]
+    for i in range(10):
+        result.append(i*2) # PERF401
+
+def f():
+    result = []
+    for val in range(5):
+        result.append(val * 2) # Ok
+    print(val)
