@@ -1,5 +1,3 @@
-# license-files is wrong here
-# https://github.com/PyO3/maturin/issues/1615
 [build-system]
 requires = [ "maturin>=0.14", "numpy", "wheel", "patchelf",]
 build-backend = "maturin"
