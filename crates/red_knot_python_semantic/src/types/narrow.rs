@@ -322,14 +322,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     range: _,
                     func: callable,
                     arguments,
-                }) => {
+                }) if arguments.len() == 1 => {
                     let callable_ty =
                         inference.expression_ty(callable.scoped_expression_id(self.db, scope));
 
                     if callable_ty
                         .into_class_literal()
                         .is_some_and(|c| c.class.is_known(self.db, KnownClass::Type))
-                        && arguments.len() == 1
                     {
                         if let Some(id) = arguments.args[0].as_name_expr().map(|name| &name.id) {
                             let symbol = self
