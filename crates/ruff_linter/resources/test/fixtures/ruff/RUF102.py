@@ -73,3 +73,10 @@ async def fail_finally():
         await asyncio.sleep(1)
         print(f"{e}")
         raise
+
+async def fail_async_with():
+    try:
+        await asyncio.sleep(1)
+    finally:
+        async with anyio.create_task_group() as tg:
+            pass

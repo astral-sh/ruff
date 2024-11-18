@@ -4,10 +4,10 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprAttribute, ExprCall, Stmt,
+    self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprCall, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
 /// TODO
@@ -37,6 +37,8 @@ pub(crate) fn unshielded_await_for_try(
     handlers: &Vec<ExceptHandler>,
     finalbody: &[Stmt],
 ) {
+    let mut unshielded_await_ranges: Vec<TextRange> = vec![];
+
     for handler in handlers {
         let ExceptHandler::ExceptHandler(handler) = handler;
 
@@ -64,24 +66,18 @@ pub(crate) fn unshielded_await_for_try(
         }
 
         // If there are no awaits then there is nothing to shield
-        let mut visitor = PrunedAwaitVisitor { seen_await: false, semantic: checker.semantic() };
+        let mut visitor = PrunedAwaitVisitor { seen_await: false, semantic: checker.semantic(), await_ranges: vec![] };
         visitor.visit_body(&handler.body);
-        if visitor.seen_await {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(UnshieldedAwait {}, handler.range));
-        }
+        unshielded_await_ranges.extend(visitor.await_ranges);
     }
 
     // If there are no awaits then there is nothing to shield
-    let mut visitor = PrunedAwaitVisitor { seen_await: false, semantic: checker.semantic() };
+    let mut visitor = PrunedAwaitVisitor { seen_await: false, semantic: checker.semantic(), await_ranges: vec![] };
     visitor.visit_body(finalbody);
-    if visitor.seen_await {
-        checker.diagnostics.push(Diagnostic::new(
-            UnshieldedAwait {},
-            // TODO yeah not sure where to get the finally range itself
-            finalbody[0].range(),
-        ));
+    unshielded_await_ranges.extend(visitor.await_ranges);
+
+    for range in unshielded_await_ranges {
+        checker.diagnostics.push(Diagnostic::new(UnshieldedAwait {}, range));
     }
 }
 
@@ -110,6 +106,7 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Qual
 /// A [`Visitor`] that detects the presence of `await` expressions in the current scope.
 struct PrunedAwaitVisitor<'a> {
     seen_await: bool,
+    await_ranges: Vec<TextRange>,
     semantic: &'a SemanticModel<'a>,
 }
 
@@ -119,6 +116,7 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
             Stmt::With(ast::StmtWith { is_async: true, .. }) => {
                 self.seen_await = true;
+                self.await_ranges.push(stmt.range());
             }
             Stmt::With(ast::StmtWith {
                 is_async: false,
@@ -144,6 +142,7 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
             }
             Stmt::For(ast::StmtFor { is_async: true, .. }) => {
                 self.seen_await = true;
+                self.await_ranges.push(stmt.range());
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -152,6 +151,7 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
         if let Expr::Await(ast::ExprAwait { .. }) = expr {
             self.seen_await = true;
+            self.await_ranges.push(expr.range());
         } else {
             visitor::walk_expr(self, expr);
         }
@@ -160,6 +160,7 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
     fn visit_comprehension(&mut self, comprehension: &'_ Comprehension) {
         if comprehension.is_async {
             self.seen_await = true;
+            self.await_ranges.push(comprehension.range());
         } else {
             visitor::walk_comprehension(self, comprehension);
         }
