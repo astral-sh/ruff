@@ -1,7 +1,6 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
     self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprBooleanLiteral, ExprCall,
@@ -65,16 +64,25 @@ pub(crate) fn unshielded_async_for_try(
     for handler in handlers {
         let ExceptHandler::ExceptHandler(handler) = handler;
 
-        let Some(t) = handler.type_.as_deref() else {
-            todo!()
+        let interesting_exception_types: Vec<Vec<&str>> = vec![
+            vec!["", "BaseException"],
+            // TODO only for 3.7+, in case we care about older
+            vec!["", "Exception"],
+            // TODO asyncio.CancelledError vs. CancelledError
+            vec!["asyncio", "CancelledError"],
+            // TODO only dependent on configuration?
+            vec!["trio", "Cancelled"],
+        ];
+
+        let types = match handler.type_.as_deref() {
+            Some(t) => flattened_tuple(t, checker.semantic()),
+            None => vec![interesting_exception_types[0].clone()],
         };
 
-        let types = flattened_tuple(t, checker.semantic());
-
-        if !types.iter().any(|tt| {
-            // TODO asyncio.CancelledError vs. CancelledError
-            tt.segments() == ["", "Exception"] || tt.segments() == ["asyncio", "CancelledError"]
-        }) {
+        if !types
+            .iter()
+            .any(|tt| interesting_exception_types.contains(tt))
+        {
             continue;
         }
 
@@ -85,6 +93,7 @@ pub(crate) fn unshielded_async_for_try(
         };
         visitor.visit_body(&handler.body);
         unshielded_async_ranges.extend(visitor.async_ranges);
+        break;
     }
 
     // If there is no async then there is nothing to shield
@@ -102,7 +111,7 @@ pub(crate) fn unshielded_async_for_try(
     }
 }
 
-fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<QualifiedName<'a>> {
+fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Vec<&'a str>> {
     let mut f = vec![];
 
     match t {
@@ -113,10 +122,18 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Qual
         }
         Expr::Name(..) | Expr::Attribute(..) => {
             if let Some(name) = semantic.resolve_qualified_name(t) {
-                f.push(name);
+                f.push(Vec::from(name.segments()));
             } else {
                 panic!("inside unable to handle {t:?}");
             };
+        }
+        Expr::Call(call) => {
+            if let Some(name) = semantic.resolve_qualified_name(&call.func) {
+                if name.segments() == ["anyio", "get_cancelled_exc_class"] {
+                    // TODO kinda hacking here by just picking a thing we'll detect as of interest
+                    f.push(vec!["", "BaseException"])
+                }
+            }
         }
         _ => panic!("outside unable to handle {t:?}"),
     }
@@ -134,13 +151,8 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
-            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
-                self.async_ranges.push(stmt.range());
-            }
             Stmt::With(ast::StmtWith {
-                is_async: false,
-                items,
-                ..
+                is_async, items, ..
             }) => {
                 for item in items {
                     if let Expr::Call(ExprCall {
@@ -153,12 +165,14 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                             // TODO what about x = y(); with y:?
                             let managers: Vec<Vec<&str>> = vec![
                                 vec!["anyio", "CancelScope"],
-                                vec!["anyio", "CancelScope", "bogus"],
                                 vec!["anyio", "move_on_after"],
                                 vec!["anyio", "fail_after"],
+                                vec!["trio", "CancelScope"],
+                                vec!["trio", "move_on_after"],
                             ];
 
-                            if managers.contains(&Vec::from(name.segments())) {
+                            let segments = &Vec::from(name.segments());
+                            if managers.contains(segments) {
                                 for keyword in &arguments.keywords {
                                     if let Some(Identifier { id: name, .. }) = &keyword.arg {
                                         if name.as_str() == "shield"
@@ -175,13 +189,13 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                                     }
                                 }
                             }
+                            if *is_async {
+                                self.async_ranges.push(stmt.range());
+                            }
                         }
                     }
                 }
                 visitor::walk_stmt(self, stmt);
-            }
-            Stmt::For(ast::StmtFor { is_async: true, .. }) => {
-                self.async_ranges.push(stmt.range());
             }
             _ => visitor::walk_stmt(self, stmt),
         }
