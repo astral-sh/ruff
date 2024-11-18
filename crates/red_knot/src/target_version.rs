@@ -46,3 +46,17 @@ impl From<TargetVersion> for red_knot_python_semantic::PythonVersion {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::target_version::TargetVersion;
+    use red_knot_python_semantic::PythonVersion;
+
+    #[test]
+    fn same_default_as_python_version() {
+        assert_eq!(
+            PythonVersion::from(TargetVersion::default()),
+            PythonVersion::default()
+        );
+    }
+}

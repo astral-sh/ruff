@@ -68,6 +68,10 @@ impl PythonVersion {
         Self::Py313
     }
 
+    pub const fn minimal_supported() -> Self {
+        Self::Py37
+    }
+
     pub const fn as_tuple(&self) -> (u8, u8) {
         match self {
             Self::Py37 => (3, 7),
