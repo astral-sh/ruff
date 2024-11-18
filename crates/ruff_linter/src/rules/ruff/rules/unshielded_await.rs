@@ -64,7 +64,7 @@ pub(crate) fn unshielded_await_for_try(
         }
 
         // If there are no awaits then there is nothing to shield
-        let mut visitor = PrunedAwaitVisitor { seen_await: false };
+        let mut visitor = PrunedAwaitVisitor { seen_await: false, semantic: checker.semantic() };
         visitor.visit_body(&handler.body);
         if visitor.seen_await {
             checker
@@ -74,7 +74,7 @@ pub(crate) fn unshielded_await_for_try(
     }
 
     // If there are no awaits then there is nothing to shield
-    let mut visitor = PrunedAwaitVisitor { seen_await: false };
+    let mut visitor = PrunedAwaitVisitor { seen_await: false, semantic: checker.semantic() };
     visitor.visit_body(finalbody);
     if visitor.seen_await {
         checker.diagnostics.push(Diagnostic::new(
@@ -108,12 +108,12 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Qual
 }
 
 /// A [`Visitor`] that detects the presence of `await` expressions in the current scope.
-#[derive(Debug, Default)]
-struct PrunedAwaitVisitor {
+struct PrunedAwaitVisitor<'a> {
     seen_await: bool,
+    semantic: &'a SemanticModel<'a>,
 }
 
-impl Visitor<'_> for PrunedAwaitVisitor {
+impl Visitor<'_> for PrunedAwaitVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
@@ -127,9 +127,14 @@ impl Visitor<'_> for PrunedAwaitVisitor {
             }) => {
                 for item in items {
                     if let Expr::Call(ExprCall { ref func, .. }) = item.context_expr {
-                        if let Expr::Attribute(ExprAttribute { attr, .. }) = &**func {
-                            // TODO resolved name...  what about x = y(); with y:? check the shield argument, etc
-                            if attr.id.as_str() == "CancelScope" {
+                        if let Some(name) = self.semantic.resolve_qualified_name(func) {
+                            let mut builder = QualifiedNameBuilder::default();
+                            builder.push("anyio");
+                            builder.push("CancelScope");
+                            let anyio_cancel_scope = builder.build();
+                            // TODO what about x = y(); with y:? check the shield argument, etc
+                            // TODO i challenge you to make it worse than this
+                            if format!("{name}").as_str() == format!("{anyio_cancel_scope}").as_str() {
                                 return;
                             }
                         }
