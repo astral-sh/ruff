@@ -93,3 +93,13 @@ async def fail_async_with():
     finally:
         async with my_own_async_manager():  # fail
             pass
+
+async def pass_variable_for_exception_types(exceptions_to_process: BaseException) -> Iterator[None]:
+    try:
+        pass
+    except exceptions_to_process as e:
+        # allowing no error since we are not tracking the variable
+        await asyncio.sleep(0)
+    except unknown_name as e:
+        # allowing no error since the variable doesn't even exist
+        await asyncio.sleep(0)

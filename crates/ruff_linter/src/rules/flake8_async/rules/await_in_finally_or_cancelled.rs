@@ -123,8 +123,6 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Vec<
         Expr::Name(..) | Expr::Attribute(..) => {
             if let Some(name) = semantic.resolve_qualified_name(t) {
                 f.push(Vec::from(name.segments()));
-            } else {
-                panic!("inside unable to handle {t:?}");
             };
         }
         Expr::Call(call) => {

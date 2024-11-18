@@ -102,4 +102,6 @@ ASYNC102_old.py:94:9: ASYNC102 shield it!
    |  _________^
 95 | |             pass
    | |________________^ ASYNC102
+96 |   
+97 |   async def pass_variable_for_exception_types(exceptions_to_process: BaseException) -> Iterator[None]:
    |
