@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprCall, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -44,21 +44,11 @@ pub(crate) fn unshielded_await_for_try(
             todo!()
         };
 
-        let mut builder = QualifiedNameBuilder::default();
-        builder.push("asyncio");
-        builder.push("CancelledError");
-        let asyncio_cancelled_error = builder.build();
-
-        let mut builder = QualifiedNameBuilder::default();
-        builder.push("Exception");
-        let exception = builder.build();
-
         let types = flattened_tuple(t, checker.semantic());
 
-        // TODO i challenge you to make it worse than this
         if !types.iter().any(|tt| {
-            format!("{tt}").as_str() == format!("{exception}").as_str()
-                || format!("{tt}").as_str() == format!("{asyncio_cancelled_error}").as_str()
+            // TODO asyncio.CancelledError vs. CancelledError
+            tt.segments() == ["", "Exception"] || tt.segments() == ["asyncio", "CancelledError"]
         }) {
             continue;
         }
@@ -130,15 +120,8 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
                 for item in items {
                     if let Expr::Call(ExprCall { ref func, .. }) = item.context_expr {
                         if let Some(name) = self.semantic.resolve_qualified_name(func) {
-                            let mut builder = QualifiedNameBuilder::default();
-                            builder.push("anyio");
-                            builder.push("CancelScope");
-                            let anyio_cancel_scope = builder.build();
                             // TODO what about x = y(); with y:? check the shield argument, etc
-                            // TODO i challenge you to make it worse than this
-                            if format!("{name}").as_str()
-                                == format!("{anyio_cancel_scope}").as_str()
-                            {
+                            if name.segments() == ["anyio", "CancelScope"] {
                                 return;
                             }
                         }
