@@ -179,3 +179,8 @@ def f():
                 2
             )
         ) # PERF401
+
+def f():
+    result: list[int] = []
+    for i in range(10):
+        result.append(i*2) # PERF401

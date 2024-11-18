@@ -246,14 +246,17 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         return;
     }
 
-    let binding_stmt = binding
-        .statement(checker.semantic())
-        .and_then(|stmt| stmt.as_assign_stmt());
-
+    let binding_stmt = binding.statement(checker.semantic());
+    let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
+        ast::Stmt::AnnAssign(assign) => assign.value.as_ref(),
+        ast::Stmt::Assign(assign) => Some(&assign.value),
+        _ => None,
+    });
+    dbg!(binding_value);
     // If the variable is an empty list literal, then we might be able to replace it with a full list comprehension
     // otherwise, it has to be replaced with a `list.extend`
     let binding_is_empty_list =
-        binding_stmt.is_some_and(|binding_stmt| match binding_stmt.value.as_list_expr() {
+        binding_value.is_some_and(|binding_value| match binding_value.as_list_expr() {
             Some(list_expr) => list_expr.elts.is_empty(),
             None => false,
         });
@@ -270,8 +273,13 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
 
     // If the binding is not a single name expression, it could be replaced with a list comprehension,
     // but not necessarily, so this needs to be manually fixed. This does not apply when using an extend.
+    let binding_target = binding_stmt.and_then(|binding_stmt| match binding_stmt {
+        ast::Stmt::AnnAssign(assign) => Some(std::slice::from_ref(assign.target.as_ref())),
+        ast::Stmt::Assign(assign) => Some(assign.targets.as_slice()),
+        _ => None,
+    });
     let binding_has_one_target = {
-        match binding_stmt.map(|binding_stmt| binding_stmt.targets.as_slice()) {
+        match binding_target {
             Some([only_target]) => only_target.is_name_expr(),
             _ => false,
         }
@@ -279,7 +287,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
 
     // If the binding gets used in between the assignment and the for loop, a list comprehension is no longer safe
     let binding_unused_between = binding_stmt.is_some_and(|binding_stmt| {
-        let from_assign_to_loop = binding_stmt.range.cover(for_stmt.range);
+        let from_assign_to_loop = binding_stmt.range().cover(for_stmt.range);
         // count the number of references between the assignment and the for loop
         let count = binding
             .references()
@@ -394,14 +402,19 @@ fn convert_to_list_extend(
             )))
         }
         ComprehensionType::ListComprehension => {
-            let binding_stmt = binding
+            let binding_stmt_range = binding
                 .statement(checker.semantic())
-                .and_then(|stmt| stmt.as_assign_stmt())
+                .and_then(|stmt| match stmt {
+                    ast::Stmt::AnnAssign(assign) => Some(assign.range),
+                    ast::Stmt::Assign(assign) => Some(assign.range),
+                    _ => None,
+                })
+                .map(|range| locator.full_lines_range(range))
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
             let mut comments_to_move =
-                comment_strings_in_range(locator.full_lines_range(binding_stmt.range));
+                comment_strings_in_range(binding_stmt_range);
             comments_to_move.extend(for_loop_inline_comments);
 
             let indentation = if comments_to_move.is_empty() {
@@ -413,8 +426,6 @@ fn convert_to_list_extend(
 
             let comprehension_body =
                 format!("{leading_comments}{variable_name} = [{generator_str}]");
-
-            let binding_stmt_range = locator.full_lines_range(binding_stmt.range);
 
             Ok(Fix::unsafe_edits(
                 Edit::range_deletion(binding_stmt_range),
