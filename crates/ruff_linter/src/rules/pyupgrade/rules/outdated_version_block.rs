@@ -237,11 +237,11 @@ fn version_always_less_than(
             };
 
             Ok(if or_equal {
-                // Ex) `sys.version_info <= 3.9`. If Python 3.9 is the minimum supported version,
+                // Ex) `sys.version_info <= 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition won't always evaluate to `false`, so we want to return `false`.
                 if_minor < py_minor
             } else {
-                // Ex) `sys.version_info < 3.9`. If Python 3.9 is the minimum supported version,
+                // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition _will_ always evaluate to `false`, so we want to return `true`.
                 if_minor <= py_minor
             })
