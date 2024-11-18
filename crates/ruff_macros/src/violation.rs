@@ -53,6 +53,7 @@ pub(crate) fn violation(violation: &ItemStruct) -> Result<TokenStream> {
             #[derive(Debug, PartialEq, Eq)]
             #violation
 
+            #[allow(deprecated)]
             #[automatically_derived]
             impl From<#ident> for ruff_diagnostics::DiagnosticKind {
                 fn from(value: #ident) -> Self {
@@ -71,12 +72,15 @@ pub(crate) fn violation(violation: &ItemStruct) -> Result<TokenStream> {
             #[derive(Debug, PartialEq, Eq)]
             #violation
 
+            #[automatically_derived]
+            #[allow(deprecated)]
             impl #ident {
                 pub fn explanation() -> Option<&'static str> {
                     Some(#explanation)
                 }
             }
 
+            #[allow(deprecated)]
             #[automatically_derived]
             impl From<#ident> for ruff_diagnostics::DiagnosticKind {
                 fn from(value: #ident) -> Self {

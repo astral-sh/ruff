@@ -126,7 +126,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E742") => (RuleGroup::Stable, rules::pycodestyle::rules::AmbiguousClassName),
         (Pycodestyle, "E743") => (RuleGroup::Stable, rules::pycodestyle::rules::AmbiguousFunctionName),
         (Pycodestyle, "E902") => (RuleGroup::Stable, rules::pycodestyle::rules::IOError),
-        (Pycodestyle, "E999") => (RuleGroup::Deprecated, rules::pycodestyle::rules::SyntaxError),
+        #[allow(deprecated)]
+        (Pycodestyle, "E999") => (RuleGroup::Removed, rules::pycodestyle::rules::SyntaxError),
 
         // pycodestyle warnings
         (Pycodestyle, "W191") => (RuleGroup::Stable, rules::pycodestyle::rules::TabIndentation),
