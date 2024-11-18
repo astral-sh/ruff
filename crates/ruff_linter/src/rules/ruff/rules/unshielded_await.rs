@@ -3,11 +3,15 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprCall, Stmt};
+use ruff_python_ast::{
+    self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprBooleanLiteral, ExprCall,
+    Identifier, Stmt,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 // TODO review for and add handling of trio and asyncio solutions
+// TODO will a config option be needed for which system is being used?
 
 /// ## What it does
 /// Checks for async yielding activities such as `await`, async loops, and async context managers
@@ -138,13 +142,37 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
                 ..
             }) => {
                 for item in items {
-                    if let Expr::Call(ExprCall { ref func, .. }) = item.context_expr {
+                    if let Expr::Call(ExprCall {
+                        ref func,
+                        arguments,
+                        ..
+                    }) = &item.context_expr
+                    {
                         if let Some(name) = self.semantic.resolve_qualified_name(func) {
                             // TODO what about x = y(); with y:?
-                            // TODO check the shield argument
-                            // TODO also move_on_after() and fail_after()
-                            if name.segments() == ["anyio", "CancelScope"] {
-                                return;
+                            let managers: Vec<Vec<&str>> = vec![
+                                vec!["anyio", "CancelScope"],
+                                vec!["anyio", "CancelScope", "bogus"],
+                                vec!["anyio", "move_on_after"],
+                                vec!["anyio", "fail_after"],
+                            ];
+
+                            if managers.contains(&Vec::from(name.segments())) {
+                                for keyword in &arguments.keywords {
+                                    if let Some(Identifier { id: name, .. }) = &keyword.arg {
+                                        if name.as_str() == "shield"
+                                            && matches!(
+                                                keyword.value,
+                                                Expr::BooleanLiteral(ExprBooleanLiteral {
+                                                    value: true,
+                                                    ..
+                                                })
+                                            )
+                                        {
+                                            return;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

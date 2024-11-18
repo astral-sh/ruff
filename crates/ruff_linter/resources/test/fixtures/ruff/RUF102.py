@@ -23,6 +23,36 @@ async def pass_shielded():
             await asyncio.sleep(1)
 
 
+async def pass_shielded_in_multiple_ways():
+    try:
+        pass
+    except Exception as e:
+        with anyio.CancelScope(shield=True):
+            await asyncio.sleep(1)
+        with anyio.move_on_after(shield=True):
+            await asyncio.sleep(1)
+        with anyio.fail_after(shield=True):
+            await asyncio.sleep(1)
+
+
+async def fail_context_manager_but_not_shielded_in_multiple_ways():
+    try:
+        pass
+    except Exception as e:
+        with anyio.CancelScope(shield=False):
+            await asyncio.sleep(1)  # fail
+        with anyio.CancelScope():
+            await asyncio.sleep(1)  # fail
+        with anyio.move_on_after(shield=False):
+            await asyncio.sleep(1)  # fail
+        with anyio.move_on_after():
+            await asyncio.sleep(1)  # fail
+        with anyio.fail_after(shield=False):
+            await asyncio.sleep(1)  # fail
+        with anyio.fail_after():
+            await asyncio.sleep(1)  # fail
+
+
 async def pass_just_value_error():
     try:
         pass
@@ -34,32 +64,32 @@ async def fail_exception():
     try:
         pass
     except Exception as e:
-        await asyncio.sleep(1)
+        await asyncio.sleep(1)  # fail
 
 
 async def fail_cancelled_error():
     try:
         pass
     except asyncio.CancelledError as e:
-        await asyncio.sleep(1)
+        await asyncio.sleep(1)  # fail
 
 
 async def fail_nested_exception():
     try:
         pass
     except ((ZeroDivisionError, Exception), ValueError) as e:
-        await asyncio.sleep(1)
+        await asyncio.sleep(1)  # fail
 
 
 async def fail_finally():
     try:
         pass
     finally:
-        await asyncio.sleep(1)
+        await asyncio.sleep(1)  # fail
 
 async def fail_async_with():
     try:
         pass
     finally:
-        async with anyio.create_task_group() as tg:
+        async with anyio.create_task_group() as tg:  # fail
             pass
