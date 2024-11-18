@@ -1,0 +1,54 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
+---
+ASYNC102_asyncio.py:17:13: ASYNC102 shield it!
+   |
+15 |         with asyncio.move_on_after(deadline=30) as s:
+16 |             s.shield = True
+17 |             await foo()  # error: 12, Statement("try/finally", lineno-5)
+   |             ^^^^^^^^^^^ ASYNC102
+18 | 
+19 |     try:
+   |
+
+ASYNC102_asyncio.py:22:9: ASYNC102 shield it!
+   |
+20 |         pass
+21 |     finally:
+22 |         await foo()  # error: 8, Statement("try/finally", lineno-3)
+   |         ^^^^^^^^^^^ ASYNC102
+23 | 
+24 |     # asyncio.CancelScope does not exist, so this will raise an error
+   |
+
+ASYNC102_asyncio.py:29:13: ASYNC102 shield it!
+   |
+27 |     finally:
+28 |         with asyncio.CancelScope(deadline=30, shield=True):
+29 |             await foo()  # error: 12, Statement("try/finally", lineno-4)
+   |             ^^^^^^^^^^^ ASYNC102
+30 | 
+31 |     # TODO: I think this is the asyncio-equivalent, but functionality to ignore the error
+   |
+
+ASYNC102_asyncio.py:37:9: ASYNC102 shield it!
+   |
+35 |           ...
+36 |       finally:
+37 |           await asyncio.shield(  # error: 8, Statement("try/finally", lineno-3)
+   |  _________^
+38 | |             asyncio.wait_for(foo())
+39 | |         )
+   | |_________^ ASYNC102
+   |
+
+ASYNC102_asyncio.py:47:9: ASYNC102 shield it!
+   |
+45 |           pass
+46 |       finally:
+47 |           async with asyncio.TaskGroup() as tg:  # error: 8, Statement("try/finally", lineno-3)
+   |  _________^
+48 | |             ...
+   | |_______________^ ASYNC102
+   |

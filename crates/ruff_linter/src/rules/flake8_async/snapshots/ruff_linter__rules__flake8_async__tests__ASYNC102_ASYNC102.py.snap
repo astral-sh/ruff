@@ -1,0 +1,421 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
+---
+ASYNC102.py:15:13: ASYNC102 shield it!
+   |
+13 |         with trio.move_on_after(deadline=30) as s:
+14 |             s.shield = True
+15 |             await foo()
+   |             ^^^^^^^^^^^ ASYNC102
+16 | 
+17 |     try:
+   |
+
+ASYNC102.py:22:13: ASYNC102 shield it!
+   |
+20 |         with trio.move_on_after(30) as s:
+21 |             s.shield = True
+22 |             await foo()
+   |             ^^^^^^^^^^^ ASYNC102
+23 | 
+24 |     try:
+   |
+
+ASYNC102.py:33:9: ASYNC102 shield it!
+   |
+31 |         pass
+32 |     finally:
+33 |         await foo()  # error: 8, Statement("try/finally", lineno-3)
+   |         ^^^^^^^^^^^ ASYNC102
+34 | 
+35 |     try:
+   |
+
+ASYNC102.py:39:13: ASYNC102 shield it!
+   |
+37 |     finally:
+38 |         with trio.move_on_after(30) as s:
+39 |             await foo()  # error: 12, Statement("try/finally", lineno-4)
+   |             ^^^^^^^^^^^ ASYNC102
+40 | 
+41 |     try:
+   |
+
+ASYNC102.py:45:13: ASYNC102 shield it!
+   |
+43 |     finally:
+44 |         with trio.move_on_after(30):
+45 |             await foo()  # error: 12, Statement("try/finally", lineno-4)
+   |             ^^^^^^^^^^^ ASYNC102
+46 | 
+47 |     bar = 10
+   |
+
+ASYNC102.py:54:13: ASYNC102 shield it!
+   |
+52 |         with trio.move_on_after(bar) as s:
+53 |             s.shield = True
+54 |             await foo()
+   |             ^^^^^^^^^^^ ASYNC102
+55 | 
+56 |     try:
+   |
+
+ASYNC102.py:62:13: ASYNC102 shield it!
+   |
+60 |             s.shield = False
+61 |             s.shield = True
+62 |             await foo()
+   |             ^^^^^^^^^^^ ASYNC102
+63 | 
+64 |     try:
+   |
+
+ASYNC102.py:69:13: ASYNC102 shield it!
+   |
+67 |         with trio.move_on_after(bar) as s:
+68 |             s.shield = True
+69 |             await foo()
+   |             ^^^^^^^^^^^ ASYNC102
+70 |             s.shield = False
+71 |             await foo()  # error: 12, Statement("try/finally", lineno-7)
+   |
+
+ASYNC102.py:71:13: ASYNC102 shield it!
+   |
+69 |             await foo()
+70 |             s.shield = False
+71 |             await foo()  # error: 12, Statement("try/finally", lineno-7)
+   |             ^^^^^^^^^^^ ASYNC102
+72 |             s.shield = True
+73 |             await foo()
+   |
+
+ASYNC102.py:73:13: ASYNC102 shield it!
+   |
+71 |             await foo()  # error: 12, Statement("try/finally", lineno-7)
+72 |             s.shield = True
+73 |             await foo()
+   |             ^^^^^^^^^^^ ASYNC102
+74 | 
+75 |     try:
+   |
+
+ASYNC102.py:79:13: ASYNC102 shield it!
+   |
+77 |     finally:
+78 |         with open("bar"):
+79 |             await foo()  # error: 12, Statement("try/finally", lineno-4)
+   |             ^^^^^^^^^^^ ASYNC102
+80 |     try:
+81 |         pass
+   |
+
+ASYNC102.py:89:13: ASYNC102 shield it!
+   |
+87 |     finally:
+88 |         with trio.move_on_after():
+89 |             await foo()  # error: 12, Statement("try/finally", lineno-4)
+   |             ^^^^^^^^^^^ ASYNC102
+90 |     try:
+91 |         pass
+   |
+
+ASYNC102.py:94:13: ASYNC102 shield it!
+   |
+92 |     finally:
+93 |         with trio.move_on_after(foo=bar):
+94 |             await foo()  # error: 12, Statement("try/finally", lineno-4)
+   |             ^^^^^^^^^^^ ASYNC102
+95 |     try:
+96 |         pass
+   |
+
+ASYNC102.py:109:13: ASYNC102 shield it!
+    |
+107 |     finally:
+108 |         with trio.CancelScope(deadline=30):
+109 |             await foo()  # error: 12, Statement("try/finally", lineno-4)
+    |             ^^^^^^^^^^^ ASYNC102
+110 |     try:
+111 |         pass
+    |
+
+ASYNC102.py:114:13: ASYNC102 shield it!
+    |
+112 |     finally:
+113 |         with trio.CancelScope(deadline=30, shield=(1 == 1)):
+114 |             await foo()  # safe in theory, error: 12, Statement("try/finally", lineno-4)
+    |             ^^^^^^^^^^^ ASYNC102
+115 |     try:
+116 |         pass
+    |
+
+ASYNC102.py:122:13: ASYNC102 shield it!
+    |
+120 |             cs.shield = myvar
+121 |             # safe in theory, but we don't track variable values
+122 |             await foo()  # error: 12, Statement("try/finally", lineno-7)
+    |             ^^^^^^^^^^^ ASYNC102
+123 |     try:
+124 |         pass
+    |
+
+ASYNC102.py:148:13: ASYNC102 shield it!
+    |
+146 |             pass
+147 |         finally:
+148 |             await foo()  # error: 12, Statement("try/finally", lineno-3)
+    |             ^^^^^^^^^^^ ASYNC102
+    |
+
+ASYNC102.py:158:9: ASYNC102 shield it!
+    |
+156 |         yield 1
+157 |     finally:
+158 |         await foo()  # error: 8, Statement("try/finally", lineno-3)
+    |         ^^^^^^^^^^^ ASYNC102
+    |
+
+ASYNC102.py:167:13: ASYNC102 shield it!
+    |
+165 |         with trio.move_on_after(30) as s, trio.fail_after(5):
+166 |             s.shield = True
+167 |             await foo()  # safe
+    |             ^^^^^^^^^^^ ASYNC102
+168 |         with trio.move_on_after(30) as s, trio.fail_after(5):
+169 |             await foo()  # ASYNC102: 12, Statement("try/finally", lineno-7)
+    |
+
+ASYNC102.py:169:13: ASYNC102 shield it!
+    |
+167 |             await foo()  # safe
+168 |         with trio.move_on_after(30) as s, trio.fail_after(5):
+169 |             await foo()  # ASYNC102: 12, Statement("try/finally", lineno-7)
+    |             ^^^^^^^^^^^ ASYNC102
+170 |         with open(""), trio.CancelScope(deadline=30, shield=True):
+171 |             await foo()  # safe
+    |
+
+ASYNC102.py:174:13: ASYNC102 shield it!
+    |
+172 |         with trio.fail_after(5), trio.move_on_after(30) as s:
+173 |             s.shield = True
+174 |             await foo()  # safe in theory, error: 12, Statement("try/finally", lineno-12)
+    |             ^^^^^^^^^^^ ASYNC102
+    |
+
+ASYNC102.py:183:9: ASYNC102 shield it!
+    |
+181 |         await foo()
+182 |     except BaseException:
+183 |         await foo()  # error: 8, Statement("BaseException", lineno-1)
+    |         ^^^^^^^^^^^ ASYNC102
+184 |     except:
+185 |         await foo()
+    |
+
+ASYNC102.py:211:9: ASYNC102 shield it!
+    |
+209 |         ...
+210 |     except BaseException:
+211 |         await foo()  # error: 8, Statement("BaseException", lineno-1)
+    |         ^^^^^^^^^^^ ASYNC102
+212 |     finally:
+213 |         await foo()  # error: 8, Statement("try/finally", lineno-5)
+    |
+
+ASYNC102.py:213:9: ASYNC102 shield it!
+    |
+211 |         await foo()  # error: 8, Statement("BaseException", lineno-1)
+212 |     finally:
+213 |         await foo()  # error: 8, Statement("try/finally", lineno-5)
+    |         ^^^^^^^^^^^ ASYNC102
+214 | 
+215 |     try:
+    |
+
+ASYNC102.py:218:9: ASYNC102 shield it!
+    |
+216 |         ...
+217 |     except:
+218 |         await foo()  # error: 8, Statement("bare except", lineno-1)
+    |         ^^^^^^^^^^^ ASYNC102
+219 |     finally:
+220 |         await foo()  # error: 8, Statement("try/finally", lineno-5)
+    |
+
+ASYNC102.py:220:9: ASYNC102 shield it!
+    |
+218 |         await foo()  # error: 8, Statement("bare except", lineno-1)
+219 |     finally:
+220 |         await foo()  # error: 8, Statement("try/finally", lineno-5)
+    |         ^^^^^^^^^^^ ASYNC102
+221 | 
+222 |     try:
+    |
+
+ASYNC102.py:225:9: ASYNC102 shield it!
+    |
+223 |         ...
+224 |     finally:
+225 |         await foo()  # error: 8, Statement("try/finally", lineno-3)
+    |         ^^^^^^^^^^^ ASYNC102
+    |
+
+ASYNC102.py:234:13: ASYNC102 shield it!
+    |
+232 |         ...
+233 |     except BaseException:
+234 |         _ = await foo(), await foo()  # error: 12, Statement("BaseException", lineno-1) # error: 25, Statement("BaseException", lineno-1)
+    |             ^^^^^^^^^^^ ASYNC102
+235 | # fmt: on
+    |
+
+ASYNC102.py:234:26: ASYNC102 shield it!
+    |
+232 |         ...
+233 |     except BaseException:
+234 |         _ = await foo(), await foo()  # error: 12, Statement("BaseException", lineno-1) # error: 25, Statement("BaseException", lineno-1)
+    |                          ^^^^^^^^^^^ ASYNC102
+235 | # fmt: on
+    |
+
+ASYNC102.py:244:9: ASYNC102 shield it!
+    |
+242 |         await foo()
+243 |     except BaseException:
+244 |         await foo()  # error: 8, Statement("BaseException", lineno-1)
+    |         ^^^^^^^^^^^ ASYNC102
+245 |         try:
+246 |             await foo()  # error: 12, Statement("BaseException", lineno-3)
+    |
+
+ASYNC102.py:246:13: ASYNC102 shield it!
+    |
+244 |         await foo()  # error: 8, Statement("BaseException", lineno-1)
+245 |         try:
+246 |             await foo()  # error: 12, Statement("BaseException", lineno-3)
+    |             ^^^^^^^^^^^ ASYNC102
+247 |         except BaseException:
+248 |             await foo()  # error: 12, Statement("BaseException", lineno-5)
+    |
+
+ASYNC102.py:248:13: ASYNC102 shield it!
+    |
+246 |             await foo()  # error: 12, Statement("BaseException", lineno-3)
+247 |         except BaseException:
+248 |             await foo()  # error: 12, Statement("BaseException", lineno-5)
+    |             ^^^^^^^^^^^ ASYNC102
+249 |         except:
+250 |             # unsafe, because we're waiting inside the parent baseexception
+    |
+
+ASYNC102.py:248:13: ASYNC102 shield it!
+    |
+246 |             await foo()  # error: 12, Statement("BaseException", lineno-3)
+247 |         except BaseException:
+248 |             await foo()  # error: 12, Statement("BaseException", lineno-5)
+    |             ^^^^^^^^^^^ ASYNC102
+249 |         except:
+250 |             # unsafe, because we're waiting inside the parent baseexception
+    |
+
+ASYNC102.py:251:13: ASYNC102 shield it!
+    |
+249 |         except:
+250 |             # unsafe, because we're waiting inside the parent baseexception
+251 |             await foo()  # error: 12, Statement("BaseException", lineno-8)
+    |             ^^^^^^^^^^^ ASYNC102
+252 |         await foo()  # error: 8, Statement("BaseException", lineno-9)
+253 |     except:
+    |
+
+ASYNC102.py:252:9: ASYNC102 shield it!
+    |
+250 |             # unsafe, because we're waiting inside the parent baseexception
+251 |             await foo()  # error: 12, Statement("BaseException", lineno-8)
+252 |         await foo()  # error: 8, Statement("BaseException", lineno-9)
+    |         ^^^^^^^^^^^ ASYNC102
+253 |     except:
+254 |         await foo()
+    |
+
+ASYNC102.py:258:13: ASYNC102 shield it!
+    |
+256 |             await foo()
+257 |         except BaseException:
+258 |             await foo()  # error: 12, Statement("BaseException", lineno-1)
+    |             ^^^^^^^^^^^ ASYNC102
+259 |         except:
+260 |             await foo()
+    |
+
+ASYNC102.py:295:17: ASYNC102 shield it!
+    |
+293 |         with trio.CancelScope(deadline=10) as cs1:
+294 |             with trio.CancelScope(deadline=10) as cs2:
+295 |                 await foo()  # error: 16, Statement("bare except", lineno-3)
+    |                 ^^^^^^^^^^^ ASYNC102
+296 |                 cs1.shield = True
+297 |                 await foo()
+    |
+
+ASYNC102.py:297:17: ASYNC102 shield it!
+    |
+295 |                 await foo()  # error: 16, Statement("bare except", lineno-3)
+296 |                 cs1.shield = True
+297 |                 await foo()
+    |                 ^^^^^^^^^^^ ASYNC102
+298 |                 cs1.shield = False
+299 |                 await foo()  # error: 16, Statement("bare except", lineno-7)
+    |
+
+ASYNC102.py:299:17: ASYNC102 shield it!
+    |
+297 |                 await foo()
+298 |                 cs1.shield = False
+299 |                 await foo()  # error: 16, Statement("bare except", lineno-7)
+    |                 ^^^^^^^^^^^ ASYNC102
+300 |                 cs2.shield = True
+301 |                 await foo()
+    |
+
+ASYNC102.py:301:17: ASYNC102 shield it!
+    |
+299 |                 await foo()  # error: 16, Statement("bare except", lineno-7)
+300 |                 cs2.shield = True
+301 |                 await foo()
+    |                 ^^^^^^^^^^^ ASYNC102
+302 |             await foo()  # error: 12, Statement("bare except", lineno-10)
+303 |             cs2.shield = True
+    |
+
+ASYNC102.py:302:13: ASYNC102 shield it!
+    |
+300 |                 cs2.shield = True
+301 |                 await foo()
+302 |             await foo()  # error: 12, Statement("bare except", lineno-10)
+    |             ^^^^^^^^^^^ ASYNC102
+303 |             cs2.shield = True
+304 |             await foo()  # error: 12, Statement("bare except", lineno-12)
+    |
+
+ASYNC102.py:304:13: ASYNC102 shield it!
+    |
+302 |             await foo()  # error: 12, Statement("bare except", lineno-10)
+303 |             cs2.shield = True
+304 |             await foo()  # error: 12, Statement("bare except", lineno-12)
+    |             ^^^^^^^^^^^ ASYNC102
+305 |             cs1.shield = True
+306 |             await foo()
+    |
+
+ASYNC102.py:306:13: ASYNC102 shield it!
+    |
+304 |             await foo()  # error: 12, Statement("bare except", lineno-12)
+305 |             cs1.shield = True
+306 |             await foo()
+    |             ^^^^^^^^^^^ ASYNC102
+    |

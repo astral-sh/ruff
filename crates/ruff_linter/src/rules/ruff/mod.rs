@@ -282,18 +282,6 @@ mod tests {
     }
 
     #[test]
-    fn ruf102() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("ruff/RUF102.py"),
-            &settings::LinterSettings {
-                ..settings::LinterSettings::for_rules(vec![Rule::UnshieldedAwait])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
     fn ruff_per_file_ignores() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),

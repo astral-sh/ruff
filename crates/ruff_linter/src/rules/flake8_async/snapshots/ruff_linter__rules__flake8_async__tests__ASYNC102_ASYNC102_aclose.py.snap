@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
+---
+ASYNC102_aclose.py:22:9: ASYNC102 shield it!
+   |
+20 |         ...
+21 |     except BaseException:
+22 |         await x.aclose()  # ASYNC102: 8, Statement("BaseException", lineno-1)
+   |         ^^^^^^^^^^^^^^^^ ASYNC102
+23 |         await x.y.aclose()  # ASYNC102: 8, Statement("BaseException", lineno-2)
+24 |     finally:
+   |
+
+ASYNC102_aclose.py:23:9: ASYNC102 shield it!
+   |
+21 |     except BaseException:
+22 |         await x.aclose()  # ASYNC102: 8, Statement("BaseException", lineno-1)
+23 |         await x.y.aclose()  # ASYNC102: 8, Statement("BaseException", lineno-2)
+   |         ^^^^^^^^^^^^^^^^^^ ASYNC102
+24 |     finally:
+25 |         await x.aclose()  # ASYNC102: 8, Statement("try/finally", lineno-6)
+   |
+
+ASYNC102_aclose.py:25:9: ASYNC102 shield it!
+   |
+23 |         await x.y.aclose()  # ASYNC102: 8, Statement("BaseException", lineno-2)
+24 |     finally:
+25 |         await x.aclose()  # ASYNC102: 8, Statement("try/finally", lineno-6)
+   |         ^^^^^^^^^^^^^^^^ ASYNC102
+26 |         await x.y.aclose()  # ASYNC102: 8, Statement("try/finally", lineno-7)
+   |
+
+ASYNC102_aclose.py:26:9: ASYNC102 shield it!
+   |
+24 |     finally:
+25 |         await x.aclose()  # ASYNC102: 8, Statement("try/finally", lineno-6)
+26 |         await x.y.aclose()  # ASYNC102: 8, Statement("try/finally", lineno-7)
+   |         ^^^^^^^^^^^^^^^^^^ ASYNC102
+   |

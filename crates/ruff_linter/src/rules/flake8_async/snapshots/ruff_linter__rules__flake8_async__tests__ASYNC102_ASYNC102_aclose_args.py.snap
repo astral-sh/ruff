@@ -1,0 +1,80 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
+---
+ASYNC102_aclose_args.py:16:9: ASYNC102 shield it!
+   |
+14 |         ...
+15 |     except BaseException:
+16 |         await x.aclose(foo)  # ASYNC102: 8, Statement("BaseException", lineno-1)
+   |         ^^^^^^^^^^^^^^^^^^^ ASYNC102
+17 |         await x.aclose(bar=foo)  # ASYNC102: 8, Statement("BaseException", lineno-2)
+18 |         await x.aclose(*foo)  # ASYNC102: 8, Statement("BaseException", lineno-3)
+   |
+
+ASYNC102_aclose_args.py:17:9: ASYNC102 shield it!
+   |
+15 |     except BaseException:
+16 |         await x.aclose(foo)  # ASYNC102: 8, Statement("BaseException", lineno-1)
+17 |         await x.aclose(bar=foo)  # ASYNC102: 8, Statement("BaseException", lineno-2)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+18 |         await x.aclose(*foo)  # ASYNC102: 8, Statement("BaseException", lineno-3)
+19 |         await x.aclose(None)  # ASYNC102: 8, Statement("BaseException", lineno-4)
+   |
+
+ASYNC102_aclose_args.py:18:9: ASYNC102 shield it!
+   |
+16 |         await x.aclose(foo)  # ASYNC102: 8, Statement("BaseException", lineno-1)
+17 |         await x.aclose(bar=foo)  # ASYNC102: 8, Statement("BaseException", lineno-2)
+18 |         await x.aclose(*foo)  # ASYNC102: 8, Statement("BaseException", lineno-3)
+   |         ^^^^^^^^^^^^^^^^^^^^ ASYNC102
+19 |         await x.aclose(None)  # ASYNC102: 8, Statement("BaseException", lineno-4)
+20 |     finally:
+   |
+
+ASYNC102_aclose_args.py:19:9: ASYNC102 shield it!
+   |
+17 |         await x.aclose(bar=foo)  # ASYNC102: 8, Statement("BaseException", lineno-2)
+18 |         await x.aclose(*foo)  # ASYNC102: 8, Statement("BaseException", lineno-3)
+19 |         await x.aclose(None)  # ASYNC102: 8, Statement("BaseException", lineno-4)
+   |         ^^^^^^^^^^^^^^^^^^^^ ASYNC102
+20 |     finally:
+21 |         await x.aclose(foo)  # ASYNC102: 8, Statement("try/finally", lineno-8)
+   |
+
+ASYNC102_aclose_args.py:21:9: ASYNC102 shield it!
+   |
+19 |         await x.aclose(None)  # ASYNC102: 8, Statement("BaseException", lineno-4)
+20 |     finally:
+21 |         await x.aclose(foo)  # ASYNC102: 8, Statement("try/finally", lineno-8)
+   |         ^^^^^^^^^^^^^^^^^^^ ASYNC102
+22 |         await x.aclose(bar=foo)  # ASYNC102: 8, Statement("try/finally", lineno-9)
+23 |         await x.aclose(*foo)  # ASYNC102: 8, Statement("try/finally", lineno-10)
+   |
+
+ASYNC102_aclose_args.py:22:9: ASYNC102 shield it!
+   |
+20 |     finally:
+21 |         await x.aclose(foo)  # ASYNC102: 8, Statement("try/finally", lineno-8)
+22 |         await x.aclose(bar=foo)  # ASYNC102: 8, Statement("try/finally", lineno-9)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+23 |         await x.aclose(*foo)  # ASYNC102: 8, Statement("try/finally", lineno-10)
+24 |         await x.aclose(None)  # ASYNC102: 8, Statement("try/finally", lineno-11)
+   |
+
+ASYNC102_aclose_args.py:23:9: ASYNC102 shield it!
+   |
+21 |         await x.aclose(foo)  # ASYNC102: 8, Statement("try/finally", lineno-8)
+22 |         await x.aclose(bar=foo)  # ASYNC102: 8, Statement("try/finally", lineno-9)
+23 |         await x.aclose(*foo)  # ASYNC102: 8, Statement("try/finally", lineno-10)
+   |         ^^^^^^^^^^^^^^^^^^^^ ASYNC102
+24 |         await x.aclose(None)  # ASYNC102: 8, Statement("try/finally", lineno-11)
+   |
+
+ASYNC102_aclose_args.py:24:9: ASYNC102 shield it!
+   |
+22 |         await x.aclose(bar=foo)  # ASYNC102: 8, Statement("try/finally", lineno-9)
+23 |         await x.aclose(*foo)  # ASYNC102: 8, Statement("try/finally", lineno-10)
+24 |         await x.aclose(None)  # ASYNC102: 8, Statement("try/finally", lineno-11)
+   |         ^^^^^^^^^^^^^^^^^^^^ ASYNC102
+   |
