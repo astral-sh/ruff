@@ -2,49 +2,49 @@
 
 
 def f():
-    import pandas as pd  # TCH002
+    import pandas as pd  # TC002
 
     x: pd.DataFrame
 
 
 def f():
-    from pandas import DataFrame  # TCH002
+    from pandas import DataFrame  # TC002
 
     x: DataFrame
 
 
 def f():
-    from pandas import DataFrame as df  # TCH002
+    from pandas import DataFrame as df  # TC002
 
     x: df
 
 
 def f():
-    import pandas as pd  # TCH002
+    import pandas as pd  # TC002
 
     x: pd.DataFrame = 1
 
 
 def f():
-    from pandas import DataFrame  # TCH002
+    from pandas import DataFrame  # TC002
 
     x: DataFrame = 2
 
 
 def f():
-    from pandas import DataFrame as df  # TCH002
+    from pandas import DataFrame as df  # TC002
 
     x: df = 3
 
 
 def f():
-    import pandas as pd  # TCH002
+    import pandas as pd  # TC002
 
     x: "pd.DataFrame" = 1
 
 
 def f():
-    import pandas as pd  # TCH002
+    import pandas as pd  # TC002
 
     x = dict["pd.DataFrame", "pd.DataFrame"]
 
@@ -153,13 +153,13 @@ def f():
 
 
 def f():
-    from pandas import DataFrame  # noqa: TCH002
+    from pandas import DataFrame  # noqa: TC002
 
     x: DataFrame = 2
 
 
 def f():
-    from pandas import (  # noqa: TCH002
+    from pandas import (  # noqa: TC002
         DataFrame,
     )
 

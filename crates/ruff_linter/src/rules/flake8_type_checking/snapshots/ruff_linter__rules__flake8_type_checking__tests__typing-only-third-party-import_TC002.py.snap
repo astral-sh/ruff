@@ -2,11 +2,11 @@
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 snapshot_kind: text
 ---
-TCH002.py:5:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
+TC002.py:5:22: TC002 [*] Move third-party import `pandas` into a type-checking block
   |
 4 | def f():
-5 |     import pandas as pd  # TCH002
-  |                      ^^ TCH002
+5 |     import pandas as pd  # TC002
+  |                      ^^ TC002
 6 | 
 7 |     x: pd.DataFrame
   |
@@ -21,16 +21,16 @@ TCH002.py:5:22: TCH002 [*] Move third-party import `pandas` into a type-checking
 2 6 | 
 3 7 | 
 4 8 | def f():
-5   |-    import pandas as pd  # TCH002
+5   |-    import pandas as pd  # TC002
 6 9 | 
 7 10 |     x: pd.DataFrame
 8 11 | 
 
-TCH002.py:11:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002.py:11:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 10 | def f():
-11 |     from pandas import DataFrame  # TCH002
-   |                        ^^^^^^^^^ TCH002
+11 |     from pandas import DataFrame  # TC002
+   |                        ^^^^^^^^^ TC002
 12 | 
 13 |     x: DataFrame
    |
@@ -49,16 +49,16 @@ TCH002.py:11:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 8  12 | 
 9  13 | 
 10 14 | def f():
-11    |-    from pandas import DataFrame  # TCH002
+11    |-    from pandas import DataFrame  # TC002
 12 15 | 
 13 16 |     x: DataFrame
 14 17 | 
 
-TCH002.py:17:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002.py:17:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 16 | def f():
-17 |     from pandas import DataFrame as df  # TCH002
-   |                                     ^^ TCH002
+17 |     from pandas import DataFrame as df  # TC002
+   |                                     ^^ TC002
 18 | 
 19 |     x: df
    |
@@ -77,16 +77,16 @@ TCH002.py:17:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 14 18 | 
 15 19 | 
 16 20 | def f():
-17    |-    from pandas import DataFrame as df  # TCH002
+17    |-    from pandas import DataFrame as df  # TC002
 18 21 | 
 19 22 |     x: df
 20 23 | 
 
-TCH002.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
+TC002.py:23:22: TC002 [*] Move third-party import `pandas` into a type-checking block
    |
 22 | def f():
-23 |     import pandas as pd  # TCH002
-   |                      ^^ TCH002
+23 |     import pandas as pd  # TC002
+   |                      ^^ TC002
 24 | 
 25 |     x: pd.DataFrame = 1
    |
@@ -105,16 +105,16 @@ TCH002.py:23:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
 20 24 | 
 21 25 | 
 22 26 | def f():
-23    |-    import pandas as pd  # TCH002
+23    |-    import pandas as pd  # TC002
 24 27 | 
 25 28 |     x: pd.DataFrame = 1
 26 29 | 
 
-TCH002.py:29:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002.py:29:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 28 | def f():
-29 |     from pandas import DataFrame  # TCH002
-   |                        ^^^^^^^^^ TCH002
+29 |     from pandas import DataFrame  # TC002
+   |                        ^^^^^^^^^ TC002
 30 | 
 31 |     x: DataFrame = 2
    |
@@ -133,16 +133,16 @@ TCH002.py:29:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 26 30 | 
 27 31 | 
 28 32 | def f():
-29    |-    from pandas import DataFrame  # TCH002
+29    |-    from pandas import DataFrame  # TC002
 30 33 | 
 31 34 |     x: DataFrame = 2
 32 35 | 
 
-TCH002.py:35:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002.py:35:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 34 | def f():
-35 |     from pandas import DataFrame as df  # TCH002
-   |                                     ^^ TCH002
+35 |     from pandas import DataFrame as df  # TC002
+   |                                     ^^ TC002
 36 | 
 37 |     x: df = 3
    |
@@ -161,16 +161,16 @@ TCH002.py:35:37: TCH002 [*] Move third-party import `pandas.DataFrame` into a ty
 32 36 | 
 33 37 | 
 34 38 | def f():
-35    |-    from pandas import DataFrame as df  # TCH002
+35    |-    from pandas import DataFrame as df  # TC002
 36 39 | 
 37 40 |     x: df = 3
 38 41 | 
 
-TCH002.py:41:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
+TC002.py:41:22: TC002 [*] Move third-party import `pandas` into a type-checking block
    |
 40 | def f():
-41 |     import pandas as pd  # TCH002
-   |                      ^^ TCH002
+41 |     import pandas as pd  # TC002
+   |                      ^^ TC002
 42 | 
 43 |     x: "pd.DataFrame" = 1
    |
@@ -189,16 +189,16 @@ TCH002.py:41:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
 38 42 | 
 39 43 | 
 40 44 | def f():
-41    |-    import pandas as pd  # TCH002
+41    |-    import pandas as pd  # TC002
 42 45 | 
 43 46 |     x: "pd.DataFrame" = 1
 44 47 | 
 
-TCH002.py:47:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
+TC002.py:47:22: TC002 [*] Move third-party import `pandas` into a type-checking block
    |
 46 | def f():
-47 |     import pandas as pd  # TCH002
-   |                      ^^ TCH002
+47 |     import pandas as pd  # TC002
+   |                      ^^ TC002
 48 | 
 49 |     x = dict["pd.DataFrame", "pd.DataFrame"]
    |
@@ -217,17 +217,17 @@ TCH002.py:47:22: TCH002 [*] Move third-party import `pandas` into a type-checkin
 44 48 | 
 45 49 | 
 46 50 | def f():
-47    |-    import pandas as pd  # TCH002
+47    |-    import pandas as pd  # TC002
 48 51 | 
 49 52 |     x = dict["pd.DataFrame", "pd.DataFrame"]
 50 53 | 
 
-TCH002.py:172:24: TCH002 [*] Move third-party import `module.Member` into a type-checking block
+TC002.py:172:24: TC002 [*] Move third-party import `module.Member` into a type-checking block
     |
 170 |     global Member
 171 | 
 172 |     from module import Member
-    |                        ^^^^^^ TCH002
+    |                        ^^^^^^ TC002
 173 | 
 174 |     x: Member = 1
     |

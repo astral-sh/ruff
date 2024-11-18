@@ -1,25 +1,25 @@
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    pass  # TCH005
+    pass  # TC005
 
 
 if False:
-    pass  # TCH005
+    pass  # TC005
 
 if 0:
-    pass  # TCH005
+    pass  # TC005
 
 
 def example():
     if TYPE_CHECKING:
-        pass  # TCH005
+        pass  # TC005
     return
 
 
 class Test:
     if TYPE_CHECKING:
-        pass  # TCH005
+        pass  # TC005
     x = 2
 
 
@@ -42,7 +42,7 @@ if 0:
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    pass  # TCH005
+    pass  # TC005
 
 # https://github.com/astral-sh/ruff/issues/11368
 if TYPE_CHECKING:
