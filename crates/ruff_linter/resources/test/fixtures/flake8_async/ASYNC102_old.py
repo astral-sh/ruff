@@ -91,5 +91,5 @@ async def fail_async_with():
     try:
         pass
     finally:
-        async with anyio.create_task_group() as tg:  # fail
+        async with my_own_async_manager():  # fail
             pass

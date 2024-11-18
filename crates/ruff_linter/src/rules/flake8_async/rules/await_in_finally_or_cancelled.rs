@@ -189,9 +189,9 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                                     }
                                 }
                             }
-                            if *is_async {
-                                self.async_ranges.push(stmt.range());
-                            }
+                        }
+                        if *is_async {
+                            self.async_ranges.push(stmt.range());
                         }
                     }
                 }

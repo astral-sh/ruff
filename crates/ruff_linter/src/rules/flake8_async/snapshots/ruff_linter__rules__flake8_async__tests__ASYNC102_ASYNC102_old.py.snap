@@ -98,7 +98,7 @@ ASYNC102_old.py:94:9: ASYNC102 shield it!
    |
 92 |           pass
 93 |       finally:
-94 |           async with anyio.create_task_group() as tg:  # fail
+94 |           async with my_own_async_manager():  # fail
    |  _________^
 95 | |             pass
    | |________________^ ASYNC102
