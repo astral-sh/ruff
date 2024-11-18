@@ -1807,7 +1807,7 @@ impl<'db> KnownClass {
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
-    /// The symbol `typing.Optional` (which can also be found as `typing_extensions.Literal`)
+    /// The symbol `typing.Optional` (which can also be found as `typing_extensions.Optional`)
     Optional,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
