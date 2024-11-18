@@ -184,8 +184,8 @@ impl Settings {
 #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum TargetVersion {
     Py37,
-    #[default]
     Py38,
+    #[default]
     Py39,
     Py310,
     Py311,
@@ -290,4 +290,18 @@ impl System for WasmSystem {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::TargetVersion;
+    use red_knot_python_semantic::PythonVersion;
+
+    #[test]
+    fn same_default_as_python_version() {
+        assert_eq!(
+            PythonVersion::from(TargetVersion::default()),
+            PythonVersion::default()
+        );
+    }
 }
