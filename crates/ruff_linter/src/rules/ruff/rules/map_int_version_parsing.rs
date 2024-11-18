@@ -52,13 +52,11 @@ pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    if !semantic.match_builtin_expr(first, "int") || !is_dunder_version_split_dot(second) {
-        return;
+    if semantic.match_builtin_expr(first, "int") && is_dunder_version_split_dot(second) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(MapIntVersionParsing, call.range()));
     }
-
-    let diagnostic = Diagnostic::new(MapIntVersionParsing, call.range());
-
-    checker.diagnostics.push(diagnostic);
 }
 
 fn map_call_with_two_arguments<'a>(
