@@ -51,15 +51,13 @@ invalid1: Literal[3 + 4]
 invalid2: Literal[4 + 3j]
 # error: [invalid-literal-parameter]
 invalid3: Literal[(3, 4)]
+
+hello = "hello"
 invalid4: Literal[
-    # error: [invalid-literal-parameter]
-    1 + 2,
+    1 + 2,  # error: [invalid-literal-parameter]
     "foo",
-    # error: [invalid-literal-parameter]
-    # error: [unresolved-reference]
-    hello,
-    # error: [invalid-literal-parameter]
-    (1, 2, 3),
+    hello,  # error: [invalid-literal-parameter]
+    (1, 2, 3),  # error: [invalid-literal-parameter]
 ]
 ```
 
