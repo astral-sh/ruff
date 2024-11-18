@@ -384,11 +384,9 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
-            if checker.settings.preview.is_enabled() {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
-            }
+            checker
+                .diagnostics
+                .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
             return;
         }
 
@@ -447,11 +445,9 @@ pub(crate) fn printf_string_formatting(
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
-                if checker.settings.preview.is_enabled() {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
-                }
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
                 return;
             };
             Cow::Owned(params_string)
