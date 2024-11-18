@@ -39,7 +39,10 @@ else:
 ## `type(x) == C`, `type(x) != C`
 
 No narrowing can occur for equality comparisons, since there might be a custom `__eq__`
-implementation on the metaclass:
+implementation on the metaclass.
+
+TODO: Narrowing might be possible in some cases where the classes themselves are `@final` or their
+metaclass is `@final`.
 
 ```py
 class IsEqualToEverything(type):
