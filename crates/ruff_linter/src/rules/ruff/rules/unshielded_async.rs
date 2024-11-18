@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 // TODO review for and add handling of trio and asyncio solutions
 // TODO will a config option be needed for which system is being used?
+// TODO consider checking .__aexit__() as well
 
 /// ## What it does
 /// Checks for async yielding activities such as `await`, async loops, and async context managers
@@ -44,9 +45,9 @@ use ruff_text_size::{Ranged, TextRange};
 /// ## References
 /// - [AnyIO shielding](https://anyio.readthedocs.io/en/stable/cancellation.html#shielding)
 #[violation]
-pub struct UnshieldedAwait;
+pub struct UnshieldedAsync;
 
-impl Violation for UnshieldedAwait {
+impl Violation for UnshieldedAsync {
     #[derive_message_formats]
     fn message(&self) -> String {
         "shield it!".to_string()
@@ -54,12 +55,12 @@ impl Violation for UnshieldedAwait {
 }
 
 /// RUF102
-pub(crate) fn unshielded_await_for_try(
+pub(crate) fn unshielded_aasync_for_try(
     checker: &mut Checker,
     handlers: &Vec<ExceptHandler>,
     finalbody: &[Stmt],
 ) {
-    let mut unshielded_await_ranges: Vec<TextRange> = vec![];
+    let mut unshielded_async_ranges: Vec<TextRange> = vec![];
 
     for handler in handlers {
         let ExceptHandler::ExceptHandler(handler) = handler;
@@ -77,27 +78,27 @@ pub(crate) fn unshielded_await_for_try(
             continue;
         }
 
-        // If there are no awaits then there is nothing to shield
-        let mut visitor = PrunedAwaitVisitor {
+        // If there is no async then there is nothing to shield
+        let mut visitor = PrunedAsyncVisitor {
             semantic: checker.semantic(),
-            await_ranges: vec![],
+            async_ranges: vec![],
         };
         visitor.visit_body(&handler.body);
-        unshielded_await_ranges.extend(visitor.await_ranges);
+        unshielded_async_ranges.extend(visitor.async_ranges);
     }
 
-    // If there are no awaits then there is nothing to shield
-    let mut visitor = PrunedAwaitVisitor {
+    // If there is no async then there is nothing to shield
+    let mut visitor = PrunedAsyncVisitor {
         semantic: checker.semantic(),
-        await_ranges: vec![],
+        async_ranges: vec![],
     };
     visitor.visit_body(finalbody);
-    unshielded_await_ranges.extend(visitor.await_ranges);
+    unshielded_async_ranges.extend(visitor.async_ranges);
 
-    for range in unshielded_await_ranges {
+    for range in unshielded_async_ranges {
         checker
             .diagnostics
-            .push(Diagnostic::new(UnshieldedAwait {}, range));
+            .push(Diagnostic::new(UnshieldedAsync {}, range));
     }
 }
 
@@ -123,18 +124,18 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Qual
     f
 }
 
-/// A [`Visitor`] that detects the presence of `await` expressions in the current scope.
-struct PrunedAwaitVisitor<'a> {
-    await_ranges: Vec<TextRange>,
+/// A [`Visitor`] that detects the presence of async expressions in the current scope.
+struct PrunedAsyncVisitor<'a> {
+    async_ranges: Vec<TextRange>,
     semantic: &'a SemanticModel<'a>,
 }
 
-impl Visitor<'_> for PrunedAwaitVisitor<'_> {
+impl Visitor<'_> for PrunedAsyncVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
             Stmt::With(ast::StmtWith { is_async: true, .. }) => {
-                self.await_ranges.push(stmt.range());
+                self.async_ranges.push(stmt.range());
             }
             Stmt::With(ast::StmtWith {
                 is_async: false,
@@ -180,7 +181,7 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
                 visitor::walk_stmt(self, stmt);
             }
             Stmt::For(ast::StmtFor { is_async: true, .. }) => {
-                self.await_ranges.push(stmt.range());
+                self.async_ranges.push(stmt.range());
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -188,7 +189,7 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
 
     fn visit_expr(&mut self, expr: &Expr) {
         if let Expr::Await(ast::ExprAwait { .. }) = expr {
-            self.await_ranges.push(expr.range());
+            self.async_ranges.push(expr.range());
         } else {
             visitor::walk_expr(self, expr);
         }
@@ -196,7 +197,7 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
 
     fn visit_comprehension(&mut self, comprehension: &'_ Comprehension) {
         if comprehension.is_async {
-            self.await_ranges.push(comprehension.range());
+            self.async_ranges.push(comprehension.range());
         } else {
             visitor::walk_comprehension(self, comprehension);
         }

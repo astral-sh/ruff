@@ -971,7 +971,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "036") => (RuleGroup::Preview, rules::ruff::rules::NoneNotAtEndOfUnion),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
-        (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::UnshieldedAwait),
+        (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::UnshieldedAsync),
 
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(any(feature = "test-rules", test))]
