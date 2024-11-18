@@ -1,0 +1,105 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF102.py:43:13: RUF102 shield it!
+   |
+41 |     except Exception as e:
+42 |         with anyio.CancelScope(shield=False):
+43 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+44 |         with anyio.CancelScope():
+45 |             await asyncio.sleep(1)  # fail
+   |
+
+RUF102.py:45:13: RUF102 shield it!
+   |
+43 |             await asyncio.sleep(1)  # fail
+44 |         with anyio.CancelScope():
+45 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+46 |         with anyio.move_on_after(shield=False):
+47 |             await asyncio.sleep(1)  # fail
+   |
+
+RUF102.py:47:13: RUF102 shield it!
+   |
+45 |             await asyncio.sleep(1)  # fail
+46 |         with anyio.move_on_after(shield=False):
+47 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+48 |         with anyio.move_on_after():
+49 |             await asyncio.sleep(1)  # fail
+   |
+
+RUF102.py:49:13: RUF102 shield it!
+   |
+47 |             await asyncio.sleep(1)  # fail
+48 |         with anyio.move_on_after():
+49 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+50 |         with anyio.fail_after(shield=False):
+51 |             await asyncio.sleep(1)  # fail
+   |
+
+RUF102.py:51:13: RUF102 shield it!
+   |
+49 |             await asyncio.sleep(1)  # fail
+50 |         with anyio.fail_after(shield=False):
+51 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+52 |         with anyio.fail_after():
+53 |             await asyncio.sleep(1)  # fail
+   |
+
+RUF102.py:53:13: RUF102 shield it!
+   |
+51 |             await asyncio.sleep(1)  # fail
+52 |         with anyio.fail_after():
+53 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+   |
+
+RUF102.py:67:9: RUF102 shield it!
+   |
+65 |         pass
+66 |     except Exception as e:
+67 |         await asyncio.sleep(1)  # fail
+   |         ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+   |
+
+RUF102.py:74:9: RUF102 shield it!
+   |
+72 |         pass
+73 |     except asyncio.CancelledError as e:
+74 |         await asyncio.sleep(1)  # fail
+   |         ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+   |
+
+RUF102.py:81:9: RUF102 shield it!
+   |
+79 |         pass
+80 |     except ((ZeroDivisionError, Exception), ValueError) as e:
+81 |         await asyncio.sleep(1)  # fail
+   |         ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+   |
+
+RUF102.py:88:9: RUF102 shield it!
+   |
+86 |         pass
+87 |     finally:
+88 |         await asyncio.sleep(1)  # fail
+   |         ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+89 | 
+90 | async def fail_async_with():
+   |
+
+RUF102.py:94:9: RUF102 shield it!
+   |
+92 |           pass
+93 |       finally:
+94 |           async with anyio.create_task_group() as tg:  # fail
+   |  _________^
+95 | |             pass
+   | |________________^ RUF102
+   |
