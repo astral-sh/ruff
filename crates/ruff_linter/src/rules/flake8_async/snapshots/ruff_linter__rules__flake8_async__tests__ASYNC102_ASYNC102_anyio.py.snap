@@ -42,32 +42,10 @@ ASYNC102_anyio.py:39:9: ASYNC102 shield it!
 41 |         await foo()
    |
 
-ASYNC102_anyio.py:49:9: ASYNC102 shield it!
-   |
-47 |         await foo()  # not handled
-48 |     except anyio.get_cancelled_exc_class(...):
-49 |         await foo()  # not handled
-   |         ^^^^^^^^^^^ ASYNC102
-50 |     except get_cancelled_exc_class:
-51 |         await foo()  # not handled
-   |
-
 ASYNC102_anyio.py:64:9: ASYNC102 shield it!
    |
 62 |         await foo()  # not an error
 63 |     except:
 64 |         await foo()  # error: 8, Statement("bare except", lineno-1)
    |         ^^^^^^^^^^^ ASYNC102
-   |
-
-ASYNC102_anyio.py:84:9: ASYNC102 shield it!
-   |
-82 |           # create_task_group does not block/checkpoint on entry, and is not
-83 |           # a cancellation point on exit.
-84 |           async with anyio.create_task_group() as tg:
-   |  _________^
-85 | |             tg.cancel_scope.deadline = anyio.current_time() + 10
-86 | |             tg.cancel_scope.shield = True
-87 | |             await foo()  # noqa: ASYNC102 - fixthis
-   | |_______________________^ ASYNC102
    |

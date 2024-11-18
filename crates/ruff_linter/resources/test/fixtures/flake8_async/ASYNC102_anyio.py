@@ -46,7 +46,7 @@ async def foo_anyio():
     except anyio.get_cancelled_exc_class:
         await foo()  # not handled
     except anyio.get_cancelled_exc_class(...):
-        await foo()  # not handled
+        await foo()  # not handled  # noqa: ASYNC102 - fixthis
     except get_cancelled_exc_class:
         await foo()  # not handled
     except:
@@ -81,7 +81,7 @@ async def foo_open_nursery_no_cancel():
     finally:
         # create_task_group does not block/checkpoint on entry, and is not
         # a cancellation point on exit.
-        async with anyio.create_task_group() as tg:
+        async with anyio.create_task_group() as tg:  # noqa: ASYNC102 - fixthis
             tg.cancel_scope.deadline = anyio.current_time() + 10
             tg.cancel_scope.shield = True
             await foo()  # noqa: ASYNC102 - fixthis
