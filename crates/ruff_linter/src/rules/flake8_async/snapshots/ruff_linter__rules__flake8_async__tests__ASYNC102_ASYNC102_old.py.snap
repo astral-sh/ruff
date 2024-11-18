@@ -2,106 +2,106 @@
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 snapshot_kind: text
 ---
-ASYNC102_old.py:43:13: ASYNC102 shield it!
+ASYNC102_old.py:44:13: ASYNC102 shield it!
    |
-41 |     except Exception as e:
-42 |         with anyio.CancelScope(shield=False):
-43 |             await asyncio.sleep(1)  # fail
+42 |     except Exception as e:
+43 |         with anyio.CancelScope(shield=False):
+44 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
-44 |         with anyio.CancelScope():
-45 |             await asyncio.sleep(1)  # fail
+45 |         with anyio.CancelScope():
+46 |             await asyncio.sleep(1)  # fail
    |
 
-ASYNC102_old.py:45:13: ASYNC102 shield it!
+ASYNC102_old.py:46:13: ASYNC102 shield it!
    |
-43 |             await asyncio.sleep(1)  # fail
-44 |         with anyio.CancelScope():
-45 |             await asyncio.sleep(1)  # fail
+44 |             await asyncio.sleep(1)  # fail
+45 |         with anyio.CancelScope():
+46 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
-46 |         with anyio.move_on_after(shield=False):
-47 |             await asyncio.sleep(1)  # fail
+47 |         with anyio.move_on_after(shield=False):
+48 |             await asyncio.sleep(1)  # fail
    |
 
-ASYNC102_old.py:47:13: ASYNC102 shield it!
+ASYNC102_old.py:48:13: ASYNC102 shield it!
    |
-45 |             await asyncio.sleep(1)  # fail
-46 |         with anyio.move_on_after(shield=False):
-47 |             await asyncio.sleep(1)  # fail
+46 |             await asyncio.sleep(1)  # fail
+47 |         with anyio.move_on_after(shield=False):
+48 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
-48 |         with anyio.move_on_after():
-49 |             await asyncio.sleep(1)  # fail
+49 |         with anyio.move_on_after():
+50 |             await asyncio.sleep(1)  # fail
    |
 
-ASYNC102_old.py:49:13: ASYNC102 shield it!
+ASYNC102_old.py:50:13: ASYNC102 shield it!
    |
-47 |             await asyncio.sleep(1)  # fail
-48 |         with anyio.move_on_after():
-49 |             await asyncio.sleep(1)  # fail
+48 |             await asyncio.sleep(1)  # fail
+49 |         with anyio.move_on_after():
+50 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
-50 |         with anyio.fail_after(shield=False):
-51 |             await asyncio.sleep(1)  # fail
+51 |         with anyio.fail_after(shield=False):
+52 |             await asyncio.sleep(1)  # fail
    |
 
-ASYNC102_old.py:51:13: ASYNC102 shield it!
+ASYNC102_old.py:52:13: ASYNC102 shield it!
    |
-49 |             await asyncio.sleep(1)  # fail
-50 |         with anyio.fail_after(shield=False):
-51 |             await asyncio.sleep(1)  # fail
+50 |             await asyncio.sleep(1)  # fail
+51 |         with anyio.fail_after(shield=False):
+52 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
-52 |         with anyio.fail_after():
-53 |             await asyncio.sleep(1)  # fail
+53 |         with anyio.fail_after():
+54 |             await asyncio.sleep(1)  # fail
    |
 
-ASYNC102_old.py:53:13: ASYNC102 shield it!
+ASYNC102_old.py:54:13: ASYNC102 shield it!
    |
-51 |             await asyncio.sleep(1)  # fail
-52 |         with anyio.fail_after():
-53 |             await asyncio.sleep(1)  # fail
+52 |             await asyncio.sleep(1)  # fail
+53 |         with anyio.fail_after():
+54 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
    |
 
-ASYNC102_old.py:67:9: ASYNC102 shield it!
+ASYNC102_old.py:68:9: ASYNC102 shield it!
    |
-65 |         pass
-66 |     except Exception as e:
-67 |         await asyncio.sleep(1)  # fail
+66 |         pass
+67 |     except Exception as e:
+68 |         await asyncio.sleep(1)  # fail
    |         ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
    |
 
-ASYNC102_old.py:74:9: ASYNC102 shield it!
+ASYNC102_old.py:75:9: ASYNC102 shield it!
    |
-72 |         pass
-73 |     except asyncio.CancelledError as e:
-74 |         await asyncio.sleep(1)  # fail
+73 |         pass
+74 |     except asyncio.CancelledError as e:
+75 |         await asyncio.sleep(1)  # fail
    |         ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
    |
 
-ASYNC102_old.py:81:9: ASYNC102 shield it!
+ASYNC102_old.py:82:9: ASYNC102 shield it!
    |
-79 |         pass
-80 |     except ((ZeroDivisionError, Exception), ValueError) as e:
-81 |         await asyncio.sleep(1)  # fail
+80 |         pass
+81 |     except ((ZeroDivisionError, Exception), ValueError) as e:
+82 |         await asyncio.sleep(1)  # fail
    |         ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
    |
 
-ASYNC102_old.py:88:9: ASYNC102 shield it!
+ASYNC102_old.py:89:9: ASYNC102 shield it!
    |
-86 |         pass
-87 |     finally:
-88 |         await asyncio.sleep(1)  # fail
+87 |         pass
+88 |     finally:
+89 |         await asyncio.sleep(1)  # fail
    |         ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
-89 | 
-90 | async def fail_async_with():
+90 | 
+91 | async def fail_async_with():
    |
 
-ASYNC102_old.py:94:9: ASYNC102 shield it!
+ASYNC102_old.py:95:9: ASYNC102 shield it!
    |
-92 |           pass
-93 |       finally:
-94 |           async with my_own_async_manager():  # fail
+93 |           pass
+94 |       finally:
+95 |           async with my_own_async_manager():  # fail
    |  _________^
-95 | |             pass
+96 | |             pass
    | |________________^ ASYNC102
-96 |   
-97 |   async def pass_variable_for_exception_types(exceptions_to_process: BaseException) -> Iterator[None]:
+97 |   
+98 |   async def pass_variable_for_exception_types(exceptions_to_process: BaseException) -> Iterator[None]:
    |

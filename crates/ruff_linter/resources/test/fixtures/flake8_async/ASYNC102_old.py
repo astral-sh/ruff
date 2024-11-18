@@ -1,6 +1,7 @@
 import asyncio
 
 import anyio
+import trio
 from anyio import CancelScope
 from anyio import CancelScope as CS
 
@@ -103,3 +104,10 @@ async def pass_variable_for_exception_types(exceptions_to_process: BaseException
     except unknown_name as e:
         # allowing no error since the variable doesn't even exist
         await asyncio.sleep(0)
+
+async def pass_calls_to_aclose_forcefully():
+    try:
+        pass
+    finally:
+        await anyio.aclose_forcefully()
+        await trio.aclose_forcefully()

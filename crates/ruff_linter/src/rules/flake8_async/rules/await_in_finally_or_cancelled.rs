@@ -160,7 +160,6 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                     }) = &item.context_expr
                     {
                         if let Some(name) = self.semantic.resolve_qualified_name(func) {
-                            // TODO what about x = y(); with y:?
                             let managers: Vec<Vec<&str>> = vec![
                                 vec!["anyio", "CancelScope"],
                                 vec!["anyio", "move_on_after"],
@@ -200,7 +199,19 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
-        if let Expr::Await(ast::ExprAwait { .. }) = expr {
+        if let Expr::Await(ast::ExprAwait { value, .. }) = expr {
+            if let Expr::Call(ExprCall { ref func, .. }) = **value {
+                if let Some(name) = self.semantic.resolve_qualified_name(func) {
+                    let allowed_async_calls: Vec<Vec<&str>> = vec![
+                        vec!["anyio", "aclose_forcefully"],
+                        vec!["trio", "aclose_forcefully"],
+                    ];
+                    let segments = &Vec::from(name.segments());
+                    if allowed_async_calls.contains(&segments) {
+                        return;
+                    }
+                }
+            };
             self.async_ranges.push(expr.range());
         } else {
             visitor::walk_expr(self, expr);
