@@ -7,18 +7,38 @@ use ruff_python_ast::{self as ast, visitor, Comprehension, ExceptHandler, Expr, 
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+// TODO review for and add handling of trio and asyncio solutions
+
 /// ## What it does
-/// TODO
-///
+/// Checks for async yielding activities such as `await`, async loops, and async context managers
+/// in cleanup contexts that are not shielded from cancellation.
 ///
 /// ## Why is this bad?
-/// TODO
+/// The intent when coding in a `finally:` block and similar is usually to have that code execute
+/// in to completion to undo an incomplete action or shutdown a resource.  If async activities in
+/// these context are not shielded then they may be cancelled leaving the cleanup incomplete.
 ///
 /// ## Example
-/// TODO
+/// ```python
+/// session = await login(username, password)
+/// try:
+///     win_the_game(session)
+/// finally:
+///     await session.close()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// session = await login(username, password)
+/// try:
+///     win_the_game(session)
+/// finally:
+///     with anyio.CancelScope(shield=True):
+///         await session.close()
+/// ```
 ///
 /// ## References
-/// TODO
+/// - [AnyIO shielding](https://anyio.readthedocs.io/en/stable/cancellation.html#shielding)
 #[violation]
 pub struct UnshieldedAwait;
 
@@ -120,7 +140,9 @@ impl Visitor<'_> for PrunedAwaitVisitor<'_> {
                 for item in items {
                     if let Expr::Call(ExprCall { ref func, .. }) = item.context_expr {
                         if let Some(name) = self.semantic.resolve_qualified_name(func) {
-                            // TODO what about x = y(); with y:? check the shield argument, etc
+                            // TODO what about x = y(); with y:?
+                            // TODO check the shield argument
+                            // TODO also move_on_after() and fail_after()
                             if name.segments() == ["anyio", "CancelScope"] {
                                 return;
                             }
