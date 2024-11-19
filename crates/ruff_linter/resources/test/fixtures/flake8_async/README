@@ -1,0 +1,11 @@
+Most of the ASYNC102* reference files have been copied from the flake8-async project.
+Thanks to all the contributors over there that did all the work of identifying a
+good feature set and for providing reference analysis code to test against.
+
+https://github.com/python-trio/flake8-async/tree/b8422658298648e6791c74f1b455913f7e5fe1cb/tests/eval_files
+
+for f in flake8-async/tests/eval_files/async102*; do F=$(echo "${f}" | sed 's;.*/async;ruff/crates/ruff_linter/resources/test/fixtures/flake8_async/ASYNC;'); cp "${f}" "${F}"; done
+
+After copying any updates, review for any existing modifications.  Mostly these would
+be comments such as `# noqa: ASYNC102 - fixthis` for cases that are not yet properly
+handled in the Ruff implementation of ASYNC102.

@@ -20,7 +20,7 @@ mod tests {
     #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_aclose.py"))]
     #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_anyio.py"))]
     #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_asyncio.py"))]
-    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_old.py"))]
+    #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_ruff.py"))]
     #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102.py"))]
     #[test_case(Rule::AwaitInFinallyOrCancelled, Path::new("ASYNC102_trio.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
