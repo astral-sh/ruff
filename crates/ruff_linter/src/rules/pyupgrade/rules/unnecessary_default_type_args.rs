@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
@@ -43,6 +43,9 @@ use crate::checkers::ast::Checker;
 /// async def async_gen() -> AsyncGenerator[int]:
 ///     yield 42
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the type annotation contains comments.
 ///
 /// ## References
 /// - [PEP 696 – Type Defaults for Type Parameters](https://peps.python.org/pep-0696/)
@@ -93,26 +96,39 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
     }
 
     let mut diagnostic = Diagnostic::new(UnnecessaryDefaultTypeArgs, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        checker
-            .generator()
-            .expr(&Expr::Subscript(ast::ExprSubscript {
-                value: value.clone(),
-                slice: Box::new(if let [elt] = valid_elts.as_slice() {
-                    elt.clone()
-                } else {
-                    Expr::Tuple(ast::ExprTuple {
-                        elts: valid_elts,
-                        ctx: ast::ExprContext::Load,
-                        range: TextRange::default(),
-                        parenthesized: true,
-                    })
-                }),
-                ctx: ast::ExprContext::Load,
-                range: TextRange::default(),
-            })),
-        expr.range(),
-    )));
+
+    let applicability = if checker
+        .comment_ranges()
+        .has_comments(expr, checker.source())
+    {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(
+            checker
+                .generator()
+                .expr(&Expr::Subscript(ast::ExprSubscript {
+                    value: value.clone(),
+                    slice: Box::new(if let [elt] = valid_elts.as_slice() {
+                        elt.clone()
+                    } else {
+                        Expr::Tuple(ast::ExprTuple {
+                            elts: valid_elts,
+                            ctx: ast::ExprContext::Load,
+                            range: TextRange::default(),
+                            parenthesized: true,
+                        })
+                    }),
+                    ctx: ast::ExprContext::Load,
+                    range: TextRange::default(),
+                })),
+            expr.range(),
+        ),
+        applicability,
+    ));
     checker.diagnostics.push(diagnostic);
 }
 
