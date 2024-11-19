@@ -27,10 +27,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingReturnTypeStaticMethod,
         Rule::MissingReturnTypeUndocumentedPublicFunction,
         Rule::MissingTypeArgs,
-        Rule::MissingTypeCls,
         Rule::MissingTypeFunctionArgument,
         Rule::MissingTypeKwargs,
-        Rule::MissingTypeSelf,
     ]);
     let enforce_stubs = checker.source_type.is_stub() && checker.enabled(Rule::DocstringInStub);
     let enforce_stubs_and_runtime = checker.enabled(Rule::IterMethodReturnIterable);
