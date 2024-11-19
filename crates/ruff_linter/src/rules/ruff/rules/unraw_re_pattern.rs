@@ -112,8 +112,8 @@ fn regex_module_and_func(semantic: &SemanticModel, expr: &Expr) -> Option<(Regex
 
     let (module, func) = match qualified_name.segments() {
         [module, func] => match *module {
-            "re" => (RegexModule::Re, func),
-            "regex" => (RegexModule::Regex, func),
+            "re" => (RegexModule::Re, *func),
+            "regex" => (RegexModule::Regex, *func),
             _ => return None,
         },
         _ => return None,
