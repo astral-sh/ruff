@@ -6,14 +6,18 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for unnecessary default type arguments.
+/// Checks for unnecessary default type arguments for `Generator` and
+/// `AsyncGenerator` on Python 3.13+.
 ///
 /// ## Why is this bad?
 /// Python 3.13 introduced the ability for type parameters to specify default
-/// values. As such, the default type arguments for some types in the standard
-/// library (e.g., Generator, AsyncGenerator) are now optional.
+/// values. Following this change, several standard-library classes were
+/// updated to add default values for some of their type parameters. For
+/// example, `Generator[int]` is now equivalent to
+/// `Generator[int, None, None]`, as the second and third type parameters of
+/// `Generator` now default to `None`.
 ///
-/// Omitting type parameters that match the default values can make the code
+/// Omitting type argument that match the default values can make the code
 /// more concise and easier to read.
 ///
 /// ## Examples
@@ -46,7 +50,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the type annotation contains comments.
-/// 
+///
 /// ## Options
 /// - `target-version`
 ///
