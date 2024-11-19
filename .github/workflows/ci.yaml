@@ -103,11 +103,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
@@ -121,6 +121,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -133,7 +134,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-insta
-      - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
         env:
@@ -165,13 +165,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
-      - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
         env:
@@ -189,6 +189,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v4
@@ -197,7 +198,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
-      - uses: Swatinem/rust-cache@v2
       - name: "Test ruff_wasm"
         run: |
           cd crates/ruff_wasm
@@ -215,11 +215,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@v1
-      - uses: Swatinem/rust-cache@v2
       - name: "Build"
         run: cargo build --release --locked
 
@@ -231,6 +231,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - uses: SebRollen/toml-action@v1.2.0
         id: msrv
         with:
@@ -248,7 +249,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-insta
-      - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
         env:
@@ -263,11 +263,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: "Install Rust toolchain"
-        run: rustup show
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "fuzz -> target"
+      - name: "Install Rust toolchain"
+        run: rustup show
       - name: "Install cargo-binstall"
         uses: cargo-bins/cargo-binstall@main
         with:
@@ -317,9 +317,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
-      - uses: Swatinem/rust-cache@v2
       - run: ./scripts/add_rule.py --name DoTheThing --prefix PL --code C0999 --linter pylint
       - run: cargo check
       - run: cargo fmt --all --check
@@ -486,12 +486,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
@@ -517,6 +517,7 @@ jobs:
       MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -529,7 +530,6 @@ jobs:
         run: rustup show
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-      - uses: Swatinem/rust-cache@v2
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: uv pip install -r docs/requirements-insiders.txt --system
@@ -557,10 +557,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Cache rust"
-        uses: Swatinem/rust-cache@v2
       - name: "Formatter progress"
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
@@ -617,8 +616,8 @@ jobs:
     if: ${{ github.repository == 'astral-sh/ruff' && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
-      - name: "Checkout Branch"
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -627,8 +626,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-codspeed
-
-      - uses: Swatinem/rust-cache@v2
 
       - name: "Build benchmarks"
         run: cargo codspeed build --features codspeed -p ruff_benchmark
