@@ -5,7 +5,7 @@ snapshot_kind: text
 ASYNC102_ruff.py:44:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
    |
 42 |     except Exception as e:
-43 |         with anyio.CancelScope(shield=False):
+43 |         with anyio.CancelScope(deadline=30, shield=False):
 44 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
 45 |         with anyio.CancelScope():
@@ -18,14 +18,14 @@ ASYNC102_ruff.py:46:13: ASYNC102 await inside Exception must have shielded cance
 45 |         with anyio.CancelScope():
 46 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
-47 |         with anyio.move_on_after(shield=False):
+47 |         with anyio.move_on_after(deadline=30, shield=False):
 48 |             await asyncio.sleep(1)  # fail
    |
 
 ASYNC102_ruff.py:48:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
    |
 46 |             await asyncio.sleep(1)  # fail
-47 |         with anyio.move_on_after(shield=False):
+47 |         with anyio.move_on_after(deadline=30, shield=False):
 48 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
 49 |         with anyio.move_on_after():
@@ -38,14 +38,14 @@ ASYNC102_ruff.py:50:13: ASYNC102 await inside Exception must have shielded cance
 49 |         with anyio.move_on_after():
 50 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
-51 |         with anyio.fail_after(shield=False):
+51 |         with anyio.fail_after(deadline=30, shield=False):
 52 |             await asyncio.sleep(1)  # fail
    |
 
 ASYNC102_ruff.py:52:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
    |
 50 |             await asyncio.sleep(1)  # fail
-51 |         with anyio.fail_after(shield=False):
+51 |         with anyio.fail_after(deadline=30, shield=False):
 52 |             await asyncio.sleep(1)  # fail
    |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
 53 |         with anyio.fail_after():

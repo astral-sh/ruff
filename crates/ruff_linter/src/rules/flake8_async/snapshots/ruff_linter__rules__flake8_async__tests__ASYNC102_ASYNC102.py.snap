@@ -72,6 +72,16 @@ ASYNC102.py:94:13: ASYNC102 await inside finally must have shielded cancel scope
 96 |         pass
    |
 
+ASYNC102.py:104:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
+    |
+102 |     finally:
+103 |         with trio.CancelScope(shield=True):
+104 |             await foo()  # error: 12, Statement("try/finally", lineno-4)
+    |             ^^^^^^^^^^^ ASYNC102
+105 |     try:
+106 |         pass
+    |
+
 ASYNC102.py:109:13: ASYNC102 await inside finally must have shielded cancel scope with a timeout
     |
 107 |     finally:

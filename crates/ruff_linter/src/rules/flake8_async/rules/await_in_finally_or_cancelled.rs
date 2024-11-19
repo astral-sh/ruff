@@ -238,20 +238,33 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                         if let Some(name) = self.semantic.resolve_qualified_name(func) {
                             let segments = &Vec::from(name.segments());
                             if self.managers.contains(segments) {
+                                let mut shield_satisfied = false;
+                                let mut deadline_satisfied = false;
+                                if let Some(..) = arguments.args.get(0) {
+                                    // TODO check the value isn't inf?
+                                    deadline_satisfied = true;
+                                }
                                 for keyword in &arguments.keywords {
                                     if let Some(Identifier { id: name, .. }) = &keyword.arg {
-                                        if name.as_str() == "shield"
-                                            && matches!(
-                                                keyword.value,
-                                                Expr::BooleanLiteral(ExprBooleanLiteral {
-                                                    value: true,
-                                                    ..
-                                                })
-                                            )
-                                        {
-                                            return;
-                                        }
+                                        match name.as_str() {
+                                            "shield" => {
+                                                if matches!(
+                                                    keyword.value,
+                                                    Expr::BooleanLiteral(ExprBooleanLiteral {
+                                                        value: true,
+                                                        ..
+                                                    })
+                                                ) {
+                                                    shield_satisfied = true;
+                                                }
+                                            }
+                                            "deadline" => deadline_satisfied = true,
+                                            _ => (),
+                                        };
                                     }
+                                }
+                                if shield_satisfied && deadline_satisfied {
+                                    return;
                                 }
                             }
                         }

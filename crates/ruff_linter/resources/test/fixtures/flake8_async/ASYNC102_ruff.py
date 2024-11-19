@@ -16,11 +16,11 @@ async def pass_shielded():
     try:
         pass
     except Exception as e:
-        with anyio.CancelScope(shield=True):
+        with anyio.CancelScope(deadline=30, shield=True):
             await asyncio.sleep(1)
-        with CancelScope(shield=True):
+        with CancelScope(deadline=30, shield=True):
             await asyncio.sleep(1)
-        with CS(shield=True):
+        with CS(deadline=30, shield=True):
             await asyncio.sleep(1)
 
 
@@ -28,11 +28,11 @@ async def pass_shielded_in_multiple_ways():
     try:
         pass
     except Exception as e:
-        with anyio.CancelScope(shield=True):
+        with anyio.CancelScope(deadline=30, shield=True):
             await asyncio.sleep(1)
-        with anyio.move_on_after(shield=True):
+        with anyio.move_on_after(deadline=30, shield=True):
             await asyncio.sleep(1)
-        with anyio.fail_after(shield=True):
+        with anyio.fail_after(deadline=30, shield=True):
             await asyncio.sleep(1)
 
 
@@ -40,15 +40,15 @@ async def fail_context_manager_but_not_shielded_in_multiple_ways():
     try:
         pass
     except Exception as e:
-        with anyio.CancelScope(shield=False):
+        with anyio.CancelScope(deadline=30, shield=False):
             await asyncio.sleep(1)  # fail
         with anyio.CancelScope():
             await asyncio.sleep(1)  # fail
-        with anyio.move_on_after(shield=False):
+        with anyio.move_on_after(deadline=30, shield=False):
             await asyncio.sleep(1)  # fail
         with anyio.move_on_after():
             await asyncio.sleep(1)  # fail
-        with anyio.fail_after(shield=False):
+        with anyio.fail_after(deadline=30, shield=False):
             await asyncio.sleep(1)  # fail
         with anyio.fail_after():
             await asyncio.sleep(1)  # fail
