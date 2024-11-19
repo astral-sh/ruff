@@ -241,7 +241,7 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                                 // TODO better awareness of any variations between the known managers
                                 let mut shield_satisfied = false;
                                 let mut deadline_satisfied = false;
-                                if let Some(..) = arguments.args.get(0) {
+                                if arguments.args.first().is_some() {
                                     // TODO check the value isn't inf?
                                     deadline_satisfied = true;
                                 }
