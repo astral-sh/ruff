@@ -1251,6 +1251,68 @@ fn removed_indirect() {
 }
 
 #[test]
+fn removed_ignore_direct() {
+    let mut cmd = RuffCheck::default().args(["--ignore", "UP027"]).build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The following rules have been removed and ignoring them has no effect:
+        - UP027
+    ");
+}
+
+#[test]
+fn removed_ignore_multiple_direct() {
+    let mut cmd = RuffCheck::default()
+        .args(["--ignore", "UP027", "--ignore", "PLR1706"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The following rules have been removed and ignoring them has no effect:
+        - PLR1706
+        - UP027
+    ");
+}
+
+#[test]
+fn removed_ignore_remapped_direct() {
+    let mut cmd = RuffCheck::default().args(["--ignore", "PGH001"]).build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: `PGH001` has been remapped to `S307`.
+    ");
+}
+
+#[test]
+fn removed_ignore_indirect() {
+    // `PLR170` includes removed rules but should not select or warn
+    // since it is not a "direct" selection
+    let mut cmd = RuffCheck::default().args(["--ignore", "PLR170"]).build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
 fn redirect_direct() {
     // Selection of a redirected rule directly should use the new rule and warn
     let mut cmd = RuffCheck::default().args(["--select", "RUF940"]).build();
