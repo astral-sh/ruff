@@ -2285,17 +2285,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 } = expression;
                                 let ty = self.infer_expression(expression);
 
+                                if let Some(ref format_spec) = format_spec {
+                                    for element in format_spec.elements.expressions() {
+                                        self.infer_expression(&element.expression);
+                                    }
+                                }
+
                                 // TODO: handle format specifiers by calling a method
                                 // (`Type::format`?) that handles the `__format__` method.
                                 // Conversion flags should be handled before calling `__format__`.
                                 // https://docs.python.org/3/library/string.html#format-string-syntax
-                                if !conversion.is_none() {
-                                    collector.add_expression();
-                                } else if let Some(ref format_spec) = format_spec {
-                                    for element in format_spec.elements.expressions() {
-                                        self.infer_expression(&element.expression);
-                                    }
-
+                                if !conversion.is_none() || format_spec.is_some() {
                                     collector.add_expression();
                                 } else {
                                     if let Type::StringLiteral(literal) = ty.str(self.db) {
