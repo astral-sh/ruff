@@ -108,3 +108,28 @@ UP043.py:51:21: UP043 [*] Unnecessary default type arguments
 51    |-async def func() -> AsyncGenerator[str, None]:
    51 |+async def func() -> AsyncGenerator[str]:
 52 52 |     yield "hello"
+53 53 | 
+54 54 | 
+
+UP043.py:55:21: UP043 [*] Unnecessary default type arguments
+   |
+55 |   async def func() -> AsyncGenerator[  # type: ignore
+   |  _____________________^
+56 | |     str,
+57 | |     None
+58 | | ]:
+   | |_^ UP043
+59 |       yield "hello"
+   |
+   = help: Remove default type arguments
+
+ℹ Unsafe fix
+52 52 |     yield "hello"
+53 53 | 
+54 54 | 
+55    |-async def func() -> AsyncGenerator[  # type: ignore
+56    |-    str,
+57    |-    None
+58    |-]:
+   55 |+async def func() -> AsyncGenerator[str]:
+59 56 |     yield "hello"
