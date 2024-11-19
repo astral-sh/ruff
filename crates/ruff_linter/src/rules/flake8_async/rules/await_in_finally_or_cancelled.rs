@@ -238,6 +238,7 @@ impl Visitor<'_> for PrunedAsyncVisitor<'_> {
                         if let Some(name) = self.semantic.resolve_qualified_name(func) {
                             let segments = &Vec::from(name.segments());
                             if self.managers.contains(segments) {
+                                // TODO better awareness of any variations between the known managers
                                 let mut shield_satisfied = false;
                                 let mut deadline_satisfied = false;
                                 if let Some(..) = arguments.args.get(0) {
