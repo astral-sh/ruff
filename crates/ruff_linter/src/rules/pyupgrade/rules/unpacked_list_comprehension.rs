@@ -5,7 +5,7 @@ use ruff_macros::violation;
 /// There's no [evidence](https://github.com/astral-sh/ruff/issues/12754) that generators are
 /// meaningfully faster than list comprehensions when combined with unpacking.
 ///
-/// ## What it did
+/// ## What it does
 /// Checks for list comprehensions that are immediately unpacked.
 ///
 /// ## Why is this bad?
