@@ -39,8 +39,8 @@ impl Violation for IOError {
     }
 }
 
-/// ## Deprecated
-/// This rule has been deprecated and will be removed in a future release. Syntax errors will
+/// ## Removed
+/// This rule has been removed. Syntax errors will
 /// always be shown regardless of whether this rule is selected or not.
 ///
 /// ## What it does
@@ -63,14 +63,16 @@ impl Violation for IOError {
 /// ## References
 /// - [Python documentation: Syntax Errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
 #[violation]
-pub struct SyntaxError {
-    pub message: String,
-}
+#[deprecated(note = "E999 has been removed")]
+pub struct SyntaxError;
 
+#[allow(deprecated)]
 impl Violation for SyntaxError {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let SyntaxError { message } = self;
-        format!("SyntaxError: {message}")
+        unreachable!("E999 has been removed")
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["SyntaxError"]
     }
 }
