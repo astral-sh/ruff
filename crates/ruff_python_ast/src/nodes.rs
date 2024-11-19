@@ -1726,6 +1726,16 @@ impl StringLiteralValue {
             .map_or(false, |part| part.flags.prefix().is_unicode())
     }
 
+    /// Returns `true` if the string literal is a raw string.
+    ///
+    /// For an implicitly concatenated string, it returns `true` only if the first
+    /// string literal is a raw string.
+    pub fn is_raw(&self) -> bool {
+        self.iter()
+            .next()
+            .map_or(false, |part| part.flags.prefix().is_raw())
+    }
+
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
     pub fn as_slice(&self) -> &[StringLiteral] {
         match &self.inner {
@@ -2113,6 +2123,13 @@ impl BytesLiteralValue {
     /// Returns `true` if the bytes literal is implicitly concatenated.
     pub const fn is_implicit_concatenated(&self) -> bool {
         matches!(self.inner, BytesLiteralValueInner::Concatenated(_))
+    }
+
+    /// Returns `true` if the bytes literal is raw.
+    pub fn is_raw(&self) -> bool {
+        self.iter()
+            .next()
+            .map_or(false, |part| part.flags.prefix().is_raw())
     }
 
     /// Returns a slice of all the [`BytesLiteral`] parts contained in this value.
