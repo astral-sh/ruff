@@ -126,8 +126,7 @@ REPOSITORIES: list[Repository] = [
     Repository("binary-husky", "gpt_academic", "master"),
     Repository("bloomberg", "pytest-memray", "main"),
     Repository("bokeh", "bokeh", "branch-3.3", select="ALL"),
-    # Disabled due to use of explicit `select` with `E999`, which is no longer
-    # supported in `--preview`.
+    # Disabled due to use of explicit `select` with `E999`, which has been removed.
     # See: https://github.com/astral-sh/ruff/pull/12129
     # Repository("demisto", "content", "master"),
     Repository("docker", "docker-py", "main"),
