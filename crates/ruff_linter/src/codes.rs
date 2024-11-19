@@ -972,7 +972,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "036") => (RuleGroup::Preview, rules::ruff::rules::NoneNotAtEndOfUnion),
         (Ruff, "038") => (RuleGroup::Preview, rules::ruff::rules::RedundantBoolLiteral),
         (Ruff, "048") => (RuleGroup::Preview, rules::ruff::rules::MapIntVersionParsing),
-        (Ruff, "051") => (RuleGroup::Preview, rules::ruff::rules::UnrawRePattern),
+        (Ruff, "039") => (RuleGroup::Preview, rules::ruff::rules::UnrawRePattern),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
 
