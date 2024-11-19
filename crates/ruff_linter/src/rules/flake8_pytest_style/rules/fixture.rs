@@ -230,7 +230,7 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 }
 
 /// ## Removal
-/// This rule has been removed becausae marking fixtures that do not return a value with an underscore
+/// This rule has been removed because marking fixtures that do not return a value with an underscore
 /// isn't a practice recommended by the pytest community.
 ///
 /// ## What it does
