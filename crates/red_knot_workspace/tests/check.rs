@@ -283,9 +283,7 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_20.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, false),
     // Fails for unknown reasons:
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F541.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F632.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F811_19.py", true, false),
     ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP039.py", true, false),
-    ("crates/ruff_python_parser/resources/valid/expressions/f_string.py", true, true),
 ];

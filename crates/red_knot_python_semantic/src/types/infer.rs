@@ -2285,6 +2285,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 } = expression;
                                 let ty = self.infer_expression(expression);
 
+                                if let Some(ref format_spec) = format_spec {
+                                    for element in format_spec.elements.expressions() {
+                                        self.infer_expression(&element.expression);
+                                    }
+                                }
+
                                 // TODO: handle format specifiers by calling a method
                                 // (`Type::format`?) that handles the `__format__` method.
                                 // Conversion flags should be handled before calling `__format__`.
