@@ -798,8 +798,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "001") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),
         (Flake8PytestStyle, "002") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestFixturePositionalArgs),
         (Flake8PytestStyle, "003") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestExtraneousScopeFunction),
-        (Flake8PytestStyle, "004") => (RuleGroup::Deprecated, rules::flake8_pytest_style::rules::PytestMissingFixtureNameUnderscore),
-        (Flake8PytestStyle, "005") => (RuleGroup::Deprecated, rules::flake8_pytest_style::rules::PytestIncorrectFixtureNameUnderscore),
+        #[allow(deprecated)]
+        (Flake8PytestStyle, "004") => (RuleGroup::Removed, rules::flake8_pytest_style::rules::PytestMissingFixtureNameUnderscore),
+        #[allow(deprecated)]
+        (Flake8PytestStyle, "005") => (RuleGroup::Removed, rules::flake8_pytest_style::rules::PytestIncorrectFixtureNameUnderscore),
         (Flake8PytestStyle, "006") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestParametrizeNamesWrongType),
         (Flake8PytestStyle, "007") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestParametrizeValuesWrongType),
         (Flake8PytestStyle, "008") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestPatchWithLambda),
