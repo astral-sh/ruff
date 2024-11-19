@@ -9,3 +9,9 @@ for f in flake8-async/tests/eval_files/async102*; do F=$(echo "${f}" | sed 's;.*
 After copying any updates, review for any existing modifications.  Mostly these would
 be comments such as `# noqa: ASYNC102 - fixthis` for cases that are not yet properly
 handled in the Ruff implementation of ASYNC102.
+
+A naive check for the same error count is to grep as below.  Also make sure the grep
+output itself does not contain any of the noqa comments noted about.
+
+cat crates/ruff_linter/resources/test/fixtures/flake8_async/ASYNC102* | grep -E '# (error|ASYNC102)' | wc -l
+cat crates/ruff_linter/resources/test/fixtures/flake8_async/ASYNC102* | grep -E '# (error|ASYNC102)' | grep '# noqa: ASYNC102' | wc -l
