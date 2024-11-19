@@ -27,6 +27,9 @@ use crate::settings::types::PythonVersion;
 /// def foo(x: int, /) -> None: ...
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// [PEP 484]: https://peps.python.org/pep-0484/#positional-only-arguments
 /// [PEP 570]: https://peps.python.org/pep-0570
 #[violation]

@@ -46,6 +46,9 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the type annotation contains comments.
+/// 
+/// ## Options
+/// - `target-version`
 ///
 /// ## References
 /// - [PEP 696 – Type Defaults for Type Parameters](https://peps.python.org/pep-0696/)
