@@ -5,8 +5,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::{Binding, SemanticModel};
+use ruff_python_stdlib::typing::{is_pep_593_generic_type, is_standard_library_literal};
 use ruff_text_size::Ranged;
-use std::borrow::Borrow;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
@@ -16,7 +16,7 @@ use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 /// symbols that are not available at runtime.
 ///
 /// ## Why is this bad?
-/// We will get a `NameError` at runtime.
+/// Referencing type-checking only symbols results in a `NameError` at runtime.
 ///
 /// ## Example
 /// ```python
@@ -180,11 +180,23 @@ fn collect_typing_references<'a>(
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             collect_typing_references(checker, value, names);
-            if let Expr::Name(ast::ExprName { id, .. }) = value.borrow() {
-                if id.as_str() != "Literal" {
-                    collect_typing_references(checker, slice, names);
+            if let Some(qualified_name) = checker.semantic().resolve_qualified_name(value) {
+                if is_standard_library_literal(qualified_name.segments()) {
+                    return;
+                }
+                if is_pep_593_generic_type(qualified_name.segments()) {
+                    // First argument is a type (including forward references); the
+                    // rest are arbitrary Python objects.
+                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                        let mut iter = elts.iter();
+                        if let Some(expr) = iter.next() {
+                            collect_typing_references(checker, expr, names);
+                        }
+                    }
+                    return;
                 }
             }
+            collect_typing_references(checker, slice, names);
         }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {

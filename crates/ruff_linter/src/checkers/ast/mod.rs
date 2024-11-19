@@ -1855,6 +1855,9 @@ impl<'a> Checker<'a> {
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
     fn visit_generic_type_alias(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
+        // even though we don't visit these nodes immediately we need to
+        // modify the semantic flags before we push the expression and its
+        // corresponding semantic snapshot
         self.semantic.flags |= SemanticModelFlags::GENERIC_TYPE_ALIAS;
         self.visit
             .type_param_definitions

@@ -135,12 +135,16 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::IN_EXCEPT_HANDLER)
     }
 
-    /// Return `true` if this [`Binding`] represents an explicit type alias
+    /// Return `true` if this [`Binding`] represents a [PEP 613] explicit type alias
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
     pub const fn is_explicit_type_alias(&self) -> bool {
         self.flags.intersects(BindingFlags::EXPLICIT_TYPE_ALIAS)
     }
 
-    /// Return `true` if this [`Binding`] represents a generic type alias
+    /// Return `true` if this [`Binding`] represents a [PEP 695] generic type alias
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
     pub const fn is_generic_type_alias(&self) -> bool {
         self.flags.intersects(BindingFlags::GENERIC_TYPE_ALIAS)
     }
@@ -261,16 +265,6 @@ impl<'a> Binding<'a> {
                 None
             }
         })
-    }
-
-    /// Returns the statement range for bindings created by `[ast::StmtAnnAssign]`
-    /// or `[ast::StmtClassDef]` and `[Binding.range]` otherwise.
-    pub fn defn_range(&self, semantic: &SemanticModel) -> TextRange {
-        match self.statement(semantic) {
-            Some(Stmt::AnnAssign(stmt)) => stmt.range(),
-            Some(Stmt::ClassDef(stmt)) => stmt.range(),
-            _ => self.range,
-        }
     }
 
     pub fn as_any_import(&self) -> Option<AnyImport<'_, 'a>> {

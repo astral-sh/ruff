@@ -700,6 +700,7 @@ impl<'a> SemanticModel<'a> {
             }
 
             class_variables_visible = scope.kind.is_type() && index == 0;
+            seen_function |= scope.kind.is_function();
 
             if let Some(binding_id) = scope.get(symbol) {
                 if lexicographical_lookup {
@@ -719,7 +720,16 @@ impl<'a> SemanticModel<'a> {
                             continue;
                         }
 
-                        if binding.defn_range(self).ordering(range).is_lt() {
+                        // This ensures we perform the correct lexicographical lookup
+                        // since the ranges for these two types of bindings are trimmed
+                        // but the name is not available until the end of the statement
+                        let binding_range = match binding.statement(self) {
+                            Some(Stmt::AnnAssign(stmt)) => stmt.range(),
+                            Some(Stmt::ClassDef(stmt)) => stmt.range(),
+                            _ => binding.range,
+                        };
+
+                        if binding_range.ordering(range).is_lt() {
                             return Some(shadowed_id);
                         }
                     }
@@ -745,9 +755,6 @@ impl<'a> SemanticModel<'a> {
                     return None;
                 }
             }
-
-            // FIXME: Shouldn't this happen above where `class_variables_visible` is set?
-            seen_function |= scope.kind.is_function();
         }
 
         None
@@ -1745,13 +1752,17 @@ impl<'a> SemanticModel<'a> {
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
 
-    /// Return `true` if the model is in an explicit type alias
+    /// Return `true` if the model is in a [PEP 613] explicit type alias
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
     pub const fn in_explicit_type_alias(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::EXPLICIT_TYPE_ALIAS)
     }
 
-    /// Return `true` if the model is in a generic type alias
+    /// Return `true` if the model is in a [PEP 695] generic type alias
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
     pub const fn in_generic_type_alias(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::GENERIC_TYPE_ALIAS)
