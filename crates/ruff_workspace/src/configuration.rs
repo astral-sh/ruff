@@ -1000,13 +1000,9 @@ impl LintConfiguration {
         if preview.mode.is_disabled() {
             for selection in deprecated_selectors.iter().sorted() {
                 let (prefix, code) = selection.prefix_and_code();
-                let rule = format!("{prefix}{code}");
-                let mut message =
-                    format!("Rule `{rule}` is deprecated and will be removed in a future release.");
-                if matches!(rule.as_str(), "E999") {
-                    message.push_str(" Syntax errors will always be shown regardless of whether this rule is selected or not.");
-                }
-                warn_user_once_by_message!("{message}");
+                warn_user_once_by_message!(
+                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release."
+                );
             }
         } else {
             let deprecated_selectors = deprecated_selectors.iter().sorted().collect::<Vec<_>>();
@@ -1632,7 +1628,6 @@ mod tests {
             Rule::AmbiguousClassName,
             Rule::AmbiguousFunctionName,
             Rule::IOError,
-            Rule::SyntaxError,
             Rule::TabIndentation,
             Rule::TrailingWhitespace,
             Rule::MissingNewlineAtEndOfFile,
