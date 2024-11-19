@@ -179,7 +179,7 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Vec<
                 }
             }
         }
-        _ => panic!("outside unable to handle {t:?}"),
+        _ => (),
     }
 
     f
