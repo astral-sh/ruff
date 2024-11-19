@@ -293,8 +293,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::PytestFixtureIncorrectParenthesesStyle,
                 Rule::PytestFixturePositionalArgs,
                 Rule::PytestExtraneousScopeFunction,
-                Rule::PytestMissingFixtureNameUnderscore,
-                Rule::PytestIncorrectFixtureNameUnderscore,
                 Rule::PytestFixtureParamWithoutValue,
                 Rule::PytestDeprecatedYieldFixture,
                 Rule::PytestFixtureFinalizerCallback,
@@ -304,7 +302,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             ]) {
                 flake8_pytest_style::rules::fixture(
                     checker,
-                    stmt,
                     name,
                     parameters,
                     returns.as_deref(),
