@@ -513,6 +513,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "024") => (RuleGroup::Stable, rules::pyupgrade::rules::OSErrorAlias),
         (Pyupgrade, "025") => (RuleGroup::Stable, rules::pyupgrade::rules::UnicodeKindPrefix),
         (Pyupgrade, "026") => (RuleGroup::Stable, rules::pyupgrade::rules::DeprecatedMockImport),
+        (Pyupgrade, "027") => (RuleGroup::Removed, rules::pyupgrade::rules::UnpackedListComprehension),
         (Pyupgrade, "028") => (RuleGroup::Stable, rules::pyupgrade::rules::YieldInForLoop),
         (Pyupgrade, "029") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryBuiltinImport),
         (Pyupgrade, "030") => (RuleGroup::Stable, rules::pyupgrade::rules::FormatLiterals),
