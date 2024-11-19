@@ -201,7 +201,7 @@ reveal_type((A(), B()) < (A(), B()))  # revealed: float | set | Literal[False]
 
 `Eq` and `NotEq` have unique behavior compared to other operators in lexicographic comparisons.
 Specifically, for `Eq`, if any non-equal pair exists within the tuples being compared, we can
-immediately conclude that the tuples are not equal. Conversely, for `NotEq`, if any equal pair
+immediately conclude that the tuples are not equal. Conversely, for `NotEq`, if any non-equal pair
 exists, we can determine that the tuples are unequal.
 
 In contrast, with operators like `<` and `>`, the comparison must consider each pair of elements
@@ -209,8 +209,6 @@ sequentially, and the final outcome might remain ambiguous until all pairs are c
 
 Naive implementations of lexicographic comparisons may overlook this distinction, leading to broad
 inferences.
-
-This is based on an issue reported [here](https://github.com/astral-sh/ruff/issues/14279).
 
 ```py
 def str_instance() -> str:

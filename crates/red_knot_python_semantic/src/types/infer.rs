@@ -3786,9 +3786,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             | RichCompareOperator::Ge => {
                                 self.infer_binary_type_comparison(l_ty, op.into(), r_ty)?
                             }
-                            // For `==` and `!=`, we already know the result from `pairwise_eq_result`
-                            // NOTE: cpython implementation doesn't consider the custom-rich-comparison
-                            // (ex. non-boolean return type, the case that `!=` is not negation of `==`)
+                            // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
+                            // NOTE: The CPython implementation does not account for non-boolean return types
+                            // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
                             RichCompareOperator::Eq => Type::BooleanLiteral(false),
                             RichCompareOperator::Ne => Type::BooleanLiteral(true),
                         };
