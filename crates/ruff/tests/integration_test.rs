@@ -840,7 +840,7 @@ fn stdin_multiple_parse_error() {
 
 #[test]
 fn parse_error_not_included() {
-    // Select any rule except for `E999`, syntax error should still be shown.
+    // Parse errors are always shown
     let mut cmd = RuffCheck::default().args(["--select=I"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("foo =\n"), @r"
@@ -856,27 +856,6 @@ fn parse_error_not_included() {
     Found 1 error.
 
     ----- stderr -----
-    ");
-}
-
-#[test]
-fn deprecated_parse_error_selection() {
-    let mut cmd = RuffCheck::default().args(["--select=E999"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("foo =\n"), @r"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:6: SyntaxError: Expected an expression
-      |
-    1 | foo =
-      |      ^
-      |
-
-    Found 1 error.
-
-    ----- stderr -----
-    warning: Rule `E999` is deprecated and will be removed in a future release. Syntax errors will always be shown regardless of whether this rule is selected or not.
     ");
 }
 
