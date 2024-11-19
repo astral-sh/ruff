@@ -67,15 +67,11 @@ enum RegexModule {
 }
 
 impl RegexModule {
-    fn is_regex(self) -> bool {
-        matches!(self, RegexModule::Regex)
-    }
-
     fn is_function_taking_pattern(self, name: &str) -> bool {
         match name {
             "compile" | "findall" | "finditer" | "fullmatch" | "match" | "search" | "split"
             | "sub" | "subn" => true,
-            "splititer" | "subf" | "subfn" | "template" => self.is_regex(),
+            "splititer" | "subf" | "subfn" | "template" => self == Self::Regex,
             _ => false,
         }
     }
