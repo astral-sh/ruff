@@ -4374,6 +4374,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!()
             }
 
+            // Avoid inferring the types of invalid type expressions that have been parsed from a
+            // string annotation, as they are not present in the semantic index.
+            _ if self.deferred_state.in_string_annotation() => Type::Unknown,
+
             // Forms which are invalid in the context of annotation expressions: we infer their
             // nested expressions as normal expressions, but the type of the top-level expression is
             // always `Type::Unknown` in these cases.
@@ -4457,7 +4461,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_slice_expression(slice);
                 Type::Unknown
             }
-
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         }
     }
