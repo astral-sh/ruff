@@ -25,4 +25,20 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+
+    // FAST002 autofixes use `typing_extensions` on Python 3.8,
+    // since `typing.Annotated` was added in Python 3.9
+    #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002.py"))]
+    fn rules_py38(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}_py38", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("fastapi").join(path).as_path(),
+            &settings::LinterSettings {
+                target_version: settings::types::PythonVersion::Py38,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
 }
