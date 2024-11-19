@@ -4469,11 +4469,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                     element_types.push(element_ty);
                 }
 
-                if return_todo {
+                let ty = if return_todo {
                     Type::Todo
                 } else {
                     Type::tuple(self.db, &element_types)
-                }
+                };
+
+                // Here, we store the type for the inner `int, str` tuple-expression,
+                // while the type for the outer `tuple[int, str]` slice-expression is
+                // stored in the surrounding `infer_type_expression` call:
+                self.store_expression_type(tuple_slice, ty);
+
+                ty
             }
             single_element => {
                 let single_element_ty = self.infer_type_expression(single_element);
@@ -4489,8 +4496,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Given the slice of a `type[]` annotation, return the type that the annotation represents
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
         match slice {
-            ast::Expr::Name(name) => {
-                let name_ty = self.infer_name_expression(name);
+            ast::Expr::Name(_) => {
+                let name_ty = self.infer_expression(slice);
                 if let Some(ClassLiteralType { class }) = name_ty.into_class_literal() {
                     Type::subclass_of(class)
                 } else {
@@ -4567,8 +4574,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value);
                 if matches!(value_ty, Type::KnownInstance(KnownInstanceType::Literal)) {
-                    self.infer_literal_parameter_type(slice)?
+                    let ty = self.infer_literal_parameter_type(slice)?;
+
+                    // This branch deals with annotations such as `Literal[Literal[1]]`.
+                    // Here, we store the type for the inner `Literal[1]` expression:
+                    self.store_expression_type(parameters, ty);
+                    ty
                 } else {
+                    self.store_expression_type(parameters, Type::Unknown);
+
                     return Err(vec![parameters]);
                 }
             }
@@ -4586,15 +4600,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
                 if errors.is_empty() {
-                    builder.build()
+                    let union_type = builder.build();
+
+                    // This branch deals with annotations such as `Literal[1, 2]`. Here, we
+                    // store the type for the inner `1, 2` tuple-expression:
+                    self.store_expression_type(parameters, union_type);
+
+                    union_type
                 } else {
+                    self.store_expression_type(parameters, Type::Unknown);
+
                     return Err(errors);
                 }
             }
 
-            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
-            ast::Expr::BytesLiteral(literal) => self.infer_bytes_literal_expression(literal),
-            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
+            literal @ (ast::Expr::StringLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_)) => self.infer_expression(literal),
+            literal @ ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
+                self.infer_expression(literal)
+            }
             // For enum values
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
@@ -4604,7 +4630,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .ignore_possibly_unbound()
                     .unwrap_or(Type::Unknown)
             }
-            ast::Expr::NoneLiteral(_) => Type::none(self.db),
             // for negative and positive numbers
             ast::Expr::UnaryOp(ref u)
                 if matches!(u.op, UnaryOp::USub | UnaryOp::UAdd)
@@ -4612,10 +4637,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             {
                 self.infer_unary_expression(u)
             }
-            ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
-                self.infer_number_literal_expression(number)
-            }
             _ => {
+                self.infer_expression(parameters);
                 return Err(vec![parameters]);
             }
         })
