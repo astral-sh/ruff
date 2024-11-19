@@ -1,11 +1,11 @@
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprBytesLiteral, ExprCall, ExprStringLiteral};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt::{Display, Formatter};
-
-use crate::checkers::ast::Checker;
+use std::str::FromStr;
 
 /// ## What it does
 /// Reports the following `re` and `regex` calls when
@@ -57,7 +57,7 @@ impl Violation for UnrawRePattern {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum RegexModule {
     Re,
     Regex,
@@ -67,22 +67,39 @@ impl RegexModule {
     fn is_regex(&self) -> bool {
         matches!(self, RegexModule::Regex)
     }
+
+    fn is_function_taking_pattern(&self, name: &str) -> bool {
+        match name {
+            "compile" | "findall" | "finditer" | "fullmatch" | "match" | "search" | "split"
+            | "sub" | "subn" => true,
+            "splititer" | "subf" | "subfn" | "template" => self.is_regex(),
+            _ => false,
+        }
+    }
 }
 
 impl Display for RegexModule {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                RegexModule::Re => "re",
-                RegexModule::Regex => "regex",
-            }
-        )
+        f.write_str(match self {
+            RegexModule::Re => "re",
+            RegexModule::Regex => "regex",
+        })
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+impl FromStr for RegexModule {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "re" => Ok(Self::Re),
+            "regex" => Ok(Self::Regex),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum PatternKind {
     String,
     Bytes,
@@ -103,25 +120,26 @@ pub(crate) fn unraw_re_pattern(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
+    let func = func.to_string();
     let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
 
     checker.diagnostics.push(diagnostic);
 }
 
-fn regex_module_and_func(semantic: &SemanticModel, expr: &Expr) -> Option<(RegexModule, String)> {
+fn regex_module_and_func<'model>(
+    semantic: &SemanticModel<'model>,
+    expr: &'model Expr,
+) -> Option<(RegexModule, &'model str)> {
     let qualified_name = semantic.resolve_qualified_name(expr)?;
 
-    let (module, func) = match qualified_name.segments() {
-        [module, func] => match *module {
-            "re" => (RegexModule::Re, *func),
-            "regex" => (RegexModule::Regex, *func),
-            _ => return None,
-        },
-        _ => return None,
-    };
+    if let [module, func] = qualified_name.segments() {
+        let module = RegexModule::from_str(module).ok()?;
 
-    if is_shared(func) || module.is_regex() && is_regex_specific(func) {
-        return Some((module, func.to_string()));
+        if !module.is_function_taking_pattern(func) {
+            return None;
+        }
+
+        return Some((module, func));
     }
 
     None
@@ -152,25 +170,4 @@ fn pattern_kind_and_range(arguments: &[Expr]) -> Option<(PatternKind, TextRange)
     };
 
     Some((pattern_kind, range))
-}
-
-/// Whether `func` is an attribute of both `re` and `regex`.
-fn is_shared(func: &str) -> bool {
-    matches!(
-        func,
-        "compile"
-            | "findall"
-            | "finditer"
-            | "fullmatch"
-            | "match"
-            | "search"
-            | "split"
-            | "sub"
-            | "subn"
-    )
-}
-
-/// Whether `func` is an extension specific to `regex`.
-fn is_regex_specific(func: &str) -> bool {
-    matches!(func, "splititer" | "subf" | "subfn" | "template")
 }
