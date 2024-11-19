@@ -44,6 +44,9 @@ use crate::checkers::ast::Checker;
 ///     yield 42
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [PEP 696 – Type Defaults for Type Parameters](https://peps.python.org/pep-0696/)
 /// - [Annotating generators and coroutines](https://docs.python.org/3/library/typing.html#annotating-generators-and-coroutines)
