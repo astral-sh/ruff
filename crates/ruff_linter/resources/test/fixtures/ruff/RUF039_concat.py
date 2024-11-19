@@ -6,7 +6,7 @@ re.compile(
     'concatenation'
 )
 re.findall(
-    '''
+    r'''
     multiline
     '''
     """
@@ -19,24 +19,23 @@ re.finditer(
     'name)'
 )
 re.fullmatch(
-    r'aw first'
-    'unraw second'
+    u'n'r'''eadable'''
+    f'much?'
 )
 re.match(
     b'reak'
     br'eak'
 )
 re.search(
-    r''
-    u''
+    r''u''
     '''okay?'''
 )
 re.split(''U"""w"""U'')
 re.sub(
-    'I''m o'
+    "I''m o"
     'utta ideas'
 )
-re.subn("O"r' am I'"??")
+re.subn("()"r' am I'"??")
 
 
 import regex
