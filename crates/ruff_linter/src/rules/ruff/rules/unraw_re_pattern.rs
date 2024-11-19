@@ -131,7 +131,7 @@ pub(crate) fn unraw_re_pattern(checker: &mut Checker, call: &ExprCall) {
                 .iter()
                 .for_each(|part| check_bytes(checker, part, module, func));
         }
-        _ => return,
+        _ => {}
     }
 }
 
