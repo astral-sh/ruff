@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 /// Reports the following `re` and `regex` calls when
 /// their first arguments are not raw strings:
 ///
-/// - Both modules: `compile`, `findall`, `finditer`,
+/// - For `regex` and `re`: `compile`, `findall`, `finditer`,
 ///   `fullmatch`, `match`, `search`, `split`, `sub`, `subn`.
 /// - `regex`-specific: `splititer`, `subf`, `subfn`, `template`.
 ///
@@ -104,7 +104,7 @@ enum PatternKind {
     Bytes,
 }
 
-/// RUF051
+/// RUF039
 pub(crate) fn unraw_re_pattern(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
