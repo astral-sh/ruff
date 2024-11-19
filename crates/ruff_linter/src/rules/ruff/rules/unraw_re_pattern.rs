@@ -1,11 +1,14 @@
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprBytesLiteral, ExprCall, ExprStringLiteral};
-use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_text_size::{Ranged, TextRange};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{
+    BytesLiteral, Expr, ExprBytesLiteral, ExprCall, ExprStringLiteral, StringLiteral,
+};
+use ruff_python_semantic::{Modules, SemanticModel};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Reports the following `re` and `regex` calls when
@@ -64,11 +67,11 @@ enum RegexModule {
 }
 
 impl RegexModule {
-    fn is_regex(&self) -> bool {
+    fn is_regex(self) -> bool {
         matches!(self, RegexModule::Regex)
     }
 
-    fn is_function_taking_pattern(&self, name: &str) -> bool {
+    fn is_function_taking_pattern(self, name: &str) -> bool {
         match name {
             "compile" | "findall" | "finditer" | "fullmatch" | "match" | "search" | "split"
             | "sub" | "subn" => true,
@@ -116,14 +119,20 @@ pub(crate) fn unraw_re_pattern(checker: &mut Checker, call: &ExprCall) {
     let Some((module, func)) = regex_module_and_func(semantic, call.func.as_ref()) else {
         return;
     };
-    let Some((kind, range)) = pattern_kind_and_range(call.arguments.args.as_ref()) else {
-        return;
-    };
 
-    let func = func.to_string();
-    let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
-
-    checker.diagnostics.push(diagnostic);
+    match call.arguments.args.as_ref().first() {
+        Some(Expr::StringLiteral(ExprStringLiteral { value, .. })) => {
+            value
+                .iter()
+                .for_each(|part| check_string(checker, part, module, func));
+        }
+        Some(Expr::BytesLiteral(ExprBytesLiteral { value, .. })) => {
+            value
+                .iter()
+                .for_each(|part| check_bytes(checker, part, module, func));
+        }
+        _ => return,
+    }
 }
 
 fn regex_module_and_func<'model>(
@@ -145,29 +154,28 @@ fn regex_module_and_func<'model>(
     None
 }
 
-fn pattern_kind_and_range(arguments: &[Expr]) -> Option<(PatternKind, TextRange)> {
-    let first = arguments.first()?;
-    let range = first.range();
+fn check_string(checker: &mut Checker, literal: &StringLiteral, module: RegexModule, func: &str) {
+    if literal.flags.prefix().is_raw() {
+        return;
+    }
 
-    let pattern_kind = match first {
-        Expr::StringLiteral(ExprStringLiteral { value, .. }) => {
-            if value.is_implicit_concatenated() || value.is_raw() {
-                return None;
-            }
+    let kind = PatternKind::String;
+    let func = func.to_string();
+    let range = literal.range;
+    let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
 
-            PatternKind::String
-        }
+    checker.diagnostics.push(diagnostic);
+}
 
-        Expr::BytesLiteral(ExprBytesLiteral { value, .. }) => {
-            if value.is_implicit_concatenated() || value.is_raw() {
-                return None;
-            }
+fn check_bytes(checker: &mut Checker, literal: &BytesLiteral, module: RegexModule, func: &str) {
+    if literal.flags.prefix().is_raw() {
+        return;
+    }
 
-            PatternKind::Bytes
-        }
+    let kind = PatternKind::Bytes;
+    let func = func.to_string();
+    let range = literal.range;
+    let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
 
-        _ => return None,
-    };
-
-    Some((pattern_kind, range))
+    checker.diagnostics.push(diagnostic);
 }

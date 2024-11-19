@@ -400,6 +400,7 @@ mod tests {
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF051.py"))]
+    #[test_case(Rule::UnrawRePattern, Path::new("RUF051_concat.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
