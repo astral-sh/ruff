@@ -1,0 +1,54 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301.py:4:1: AIR301 DAG should have an explicit `schedule` argument
+  |
+2 | from airflow.timetables.trigger import CronTriggerTimetable
+3 | 
+4 | DAG(dag_id="class_default_schedule")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+5 | 
+6 | DAG(dag_id="class_schedule", schedule="@hourly")
+  |
+
+AIR301.py:8:31: AIR301 argument `timetable` is deprecated; use `schedule` instead
+   |
+ 6 | DAG(dag_id="class_schedule", schedule="@hourly")
+ 7 | 
+ 8 | DAG(dag_id="class_timetable", timetable=CronTriggerTimetable())
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+ 9 | 
+10 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
+   |
+
+AIR301.py:10:39: AIR301 argument `schedule_interval` is deprecated; use `schedule` instead
+   |
+ 8 | DAG(dag_id="class_timetable", timetable=CronTriggerTimetable())
+ 9 | 
+10 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+   |
+
+AIR301.py:13:2: AIR301 DAG should have an explicit `schedule` argument
+   |
+13 | @dag()
+   |  ^^^^^ AIR301
+14 | def decorator_default_schedule():
+15 |     pass
+   |
+
+AIR301.py:23:6: AIR301 argument `timetable` is deprecated; use `schedule` instead
+   |
+23 | @dag(timetable=CronTriggerTimetable())
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+24 | def decorator_timetable():
+25 |     pass
+   |
+
+AIR301.py:28:6: AIR301 argument `schedule_interval` is deprecated; use `schedule` instead
+   |
+28 | @dag(schedule_interval="0 * * * *")
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+29 | def decorator_schedule_interval():
+30 |     pass
+   |
