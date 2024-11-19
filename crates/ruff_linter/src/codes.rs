@@ -428,8 +428,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Annotations, "001") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeFunctionArgument),
         (Flake8Annotations, "002") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeArgs),
         (Flake8Annotations, "003") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeKwargs),
-        (Flake8Annotations, "101") => (RuleGroup::Deprecated, rules::flake8_annotations::rules::MissingTypeSelf),
-        (Flake8Annotations, "102") => (RuleGroup::Deprecated, rules::flake8_annotations::rules::MissingTypeCls),
+        #[allow(deprecated)]
+        (Flake8Annotations, "101") => (RuleGroup::Removed, rules::flake8_annotations::rules::MissingTypeSelf),
+        #[allow(deprecated)]
+        (Flake8Annotations, "102") => (RuleGroup::Removed, rules::flake8_annotations::rules::MissingTypeCls),
         (Flake8Annotations, "201") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingReturnTypeUndocumentedPublicFunction),
         (Flake8Annotations, "202") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingReturnTypePrivateFunction),
         (Flake8Annotations, "204") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingReturnTypeSpecialMethod),
