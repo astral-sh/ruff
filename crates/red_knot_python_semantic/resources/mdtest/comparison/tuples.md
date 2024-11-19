@@ -207,9 +207,6 @@ exists, we can determine that the tuples are unequal.
 In contrast, with operators like `<` and `>`, the comparison must consider each pair of elements
 sequentially, and the final outcome might remain ambiguous until all pairs are compared.
 
-Naive implementations of lexicographic comparisons may overlook this distinction, leading to broad
-inferences.
-
 ```py
 def str_instance() -> str:
     return "hello"
@@ -217,7 +214,6 @@ def str_instance() -> str:
 def int_instance() -> int:
     return 42
 
-# examples from the issue
 reveal_type("foo" == "bar")  # revealed: Literal[False]
 reveal_type(("foo",) == ("bar",))  # revealed: Literal[False]
 reveal_type((4, "foo") == (4, "bar"))  # revealed: Literal[False]
