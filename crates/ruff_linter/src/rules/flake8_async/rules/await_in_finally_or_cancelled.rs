@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
     self as ast, visitor, Comprehension, ExceptHandler, Expr, ExprBooleanLiteral, ExprCall,
-    Identifier, Stmt,
+    Identifier, Stmt, StmtFunctionDef,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -64,25 +64,7 @@ pub(crate) fn await_in_finally_or_cancelled(
     handlers: &Vec<ExceptHandler>,
     finalbody: &[Stmt],
 ) {
-    let managers = vec![
-        vec!["anyio", "CancelScope"],
-        vec!["anyio", "move_on_after"],
-        vec!["anyio", "fail_after"],
-        vec!["trio", "CancelScope"],
-        vec!["trio", "move_on_after"],
-    ];
-
-    let allowed_async_calls = vec![
-        vec!["anyio", "aclose_forcefully"],
-        vec!["trio", "aclose_forcefully"],
-    ];
-
-    let mut visitor = PrunedAsyncVisitor {
-        semantic: checker.semantic(),
-        async_ranges: vec![],
-        managers: &managers,
-        allowed_async_calls: &allowed_async_calls,
-    };
+    let mut visitor = PrunedAsyncVisitor::new(checker.semantic());
 
     let bare_except = vec!["", "", "bare except"];
 
@@ -124,9 +106,9 @@ pub(crate) fn await_in_finally_or_cancelled(
                 .join(".")
         };
 
-        // If there is no async then there is nothing to shield
+        visitor.clear();
         visitor.visit_body(&handler.body);
-        for concern in visitor.async_ranges {
+        for concern in visitor.async_ranges.clone() {
             concerns.push(AwaitInFinallyOrCancelled {
                 range: concern,
                 location: location.clone(),
@@ -135,9 +117,34 @@ pub(crate) fn await_in_finally_or_cancelled(
         break;
     }
 
+    visitor.clear();
+    visitor.visit_body(finalbody);
+    for concern in visitor.async_ranges.clone() {
+        concerns.push(AwaitInFinallyOrCancelled {
+            range: concern,
+            location: "finally".to_string(),
+        });
+    }
+
+    for concern in concerns {
+        let range = concern.range;
+        checker.diagnostics.push(Diagnostic::new(concern, range));
+    }
+}
+
+/// RUF102
+pub(crate) fn await_in_function_def(checker: &mut Checker, function_def: &StmtFunctionDef) {
+    let interesting_names = ["__aexit__"];
+    if !function_def.is_async || !interesting_names.contains(&function_def.name.as_str()) {
+        return;
+    }
+
+    let mut visitor = PrunedAsyncVisitor::new(checker.semantic());
+    let mut concerns: Vec<AwaitInFinallyOrCancelled> = vec![];
+
     // If there is no async then there is nothing to shield
     visitor.async_ranges = vec![];
-    visitor.visit_body(finalbody);
+    visitor.visit_body(&function_def.body);
     for concern in visitor.async_ranges {
         concerns.push(AwaitInFinallyOrCancelled {
             range: concern,
@@ -182,8 +189,36 @@ fn flattened_tuple<'a>(t: &'a Expr, semantic: &'a SemanticModel<'a>) -> Vec<Vec<
 struct PrunedAsyncVisitor<'a> {
     async_ranges: Vec<TextRange>,
     semantic: &'a SemanticModel<'a>,
-    managers: &'a Vec<Vec<&'static str>>,
-    allowed_async_calls: &'a Vec<Vec<&'static str>>,
+    managers: Vec<Vec<&'static str>>,
+    allowed_async_calls: Vec<Vec<&'static str>>,
+}
+
+impl<'a> PrunedAsyncVisitor<'a> {
+    fn new(semantic: &'a SemanticModel) -> Self {
+        let managers = vec![
+            vec!["anyio", "CancelScope"],
+            vec!["anyio", "move_on_after"],
+            vec!["anyio", "fail_after"],
+            vec!["trio", "CancelScope"],
+            vec!["trio", "move_on_after"],
+        ];
+
+        let allowed_async_calls = vec![
+            vec!["anyio", "aclose_forcefully"],
+            vec!["trio", "aclose_forcefully"],
+        ];
+
+        Self {
+            semantic,
+            async_ranges: vec![],
+            managers,
+            allowed_async_calls,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.async_ranges.clear();
+    }
 }
 
 impl Visitor<'_> for PrunedAsyncVisitor<'_> {

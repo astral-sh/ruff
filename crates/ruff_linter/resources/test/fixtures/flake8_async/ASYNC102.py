@@ -308,4 +308,4 @@ async def foo_nested_cs():
 
 # treat __aexit__ as a critical scope
 async def __aexit__():
-    await foo()  # error: 4, Statement("__aexit__", lineno-1)  # noqa: ASYNC102 - fixthis
+    await foo()  # error: 4, Statement("__aexit__", lineno-1)

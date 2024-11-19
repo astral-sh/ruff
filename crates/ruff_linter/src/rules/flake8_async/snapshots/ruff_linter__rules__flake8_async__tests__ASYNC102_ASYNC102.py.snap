@@ -321,3 +321,11 @@ ASYNC102.py:304:13: ASYNC102 await inside bare except must have shielded cancel 
 305 |             cs1.shield = True
 306 |             await foo()  # noqa: ASYNC102 - fixthis
     |
+
+ASYNC102.py:311:5: ASYNC102 await inside finally must have shielded cancel scope with a timeout
+    |
+309 | # treat __aexit__ as a critical scope
+310 | async def __aexit__():
+311 |     await foo()  # error: 4, Statement("__aexit__", lineno-1)
+    |     ^^^^^^^^^^^ ASYNC102
+    |
