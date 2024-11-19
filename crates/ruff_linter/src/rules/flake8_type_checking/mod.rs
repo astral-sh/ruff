@@ -13,6 +13,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
@@ -35,8 +36,6 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
-    #[test_case(Rule::UnquotedTypeAlias, Path::new("TCH007.py"))]
-    #[test_case(Rule::QuotedTypeAlias, Path::new("TCH008.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_1.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_2.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
@@ -59,6 +58,24 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnquotedTypeAlias, Path::new("TCH007.py"))]
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TCH008.py"))]
+    fn type_alias_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnquotedTypeAlias,
+                    Rule::QuotedTypeAlias,
+                ])
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
