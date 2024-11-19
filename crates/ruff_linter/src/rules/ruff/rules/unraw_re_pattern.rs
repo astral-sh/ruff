@@ -22,12 +22,13 @@ use crate::checkers::ast::Checker;
 /// ## Example
 ///
 /// ```python
-/// re.compile('foo\\bar')
+/// re.compile("foo\\bar")
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// re.compile(r'foo\bar')
+/// re.compile(r"foo\bar")
 /// ```
 #[violation]
 pub struct UnrawRePattern {
