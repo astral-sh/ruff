@@ -18,7 +18,7 @@ box: MyBox[int] = MyBox(5)
 wrong_innards: MyBox[int] = MyBox("five")
 
 # TODO reveal int
-reveal_type(box.data)  # revealed: @Todo
+reveal_type(box.data)  # revealed: @Todo(instance attributes)
 
 reveal_type(MyBox.box_model_number)  # revealed: Literal[695]
 ```
@@ -39,7 +39,7 @@ class MySecureBox[T](MyBox[T]): ...
 secure_box: MySecureBox[int] = MySecureBox(5)
 reveal_type(secure_box)  # revealed: MySecureBox
 # TODO reveal int
-reveal_type(secure_box.data)  # revealed: @Todo
+reveal_type(secure_box.data)  # revealed: @Todo(instance attributes)
 ```
 
 ## Cyclical class definition

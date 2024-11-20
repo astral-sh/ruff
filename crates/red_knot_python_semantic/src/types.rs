@@ -324,6 +324,61 @@ fn declarations_ty<'db>(
     }
 }
 
+/// Meta data for `Type::Todo`, which represents a known limitation in the type system.
+#[cfg(debug_assertions)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TodoType {
+    FileAndLine(&'static str, u32),
+    Message(&'static str),
+}
+
+#[cfg(debug_assertions)]
+impl std::fmt::Display for TodoType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TodoType::FileAndLine(file, line) => write!(f, "[{file}:{line}]"),
+            TodoType::Message(msg) => write!(f, "({msg})"),
+        }
+    }
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TodoType;
+
+#[cfg(not(debug_assertions))]
+impl std::fmt::Display for TodoType {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+/// Create a `Type::Todo` variant to represent a known limitation in the type system.
+///
+/// It can be used with a custom message (preferred): `todo_type!("PEP 604 not supported")`,
+/// or simply using `todo_type!()`, which will include information about the file and line.
+#[cfg(debug_assertions)]
+macro_rules! todo_type {
+    () => {
+        Type::Todo(crate::types::TodoType::FileAndLine(file!(), line!()))
+    };
+    ($message:literal) => {
+        Type::Todo(crate::types::TodoType::Message($message))
+    };
+}
+
+#[cfg(not(debug_assertions))]
+macro_rules! todo_type {
+    () => {
+        Type::Todo(crate::types::TodoType)
+    };
+    ($message:literal) => {
+        Type::Todo(crate::types::TodoType)
+    };
+}
+
+pub(crate) use todo_type;
+
 /// Representation of a type: a set of possible values at runtime.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
@@ -340,7 +395,9 @@ pub enum Type<'db> {
     /// General rule: `Todo` should only propagate when the presence of the input `Todo` caused the
     /// output to be unknown. An output should only be `Todo` if fixing all `Todo` inputs to be not
     /// `Todo` would change the output type.
-    Todo,
+    ///
+    /// This variant should be created with the `todo_type!` macro.
+    Todo(TodoType),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -384,7 +441,7 @@ impl<'db> Type<'db> {
     }
 
     pub const fn is_todo(&self) -> bool {
-        matches!(self, Type::Todo)
+        matches!(self, Type::Todo(_))
     }
 
     pub const fn class_literal(class: Class<'db>) -> Self {
@@ -530,8 +587,8 @@ impl<'db> Type<'db> {
             return true;
         }
         match (self, target) {
-            (Type::Unknown | Type::Any | Type::Todo, _) => false,
-            (_, Type::Unknown | Type::Any | Type::Todo) => false,
+            (Type::Unknown | Type::Any | Type::Todo(_), _) => false,
+            (_, Type::Unknown | Type::Any | Type::Todo(_)) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (_, Type::Instance(InstanceType { class }))
@@ -666,8 +723,8 @@ impl<'db> Type<'db> {
             return true;
         }
         match (self, target) {
-            (Type::Unknown | Type::Any | Type::Todo, _) => true,
-            (_, Type::Unknown | Type::Any | Type::Todo) => true,
+            (Type::Unknown | Type::Any | Type::Todo(_), _) => true,
+            (_, Type::Unknown | Type::Any | Type::Todo(_)) => true,
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
@@ -703,6 +760,7 @@ impl<'db> Type<'db> {
         // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
         // we understand `sys.version_info` branches.
         self == other
+            || matches!((self, other), (Type::Todo(_), Type::Todo(_)))
             || matches!((self, other),
                 (
                     Type::Instance(InstanceType { class: self_class }),
@@ -726,7 +784,7 @@ impl<'db> Type<'db> {
 
             (Type::Any, _) | (_, Type::Any) => false,
             (Type::Unknown, _) | (_, Type::Unknown) => false,
-            (Type::Todo, _) | (_, Type::Todo) => false,
+            (Type::Todo(_), _) | (_, Type::Todo(_)) => false,
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
@@ -931,7 +989,7 @@ impl<'db> Type<'db> {
             Type::Any
             | Type::Never
             | Type::Unknown
-            | Type::Todo
+            | Type::Todo(_)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
@@ -1034,7 +1092,7 @@ impl<'db> Type<'db> {
             Type::Any
             | Type::Never
             | Type::Unknown
-            | Type::Todo
+            | Type::Todo(_)
             | Type::Union(..)
             | Type::Intersection(..)
             | Type::LiteralString => false,
@@ -1052,12 +1110,12 @@ impl<'db> Type<'db> {
             Type::Any => Type::Any.into(),
             Type::Never => {
                 // TODO: attribute lookup on Never type
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::Unknown => Type::Unknown.into(),
             Type::FunctionLiteral(_) => {
                 // TODO: attribute lookup on function type
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::ModuleLiteral(file) => {
                 // `__dict__` is a very special member that is never overridden by module globals;
@@ -1107,7 +1165,7 @@ impl<'db> Type<'db> {
                         Type::IntLiteral(Program::get(db).target_version(db).minor.into())
                     }
                     // TODO MRO? get_own_instance_member, get_instance_member
-                    _ => Type::Todo,
+                    _ => todo_type!("instance attributes"),
                 };
                 ty.into()
             }
@@ -1149,36 +1207,36 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
-                Type::Todo.into()
+                todo_type!().into()
             }
-            Type::BooleanLiteral(_) => Type::Todo.into(),
+            Type::BooleanLiteral(_) => todo_type!().into(),
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::LiteralString => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::BytesLiteral(_) => {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::SliceLiteral(_) => {
                 // TODO defer to `builtins.slice` methods
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
-                Type::Todo.into()
+                todo_type!().into()
             }
-            Type::Todo => Type::Todo.into(),
+            Type::Todo(_) => todo_type!().into(),
         }
     }
 
@@ -1188,7 +1246,7 @@ impl<'db> Type<'db> {
     /// when `bool(x)` is called on an object `x`.
     fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
-            Type::Any | Type::Todo | Type::Never | Type::Unknown => Truthiness::Ambiguous,
+            Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(_) => {
@@ -1329,7 +1387,7 @@ impl<'db> Type<'db> {
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
 
-            Type::Todo => CallOutcome::callable(Type::Todo),
+            Type::Todo(_) => CallOutcome::callable(todo_type!()),
 
             Type::Unknown => CallOutcome::callable(Type::Unknown),
 
@@ -1342,7 +1400,7 @@ impl<'db> Type<'db> {
             ),
 
             // TODO: intersection types
-            Type::Intersection(_) => CallOutcome::callable(Type::Todo),
+            Type::Intersection(_) => CallOutcome::callable(todo_type!()),
 
             _ => CallOutcome::not_callable(self),
         }
@@ -1381,7 +1439,7 @@ impl<'db> Type<'db> {
             };
         }
 
-        if matches!(self, Type::Unknown | Type::Any | Type::Todo) {
+        if matches!(self, Type::Unknown | Type::Any | Type::Todo(_)) {
             // Explicit handling of `Unknown` and `Any` necessary until `type[Unknown]` and
             // `type[Any]` are not defined as `Todo` anymore.
             return IterationOutcome::Iterable { element_ty: self };
@@ -1440,14 +1498,14 @@ impl<'db> Type<'db> {
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
-            Type::Todo => Type::Todo,
+            todo @ Type::Todo(_) => *todo,
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
             Type::SubclassOf(SubclassOfType { class }) => Type::instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
-            Type::Intersection(_) => Type::Todo,
+            Type::Intersection(_) => todo_type!(),
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
@@ -1478,7 +1536,7 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             // TODO map this to a new `Type::TypeVar` variant
             Type::KnownInstance(KnownInstanceType::TypeVar(_)) => *self,
-            _ => Type::Todo,
+            _ => todo_type!(),
         }
     }
 
@@ -1553,8 +1611,8 @@ impl<'db> Type<'db> {
             // TODO: `type[Unknown]`?
             Type::Unknown => Type::Unknown,
             // TODO intersections
-            Type::Intersection(_) => Type::Todo,
-            Type::Todo => Type::Todo,
+            Type::Intersection(_) => todo_type!(),
+            todo @ Type::Todo(_) => *todo,
         }
     }
 
@@ -2607,7 +2665,7 @@ impl<'db> Class<'db> {
             // TODO: If the metaclass is not a class, we should verify that it's a callable
             // which accepts the same arguments as `type.__new__` (otherwise error), and return
             // the meta-type of its return type. (And validate that is a class type?)
-            return Ok(Type::Todo);
+            return Ok(todo_type!("metaclass not a class"));
         };
 
         // Reconcile all base classes' metaclasses with the candidate metaclass.
@@ -2907,6 +2965,10 @@ impl<'db> TupleType<'db> {
     }
 }
 
+// Make sure that the `Type` enum does not grow unexpectedly.
+#[cfg(not(debug_assertions))]
+static_assertions::assert_eq_size!(Type, [u8; 16]);
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -2921,13 +2983,6 @@ pub(crate) mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast as ast;
     use test_case::test_case;
-
-    #[cfg(target_pointer_width = "64")]
-    #[test]
-    fn no_bloat_enum_sizes() {
-        use std::mem::size_of;
-        assert_eq!(size_of::<Type>(), 16);
-    }
 
     pub(crate) fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -2982,7 +3037,7 @@ pub(crate) mod tests {
                 Ty::Unknown => Type::Unknown,
                 Ty::None => Type::none(db),
                 Ty::Any => Type::Any,
-                Ty::Todo => Type::Todo,
+                Ty::Todo => todo_type!("Ty::Todo"),
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => Type::string_literal(db, s),
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
@@ -3572,5 +3627,67 @@ pub(crate) mod tests {
         assert_function_query_was_not_run(&db, infer_expression_types, foo_call, &events);
 
         Ok(())
+    }
+
+    /// All other tests also make sure that `Type::Todo` works as expected. This particular
+    /// test makes sure that we handle `Todo` types correctly, even if they originate from
+    /// different sources.
+    #[test]
+    fn todo_types() {
+        let db = setup_db();
+
+        let todo1 = todo_type!("1");
+        let todo2 = todo_type!("2");
+        let todo3 = todo_type!();
+        let todo4 = todo_type!();
+
+        assert!(todo1.is_equivalent_to(&db, todo2));
+        assert!(todo3.is_equivalent_to(&db, todo4));
+        assert!(todo1.is_equivalent_to(&db, todo3));
+
+        assert!(todo1.is_subtype_of(&db, todo2));
+        assert!(todo2.is_subtype_of(&db, todo1));
+
+        assert!(todo3.is_subtype_of(&db, todo4));
+        assert!(todo4.is_subtype_of(&db, todo3));
+
+        assert!(todo1.is_subtype_of(&db, todo3));
+        assert!(todo3.is_subtype_of(&db, todo1));
+
+        let int = KnownClass::Int.to_instance(&db);
+
+        assert!(int.is_assignable_to(&db, todo1));
+        assert!(int.is_assignable_to(&db, todo3));
+
+        assert!(todo1.is_assignable_to(&db, int));
+        assert!(todo3.is_assignable_to(&db, int));
+
+        // We lose information when combining several `Todo` types. This is an
+        // acknowledged limitation of the current implementation. We can not
+        // easily store the meta information of several `Todo`s in a single
+        // variant, as `TodoType` needs to implement `Copy`, meaning it can't
+        // contain `Vec`/`Box`/etc., and can't be boxed itself.
+        //
+        // Lifting this restriction would require us to intern `TodoType` in
+        // salsa, but that would mean we would have to pass in `db` everywhere.
+
+        // A union of several `Todo` types collapses to a single `Todo` type:
+        assert!(UnionType::from_elements(&db, vec![todo1, todo2, todo3, todo4]).is_todo());
+
+        // An similar for intersection types:
+        assert!(IntersectionBuilder::new(&db)
+            .add_positive(todo1)
+            .add_positive(todo2)
+            .add_positive(todo3)
+            .add_positive(todo4)
+            .build()
+            .is_todo());
+        assert!(IntersectionBuilder::new(&db)
+            .add_positive(todo1)
+            .add_negative(todo2)
+            .add_positive(todo3)
+            .add_negative(todo4)
+            .build()
+            .is_todo());
     }
 }

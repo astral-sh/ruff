@@ -309,7 +309,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     self.add_positive(db, *neg);
                 }
             }
-            ty @ (Type::Any | Type::Unknown | Type::Todo) => {
+            ty @ (Type::Any | Type::Unknown | Type::Todo(_)) => {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
                 // simplify the representation.
@@ -379,7 +379,7 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::stdlib::typing_symbol;
-    use crate::types::{global_symbol, KnownClass, UnionBuilder};
+    use crate::types::{global_symbol, todo_type, KnownClass, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -987,7 +987,7 @@ mod tests {
 
     #[test_case(Type::Any)]
     #[test_case(Type::Unknown)]
-    #[test_case(Type::Todo)]
+    #[test_case(todo_type!())]
     fn build_intersection_t_and_negative_t_does_not_simplify(ty: Type) {
         let db = setup_db();
 

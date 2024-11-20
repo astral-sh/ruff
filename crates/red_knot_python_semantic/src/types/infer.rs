@@ -52,11 +52,12 @@ use crate::types::diagnostic::{TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
-    Boundness, Class, ClassLiteralType, FunctionType, InstanceType, IntersectionBuilder,
-    IntersectionType, IterationOutcome, KnownClass, KnownFunction, KnownInstanceType,
-    MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol, Truthiness, TupleType, Type,
-    TypeArrayDisplay, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
+    typing_extensions_symbol, Boundness, Class, ClassLiteralType, FunctionType, InstanceType,
+    IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
+    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol,
+    Truthiness, TupleType, Type, TypeArrayDisplay, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -1027,7 +1028,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         // TODO(dhruvmanila): Annotation expression is resolved at the enclosing scope, infer the
         // parameter type from there
-        let annotated_ty = Type::Todo;
+        let annotated_ty = todo_type!("function parameter type");
         if parameter.annotation.is_some() {
             self.add_declaration_with_binding(
                 parameter.into(),
@@ -1236,7 +1237,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         // TODO: Handle async with statements (they use `aenter` and `aexit`)
         if is_async {
-            return Type::Todo;
+            return todo_type!("async with statement");
         }
 
         let context_manager_ty = context_expression_ty.to_meta_type(self.db);
@@ -1386,12 +1387,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
                         ty.into_class_literal()
-                            .map_or(Type::Todo, |ClassLiteralType { class }| {
+                            .map_or(todo_type!(), |ClassLiteralType { class }| {
                                 Type::instance(class)
                             })
                     }),
                 ),
-                _ => Type::Todo,
+                _ => todo_type!("exception type"),
             }
         };
 
@@ -1461,7 +1462,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
         } = node;
         self.infer_optional_expression(default.as_deref());
-        self.add_declaration_with_binding(node.into(), definition, Type::Todo, Type::Todo);
+        self.add_declaration_with_binding(node.into(), definition, todo_type!(), todo_type!());
     }
 
     fn infer_typevartuple_definition(
@@ -1475,7 +1476,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
         } = node;
         self.infer_optional_expression(default.as_deref());
-        self.add_declaration_with_binding(node.into(), definition, Type::Todo, Type::Todo);
+        self.add_declaration_with_binding(node.into(), definition, todo_type!(), todo_type!());
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -1510,7 +1511,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // against the subject expression type (which we can query via `infer_expression_types`)
         // and extract the type at the `index` position if the pattern matches. This will be
         // similar to the logic in `self.infer_assignment_definition`.
-        self.add_binding(pattern.into(), definition, Type::Todo);
+        self.add_binding(pattern.into(), definition, todo_type!());
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
@@ -1874,8 +1875,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let iterable_ty = self.infer_standalone_expression(iterable);
 
         let loop_var_value_ty = if is_async {
-            // TODO(Alex): async iterables/iterators!
-            Type::Todo
+            todo_type!("async iterables/iterators")
         } else {
             iterable_ty
                 .iterate(self.db)
@@ -2203,7 +2203,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
             ast::Expr::IpyEscapeCommand(_) => {
                 // TODO Implement Ipy escape command support
-                Type::Todo
+                todo_type!()
             }
         };
 
@@ -2397,7 +2397,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO generator type
-        Type::Todo
+        todo_type!()
     }
 
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
@@ -2410,7 +2410,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO list type
-        Type::Todo
+        todo_type!()
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
@@ -2424,7 +2424,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO dict type
-        Type::Todo
+        todo_type!()
     }
 
     fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
@@ -2437,7 +2437,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO set type
-        Type::Todo
+        todo_type!()
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
@@ -2552,7 +2552,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let target_ty = if is_async {
             // TODO: async iterables/iterators! -- Alex
-            Type::Todo
+            todo_type!("async iterables/iterators")
         } else {
             iterable_ty
                 .iterate(self.db)
@@ -2642,7 +2642,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO function type
-        Type::Todo
+        todo_type!()
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
@@ -2673,7 +2673,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(value.as_ref().into(), &mut self.diagnostics);
 
         // TODO
-        Type::Todo
+        todo_type!()
     }
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
@@ -2682,7 +2682,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(value.as_deref());
 
         // TODO awaitable type
-        Type::Todo
+        todo_type!()
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -2694,7 +2694,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(value.as_ref().into(), &mut self.diagnostics);
 
         // TODO get type from `ReturnType` of generator
-        Type::Todo
+        todo_type!()
     }
 
     fn infer_await_expression(&mut self, await_expression: &ast::ExprAwait) -> Type<'db> {
@@ -2703,7 +2703,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(value);
 
         // TODO awaitable type
-        Type::Todo
+        todo_type!()
     }
 
     /// Look up a name reference that isn't bound in the local scope.
@@ -2979,7 +2979,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Unknown
                 }
             }
-            _ => Type::Todo, // TODO other unary op types
+            _ => todo_type!(), // TODO other unary op types
         }
     }
 
@@ -3227,7 +3227,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (left, Type::BooleanLiteral(bool_value), op) => {
                 self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
             }
-            _ => Some(Type::Todo), // TODO
+            _ => Some(todo_type!()), // TODO
         }
     }
 
@@ -3665,7 +3665,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
                             match eq_result {
-                                Type::Todo => return Ok(Type::Todo),
+                                todo @ Type::Todo(_) => return Ok(todo),
                                 ty => match ty.bool(self.db) {
                                     Truthiness::AlwaysTrue => eq_count += 1,
                                     Truthiness::AlwaysFalse => not_eq_count += 1,
@@ -3690,7 +3690,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
 
                         Ok(match eq_result {
-                            Type::Todo => Type::Todo,
+                            todo @ Type::Todo(_) => todo,
                             ty => match ty.bool(self.db) {
                                 Truthiness::AlwaysFalse => Type::BooleanLiteral(op.is_is_not()),
                                 _ => KnownClass::Bool.to_instance(self.db),
@@ -3745,7 +3745,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: handle more types
             _ => match op {
                 ast::CmpOp::Is | ast::CmpOp::IsNot => Ok(KnownClass::Bool.to_instance(self.db)),
-                _ => Ok(Type::Todo),
+                _ => Ok(todo_type!()),
             },
         }
     }
@@ -3773,7 +3773,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             match pairwise_eq_result {
                 // If propagation is required, return the result as is
-                Type::Todo => return Ok(Type::Todo),
+                todo @ Type::Todo(_) => return Ok(todo),
                 ty => match ty.bool(self.db) {
                     // - AlwaysTrue : Continue to the next pair for lexicographic comparison
                     Truthiness::AlwaysTrue => continue,
@@ -4263,7 +4263,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_name_expression(name).in_type_expression(self.db)
                 }
                 ast::ExprContext::Invalid => Type::Unknown,
-                ast::ExprContext::Store | ast::ExprContext::Del => Type::Todo,
+                ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
             },
 
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
@@ -4271,7 +4271,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .infer_attribute_expression(attribute_expression)
                     .in_type_expression(self.db),
                 ast::ExprContext::Invalid => Type::Unknown,
-                ast::ExprContext::Store | ast::ExprContext::Del => Type::Todo,
+                ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
             },
 
             ast::Expr::NoneLiteral(_literal) => Type::none(self.db),
@@ -4281,14 +4281,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
             // expressions, but is meaningful in the context of a number of special forms.
-            ast::Expr::EllipsisLiteral(_literal) => Type::Todo,
+            ast::Expr::EllipsisLiteral(_literal) => todo_type!(),
 
             // Other literals do not have meaningful values in the annotation expression context.
             // However, we will we want to handle these differently when working with special forms,
             // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
-            ast::Expr::BytesLiteral(_literal) => Type::Todo,
-            ast::Expr::NumberLiteral(_literal) => Type::Todo,
-            ast::Expr::BooleanLiteral(_literal) => Type::Todo,
+            ast::Expr::BytesLiteral(_literal) => todo_type!(),
+            ast::Expr::NumberLiteral(_literal) => todo_type!(),
+            ast::Expr::BooleanLiteral(_literal) => todo_type!(),
 
             ast::Expr::Subscript(subscript) => {
                 let ast::ExprSubscript {
@@ -4331,7 +4331,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO PEP 646
             ast::Expr::Starred(starred) => {
                 self.infer_starred_expression(starred);
-                Type::Todo
+                todo_type!()
             }
 
             // Forms which are invalid in the context of annotation expressions: we infer their
@@ -4476,7 +4476,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let ty = if return_todo {
-                    Type::Todo
+                    todo_type!("full tuple[...] support")
                 } else {
                     Type::tuple(self.db, &element_types)
                 };
@@ -4491,7 +4491,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             single_element => {
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
-                    Type::Todo
+                    todo_type!()
                 } else {
                     Type::tuple(self.db, &[single_element_ty])
                 }
@@ -4507,13 +4507,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(ClassLiteralType { class }) = name_ty.into_class_literal() {
                     Type::subclass_of(class)
                 } else {
-                    Type::Todo
+                    todo_type!()
                 }
             }
             // TODO: attributes, unions, subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);
-                Type::Todo
+                todo_type!()
             }
         }
     }
@@ -4536,7 +4536,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => {
                 self.infer_type_expression(slice);
-                Type::Todo // TODO: generics
+                todo_type!("generics")
             }
         }
     }
@@ -4574,7 +4574,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ),
                 _ => self.infer_type_expression(parameters),
             },
-            KnownInstanceType::TypeVar(_) => Type::Todo,
+            KnownInstanceType::TypeVar(_) => todo_type!(),
         }
     }
 
@@ -4942,8 +4942,8 @@ fn perform_membership_test_comparison<'db>(
 
     compare_result_opt
         .map(|ty| {
-            if matches!(ty, Type::Todo) {
-                return Type::Todo;
+            if matches!(ty, Type::Todo(_)) {
+                return ty;
             }
 
             match op {
@@ -5914,7 +5914,13 @@ mod tests {
 
         // We currently return `Todo` for all async comprehensions,
         // including comprehensions that have invalid syntax
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "@Todo");
+        assert_scope_ty(
+            &db,
+            "src/a.py",
+            &["foo", "<listcomp>"],
+            "x",
+            "@Todo(async iterables/iterators)",
+        );
 
         Ok(())
     }
@@ -5938,7 +5944,13 @@ mod tests {
         )?;
 
         // TODO async iterables/iterators! --Alex
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "@Todo");
+        assert_scope_ty(
+            &db,
+            "src/a.py",
+            &["foo", "<listcomp>"],
+            "x",
+            "@Todo(async iterables/iterators)",
+        );
 
         Ok(())
     }

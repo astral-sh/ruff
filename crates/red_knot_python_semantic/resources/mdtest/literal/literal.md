@@ -78,7 +78,7 @@ from other import Literal
 a1: Literal[26]
 
 def f():
-    reveal_type(a1)  # revealed: @Todo
+    reveal_type(a1)  # revealed: @Todo(generics)
 ```
 
 ## Detecting typing_extensions.Literal

@@ -23,7 +23,7 @@ def int_instance() -> int: ...
 
 a = "abcde"[int_instance()]
 # TODO: Support overloads... Should be `str`
-reveal_type(a)  # revealed: @Todo
+reveal_type(a)  # revealed: @Todo(return type)
 ```
 
 ## Slices
@@ -78,13 +78,13 @@ def int_instance() -> int: ...
 
 substring1 = s[int_instance() : int_instance()]
 # TODO: Support overloads... Should be `LiteralString`
-reveal_type(substring1)  # revealed: @Todo
+reveal_type(substring1)  # revealed: @Todo(return type)
 
 def str_instance() -> str: ...
 
 substring2 = str_instance()[0:5]
 # TODO: Support overloads... Should be `str`
-reveal_type(substring2)  # revealed: @Todo
+reveal_type(substring2)  # revealed: @Todo(return type)
 ```
 
 ## Unsupported slice types

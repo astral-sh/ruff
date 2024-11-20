@@ -84,7 +84,7 @@ reveal_type(b)  # revealed: Literal[2]
 [a, *b, c, d] = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
 # TODO: Should be list[Any] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo
+reveal_type(b)  # revealed: @Todo(starred unpacking)
 reveal_type(c)  # revealed: Literal[2]
 reveal_type(d)  # revealed: Unknown
 ```
@@ -95,7 +95,7 @@ reveal_type(d)  # revealed: Unknown
 [a, *b, c] = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
 # TODO: Should be list[Any] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo
+reveal_type(b)  # revealed: @Todo(starred unpacking)
 reveal_type(c)  # revealed: Literal[2]
 ```
 
@@ -105,7 +105,7 @@ reveal_type(c)  # revealed: Literal[2]
 [a, *b, c] = (1, 2, 3)
 reveal_type(a)  # revealed: Literal[1]
 # TODO: Should be list[int] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo
+reveal_type(b)  # revealed: @Todo(starred unpacking)
 reveal_type(c)  # revealed: Literal[3]
 ```
 
@@ -115,7 +115,7 @@ reveal_type(c)  # revealed: Literal[3]
 [a, *b, c, d] = (1, 2, 3, 4, 5, 6)
 reveal_type(a)  # revealed: Literal[1]
 # TODO: Should be list[int] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo
+reveal_type(b)  # revealed: @Todo(starred unpacking)
 reveal_type(c)  # revealed: Literal[5]
 reveal_type(d)  # revealed: Literal[6]
 ```
@@ -127,7 +127,7 @@ reveal_type(d)  # revealed: Literal[6]
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
 # TODO: Should be list[int] once support for assigning to starred expression is added
-reveal_type(c)  # revealed: @Todo
+reveal_type(c)  # revealed: @Todo(starred unpacking)
 ```
 
 ### Starred expression (6)
@@ -138,7 +138,7 @@ reveal_type(c)  # revealed: @Todo
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
-reveal_type(d)  # revealed: @Todo
+reveal_type(d)  # revealed: @Todo(starred unpacking)
 reveal_type(e)  # revealed: Unknown
 reveal_type(f)  # revealed: Unknown
 ```
@@ -222,7 +222,7 @@ reveal_type(b)  # revealed: LiteralString
 (a, *b, c, d) = "ab"
 reveal_type(a)  # revealed: LiteralString
 # TODO: Should be list[LiteralString] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo
+reveal_type(b)  # revealed: @Todo(starred unpacking)
 reveal_type(c)  # revealed: LiteralString
 reveal_type(d)  # revealed: Unknown
 ```
@@ -233,7 +233,7 @@ reveal_type(d)  # revealed: Unknown
 (a, *b, c) = "ab"
 reveal_type(a)  # revealed: LiteralString
 # TODO: Should be list[Any] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo
+reveal_type(b)  # revealed: @Todo(starred unpacking)
 reveal_type(c)  # revealed: LiteralString
 ```
 
@@ -243,7 +243,7 @@ reveal_type(c)  # revealed: LiteralString
 (a, *b, c) = "abc"
 reveal_type(a)  # revealed: LiteralString
 # TODO: Should be list[LiteralString] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo
+reveal_type(b)  # revealed: @Todo(starred unpacking)
 reveal_type(c)  # revealed: LiteralString
 ```
 
@@ -253,7 +253,7 @@ reveal_type(c)  # revealed: LiteralString
 (a, *b, c, d) = "abcdef"
 reveal_type(a)  # revealed: LiteralString
 # TODO: Should be list[LiteralString] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo
+reveal_type(b)  # revealed: @Todo(starred unpacking)
 reveal_type(c)  # revealed: LiteralString
 reveal_type(d)  # revealed: LiteralString
 ```
@@ -265,5 +265,5 @@ reveal_type(d)  # revealed: LiteralString
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
 # TODO: Should be list[int] once support for assigning to starred expression is added
-reveal_type(c)  # revealed: @Todo
+reveal_type(c)  # revealed: @Todo(starred unpacking)
 ```

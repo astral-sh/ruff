@@ -16,7 +16,7 @@ async def get_int_async() -> int:
     return 42
 
 # TODO: we don't yet support `types.CoroutineType`, should be generic `Coroutine[Any, Any, int]`
-reveal_type(get_int_async())  # revealed: @Todo
+reveal_type(get_int_async())  # revealed: @Todo(generic types.CoroutineType)
 ```
 
 ## Generic
@@ -44,7 +44,7 @@ def bar() -> str:
     return "bar"
 
 # TODO: should reveal `int`, as the decorator replaces `bar` with `foo`
-reveal_type(bar())  # revealed: @Todo
+reveal_type(bar())  # revealed: @Todo(return type)
 ```
 
 ## Invalid callable

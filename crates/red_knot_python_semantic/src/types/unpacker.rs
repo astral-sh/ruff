@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
+use crate::types::{todo_type, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
 use crate::Db;
 
 /// Unpacks the value expression type to their respective targets.
@@ -59,7 +59,7 @@ impl<'db> Unpacker<'db> {
                             // TODO: Combine the types into a list type. If the
                             // starred_element_types is empty, then it should be `List[Any]`.
                             // combine_types(starred_element_types);
-                            element_types.push(Type::Todo);
+                            element_types.push(todo_type!("starred unpacking"));
 
                             element_types.extend_from_slice(
                                 // SAFETY: Safe because of the length check above.
@@ -72,7 +72,7 @@ impl<'db> Unpacker<'db> {
                             // index.
                             element_types.resize(elts.len() - 1, Type::Unknown);
                             // TODO: This should be `list[Unknown]`
-                            element_types.insert(starred_index, Type::Todo);
+                            element_types.insert(starred_index, todo_type!("starred unpacking"));
                             Cow::Owned(element_types)
                         }
                     } else {
