@@ -16,6 +16,27 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// Builtins can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
 ///
+/// ## Example
+/// ```python
+/// from rich import print
+///
+/// print("Some message")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from rich import print as rich_print
+///
+/// rich_print("Some message")
+/// ```
+///
+/// or:
+/// ```python
+/// import rich
+///
+/// rich.print("Some message")
+/// ```
+///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-ignorelist`
 /// - `target-version`
