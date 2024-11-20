@@ -154,18 +154,16 @@ pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, call: &ast::ExprCal
 
     let mut diagnostic = Diagnostic::new(ZipInsteadOfPairwise, func.range());
 
-    if checker.settings.preview.is_enabled() {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("itertools", "pairwise"),
-                func.start(),
-                checker.semantic(),
-            )?;
-            let reference_edit =
-                Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
-            Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("itertools", "pairwise"),
+            func.start(),
+            checker.semantic(),
+        )?;
+        let reference_edit =
+            Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
+        Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+    });
 
     checker.diagnostics.push(diagnostic);
 }

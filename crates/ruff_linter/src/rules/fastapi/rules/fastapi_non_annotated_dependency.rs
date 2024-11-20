@@ -11,14 +11,18 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Identifies FastAPI routes with deprecated uses of `Depends`.
+/// Identifies FastAPI routes with deprecated uses of `Depends` or similar.
 ///
 /// ## Why is this bad?
-/// The FastAPI documentation recommends the use of `Annotated` for defining
-/// route dependencies and parameters, rather than using `Depends` directly
-/// with a default value.
+/// The [FastAPI documentation] recommends the use of [`typing.Annotated`] for
+/// defining route dependencies and parameters, rather than using `Depends`,
+/// `Query` or similar as a default value for a parameter. Using this approach
+/// everywhere helps ensure consistency and clarity in defining dependencies
+/// and parameters.
 ///
-/// This approach is also suggested for various route parameters, including Body and Cookie, as it helps ensure consistency and clarity in defining dependencies and parameters.
+/// `Annotated` was added to the `typing` module in Python 3.9; however,
+/// the third-party [`typing_extensions`] package provides a backport that can be
+/// used on older versions of Python.
 ///
 /// ## Example
 ///
@@ -55,9 +59,14 @@ use crate::settings::types::PythonVersion;
 /// async def read_items(commons: Annotated[dict, Depends(common_parameters)]):
 ///     return commons
 /// ```
-
+///
+/// [fastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
+/// [typing.Annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
+/// [typing_extensions]: https://typing-extensions.readthedocs.io/en/stable/
 #[violation]
-pub struct FastApiNonAnnotatedDependency;
+pub struct FastApiNonAnnotatedDependency {
+    py_version: PythonVersion,
+}
 
 impl Violation for FastApiNonAnnotatedDependency {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -68,11 +77,16 @@ impl Violation for FastApiNonAnnotatedDependency {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with `Annotated`".to_string())
+        let title = if self.py_version >= PythonVersion::Py39 {
+            "Replace with `typing.Annotated`"
+        } else {
+            "Replace with `typing_extensions.Annotated`"
+        };
+        Some(title.to_string())
     }
 }
 
-/// RUF103
+/// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
     checker: &mut Checker,
     function_def: &ast::StmtFunctionDef,
@@ -135,7 +149,12 @@ fn create_diagnostic(
     parameter: &ast::ParameterWithDefault,
     safe_to_update: bool,
 ) {
-    let mut diagnostic = Diagnostic::new(FastApiNonAnnotatedDependency, parameter.range);
+    let mut diagnostic = Diagnostic::new(
+        FastApiNonAnnotatedDependency {
+            py_version: checker.settings.target_version,
+        },
+        parameter.range,
+    );
 
     if safe_to_update {
         if let (Some(annotation), Some(default)) =

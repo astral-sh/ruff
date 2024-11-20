@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_9.py:22:20: F821 Undefined name `captured`
    |
@@ -8,5 +9,3 @@ F821_9.py:22:20: F821 Undefined name `captured`
 22 |             return captured  # F821
    |                    ^^^^^^^^ F821
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI056.py:4:1: PYI056 Calling `.append()` on `__all__` may not be supported by all type checkers (use `+=` instead)
   |
@@ -28,5 +29,3 @@ PYI056.py:6:1: PYI056 Calling `.remove()` on `__all__` may not be supported by a
 7 | 
 8 | # OK
   |
-
-

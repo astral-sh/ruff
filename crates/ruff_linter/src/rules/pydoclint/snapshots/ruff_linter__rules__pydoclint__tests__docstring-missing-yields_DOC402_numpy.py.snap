@@ -1,68 +1,107 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+snapshot_kind: text
 ---
-DOC402_numpy.py:11:5: DOC402 `yield` is not documented in docstring
+DOC402_numpy.py:3:5: DOC402 `yield` is not documented in docstring
    |
- 9 |         A number
-10 |     """
-11 |     yield 'test'
-   |     ^^^^^^^^^^^^ DOC402
-   |
-   = help: Add a "Yields" section to the docstring
-
-DOC402_numpy.py:62:9: DOC402 `yield` is not documented in docstring
-   |
-60 |             A number
-61 |         """
-62 |         yield 'test'
-   |         ^^^^^^^^^^^^ DOC402
-   |
-   = help: Add a "Yields" section to the docstring
-
-DOC402_numpy.py:89:5: DOC402 `yield` is not documented in docstring
-   |
-87 |     Do something
-88 |     """
-89 |     yield None
-   |     ^^^^^^^^^^ DOC402
-90 |     yield 1
+ 1 |   # DOC402
+ 2 |   def foo(num: int) -> str:
+ 3 |       """
+   |  _____^
+ 4 | |     Do something
+ 5 | | 
+ 6 | |     Parameters
+ 7 | |     ----------
+ 8 | |     num : int
+ 9 | |         A number
+10 | |     """
+   | |_______^ DOC402
+11 |       yield 'test'
    |
    = help: Add a "Yields" section to the docstring
 
-DOC402_numpy.py:98:5: DOC402 `yield` is not documented in docstring
+DOC402_numpy.py:54:9: DOC402 `yield` is not documented in docstring
    |
-96 |     Do something
-97 |     """
-98 |     yield None
-   |     ^^^^^^^^^^ DOC402
+52 |       # DOC402
+53 |       def bar(self) -> str:
+54 |           """
+   |  _________^
+55 | |         Do something
+56 | | 
+57 | |         Parameters
+58 | |         ----------
+59 | |         num : int
+60 | |             A number
+61 | |         """
+   | |___________^ DOC402
+62 |           yield 'test'
    |
    = help: Add a "Yields" section to the docstring
 
-DOC402_numpy.py:122:5: DOC402 `yield` is not documented in docstring
+DOC402_numpy.py:86:5: DOC402 `yield` is not documented in docstring
+   |
+84 |   # DOC402
+85 |   def foo() -> typing.Generator[int | None, None, None]:
+86 |       """
+   |  _____^
+87 | |     Do something
+88 | |     """
+   | |_______^ DOC402
+89 |       yield None
+90 |       yield 1
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:95:5: DOC402 `yield` is not documented in docstring
+   |
+93 |   # DOC402
+94 |   def foo() -> typing.Generator[int, None, None]:
+95 |       """
+   |  _____^
+96 | |     Do something
+97 | |     """
+   | |_______^ DOC402
+98 |       yield None
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:119:5: DOC402 `yield` is not documented in docstring
     |
-120 |     Do something
-121 |     """
-122 |     yield None
-    |     ^^^^^^^^^^ DOC402
-123 |     yield 1
+117 |   # DOC402
+118 |   def foo():
+119 |       """
+    |  _____^
+120 | |     Do something
+121 | |     """
+    | |_______^ DOC402
+122 |       yield None
+123 |       yield 1
     |
     = help: Add a "Yields" section to the docstring
 
-DOC402_numpy.py:131:5: DOC402 `yield` is not documented in docstring
+DOC402_numpy.py:128:5: DOC402 `yield` is not documented in docstring
     |
-129 |     Do something
-130 |     """
-131 |     yield 1
-    |     ^^^^^^^ DOC402
-132 |     yield
+126 |   # DOC402
+127 |   def foo():
+128 |       """
+    |  _____^
+129 | |     Do something
+130 | |     """
+    | |_______^ DOC402
+131 |       yield 1
+132 |       yield
     |
     = help: Add a "Yields" section to the docstring
 
-DOC402_numpy.py:140:5: DOC402 `yield` is not documented in docstring
+DOC402_numpy.py:137:5: DOC402 `yield` is not documented in docstring
     |
-138 |     Do something
-139 |     """
-140 |     yield
-    |     ^^^^^ DOC402
+135 |   # DOC402
+136 |   def bar() -> typing.Iterator[int | None]:
+137 |       """
+    |  _____^
+138 | |     Do something
+139 | |     """
+    | |_______^ DOC402
+140 |       yield
     |
     = help: Add a "Yields" section to the docstring

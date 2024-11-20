@@ -100,3 +100,5 @@ class Thing:
 blah = lambda: {"a": 1}.__delitem__("a")  # OK
 
 blah = dict[{"a": 1}.__delitem__("a")]  # OK
+
+"abc".__contains__("a")

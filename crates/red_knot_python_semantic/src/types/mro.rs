@@ -340,7 +340,7 @@ impl<'db> ClassBase<'db> {
     /// Return a `ClassBase` representing the class `builtins.object`
     fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
-            .to_class(db)
+            .to_class_literal(db)
             .into_class_literal()
             .map_or(Self::Unknown, |ClassLiteralType { class }| {
                 Self::Class(class)
@@ -371,8 +371,9 @@ impl<'db> ClassBase<'db> {
             | Type::ModuleLiteral(_)
             | Type::SubclassOf(_) => None,
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::Literal => None,
-                KnownInstanceType::TypeVar(_) => None,
+                KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Literal
+                | KnownInstanceType::Optional => None,
             },
         }
     }

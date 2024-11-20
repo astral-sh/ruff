@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+snapshot_kind: text
 ---
 docstring_doubles_module_singleline.py:1:1: Q002 [*] Double quote docstring found but single quotes preferred
   |
@@ -15,5 +16,3 @@ docstring_doubles_module_singleline.py:1:1: Q002 [*] Double quote docstring foun
 2 2 | """ this is not a docstring """
 3 3 | 
 4 4 | def foo():
-
-

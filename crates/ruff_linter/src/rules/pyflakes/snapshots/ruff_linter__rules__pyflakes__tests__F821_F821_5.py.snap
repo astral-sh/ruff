@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_5.py:5:31: F821 Undefined name `InnerClass`
   |
@@ -8,5 +9,3 @@ F821_5.py:5:31: F821 Undefined name `InnerClass`
   |                               ^^^^^^^^^^ F821
 6 |         pass
   |
-
-

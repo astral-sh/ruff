@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B006_6.py:4:22: B006 [*] Do not use mutable data structures for argument defaults
   |
@@ -21,5 +22,3 @@ B006_6.py:4:22: B006 [*] Do not use mutable data structures for argument default
   5 |+    import os                    
   6 |+    if bar is None:
   7 |+        bar = {}
-
-

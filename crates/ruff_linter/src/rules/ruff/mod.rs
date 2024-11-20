@@ -62,6 +62,10 @@ mod tests {
     #[test_case(Rule::UselessIfElse, Path::new("RUF034.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
     #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
+    #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.py"))]
+    #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.pyi"))]
+    #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.py"))]
+    #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.pyi"))]
     #[test_case(Rule::NonStringLiteralAsAssertMessage, Path::new("RUF040.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -80,6 +84,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
+                    extend_markup_names: vec![],
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -95,6 +100,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
+                    extend_markup_names: vec![],
                 },
                 target_version: PythonVersion::Py310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -367,7 +373,8 @@ mod tests {
     #[test_case(Rule::InvalidPyprojectToml, Path::new("bleach"))]
     #[test_case(Rule::InvalidPyprojectToml, Path::new("invalid_author"))]
     #[test_case(Rule::InvalidPyprojectToml, Path::new("maturin"))]
-    #[test_case(Rule::InvalidPyprojectToml, Path::new("maturin_gh_1615"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("various_invalid"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("pep639"))]
     fn invalid_pyproject_toml(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let path = test_resource_path("fixtures")
@@ -385,7 +392,16 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035.py"))]
+    #[test_case(
+        Rule::FunctionCallInDataclassDefaultArgument,
+        Path::new("RUF009_attrs.py")
+    )]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
+    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
+    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
+    #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
+    #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -397,6 +413,29 @@ mod tests {
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035_extend_markup_names.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035_skip_early_out.py"))]
+    fn extend_allowed_callable(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "extend_allow_callables__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    parenthesize_tuple_in_subscript: true,
+                    extend_markup_names: vec!["webhelpers.html.literal".to_string()],
+                },
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

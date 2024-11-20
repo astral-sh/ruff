@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B029.py:8:1: B029 Using `except ():` with an empty tuple does not catch anything; add exceptions to handle
    |
@@ -20,5 +21,3 @@ B029.py:13:1: B029 Using `except ():` with an empty tuple does not catch anythin
 14 | |     pass
    | |________^ B029
    |
-
-

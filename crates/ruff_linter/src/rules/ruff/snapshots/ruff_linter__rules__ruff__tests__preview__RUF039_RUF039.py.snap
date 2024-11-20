@@ -1,0 +1,211 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF039.py:5:12: RUF039 First argument to `re.compile()` is not raw string
+  |
+4 | # Errors
+5 | re.compile('single free-spacing', flags=re.X)
+  |            ^^^^^^^^^^^^^^^^^^^^^ RUF039
+6 | re.findall('si\ngle')
+7 | re.finditer("dou\ble")
+  |
+  = help: Replace with raw string
+
+RUF039.py:6:12: RUF039 First argument to `re.findall()` is not raw string
+  |
+4 | # Errors
+5 | re.compile('single free-spacing', flags=re.X)
+6 | re.findall('si\ngle')
+  |            ^^^^^^^^^ RUF039
+7 | re.finditer("dou\ble")
+8 | re.fullmatch('''t\riple single''')
+  |
+  = help: Replace with raw string
+
+RUF039.py:7:13: RUF039 First argument to `re.finditer()` is not raw string
+  |
+5 | re.compile('single free-spacing', flags=re.X)
+6 | re.findall('si\ngle')
+7 | re.finditer("dou\ble")
+  |             ^^^^^^^^^ RUF039
+8 | re.fullmatch('''t\riple single''')
+9 | re.match("""\triple double""")
+  |
+  = help: Replace with raw string
+
+RUF039.py:8:14: RUF039 First argument to `re.fullmatch()` is not raw string
+   |
+ 6 | re.findall('si\ngle')
+ 7 | re.finditer("dou\ble")
+ 8 | re.fullmatch('''t\riple single''')
+   |              ^^^^^^^^^^^^^^^^^^^^ RUF039
+ 9 | re.match("""\triple double""")
+10 | re.search('two', 'args')
+   |
+   = help: Replace with raw string
+
+RUF039.py:9:10: RUF039 First argument to `re.match()` is not raw string
+   |
+ 7 | re.finditer("dou\ble")
+ 8 | re.fullmatch('''t\riple single''')
+ 9 | re.match("""\triple double""")
+   |          ^^^^^^^^^^^^^^^^^^^^ RUF039
+10 | re.search('two', 'args')
+11 | re.split("raw", r'second')
+   |
+   = help: Replace with raw string
+
+RUF039.py:10:11: RUF039 First argument to `re.search()` is not raw string
+   |
+ 8 | re.fullmatch('''t\riple single''')
+ 9 | re.match("""\triple double""")
+10 | re.search('two', 'args')
+   |           ^^^^^ RUF039
+11 | re.split("raw", r'second')
+12 | re.sub(u'''nicode''', u"f(?i)rst")
+   |
+   = help: Replace with raw string
+
+RUF039.py:11:10: RUF039 First argument to `re.split()` is not raw string
+   |
+ 9 | re.match("""\triple double""")
+10 | re.search('two', 'args')
+11 | re.split("raw", r'second')
+   |          ^^^^^ RUF039
+12 | re.sub(u'''nicode''', u"f(?i)rst")
+13 | re.subn(b"""ytes are""", f"\u006e")
+   |
+   = help: Replace with raw string
+
+RUF039.py:12:8: RUF039 First argument to `re.sub()` is not raw string
+   |
+10 | re.search('two', 'args')
+11 | re.split("raw", r'second')
+12 | re.sub(u'''nicode''', u"f(?i)rst")
+   |        ^^^^^^^^^^^^^ RUF039
+13 | re.subn(b"""ytes are""", f"\u006e")
+   |
+   = help: Replace with raw string
+
+RUF039.py:13:9: RUF039 First argument to `re.subn()` is not raw bytes literal
+   |
+11 | re.split("raw", r'second')
+12 | re.sub(u'''nicode''', u"f(?i)rst")
+13 | re.subn(b"""ytes are""", f"\u006e")
+   |         ^^^^^^^^^^^^^^^ RUF039
+14 | 
+15 | regex.compile('single free-spacing', flags=regex.X)
+   |
+   = help: Replace with raw bytes literal
+
+RUF039.py:15:15: RUF039 First argument to `regex.compile()` is not raw string
+   |
+13 | re.subn(b"""ytes are""", f"\u006e")
+14 | 
+15 | regex.compile('single free-spacing', flags=regex.X)
+   |               ^^^^^^^^^^^^^^^^^^^^^ RUF039
+16 | regex.findall('si\ngle')
+17 | regex.finditer("dou\ble")
+   |
+   = help: Replace with raw string
+
+RUF039.py:16:15: RUF039 First argument to `regex.findall()` is not raw string
+   |
+15 | regex.compile('single free-spacing', flags=regex.X)
+16 | regex.findall('si\ngle')
+   |               ^^^^^^^^^ RUF039
+17 | regex.finditer("dou\ble")
+18 | regex.fullmatch('''t\riple single''')
+   |
+   = help: Replace with raw string
+
+RUF039.py:17:16: RUF039 First argument to `regex.finditer()` is not raw string
+   |
+15 | regex.compile('single free-spacing', flags=regex.X)
+16 | regex.findall('si\ngle')
+17 | regex.finditer("dou\ble")
+   |                ^^^^^^^^^ RUF039
+18 | regex.fullmatch('''t\riple single''')
+19 | regex.match("""\triple double""")
+   |
+   = help: Replace with raw string
+
+RUF039.py:18:17: RUF039 First argument to `regex.fullmatch()` is not raw string
+   |
+16 | regex.findall('si\ngle')
+17 | regex.finditer("dou\ble")
+18 | regex.fullmatch('''t\riple single''')
+   |                 ^^^^^^^^^^^^^^^^^^^^ RUF039
+19 | regex.match("""\triple double""")
+20 | regex.search('two', 'args')
+   |
+   = help: Replace with raw string
+
+RUF039.py:19:13: RUF039 First argument to `regex.match()` is not raw string
+   |
+17 | regex.finditer("dou\ble")
+18 | regex.fullmatch('''t\riple single''')
+19 | regex.match("""\triple double""")
+   |             ^^^^^^^^^^^^^^^^^^^^ RUF039
+20 | regex.search('two', 'args')
+21 | regex.split("raw", r'second')
+   |
+   = help: Replace with raw string
+
+RUF039.py:20:14: RUF039 First argument to `regex.search()` is not raw string
+   |
+18 | regex.fullmatch('''t\riple single''')
+19 | regex.match("""\triple double""")
+20 | regex.search('two', 'args')
+   |              ^^^^^ RUF039
+21 | regex.split("raw", r'second')
+22 | regex.sub(u'''nicode''', u"f(?i)rst")
+   |
+   = help: Replace with raw string
+
+RUF039.py:21:13: RUF039 First argument to `regex.split()` is not raw string
+   |
+19 | regex.match("""\triple double""")
+20 | regex.search('two', 'args')
+21 | regex.split("raw", r'second')
+   |             ^^^^^ RUF039
+22 | regex.sub(u'''nicode''', u"f(?i)rst")
+23 | regex.subn(b"""ytes are""", f"\u006e")
+   |
+   = help: Replace with raw string
+
+RUF039.py:22:11: RUF039 First argument to `regex.sub()` is not raw string
+   |
+20 | regex.search('two', 'args')
+21 | regex.split("raw", r'second')
+22 | regex.sub(u'''nicode''', u"f(?i)rst")
+   |           ^^^^^^^^^^^^^ RUF039
+23 | regex.subn(b"""ytes are""", f"\u006e")
+   |
+   = help: Replace with raw string
+
+RUF039.py:23:12: RUF039 First argument to `regex.subn()` is not raw bytes literal
+   |
+21 | regex.split("raw", r'second')
+22 | regex.sub(u'''nicode''', u"f(?i)rst")
+23 | regex.subn(b"""ytes are""", f"\u006e")
+   |            ^^^^^^^^^^^^^^^ RUF039
+24 | 
+25 | regex.template("""(?m)
+   |
+   = help: Replace with raw bytes literal
+
+RUF039.py:25:16: RUF039 First argument to `regex.template()` is not raw string
+   |
+23 |   regex.subn(b"""ytes are""", f"\u006e")
+24 |   
+25 |   regex.template("""(?m)
+   |  ________________^
+26 | |     (?:ulti)?
+27 | |     (?=(?<!(?<=(?!l)))
+28 | |     l(?i:ne)
+29 | | """, flags = regex.X)
+   | |___^ RUF039
+   |
+   = help: Replace with raw string

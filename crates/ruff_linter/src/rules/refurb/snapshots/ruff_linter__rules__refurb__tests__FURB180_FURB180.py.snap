@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   |
@@ -76,6 +77,4 @@ FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract 
    31 |+class A3(B0, abc.ABC, before_metaclass=1):
 32 32 |     pass
 33 33 | 
-34 34 | 
-
-
+34 34 |

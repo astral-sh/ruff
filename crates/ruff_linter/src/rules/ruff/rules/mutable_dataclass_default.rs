@@ -6,7 +6,7 @@ use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
+use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation};
 
 /// ## What it does
 /// Checks for mutable default values in dataclass attributes.
@@ -66,25 +66,33 @@ impl Violation for MutableDataclassDefault {
 
 /// RUF008
 pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
-    if !is_dataclass(class_def, checker.semantic()) {
+    let semantic = checker.semantic();
+
+    let Some(dataclass_kind) = dataclass_kind(class_def, semantic) else {
+        return;
+    };
+
+    if dataclass_kind.is_attrs() && checker.settings.preview.is_disabled() {
         return;
     }
 
     for statement in &class_def.body {
-        if let Stmt::AnnAssign(ast::StmtAnnAssign {
+        let Stmt::AnnAssign(ast::StmtAnnAssign {
             annotation,
             value: Some(value),
             ..
         }) = statement
+        else {
+            continue;
+        };
+
+        if is_mutable_expr(value, checker.semantic())
+            && !is_class_var_annotation(annotation, checker.semantic())
+            && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {
-            if is_mutable_expr(value, checker.semantic())
-                && !is_class_var_annotation(annotation, checker.semantic())
-                && !is_immutable_annotation(annotation, checker.semantic(), &[])
-            {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(MutableDataclassDefault, value.range()));
-            }
+            let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
+
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

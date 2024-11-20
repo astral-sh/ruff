@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI003.pyi:4:4: PYI003 Unrecognized `sys.version_info` check
   |
@@ -169,5 +170,3 @@ PYI003.pyi:24:4: PYI003 Unrecognized `sys.version_info` check
 25 | if sys.version_info >= (3, 4, 3): ...  # Y004 Version comparison must use only major and minor version
 26 | if sys.version_info == (3, 4): ...  # Y006 Use only < and >= for version comparisons
    |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM211.py:1:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   |
@@ -56,5 +57,3 @@ SIM211.py:5:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
   5 |+a = not b + c  # SIM211
 6 6 | 
 7 7 | a = True if b else False  # OK
-
-

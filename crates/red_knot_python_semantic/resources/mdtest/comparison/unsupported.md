@@ -4,6 +4,8 @@
 def bool_instance() -> bool:
     return True
 
+class A: ...
+
 a = 1 in 7  # error: "Operator `in` is not supported for types `Literal[1]` and `Literal[7]`"
 reveal_type(a)  # revealed: bool
 
@@ -33,4 +35,8 @@ reveal_type(e)  # revealed: bool
 f = (1, 2) < (1, "hello")
 # TODO: should be Unknown, once operand type check is implemented
 reveal_type(f)  # revealed: bool
+
+# error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`, in comparing `tuple[bool, A]` with `tuple[bool, A]`"
+g = (bool_instance(), A()) < (bool_instance(), A())
+reveal_type(g)  # revealed: Unknown
 ```

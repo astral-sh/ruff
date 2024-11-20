@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM118.py:3:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   |

@@ -7,7 +7,7 @@ import pandas
 import pyproj
 from attrs import frozen
 
-import numpy  # TCH002
+import numpy  # TC002
 
 
 @attrs.define(auto_attribs=True)

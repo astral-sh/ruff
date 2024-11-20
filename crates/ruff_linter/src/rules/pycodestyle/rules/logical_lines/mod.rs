@@ -37,18 +37,17 @@ bitflags! {
     #[derive(Default, Eq, PartialEq, Clone, Copy, Debug)]
     pub(crate) struct TokenFlags: u8 {
         /// Whether the logical line contains an operator.
-        const OPERATOR = 0b0000_0001;
+        const OPERATOR = 1 << 0;
         /// Whether the logical line contains a bracket.
-        const BRACKET = 0b0000_0010;
+        const BRACKET = 1 << 1;
         /// Whether the logical line contains a punctuation mark.
-        const PUNCTUATION = 0b0000_0100;
+        const PUNCTUATION = 1 << 2;
         /// Whether the logical line contains a keyword.
-        const KEYWORD = 0b0000_1000;
+        const KEYWORD = 1 << 3;
         /// Whether the logical line contains a comment.
-        const COMMENT = 0b0001_0000;
-
+        const COMMENT = 1 << 4;
         /// Whether the logical line contains any non trivia token (no comment, newline, or in/dedent)
-        const NON_TRIVIA = 0b0010_0000;
+        const NON_TRIVIA = 1 << 5;
     }
 }
 

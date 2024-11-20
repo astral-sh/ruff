@@ -3,15 +3,15 @@ use std::any::Any;
 use js_sys::Error;
 use wasm_bindgen::prelude::*;
 
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath,
 };
 use ruff_notebook::Notebook;
 
@@ -42,10 +42,10 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
         let system = WasmSystem::new(SystemPath::new(root));
-        let workspace = WorkspaceMetadata::from_path(
+        let workspace = WorkspaceMetadata::discover(
             SystemPath::new(root),
             &system,
-            Some(Configuration {
+            Some(&Configuration {
                 target_version: Some(settings.target_version.into()),
                 ..Configuration::default()
             }),
@@ -184,8 +184,8 @@ impl Settings {
 #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum TargetVersion {
     Py37,
-    #[default]
     Py38,
+    #[default]
     Py39,
     Py310,
     Py311,
@@ -226,7 +226,7 @@ impl System for WasmSystem {
     }
 
     fn canonicalize_path(&self, path: &SystemPath) -> ruff_db::system::Result<SystemPathBuf> {
-        Ok(self.fs.canonicalize(path))
+        self.fs.canonicalize(path)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
@@ -272,6 +272,13 @@ impl System for WasmSystem {
         self.fs.walk_directory(path)
     }
 
+    fn glob(
+        &self,
+        pattern: &str,
+    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>>>, PatternError> {
+        Ok(Box::new(self.fs.glob(pattern)?))
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -283,4 +290,18 @@ impl System for WasmSystem {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::TargetVersion;
+    use red_knot_python_semantic::PythonVersion;
+
+    #[test]
+    fn same_default_as_python_version() {
+        assert_eq!(
+            PythonVersion::from(TargetVersion::default()),
+            PythonVersion::default()
+        );
+    }
 }

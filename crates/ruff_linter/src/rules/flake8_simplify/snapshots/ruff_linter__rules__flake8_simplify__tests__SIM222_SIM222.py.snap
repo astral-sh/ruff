@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM222.py:1:4: SIM222 [*] Use `True` instead of `... or True`
   |
@@ -1060,5 +1061,5 @@ SIM222.py:168:7: SIM222 [*] Use `"bar"` instead of `... or "bar"`
 168     |-print(f"{''}{''}" or "bar")
     168 |+print("bar")
 169 169 | print(f"{1}{''}" or "bar")
-
-
+170 170 | 
+171 171 |

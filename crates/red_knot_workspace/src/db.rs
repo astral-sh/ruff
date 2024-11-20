@@ -15,7 +15,9 @@ use ruff_db::{Db as SourceDb, Upcast};
 mod changes;
 
 #[salsa::db]
-pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {}
+pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
+    fn workspace(&self) -> Workspace;
+}
 
 #[salsa::db]
 pub struct RootDatabase {
@@ -43,11 +45,6 @@ impl RootDatabase {
         db.workspace = Some(Workspace::from_metadata(&db, workspace));
 
         Ok(db)
-    }
-
-    pub fn workspace(&self) -> Workspace {
-        // SAFETY: The workspace is always initialized in `new`.
-        self.workspace.unwrap()
     }
 
     /// Checks all open files in the workspace and its dependencies.
@@ -153,7 +150,11 @@ impl salsa::Database for RootDatabase {
 }
 
 #[salsa::db]
-impl Db for RootDatabase {}
+impl Db for RootDatabase {
+    fn workspace(&self) -> Workspace {
+        self.workspace.unwrap()
+    }
+}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -168,6 +169,7 @@ pub(crate) mod tests {
     use ruff_db::{Db as SourceDb, Upcast};
 
     use crate::db::Db;
+    use crate::workspace::{Workspace, WorkspaceMetadata};
 
     #[salsa::db]
     pub(crate) struct TestDb {
@@ -176,17 +178,23 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
+        workspace: Option<Workspace>,
     }
 
     impl TestDb {
-        pub(crate) fn new() -> Self {
-            Self {
+        pub(crate) fn new(workspace: WorkspaceMetadata) -> Self {
+            let mut db = Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
                 vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
-            }
+                workspace: None,
+            };
+
+            let workspace = Workspace::from_metadata(&db, workspace);
+            db.workspace = Some(workspace);
+            db
         }
     }
 
@@ -254,7 +262,11 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl Db for TestDb {}
+    impl Db for TestDb {
+        fn workspace(&self) -> Workspace {
+            self.workspace.unwrap()
+        }
+    }
 
     #[salsa::db]
     impl salsa::Database for TestDb {

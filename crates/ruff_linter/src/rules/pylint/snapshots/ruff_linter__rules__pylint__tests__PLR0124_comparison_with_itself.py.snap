@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 comparison_with_itself.py:2:1: PLR0124 Name compared with itself, consider replacing `foo == foo`
   |
@@ -119,5 +120,3 @@ comparison_with_itself.py:24:1: PLR0124 Name compared with itself, consider repl
 25 | 
 26 | # Non-errors.
    |
-
-

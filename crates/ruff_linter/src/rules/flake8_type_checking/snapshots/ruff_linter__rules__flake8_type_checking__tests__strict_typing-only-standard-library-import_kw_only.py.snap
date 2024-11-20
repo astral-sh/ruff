@@ -1,12 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
 ---
-kw_only.py:5:45: TCH003 [*] Move standard library import `dataclasses.Field` into a type-checking block
+kw_only.py:5:45: TC003 [*] Move standard library import `dataclasses.Field` into a type-checking block
   |
 3 | from __future__ import annotations
 4 | 
 5 | from dataclasses import KW_ONLY, dataclass, Field
-  |                                             ^^^^^ TCH003
+  |                                             ^^^^^ TC003
   |
   = help: Move into type-checking block
 

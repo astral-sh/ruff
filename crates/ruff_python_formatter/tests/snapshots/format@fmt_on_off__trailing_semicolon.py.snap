@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/trailing_semicolon.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -64,6 +65,3 @@ a = 10
 # fmt: off
 last_statement_with_semi   ;
 ```
-
-
-

@@ -19,9 +19,9 @@ mod parser;
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &Path, title: &str) {
+pub fn run(path: &Path, long_title: &str, short_title: &str) {
     let source = std::fs::read_to_string(path).unwrap();
-    let suite = match test_parser::parse(title, &source) {
+    let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
             panic!("Error parsing `{}`: {err}", path.to_str().unwrap())
@@ -49,8 +49,8 @@ pub fn run(path: &Path, title: &str) {
                     for failure in failures {
                         let absolute_line_number =
                             backtick_line.checked_add(relative_line_number).unwrap();
-                        let line_info = format!("{title}:{absolute_line_number}").cyan();
-                        println!("    {line_info} {failure}");
+                        let line_info = format!("{long_title}:{absolute_line_number}").cyan();
+                        println!("  {line_info} {failure}");
                     }
                 }
             }

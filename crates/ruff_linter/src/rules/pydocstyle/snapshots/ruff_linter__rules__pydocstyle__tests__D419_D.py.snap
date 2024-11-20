@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:20:9: D419 Docstring is empty
    |
@@ -27,5 +28,3 @@ D.py:80:9: D419 Docstring is empty
 80 |         ''
    |         ^^ D419
    |
-
-

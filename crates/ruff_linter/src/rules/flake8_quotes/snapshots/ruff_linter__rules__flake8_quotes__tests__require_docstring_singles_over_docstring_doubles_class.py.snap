@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+snapshot_kind: text
 ---
 docstring_doubles_class.py:2:5: Q002 [*] Double quote docstring found but single quotes preferred
   |
@@ -52,5 +53,3 @@ docstring_doubles_class.py:9:29: Q002 [*] Double quote docstring found but singl
 8 8 | 
 9   |-    class Nested(foo()[:]): """ inline docstring """; pass
   9 |+    class Nested(foo()[:]): ''' inline docstring '''; pass
-
-

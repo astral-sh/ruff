@@ -248,7 +248,7 @@ impl DunderReplacement {
         match dunder_method {
             "__add__" => Some(Self::Operator("+", "Use `+` operator")),
             "__and__" => Some(Self::Operator("&", "Use `&` operator")),
-            "__contains__" => Some(Self::Operator("in", "Use `in` operator")),
+            "__contains__" => Some(Self::ROperator("in", "Use `in` operator")),
             "__eq__" => Some(Self::Operator("==", "Use `==` operator")),
             "__floordiv__" => Some(Self::Operator("//", "Use `//` operator")),
             "__ge__" => Some(Self::Operator(">=", "Use `>=` operator")),

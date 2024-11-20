@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N801.py:1:7: N801 Class name `bad` should use CapWords convention
   |

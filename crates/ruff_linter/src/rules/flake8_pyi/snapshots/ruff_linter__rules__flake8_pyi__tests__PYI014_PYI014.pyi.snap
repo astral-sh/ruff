@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI014.pyi:3:7: PYI014 [*] Only simple default values allowed for arguments
   |
@@ -311,5 +312,3 @@ PYI014.pyi:78:7: PYI014 [*] Only simple default values allowed for arguments
 79 79 | ) -> None: ...
 80 80 | def f23(
 81 81 |     x=True,  # OK
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S603.py:4:1: S603 `subprocess` call: check for execution of untrusted input
   |

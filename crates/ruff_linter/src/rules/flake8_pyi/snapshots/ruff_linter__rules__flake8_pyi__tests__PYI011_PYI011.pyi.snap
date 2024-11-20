@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI011.pyi:10:14: PYI011 [*] Only simple default values allowed for typed arguments
    |
@@ -453,5 +454,3 @@ PYI011.pyi:159:14: PYI011 [*] Only simple default values allowed for typed argum
 160     |-    + "",
     159 |+    x: str = ...,
 161 160 | ) -> None: ...
-
-

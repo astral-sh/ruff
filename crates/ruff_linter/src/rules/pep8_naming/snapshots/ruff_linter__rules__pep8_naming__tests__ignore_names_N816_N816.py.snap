@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N816.py:2:1: N816 Variable `stillBad` in global scope should not be mixedCase
   |
@@ -25,5 +26,3 @@ N816.py:8:1: N816 Variable `still_Bad` in global scope should not be mixedCase
 8 | still_Bad = 0
   | ^^^^^^^^^ N816
   |
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N803.py:4:16: N803 Argument name `stillBad` should be lowercase
   |
@@ -18,5 +19,3 @@ N803.py:11:28: N803 Argument name `stillBad` should be lowercase
    |                            ^^^^^^^^ N803
 12 |         return _, a, stillBad
    |
-
-

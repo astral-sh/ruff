@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F841_3.py:5:5: F841 [*] Local variable `x` is assigned to but never used
   |
@@ -712,5 +713,3 @@ F841_3.py:173:6: F841 [*] Local variable `x` is assigned to but never used
 172 172 |     ((x)) = foo()
 173     |-    (x) = (y.z) = foo()
     173 |+    (y.z) = foo()
-
-

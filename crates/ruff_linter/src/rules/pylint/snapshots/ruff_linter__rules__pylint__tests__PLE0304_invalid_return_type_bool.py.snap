@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 invalid_return_type_bool.py:5:16: PLE0304 `__bool__` does not return `bool`
   |

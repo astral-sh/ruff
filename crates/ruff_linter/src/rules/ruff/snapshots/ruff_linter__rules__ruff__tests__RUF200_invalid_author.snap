@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
-pyproject.toml:6:84: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+pyproject.toml:5:11: RUF200 Failed to parse pyproject.toml: a table with 'name' and/or 'email' keys
   |
-4 | # Ensure that the spans from toml handle utf-8 correctly
-5 | authors = [
-6 |     { name = "Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘", email = 1 }
-  |                               ^ RUF200
-7 | ]
+3 |   version = "0.1.0"
+4 |   # Ensure that the spans from toml handle utf-8 correctly
+5 |   authors = [
+  |  ___________^
+6 | |     { name = "Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘", email = 1 }
+7 | | ]
+  | |_^ RUF200
   |
-
-

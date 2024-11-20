@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_linter/src/message/sarif.rs
 expression: value
+snapshot_kind: text
 ---
 {
   "$schema": "https://json.schemastore.org/sarif-2.1.0.json",

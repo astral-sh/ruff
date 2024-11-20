@@ -213,6 +213,7 @@ impl Default for LoggingBuilder {
     }
 }
 
+#[must_use = "Dropping the guard unregisters the tracing subscriber."]
 pub struct LoggingGuard {
     _guard: tracing::subscriber::DefaultGuard,
 }

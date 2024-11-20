@@ -277,7 +277,7 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn use_boundness(&self, use_id: ScopedUseId) -> Boundness {
         if self.bindings_by_use[use_id].may_be_unbound() {
-            Boundness::MayBeUnbound
+            Boundness::PossiblyUnbound
         } else {
             Boundness::Bound
         }
@@ -292,7 +292,7 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn public_boundness(&self, symbol: ScopedSymbolId) -> Boundness {
         if self.public_symbols[symbol].may_be_unbound() {
-            Boundness::MayBeUnbound
+            Boundness::PossiblyUnbound
         } else {
             Boundness::Bound
         }
@@ -459,10 +459,6 @@ pub(super) struct UseDefMapBuilder<'db> {
 }
 
 impl<'db> UseDefMapBuilder<'db> {
-    pub(super) fn new() -> Self {
-        Self::default()
-    }
-
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
         let new_symbol = self.symbol_states.push(SymbolState::undefined());
         debug_assert_eq!(symbol, new_symbol);

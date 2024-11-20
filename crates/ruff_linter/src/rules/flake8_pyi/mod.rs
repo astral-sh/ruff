@@ -66,8 +66,8 @@ mod tests {
     #[test_case(Rule::PatchVersionComparison, Path::new("PYI004.pyi"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.py"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.pyi"))]
-    #[test_case(Rule::PrePep570PositionalArgument, Path::new("PYI063.py"))]
-    #[test_case(Rule::PrePep570PositionalArgument, Path::new("PYI063.pyi"))]
+    #[test_case(Rule::Pep484StylePositionalOnlyParameter, Path::new("PYI063.py"))]
+    #[test_case(Rule::Pep484StylePositionalOnlyParameter, Path::new("PYI063.pyi"))]
     #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.py"))]
     #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.pyi"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.py"))]
@@ -124,6 +124,8 @@ mod tests {
     #[test_case(Rule::UnusedPrivateTypedDict, Path::new("PYI049.pyi"))]
     #[test_case(Rule::WrongTupleLengthVersionComparison, Path::new("PYI005.py"))]
     #[test_case(Rule::WrongTupleLengthVersionComparison, Path::new("PYI005.pyi"))]
+    #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.py"))]
+    #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -149,6 +151,23 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn custom_classmethod_rules_preview() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_pyi/PYI019.pyi"),
+            &settings::LinterSettings {
+                pep8_naming: pep8_naming::settings::Settings {
+                    classmethod_decorators: vec!["foo_classmethod".to_string()],
+                    ..pep8_naming::settings::Settings::default()
+                },
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::CustomTypeVarReturnType)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

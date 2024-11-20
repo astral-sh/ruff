@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_linter/src/message/text.rs
 expression: content
+snapshot_kind: text
 ---
 notebook.ipynb:cell 1:2:8: F401 [*] `os` imported but unused
   |
@@ -28,5 +29,3 @@ notebook.ipynb:cell 3:4:5: F841 [*] Local variable `x` is assigned to but never 
   |     ^ F841
   |
   = help: Remove assignment to unused variable `x`
-
-

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI018.py:6:1: PYI018 Private TypeVar `_T` is never used
   |
@@ -48,5 +49,3 @@ PYI018.py:10:1: PYI018 Private TypeVarTuple `_Ts2` is never used
 11 | 
 12 | # OK
    |
-
-

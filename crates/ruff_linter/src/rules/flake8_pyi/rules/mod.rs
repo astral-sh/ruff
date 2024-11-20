@@ -1,3 +1,5 @@
+use std::fmt;
+
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_generator_return_type::*;
 pub(crate) use bad_version_info_comparison::*;
@@ -25,9 +27,9 @@ pub(crate) use prefix_type_params::*;
 pub(crate) use quoted_annotation_in_stub::*;
 pub(crate) use redundant_final_literal::*;
 pub(crate) use redundant_literal_union::*;
+pub(crate) use redundant_none_literal::*;
 pub(crate) use redundant_numeric_union::*;
 pub(crate) use simple_defaults::*;
-use std::fmt;
 pub(crate) use str_or_repr_defined_in_stub::*;
 pub(crate) use string_or_bytes_too_long::*;
 pub(crate) use stub_body_multiple_statements::*;
@@ -68,6 +70,7 @@ mod prefix_type_params;
 mod quoted_annotation_in_stub;
 mod redundant_final_literal;
 mod redundant_literal_union;
+mod redundant_none_literal;
 mod redundant_numeric_union;
 mod simple_defaults;
 mod str_or_repr_defined_in_stub;

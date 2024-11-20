@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF100_1.py:37:9: F401 [*] `typing.Union` imported but unused
    |
@@ -150,5 +151,3 @@ RUF100_1.py:89:55: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
 88 88 |     # This should mark F501 as unused.
 89    |-    from typing import Awaitable, AwaitableGenerator  # noqa: F501
    89 |+    from typing import Awaitable, AwaitableGenerator
-
-

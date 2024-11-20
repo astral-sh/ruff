@@ -155,7 +155,7 @@ pub enum Linter {
     #[prefix = "TID"]
     Flake8TidyImports,
     /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
-    #[prefix = "TCH"]
+    #[prefix = "TC"]
     Flake8TypeChecking,
     /// [flake8-gettext](https://pypi.org/project/flake8-gettext/)
     #[prefix = "INT"]
