@@ -10,15 +10,17 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Default to Python 3.9**
 
-    Ruff now defaults to Python 3.9 instead of 3.8 if no explicit Python version is configured using `ruff.target-version` or `project.requires-python` ([#13896](https://github.com/astral-sh/ruff/pull/13896))
+    Ruff now defaults to Python 3.9 instead of 3.8 if no explicit Python version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version) or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires) ([#13896](https://github.com/astral-sh/ruff/pull/13896))
 
-- **Use XDG (i.e. `~/.local/bin`) instead of the Cargo home directory in the installer**
+- **Use XDG (i.e. `~/.local/bin`) instead of the Cargo home directory in the standalone installer**
 
-    Previously, Ruff's installer used `$CARGO_HOME` or `~/.cargo/bin` for its target install directory. Now, Ruff will be installed into `$XDG_BIN_HOME`, `$XDG_DATA_HOME/../bin`, or `~/.local/bin` (in that order). Note, this only applies if you installed Ruff with the standalone installer (using the shell or PowerShell script but not when using e.g. pip).
+    Previously, Ruff's installer used `$CARGO_HOME` or `~/.cargo/bin` for its target install directory. Now, Ruff will be installed into `$XDG_BIN_HOME`, `$XDG_DATA_HOME/../bin`, or `~/.local/bin` (in that order).
+    
+    This change is only relevant to users of the standalone Ruff installer (using the shell or PowerShell script). If you installed Ruff using `uv` or `pip`, you should be unaffected.
 
 - **Updated Unicode standard**
 
-    Ruff now uses a more recent version of the Unicode standard. In very rare cases, this can lead to formatting changes or new `E501` violations if the computed line width differs.
+    Ruff now uses a more recent version of the Unicode standard. In very rare cases, this can lead to formatting changes or new [`E501`](https://docs.astral.sh/ruff/rules/line-too-long/) violations if the computed line width differs.
 
 ### Removed Rules
 
@@ -57,9 +59,9 @@ The following rules have been stabilized and are no longer in preview:
 
 The following behaviors have been stabilized:
 
-- [`ambiguous-variable-name`](https://docs.astral.sh/ruff/rules/ambiguous-variable-name/) (`E741`): Ignore violations in stub files because the stub-author doesn't control the variable name.
-- [`invalid-pyproject-toml`](https://docs.astral.sh/ruff/rules/invalid-pyproject-toml/) (`RUF200`): Updated to reflect the provisionally accepted PEP 639.
-- [`printf-string-formatting`](https://docs.astral.sh/ruff/rules/printf-string-formatting/) (`UP031`): Report all printf-like usages even if no autofix is available
+- [`ambiguous-variable-name`](https://docs.astral.sh/ruff/rules/ambiguous-variable-name/) (`E741`): Violations in stub files are now ignored. Stub authors typically don't control variable names.
+- [`invalid-pyproject-toml`](https://docs.astral.sh/ruff/rules/invalid-pyproject-toml/) (`RUF200`): Updated to reflect the provisionally accepted [PEP 639](https://peps.python.org/pep-0639/).
+- [`printf-string-formatting`](https://docs.astral.sh/ruff/rules/printf-string-formatting/) (`UP031`): Report all `printf`-like usages even if no autofix is available
 
 The following fixes have been stabilized:
 
