@@ -412,6 +412,8 @@ pub enum Type<'db> {
     Instance(InstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
     KnownInstance(KnownInstanceType<'db>),
+    /// A type alias, with a name and corresponding type
+    TypeAlias(TypeAliasType<'db>),
     /// The set of objects in any of the types in the union
     Union(UnionType<'db>),
     /// The set of objects in all of the types in the intersection
@@ -780,6 +782,9 @@ impl<'db> Type<'db> {
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
+            (Type::TypeAlias(alias), other) | (other, Type::TypeAlias(alias)) => {
+                alias.value(db).is_disjoint_from(db, other)
+            }
             (Type::Never, _) | (_, Type::Never) => true,
 
             (Type::Any, _) | (_, Type::Any) => false,
@@ -986,6 +991,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
+            Type::TypeAlias(alias) => alias.value(db).is_singleton(db),
             Type::Any
             | Type::Never
             | Type::Unknown
@@ -1043,6 +1049,7 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            Type::TypeAlias(alias) => alias.value(db).is_single_valued(db),
             Type::FunctionLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
@@ -1107,6 +1114,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         match self {
+            Type::TypeAlias(alias) => alias.value(db).member(db, name),
             Type::Any => Type::Any.into(),
             Type::Never => {
                 // TODO: attribute lookup on Never type
@@ -1246,6 +1254,7 @@ impl<'db> Type<'db> {
     /// when `bool(x)` is called on an object `x`.
     fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
+            Type::TypeAlias(alias) => alias.value(db).bool(db),
             Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
@@ -1497,6 +1506,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            Type::TypeAlias(alias) => alias.value(db).to_instance(db),
             Type::Any => Type::Any,
             todo @ Type::Todo(_) => *todo,
             Type::Unknown => Type::Unknown,
@@ -1536,6 +1546,7 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             // TODO map this to a new `Type::TypeVar` variant
             Type::KnownInstance(KnownInstanceType::TypeVar(_)) => *self,
+            Type::TypeAlias(alias) => alias.value(db),
             _ => todo_type!(),
         }
     }
@@ -1583,6 +1594,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            Type::TypeAlias(alias) => alias.value(db).to_meta_type(db),
             Type::Never => Type::Never,
             Type::Instance(InstanceType { class }) => {
                 Type::SubclassOf(SubclassOfType { class: *class })
@@ -2776,6 +2788,25 @@ impl<'db> Class<'db> {
 
         self.fully_static_explicit_bases(db)
             .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::new()))
+    }
+}
+
+#[salsa::interned]
+pub struct TypeAliasType<'db> {
+    #[return_ref]
+    pub name: ast::name::Name,
+
+    rhs_scope: ScopeId<'db>,
+}
+
+impl TypeAliasType<'_> {
+    pub fn value(self, db: &dyn Db) -> Type {
+        let scope = self.rhs_scope(db);
+
+        let type_alias_stmt_node = scope.node(db).expect_type_alias();
+        let definition = semantic_index(db, scope.file(db)).definition(type_alias_stmt_node);
+
+        definition_expression_ty(db, definition, &type_alias_stmt_node.value)
     }
 }
 
