@@ -563,12 +563,12 @@ jobs:
         run: rustup show
       - name: "Cache rust"
         uses: Swatinem/rust-cache@v2
-      - name: "Formatter progress"
+      - name: "Run checks"
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
-        run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
+        run: cat target/formatter-ecosystem/stats.txt > $GITHUB_STEP_SUMMARY
       - name: "Remove checkouts from cache"
-        run: rm -r target/progress_projects
+        run: rm -r target/formatter-ecosystem
 
   check-ruff-lsp:
     name: "test ruff-lsp"
