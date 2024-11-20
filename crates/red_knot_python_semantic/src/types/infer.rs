@@ -4570,7 +4570,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             KnownInstanceType::Union => match parameters {
                 ast::Expr::Tuple(t) => UnionType::from_elements(
                     self.db,
-                    t.elts.iter().map(|elt| self.infer_type_expression(elt)),
+                    t.iter().map(|elt| self.infer_type_expression(elt)),
                 ),
                 _ => self.infer_type_expression(parameters),
             },
