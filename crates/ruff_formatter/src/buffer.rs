@@ -294,11 +294,11 @@ where
     }
 }
 
-/// A Buffer that removes any soft line breaks or [`if_group_breaks`] elements.
+/// A Buffer that removes any soft line breaks or [`if_group_breaks`](crate::builders::if_group_breaks) elements.
 ///
 /// - Removes [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::Soft).
 /// - Replaces [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::SoftOrSpace) with a [`Space`](FormatElement::Space)
-/// - Removes `if_group_breaks` elements.
+/// - Removes [`if_group_breaks`](crate::builders::if_group_breaks) elements.
 ///
 /// # Examples
 ///
