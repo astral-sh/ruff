@@ -17,7 +17,7 @@ a5: Union[int]
 def f():
     # revealed: int | str
     reveal_type(a)
-    # Since bool is a subtype of int we merge both types to int here. But we do allow assigning boolean value
+    # Since bool is a subtype of int we simplify to int here. But we do allow assigning boolean values (see below).
     # revealed: int
     reveal_type(a1)
     # revealed: int | float | str
