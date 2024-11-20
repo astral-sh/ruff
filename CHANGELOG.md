@@ -2,38 +2,87 @@
 
 ## 0.8.0
 
+Check out the [blog post](https://astral.sh/blog/ruff-v0.8.0) for a migration guide and overview of the changes!
+
 ### Breaking changes
 
-- Ruff 0.8 ([#14383](https://github.com/MichaReiser/ruff/pull/14383))
+See also, the "Remapped rules" section which may result in disabled rules.
+
+- **Default to Python 3.9**
+
+    Ruff now defaults to Python 3.9 instead of 3.8 if no explicit Python version is configured using `ruff.target-version` or `project.requires-python` ([#13896](https://github.com/astral-sh/ruff/pull/13896))
+
+- **Use XDG (i.e. `~/.local/bin`) instead of the Cargo home directory in the installer**
+
+    Previously, Ruff's installer used `$CARGO_HOME` or `~/.cargo/bin` for its target install directory. Now, Ruff will be installed into `$XDG_BIN_HOME`, `$XDG_DATA_HOME/../bin`, or `~/.local/bin` (in that order). Note, this only applies if you installed Ruff with the standalone installer (using the shell or PowerShell script but not when using e.g. pip).
+
+- **Updated Unicode standard**
+
+    Ruff now uses a more recent version of the Unicode standard. In very rare cases, this can lead to formatting changes or new `E501` violations if the computed line width differs.
+
+### Removed Rules
+
+The following deprecated rules have been removed:
+
+- [`missing-type-self`](https://docs.astral.sh/ruff/rules/missing-type-self/) (`ANN101`)
+- [`missing-type-cls`](https://docs.astral.sh/ruff/rules/missing-type-cls/) (`ANN102`)
+- [`pytest-incorrect-fixture-name-underscore`](https://docs.astral.sh/ruff/rules/pytest-incorrect-fixture-name-underscore/) (`E999`)
+- [`pytest-missing-fixture-name-underscore`](https://docs.astral.sh/ruff/rules/pytest-missing-fixture-name-underscore/) (`PT004`)
+- [`pytest-incorrect-fixture-name-underscore`](https://docs.astral.sh/ruff/rules/pytest-incorrect-fixture-name-underscore/) (`PT005`)
+- [`unpacked-list-comprehension`](https://docs.astral.sh/ruff/rules/unpacked-list-comprehension/) (`UP027`)
+
+### Remapped rules
+
+The following rules have been remapped to new rule codes:
+
+- [`flake8-type-checking`](https://docs.astral.sh/ruff/rules/#flake8-type-checking-tch): `TCH` to `TC`
+
+### Stabilization
+
+The following rules have been stabilized and are no longer in preview:
+
+- [`builtin-import-shadowing`](https://docs.astral.sh/ruff/rules/builtin-import-shadowing/) (`A004`)
+- [`mutable-contextvar-default`](https://docs.astral.sh/ruff/rules/mutable-contextvar-default/) (`B039`)
+- [`fast-api-redundant-response-model`](https://docs.astral.sh/ruff/rules/fast-api-redundant-response-model/) (`FAST001`)
+- [`fast-api-non-annotated-dependency`](https://docs.astral.sh/ruff/rules/fast-api-non-annotated-dependency/) (`FAST002`)
+- [`dict-index-missing-items`](https://docs.astral.sh/ruff/rules/dict-index-missing-items/) (`PLC0206`)
+- [`pep484-style-positional-only-argument`](https://docs.astral.sh/ruff/rules/pep484-style-positional-only-argument/) (`PYI063`)
+- [`redundant-final-literal`](https://docs.astral.sh/ruff/rules/redundant-final-literal/) (`PYI064`)
+- [`bad-version-info-order`](https://docs.astral.sh/ruff/rules/bad-version-info-order/) (`PYI066`)
+- [`parenthesize-chained-operators`](https://docs.astral.sh/ruff/rules/parenthesize-chained-operators/) (`RUF021`)
+- [`unsorted-dunder-all`](https://docs.astral.sh/ruff/rules/unsorted-dunder-all/) (`RUF022`)
+- [`unsorted-dunder-slots`](https://docs.astral.sh/ruff/rules/unsorted-dunder-slots/) (`RUF023`)
+- [`assert-with-print-message`](https://docs.astral.sh/ruff/rules/assert-with-print-message/) (`RUF030`)
+- [`unnecessary-default-type-args`](https://docs.astral.sh/ruff/rules/unnecessary-default-type-args/) (`UP043`)
+
+The following behaviors have been stabilized:
+
+- [`ambiguous-variable-name`](https://docs.astral.sh/ruff/rules/ambiguous-variable-name/) (`E741`): Ignore violations in stub files because the stub-author doesn't control the variable name.
+- [`invalid-pyproject-toml`](https://docs.astral.sh/ruff/rules/invalid-pyproject-toml/) (`RUF200`): Updated to reflect the provisionally accepted PEP 639.
+- [`printf-string-formatting`](https://docs.astral.sh/ruff/rules/printf-string-formatting/) (`UP031`): Report all printf-like usages even if no autofix is available
+
+The following fixes have been stabilized:
+
+- [`zip-instead-of-pairwise`](https://docs.astral.sh/ruff/rules/zip-instead-of-pairwise/) (`RUF007`)
 
 ### Preview features
 
-- Mark UP043 fix unsafe when the type annotation contains any comments ([#14458](https://github.com/astral-sh/ruff/pull/14458))
-- \[`flake8-pyi`\] Implement `redundant-none-literal` (`PYI061`) ([#14316](https://github.com/astral-sh/ruff/pull/14316))
-- \[`flake8-pyi`\] Implement autofix for `redundant-numeric-union` (`PYI041`) ([#14273](https://github.com/astral-sh/ruff/pull/14273))
+- \[`flake8-pyi`\] Add `redundant-none-literal` (`PYI061`) ([#14316](https://github.com/astral-sh/ruff/pull/14316))
+- \[`flake8-pyi`\] Add autofix for `redundant-numeric-union` (`PYI041`) ([#14273](https://github.com/astral-sh/ruff/pull/14273))
 - \[`pycodestyle`\] Exempt `pytest.importorskip()` calls (`E402`) ([#14474](https://github.com/astral-sh/ruff/pull/14474))
-- \[`pydoclint`\] Update diagnostics to target the docstring ([#14381](https://github.com/astral-sh/ruff/pull/14381))
-- \[`pylint`\] - use sets when possible for `PLR1714` autofix (`repeated-equality-comparison`) ([#14372](https://github.com/astral-sh/ruff/pull/14372))
-- \[`ruff`\] Add rule forbidding `map(int, package.__version__.split('.'))` (`RUF048`) ([#14373](https://github.com/astral-sh/ruff/pull/14373))
-- \[`ruff`\] Implement `redundant-bool-literal` (`RUF038`) ([#14319](https://github.com/astral-sh/ruff/pull/14319))
-- \[`ruff`\] `re` and `regex` calls with unraw string as first argument (`RUF039`) ([#14446](https://github.com/astral-sh/ruff/pull/14446))
+- \[`pydoclint`\] Report pydoclint diagnostics at the start of the docstring instead of the documented statement ([#14381](https://github.com/astral-sh/ruff/pull/14381))
+- \[`pylint`\] Autofix suggests using sets when possible (`PLR1714`) ([#14372](https://github.com/astral-sh/ruff/pull/14372))
+- \[`ruff`\] New rule `map-int-version-parsing` (`RUF048`) ([#14373](https://github.com/astral-sh/ruff/pull/14373))
+- \[`ruff`\] New rule `redundant-bool-literal` (`RUF038`) ([#14319](https://github.com/astral-sh/ruff/pull/14319))
+- \[`ruff`\] New rule  `unraw-re-pattern` (`RUF039`) ([#14446](https://github.com/astral-sh/ruff/pull/14446))
 
-### Bug fixes
+### Rule changes
 
-- Avoid panic in unfixable `redundant-numeric-union` ([#14402](https://github.com/astral-sh/ruff/pull/14402))
-- Reverse order of `__contains__` arguments ([#14424](https://github.com/astral-sh/ruff/pull/14424))
-- \[`flake8-datetimez`\] Also exempt `.time()` (`DTZ901`) ([#14394](https://github.com/astral-sh/ruff/pull/14394))
-- \[`flake8-type-checking`\] Consider type expressions in list for quoting annotations ([#14371](https://github.com/astral-sh/ruff/pull/14371))
-
-### Documentation
-
-- Improve rule & options documentation ([#14329](https://github.com/astral-sh/ruff/pull/14329))
-- Watch for changes to the generated file during documentation serve ([#14476](https://github.com/astral-sh/ruff/pull/14476))
-- \[`flake8-logging`\] Suggest `.getLogger(__name__)` instead of `.getLogger(__file__)` (`LOG015`) ([#14392](https://github.com/astral-sh/ruff/pull/14392))
-
-### Other changes
-
+- \[`flake8-datetimez`\] Exempt `min.time()` and `max.time()` (`DTZ901`) ([#14394](https://github.com/astral-sh/ruff/pull/14394))
 - \[`flake8-pie`\] Mark fix as unsafe if the following statement is a string literal (`PIE790`) ([#14393](https://github.com/astral-sh/ruff/pull/14393))
+- \[`flake8-pyi`\] Avoid panic in unfixable case (`PYI041`) ([#14402](https://github.com/astral-sh/ruff/pull/14402))
+- \[`flake8-type-checking`\] Correctly handle quotes in subscript expression when generating an autofix ([#14371](https://github.com/astral-sh/ruff/pull/14371))
+- \[`pylint`\] Fix incorrect autofix for `__contains__`  (`PLC2801`) ([#14424](https://github.com/astral-sh/ruff/pull/14424))
 
 ## 0.7.4
 
