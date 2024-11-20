@@ -38,9 +38,8 @@ a = ""
 a1: Union[int, bool]
 a1 = 1
 a1 = True
-a2: int
-# error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
-a2 = a
+# error: [invalid-assignment] "Object of type `bytes` is not assignable to `int | str`"
+a = b""
 ```
 
 ## Typing Extensions
