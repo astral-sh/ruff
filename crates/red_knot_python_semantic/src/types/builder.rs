@@ -31,7 +31,7 @@ use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
 pub(crate) struct UnionBuilder<'db> {
-    elements: Vec<Type<'db>>,
+    elements: SmallVec<[Type<'db>; 1]>,
     db: &'db dyn Db,
 }
 
@@ -39,7 +39,7 @@ impl<'db> UnionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
-            elements: vec![],
+            elements: SmallVec::new(),
         }
     }
 
@@ -48,13 +48,22 @@ impl<'db> UnionBuilder<'db> {
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(self.db);
-                self.elements.reserve(new_elements.len());
-                for element in new_elements {
-                    self = self.add(*element);
+                if self.elements.is_empty() {
+                    self.elements.extend_from_slice(new_elements);
+                } else {
+                    self.elements.reserve(new_elements.len());
+                    for element in new_elements {
+                        self = self.add(*element);
+                    }
                 }
             }
             Type::Never => {}
             _ => {
+                if self.elements.is_empty() {
+                    self.elements.push(ty);
+                    return self;
+                }
+
                 let bool_pair = if let Type::BooleanLiteral(b) = ty {
                     Some(Type::BooleanLiteral(!b))
                 } else {
