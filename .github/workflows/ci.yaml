@@ -333,7 +333,7 @@ jobs:
 
   ecosystem:
     name: "ecosystem"
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest-8
     needs:
       - cargo-test-linux
       - determine_changes
