@@ -1809,7 +1809,7 @@ pub enum KnownInstanceType<'db> {
     Literal,
     /// The symbol `typing.Optional` (which can also be found as `typing_extensions.Optional`)
     Optional,
-    /// The symbol `typing.Union` (which can also be found as `typing_extensions.Literal`)
+    /// The symbol `typing.Union` (which can also be found as `typing_extensions.Union`)
     Union,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
