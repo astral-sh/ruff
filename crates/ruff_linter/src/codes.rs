@@ -313,8 +313,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Builtins, "001") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinVariableShadowing),
         (Flake8Builtins, "002") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinArgumentShadowing),
         (Flake8Builtins, "003") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinAttributeShadowing),
-        // TODO(charlie): When stabilizing, remove preview gating for A001's treatment of imports.
-        (Flake8Builtins, "004") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinImportShadowing),
+        (Flake8Builtins, "004") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinImportShadowing),
         (Flake8Builtins, "005") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinModuleShadowing),
         (Flake8Builtins, "006") => (RuleGroup::Preview, rules::flake8_builtins::rules::BuiltinLambdaArgumentShadowing),
 
