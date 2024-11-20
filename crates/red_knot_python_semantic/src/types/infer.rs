@@ -4578,9 +4578,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .fold(builder, super::builder::UnionBuilder::add);
                         builder.build()
                     }
-                    _ => {
-                        UnionType::from_elements(self.db, [self.infer_type_expression(parameters)])
-                    }
+                    _ => self.infer_type_expression(parameters),
                 }
             }
             KnownInstanceType::TypeVar(_) => Type::Todo,
