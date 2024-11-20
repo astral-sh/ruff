@@ -4567,20 +4567,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let param_type = self.infer_type_expression(parameters);
                 UnionType::from_elements(self.db, [param_type, Type::none(self.db)])
             }
-            KnownInstanceType::Union => {
-                let mut builder = UnionBuilder::new(self.db);
-                match parameters {
-                    ast::Expr::Tuple(t) => {
-                        builder = t
-                            .elts
-                            .iter()
-                            .map(|elt| self.infer_type_expression(elt))
-                            .fold(builder, super::builder::UnionBuilder::add);
-                        builder.build()
-                    }
-                    _ => self.infer_type_expression(parameters),
-                }
-            }
+            KnownInstanceType::Union => match parameters {
+                ast::Expr::Tuple(t) => UnionType::from_elements(
+                    self.db,
+                    t.elts.iter().map(|elt| self.infer_type_expression(elt)),
+                ),
+                _ => self.infer_type_expression(parameters),
+            },
             KnownInstanceType::TypeVar(_) => Type::Todo,
         }
     }
