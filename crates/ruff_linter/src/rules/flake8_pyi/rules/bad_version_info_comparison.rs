@@ -16,8 +16,9 @@ use crate::registry::Rule;
 /// Comparing `sys.version_info` with `==` or `<=` has unexpected behavior
 /// and can lead to bugs.
 ///
-/// For example, `sys.version_info > (3, 8)` will also match `3.8.10`,
-/// while `sys.version_info <= (3, 8)` will _not_ match `3.8.10`:
+/// For example, `sys.version_info > (3, 8, 1)` will resolve to `True` if your
+/// Python version is 3.8.1; meanwhile, `sys.version_info <= (3, 8)` will _not_
+/// resolve to `True` if your Python version is 3.8.10:
 ///
 /// ```python
 /// >>> import sys
@@ -61,16 +62,20 @@ impl Violation for BadVersionInfoComparison {
 }
 
 /// ## What it does
-/// Checks for if-else statements with `sys.version_info` comparisons that use
-/// `<` comparators.
+/// Checks for code that branches on `sys.version_info` comparisons where
+/// branches corresponding to older Python versions come before branches
+/// corresponding to newer Python versions.
 ///
 /// ## Why is this bad?
 /// As a convention, branches that correspond to newer Python versions should
-/// come first when using `sys.version_info` comparisons. This makes it easier
-/// to understand the desired behavior, which typically corresponds to the
-/// latest Python versions.
+/// come first. This makes it easier to understand the desired behavior, which
+/// typically corresponds to the latest Python versions.
 ///
-/// In [preview], this rule will also flag non-stub files.
+/// This rule enforces the convention by checking for `if` tests that compare
+/// `sys.version_info` with `<` rather than `>=`.
+///
+/// By default, this rule only applies to stub files.
+/// In [preview], it will also flag this anti-pattern in non-stub files.
 ///
 /// ## Example
 ///
@@ -101,7 +106,7 @@ pub struct BadVersionInfoOrder;
 impl Violation for BadVersionInfoOrder {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `>=` when using `if`-`else` with `sys.version_info` comparisons".to_string()
+        "Put branches for newer Python versions first when branching on `sys.version_info` comparisons".to_string()
     }
 }
 
