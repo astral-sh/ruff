@@ -453,6 +453,8 @@ impl<'a> Checker<'a> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        let in_preview = self.settings.preview.is_enabled();
+
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -504,7 +506,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
                     || imports::is_sys_path_modification(stmt, self.semantic())
-                    || imports::is_os_environ_modification(stmt, self.semantic()))
+                    || imports::is_os_environ_modification(stmt, self.semantic())
+                    || (in_preview && imports::is_pytest_importorskip(stmt, self.semantic())))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
