@@ -1,6 +1,7 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use serde::{Deserialize, Serialize};
+use serde::de::{self};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
@@ -34,6 +35,7 @@ use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
+use ruff_python_stdlib::identifiers::is_identifier;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -1327,6 +1329,7 @@ pub struct Flake8ImportConventionsOptions {
             scipy = "sp"
         "#
     )]
+    #[serde(deserialize_with = "deserialize_and_validate_aliases")]
     pub aliases: Option<FxHashMap<String, String>>,
 
     /// A mapping from module to conventional import alias. These aliases will
@@ -1368,6 +1371,30 @@ pub struct Flake8ImportConventionsOptions {
     "#
     )]
     pub banned_from: Option<FxHashSet<String>>,
+}
+
+fn deserialize_and_validate_aliases<'de, D>(
+    deserializer: D,
+) -> Result<Option<FxHashMap<String, String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let Some(aliases) = Option::<FxHashMap<String, String>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+
+    for (module, alias) in &aliases {
+        if module.is_empty()
+            || module.split('.').any(|part| !is_identifier(part))
+            || !is_identifier(alias)
+        {
+            return Err(de::Error::custom(
+                "Module must be valid identifier separated by single periods and alias must be valid identifier",
+            ));
+        }
+    }
+
+    Ok(Some(aliases)) // Return the validated map.
 }
 
 impl Flake8ImportConventionsOptions {
@@ -3406,11 +3433,19 @@ pub struct AnalyzeOptions {
 
 #[cfg(test)]
 mod tests {
+    use crate::options::Flake8ImportConventionsOptions;
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
     use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
     use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
+
+    #[test]
+    fn flake8_import_conventions_validate_aliases() {
+        let json_options = r#"{"aliases": {"a.b":"a.b"}}"#;
+        let result: Result<Flake8ImportConventionsOptions, _> = serde_json::from_str(json_options);
+        assert!(result.unwrap_err().to_string().contains("Module must be valid identifier separated by single periods and alias must be valid identifier"));
+    }
 
     #[test]
     fn flake8_self_options() {
