@@ -23,7 +23,7 @@ h: TypeAlias = 'Bar'   # TCH008
 i: TypeAlias = Foo['str']   # TCH008
 j: TypeAlias = 'Baz'   # OK
 k: TypeAlias = 'k | None'  # OK
-l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
+l: TypeAlias = 'int' | None  # TCH008 (because TCH010 is not enabled)
 m: TypeAlias = ('int'  # TCH008
     | None)
 n: TypeAlias = ('int'  # TCH008 (fix removes comment currently)

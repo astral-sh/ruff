@@ -104,13 +104,13 @@ TCH008.py:23:20: TCH008 [*] Remove quotes from type alias
    23 |+i: TypeAlias = Foo[str]   # TCH008
 24 24 | j: TypeAlias = 'Baz'   # OK
 25 25 | k: TypeAlias = 'k | None'  # OK
-26 26 | l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
+26 26 | l: TypeAlias = 'int' | None  # TCH008 (because TCH010 is not enabled)
 
 TCH008.py:26:16: TCH008 [*] Remove quotes from type alias
    |
 24 | j: TypeAlias = 'Baz'   # OK
 25 | k: TypeAlias = 'k | None'  # OK
-26 | l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
+26 | l: TypeAlias = 'int' | None  # TCH008 (because TCH010 is not enabled)
    |                ^^^^^ TCH008
 27 | m: TypeAlias = ('int'  # TCH008
 28 |     | None)
@@ -121,8 +121,8 @@ TCH008.py:26:16: TCH008 [*] Remove quotes from type alias
 23 23 | i: TypeAlias = Foo['str']   # TCH008
 24 24 | j: TypeAlias = 'Baz'   # OK
 25 25 | k: TypeAlias = 'k | None'  # OK
-26    |-l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
-   26 |+l: TypeAlias = int | None  # TCH008 (because TC010 is not enabled)
+26    |-l: TypeAlias = 'int' | None  # TCH008 (because TCH010 is not enabled)
+   26 |+l: TypeAlias = int | None  # TCH008 (because TCH010 is not enabled)
 27 27 | m: TypeAlias = ('int'  # TCH008
 28 28 |     | None)
 29 29 | n: TypeAlias = ('int'  # TCH008 (fix removes comment currently)
@@ -130,7 +130,7 @@ TCH008.py:26:16: TCH008 [*] Remove quotes from type alias
 TCH008.py:27:17: TCH008 [*] Remove quotes from type alias
    |
 25 | k: TypeAlias = 'k | None'  # OK
-26 | l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
+26 | l: TypeAlias = 'int' | None  # TCH008 (because TCH010 is not enabled)
 27 | m: TypeAlias = ('int'  # TCH008
    |                 ^^^^^ TCH008
 28 |     | None)
@@ -141,7 +141,7 @@ TCH008.py:27:17: TCH008 [*] Remove quotes from type alias
 ℹ Safe fix
 24 24 | j: TypeAlias = 'Baz'   # OK
 25 25 | k: TypeAlias = 'k | None'  # OK
-26 26 | l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
+26 26 | l: TypeAlias = 'int' | None  # TCH008 (because TCH010 is not enabled)
 27    |-m: TypeAlias = ('int'  # TCH008
    27 |+m: TypeAlias = (int  # TCH008
 28 28 |     | None)
@@ -162,7 +162,7 @@ TCH008.py:29:17: TCH008 [*] Remove quotes from type alias
    = help: Remove quotes
 
 ℹ Unsafe fix
-26 26 | l: TypeAlias = 'int' | None  # TCH008 (because TC010 is not enabled)
+26 26 | l: TypeAlias = 'int' | None  # TCH008 (because TCH010 is not enabled)
 27 27 | m: TypeAlias = ('int'  # TCH008
 28 28 |     | None)
 29    |-n: TypeAlias = ('int'  # TCH008 (fix removes comment currently)
@@ -274,7 +274,7 @@ TCH008.py:36:14: TCH008 [*] Remove quotes from type alias
    36 |+type I = Foo[str]  # TCH008
 37 37 | type J = 'Baz'  # TCH008
 38 38 | type K = 'K | None'  # TCH008
-39 39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
 
 TCH008.py:37:10: TCH008 [*] Remove quotes from type alias
    |
@@ -283,7 +283,7 @@ TCH008.py:37:10: TCH008 [*] Remove quotes from type alias
 37 | type J = 'Baz'  # TCH008
    |          ^^^^^ TCH008
 38 | type K = 'K | None'  # TCH008
-39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
    |
    = help: Remove quotes
 
@@ -294,7 +294,7 @@ TCH008.py:37:10: TCH008 [*] Remove quotes from type alias
 37    |-type J = 'Baz'  # TCH008
    37 |+type J = Baz  # TCH008
 38 38 | type K = 'K | None'  # TCH008
-39 39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
 40 40 | type M = ('int'  # TCH008
 
 TCH008.py:38:10: TCH008 [*] Remove quotes from type alias
@@ -303,7 +303,7 @@ TCH008.py:38:10: TCH008 [*] Remove quotes from type alias
 37 | type J = 'Baz'  # TCH008
 38 | type K = 'K | None'  # TCH008
    |          ^^^^^^^^^^ TCH008
-39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
 40 | type M = ('int'  # TCH008
    |
    = help: Remove quotes
@@ -314,7 +314,7 @@ TCH008.py:38:10: TCH008 [*] Remove quotes from type alias
 37 37 | type J = 'Baz'  # TCH008
 38    |-type K = 'K | None'  # TCH008
    38 |+type K = K | None  # TCH008
-39 39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
 40 40 | type M = ('int'  # TCH008
 41 41 |     | None)
 
@@ -322,7 +322,7 @@ TCH008.py:39:10: TCH008 [*] Remove quotes from type alias
    |
 37 | type J = 'Baz'  # TCH008
 38 | type K = 'K | None'  # TCH008
-39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
    |          ^^^^^ TCH008
 40 | type M = ('int'  # TCH008
 41 |     | None)
@@ -333,8 +333,8 @@ TCH008.py:39:10: TCH008 [*] Remove quotes from type alias
 36 36 | type I = Foo['str']  # TCH008
 37 37 | type J = 'Baz'  # TCH008
 38 38 | type K = 'K | None'  # TCH008
-39    |-type L = 'int' | None  # TCH008 (because TC010 is not enabled)
-   39 |+type L = int | None  # TCH008 (because TC010 is not enabled)
+39    |-type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
+   39 |+type L = int | None  # TCH008 (because TCH010 is not enabled)
 40 40 | type M = ('int'  # TCH008
 41 41 |     | None)
 42 42 | type N = ('int'  # TCH008 (fix removes comment currently)
@@ -342,7 +342,7 @@ TCH008.py:39:10: TCH008 [*] Remove quotes from type alias
 TCH008.py:40:11: TCH008 [*] Remove quotes from type alias
    |
 38 | type K = 'K | None'  # TCH008
-39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
 40 | type M = ('int'  # TCH008
    |           ^^^^^ TCH008
 41 |     | None)
@@ -353,7 +353,7 @@ TCH008.py:40:11: TCH008 [*] Remove quotes from type alias
 ℹ Safe fix
 37 37 | type J = 'Baz'  # TCH008
 38 38 | type K = 'K | None'  # TCH008
-39 39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
 40    |-type M = ('int'  # TCH008
    40 |+type M = (int  # TCH008
 41 41 |     | None)
@@ -372,7 +372,7 @@ TCH008.py:42:11: TCH008 [*] Remove quotes from type alias
    = help: Remove quotes
 
 ℹ Unsafe fix
-39 39 | type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+39 39 | type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
 40 40 | type M = ('int'  # TCH008
 41 41 |     | None)
 42    |-type N = ('int'  # TCH008 (fix removes comment currently)

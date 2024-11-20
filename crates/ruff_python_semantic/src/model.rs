@@ -677,17 +677,17 @@ impl<'a> SemanticModel<'a> {
         let range = name.range;
         let mut seen_function = false;
         let mut class_variables_visible = true;
-        let mut lexicographical_lookup = true;
+        let mut source_order_sensitive_lookup = true;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
 
             // Only once we leave a function scope and its enclosing type scope should
-            // we stop doing lexicographical lookups. We could e.g. have nested classes
+            // we stop doing source-order lookups. We could e.g. have nested classes
             // where we lookup symbols from the innermost class scope, which can only see
             // things from the outer class(es) that have been defined before the inner
             // class.
             if seen_function && !scope.kind.is_type() {
-                lexicographical_lookup = false;
+                source_order_sensitive_lookup = false;
             }
 
             if scope.kind.is_class() {
@@ -703,10 +703,10 @@ impl<'a> SemanticModel<'a> {
             seen_function |= scope.kind.is_function();
 
             if let Some(binding_id) = scope.get(symbol) {
-                if lexicographical_lookup {
+                if source_order_sensitive_lookup {
                     // we need to look through all the shadowed bindings
-                    // since we may be shadowing a valid runtime binding
-                    // with an invalid one
+                    // since we may be shadowing a source-order accurate
+                    // runtime binding with a source-order inaccurate one
                     for shadowed_id in scope.shadowed_bindings(binding_id) {
                         let binding = &self.bindings[shadowed_id];
                         if binding.context.is_typing() {
@@ -721,8 +721,9 @@ impl<'a> SemanticModel<'a> {
                         }
 
                         // This ensures we perform the correct source-order lookup,
-                        // since the ranges for these two types of bindings are trimmed to just the target,
-                        // but the name is not available until the end of the entire statement
+                        // since the ranges for these two types of bindings are trimmed
+                        // to just the target, but the name is not available until the
+                        // end of the entire statement
                         let binding_range = match binding.statement(self) {
                             Some(Stmt::AnnAssign(stmt)) => stmt.range(),
                             Some(Stmt::ClassDef(stmt)) => stmt.range(),
