@@ -313,6 +313,41 @@ f"{  # comment 26
     # comment 28
 } woah {x}"
 
+# Assignment statement
+
+# Even though this f-string has multiline expression, thus allowing us to break it at the
+# curly braces, the f-string fits on a single line if it's moved inside the parentheses.
+# We should prefer doing that instead.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"
+
+# Same as above
+xxxxxxx = f"{
+    {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+}"
+
+# Similar to the previous example, but the f-string will exceed the line length limit,
+# we shouldn't add any parentheses here.
+xxxxxxx = f"{
+    {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+}"
+
+# This is an implicitly concatenated f-string but it cannot be joined because otherwise
+# it'll exceed the line length limit. So, the two f-strings will be inside parentheses
+# instead and the inline comment should be outside the parentheses.
+a = f"test{
+    expression
+}flat" f"can be {
+    joined
+} togethereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
+# Similar to the above example but this fits within the line length limit.
+a = f"test{
+    expression
+}flat" f"can be {
+    joined
+} togethereeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
 # Indentation
 
 # What should be the indentation?

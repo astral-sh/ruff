@@ -6,8 +6,10 @@ use crate::expression::parentheses::{
 };
 use crate::other::f_string::FormatFString;
 use crate::prelude::*;
-use crate::string::implicit::FormatImplicitConcatenatedStringFlat;
-use crate::string::{implicit::FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
+use crate::string::implicit::{
+    FormatImplicitConcatenatedString, FormatImplicitConcatenatedStringFlat,
+};
+use crate::string::{Quoting, StringLikeExtensions};
 
 #[derive(Default)]
 pub struct FormatExprFString;
@@ -45,26 +47,7 @@ impl NeedsParentheses for ExprFString {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        }
-        // TODO(dhruvmanila): Ideally what we want here is a new variant which
-        // is something like:
-        // - If the expression fits by just adding the parentheses, then add them and
-        //   avoid breaking the f-string expression. So,
-        //   ```
-        //   xxxxxxxxx = (
-        //       f"aaaaaaaaaaaa { xxxxxxx + yyyyyyyy } bbbbbbbbbbbbb"
-        //   )
-        //   ```
-        // - But, if the expression is too long to fit even with parentheses, then
-        //   don't add the parentheses and instead break the expression at `soft_line_break`.
-        //   ```
-        //   xxxxxxxxx = f"aaaaaaaaaaaa {
-        //       xxxxxxxxx + yyyyyyyyyy
-        //   } bbbbbbbbbbbbb"
-        //   ```
-        // This isn't decided yet, refer to the relevant discussion:
-        // https://github.com/astral-sh/ruff/discussions/9785
-        else if StringLike::FString(self).is_multiline(context.source()) {
+        } else if StringLike::FString(self).is_multiline(context) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

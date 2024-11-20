@@ -223,7 +223,7 @@ fn is_huggable_string_argument(
     arguments: &Arguments,
     context: &PyFormatContext,
 ) -> bool {
-    if string.is_implicit_concatenated() || !string.is_multiline(context.source()) {
+    if string.is_implicit_concatenated() || !string.is_multiline(context) {
         return false;
     }
 

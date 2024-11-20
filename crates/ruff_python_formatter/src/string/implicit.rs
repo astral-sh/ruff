@@ -154,7 +154,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             }
 
             // Multiline strings can never fit on a single line.
-            if !string.is_fstring() && string.is_multiline(context.source()) {
+            if !string.is_fstring() && string.is_multiline(context) {
                 return None;
             }
 

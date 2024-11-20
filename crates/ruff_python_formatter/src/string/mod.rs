@@ -1,16 +1,20 @@
-use memchr::memchr2;
-
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_python_ast::str::Quote;
+use ruff_python_ast::visitor::source_order::{
+    walk_f_string_element, SourceOrderVisitor, TraversalSignal,
+};
+use ruff_python_ast::AstNode;
 use ruff_python_ast::{
     self as ast,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
     AnyStringFlags, StringFlags,
 };
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::expression::expr_f_string::f_string_quoting;
 use crate::prelude::*;
+use crate::preview::is_f_string_formatting_enabled;
 use crate::QuoteStyle;
 
 pub(crate) mod docstring;
@@ -90,7 +94,7 @@ impl From<Quote> for QuoteStyle {
 pub(crate) trait StringLikeExtensions {
     fn quoting(&self, source: &str) -> Quoting;
 
-    fn is_multiline(&self, source: &str) -> bool;
+    fn is_multiline(&self, context: &PyFormatContext) -> bool;
 }
 
 impl StringLikeExtensions for ast::StringLike<'_> {
@@ -101,15 +105,77 @@ impl StringLikeExtensions for ast::StringLike<'_> {
         }
     }
 
-    fn is_multiline(&self, source: &str) -> bool {
+    fn is_multiline(&self, context: &PyFormatContext) -> bool {
         match self {
             Self::String(_) | Self::Bytes(_) => self.parts().any(|part| {
                 part.flags().is_triple_quoted()
-                    && memchr2(b'\n', b'\r', source[self.range()].as_bytes()).is_some()
+                    && context.source().contains_line_break(self.range())
             }),
-            Self::FString(fstring) => {
-                memchr2(b'\n', b'\r', source[fstring.range].as_bytes()).is_some()
+            Self::FString(expr) => {
+                let mut visitor = FStringMultilineVisitor::new(context);
+                expr.visit_source_order(&mut visitor);
+                visitor.is_multiline
             }
+        }
+    }
+}
+
+struct FStringMultilineVisitor<'a> {
+    context: &'a PyFormatContext<'a>,
+    is_multiline: bool,
+}
+
+impl<'a> FStringMultilineVisitor<'a> {
+    fn new(context: &'a PyFormatContext<'a>) -> Self {
+        Self {
+            context,
+            is_multiline: false,
+        }
+    }
+}
+
+impl<'a> SourceOrderVisitor<'a> for FStringMultilineVisitor<'a> {
+    fn enter_node(&mut self, _node: ruff_python_ast::AnyNodeRef<'a>) -> TraversalSignal {
+        if self.is_multiline {
+            TraversalSignal::Skip
+        } else {
+            TraversalSignal::Traverse
+        }
+    }
+
+    fn visit_string_literal(&mut self, string_literal: &'a ast::StringLiteral) {
+        if string_literal.flags.is_triple_quoted()
+            && self
+                .context
+                .source()
+                .contains_line_break(string_literal.range())
+        {
+            self.is_multiline = true;
+        }
+    }
+
+    fn visit_f_string_element(&mut self, f_string_element: &'a ast::FStringElement) {
+        let is_multiline = match f_string_element {
+            ast::FStringElement::Literal(literal) => {
+                self.context.source().contains_line_break(literal.range())
+            }
+            ast::FStringElement::Expression(expression) => {
+                if is_f_string_formatting_enabled(self.context) {
+                    // Expressions containing comments can't be joined.
+                    self.context.comments().contains_comments(expression.into())
+                } else {
+                    // Multiline f-string expressions can't be joined if the f-string formatting is disabled because
+                    // the string gets inserted in verbatim preserving the newlines.
+                    self.context
+                        .source()
+                        .contains_line_break(expression.range())
+                }
+            }
+        };
+        if is_multiline {
+            self.is_multiline = true;
+        } else {
+            walk_f_string_element(self, f_string_element);
         }
     }
 }

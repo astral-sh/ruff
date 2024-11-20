@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/fstring.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -320,6 +319,41 @@ f"{  # comment 26
     # comment 28
 } woah {x}"
 
+# Assignment statement
+
+# Even though this f-string has multiline expression, thus allowing us to break it at the
+# curly braces, the f-string fits on a single line if it's moved inside the parentheses.
+# We should prefer doing that instead.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"
+
+# Same as above
+xxxxxxx = f"{
+    {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+}"
+
+# Similar to the previous example, but the f-string will exceed the line length limit,
+# we shouldn't add any parentheses here.
+xxxxxxx = f"{
+    {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+}"
+
+# This is an implicitly concatenated f-string but it cannot be joined because otherwise
+# it'll exceed the line length limit. So, the two f-strings will be inside parentheses
+# instead and the inline comment should be outside the parentheses.
+a = f"test{
+    expression
+}flat" f"can be {
+    joined
+} togethereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
+# Similar to the above example but this fits within the line length limit.
+a = f"test{
+    expression
+}flat" f"can be {
+    joined
+} togethereeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
 # Indentation
 
 # What should be the indentation?
@@ -521,9 +555,9 @@ x = f"aaaaa { {'aaaaaa', 'bbbbbbb', 'ccccccccc'}:.3f} bbbbbb"
 
 # But, in this case, we would split the expression itself because it exceeds the line
 # length limit so we need not add the extra space.
-xxxxxxx = f"{
-    {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbb', 'ccccccccccccccccccccc'}
-}"
+xxxxxxx = (
+    f"{ {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbb', 'ccccccccccccccccccccc'} }"
+)
 # And, split the expression itself because it exceeds the line length.
 xxxxxxx = f"{
     {
@@ -697,6 +731,41 @@ f"{  # comment 26
     # comment 27
     # comment 28
 } woah {x}"
+
+# Assignment statement
+
+# Even though this f-string has multiline expression, thus allowing us to break it at the
+# curly braces, the f-string fits on a single line if it's moved inside the parentheses.
+# We should prefer doing that instead.
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
+)
+
+# Same as above
+xxxxxxx = (
+    f"{ {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'} }"
+)
+
+# Similar to the previous example, but the f-string will exceed the line length limit,
+# we shouldn't add any parentheses here.
+xxxxxxx = f"{
+    {
+        'aaaaaaaaaaaaaaaaaaaaaaaaa',
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'cccccccccccccccccccccccccc',
+    }
+}"
+
+# This is an implicitly concatenated f-string but it cannot be joined because otherwise
+# it'll exceed the line length limit. So, the two f-strings will be inside parentheses
+# instead and the inline comment should be outside the parentheses.
+a = (
+    f"test{expression}flat"
+    f"can be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+)  # inline
+
+# Similar to the above example but this fits within the line length limit.
+a = f"test{expression}flatcan be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"  # inline
 
 # Indentation
 
@@ -1064,6 +1133,47 @@ f"{  # comment 26
     # comment 28
 } woah {x}"
 
+# Assignment statement
+
+# Even though this f-string has multiline expression, thus allowing us to break it at the
+# curly braces, the f-string fits on a single line if it's moved inside the parentheses.
+# We should prefer doing that instead.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"
+
+# Same as above
+xxxxxxx = f"{
+    {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+}"
+
+# Similar to the previous example, but the f-string will exceed the line length limit,
+# we shouldn't add any parentheses here.
+xxxxxxx = f"{
+    {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+}"
+
+# This is an implicitly concatenated f-string but it cannot be joined because otherwise
+# it'll exceed the line length limit. So, the two f-strings will be inside parentheses
+# instead and the inline comment should be outside the parentheses.
+a = (
+    f"test{
+    expression
+}flat"
+    f"can be {
+    joined
+} togethereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+)  # inline
+
+# Similar to the above example but this fits within the line length limit.
+a = (
+    f"test{
+    expression
+}flat"
+    f"can be {
+    joined
+} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"
+)  # inline
+
 # Indentation
 
 # What should be the indentation?
@@ -1238,8 +1348,16 @@ f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccc
  x = f"{    # comment 13
      {'x': 1, 'y': 2} = }"
  # But, if there's a format specifier or a conversion flag then we don't need to add
-@@ -141,7 +149,11 @@
- }"
+@@ -136,12 +144,16 @@
+ 
+ # But, in this case, we would split the expression itself because it exceeds the line
+ # length limit so we need not add the extra space.
+-xxxxxxx = f"{
+-    {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbb', 'ccccccccccccccccccccc'}
+-}"
++xxxxxxx = (
++    f"{ {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbb', 'ccccccccccccccccccccc'} }"
++)
  # And, split the expression itself because it exceeds the line length.
  xxxxxxx = f"{
 -    {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
@@ -1453,7 +1571,63 @@ f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccc
      # comment 27
      # comment 28
  } woah {x}"
-@@ -318,29 +330,29 @@
+@@ -314,41 +326,35 @@
+ # Even though this f-string has multiline expression, thus allowing us to break it at the
+ # curly braces, the f-string fits on a single line if it's moved inside the parentheses.
+ # We should prefer doing that instead.
+-aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+-    expression}moreeeeeeeeeeeeeeeee"
++aaaaaaaaaaaaaaaaaa = (
++    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
++)
+ 
+ # Same as above
+-xxxxxxx = f"{
+-    {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+-}"
++xxxxxxx = (
++    f"{ {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'} }"
++)
+ 
+ # Similar to the previous example, but the f-string will exceed the line length limit,
+ # we shouldn't add any parentheses here.
+ xxxxxxx = f"{
+-    {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
++    {
++        'aaaaaaaaaaaaaaaaaaaaaaaaa',
++        'bbbbbbbbbbbbbbbbbbbbbbbbbbb',
++        'cccccccccccccccccccccccccc',
++    }
+ }"
+ 
+ # This is an implicitly concatenated f-string but it cannot be joined because otherwise
+ # it'll exceed the line length limit. So, the two f-strings will be inside parentheses
+ # instead and the inline comment should be outside the parentheses.
+ a = (
+-    f"test{
+-    expression
+-}flat"
+-    f"can be {
+-    joined
+-} togethereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
++    f"test{expression}flat"
++    f"can be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+ )  # inline
+ 
+ # Similar to the above example but this fits within the line length limit.
+-a = (
+-    f"test{
+-    expression
+-}flat"
+-    f"can be {
+-    joined
+-} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"
+-)  # inline
++a = f"test{expression}flatcan be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"  # inline
+ 
+ # Indentation
+ 
+@@ -359,29 +365,29 @@
          if indent2:
              foo = f"""hello world
  hello {

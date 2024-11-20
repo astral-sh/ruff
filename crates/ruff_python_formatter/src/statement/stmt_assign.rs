@@ -1,6 +1,7 @@
 use ruff_formatter::{format_args, write, FormatError, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
-    AnyNodeRef, Expr, ExprAttribute, ExprCall, Operator, StmtAssign, StringLike, TypeParams,
+    AnyNodeRef, Expr, ExprAttribute, ExprCall, ExprFString, FString, FStringPart, Operator,
+    StmtAssign, StringLike, TypeParams,
 };
 
 use crate::builders::parenthesize_if_expands;
@@ -8,6 +9,7 @@ use crate::comments::{
     trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::expr_f_string::f_string_quoting;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, NeedsParentheses, OptionalParentheses,
     Parentheses, Parenthesize,
@@ -16,12 +18,16 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::preview::is_join_implicit_concatenated_string_enabled;
+use crate::other::f_string::FormatFString;
+use crate::preview::{
+    is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
+};
 use crate::statement::trailing_semicolon;
 use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
     ImplicitConcatenatedLayout,
 };
+use crate::string::StringLikeExtensions;
 use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
@@ -183,6 +189,7 @@ impl Format<PyFormatContext<'_>> for FormatTargetWithEqualOperator<'_> {
 ///
 /// This logic isn't implemented in [`place_comment`] by associating trailing statement comments to the expression because
 /// doing so breaks the suite empty lines formatting that relies on trailing comments to be stored on the statement.
+#[derive(Debug)]
 pub(super) enum FormatStatementsLastExpression<'a> {
     /// Prefers to split what's left of `value` before splitting the value.
     ///
@@ -286,11 +293,18 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
         match self {
             FormatStatementsLastExpression::LeftToRight { value, statement } => {
                 let can_inline_comment = should_inline_comments(value, *statement, f.context());
-                let format_implicit_flat = StringLike::try_from(*value).ok().and_then(|string| {
+
+                let string_like = StringLike::try_from(*value).ok();
+                let format_f_string_flat =
+                    string_like.and_then(|string| FormatFStringFlat::new(string, f.context()));
+                let format_implicit_flat = string_like.and_then(|string| {
                     FormatImplicitConcatenatedStringFlat::new(string, f.context())
                 });
 
-                if !can_inline_comment && format_implicit_flat.is_none() {
+                if !can_inline_comment
+                    && format_implicit_flat.is_none()
+                    && format_f_string_flat.is_none()
+                {
                     return maybe_parenthesize_expression(
                         value,
                         *statement,
@@ -434,6 +448,57 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         // We can't use `parenthesize_if_expands` because it defaults to
                         // the *flat* layout when the expanded layout doesn't fit.
                         best_fitting![single_line, joined_parenthesized, implicit_expanded]
+                            .with_mode(BestFittingMode::AllLines)
+                            .fmt(f)?;
+                    } else if let Some(format_f_string) = format_f_string_flat {
+                        inline_comments.mark_formatted();
+
+                        let f_string_flat = format_with(|f| {
+                            let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
+
+                            write!(buffer, [format_f_string])
+                        })
+                        .memoized();
+
+                        // F-String containing an expression with a magic trailing comma, a comment, or a
+                        // multiline debug expression should never be joined. Use the default layout.
+                        // ```python
+                        // aaaa = f"abcd{[
+                        //    1,
+                        //    2,
+                        // ]}" "more"
+                        // ```
+                        if f_string_flat.inspect(f)?.will_break() {
+                            inline_comments.mark_unformatted();
+
+                            return write!(
+                                f,
+                                [maybe_parenthesize_expression(
+                                    value,
+                                    *statement,
+                                    Parenthesize::IfBreaks,
+                                )]
+                            );
+                        }
+
+                        let single_line =
+                            format_with(|f| write!(f, [f_string_flat, inline_comments]));
+
+                        let joined_parenthesized = format_with(|f| {
+                            group(&format_args![
+                                token("("),
+                                soft_block_indent(&format_args![f_string_flat, inline_comments]),
+                                token(")"),
+                            ])
+                            .with_group_id(Some(group_id))
+                            .should_expand(true)
+                            .fmt(f)
+                        });
+
+                        let format_f_string =
+                            format_with(|f| write!(f, [format_f_string, inline_comments]));
+
+                        best_fitting![single_line, joined_parenthesized, format_f_string]
                             .with_mode(BestFittingMode::AllLines)
                             .fmt(f)?;
                     } else {
@@ -815,6 +880,43 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 }
             }
         }
+    }
+}
+
+pub(crate) struct FormatFStringFlat<'a> {
+    expr: &'a ExprFString,
+    f_string: &'a FString,
+}
+
+impl<'a> FormatFStringFlat<'a> {
+    pub(crate) fn new(string: StringLike<'a>, context: &PyFormatContext) -> Option<Self> {
+        if !is_f_string_formatting_enabled(context) {
+            return None;
+        }
+
+        let StringLike::FString(expr) = string else {
+            return None;
+        };
+
+        let [FStringPart::FString(f_string)] = expr.value.as_slice() else {
+            return None;
+        };
+
+        if string.is_multiline(context) {
+            return None;
+        }
+
+        Some(Self { expr, f_string })
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FormatFStringFlat<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        FormatFString::new(
+            self.f_string,
+            f_string_quoting(self.expr, f.context().source()),
+        )
+        .fmt(f)
     }
 }
 
