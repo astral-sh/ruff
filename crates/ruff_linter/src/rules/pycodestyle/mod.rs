@@ -74,8 +74,6 @@ mod tests {
 
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_3.py"))]
     #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
-    // E741 has different behaviour for `.pyi` files in preview mode
-    #[test_case(Rule::AmbiguousVariableName, Path::new("E741.pyi"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_2.py"))]
