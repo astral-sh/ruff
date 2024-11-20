@@ -197,6 +197,8 @@ jobs:
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: v0.13.1
       - uses: Swatinem/rust-cache@v2
       - name: "Test ruff_wasm"
         run: |
