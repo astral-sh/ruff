@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 /// `Generator[int, None, None]`, as the second and third type parameters of
 /// `Generator` now default to `None`.
 ///
-/// Omitting type argument that match the default values can make the code
+/// Omitting type arguments that match the default values can make the code
 /// more concise and easier to read.
 ///
 /// ## Examples
