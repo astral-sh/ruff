@@ -87,8 +87,8 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("PDV90", "PD90"),
         ("PDV901", "PD901"),
         // TODO(charlie): Remove by 2023-04-01.
-        ("TYP", "TCH"),
-        ("TYP001", "TCH001"),
+        ("TYP", "TC"),
+        ("TYP001", "TC001"),
         // TODO(charlie): Remove by 2023-06-01.
         ("RUF004", "B026"),
         ("PIE802", "C419"),
@@ -98,7 +98,6 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("T003", "FIX003"),
         ("T004", "FIX004"),
         ("RUF011", "B035"),
-        ("TCH006", "TCH010"),
         ("TRY200", "B904"),
         ("PGH001", "S307"),
         ("PGH002", "G010"),
@@ -126,5 +125,14 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("RUF025", "C420"),
         // See: https://github.com/astral-sh/ruff/issues/13492
         ("TRY302", "TRY203"),
+        // TCH renamed to TC to harmonize with flake8 plugin
+        ("TCH", "TC"),
+        ("TCH001", "TC001"),
+        ("TCH002", "TC002"),
+        ("TCH003", "TC003"),
+        ("TCH004", "TC004"),
+        ("TCH005", "TC005"),
+        ("TCH006", "TC010"),
+        ("TCH010", "TC010"),
     ])
 });

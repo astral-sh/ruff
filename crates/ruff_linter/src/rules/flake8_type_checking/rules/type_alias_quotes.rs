@@ -114,7 +114,7 @@ impl AlwaysFixableViolation for QuotedTypeAlias {
     }
 }
 
-/// TCH007
+/// TC007
 pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Option<Vec<Diagnostic>> {
     if binding.context.is_typing() {
         return None;
@@ -211,8 +211,8 @@ fn collect_typing_references<'a>(
                 return;
             }
 
-            // if TCH004 is enabled we shouldn't emit a TCH007 for a reference to
-            // a binding that would emit a TCH004, otherwise the fixes will never
+            // if TC004 is enabled we shouldn't emit a TC007 for a reference to
+            // a binding that would emit a TC004, otherwise the fixes will never
             // stabilize and keep going in circles
             if checker.enabled(Rule::RuntimeImportInTypeCheckingBlock)
                 && checker
@@ -229,14 +229,14 @@ fn collect_typing_references<'a>(
     }
 }
 
-/// TCH008
+/// TC008
 pub(crate) fn quoted_type_alias(
     checker: &mut Checker,
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
 ) {
     if checker.enabled(Rule::RuntimeStringUnion) {
-        // this should return a TCH010 error instead
+        // this should return a TC010 error instead
         if let Some(Expr::BinOp(ast::ExprBinOp {
             op: Operator::BitOr,
             ..

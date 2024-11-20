@@ -14,7 +14,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::signatures::Signature;
 use crate::module_resolver::file_to_module;
-use crate::semantic_index::ast_ids::HasScopedAstId;
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -207,7 +207,7 @@ fn definition_expression_ty<'db>(
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
-    let expr_id = expression.scoped_ast_id(db, scope);
+    let expr_id = expression.scoped_expression_id(db, scope);
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
@@ -1807,6 +1807,8 @@ impl<'db> KnownClass {
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
+    /// The symbol `typing.Optional` (which can also be found as `typing_extensions.Optional`)
+    Optional,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
     // TODO: fill this enum out with more special forms, etc.
@@ -1816,6 +1818,7 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
             KnownInstanceType::Literal => "Literal",
+            KnownInstanceType::Optional => "Optional",
             KnownInstanceType::TypeVar(_) => "TypeVar",
         }
     }
@@ -1823,8 +1826,7 @@ impl<'db> KnownInstanceType<'db> {
     /// Evaluate the known instance in boolean context
     pub const fn bool(self) -> Truthiness {
         match self {
-            Self::Literal => Truthiness::AlwaysTrue,
-            Self::TypeVar(_) => Truthiness::AlwaysTrue,
+            Self::Literal | Self::Optional | Self::TypeVar(_) => Truthiness::AlwaysTrue,
         }
     }
 
@@ -1832,6 +1834,7 @@ impl<'db> KnownInstanceType<'db> {
     pub fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
             Self::Literal => "typing.Literal",
+            Self::Optional => "typing.Optional",
             Self::TypeVar(typevar) => typevar.name(db),
         }
     }
@@ -1840,6 +1843,7 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn class(self) -> KnownClass {
         match self {
             Self::Literal => KnownClass::SpecialForm,
+            Self::Optional => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
         }
     }
@@ -1859,6 +1863,7 @@ impl<'db> KnownInstanceType<'db> {
         }
         match (module.name().as_str(), instance_name) {
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
+            ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
             _ => None,
         }
     }

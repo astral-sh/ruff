@@ -2,3 +2,5 @@ INHERIT: mkdocs.generated.yml
 # Omit the `typeset` plugin which is only available in the Insiders version.
 plugins:
   - search
+watch:
+  - mkdocs.generated.yml

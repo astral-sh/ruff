@@ -23,7 +23,6 @@ use super::LogicalLine;
 ///     a = 1
 /// ```
 ///
-///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
@@ -232,7 +231,12 @@ impl Violation for UnexpectedIndentationComment {
 ///     pass
 /// ```
 ///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent indentation, making the rule redundant.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct OverIndented {
     is_comment: bool,

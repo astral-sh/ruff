@@ -115,7 +115,7 @@ jobs:
 
   cargo-test-linux:
     name: "cargo test (linux)"
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
@@ -159,7 +159,7 @@ jobs:
 
   cargo-test-windows:
     name: "cargo test (windows)"
-    runs-on: windows-latest
+    runs-on: windows-latest-xlarge
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
@@ -197,6 +197,8 @@ jobs:
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: v0.13.1
       - uses: Swatinem/rust-cache@v2
       - name: "Test ruff_wasm"
         run: |
@@ -211,7 +213,7 @@ jobs:
     name: "cargo build (release)"
     runs-on: macos-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -255,11 +257,11 @@ jobs:
           NEXTEST_PROFILE: "ci"
         run: cargo +${{ steps.msrv.outputs.value }} insta test --all-features --unreferenced reject --test-runner nextest
 
-  cargo-fuzz:
-    name: "cargo fuzz"
+  cargo-fuzz-build:
+    name: "cargo fuzz build"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -278,7 +280,7 @@ jobs:
       - run: cargo fuzz build -s none
 
   fuzz-parser:
-    name: "Fuzz the parser"
+    name: "fuzz parser"
     runs-on: ubuntu-latest
     needs:
       - cargo-test-linux
@@ -331,7 +333,7 @@ jobs:
 
   ecosystem:
     name: "ecosystem"
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest-8
     needs:
       - cargo-test-linux
       - determine_changes
@@ -561,12 +563,12 @@ jobs:
         run: rustup show
       - name: "Cache rust"
         uses: Swatinem/rust-cache@v2
-      - name: "Formatter progress"
+      - name: "Run checks"
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
-        run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
+        run: cat target/formatter-ecosystem/stats.txt > $GITHUB_STEP_SUMMARY
       - name: "Remove checkouts from cache"
-        run: rm -r target/progress_projects
+        run: rm -r target/formatter-ecosystem
 
   check-ruff-lsp:
     name: "test ruff-lsp"

@@ -840,7 +840,7 @@ fn stdin_multiple_parse_error() {
 
 #[test]
 fn parse_error_not_included() {
-    // Select any rule except for `E999`, syntax error should still be shown.
+    // Parse errors are always shown
     let mut cmd = RuffCheck::default().args(["--select=I"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("foo =\n"), @r"
@@ -856,27 +856,6 @@ fn parse_error_not_included() {
     Found 1 error.
 
     ----- stderr -----
-    ");
-}
-
-#[test]
-fn deprecated_parse_error_selection() {
-    let mut cmd = RuffCheck::default().args(["--select=E999"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("foo =\n"), @r"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:1:6: SyntaxError: Expected an expression
-      |
-    1 | foo =
-      |      ^
-      |
-
-    Found 1 error.
-
-    ----- stderr -----
-    warning: Rule `E999` is deprecated and will be removed in a future release. Syntax errors will always be shown regardless of whether this rule is selected or not.
     ");
 }
 
@@ -1240,6 +1219,68 @@ fn removed_indirect() {
     // Selection _including_ a removed rule without matching should not fail
     // nor should the rule be used
     let mut cmd = RuffCheck::default().args(["--select", "RUF93"]).build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
+fn removed_ignore_direct() {
+    let mut cmd = RuffCheck::default().args(["--ignore", "UP027"]).build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The following rules have been removed and ignoring them has no effect:
+        - UP027
+    ");
+}
+
+#[test]
+fn removed_ignore_multiple_direct() {
+    let mut cmd = RuffCheck::default()
+        .args(["--ignore", "UP027", "--ignore", "PLR1706"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The following rules have been removed and ignoring them has no effect:
+        - PLR1706
+        - UP027
+    ");
+}
+
+#[test]
+fn removed_ignore_remapped_direct() {
+    let mut cmd = RuffCheck::default().args(["--ignore", "PGH001"]).build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: `PGH001` has been remapped to `S307`.
+    ");
+}
+
+#[test]
+fn removed_ignore_indirect() {
+    // `PLR170` includes removed rules but should not select or warn
+    // since it is not a "direct" selection
+    let mut cmd = RuffCheck::default().args(["--ignore", "PLR170"]).build();
     assert_cmd_snapshot!(cmd, @r"
     success: true
     exit_code: 0

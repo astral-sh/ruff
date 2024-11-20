@@ -371,8 +371,9 @@ impl<'db> ClassBase<'db> {
             | Type::ModuleLiteral(_)
             | Type::SubclassOf(_) => None,
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::Literal => None,
-                KnownInstanceType::TypeVar(_) => None,
+                KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Literal
+                | KnownInstanceType::Optional => None,
             },
         }
     }

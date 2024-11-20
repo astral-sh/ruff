@@ -2,22 +2,6 @@
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
 snapshot_kind: text
 ---
-A001.py:1:16: A001 Variable `sum` is shadowing a Python builtin
-  |
-1 | import some as sum
-  |                ^^^ A001
-2 | from some import other as int
-3 | from directory import new as dir
-  |
-
-A001.py:2:27: A001 Variable `int` is shadowing a Python builtin
-  |
-1 | import some as sum
-2 | from some import other as int
-  |                           ^^^ A001
-3 | from directory import new as dir
-  |
-
 A001.py:5:1: A001 Variable `print` is shadowing a Python builtin
   |
 3 | from directory import new as dir

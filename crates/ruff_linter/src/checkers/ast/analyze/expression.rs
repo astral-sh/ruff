@@ -104,9 +104,21 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
 
             // Ex) Literal[...]
-            if checker.enabled(Rule::DuplicateLiteralMember) {
+            if checker.any_enabled(&[
+                Rule::DuplicateLiteralMember,
+                Rule::RedundantBoolLiteral,
+                Rule::RedundantNoneLiteral,
+            ]) {
                 if !checker.semantic.in_nested_literal() {
-                    flake8_pyi::rules::duplicate_literal_member(checker, expr);
+                    if checker.enabled(Rule::DuplicateLiteralMember) {
+                        flake8_pyi::rules::duplicate_literal_member(checker, expr);
+                    }
+                    if checker.enabled(Rule::RedundantBoolLiteral) {
+                        ruff::rules::redundant_bool_literal(checker, expr);
+                    }
+                    if checker.enabled(Rule::RedundantNoneLiteral) {
+                        flake8_pyi::rules::redundant_none_literal(checker, expr);
+                    }
                 }
             }
 
@@ -1042,6 +1054,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnsafeMarkupUse) {
                 ruff::rules::unsafe_markup_call(checker, call);
+            }
+            if checker.enabled(Rule::MapIntVersionParsing) {
+                ruff::rules::map_int_version_parsing(checker, call);
+            }
+            if checker.enabled(Rule::UnrawRePattern) {
+                ruff::rules::unraw_re_pattern(checker, call);
             }
         }
         Expr::Dict(dict) => {

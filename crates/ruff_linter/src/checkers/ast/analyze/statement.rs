@@ -180,8 +180,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::RedundantNumericUnion) {
                 flake8_pyi::rules::redundant_numeric_union(checker, parameters);
             }
-            if checker.enabled(Rule::PrePep570PositionalArgument) {
-                flake8_pyi::rules::pre_pep570_positional_argument(checker, function_def);
+            if checker.enabled(Rule::Pep484StylePositionalOnlyParameter) {
+                flake8_pyi::rules::pep_484_positional_parameter(checker, function_def);
             }
             if checker.enabled(Rule::DunderFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
@@ -293,8 +293,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::PytestFixtureIncorrectParenthesesStyle,
                 Rule::PytestFixturePositionalArgs,
                 Rule::PytestExtraneousScopeFunction,
-                Rule::PytestMissingFixtureNameUnderscore,
-                Rule::PytestIncorrectFixtureNameUnderscore,
                 Rule::PytestFixtureParamWithoutValue,
                 Rule::PytestDeprecatedYieldFixture,
                 Rule::PytestFixtureFinalizerCallback,
@@ -304,7 +302,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             ]) {
                 flake8_pytest_style::rules::fixture(
                     checker,
-                    stmt,
                     name,
                     parameters,
                     returns.as_deref(),
@@ -594,18 +591,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::NonAsciiImportName) {
                     pylint::rules::non_ascii_module_import(checker, alias);
                 }
-                // TODO(charlie): Remove when stabilizing A004.
-                if let Some(asname) = &alias.asname {
-                    if checker.settings.preview.is_disabled()
-                        && checker.enabled(Rule::BuiltinVariableShadowing)
-                    {
-                        flake8_builtins::rules::builtin_variable_shadowing(
-                            checker,
-                            asname,
-                            asname.range(),
-                        );
-                    }
-                }
+
                 if checker.enabled(Rule::Debugger) {
                     if let Some(diagnostic) =
                         flake8_debugger::rules::debugger_import(stmt, None, &alias.name)
@@ -914,19 +900,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             },
                             stmt.range(),
                         ));
-                    }
-                } else {
-                    // TODO(charlie): Remove when stabilizing A004.
-                    if let Some(asname) = &alias.asname {
-                        if checker.settings.preview.is_disabled()
-                            && checker.enabled(Rule::BuiltinVariableShadowing)
-                        {
-                            flake8_builtins::rules::builtin_variable_shadowing(
-                                checker,
-                                asname,
-                                asname.range(),
-                            );
-                        }
                     }
                 }
                 if checker.enabled(Rule::RelativeImports) {
@@ -1559,9 +1532,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::convert_named_tuple_functional_to_class(
                     checker, stmt, targets, value,
                 );
-            }
-            if checker.enabled(Rule::UnpackedListComprehension) {
-                pyupgrade::rules::unpacked_list_comprehension(checker, targets, value);
             }
             if checker.enabled(Rule::PandasDfVariableName) {
                 if let Some(diagnostic) = pandas_vet::rules::assignment_to_df(targets) {

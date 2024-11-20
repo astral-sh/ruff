@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
-snapshot_kind: text
 ---
 FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
@@ -11,7 +10,7 @@ FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
 25 |     some_security_param: str = Security(get_oauth2_user),
 26 | ):
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -40,7 +39,7 @@ FAST002.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
 26 | ):
 27 |     pass
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -69,7 +68,7 @@ FAST002.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
 33 |     some_path_param: str = Path(),
 34 |     some_body_param: str = Body("foo"),
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -98,7 +97,7 @@ FAST002.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
 34 |     some_body_param: str = Body("foo"),
 35 |     some_cookie_param: str = Cookie(),
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -127,7 +126,7 @@ FAST002.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
 35 |     some_cookie_param: str = Cookie(),
 36 |     some_header_param: int = Header(default=5),
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -156,7 +155,7 @@ FAST002.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
 36 |     some_header_param: int = Header(default=5),
 37 |     some_file_param: UploadFile = File(),
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -185,7 +184,7 @@ FAST002.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
 37 |     some_file_param: UploadFile = File(),
 38 |     some_form_param: str = Form(),
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -214,7 +213,7 @@ FAST002.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
 38 |     some_form_param: str = Form(),
 39 | ):
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -243,7 +242,7 @@ FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
 39 | ):
 40 |     # do stuff
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -272,7 +271,7 @@ FAST002.py:47:5: FAST002 [*] FastAPI dependency without `Annotated`
 48 | ):
 49 |     pass
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -301,7 +300,7 @@ FAST002.py:53:5: FAST002 [*] FastAPI dependency without `Annotated`
 54 |     skip: int = 0,
 55 |     limit: int = 10,
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 12 12 |     Security,
@@ -330,4 +329,4 @@ FAST002.py:67:5: FAST002 FastAPI dependency without `Annotated`
 68 | ):
 69 |     pass
    |
-   = help: Replace with `Annotated`
+   = help: Replace with `typing.Annotated`

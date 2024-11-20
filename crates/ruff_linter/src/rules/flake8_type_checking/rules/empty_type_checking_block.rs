@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for EmptyTypeCheckingBlock {
     }
 }
 
-/// TCH005
+/// TC005
 pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtIf) {
     if !typing::is_type_checking_block(stmt, checker.semantic()) {
         return;

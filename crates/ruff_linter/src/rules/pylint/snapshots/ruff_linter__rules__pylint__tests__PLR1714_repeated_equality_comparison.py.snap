@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 repeated_equality_comparison.py:2:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b")`. Use a `set` if the elements are hashable.
   |
@@ -375,3 +374,82 @@ repeated_equality_comparison.py:65:16: PLR1714 [*] Consider merging multiple com
    65 |+foo == "a" or (bar not in ("c", "d")) or foo == "b"  # Multiple targets
 66 66 | 
 67 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
+68 68 | 
+
+repeated_equality_comparison.py:69:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (1, True)`. Use a `set` if the elements are hashable.
+   |
+67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
+68 | 
+69 | foo == 1 or foo == True # Different types, same hashed value
+   | ^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+70 | 
+71 | foo == 1 or foo == 1.0 # Different types, same hashed value
+   |
+   = help: Merge multiple comparisons
+
+ℹ Unsafe fix
+66 66 | 
+67 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
+68 68 | 
+69    |-foo == 1 or foo == True # Different types, same hashed value
+   69 |+foo in (1, True) # Different types, same hashed value
+70 70 | 
+71 71 | foo == 1 or foo == 1.0 # Different types, same hashed value
+72 72 | 
+
+repeated_equality_comparison.py:71:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (1, 1.0)`. Use a `set` if the elements are hashable.
+   |
+69 | foo == 1 or foo == True # Different types, same hashed value
+70 | 
+71 | foo == 1 or foo == 1.0 # Different types, same hashed value
+   | ^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+72 | 
+73 | foo == False or foo == 0 # Different types, same hashed value
+   |
+   = help: Merge multiple comparisons
+
+ℹ Unsafe fix
+68 68 | 
+69 69 | foo == 1 or foo == True # Different types, same hashed value
+70 70 | 
+71    |-foo == 1 or foo == 1.0 # Different types, same hashed value
+   71 |+foo in (1, 1.0) # Different types, same hashed value
+72 72 | 
+73 73 | foo == False or foo == 0 # Different types, same hashed value
+74 74 | 
+
+repeated_equality_comparison.py:73:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (False, 0)`. Use a `set` if the elements are hashable.
+   |
+71 | foo == 1 or foo == 1.0 # Different types, same hashed value
+72 | 
+73 | foo == False or foo == 0 # Different types, same hashed value
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+74 | 
+75 | foo == 0.0 or foo == 0j # Different types, same hashed value
+   |
+   = help: Merge multiple comparisons
+
+ℹ Unsafe fix
+70 70 | 
+71 71 | foo == 1 or foo == 1.0 # Different types, same hashed value
+72 72 | 
+73    |-foo == False or foo == 0 # Different types, same hashed value
+   73 |+foo in (False, 0) # Different types, same hashed value
+74 74 | 
+75 75 | foo == 0.0 or foo == 0j # Different types, same hashed value
+
+repeated_equality_comparison.py:75:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (0.0, 0j)`. Use a `set` if the elements are hashable.
+   |
+73 | foo == False or foo == 0 # Different types, same hashed value
+74 | 
+75 | foo == 0.0 or foo == 0j # Different types, same hashed value
+   | ^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+   |
+   = help: Merge multiple comparisons
+
+ℹ Unsafe fix
+72 72 | 
+73 73 | foo == False or foo == 0 # Different types, same hashed value
+74 74 | 
+75    |-foo == 0.0 or foo == 0j # Different types, same hashed value
+   75 |+foo in (0.0, 0j) # Different types, same hashed value

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-quote.py:57:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in a type-checking block.
+quote.py:57:28: TC004 [*] Quote references to `pandas.DataFrame`. Import is in a type-checking block.
    |
 56 |     if TYPE_CHECKING:
 57 |         from pandas import DataFrame
-   |                            ^^^^^^^^^ TCH004
+   |                            ^^^^^^^^^ TC004
 58 | 
 59 |     def func(value: DataFrame):
    |
@@ -21,11 +21,11 @@ quote.py:57:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in 
 61 61 | 
 62 62 | 
 
-quote.py:110:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
+quote.py:110:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
     |
 109 |     if TYPE_CHECKING:
 110 |         from pandas import DataFrame
-    |                            ^^^^^^^^^ TCH004
+    |                            ^^^^^^^^^ TC004
 111 | 
 112 |     x: TypeAlias = DataFrame | None
     |

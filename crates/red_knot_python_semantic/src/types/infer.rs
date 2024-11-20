@@ -38,7 +38,7 @@ use salsa::plumbing::AsId;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
-use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
+use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
     ExceptHandlerDefinitionKind, TargetKind,
@@ -181,7 +181,7 @@ fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult
     let scope = unpack.scope(db);
 
     let result = infer_expression_types(db, value);
-    let value_ty = result.expression_ty(value.node_ref(db).scoped_ast_id(db, scope));
+    let value_ty = result.expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
 
     let mut unpacker = Unpacker::new(db, file);
     unpacker.unpack(unpack.target(db), value_ty, scope);
@@ -409,7 +409,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     #[track_caller]
     fn expression_ty(&self, expr: &ast::Expr) -> Type<'db> {
         self.types
-            .expression_ty(expr.scoped_ast_id(self.db, self.scope()))
+            .expression_ty(expr.scoped_expression_id(self.db, self.scope()))
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -1215,9 +1215,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async,
         );
 
-        self.types
-            .expressions
-            .insert(target.scoped_ast_id(self.db, self.scope()), target_ty);
+        self.types.expressions.insert(
+            target.scoped_expression_id(self.db, self.scope()),
+            target_ty,
+        );
         self.add_binding(target.into(), definition, target_ty);
     }
 
@@ -1607,7 +1608,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_standalone_expression(value);
 
         let value_ty = self.expression_ty(value);
-        let name_ast_id = name.scoped_ast_id(self.db, self.scope());
+        let name_ast_id = name.scoped_expression_id(self.db, self.scope());
 
         let target_ty = match assignment.target() {
             TargetKind::Sequence(unpack) => {
@@ -2211,18 +2212,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
-    fn store_expression_type(
-        &mut self,
-        expression: &impl HasScopedAstId<Id = ScopedExpressionId>,
-        ty: Type<'db>,
-    ) {
+    fn store_expression_type(&mut self, expression: &impl HasScopedExpressionId, ty: Type<'db>) {
         if self.deferred_state.in_string_annotation() {
             // Avoid storing the type of expressions that are part of a string annotation because
             // the expression ids don't exists in the semantic index. Instead, we'll store the type
             // on the string expression itself that represents the annotation.
             return;
         }
-        let expr_id = expression.scoped_ast_id(self.db, self.scope());
+        let expr_id = expression.scoped_expression_id(self.db, self.scope());
         let previous = self.types.expressions.insert(expr_id, ty);
         assert_eq!(previous, None);
     }
@@ -2287,6 +2284,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     format_spec,
                                 } = expression;
                                 let ty = self.infer_expression(expression);
+
+                                if let Some(ref format_spec) = format_spec {
+                                    for element in format_spec.elements.expressions() {
+                                        self.infer_expression(&element.expression);
+                                    }
+                                }
 
                                 // TODO: handle format specifiers by calling a method
                                 // (`Type::format`?) that handles the `__format__` method.
@@ -2541,10 +2544,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .parent_scope_id(self.scope().file_scope_id(self.db))
                 .expect("A comprehension should never be the top-level scope")
                 .to_scope_id(self.db, self.file);
-            result.expression_ty(iterable.scoped_ast_id(self.db, lookup_scope))
+            result.expression_ty(iterable.scoped_expression_id(self.db, lookup_scope))
         } else {
             self.extend(result);
-            result.expression_ty(iterable.scoped_ast_id(self.db, self.scope()))
+            result.expression_ty(iterable.scoped_expression_id(self.db, self.scope()))
         };
 
         let target_ty = if is_async {
@@ -2556,9 +2559,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .unwrap_with_diagnostic(iterable.into(), &mut self.diagnostics)
         };
 
-        self.types
-            .expressions
-            .insert(target.scoped_ast_id(self.db, self.scope()), target_ty);
+        self.types.expressions.insert(
+            target.scoped_expression_id(self.db, self.scope()),
+            target_ty,
+        );
         self.add_binding(target.into(), definition, target_ty);
     }
 
@@ -3639,16 +3643,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let lhs_elements = lhs.elements(self.db);
                 let rhs_elements = rhs.elements(self.db);
 
-                let mut lexicographic_type_comparison =
-                    |op| self.infer_lexicographic_type_comparison(lhs_elements, op, rhs_elements);
+                let mut tuple_rich_comparison =
+                    |op| self.infer_tuple_rich_comparison(lhs_elements, op, rhs_elements);
 
                 match op {
-                    ast::CmpOp::Eq => lexicographic_type_comparison(RichCompareOperator::Eq),
-                    ast::CmpOp::NotEq => lexicographic_type_comparison(RichCompareOperator::Ne),
-                    ast::CmpOp::Lt => lexicographic_type_comparison(RichCompareOperator::Lt),
-                    ast::CmpOp::LtE => lexicographic_type_comparison(RichCompareOperator::Le),
-                    ast::CmpOp::Gt => lexicographic_type_comparison(RichCompareOperator::Gt),
-                    ast::CmpOp::GtE => lexicographic_type_comparison(RichCompareOperator::Ge),
+                    ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
+                    ast::CmpOp::NotEq => tuple_rich_comparison(RichCompareOperator::Ne),
+                    ast::CmpOp::Lt => tuple_rich_comparison(RichCompareOperator::Lt),
+                    ast::CmpOp::LtE => tuple_rich_comparison(RichCompareOperator::Le),
+                    ast::CmpOp::Gt => tuple_rich_comparison(RichCompareOperator::Gt),
+                    ast::CmpOp::GtE => tuple_rich_comparison(RichCompareOperator::Ge),
                     ast::CmpOp::In | ast::CmpOp::NotIn => {
                         let mut eq_count = 0usize;
                         let mut not_eq_count = 0usize;
@@ -3681,8 +3685,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::Is | ast::CmpOp::IsNot => {
                         // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
                         // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
-                        let eq_result = lexicographic_type_comparison(RichCompareOperator::Eq)
-                            .expect(
+                        let eq_result = tuple_rich_comparison(RichCompareOperator::Eq).expect(
                             "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
                         );
 
@@ -3747,53 +3750,80 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    /// Performs lexicographic comparison between two slices of types.
+    /// Simulates rich comparison between tuples and returns the inferred result.
+    /// This performs a lexicographic comparison, returning a union of all possible return types that could result from the comparison.
     ///
-    /// For lexicographic comparison, elements from both slices are compared pairwise using
-    /// `infer_binary_type_comparison`. If a conclusive result cannot be determined as a `BooleanLiteral`,
-    /// it returns `bool`. Returns `None` if the comparison is not supported.
-    fn infer_lexicographic_type_comparison(
+    /// basically it's based on cpython's `tuple_richcompare`
+    /// see `<https://github.com/python/cpython/blob/9d6366b60d01305fc5e45100e0cd13e358aa397d/Objects/tupleobject.c#L637>`
+    fn infer_tuple_rich_comparison(
         &mut self,
         left: &[Type<'db>],
         op: RichCompareOperator,
         right: &[Type<'db>],
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-        // Compare paired elements from left and right slices
-        for (l_ty, r_ty) in left.iter().copied().zip(right.iter().copied()) {
-            let eq_result = self
+        let left_iter = left.iter().copied();
+        let right_iter = right.iter().copied();
+
+        let mut builder = UnionBuilder::new(self.db);
+
+        for (l_ty, r_ty) in left_iter.zip(right_iter) {
+            let pairwise_eq_result = self
                 .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty)
                 .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
-            match eq_result {
+            match pairwise_eq_result {
                 // If propagation is required, return the result as is
                 Type::Todo => return Ok(Type::Todo),
                 ty => match ty.bool(self.db) {
-                    // Types are equal, continue to the next pair
+                    // - AlwaysTrue : Continue to the next pair for lexicographic comparison
                     Truthiness::AlwaysTrue => continue,
-                    // Types are not equal, perform the specified comparison and return the result
-                    Truthiness::AlwaysFalse => {
-                        return self.infer_binary_type_comparison(l_ty, op.into(), r_ty)
+                    // - AlwaysFalse:
+                    // Lexicographic comparisons will always terminate with this pair.
+                    // Complete the comparison and return the result.
+                    // - Ambiguous:
+                    // Lexicographic comparisons might continue to the next pair (if eq_result is true),
+                    // or terminate here (if eq_result is false).
+                    // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
+                    eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
+                        let pairwise_compare_result = match op {
+                            RichCompareOperator::Lt
+                            | RichCompareOperator::Le
+                            | RichCompareOperator::Gt
+                            | RichCompareOperator::Ge => {
+                                self.infer_binary_type_comparison(l_ty, op.into(), r_ty)?
+                            }
+                            // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
+                            // NOTE: The CPython implementation does not account for non-boolean return types
+                            // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
+                            RichCompareOperator::Eq => Type::BooleanLiteral(false),
+                            RichCompareOperator::Ne => Type::BooleanLiteral(true),
+                        };
+
+                        builder = builder.add(pairwise_compare_result);
+
+                        if eq_truthiness.is_ambiguous() {
+                            continue;
+                        }
+
+                        return Ok(builder.build());
                     }
-                    // If the intermediate result is ambiguous, we cannot determine the final result as BooleanLiteral.
-                    // In this case, we simply return a bool instance.
-                    Truthiness::Ambiguous => return Ok(KnownClass::Bool.to_instance(self.db)),
                 },
             }
         }
 
-        // At this point, the lengths of the two slices may be different, but the prefix of
-        // left and right slices is entirely identical.
-        // We return a comparison of the slice lengths based on the operator.
+        // if no more items to compare, we just compare sizes
         let (left_len, right_len) = (left.len(), right.len());
 
-        Ok(Type::BooleanLiteral(match op {
+        builder = builder.add(Type::BooleanLiteral(match op {
             RichCompareOperator::Eq => left_len == right_len,
             RichCompareOperator::Ne => left_len != right_len,
             RichCompareOperator::Lt => left_len < right_len,
             RichCompareOperator::Le => left_len <= right_len,
             RichCompareOperator::Gt => left_len > right_len,
             RichCompareOperator::Ge => left_len >= right_len,
-        }))
+        }));
+
+        Ok(builder.build())
     }
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
@@ -4445,11 +4475,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                     element_types.push(element_ty);
                 }
 
-                if return_todo {
+                let ty = if return_todo {
                     Type::Todo
                 } else {
                     Type::tuple(self.db, &element_types)
-                }
+                };
+
+                // Here, we store the type for the inner `int, str` tuple-expression,
+                // while the type for the outer `tuple[int, str]` slice-expression is
+                // stored in the surrounding `infer_type_expression` call:
+                self.store_expression_type(tuple_slice, ty);
+
+                ty
             }
             single_element => {
                 let single_element_ty = self.infer_type_expression(single_element);
@@ -4465,8 +4502,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Given the slice of a `type[]` annotation, return the type that the annotation represents
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
         match slice {
-            ast::Expr::Name(name) => {
-                let name_ty = self.infer_name_expression(name);
+            ast::Expr::Name(_) => {
+                let name_ty = self.infer_expression(slice);
                 if let Some(ClassLiteralType { class }) = name_ty.into_class_literal() {
                     Type::subclass_of(class)
                 } else {
@@ -4526,6 +4563,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Unknown
                 }
             },
+            KnownInstanceType::Optional => {
+                let param_type = self.infer_type_expression(parameters);
+                UnionType::from_elements(self.db, [param_type, Type::none(self.db)])
+            }
             KnownInstanceType::TypeVar(_) => Type::Todo,
         }
     }
@@ -4539,8 +4580,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value);
                 if matches!(value_ty, Type::KnownInstance(KnownInstanceType::Literal)) {
-                    self.infer_literal_parameter_type(slice)?
+                    let ty = self.infer_literal_parameter_type(slice)?;
+
+                    // This branch deals with annotations such as `Literal[Literal[1]]`.
+                    // Here, we store the type for the inner `Literal[1]` expression:
+                    self.store_expression_type(parameters, ty);
+                    ty
                 } else {
+                    self.store_expression_type(parameters, Type::Unknown);
+
                     return Err(vec![parameters]);
                 }
             }
@@ -4558,15 +4606,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
                 if errors.is_empty() {
-                    builder.build()
+                    let union_type = builder.build();
+
+                    // This branch deals with annotations such as `Literal[1, 2]`. Here, we
+                    // store the type for the inner `1, 2` tuple-expression:
+                    self.store_expression_type(parameters, union_type);
+
+                    union_type
                 } else {
+                    self.store_expression_type(parameters, Type::Unknown);
+
                     return Err(errors);
                 }
             }
 
-            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
-            ast::Expr::BytesLiteral(literal) => self.infer_bytes_literal_expression(literal),
-            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
+            literal @ (ast::Expr::StringLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_)) => self.infer_expression(literal),
+            literal @ ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
+                self.infer_expression(literal)
+            }
             // For enum values
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
@@ -4576,7 +4636,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .ignore_possibly_unbound()
                     .unwrap_or(Type::Unknown)
             }
-            ast::Expr::NoneLiteral(_) => Type::none(self.db),
             // for negative and positive numbers
             ast::Expr::UnaryOp(ref u)
                 if matches!(u.op, UnaryOp::USub | UnaryOp::UAdd)
@@ -4584,10 +4643,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             {
                 self.infer_unary_expression(u)
             }
-            ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {
-                self.infer_number_literal_expression(number)
-            }
             _ => {
+                self.infer_expression(parameters);
                 return Err(vec![parameters]);
             }
         })

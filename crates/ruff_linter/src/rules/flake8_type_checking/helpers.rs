@@ -409,6 +409,22 @@ impl<'a> SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                 }
                 self.state.pop();
             }
+            // For the following expressions, we just need to make sure to visit the nested
+            // expressions using the quote annotator and not use the generator. This is so that any
+            // subscript elements nested within them are identified and quoted correctly.
+            Expr::List(ast::ExprList { elts, .. }) => {
+                let mut first = true;
+                self.annotation.push('[');
+                for expr in elts {
+                    if first {
+                        first = false;
+                    } else {
+                        self.annotation.push_str(", ");
+                    }
+                    self.visit_expr(expr);
+                }
+                self.annotation.push(']');
+            }
             Expr::BinOp(ast::ExprBinOp {
                 left, op, right, ..
             }) => {

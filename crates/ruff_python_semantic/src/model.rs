@@ -1374,6 +1374,7 @@ impl<'a> SemanticModel<'a> {
             "pandas" => self.seen.insert(Modules::PANDAS),
             "pytest" => self.seen.insert(Modules::PYTEST),
             "re" => self.seen.insert(Modules::RE),
+            "regex" => self.seen.insert(Modules::REGEX),
             "six" => self.seen.insert(Modules::SIX),
             "subprocess" => self.seen.insert(Modules::SUBPROCESS),
             "tarfile" => self.seen.insert(Modules::TARFILE),
@@ -1972,6 +1973,7 @@ bitflags! {
         const MARKUPSAFE = 1 << 23;
         const FLASK = 1 << 24;
         const ATTRS = 1 << 25;
+        const REGEX = 1 << 26;
     }
 }
 
