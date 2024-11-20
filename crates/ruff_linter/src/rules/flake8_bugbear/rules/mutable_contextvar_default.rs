@@ -19,9 +19,9 @@ use crate::checkers::ast::Checker;
 /// the `ContextVar`. If the object is modified, those modifications will persist
 /// across calls, which can lead to unexpected behavior.
 ///
-/// Instead, prefer to use immutable data structures; or, take `None` as a
-/// default, and initialize a new mutable object inside for each call using the
-/// `.set()` method.
+/// Instead, prefer to use immutable data structures. Alternatively, take
+/// `None` as a default, and initialize a new mutable object inside for each
+/// call using the `.set()` method.
 ///
 /// Types outside the standard library can be marked as immutable with the
 /// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
