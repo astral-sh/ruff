@@ -1302,6 +1302,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::AssertWithPrintMessage) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
+            if checker.enabled(Rule::NonStringLiteralAsAssertMessage) {
+                ruff::rules::non_string_literal_as_assert_message(checker, assert_stmt);
+            }
         }
         Stmt::With(
             with_stmt @ ast::StmtWith {

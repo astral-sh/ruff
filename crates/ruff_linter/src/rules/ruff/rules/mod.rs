@@ -78,3 +78,6 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
+pub(crate) use non_string_literal_as_assert_message::*;
+
+mod non_string_literal_as_assert_message;
