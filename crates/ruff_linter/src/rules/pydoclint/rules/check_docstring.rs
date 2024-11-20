@@ -463,6 +463,14 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
         let Some(colon_idx) = potential.find(':') else {
             continue;
         };
+
+        // Consider exceptions without description as undocumented to be consistent
+        // with `undocumented-param`.
+        let msg = &potential[(colon_idx + 1)..];
+        if msg.trim().is_empty() {
+            continue;
+        }
+
         let entry = potential[..colon_idx].trim();
         entries.push(QualifiedName::user_defined(entry));
     }
@@ -486,13 +494,31 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
         return entries;
     };
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
-    for potential in lines {
+    for (potential, next_line) in lines.tuple_windows() {
         if let Some(entry) = potential.strip_prefix(indentation) {
-            if let Some(first_char) = entry.chars().next() {
-                if !first_char.is_whitespace() {
-                    entries.push(QualifiedName::user_defined(entry.trim_end()));
-                }
+            let Some(first_char) = entry.chars().next() else {
+                continue;
+            };
+            if first_char.is_whitespace() {
+                continue;
             }
+
+            // Consider exceptions without description as undocumented to be
+            // consistent with `undocumented-param`.
+            if next_line.trim().is_empty() {
+                continue;
+            }
+
+            // // If the next line is another exception, then the current exception is
+            // // considered undocumented.
+            if next_line
+                .strip_prefix(indentation)
+                .is_some_and(|f| f.chars().next().is_some_and(|c| !c.is_whitespace()))
+            {
+                continue;
+            }
+
+            entries.push(QualifiedName::user_defined(entry.trim_end()));
         }
     }
     entries
