@@ -2,12 +2,12 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF035.py:3:21: RUF035 Non-string literal used as assert message
+RUF040.py:3:21: RUF040 Non-string literal used as assert message
   |
 1 | fruits = ["apples", "plums", "pear"]
 2 | fruits.filter(lambda fruit: fruit.startwith("p"))
 3 | assert len(fruits), 2
-  |                     ^ RUF035
+  |                     ^ RUF040
 4 | 
 5 | assert True, "always true"
   |
