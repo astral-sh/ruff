@@ -591,18 +591,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::NonAsciiImportName) {
                     pylint::rules::non_ascii_module_import(checker, alias);
                 }
-                // TODO(charlie): Remove when stabilizing A004.
-                if let Some(asname) = &alias.asname {
-                    if checker.settings.preview.is_disabled()
-                        && checker.enabled(Rule::BuiltinVariableShadowing)
-                    {
-                        flake8_builtins::rules::builtin_variable_shadowing(
-                            checker,
-                            asname,
-                            asname.range(),
-                        );
-                    }
-                }
+
                 if checker.enabled(Rule::Debugger) {
                     if let Some(diagnostic) =
                         flake8_debugger::rules::debugger_import(stmt, None, &alias.name)
@@ -911,19 +900,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             },
                             stmt.range(),
                         ));
-                    }
-                } else {
-                    // TODO(charlie): Remove when stabilizing A004.
-                    if let Some(asname) = &alias.asname {
-                        if checker.settings.preview.is_disabled()
-                            && checker.enabled(Rule::BuiltinVariableShadowing)
-                        {
-                            flake8_builtins::rules::builtin_variable_shadowing(
-                                checker,
-                                asname,
-                                asname.range(),
-                            );
-                        }
                     }
                 }
                 if checker.enabled(Rule::RelativeImports) {
