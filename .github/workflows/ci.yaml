@@ -268,6 +268,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "fuzz -> target"
+          cache-all-crates: "true"
       - name: "Install cargo-binstall"
         uses: cargo-bins/cargo-binstall@main
         with:
