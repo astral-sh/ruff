@@ -15,3 +15,17 @@ f'{"""other " """ + "more"}'
 f'{b"""other " """}'
 f'{f"""other " """}'
 
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/13935
+f'{1: hy "user"}'
+f'{1:hy "user"}'
+f'{1: abcd "{1}" }'
+f'{1: abcd "{'aa'}" }'
+f'{1=: "abcd {'aa'}}'
+
+#  We have to be careful about changing the quotes if the f-string has a debug expression because it is inserted verbatim.
+f'{1=: "abcd \'\'}'  # Don't change the outer quotes, or it results in a syntax error
+f'{1=: abcd \'\'}'  # Changing the quotes here is fine because the inner quotes aren't the opposite quotes
+f"""{1=: "this" is fine}"""
+f'''{1=: "this" is fine}'''  # Change quotes to double quotes because they're preferred
+f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.

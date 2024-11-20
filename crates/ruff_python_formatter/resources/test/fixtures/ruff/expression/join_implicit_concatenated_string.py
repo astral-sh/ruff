@@ -321,8 +321,8 @@ assert False, +"Implicit concatenated string" "uses {} layout on {} format".form
 )
 
 
-# https://github.com/astral-sh/ruff/issues/13935
-"aaa" f'{1: hy "user"}'
-"aaa 'b' " f'{1:hy "user"}'
-"aaa " f'{1: abcd "{1}" }'
-"aaa " f'{1: abcd "{'aa'}" }'
+# Regression tests for https://github.com/astral-sh/ruff/issues/13935
+
+"a" f'{1=: "abcd \'\'}'
+f'{1=: "abcd \'\'}' "a"
+f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"

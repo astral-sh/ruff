@@ -20,7 +20,7 @@ use crate::preview::{
 };
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
-    is_fstring_with_quoted_debug_expression,
+    is_fstring_with_quoted_debug_expression, is_fstring_with_quoted_format_spec_and_debug,
     is_fstring_with_triple_quoted_literal_expression_containing_quotes, QuoteMetadata,
 };
 use crate::string::{normalize_string, StringLikeExtensions, StringNormalizer, StringQuotes};
@@ -206,15 +206,8 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                         return None;
                     }
 
-                    // Avoid invalid syntax for pre Python 312:
-                    // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
-                    // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
-                    if !context.options().target_version().supports_pep_701() {
-                        if is_fstring_with_quoted_debug_expression(fstring, context)
-                            || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
-                                fstring, context,
-                            )
-                        {
+                    if context.options().target_version().supports_pep_701() {
+                        if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
                             if preserve_quotes_requirement
                                 .is_some_and(|quote| quote != part.flags().quote_style())
                             {
@@ -222,6 +215,21 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             }
                             preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
+                    }
+                    // Avoid invalid syntax for pre Python 312:
+                    // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
+                    // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
+                    else if is_fstring_with_quoted_debug_expression(fstring, context)
+                        || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                            fstring, context,
+                        )
+                    {
+                        if preserve_quotes_requirement
+                            .is_some_and(|quote| quote != part.flags().quote_style())
+                        {
+                            return None;
+                        }
+                        preserve_quotes_requirement = Some(part.flags().quote_style());
                     }
                 }
             }
@@ -238,26 +246,30 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 StringLike::FString(_) => AnyStringPrefix::Format(FStringPrefix::Regular),
             };
 
-            // Only determining the preferred quote for the first string is sufficient
-            // because we don't support joining triple quoted strings with non triple quoted strings.
-            let quote = if let Ok(preferred_quote) =
-                Quote::try_from(normalizer.preferred_quote_style(first_part))
-            {
-                for part in string.parts() {
-                    let part_quote_metadata =
-                        QuoteMetadata::from_part(part, context, preferred_quote);
-
-                    if let Some(merged) = merged_quotes.as_mut() {
-                        *merged = part_quote_metadata.merge(merged)?;
-                    } else {
-                        merged_quotes = Some(part_quote_metadata);
-                    }
-                }
-
-                merged_quotes?.choose(preferred_quote)
+            let quote = if let Some(quote) = preserve_quotes_requirement {
+                quote
             } else {
-                // Use the quotes of the first part if the quotes should be preserved.
-                first_part.flags().quote_style()
+                // Only determining the preferred quote for the first string is sufficient
+                // because we don't support joining triple quoted strings with non triple quoted strings.
+                if let Ok(preferred_quote) =
+                    Quote::try_from(normalizer.preferred_quote_style(first_part))
+                {
+                    for part in string.parts() {
+                        let part_quote_metadata =
+                            QuoteMetadata::from_part(part, context, preferred_quote);
+
+                        if let Some(merged) = merged_quotes.as_mut() {
+                            *merged = part_quote_metadata.merge(merged)?;
+                        } else {
+                            merged_quotes = Some(part_quote_metadata);
+                        }
+                    }
+
+                    merged_quotes?.choose(preferred_quote)
+                } else {
+                    // Use the quotes of the first part if the quotes should be preserved.
+                    first_part.flags().quote_style()
+                }
             };
 
             Some(AnyStringFlags::new(prefix, quote, false))

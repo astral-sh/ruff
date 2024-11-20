@@ -79,6 +79,10 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                             return QuoteStyle::Preserve;
                         }
                     }
+                } else if let StringLikePart::FString(fstring) = string {
+                    if is_fstring_with_quoted_format_spec_and_debug(fstring, self.context) {
+                        return QuoteStyle::Preserve;
+                    }
                 }
 
                 // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
@@ -913,7 +917,7 @@ pub(super) fn is_fstring_with_quoted_debug_expression(
     fstring: &FString,
     context: &PyFormatContext,
 ) -> bool {
-    if fstring.elements.expressions().any(|expression| {
+    fstring.elements.expressions().any(|expression| {
         if expression.debug_text.is_some() {
             let content = context.source().slice(expression);
             match fstring.flags.quote_style() {
@@ -935,11 +939,46 @@ pub(super) fn is_fstring_with_quoted_debug_expression(
         } else {
             false
         }
-    }) {
-        return true;
-    }
+    })
+}
 
-    false
+/// Returns `true` if `string` is an f-string part that contains a debug expression with a format spec
+/// that contains the opposite quote. It's important to preserve the quote style for those f-strings
+/// because changing the quote style would result in invalid syntax.
+///
+/// ```python
+/// f'{1=: "abcd \'\'}'
+/// ```
+pub(super) fn is_fstring_with_quoted_format_spec_and_debug(
+    fstring: &FString,
+    context: &PyFormatContext,
+) -> bool {
+    fstring.elements.expressions().any(|expression| {
+        if let Some(spec) = expression.format_spec.as_deref() {
+            for literal in spec.elements.literals() {
+                let content = context.source().slice(literal);
+                if match fstring.flags.quote_style() {
+                    Quote::Single => {
+                        if fstring.flags.is_triple_quoted() {
+                            content.contains(r#"""""#)
+                        } else {
+                            content.contains('"')
+                        }
+                    }
+                    Quote::Double => {
+                        if fstring.flags.is_triple_quoted() {
+                            content.contains("'''")
+                        } else {
+                            content.contains('\'')
+                        }
+                    }
+                } {
+                    return true;
+                }
+            }
+        }
+        false
+    })
 }
 
 /// Tests if the `fstring` contains any triple quoted string, byte, or f-string literal that
