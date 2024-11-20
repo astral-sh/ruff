@@ -7,22 +7,22 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of non-string literal as assert message.
-/// 
+///
 /// ## Why is this bad?
-/// Non-string literal in assert message does not provide any usefull
+/// Non-string literal in assert message does not provide any useful
 /// information and is likely an unitentional use of `assert_equal(expr, expr)`
 /// from other languages.
 ///
 /// ## Example
 /// ```python
-/// fruits = ["apples", "plums", "pear"]
+/// fruits = ["apples", "plums", "pears"]
 /// fruits.filter(lambda fruit: fruit.startwith("p"))
 /// assert len(fruits), 2  # True unless the list is empty
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// fruits = ["apples", "plums", "pear"]
+/// fruits = ["apples", "plums", "pears"]
 /// fruits.filter(lambda fruit: fruit.startwith("p"))
 /// assert len(fruits) == 2
 /// ```
@@ -46,6 +46,6 @@ pub(crate) fn non_string_literal_as_assert_message(checker: &mut Checker, stmt: 
     }
     checker.diagnostics.push(Diagnostic::new(
         NonStringLiteralAsAssertMessage,
-        message.range()
+        message.range(),
     ));
 }
