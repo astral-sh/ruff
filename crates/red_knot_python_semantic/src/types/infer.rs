@@ -4571,14 +4571,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let mut builder = UnionBuilder::new(self.db);
                 match parameters {
                     ast::Expr::Name(_) => {
-                        builder = builder.add(self.infer_type_expression(parameters))
+                        builder = builder.add(self.infer_type_expression(parameters));
                     }
                     ast::Expr::Tuple(t) => {
                         builder = t
                             .elts
                             .iter()
                             .map(|elt| self.infer_type_expression(elt))
-                            .fold(builder, |builder, ty| builder.add(ty));
+                            .fold(builder, super::builder::UnionBuilder::add);
                     }
                     _ => {}
                 }
