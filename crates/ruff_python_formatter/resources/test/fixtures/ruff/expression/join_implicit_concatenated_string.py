@@ -319,3 +319,10 @@ assert False, "Implicit concatenated stringuses {} layout on {} format"[
 assert False, +"Implicit concatenated string" "uses {} layout on {} format".format(
     "Multiline", "first"
 )
+
+
+# https://github.com/astral-sh/ruff/issues/13935
+"aaa" f'{1: hy "user"}'
+"aaa 'b' " f'{1:hy "user"}'
+"aaa " f'{1: abcd "{1}" }'
+"aaa " f'{1: abcd "{'aa'}" }'

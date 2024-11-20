@@ -5,7 +5,8 @@ use std::iter::FusedIterator;
 use ruff_formatter::FormatContext;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
-    str::Quote, AnyStringFlags, BytesLiteral, FString, StringFlags, StringLikePart, StringLiteral,
+    str::Quote, AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements,
+    FStringFlags, StringFlags, StringLikePart, StringLiteral,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
@@ -262,37 +263,14 @@ impl QuoteMetadata {
             }
             StringLikePart::FString(fstring) => {
                 if is_f_string_formatting_enabled(context) {
-                    // For f-strings, only consider the quotes inside string-literals but ignore
-                    // quotes inside expressions. This allows both the outer and the nested literals
-                    // to make the optimal local-choice to reduce the total number of quotes necessary.
-                    // This doesn't require any pre 312 special handling because an expression
-                    // can never contain the outer quote character, not even escaped:
-                    // ```python
-                    // f"{'escaping a quote like this \" is a syntax error pre 312'}"
-                    // ```
-                    let mut literals = fstring.elements.literals();
+                    let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
 
-                    let Some(first) = literals.next() else {
-                        return QuoteMetadata::from_str("", part.flags(), preferred_quote);
-                    };
-
-                    let mut metadata = QuoteMetadata::from_str(
-                        context.source().slice(first),
-                        fstring.flags.into(),
+                    metadata.merge_fstring_elements(
+                        &fstring.elements,
+                        fstring.flags,
+                        context,
                         preferred_quote,
-                    );
-
-                    for literal in literals {
-                        metadata = metadata
-                            .merge(&QuoteMetadata::from_str(
-                                context.source().slice(literal),
-                                fstring.flags.into(),
-                                preferred_quote,
-                            ))
-                            .expect("Merge to succeed because all parts have the same flags");
-                    }
-
-                    metadata
+                    )
                 } else {
                     let text = &context.source()[part.content_range()];
 
@@ -397,6 +375,50 @@ impl QuoteMetadata {
             kind,
             source_style: self.source_style,
         })
+    }
+
+    /// For f-strings, only consider the quotes inside string-literals but ignore
+    /// quotes inside expressions (except inside the format spec). This allows both the outer and the nested literals
+    /// to make the optimal local-choice to reduce the total number of quotes necessary.
+    /// This doesn't require any pre 312 special handling because an expression
+    /// can never contain the outer quote character, not even escaped:
+    /// ```python
+    /// f"{'escaping a quote like this \" is a syntax error pre 312'}"
+    /// ```
+    fn merge_fstring_elements(
+        self,
+        elements: &FStringElements,
+        flags: FStringFlags,
+        context: &PyFormatContext,
+        preferred_quote: Quote,
+    ) -> Self {
+        let mut merged = self;
+
+        for element in elements {
+            match element {
+                FStringElement::Literal(literal) => {
+                    merged = merged
+                        .merge(&QuoteMetadata::from_str(
+                            context.source().slice(literal),
+                            flags.into(),
+                            preferred_quote,
+                        ))
+                        .expect("Merge to succeed because all parts have the same flags");
+                }
+                FStringElement::Expression(expression) => {
+                    if let Some(spec) = expression.format_spec.as_deref() {
+                        merged = merged.merge_fstring_elements(
+                            &spec.elements,
+                            flags,
+                            context,
+                            preferred_quote,
+                        );
+                    }
+                }
+            }
+        }
+
+        merged
     }
 }
 
