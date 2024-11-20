@@ -46,7 +46,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the type annotation contains comments.
-/// 
+///
 /// ## Options
 /// - `target-version`
 ///
