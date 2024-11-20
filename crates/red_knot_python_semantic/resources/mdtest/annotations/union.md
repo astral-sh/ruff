@@ -17,8 +17,6 @@ def f():
     # revealed: int | str
     reveal_type(a)
     # Since bool is a subtype of int we merge both types to int here. But we do allow assigning boolean value
-    # TODO: Pyright and Mypy do show this as `int | bool`: https://pyright-play.net/?code=GYJw9gtgBALgngBwJYDsDmUkQWEMoCqKSYKAUGQIYBchxpA2qjADRQBGYYANgLoUATAKbAowABQBKamShyoIIQDchlbgH14CIeMqSgA
-    # Also mypy: https://mypy-play.net/?mypy=latest&python=3.12&gist=fd3c1609080ddc000d5247552c15b750
     # revealed: int
     reveal_type(a1)
     # revealed: int | float | str
