@@ -4571,20 +4571,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let mut builder = UnionBuilder::new(self.db);
                 match parameters {
                     ast::Expr::Name(_) => {
-                        builder =
-                            builder.add(self.infer_annotation_expression(
-                                parameters,
-                                DeferredExpressionState::None,
-                            ))
+                        builder = builder.add(self.infer_type_expression(parameters))
                     }
                     ast::Expr::Tuple(t) => {
-                        for elt in t.elts.iter() {
-                            builder =
-                                builder.add(self.infer_annotation_expression(
-                                    &elt,
-                                    DeferredExpressionState::None,
-                                ))
-                        }
+                        builder = t
+                            .elts
+                            .iter()
+                            .map(|elt| self.infer_type_expression(elt))
+                            .fold(builder, |builder, ty| builder.add(ty));
                     }
                     _ => {}
                 }
