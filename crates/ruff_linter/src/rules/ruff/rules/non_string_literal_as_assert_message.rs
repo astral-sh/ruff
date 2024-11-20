@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::StmtAssert;
+use ruff_python_ast::{Expr, StmtAssert};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,9 +41,17 @@ pub(crate) fn non_string_literal_as_assert_message(checker: &mut Checker, stmt: 
     let Some(message) = stmt.msg.as_deref() else {
         return;
     };
-    if message.is_string_literal_expr() || !message.is_literal_expr() {
+
+    if !matches!(
+        message,
+        Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+    ) {
         return;
     }
+
     checker.diagnostics.push(Diagnostic::new(
         NonStringLiteralAsAssertMessage,
         message.range(),
