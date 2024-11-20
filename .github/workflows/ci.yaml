@@ -257,11 +257,11 @@ jobs:
           NEXTEST_PROFILE: "ci"
         run: cargo +${{ steps.msrv.outputs.value }} insta test --all-features --unreferenced reject --test-runner nextest
 
-  cargo-fuzz:
-    name: "cargo fuzz"
+  cargo-fuzz-build:
+    name: "cargo fuzz build"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
