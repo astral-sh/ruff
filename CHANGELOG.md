@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.8.0
+
+### Breaking changes
+
+- Ruff 0.8 ([#14383](https://github.com/MichaReiser/ruff/pull/14383))
+
+### Preview features
+
+- Mark UP043 fix unsafe when the type annotation contains any comments ([#14458](https://github.com/astral-sh/ruff/pull/14458))
+- \[`flake8-pyi`\] Implement `redundant-none-literal` (`PYI061`) ([#14316](https://github.com/astral-sh/ruff/pull/14316))
+- \[`flake8-pyi`\] Implement autofix for `redundant-numeric-union` (`PYI041`) ([#14273](https://github.com/astral-sh/ruff/pull/14273))
+- \[`pycodestyle`\] Exempt `pytest.importorskip()` calls (`E402`) ([#14474](https://github.com/astral-sh/ruff/pull/14474))
+- \[`pydoclint`\] Update diagnostics to target the docstring ([#14381](https://github.com/astral-sh/ruff/pull/14381))
+- \[`pylint`\] - use sets when possible for `PLR1714` autofix (`repeated-equality-comparison`) ([#14372](https://github.com/astral-sh/ruff/pull/14372))
+- \[`ruff`\] Add rule forbidding `map(int, package.__version__.split('.'))` (`RUF048`) ([#14373](https://github.com/astral-sh/ruff/pull/14373))
+- \[`ruff`\] Implement `redundant-bool-literal` (`RUF038`) ([#14319](https://github.com/astral-sh/ruff/pull/14319))
+- \[`ruff`\] `re` and `regex` calls with unraw string as first argument (`RUF039`) ([#14446](https://github.com/astral-sh/ruff/pull/14446))
+
+### Bug fixes
+
+- Avoid panic in unfixable `redundant-numeric-union` ([#14402](https://github.com/astral-sh/ruff/pull/14402))
+- Reverse order of `__contains__` arguments ([#14424](https://github.com/astral-sh/ruff/pull/14424))
+- \[`flake8-datetimez`\] Also exempt `.time()` (`DTZ901`) ([#14394](https://github.com/astral-sh/ruff/pull/14394))
+- \[`flake8-type-checking`\] Consider type expressions in list for quoting annotations ([#14371](https://github.com/astral-sh/ruff/pull/14371))
+
+### Documentation
+
+- Improve rule & options documentation ([#14329](https://github.com/astral-sh/ruff/pull/14329))
+- Watch for changes to the generated file during documentation serve ([#14476](https://github.com/astral-sh/ruff/pull/14476))
+- \[`flake8-logging`\] Suggest `.getLogger(__name__)` instead of `.getLogger(__file__)` (`LOG015`) ([#14392](https://github.com/astral-sh/ruff/pull/14392))
+
+### Other changes
+
+- \[`flake8-pie`\] Mark fix as unsafe if the following statement is a string literal (`PIE790`) ([#14393](https://github.com/astral-sh/ruff/pull/14393))
+
 ## 0.7.4
 
 ### Preview features
