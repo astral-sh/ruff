@@ -720,9 +720,9 @@ impl<'a> SemanticModel<'a> {
                             continue;
                         }
 
-                        // This ensures we perform the correct lexicographical lookup
-                        // since the ranges for these two types of bindings are trimmed
-                        // but the name is not available until the end of the statement
+                        // This ensures we perform the correct source-order lookup,
+                        // since the ranges for these two types of bindings are trimmed to just the target,
+                        // but the name is not available until the end of the entire statement
                         let binding_range = match binding.statement(self) {
                             Some(Stmt::AnnAssign(stmt)) => stmt.range(),
                             Some(Stmt::ClassDef(stmt)) => stmt.range(),

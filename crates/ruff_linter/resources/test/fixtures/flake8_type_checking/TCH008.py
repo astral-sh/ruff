@@ -36,7 +36,7 @@ type G = 'OptStr'  # TCH008
 type I = Foo['str']  # TCH008
 type J = 'Baz'  # TCH008
 type K = 'K | None'  # TCH008
-type L = 'int' | None  # TCH008 (because TC010 is not enabled)
+type L = 'int' | None  # TCH008 (because TCH010 is not enabled)
 type M = ('int'  # TCH008
     | None)
 type N = ('int'  # TCH008 (fix removes comment currently)
