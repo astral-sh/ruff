@@ -3075,7 +3075,6 @@ dependencies = [
  "rustc-hash 2.0.0",
  "schemars",
  "serde",
- "serde_json",
  "shellexpand",
  "strum",
  "tempfile",
