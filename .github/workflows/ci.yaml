@@ -280,7 +280,7 @@ jobs:
       - run: cargo fuzz build -s none
 
   fuzz-parser:
-    name: "Fuzz the parser"
+    name: "fuzz parser"
     runs-on: ubuntu-latest
     needs:
       - cargo-test-linux
