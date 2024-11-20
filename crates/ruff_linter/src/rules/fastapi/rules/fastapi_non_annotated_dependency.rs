@@ -20,6 +20,10 @@ use crate::settings::types::PythonVersion;
 /// everywhere helps ensure consistency and clarity in defining dependencies
 /// and parameters.
 ///
+/// `Annotated` was added to the `typing` module in Python 3.9; however,
+/// the third-party [`typing_extensions`] package provides a backport that can be
+/// used on older versions of Python.
+///
 /// ## Example
 ///
 /// ```python
@@ -58,8 +62,11 @@ use crate::settings::types::PythonVersion;
 ///
 /// [fastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
 /// [typing.Annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
+/// [typing_extensions]: https://typing-extensions.readthedocs.io/en/stable/
 #[violation]
-pub struct FastApiNonAnnotatedDependency;
+pub struct FastApiNonAnnotatedDependency {
+    py_version: PythonVersion,
+}
 
 impl Violation for FastApiNonAnnotatedDependency {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -70,7 +77,12 @@ impl Violation for FastApiNonAnnotatedDependency {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with `Annotated`".to_string())
+        let title = if self.py_version >= PythonVersion::Py39 {
+            "Replace with `typing.Annotated`"
+        } else {
+            "Replace with `typing_extensions.Annotated`"
+        };
+        Some(title.to_string())
     }
 }
 
@@ -137,7 +149,12 @@ fn create_diagnostic(
     parameter: &ast::ParameterWithDefault,
     safe_to_update: bool,
 ) {
-    let mut diagnostic = Diagnostic::new(FastApiNonAnnotatedDependency, parameter.range);
+    let mut diagnostic = Diagnostic::new(
+        FastApiNonAnnotatedDependency {
+            py_version: checker.settings.target_version,
+        },
+        parameter.range,
+    );
 
     if safe_to_update {
         if let (Some(annotation), Some(default)) =
