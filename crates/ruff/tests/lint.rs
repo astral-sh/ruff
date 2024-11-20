@@ -1998,7 +1998,7 @@ ruff failed
   |
 2 | [lint.flake8-import-conventions.aliases]
   |  ^^^^
-alias must be a valid identifier"#)});
+alias must be a valid identifier"#);});
     Ok(())
 }
 
@@ -2033,6 +2033,6 @@ ruff failed
   |
 2 | [lint.flake8-import-conventions.aliases]
   |  ^^^^
-module must be a valid identifier separated by single periods"#)});
+module must be a valid identifier separated by single periods"#);});
     Ok(())
 }
