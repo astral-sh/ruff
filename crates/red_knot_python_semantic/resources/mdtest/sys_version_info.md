@@ -58,8 +58,7 @@ reveal_type(sys.version_info >= (3, 9, 1, "final", 0))  # revealed: bool
 # emitting a lint diagnostic of some kind warning them about the probable error?
 reveal_type(sys.version_info >= (3, 9, 1, "final", 0, 5))  # revealed: bool
 
-# TODO: this should be `Literal[False]`; see #14279
-reveal_type(sys.version_info == (3, 9, 1, "finallllll", 0))  # revealed: bool
+reveal_type(sys.version_info == (3, 8, 1, "finallllll", 0))  # revealed: Literal[False]
 ```
 
 ## Imports and aliases
