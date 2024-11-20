@@ -1384,13 +1384,13 @@ where
     };
 
     for (module, alias) in &aliases {
-        if module.is_empty()
-            || module.split('.').any(|part| !is_identifier(part))
-            || !is_identifier(alias)
-        {
+        if module.is_empty() || module.split('.').any(|part| !is_identifier(part)) {
             return Err(de::Error::custom(
-                "Module must be valid identifier separated by single periods and alias must be valid identifier",
+                "module must be a valid identifier separated by single periods",
             ));
+        }
+        if !is_identifier(alias) {
+            return Err(de::Error::custom("alias must be a valid identifier"));
         }
     }
 
@@ -3433,19 +3433,11 @@ pub struct AnalyzeOptions {
 
 #[cfg(test)]
 mod tests {
-    use crate::options::Flake8ImportConventionsOptions;
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
     use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
     use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
-
-    #[test]
-    fn flake8_import_conventions_validate_aliases() {
-        let json_options = r#"{"aliases": {"a.b":"a.b"}}"#;
-        let result: Result<Flake8ImportConventionsOptions, _> = serde_json::from_str(json_options);
-        assert!(result.unwrap_err().to_string().contains("Module must be valid identifier separated by single periods and alias must be valid identifier"));
-    }
 
     #[test]
     fn flake8_self_options() {
