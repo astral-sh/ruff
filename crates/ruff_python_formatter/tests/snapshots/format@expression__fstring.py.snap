@@ -353,6 +353,9 @@ _ = (
     f'This string uses double quotes in an expression {"it's a quote"}'
     f'This f-string does not use any quotes.'
 )
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14487
+f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
 ```
 
 ## Outputs
@@ -728,6 +731,9 @@ _ = (
     f"This string uses double quotes in an expression {"it's a quote"}"
     f"This f-string does not use any quotes."
 )
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14487
+f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
 ```
 
 
@@ -1091,6 +1097,9 @@ _ = (
     f'This string uses double quotes in an expression {"it's a quote"}'
     f'This f-string does not use any quotes.'
 )
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14487
+f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
 ```
 
 
@@ -1444,7 +1453,7 @@ _ = (
      # comment 27
      # comment 28
  } woah {x}"
-@@ -318,27 +330,27 @@
+@@ -318,29 +330,29 @@
          if indent2:
              foo = f"""hello world
  hello {
@@ -1490,4 +1499,6 @@ _ = (
 +    f"This string uses double quotes in an expression {"it's a quote"}"
 +    f"This f-string does not use any quotes."
  )
+ 
+ # Regression test for https://github.com/astral-sh/ruff/issues/14487
 ```
