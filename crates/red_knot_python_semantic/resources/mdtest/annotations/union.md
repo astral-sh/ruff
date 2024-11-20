@@ -11,6 +11,7 @@ a: Union[int, str]
 a1: Union[int, bool]
 a2: Union[int, Union[float, str]]
 a3: Union[int, None]
+a4: Union[Union[float, str]]
 
 def f():
     # revealed: int | str
@@ -24,6 +25,8 @@ def f():
     reveal_type(a2)
     # revealed: int | None
     reveal_type(a3)
+    # revealed: float | str
+    reveal_type(a4)
 ```
 
 ## Assignment
