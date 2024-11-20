@@ -12,6 +12,7 @@ a1: Union[int, bool]
 a2: Union[int, Union[float, str]]
 a3: Union[int, None]
 a4: Union[Union[float, str]]
+a5: Union[int]
 
 def f():
     # revealed: int | str
@@ -25,6 +26,8 @@ def f():
     reveal_type(a3)
     # revealed: float | str
     reveal_type(a4)
+    # revealed: int
+    reveal_type(a5)
 ```
 
 ## Assignment
@@ -38,7 +41,7 @@ a = ""
 a1: Union[int, bool]
 a1 = 1
 a1 = True
-# error: [invalid-assignment] "Object of type `bytes` is not assignable to `int | str`"
+# error: [invalid-assignment] "Object of type `Literal[b""]` is not assignable to `int | str`"
 a = b""
 ```
 
