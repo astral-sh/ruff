@@ -411,12 +411,14 @@ impl QuoteMetadata {
                 }
                 FStringElement::Expression(expression) => {
                     if let Some(spec) = expression.format_spec.as_deref() {
-                        merged = merged.merge_fstring_elements(
-                            &spec.elements,
-                            flags,
-                            context,
-                            preferred_quote,
-                        );
+                        if expression.debug_text.is_none() {
+                            merged = merged.merge_fstring_elements(
+                                &spec.elements,
+                                flags,
+                                context,
+                                preferred_quote,
+                            );
+                        }
                     }
                 }
             }
@@ -920,63 +922,61 @@ pub(super) fn is_fstring_with_quoted_debug_expression(
     fstring.elements.expressions().any(|expression| {
         if expression.debug_text.is_some() {
             let content = context.source().slice(expression);
-            match fstring.flags.quote_style() {
-                Quote::Single => {
-                    if fstring.flags.is_triple_quoted() {
-                        content.contains(r#"""""#)
-                    } else {
-                        content.contains('"')
-                    }
-                }
-                Quote::Double => {
-                    if fstring.flags.is_triple_quoted() {
-                        content.contains("'''")
-                    } else {
-                        content.contains('\'')
-                    }
-                }
-            }
+            contains_opposite_quote(content, fstring.flags.into())
         } else {
             false
         }
     })
 }
 
-/// Returns `true` if `string` is an f-string part that contains a debug expression with a format spec
+/// Returns `true` if `string` has any f-string expression element (direct or nested) with a debug expression and a format spec
 /// that contains the opposite quote. It's important to preserve the quote style for those f-strings
 /// because changing the quote style would result in invalid syntax.
 ///
 /// ```python
 /// f'{1=: "abcd \'\'}'
+/// f'{x=:a{y:"abcd"}}'
+/// f'{x=:a{y:{z:"abcd"}}}'
 /// ```
 pub(super) fn is_fstring_with_quoted_format_spec_and_debug(
     fstring: &FString,
     context: &PyFormatContext,
 ) -> bool {
+    fn has_format_spec_with_opposite_quote(
+        elements: &FStringElements,
+        flags: FStringFlags,
+        context: &PyFormatContext,
+        in_debug: bool,
+    ) -> bool {
+        elements.iter().any(|element| match element {
+            FStringElement::Literal(literal) => {
+                let content = context.source().slice(literal);
+
+                in_debug && contains_opposite_quote(content, flags.into())
+            }
+            FStringElement::Expression(expression) => {
+                expression.format_spec.as_deref().is_some_and(|spec| {
+                    has_format_spec_with_opposite_quote(
+                        &spec.elements,
+                        flags,
+                        context,
+                        in_debug || expression.debug_text.is_some(),
+                    )
+                })
+            }
+        })
+    }
+
     fstring.elements.expressions().any(|expression| {
         if let Some(spec) = expression.format_spec.as_deref() {
-            for literal in spec.elements.literals() {
-                let content = context.source().slice(literal);
-                if match fstring.flags.quote_style() {
-                    Quote::Single => {
-                        if fstring.flags.is_triple_quoted() {
-                            content.contains(r#"""""#)
-                        } else {
-                            content.contains('"')
-                        }
-                    }
-                    Quote::Double => {
-                        if fstring.flags.is_triple_quoted() {
-                            content.contains("'''")
-                        } else {
-                            content.contains('\'')
-                        }
-                    }
-                } {
-                    return true;
-                }
-            }
+            return has_format_spec_with_opposite_quote(
+                &spec.elements,
+                fstring.flags,
+                context,
+                expression.debug_text.is_some(),
+            );
         }
+
         false
     })
 }
@@ -1056,6 +1056,40 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
     ruff_python_ast::visitor::source_order::walk_f_string(&mut visitor, fstring);
 
     visitor.found
+}
+
+fn contains_opposite_quote(content: &str, flags: AnyStringFlags) -> bool {
+    if flags.is_triple_quoted() {
+        match flags.quote_style() {
+            Quote::Single => content.contains(r#"""""#),
+            Quote::Double => content.contains("'''"),
+        }
+    } else {
+        let mut rest = content;
+
+        while let Some(index) = rest.find(flags.quote_style().opposite().as_char()) {
+            // Quotes in raw strings can't be escaped
+            if flags.is_raw_string() {
+                return true;
+            }
+
+            // Only if the quote isn't escaped
+            if rest[..index]
+                .chars()
+                .rev()
+                .take_while(|c| *c == '\\')
+                .count()
+                % 2
+                == 0
+            {
+                return true;
+            }
+
+            rest = &rest[index + flags.quote_style().opposite().as_char().len_utf8()..];
+        }
+
+        false
+    }
 }
 
 #[cfg(test)]

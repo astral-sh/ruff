@@ -22,10 +22,24 @@ f'{1:hy "user"}'
 f'{1: abcd "{1}" }'
 f'{1: abcd "{'aa'}" }'
 f'{1=: "abcd {'aa'}}'
+f'{x:a{z:hy "user"}} \'\'\''
+
+# Changing the outer quotes is fine because the format-spec is in a nested expression.
+f'{f'{z=:hy "user"}'} \'\'\''
+
 
 #  We have to be careful about changing the quotes if the f-string has a debug expression because it is inserted verbatim.
 f'{1=: "abcd \'\'}'  # Don't change the outer quotes, or it results in a syntax error
 f'{1=: abcd \'\'}'  # Changing the quotes here is fine because the inner quotes aren't the opposite quotes
+f'{1=: abcd \"\"}'  # Changing the quotes here is fine because the inner quotes are escaped
+# Don't change the quotes in the following cases:
+f'{x=:hy "user"} \'\'\''
+f'{x=:a{y:hy "user"}} \'\'\''
+f'{x=:a{y:{z:hy "user"}}} \'\'\''
+f'{x:a{y=:{z:hy "user"}}} \'\'\''
+
+# This is fine because the debug expression and format spec are in a nested expression
+
 f"""{1=: "this" is fine}"""
 f'''{1=: "this" is fine}'''  # Change quotes to double quotes because they're preferred
 f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.
