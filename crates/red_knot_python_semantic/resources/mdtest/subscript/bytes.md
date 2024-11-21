@@ -27,7 +27,7 @@ def int_instance() -> int:
 
 a = b"abcde"[int_instance()]
 # TODO: Support overloads... Should be `bytes`
-reveal_type(a)  # revealed: @Todo
+reveal_type(a)  # revealed: @Todo(return type)
 ```
 
 ## Slices
@@ -47,11 +47,11 @@ def int_instance() -> int: ...
 
 byte_slice1 = b[int_instance() : int_instance()]
 # TODO: Support overloads... Should be `bytes`
-reveal_type(byte_slice1)  # revealed: @Todo
+reveal_type(byte_slice1)  # revealed: @Todo(return type)
 
 def bytes_instance() -> bytes: ...
 
 byte_slice2 = bytes_instance()[0:5]
 # TODO: Support overloads... Should be `bytes`
-reveal_type(byte_slice2)  # revealed: @Todo
+reveal_type(byte_slice2)  # revealed: @Todo(return type)
 ```

@@ -171,7 +171,7 @@ def f(*args, **kwargs) -> int: ...
 class A(metaclass=f): ...
 
 # TODO should be `type[int]`
-reveal_type(A.__class__)  # revealed: @Todo
+reveal_type(A.__class__)  # revealed: @Todo(metaclass not a class)
 ```
 
 ## Cyclic

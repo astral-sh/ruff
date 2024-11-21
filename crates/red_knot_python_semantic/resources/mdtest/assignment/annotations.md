@@ -51,12 +51,12 @@ reveal_type(c)  # revealed: tuple[str, int]
 reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 
 # TODO: homogenous tuples, PEP-646 tuples
-reveal_type(e)  # revealed: @Todo
-reveal_type(f)  # revealed: @Todo
-reveal_type(g)  # revealed: @Todo
+reveal_type(e)  # revealed: @Todo(full tuple[...] support)
+reveal_type(f)  # revealed: @Todo(full tuple[...] support)
+reveal_type(g)  # revealed: @Todo(full tuple[...] support)
 
 # TODO: support more kinds of type expressions in annotations
-reveal_type(h)  # revealed: @Todo
+reveal_type(h)  # revealed: @Todo(full tuple[...] support)
 
 reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]
