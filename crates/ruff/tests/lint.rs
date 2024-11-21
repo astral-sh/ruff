@@ -1986,7 +1986,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
             .arg(&ruff_toml)
-    , @r#"
+    , @r###"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -1998,8 +1998,8 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
           |
         2 | [lint.flake8-import-conventions.aliases]
           |  ^^^^
-        invalid value: string "invalid.alias", expected alias must be a valid identifier
-        "#);});
+        invalid value: string "invalid.alias", expected a Python identifier
+        "###);});
     Ok(())
 }
 
@@ -2022,7 +2022,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
             .arg(&ruff_toml)
-    , @r#"
+    , @r###"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -2034,7 +2034,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
           |
         2 | [lint.flake8-import-conventions.aliases]
           |  ^^^^
-        invalid value: string "module..invalid", expected module must be a valid identifier separated by single periods
-        "#);});
+        invalid value: string "module..invalid", expected a sequence of Python identifiers delimited by periods
+        "###);});
     Ok(())
 }

@@ -1391,7 +1391,7 @@ impl<'de> Deserialize<'de> for ModuleName {
         if name.is_empty() || name.split('.').any(|part| !is_identifier(part)) {
             Err(de::Error::invalid_value(
                 de::Unexpected::Str(&name),
-                &"module must be a valid identifier separated by single periods",
+                &"a sequence of Python identifiers delimited by periods",
             ))
         } else {
             Ok(Self(name))
@@ -1420,7 +1420,7 @@ impl<'de> Deserialize<'de> for Alias {
         } else {
             Err(de::Error::invalid_value(
                 de::Unexpected::Str(&name),
-                &"alias must be a valid identifier",
+                &"a Python identifier",
             ))
         }
     }
