@@ -310,13 +310,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.any_enabled(&[
-                Rule::PytestParametrizeNamesWrongType,
-                Rule::PytestParametrizeValuesWrongType,
-                Rule::PytestDuplicateParametrizeTestCases,
-            ]) {
-                flake8_pytest_style::rules::parametrize(checker, decorator_list);
-            }
-            if checker.any_enabled(&[
                 Rule::PytestIncorrectMarkParenthesesStyle,
                 Rule::PytestUseFixturesWithoutParameters,
             ]) {

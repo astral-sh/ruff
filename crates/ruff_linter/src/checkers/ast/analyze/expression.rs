@@ -856,6 +856,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.any_enabled(&[
+                Rule::PytestParametrizeNamesWrongType,
+                Rule::PytestParametrizeValuesWrongType,
+                Rule::PytestDuplicateParametrizeTestCases,
+            ]) {
+                flake8_pytest_style::rules::parametrize(checker, call);
+            }
             if checker.enabled(Rule::PytestUnittestAssertion) {
                 if let Some(diagnostic) = flake8_pytest_style::rules::unittest_assertion(
                     checker, expr, func, args, keywords,
