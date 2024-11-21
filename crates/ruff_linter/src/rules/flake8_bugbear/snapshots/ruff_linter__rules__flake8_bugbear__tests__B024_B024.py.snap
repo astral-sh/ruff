@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 snapshot_kind: text
 ---
-B024.py:18:7: B024 `Base_1` is an abstract base class, but it has no abstract methods
+B024.py:18:7: B024 `Base_1` is an abstract base class, but it has no abstract methods or properties
    |
 18 | class Base_1(ABC):  # error
    |       ^^^^^^ B024
@@ -10,7 +10,7 @@ B024.py:18:7: B024 `Base_1` is an abstract base class, but it has no abstract me
 20 |         foo()
    |
 
-B024.py:71:7: B024 `MetaBase_1` is an abstract base class, but it has no abstract methods
+B024.py:71:7: B024 `MetaBase_1` is an abstract base class, but it has no abstract methods or properties
    |
 71 | class MetaBase_1(metaclass=ABCMeta):  # error
    |       ^^^^^^^^^^ B024
@@ -18,7 +18,7 @@ B024.py:71:7: B024 `MetaBase_1` is an abstract base class, but it has no abstrac
 73 |         foo()
    |
 
-B024.py:82:7: B024 `abc_Base_1` is an abstract base class, but it has no abstract methods
+B024.py:82:7: B024 `abc_Base_1` is an abstract base class, but it has no abstract methods or properties
    |
 82 | class abc_Base_1(abc.ABC):  # error
    |       ^^^^^^^^^^ B024
@@ -26,7 +26,7 @@ B024.py:82:7: B024 `abc_Base_1` is an abstract base class, but it has no abstrac
 84 |         foo()
    |
 
-B024.py:87:7: B024 `abc_Base_2` is an abstract base class, but it has no abstract methods
+B024.py:87:7: B024 `abc_Base_2` is an abstract base class, but it has no abstract methods or properties
    |
 87 | class abc_Base_2(metaclass=abc.ABCMeta):  # error
    |       ^^^^^^^^^^ B024
@@ -34,7 +34,7 @@ B024.py:87:7: B024 `abc_Base_2` is an abstract base class, but it has no abstrac
 89 |         foo()
    |
 
-B024.py:92:7: B024 `notabc_Base_1` is an abstract base class, but it has no abstract methods
+B024.py:92:7: B024 `notabc_Base_1` is an abstract base class, but it has no abstract methods or properties
    |
 92 | class notabc_Base_1(notabc.ABC):  # error
    |       ^^^^^^^^^^^^^ B024
@@ -42,21 +42,21 @@ B024.py:92:7: B024 `notabc_Base_1` is an abstract base class, but it has no abst
 94 |         foo()
    |
 
-B024.py:132:7: B024 `abc_set_class_variable_2` is an abstract base class, but it has no abstract methods
+B024.py:132:7: B024 `abc_set_class_variable_2` is an abstract base class, but it has no abstract methods or properties
     |
 132 | class abc_set_class_variable_2(ABC):  # error (not an abstract attribute)
     |       ^^^^^^^^^^^^^^^^^^^^^^^^ B024
 133 |     foo = 2
     |
 
-B024.py:136:7: B024 `abc_set_class_variable_3` is an abstract base class, but it has no abstract methods
+B024.py:136:7: B024 `abc_set_class_variable_3` is an abstract base class, but it has no abstract methods or properties
     |
 136 | class abc_set_class_variable_3(ABC):  # error (not an abstract attribute)
     |       ^^^^^^^^^^^^^^^^^^^^^^^^ B024
 137 |     foo: int = 2
     |
 
-B024.py:141:7: B024 `abc_set_class_variable_4` is an abstract base class, but it has no abstract methods
+B024.py:141:7: B024 `abc_set_class_variable_4` is an abstract base class, but it has no abstract methods or properties
     |
 140 | # this doesn't actually declare a class variable, it's just an expression
 141 | class abc_set_class_variable_4(ABC):  # error
