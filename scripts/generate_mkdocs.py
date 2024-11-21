@@ -110,8 +110,7 @@ def generate_rule_metadata(rule_doc: Path) -> None:
     For example:
     ```yaml
     ---
-    description: Checks for abstract classes without abstract methods or abstract class
-    variables.
+    description: Checks for abstract classes without abstract methods or properties.
     tags:
     - B024
     ---
