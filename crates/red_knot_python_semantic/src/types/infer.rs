@@ -2715,12 +2715,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 false
             };
 
+        dbg!(name);
+
         let symbol_from_scope =
             |enclosing_scope_file_id: FileScopeId, immediate_nested_scope: Option<FileScopeId>| {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(self.db, self.file);
+                dbg!(enclosing_scope_id.node(self.db));
 
                 if !enclosing_scope_id.is_function_like(self.db) {
                     return None;
@@ -2779,6 +2782,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
+                dbg!(enclosing_scope_file_id);
                 match symbol_from_scope(enclosing_scope_file_id, immediate_nested_scope) {
                     Some(symbol) => return symbol,
                     None => {
