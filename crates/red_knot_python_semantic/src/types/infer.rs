@@ -867,7 +867,6 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
-        // TODO: what should the deferred state be here?
         self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
     }
 
