@@ -158,10 +158,7 @@ mod tests {
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::PythonVersion::Py312;
-    use crate::{
-        format_module_ast, format_module_source, format_range, PreviewMode, PyFormatOptions,
-    };
+    use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -189,7 +186,14 @@ if True:
     #[test]
     fn quick_test() {
         let source = r#"
-f'{x:a{y=:{z:hy "user"}}} \'\'\''
+def main() -> None:
+    if True:
+        some_very_long_variable_name_abcdefghijk = Foo()
+        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
+            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
+            == "This is a very long string abcdefghijk"
+        ]
+
 "#;
         let source_type = PySourceType::Python;
 
@@ -197,9 +201,7 @@ f'{x:a{y=:{z:hy "user"}}} \'\'\''
         let source_path = "code_inline.py";
         let parsed = parse(source, source_type.as_mode()).unwrap();
         let comment_ranges = CommentRanges::from(parsed.tokens());
-        let options = PyFormatOptions::from_extension(Path::new(source_path))
-            .with_preview(PreviewMode::Enabled)
-            .with_target_version(Py312);
+        let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&parsed, &comment_ranges, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
