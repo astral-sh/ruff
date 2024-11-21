@@ -3072,6 +3072,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_semantic",
+ "ruff_python_stdlib",
  "ruff_source_file",
  "rustc-hash 2.0.0",
  "schemars",

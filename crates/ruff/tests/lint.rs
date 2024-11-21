@@ -1966,3 +1966,75 @@ fn nested_implicit_namespace_package() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.aliases]
+"module.name" = "invalid.alias"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse [TMP]/ruff.toml
+          Cause: TOML parse error at line 2, column 2
+          |
+        2 | [lint.flake8-import-conventions.aliases]
+          |  ^^^^
+        invalid value: string "invalid.alias", expected a Python identifier
+        "###);});
+    Ok(())
+}
+
+#[test]
+fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.aliases]
+"module..invalid" = "alias"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse [TMP]/ruff.toml
+          Cause: TOML parse error at line 2, column 2
+          |
+        2 | [lint.flake8-import-conventions.aliases]
+          |  ^^^^
+        invalid value: string "module..invalid", expected a sequence of Python identifiers delimited by periods
+        "###);});
+    Ok(())
+}
