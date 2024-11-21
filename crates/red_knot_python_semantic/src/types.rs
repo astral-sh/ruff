@@ -2967,6 +2967,7 @@ impl<'db> TupleType<'db> {
 
 // Make sure that the `Type` enum does not grow unexpectedly.
 #[cfg(not(debug_assertions))]
+#[cfg(target_pointer_width = "64")]
 static_assertions::assert_eq_size!(Type, [u8; 16]);
 
 #[cfg(test)]
