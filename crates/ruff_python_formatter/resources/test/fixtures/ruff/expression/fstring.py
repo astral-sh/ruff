@@ -366,6 +366,25 @@ aaaa, bbbb = f"aaaa {[
 aaaaaaaaaaaaaaaaaa, bbbbbbbbbbb = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
     expression}moreeeeeeeeeeeeeeeee"  # comment
 
+# Here, the f-string layout is flat but it exceeds the line length limit. This shouldn't
+# try the custom best fit layout because the f-string doesn't have any split points.
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
+    f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+)
+# Same as above but without the parentheses to test that it gets formatted to the same
+# layout as the previous example.
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+
+# But, the following f-string does have a split point because of the multiline expression.
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
+    f"aaaaaaaaaaaaaaaaaaa {
+        aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+)
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
+    f"aaaaaaaaaaaaaaaaaaa {
+        aaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbb + cccccccccccccccccccccc + dddddddddddddddddddddddddddd} ddddddddddddddddddd"
+)
+
 # This is an implicitly concatenated f-string but it cannot be joined because otherwise
 # it'll exceed the line length limit. So, the two f-strings will be inside parentheses
 # instead and the inline comment should be outside the parentheses.

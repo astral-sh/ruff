@@ -18,7 +18,7 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::other::f_string::FormatFString;
+use crate::other::f_string::{FStringLayout, FormatFString};
 use crate::preview::{
     is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
 };
@@ -493,7 +493,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         let single_line =
                             format_with(|f| write!(f, [f_string_flat, inline_comments]));
 
-                        // Parenthesize the f-sring and flatten the f-string.
+                        // Parenthesize the f-string and flatten the f-string.
                         // ```python
                         // aaaaaaaaaaaaaaaaaa = (
                         //     f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"
@@ -918,7 +918,6 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     // ]} bbbb"
                     // ```
                     if format_value.inspect(f)?.will_break() {
-                        println!("Flattened f-string will break, using the default layout");
                         inline_comments.mark_unformatted();
 
                         return write!(
@@ -1092,6 +1091,15 @@ impl<'a> FormatFStringAssignment<'a> {
             return None;
         };
 
+        // If the f-string is flat, there are no breakpoints from which it can be made multiline.
+        // This is the case when the f-string has no expressions or if it does then the expressions
+        // are flat (no newlines).
+        if FStringLayout::from_f_string(f_string, context.source()).is_flat() {
+            return None;
+        }
+
+        // This checks whether the f-string is multi-line and it can *never* be flattened. Thus,
+        // we cannot try the flattened layout.
         if string.is_multiline(context) {
             return None;
         }
