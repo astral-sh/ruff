@@ -4618,8 +4618,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 _ => self.infer_type_expression(parameters),
             },
-            KnownInstanceType::TypeVar(_) => todo_type!(),
-            KnownInstanceType::TypeAliasType(_) => todo_type!("generic type alias"),
+            KnownInstanceType::TypeVar(_) => {
+                self.infer_type_expression(parameters);
+                todo_type!()
+            }
+            KnownInstanceType::TypeAliasType(_) => {
+                self.infer_type_expression(parameters);
+                todo_type!("generic type alias")
+            }
         }
     }
 

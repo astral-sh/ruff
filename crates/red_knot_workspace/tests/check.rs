@@ -268,7 +268,7 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // Related to recursive class definition?
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, false),
-    // fails with salsa cycle panic:
+    // fails with salsa cycle panic for something like `type x = x`:
     ("crates/ruff_python_parser/resources/inline/err/type_alias_invalid_value_expr.py", true, true),
     // related to string annotations (https://github.com/astral-sh/ruff/issues/14440)
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
