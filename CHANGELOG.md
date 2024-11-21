@@ -37,7 +37,7 @@ The following deprecated rules have been removed:
 
 The following rules have been remapped to new rule codes:
 
-- [`flake8-type-checking`](https://docs.astral.sh/ruff/rules/#flake8-type-checking-tch): `TCH` to `TC`
+- [`flake8-type-checking`](https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc): `TCH` to `TC`
 
 ### Stabilization
 
