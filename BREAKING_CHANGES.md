@@ -19,7 +19,7 @@
 
     Previously, Ruff's installer used `$CARGO_HOME` or `~/.cargo/bin` for its target install directory. Now, Ruff will be installed into `$XDG_BIN_HOME`, `$XDG_DATA_HOME/../bin`, or `~/.local/bin` (in that order).
 
-    This change is only relevant to users of the standalone Ruff installer (using the shell or PowerShell script). If you installed Ruff using `uv` or `pip`, you should be unaffected.
+    This change is only relevant to users of the standalone Ruff installer (using the shell or PowerShell script). If you installed Ruff using uv or pip, you should be unaffected.
 
 - **Changes to the line width calculation**
 
