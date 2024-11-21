@@ -26,6 +26,30 @@ type OptionalInt = int | None
 x: OptionalInt = "1"
 ```
 
+## Type aliases in type aliases
+
+```py
+type IntOrStr = int | str
+type IntOrStrOrBytes = IntOrStr | bytes
+
+reveal_type(IntOrStrOrBytes.__value__)  # revealed: int | str | bytes
+```
+
+## Aliased type aliases
+
+```py
+type IntOrStr = int | str
+
+MyIntOrStr = IntOrStr
+
+reveal_type(MyIntOrStr.__value__)  # revealed: int | str
+
+x: MyIntOrStr = 1
+
+# error: [invalid-assignment]
+y: MyIntOrStr = None
+```
+
 ## Generic type aliases
 
 ```py
