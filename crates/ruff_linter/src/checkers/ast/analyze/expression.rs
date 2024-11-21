@@ -965,6 +965,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathGetmtime,
                 Rule::OsPathGetctime,
                 Rule::Glob,
+                Rule::OsListdir,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
