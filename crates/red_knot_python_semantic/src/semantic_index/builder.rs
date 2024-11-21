@@ -595,9 +595,8 @@ where
                     type_alias
                         .name
                         .as_name_expr()
-                        .expect("type alias name is a name expr") // TODO: does the parser guarantee this?
-                        .id
-                        .clone(),
+                        .map(|name| name.id.clone())
+                        .unwrap_or("<unknown>".into()),
                 );
                 self.add_definition(symbol, type_alias);
                 self.visit_expr(&type_alias.name);
