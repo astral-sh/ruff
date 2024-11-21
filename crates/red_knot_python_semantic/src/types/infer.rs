@@ -2779,9 +2779,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
-                let symbol_from_scope =
-                    symbol_from_scope(enclosing_scope_file_id, immediate_nested_scope);
-                match symbol_from_scope {
+                match symbol_from_scope(enclosing_scope_file_id, immediate_nested_scope) {
                     Some(symbol) => return symbol,
                     None => {
                         immediate_nested_scope = Some(enclosing_scope_file_id);

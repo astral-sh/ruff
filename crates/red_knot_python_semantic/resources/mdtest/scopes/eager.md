@@ -42,6 +42,19 @@ def foo():
             [reveal_type(x) for _ in IntIterable()]
 ```
 
+## Lazy scopes inside eager scopes
+
+```py
+x = 1
+
+class Foo:
+    def f(self):
+        # revealed: Literal[2]
+        reveal_type(x)
+
+x = 2
+```
+
 ## Class scopes
 
 TODO class scopes also run eagerly:
