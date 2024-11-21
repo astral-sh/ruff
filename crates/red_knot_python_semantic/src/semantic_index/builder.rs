@@ -131,7 +131,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
 
         self.scope_ids_by_scope.push(scope_id);
-        self.scopes_by_node.insert(node.node_key(), file_scope_id);
+        let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
+        debug_assert_eq!(previous, None);
 
         debug_assert_eq!(ast_id_scope, file_scope_id);
 

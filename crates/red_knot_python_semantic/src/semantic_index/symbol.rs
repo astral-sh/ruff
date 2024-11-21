@@ -405,7 +405,7 @@ impl NodeWithScopeRef<'_> {
                 NodeWithScopeKey::ClassTypeParameters(NodeKey::from_node(class))
             }
             NodeWithScopeRef::TypeAlias(type_alias) => {
-                NodeWithScopeKey::TypeAliasTypeParameters(NodeKey::from_node(type_alias))
+                NodeWithScopeKey::TypeAlias(NodeKey::from_node(type_alias))
             }
             NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
                 NodeWithScopeKey::TypeAliasTypeParameters(NodeKey::from_node(type_alias))
@@ -490,6 +490,7 @@ pub(crate) enum NodeWithScopeKey {
     ClassTypeParameters(NodeKey),
     Function(NodeKey),
     FunctionTypeParameters(NodeKey),
+    TypeAlias(NodeKey),
     TypeAliasTypeParameters(NodeKey),
     Lambda(NodeKey),
     ListComprehension(NodeKey),
