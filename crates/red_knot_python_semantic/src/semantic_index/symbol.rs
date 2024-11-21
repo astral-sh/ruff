@@ -121,6 +121,7 @@ impl<'db> ScopeId<'db> {
                 | NodeWithScopeKind::FunctionTypeParameters(_)
                 | NodeWithScopeKind::Function(_)
                 | NodeWithScopeKind::TypeAlias(_)
+                | NodeWithScopeKind::TypeAliasTypeParameters(_)
                 | NodeWithScopeKind::ListComprehension(_)
                 | NodeWithScopeKind::SetComprehension(_)
                 | NodeWithScopeKind::DictComprehension(_)
