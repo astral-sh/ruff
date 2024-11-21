@@ -45,20 +45,29 @@ def foo():
 ## Lazy scopes inside eager scopes
 
 ```py
-x = 1
+def f():
+    x = 1
 
-class Foo:
-    def f(self):
-        # revealed: Literal[2]
-        reveal_type(x)
+    class Foo:
+        def f(self):
+            # revealed: Literal[2]
+            reveal_type(x)
 
-x = 2
+    x = 2
 ```
 
 ## Class scopes
 
-TODO class scopes also run eagerly:
+```py
+def f():
+    x = 1
 
+    class Foo:
+        # revealed: Literal[1]
+        reveal_type(x)
+
+    x = 2
+```
 ## Generator expressions
 
 TODO Generator expressions don't necessarily run eagerly, but in practice
