@@ -352,7 +352,7 @@ impl<'db> ClassBase<'db> {
     /// Return `None` if `ty` is not an acceptable type for a class base.
     fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
-            Type::TypeAlias(alias) => Self::try_from_ty(db, alias.value(db)),
+            Type::TypeAlias(alias) => Self::try_from_ty(db, alias.value_ty(db)),
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
             Type::Todo(_) => Some(Self::Todo),
