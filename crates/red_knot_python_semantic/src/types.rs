@@ -2799,8 +2799,10 @@ pub struct TypeAliasType<'db> {
     rhs_scope: ScopeId<'db>,
 }
 
-impl TypeAliasType<'_> {
-    pub fn value_ty(self, db: &dyn Db) -> Type {
+#[salsa::tracked]
+impl<'db> TypeAliasType<'db> {
+    #[salsa::tracked]
+    pub fn value_ty(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
 
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
