@@ -800,21 +800,20 @@ pub(crate) fn parametrize(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let ExprCall { arguments, .. } = call;
     if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-        if let Some(names) = arguments.find_argument("argnames", 0) {
+        if let Some(names) = call.arguments.find_argument("argnames", 0) {
             check_names(checker, call, names);
         }
     }
     if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-        if let Some(names) = arguments.find_argument("argnames", 0) {
-            if let Some(values) = arguments.find_argument("argvalues", 1) {
+        if let Some(names) = call.arguments.find_argument("argnames", 0) {
+            if let Some(values) = call.arguments.find_argument("argvalues", 1) {
                 check_values(checker, names, values);
             }
         }
     }
     if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-        if let Some(values) = arguments.find_argument("argvalues", 1) {
+        if let Some(values) = call.arguments.find_argument("argvalues", 1) {
             check_duplicates(checker, values);
         }
     }
