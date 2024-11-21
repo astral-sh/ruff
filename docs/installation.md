@@ -79,4 +79,4 @@ $ # Or, for Podman on SELinux.
 $ docker run -v .:/io:Z --rm ghcr.io/astral-sh/ruff check
 ```
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1&columns=3)](https://repology.org/project/ruff-python-linter/versions)
