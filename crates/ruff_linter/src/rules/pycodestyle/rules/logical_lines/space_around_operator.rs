@@ -169,7 +169,8 @@ impl AlwaysFixableViolation for TabAfterComma {
 /// Checks for extraneous whitespace after a comma.
 ///
 /// ## Why is this bad?
-/// According to the `black` code style, commas should be followed by a single space.
+/// Consistency is good. This rule helps ensure you have a consistent
+/// formatting style across your project.
 ///
 /// ## Example
 /// ```python

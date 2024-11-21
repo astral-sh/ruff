@@ -12,8 +12,8 @@ use crate::settings::LinterSettings;
 /// ## Why is this bad?
 /// Overlong lines can hurt readability. [PEP 8], for example, recommends
 /// limiting lines to 79 characters. By default, this rule enforces a limit
-/// of 88 characters for compatibility with Black, though that limit is
-/// configurable via the [`line-length`] setting.
+/// of 88 characters for compatibility with Black and the Ruff formatter,
+/// though that limit is configurable via the [`line-length`] setting.
 ///
 /// In the interest of pragmatism, this rule makes a few exceptions when
 /// determining whether a line is overlong. Namely, it:
