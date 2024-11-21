@@ -88,7 +88,6 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
-            Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),

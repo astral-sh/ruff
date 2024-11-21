@@ -1142,11 +1142,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
             .to_scope_id(self.db, self.file);
 
-        let type_alias_ty = Type::TypeAlias(TypeAliasType::new(
-            self.db,
-            &type_alias.name.as_name_expr().unwrap().id,
-            rhs_scope,
-        ));
+        let type_alias_ty =
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::new(
+                self.db,
+                &type_alias.name.as_name_expr().unwrap().id,
+                rhs_scope,
+            )));
 
         self.add_declaration_with_binding(
             type_alias.into(),
@@ -4618,6 +4619,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 _ => self.infer_type_expression(parameters),
             },
             KnownInstanceType::TypeVar(_) => todo_type!(),
+            KnownInstanceType::TypeAliasType(_) => todo_type!("generic type alias"),
         }
     }
 

@@ -77,7 +77,7 @@ impl<'db> Mro<'db> {
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
             [single_base] => {
-                let single_base = ClassBase::try_from_ty(db, *single_base).ok_or(*single_base);
+                let single_base = ClassBase::try_from_ty(*single_base).ok_or(*single_base);
                 single_base.map_or_else(
                     |invalid_base_ty| {
                         let bases_info = Box::from([(0, invalid_base_ty)]);
@@ -102,7 +102,7 @@ impl<'db> Mro<'db> {
                 let mut invalid_bases = vec![];
 
                 for (i, base) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_ty(db, *base).ok_or(*base) {
+                    match ClassBase::try_from_ty(*base).ok_or(*base) {
                         Ok(valid_base) => valid_bases.push(valid_base),
                         Err(invalid_base) => invalid_bases.push((i, invalid_base)),
                     }
@@ -350,9 +350,8 @@ impl<'db> ClassBase<'db> {
     /// Attempt to resolve `ty` into a `ClassBase`.
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
-    fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn try_from_ty(ty: Type<'db>) -> Option<Self> {
         match ty {
-            Type::TypeAlias(alias) => Self::try_from_ty(db, alias.value_ty(db)),
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
             Type::Todo(_) => Some(Self::Todo),
@@ -373,6 +372,7 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_) => None,
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::Literal
                 | KnownInstanceType::Union
                 | KnownInstanceType::Optional => None,

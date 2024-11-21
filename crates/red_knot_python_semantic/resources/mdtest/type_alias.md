@@ -3,15 +3,16 @@
 ## Basic
 
 ```py
-type MyInt = int
+type IntOrStr = int | str
 
-# TODO: should be typing.TypeAliasType
-reveal_type(MyInt)  # revealed: MyInt
+reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
+reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
+reveal_type(IntOrStr.__value__)  # revealed: int | str
 
-x: MyInt = 1
+x: IntOrStr = 1
 
 reveal_type(x)  # revealed: Literal[1]
 
 def f() -> None:
-    reveal_type(x)  # revealed: int
+    reveal_type(x)  # revealed: int | str
 ```
