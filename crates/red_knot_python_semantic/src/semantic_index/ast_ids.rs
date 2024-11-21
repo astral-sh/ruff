@@ -87,7 +87,7 @@ impl HasScopedUseId for ast::ExpressionRef<'_> {
 /// This is required to store a record of snapshots that provide information on the definition
 /// states of symbols in the parent scope at the point where the nested scope is defined.
 #[newtype_index]
-pub(super) struct ScopedEagerNestedScopeId;
+pub(crate) struct ScopedEagerNestedScopeId;
 
 pub(super) trait HasScopedEagerNestedScopeId {
     fn scoped_eager_nested_scope_id(

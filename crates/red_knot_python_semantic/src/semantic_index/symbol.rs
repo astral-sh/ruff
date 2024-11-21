@@ -15,7 +15,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
 
-use super::ast_ids::EagerNestedScopeRef;
+use super::ast_ids::{EagerNestedScopeRef, HasScopedEagerNestedScopeId, ScopedEagerNestedScopeId};
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
@@ -135,6 +135,50 @@ impl<'db> ScopeId<'db> {
 
     pub(crate) fn scope(self, db: &dyn Db) -> &Scope {
         semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
+    }
+
+    pub(crate) fn is_eager(self, db: &dyn Db) -> bool {
+        match self.node(db) {
+            NodeWithScopeKind::Class(_)
+            | NodeWithScopeKind::ListComprehension(_)
+            | NodeWithScopeKind::GeneratorExpression(_)
+            | NodeWithScopeKind::SetComprehension(_)
+            | NodeWithScopeKind::DictComprehension(_) => true,
+            NodeWithScopeKind::ClassTypeParameters(_)
+            | NodeWithScopeKind::Function(_)
+            | NodeWithScopeKind::FunctionTypeParameters(_)
+            | NodeWithScopeKind::Lambda(_)
+            | NodeWithScopeKind::Module => false,
+        }
+    }
+
+    pub(crate) fn scoped_eager_nested_scope_id(
+        self,
+        db: &'db dyn Db,
+        outer_scope: ScopeId,
+    ) -> Option<ScopedEagerNestedScopeId> {
+        match self.node(db) {
+            NodeWithScopeKind::Class(class) => {
+                Some(class.scoped_eager_nested_scope_id(db, outer_scope))
+            }
+            NodeWithScopeKind::ListComprehension(list_comp) => {
+                Some(list_comp.scoped_eager_nested_scope_id(db, outer_scope))
+            }
+            NodeWithScopeKind::GeneratorExpression(generator) => {
+                Some(generator.scoped_eager_nested_scope_id(db, outer_scope))
+            }
+            NodeWithScopeKind::SetComprehension(set_comp) => {
+                Some(set_comp.scoped_eager_nested_scope_id(db, outer_scope))
+            }
+            NodeWithScopeKind::DictComprehension(dict_comp) => {
+                Some(dict_comp.scoped_eager_nested_scope_id(db, outer_scope))
+            }
+            NodeWithScopeKind::ClassTypeParameters(_)
+            | NodeWithScopeKind::Function(_)
+            | NodeWithScopeKind::FunctionTypeParameters(_)
+            | NodeWithScopeKind::Lambda(_)
+            | NodeWithScopeKind::Module => None,
+        }
     }
 
     #[cfg(test)]

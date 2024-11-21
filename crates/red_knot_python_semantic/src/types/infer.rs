@@ -45,7 +45,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
@@ -2715,31 +2715,78 @@ impl<'db> TypeInferenceBuilder<'db> {
                 false
             };
 
-        // In function-like scopes, any local variable (symbol that is bound in this scope) can
-        // only have a definition in this scope, or error; it never references another scope.
-        // (At runtime, it would use the `LOAD_FAST` opcode.)
-        if !is_bound || !self.scope().is_function_like(self.db) {
-            // Walk up parent scopes looking for a possible enclosing scope that may have a
-            // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
+        let symbol_from_scope =
+            |enclosing_scope_file_id: FileScopeId, immediate_nested_scope: Option<FileScopeId>| {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(self.db, self.file);
+
                 if !enclosing_scope_id.is_function_like(self.db) {
-                    continue;
+                    return None;
                 }
+
+                let nested_eager_scope_id = immediate_nested_scope.and_then(|file_scope_id| {
+                    file_scope_id
+                        .to_scope_id(self.db, self.file)
+                        .scoped_eager_nested_scope_id(self.db, enclosing_scope_id)
+                });
+
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(name) else {
-                    continue;
-                };
-                if enclosing_symbol.is_bound() {
-                    // We can return early here, because the nearest function-like scope that
-                    // defines a name must be the only source for the nonlocal reference (at
-                    // runtime, it is the scope that creates the cell for our closure.) If the name
-                    // isn't bound in that scope, we should get an unbound name, not continue
+
+                if let Some(eager_scope_id) = nested_eager_scope_id {
+                    let enclosing_scope_use_def = self.index.use_def_map(enclosing_scope_file_id);
+                    enclosing_symbol_table
+                        .symbol_id_by_name(name)
+                        .and_then(|symbol_id| {
+                            let bindings_at_nested_scope_definition = enclosing_scope_use_def
+                                .bindings_at_eager_nested_scope_definition(
+                                    eager_scope_id,
+                                    symbol_id,
+                                )?;
+                            dbg!(&bindings_at_nested_scope_definition);
+
+                            let symbol = bindings_ty(self.db, bindings_at_nested_scope_definition)
+                                .and_then(|bindings_ty| {
+                                    let boundness = enclosing_scope_use_def
+                                        .boundness_at_eager_nested_scope_definition(
+                                            eager_scope_id,
+                                            symbol_id,
+                                        )?;
+                                    Some(Symbol::Type(bindings_ty, boundness))
+                                })
+                                .unwrap_or(Symbol::Unbound);
+
+                            Some(symbol)
+                        })
+                } else {
+                    // The nearest function-like scope that defines a name must be the only source
+                    // for the nonlocal reference (at runtime, it is the scope that creates the cell for our closure).
+                    // If the name isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(self.db, enclosing_scope_id, name);
+                    enclosing_symbol_table.symbol_by_name(name).and_then(|sym| {
+                        sym.is_bound()
+                            .then(|| symbol(self.db, enclosing_scope_id, name))
+                    })
+                }
+            };
+
+        // In function-like scopes, any local variable (symbol that is bound in this scope) can
+        // only have a definition in this scope, or error; it never references another scope.
+        // (At runtime, it would use the `LOAD_FAST` opcode.)
+        if !is_bound || !self.scope().is_function_like(self.db) {
+            let mut immediate_nested_scope = None;
+
+            // Walk up parent scopes looking for a possible enclosing scope that may have a
+            // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
+            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
+                let symbol_from_scope =
+                    symbol_from_scope(enclosing_scope_file_id, immediate_nested_scope);
+                match symbol_from_scope {
+                    Some(symbol) => return symbol,
+                    None => {
+                        immediate_nested_scope = Some(enclosing_scope_file_id);
+                    }
                 }
             }
 

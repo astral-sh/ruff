@@ -19,7 +19,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
-    BindingWithConstraintsIterator, DeclarationsIterator,
+    BindingWithConstraintsIterator, DeclarationsIterator, UseDefMap,
 };
 use crate::stdlib::{
     builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,

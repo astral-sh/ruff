@@ -15,11 +15,12 @@ class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
 
-for x in IntIterable():
-    reveal_type(x)  # revealed: int
+def f():
+    for x in IntIterable():
+        reveal_type(x)  # revealed: int
 
-    # revealed: int
-    [reveal_type(x) for _ in IntIterable()]
+        # revealed: int
+        [reveal_type(x) for _ in IntIterable()]
 ```
 
 ## Class scopes

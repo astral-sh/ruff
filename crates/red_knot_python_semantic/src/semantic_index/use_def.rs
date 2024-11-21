@@ -303,6 +303,33 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
+    #[track_caller]
+    pub(crate) fn bindings_at_eager_nested_scope_definition(
+        &self,
+        scope: ScopedEagerNestedScopeId,
+        symbol: ScopedSymbolId,
+    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
+        self.bindings_by_eager_nested_scope
+            .get(&(scope, symbol))
+            .map(|symbol_bindings| self.bindings_iterator(symbol_bindings))
+    }
+
+    pub(crate) fn boundness_at_eager_nested_scope_definition(
+        &self,
+        scope: ScopedEagerNestedScopeId,
+        symbol: ScopedSymbolId,
+    ) -> Option<Boundness> {
+        self.bindings_by_eager_nested_scope
+            .get(&(scope, symbol))
+            .map(|symbol_bindings| {
+                if symbol_bindings.may_be_unbound() {
+                    Boundness::PossiblyUnbound
+                } else {
+                    Boundness::Bound
+                }
+            })
+    }
+
     pub(crate) fn bindings_at_declaration(
         &self,
         declaration: Definition<'db>,

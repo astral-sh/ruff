@@ -151,8 +151,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         popped_scope.extend_descendents(children_end);
 
         // We might have just popped the root scope off the stack, so this might be an empty stack!
-        if let Some(outer_scope) = self.scope_stack.last() {
-            let outer_scope = *outer_scope;
+        if let Some(outer_scope) = self.scope_stack.last().copied() {
             let mut use_def_maps = std::mem::take(&mut self.use_def_maps);
             let current_use_def_map = &mut use_def_maps[outer_scope];
 
