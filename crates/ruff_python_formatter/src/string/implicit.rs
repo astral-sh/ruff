@@ -104,7 +104,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
         for part in self.string.parts() {
             let format_part = format_with(|f: &mut PyFormatter| match part {
                 StringLikePart::String(part) => {
-                    let kind = if self.string.is_f_string() {
+                    let kind = if self.string.is_fstring() {
                         #[allow(deprecated)]
                         StringLiteralKind::InImplicitlyConcatenatedFString(quoting)
                     } else {
@@ -154,7 +154,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             }
 
             // Multiline strings can never fit on a single line.
-            if !string.is_f_string() && string.is_multiline(context) {
+            if !string.is_fstring() && string.is_multiline(context) {
                 return None;
             }
 

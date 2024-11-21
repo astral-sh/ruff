@@ -355,7 +355,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         let string = flat.string();
 
                         let flat = format_with(|f| {
-                            if string.is_f_string() {
+                            if string.is_fstring() {
                                 let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
 
                                 write!(buffer, [flat])
@@ -373,7 +373,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         //    2,
                         // ]}" "more"
                         // ```
-                        if string.is_f_string() && flat.inspect(f)?.will_break() {
+                        if string.is_fstring() && flat.inspect(f)?.will_break() {
                             inline_comments.mark_unformatted();
 
                             return write!(
@@ -656,7 +656,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
                 let format_value = format_with(|f| {
                     if let Some(format_implicit_flat) = format_implicit_flat.as_ref() {
-                        if format_implicit_flat.string().is_f_string() {
+                        if format_implicit_flat.string().is_fstring() {
                             // Remove any soft line breaks emitted by the f-string formatting.
                             // This is important when formatting f-strings as part of an assignment right side
                             // because `best_fit_parenthesize` will otherwise still try to break inner
@@ -769,7 +769,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     //    2,
                     // ]}" "more"
                     // ```
-                    if format_implicit_flat.string().is_f_string()
+                    if format_implicit_flat.string().is_fstring()
                         && format_value.inspect(f)?.will_break()
                     {
                         inline_comments.mark_unformatted();
