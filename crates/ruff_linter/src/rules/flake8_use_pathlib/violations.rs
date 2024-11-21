@@ -1116,7 +1116,7 @@ impl Violation for PyPath {
 ///
 /// ```python
 /// p = "."
-/// for d in os.listdir(p)):
+/// for d in os.listdir(p):
 ///     ...
 /// ```
 ///
