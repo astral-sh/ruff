@@ -1987,18 +1987,19 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
             .arg("--config")
             .arg(&ruff_toml)
     , @r#"
-success: false
-exit_code: 2
------ stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
------ stderr -----
-ruff failed
-  Cause: Failed to parse [TMP]/ruff.toml
-  Cause: TOML parse error at line 2, column 2
-  |
-2 | [lint.flake8-import-conventions.aliases]
-  |  ^^^^
-alias must be a valid identifier"#);});
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse [TMP]/ruff.toml
+          Cause: TOML parse error at line 2, column 2
+          |
+        2 | [lint.flake8-import-conventions.aliases]
+          |  ^^^^
+        invalid value: string "invalid.alias", expected alias must be a valid identifier
+        "#);});
     Ok(())
 }
 
@@ -2022,17 +2023,18 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
             .arg("--config")
             .arg(&ruff_toml)
     , @r#"
-success: false
-exit_code: 2
------ stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
------ stderr -----
-ruff failed
-  Cause: Failed to parse [TMP]/ruff.toml
-  Cause: TOML parse error at line 2, column 2
-  |
-2 | [lint.flake8-import-conventions.aliases]
-  |  ^^^^
-module must be a valid identifier separated by single periods"#);});
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse [TMP]/ruff.toml
+          Cause: TOML parse error at line 2, column 2
+          |
+        2 | [lint.flake8-import-conventions.aliases]
+          |  ^^^^
+        invalid value: string "module..invalid", expected module must be a valid identifier separated by single periods
+        "#);});
     Ok(())
 }

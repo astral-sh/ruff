@@ -1329,8 +1329,7 @@ pub struct Flake8ImportConventionsOptions {
             scipy = "sp"
         "#
     )]
-    #[serde(deserialize_with = "deserialize_and_validate_aliases")]
-    pub aliases: Option<FxHashMap<String, String>>,
+    pub aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
     /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
@@ -1373,34 +1372,67 @@ pub struct Flake8ImportConventionsOptions {
     pub banned_from: Option<FxHashSet<String>>,
 }
 
-fn deserialize_and_validate_aliases<'de, D>(
-    deserializer: D,
-) -> Result<Option<FxHashMap<String, String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let Some(aliases) = Option::<FxHashMap<String, String>>::deserialize(deserializer)? else {
-        return Ok(None);
-    };
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct ModuleName(String);
 
-    for (module, alias) in &aliases {
-        if module.is_empty() || module.split('.').any(|part| !is_identifier(part)) {
-            return Err(de::Error::custom(
-                "module must be a valid identifier separated by single periods",
-            ));
-        }
-        if !is_identifier(alias) {
-            return Err(de::Error::custom("alias must be a valid identifier"));
+impl ModuleName {
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ModuleName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        if name.is_empty() || name.split('.').any(|part| !is_identifier(part)) {
+            Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"module must be a valid identifier separated by single periods",
+            ))
+        } else {
+            Ok(Self(name))
         }
     }
+}
 
-    Ok(Some(aliases)) // Return the validated map.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Alias(String);
+
+impl Alias {
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Alias {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        if is_identifier(&name) {
+            Ok(Self(name))
+        } else {
+            Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"alias must be a valid identifier",
+            ))
+        }
+    }
 }
 
 impl Flake8ImportConventionsOptions {
     pub fn into_settings(self) -> flake8_import_conventions::settings::Settings {
-        let mut aliases = match self.aliases {
-            Some(options_aliases) => options_aliases,
+        let mut aliases: FxHashMap<String, String> = match self.aliases {
+            Some(options_aliases) => options_aliases
+                .into_iter()
+                .map(|(module, alias)| (module.into_string(), alias.into_string()))
+                .collect(),
             None => flake8_import_conventions::settings::default_aliases(),
         };
         if let Some(extend_aliases) = self.extend_aliases {
