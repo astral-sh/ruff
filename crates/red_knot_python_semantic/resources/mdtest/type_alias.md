@@ -16,3 +16,21 @@ reveal_type(x)  # revealed: Literal[1]
 def f() -> None:
     reveal_type(x)  # revealed: int | str
 ```
+
+## Invalid assignment
+
+```py
+type OptionalInt = int | None
+
+# error: [invalid-assignment]
+x: OptionalInt = "1"
+```
+
+## Generic type aliases
+
+```py
+type ListOrSet[T] = list[T] | set[T]
+
+# TODO: Should be tuple[typing.TypeVar | typing.ParamSpec | typing.TypeVarTuple, ...]
+reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(TypeAliasType __type_params__)
+```
