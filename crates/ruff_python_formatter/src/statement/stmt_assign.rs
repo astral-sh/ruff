@@ -939,7 +939,22 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     let format_f_string =
                         format_with(|f| write!(f, [format_f_string, inline_comments])).memoized();
 
+                    // Considering the following initial source:
+                    //
+                    // ```python
+                    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
+                    //     f"aaaaaaaaaaaaaaaaaaa {
+                    //         aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+                    // )
+                    // ```
+
                     // Keep the target flat, and use the regular f-string formatting.
+                    //
+                    // ```python
+                    // aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {
+                    //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
+                    // } ddddddddddddddddddd"
+                    // ```
                     let flat_target_regular_f_string = format_with(|f| {
                         write!(
                             f,
@@ -948,6 +963,14 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     });
 
                     // Expand the parent and parenthesize the flattened f-string.
+                    //
+                    // ```python
+                    // aaaaaaaaaaaa[
+                    //     "bbbbbbbbbbbbbbbb"
+                    // ] = (
+                    //     f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+                    // )
+                    // ```
                     let split_target_value_parenthesized_flat = format_with(|f| {
                         write!(
                             f,
@@ -968,6 +991,14 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     });
 
                     // Expand the parent, and use the regular f-string formatting.
+                    //
+                    // ```python
+                    // aaaaaaaaaaaa[
+                    //     "bbbbbbbbbbbbbbbb"
+                    // ] = f"aaaaaaaaaaaaaaaaaaa {
+                    //     aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
+                    // } ddddddddddddddddddd"
+                    // ```
                     let split_target_regular_f_string = format_with(|f| {
                         write!(
                             f,
