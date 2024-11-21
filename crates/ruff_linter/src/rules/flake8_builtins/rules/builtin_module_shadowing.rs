@@ -1,12 +1,14 @@
-use crate::package::PackageRoot;
-use crate::settings::types::PythonVersion;
+use std::path::Path;
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
-use std::path::Path;
+
+use crate::package::PackageRoot;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for modules that use the same names as Python builtin modules.
@@ -60,7 +62,7 @@ pub(crate) fn builtin_module_shadowing(
 
     // Shadowing private stdlib modules is okay.
     // https://github.com/astral-sh/ruff/issues/12949
-    if module_name.starts_with("_") && !module_name.starts_with("__") {
+    if module_name.starts_with('_') && !module_name.starts_with("__") {
         return None;
     }
 
