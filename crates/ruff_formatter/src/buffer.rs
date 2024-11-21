@@ -5,6 +5,7 @@ use crate::{FormatResult, FormatState};
 use rustc_hash::FxHashMap;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
+use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 
 /// A trait for writing or formatting into [`FormatElement`]-accepting buffers or streams.
@@ -392,15 +393,6 @@ fn clean_interned(
                     cleaned.extend_from_slice(before);
                     Some((cleaned, &after[1..]))
                 }
-                FormatElement::Tag(Tag::StartConditionalContent(condition))
-                    if condition.mode.is_expanded() =>
-                {
-                    state.increment_conditional_content();
-                    let mut cleaned = Vec::new();
-                    let (before, after) = interned.split_at(index);
-                    cleaned.extend_from_slice(before);
-                    Some((cleaned, &after[1..]))
-                }
                 FormatElement::Interned(inner) => {
                     let cleaned_inner = clean_interned(inner, interned_cache);
 
@@ -414,7 +406,16 @@ fn clean_interned(
                     }
                 }
 
-                _ => None,
+                element => {
+                    if state.should_drop(element) {
+                        let mut cleaned = Vec::new();
+                        let (before, after) = interned.split_at(index);
+                        cleaned.extend_from_slice(before);
+                        Some((cleaned, &after[1..]))
+                    } else {
+                        None
+                    }
+                }
             });
 
         let result = match result {
@@ -430,12 +431,6 @@ fn clean_interned(
                         FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
                         FormatElement::Interned(interned) => {
                             FormatElement::Interned(clean_interned(interned, interned_cache))
-                        }
-                        FormatElement::Tag(Tag::StartConditionalContent(condition))
-                            if condition.mode.is_expanded() =>
-                        {
-                            state.increment_conditional_content();
-                            continue;
                         }
 
                         element => element.clone(),
@@ -468,12 +463,6 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
             FormatElement::Interned(interned) => {
                 FormatElement::Interned(self.clean_interned(&interned))
             }
-            FormatElement::Tag(Tag::StartConditionalContent(condition))
-                if condition.mode.is_expanded() =>
-            {
-                self.state.increment_conditional_content();
-                return;
-            }
 
             element => element,
         };
@@ -494,11 +483,16 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
     }
 
     fn snapshot(&self) -> BufferSnapshot {
-        self.inner.snapshot()
+        BufferSnapshot::Any(Box::new(RemoveSoftLinebreaksSnapshot {
+            inner: self.inner.snapshot(),
+            state: self.state,
+        }))
     }
 
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
-        self.inner.restore_snapshot(snapshot);
+        let RemoveSoftLinebreaksSnapshot { inner, state } = snapshot.unwrap_any();
+        self.inner.restore_snapshot(inner);
+        self.state = state;
     }
 }
 
@@ -507,21 +501,44 @@ enum RemoveSoftLineBreaksState {
     #[default]
     Default,
     InIfGroupBreaks {
-        conditional_content_level: usize,
+        conditional_content_level: NonZeroUsize,
     },
 }
 
 impl RemoveSoftLineBreaksState {
     fn should_drop(&mut self, element: &FormatElement) -> bool {
         match self {
-            Self::Default => false,
-            Self::InIfGroupBreaks { .. } => {
-                match element {
-                    FormatElement::Tag(Tag::StartConditionalContent(_)) => {
-                        self.increment_conditional_content();
+            Self::Default => {
+                // Entered the start of an `if_group_breaks`
+                if let FormatElement::Tag(Tag::StartConditionalContent(condition)) = element {
+                    if condition.mode.is_expanded() {
+                        *self = Self::InIfGroupBreaks {
+                            conditional_content_level: NonZeroUsize::new(1).unwrap(),
+                        };
+                        return true;
                     }
+                }
+
+                false
+            }
+            Self::InIfGroupBreaks {
+                conditional_content_level,
+            } => {
+                match element {
+                    // A nested `if_group_breaks` or `if_group_fits`
+                    FormatElement::Tag(Tag::StartConditionalContent(_)) => {
+                        *conditional_content_level = conditional_content_level.saturating_add(1);
+                    }
+                    // The end of an `if_group_breaks` or `if_group_fits`.
                     FormatElement::Tag(Tag::EndConditionalContent) => {
-                        self.decrement_conditional_content();
+                        if let Some(level) = NonZeroUsize::new(conditional_content_level.get() - 1)
+                        {
+                            *conditional_content_level = level;
+                        } else {
+                            // Found the end tag of the initial `if_group_breaks`. Skip this element but retain
+                            // the elements coming after
+                            *self = RemoveSoftLineBreaksState::Default;
+                        }
                     }
                     _ => {}
                 }
@@ -530,38 +547,11 @@ impl RemoveSoftLineBreaksState {
             }
         }
     }
+}
 
-    fn decrement_conditional_content(&mut self) -> bool {
-        match self {
-            Self::InIfGroupBreaks {
-                conditional_content_level,
-            } => {
-                if *conditional_content_level == 0 {
-                    *self = RemoveSoftLineBreaksState::Default;
-                    true
-                } else {
-                    *conditional_content_level -= 1;
-                    false
-                }
-            }
-            Self::Default => false,
-        }
-    }
-
-    fn increment_conditional_content(&mut self) {
-        match self {
-            Self::InIfGroupBreaks {
-                conditional_content_level,
-            } => {
-                *conditional_content_level += 1;
-            }
-            Self::Default => {
-                *self = RemoveSoftLineBreaksState::InIfGroupBreaks {
-                    conditional_content_level: 0,
-                };
-            }
-        }
-    }
+struct RemoveSoftLinebreaksSnapshot {
+    inner: BufferSnapshot,
+    state: RemoveSoftLineBreaksState,
 }
 
 pub trait BufferExtensions: Buffer + Sized {
