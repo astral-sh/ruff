@@ -52,10 +52,14 @@ pub(crate) fn invalid_envvar_default(checker: &mut Checker, call: &ast::ExprCall
         .semantic()
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["os", "getenv"] | ["os", "environ", "get"]
-            )
+            if checker.settings.preview.is_enabled() {
+                matches!(
+                    qualified_name.segments(),
+                    ["os", "getenv"] | ["os", "environ", "get"]
+                )
+            } else {
+                matches!(qualified_name.segments(), ["os", "getenv"])
+            }
         })
     {
         // Find the `default` argument, if it exists.
