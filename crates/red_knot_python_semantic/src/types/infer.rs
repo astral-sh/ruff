@@ -2744,7 +2744,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     eager_scope_id,
                                     symbol_id,
                                 )?;
-                            dbg!(&bindings_at_nested_scope_definition);
 
                             let symbol = bindings_ty(self.db, bindings_at_nested_scope_definition)
                                 .and_then(|bindings_ty| {

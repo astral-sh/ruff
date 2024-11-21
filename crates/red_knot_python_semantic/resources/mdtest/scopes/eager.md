@@ -23,6 +23,25 @@ def f():
         [reveal_type(x) for _ in IntIterable()]
 ```
 
+## Eager scopes inside lazy scopes
+
+```py
+class IntIterator:
+    def __next__(self) -> int:
+        return 42
+
+class IntIterable:
+    def __iter__(self) -> IntIterator:
+        return IntIterator()
+
+def foo():
+    for x in IntIterable():
+        def bar():
+            # error: [possibly-unresolved-reference]
+            # revealed: int
+            [reveal_type(x) for _ in IntIterable()]
+```
+
 ## Class scopes
 
 TODO class scopes also run eagerly:
