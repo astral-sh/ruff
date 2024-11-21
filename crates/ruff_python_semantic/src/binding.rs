@@ -136,6 +136,12 @@ impl<'a> Binding<'a> {
     }
 
     /// Return `true` if this [`Binding`] represents a [PEP 613] explicit type alias
+    /// e.g. `OptString` in:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptString: TypeAlias = str | None
+    /// ```
     ///
     /// [PEP 613]: https://peps.python.org/pep-0613/
     pub const fn is_explicit_type_alias(&self) -> bool {
@@ -143,13 +149,17 @@ impl<'a> Binding<'a> {
     }
 
     /// Return `true` if this [`Binding`] represents a [PEP 695] generic type alias
+    /// e.g. `OptString` in:
+    /// ```python
+    /// type OptString = str | None
+    /// ```
     ///
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
     pub const fn is_generic_type_alias(&self) -> bool {
         self.flags.intersects(BindingFlags::GENERIC_TYPE_ALIAS)
     }
 
-    /// Return `true` if this [`Binding`] represents a type alias
+    /// Return `true` if this [`Binding`] represents either kind of type alias
     pub const fn is_type_alias(&self) -> bool {
         self.flags.intersects(BindingFlags::TYPE_ALIAS)
     }

@@ -882,7 +882,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit_generic_type_alias(value);
+                self.visit_generic_type_alias_value(value);
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -953,7 +953,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 if let Some(expr) = value {
                     if self.semantic.match_typing_expr(annotation, "TypeAlias") {
-                        self.visit_explicit_type_alias(expr);
+                        self.visit_explicit_type_alias_value(expr);
                     } else {
                         self.visit_expr(expr);
                     }
@@ -1843,20 +1843,34 @@ impl<'a> Checker<'a> {
         self.semantic.flags = snapshot;
     }
 
-    /// Visit an [`Expr`], and treat it as a [PEP 613] explicit type alias.
+    /// Visit an [`Expr`], and treat it as the value expression
+    /// of a [PEP 613] explicit type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+    /// ```
     ///
     /// [PEP 613]: https://peps.python.org/pep-0613/
-    fn visit_explicit_type_alias(&mut self, expr: &'a Expr) {
+    fn visit_explicit_type_alias_value(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXPLICIT_TYPE_ALIAS;
         self.visit_type_definition(expr);
         self.semantic.flags = snapshot;
     }
 
-    /// Visit an [`Expr`], and treat it as a [PEP 695] generic type alias.
+    /// Visit an [`Expr`], and treat it as the value expression
+    /// of a [PEP 695] generic type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// type OptStr = str | None  # We're visiting the RHS
+    /// ```
     ///
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-    fn visit_generic_type_alias(&mut self, expr: &'a Expr) {
+    fn visit_generic_type_alias_value(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
         // even though we don't visit these nodes immediately we need to
         // modify the semantic flags before we push the expression and its
@@ -2299,7 +2313,7 @@ impl<'a> Checker<'a> {
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
                     let parsed_expr = parsed_annotation.expression();
                     self.visit_expr(parsed_expr);
-                    if self.semantic.in_type_alias() {
+                    if self.semantic.in_type_alias_value() {
                         if self.enabled(Rule::QuotedTypeAlias) {
                             flake8_type_checking::rules::quoted_type_alias(
                                 self,

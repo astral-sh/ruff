@@ -247,7 +247,7 @@ pub(crate) fn quoted_type_alias(
     }
 
     // explicit type aliases require some additional checks to avoid false positives
-    if checker.semantic().in_explicit_type_alias()
+    if checker.semantic().in_explicit_type_alias_value()
         && quotes_are_unremovable(checker.semantic(), expr)
     {
         return;

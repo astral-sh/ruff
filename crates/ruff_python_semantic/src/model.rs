@@ -1754,24 +1754,39 @@ impl<'a> SemanticModel<'a> {
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
 
-    /// Return `true` if the model is in a [PEP 613] explicit type alias
+    /// Return `true` if the model is visiting the value expression
+    /// of a [PEP 613] explicit type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+    /// ```
     ///
     /// [PEP 613]: https://peps.python.org/pep-0613/
-    pub const fn in_explicit_type_alias(&self) -> bool {
+    pub const fn in_explicit_type_alias_value(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::EXPLICIT_TYPE_ALIAS)
     }
 
-    /// Return `true` if the model is in a [PEP 695] generic type alias
+    /// Return `true` if the model is visiting the value expression
+    /// of a [PEP 695] generic type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// type OptStr = str | None  # We're visiting the RHS
+    /// ```
     ///
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-    pub const fn in_generic_type_alias(&self) -> bool {
+    pub const fn in_generic_type_alias_value(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::GENERIC_TYPE_ALIAS)
     }
 
-    /// Return `true` if the model is in a type alias
-    pub const fn in_type_alias(&self) -> bool {
+    /// Return `true` if the model is visiting the value expression of
+    /// either kind of type alias.
+    pub const fn in_type_alias_value(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::TYPE_ALIAS)
     }
 
@@ -2336,10 +2351,22 @@ bitflags! {
 
         /// The model is in the value expression of a [PEP 613] explicit type alias.
         ///
+        /// For example:
+        /// ```python
+        /// from typing import TypeAlias
+        ///
+        /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+        /// ```
+        ///
         /// [PEP 613]: https://peps.python.org/pep-0613/
         const EXPLICIT_TYPE_ALIAS = 1 << 26;
 
-        /// The model is in the value expression of a [PEP 695] type statement
+        /// The model is in the value expression of a [PEP 695] type statement.
+        ///
+        /// For example:
+        /// ```python
+        /// type OptStr = str | None  # We're visiting the RHS
+        /// ```
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
         const GENERIC_TYPE_ALIAS = 1 << 27;
