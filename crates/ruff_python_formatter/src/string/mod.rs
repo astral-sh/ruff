@@ -135,7 +135,7 @@ impl<'a> FStringMultilineVisitor<'a> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for FStringMultilineVisitor<'a> {
-    fn enter_node(&mut self, _node: ruff_python_ast::AnyNodeRef<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, _node: ast::AnyNodeRef<'a>) -> TraversalSignal {
         if self.is_multiline {
             TraversalSignal::Skip
         } else {
@@ -164,8 +164,9 @@ impl<'a> SourceOrderVisitor<'a> for FStringMultilineVisitor<'a> {
                     // Expressions containing comments can't be joined.
                     self.context.comments().contains_comments(expression.into())
                 } else {
-                    // Multiline f-string expressions can't be joined if the f-string formatting is disabled because
-                    // the string gets inserted in verbatim preserving the newlines.
+                    // Multiline f-string expressions can't be joined if the f-string formatting is
+                    // disabled because the string gets inserted in verbatim preserving the
+                    // newlines.
                     self.context
                         .source()
                         .contains_line_break(expression.range())
@@ -175,6 +176,14 @@ impl<'a> SourceOrderVisitor<'a> for FStringMultilineVisitor<'a> {
         if is_multiline {
             self.is_multiline = true;
         } else {
+            // Continue walking the f-string elements to visit the ones in format specifiers.
+            //
+            // For example, the following should be considered multiline because the literal part
+            // of the format specifier contains a newline at the end (`.3f\n`):
+            // ```py
+            // x = f"hello {a + b + c + d:.3f
+            // } world"
+            // ```
             walk_f_string_element(self, f_string_element);
         }
     }

@@ -408,7 +408,7 @@ pub enum StringLike<'a> {
 }
 
 impl<'a> StringLike<'a> {
-    pub const fn is_fstring(self) -> bool {
+    pub const fn is_f_string(self) -> bool {
         matches!(self, Self::FString(_))
     }
 

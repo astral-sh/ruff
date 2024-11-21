@@ -332,6 +332,40 @@ xxxxxxx = f"{
     {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
 }"
 
+# Same as above but with an inline comment. The f-string should be formatted inside the
+# parentheses and the comment should be part of the line inside the parentheses.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"  # comment
+
+# Similar to the previous example but this time parenthesizing doesn't work because it
+# exceeds the line length. So, avoid parenthesizing this f-string.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"  # comment loooooooong
+
+# Similar to the previous example but we start with the parenthesized layout. This should
+# remove the parentheses and format the f-string on a single line. This shows that the
+# final layout for the formatter is same for this and the previous case. The only
+# difference is that in the previous case the expression is already mulitline which means
+# the formatter can break it further at the curly braces.
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"  # comment loooooooong
+)
+
+# The following f-strings are going to break because of the trailing comma so we should
+# avoid using the best fit layout and instead use the default layout.
+# left-to-right
+aaaa = f"aaaa {[
+    1, 2,
+]} bbbb"
+# right-to-left
+aaaa, bbbb = f"aaaa {[
+    1, 2,
+]} bbbb"
+
+# Using the right-to-left assignment statement variant.
+aaaaaaaaaaaaaaaaaa, bbbbbbbbbbb = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"  # comment
+
 # This is an implicitly concatenated f-string but it cannot be joined because otherwise
 # it'll exceed the line length limit. So, the two f-strings will be inside parentheses
 # instead and the inline comment should be outside the parentheses.
