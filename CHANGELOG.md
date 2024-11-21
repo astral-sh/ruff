@@ -14,9 +14,9 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Changed location of `pydoclint` diagnostics**
 
-    The [`pydoclint`](https://docs.astral.sh/ruff/rules/#pydoclint-doc) diagnostics now point to the first-line of the problematic docstring. Previously, this was not the case.
+    [`pydoclint`](https://docs.astral.sh/ruff/rules/#pydoclint-doc) diagnostics now point to the first-line of the problematic docstring. Previously, this was not the case.
 
-    If you've opted into these rules but have them suppressed using
+    If you've opted into these preview rules but have them suppressed using
     [`noqa`](https://docs.astral.sh/ruff/linter/#error-suppression) comments in
     some places, this change may mean that you need to move the `noqa` suppression
     comments. Most users should be unaffected by this change.
@@ -29,7 +29,7 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Changes to the line width calculation**
 
-    Ruff now uses a new version of the [unicode-width](https://github.com/unicode-rs/unicode-width) Rust crate to calculate the line width. In very rare cases, this can lead to lines containing Unicode characters to get reformatted, or be considered too long ([`E501`](https://docs.astral.sh/ruff/rules/line-too-long/)).
+    Ruff now uses a new version of the [unicode-width](https://github.com/unicode-rs/unicode-width) Rust crate to calculate the line width. In very rare cases, this may lead to lines containing Unicode characters being reformatted, or being considered too long when they were not before ([`E501`](https://docs.astral.sh/ruff/rules/line-too-long/)).
 
 ### Removed Rules
 
