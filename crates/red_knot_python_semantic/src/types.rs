@@ -324,7 +324,7 @@ fn declarations_ty<'db>(
     }
 }
 
-/// Meta data for `Type::Todo`, which represents a known limitation in the type system.
+/// Meta data for `Type::Todo`, which represents a known limitation in red-knot.
 #[cfg(debug_assertions)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TodoType {
@@ -1236,7 +1236,7 @@ impl<'db> Type<'db> {
                 // TODO: implement tuple methods
                 todo_type!().into()
             }
-            Type::Todo(_) => todo_type!().into(),
+            &todo @ Type::Todo(_) => todo.into(),
         }
     }
 
@@ -3674,7 +3674,7 @@ pub(crate) mod tests {
         // A union of several `Todo` types collapses to a single `Todo` type:
         assert!(UnionType::from_elements(&db, vec![todo1, todo2, todo3, todo4]).is_todo());
 
-        // An similar for intersection types:
+        // And similar for intersection types:
         assert!(IntersectionBuilder::new(&db)
             .add_positive(todo1)
             .add_positive(todo2)
