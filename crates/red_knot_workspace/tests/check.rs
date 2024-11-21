@@ -266,15 +266,14 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-    // Related to recursive class definition?
+    // related to circular references in class definitions
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, false),
-    // fails with salsa cycle panic for something like `type x = x`:
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F811_19.py", true, false),
+    ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP039.py", true, false),
+    // related to circular references in type aliases (salsa cycle panic):
     ("crates/ruff_python_parser/resources/inline/err/type_alias_invalid_value_expr.py", true, true),
     // related to string annotations (https://github.com/astral-sh/ruff/issues/14440)
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_14.py", false, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F632.py", true, true),
-    // Fails for unknown reasons:
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F811_19.py", true, false),
-    ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP039.py", true, false),
 ];
