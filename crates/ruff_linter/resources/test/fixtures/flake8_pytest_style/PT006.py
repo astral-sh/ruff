@@ -70,6 +70,7 @@ def test_implicit_str_concat_with_multi_parens(param1, param2, param3):
 def test_csv_with_parens(param1, param2):
     ...
 
+
 parametrize = pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
 
 @parametrize
