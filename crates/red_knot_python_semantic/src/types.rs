@@ -412,7 +412,7 @@ pub enum Type<'db> {
     Instance(InstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
     KnownInstance(KnownInstanceType<'db>),
-    /// A type alias, with a name and corresponding type
+    /// A PEP 695 type alias, with a name and corresponding type
     TypeAlias(TypeAliasType<'db>),
     /// The set of objects in any of the types in the union
     Union(UnionType<'db>),
