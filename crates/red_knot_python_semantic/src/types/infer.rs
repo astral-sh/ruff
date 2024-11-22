@@ -6035,6 +6035,72 @@ mod tests {
         );
     }
 
+    #[test]
+    fn pep695_type_params() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            def f[T, U: A, V: (A, B), W = A, X: A = A1, Y: (int,)]():
+                pass
+
+            class A: ...
+            class B: ...
+            class A1(A): ...
+            ",
+        )
+        .unwrap();
+
+        let check_typevar = |var: &'static str,
+                             upper_bound: Option<&'static str>,
+                             constraints: Option<&[&'static str]>,
+                             default: Option<&'static str>| {
+            let var_ty = get_symbol(&db, "src/a.py", &["f"], var).expect_type();
+            assert_eq!(var_ty.display(&db).to_string(), var);
+
+            let expected_name_ty = format!(r#"Literal["{var}"]"#);
+            let name_ty = var_ty.member(&db, "__name__").expect_type();
+            assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
+
+            let KnownInstanceType::TypeVar(typevar) = var_ty.expect_known_instance() else {
+                panic!("expected TypeVar");
+            };
+
+            assert_eq!(
+                typevar
+                    .upper_bound(&db)
+                    .map(|ty| ty.display(&db).to_string()),
+                upper_bound.map(std::borrow::ToOwned::to_owned)
+            );
+            assert_eq!(
+                typevar.constraints(&db).map(|tys| tys
+                    .iter()
+                    .map(|ty| ty.display(&db).to_string())
+                    .collect::<Vec<_>>()),
+                constraints.map(|strings| strings
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<_>>())
+            );
+            assert_eq!(
+                typevar
+                    .default_ty(&db)
+                    .map(|ty| ty.display(&db).to_string()),
+                default.map(std::borrow::ToOwned::to_owned)
+            );
+        };
+
+        check_typevar("T", None, None, None);
+        check_typevar("U", Some("A"), None, None);
+        check_typevar("V", None, Some(&["A", "B"]), None);
+        check_typevar("W", None, None, Some("A"));
+        check_typevar("X", Some("A"), None, Some("A1"));
+
+        // a typevar with less than two constraints is treated as unconstrained
+        check_typevar("Y", None, None, None);
+    }
+
     // Incremental inference tests
 
     fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
