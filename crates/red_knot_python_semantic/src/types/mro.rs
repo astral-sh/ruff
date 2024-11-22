@@ -5,7 +5,7 @@ use itertools::Either;
 use rustc_hash::FxHashSet;
 
 use super::{Class, ClassLiteralType, KnownClass, KnownInstanceType, Type};
-use crate::Db;
+use crate::{types::todo_type, Db};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -354,7 +354,7 @@ impl<'db> ClassBase<'db> {
         match ty {
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
-            Type::Todo => Some(Self::Todo),
+            Type::Todo(_) => Some(Self::Todo),
             Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
@@ -372,7 +372,9 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_) => None,
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::Literal
+                | KnownInstanceType::Union
                 | KnownInstanceType::Optional => None,
             },
         }
@@ -405,7 +407,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
             ClassBase::Any => Type::Any,
-            ClassBase::Todo => Type::Todo,
+            ClassBase::Todo => todo_type!(),
             ClassBase::Unknown => Type::Unknown,
             ClassBase::Class(class) => Type::class_literal(class),
         }

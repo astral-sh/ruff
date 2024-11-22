@@ -112,9 +112,9 @@ properties on instance types:
 ```py path=b.py
 import sys
 
-reveal_type(sys.version_info.micro)  # revealed: @Todo
-reveal_type(sys.version_info.releaselevel)  # revealed: @Todo
-reveal_type(sys.version_info.serial)  # revealed: @Todo
+reveal_type(sys.version_info.micro)  # revealed: @Todo(instance attributes)
+reveal_type(sys.version_info.releaselevel)  # revealed: @Todo(instance attributes)
+reveal_type(sys.version_info.serial)  # revealed: @Todo(instance attributes)
 ```
 
 ## Accessing fields by index/slice

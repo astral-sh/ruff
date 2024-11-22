@@ -2489,7 +2489,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.7.4"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2708,7 +2708,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.7.4"
+version = "0.8.0"
 dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.2",
@@ -3023,7 +3023,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.7.4"
+version = "0.8.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3072,6 +3072,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_semantic",
+ "ruff_python_stdlib",
  "ruff_source_file",
  "rustc-hash 2.0.0",
  "schemars",

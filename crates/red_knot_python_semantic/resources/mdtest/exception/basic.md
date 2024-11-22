@@ -50,11 +50,11 @@ def foo(
         help()
     except x as e:
         # TODO: should be `AttributeError`
-        reveal_type(e)  # revealed: @Todo
+        reveal_type(e)  # revealed: @Todo(exception type)
     except y as f:
         # TODO: should be `OSError | RuntimeError`
-        reveal_type(f)  # revealed: @Todo
+        reveal_type(f)  # revealed: @Todo(exception type)
     except z as g:
         # TODO: should be `BaseException`
-        reveal_type(g)  # revealed: @Todo
+        reveal_type(g)  # revealed: @Todo(exception type)
 ```

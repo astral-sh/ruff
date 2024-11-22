@@ -12,13 +12,13 @@ x = [1, 2, 3]
 reveal_type(x)  # revealed: list
 
 # TODO reveal int
-reveal_type(x[0])  # revealed: @Todo
+reveal_type(x[0])  # revealed: @Todo(return type)
 
 # TODO reveal list
-reveal_type(x[0:1])  # revealed: @Todo
+reveal_type(x[0:1])  # revealed: @Todo(return type)
 
 # TODO error
-reveal_type(x["a"])  # revealed: @Todo
+reveal_type(x["a"])  # revealed: @Todo(return type)
 ```
 
 ## Assignments within list assignment

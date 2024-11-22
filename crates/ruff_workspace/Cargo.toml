@@ -21,6 +21,7 @@ ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true, features = ["serde"] }
 ruff_python_semantic = { workspace = true, features = ["serde"] }
+ruff_python_stdlib = {workspace = true}
 ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }

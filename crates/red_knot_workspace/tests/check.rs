@@ -264,26 +264,16 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 }
 
 /// Whether or not the .py/.pyi version of this file is expected to fail
+#[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-    // Probably related to missing support for type aliases / type params:
-    ("crates/ruff_python_parser/resources/inline/err/type_param_invalid_bound_expr.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/err/type_param_param_spec_invalid_default_expr.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/err/type_param_type_var_invalid_default_expr.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/err/type_param_type_var_missing_default.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/err/type_param_type_var_tuple_invalid_default_expr.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/ok/type_param_param_spec.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/ok/type_param_type_var_tuple.py", true, true),
-    ("crates/ruff_python_parser/resources/inline/ok/type_param_type_var.py", true, true),
-    ("crates/ruff_python_parser/resources/valid/statement/type.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/TC004_15.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_19.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_14.py", false, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_17.py", true, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_20.py", true, true),
+    // related to circular references in class definitions
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, false),
-    // Fails for unknown reasons:
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F632.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F811_19.py", true, false),
     ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP039.py", true, false),
+    // related to circular references in type aliases (salsa cycle panic):
+    ("crates/ruff_python_parser/resources/inline/err/type_alias_invalid_value_expr.py", true, true),
+    // related to string annotations (https://github.com/astral-sh/ruff/issues/14440)
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_14.py", false, true),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F632.py", true, true),
 ];
