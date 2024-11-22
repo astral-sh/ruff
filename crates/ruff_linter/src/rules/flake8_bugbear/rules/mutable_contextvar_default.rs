@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, is_mutable_func};
@@ -92,11 +93,11 @@ pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::Expr
         || matches!(
             default,
             Expr::Call(ast::ExprCall { func, .. })
-                if !is_mutable_func(func, checker.semantic())
-                    && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)))
+                if !is_mutable_func(map_subscript(func), checker.semantic())
+                    && !is_immutable_func(map_subscript(func), checker.semantic(), &extend_immutable_calls)))
         && checker
             .semantic()
-            .resolve_qualified_name(&call.func)
+            .resolve_qualified_name(map_subscript(&call.func))
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
             })
