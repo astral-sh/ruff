@@ -55,14 +55,14 @@ pub(crate) fn runtime_cast_value(checker: &mut Checker, type_expr: &Expr) {
 
     let mut diagnostic = Diagnostic::new(RuntimeCastValue, type_expr.range());
     let edit = quote_type_expression(type_expr, checker.semantic(), checker.stylist()).ok();
-    if let Some(edit) = edit.as_ref() {
+    if let Some(edit) = edit {
         if checker
             .comment_ranges()
             .has_comments(type_expr, checker.source())
         {
-            diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+            diagnostic.set_fix(Fix::unsafe_edit(edit));
         } else {
-            diagnostic.set_fix(Fix::safe_edit(edit.clone()));
+            diagnostic.set_fix(Fix::safe_edit(edit));
         }
     }
     checker.diagnostics.push(diagnostic);
