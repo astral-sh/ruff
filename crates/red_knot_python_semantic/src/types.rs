@@ -537,6 +537,19 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::IntLiteral variant")
     }
 
+    pub const fn into_known_instance(self) -> Option<KnownInstanceType<'db>> {
+        match self {
+            Type::KnownInstance(known_instance) => Some(known_instance),
+            _ => None,
+        }
+    }
+
+    #[track_caller]
+    pub fn expect_known_instance(self) -> KnownInstanceType<'db> {
+        self.into_known_instance()
+            .expect("Expected a Type::KnownInstance variant")
+    }
+
     pub const fn is_boolean_literal(&self) -> bool {
         matches!(self, Type::BooleanLiteral(..))
     }
@@ -1951,23 +1964,6 @@ impl<'db> KnownInstanceType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let ty = match (self, name) {
             (Self::TypeVar(typevar), "__name__") => Type::string_literal(db, typevar.name(db)),
-            (Self::TypeVar(typevar), "__bound__") => typevar
-                .upper_bound(db)
-                .map(|ty| ty.to_meta_type(db))
-                .unwrap_or_else(|| KnownClass::NoneType.to_instance(db)),
-            (Self::TypeVar(typevar), "__constraints__") => {
-                let tuple_elements: Vec<Type<'db>> = typevar
-                    .constraints(db)
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|ty| ty.to_meta_type(db))
-                    .collect();
-                Type::tuple(db, &tuple_elements)
-            }
-            (Self::TypeVar(typevar), "__default__") => typevar
-                .default_ty(db)
-                .map(|ty| ty.to_meta_type(db))
-                .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
             (Self::TypeAliasType(alias), "__name__") => Type::string_literal(db, alias.name(db)),
             _ => return self.instance_fallback(db).member(db, name),
         };
@@ -2000,6 +1996,7 @@ pub struct TypeVarInstance<'db> {
 }
 
 impl<'db> TypeVarInstance<'db> {
+    #[allow(unused)]
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
@@ -2008,6 +2005,7 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
         if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
             Some(tuple.elements(db))
