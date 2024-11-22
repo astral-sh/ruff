@@ -5,7 +5,8 @@ use std::iter::FusedIterator;
 use ruff_formatter::FormatContext;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
-    str::Quote, AnyStringFlags, BytesLiteral, FString, StringFlags, StringLikePart, StringLiteral,
+    str::Quote, AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements,
+    FStringFlags, StringFlags, StringLikePart, StringLiteral,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
@@ -77,6 +78,10 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                         ) {
                             return QuoteStyle::Preserve;
                         }
+                    }
+                } else if let StringLikePart::FString(fstring) = string {
+                    if is_fstring_with_quoted_format_spec_and_debug(fstring, self.context) {
+                        return QuoteStyle::Preserve;
                     }
                 }
 
@@ -262,37 +267,14 @@ impl QuoteMetadata {
             }
             StringLikePart::FString(fstring) => {
                 if is_f_string_formatting_enabled(context) {
-                    // For f-strings, only consider the quotes inside string-literals but ignore
-                    // quotes inside expressions. This allows both the outer and the nested literals
-                    // to make the optimal local-choice to reduce the total number of quotes necessary.
-                    // This doesn't require any pre 312 special handling because an expression
-                    // can never contain the outer quote character, not even escaped:
-                    // ```python
-                    // f"{'escaping a quote like this \" is a syntax error pre 312'}"
-                    // ```
-                    let mut literals = fstring.elements.literals();
+                    let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
 
-                    let Some(first) = literals.next() else {
-                        return QuoteMetadata::from_str("", part.flags(), preferred_quote);
-                    };
-
-                    let mut metadata = QuoteMetadata::from_str(
-                        context.source().slice(first),
-                        fstring.flags.into(),
+                    metadata.merge_fstring_elements(
+                        &fstring.elements,
+                        fstring.flags,
+                        context,
                         preferred_quote,
-                    );
-
-                    for literal in literals {
-                        metadata = metadata
-                            .merge(&QuoteMetadata::from_str(
-                                context.source().slice(literal),
-                                fstring.flags.into(),
-                                preferred_quote,
-                            ))
-                            .expect("Merge to succeed because all parts have the same flags");
-                    }
-
-                    metadata
+                    )
                 } else {
                     let text = &context.source()[part.content_range()];
 
@@ -397,6 +379,52 @@ impl QuoteMetadata {
             kind,
             source_style: self.source_style,
         })
+    }
+
+    /// For f-strings, only consider the quotes inside string-literals but ignore
+    /// quotes inside expressions (except inside the format spec). This allows both the outer and the nested literals
+    /// to make the optimal local-choice to reduce the total number of quotes necessary.
+    /// This doesn't require any pre 312 special handling because an expression
+    /// can never contain the outer quote character, not even escaped:
+    /// ```python
+    /// f"{'escaping a quote like this \" is a syntax error pre 312'}"
+    /// ```
+    fn merge_fstring_elements(
+        self,
+        elements: &FStringElements,
+        flags: FStringFlags,
+        context: &PyFormatContext,
+        preferred_quote: Quote,
+    ) -> Self {
+        let mut merged = self;
+
+        for element in elements {
+            match element {
+                FStringElement::Literal(literal) => {
+                    merged = merged
+                        .merge(&QuoteMetadata::from_str(
+                            context.source().slice(literal),
+                            flags.into(),
+                            preferred_quote,
+                        ))
+                        .expect("Merge to succeed because all parts have the same flags");
+                }
+                FStringElement::Expression(expression) => {
+                    if let Some(spec) = expression.format_spec.as_deref() {
+                        if expression.debug_text.is_none() {
+                            merged = merged.merge_fstring_elements(
+                                &spec.elements,
+                                flags,
+                                context,
+                                preferred_quote,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        merged
     }
 }
 
@@ -891,33 +919,66 @@ pub(super) fn is_fstring_with_quoted_debug_expression(
     fstring: &FString,
     context: &PyFormatContext,
 ) -> bool {
-    if fstring.elements.expressions().any(|expression| {
+    fstring.elements.expressions().any(|expression| {
         if expression.debug_text.is_some() {
             let content = context.source().slice(expression);
-            match fstring.flags.quote_style() {
-                Quote::Single => {
-                    if fstring.flags.is_triple_quoted() {
-                        content.contains(r#"""""#)
-                    } else {
-                        content.contains('"')
-                    }
-                }
-                Quote::Double => {
-                    if fstring.flags.is_triple_quoted() {
-                        content.contains("'''")
-                    } else {
-                        content.contains('\'')
-                    }
-                }
-            }
+            contains_opposite_quote(content, fstring.flags.into())
         } else {
             false
         }
-    }) {
-        return true;
+    })
+}
+
+/// Returns `true` if `string` has any f-string expression element (direct or nested) with a debug expression and a format spec
+/// that contains the opposite quote. It's important to preserve the quote style for those f-strings
+/// because changing the quote style would result in invalid syntax.
+///
+/// ```python
+/// f'{1=: "abcd \'\'}'
+/// f'{x=:a{y:"abcd"}}'
+/// f'{x=:a{y:{z:"abcd"}}}'
+/// ```
+pub(super) fn is_fstring_with_quoted_format_spec_and_debug(
+    fstring: &FString,
+    context: &PyFormatContext,
+) -> bool {
+    fn has_format_spec_with_opposite_quote(
+        elements: &FStringElements,
+        flags: FStringFlags,
+        context: &PyFormatContext,
+        in_debug: bool,
+    ) -> bool {
+        elements.iter().any(|element| match element {
+            FStringElement::Literal(literal) => {
+                let content = context.source().slice(literal);
+
+                in_debug && contains_opposite_quote(content, flags.into())
+            }
+            FStringElement::Expression(expression) => {
+                expression.format_spec.as_deref().is_some_and(|spec| {
+                    has_format_spec_with_opposite_quote(
+                        &spec.elements,
+                        flags,
+                        context,
+                        in_debug || expression.debug_text.is_some(),
+                    )
+                })
+            }
+        })
     }
 
-    false
+    fstring.elements.expressions().any(|expression| {
+        if let Some(spec) = expression.format_spec.as_deref() {
+            return has_format_spec_with_opposite_quote(
+                &spec.elements,
+                fstring.flags,
+                context,
+                expression.debug_text.is_some(),
+            );
+        }
+
+        false
+    })
 }
 
 /// Tests if the `fstring` contains any triple quoted string, byte, or f-string literal that
@@ -995,6 +1056,40 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
     ruff_python_ast::visitor::source_order::walk_f_string(&mut visitor, fstring);
 
     visitor.found
+}
+
+fn contains_opposite_quote(content: &str, flags: AnyStringFlags) -> bool {
+    if flags.is_triple_quoted() {
+        match flags.quote_style() {
+            Quote::Single => content.contains(r#"""""#),
+            Quote::Double => content.contains("'''"),
+        }
+    } else {
+        let mut rest = content;
+
+        while let Some(index) = rest.find(flags.quote_style().opposite().as_char()) {
+            // Quotes in raw strings can't be escaped
+            if flags.is_raw_string() {
+                return true;
+            }
+
+            // Only if the quote isn't escaped
+            if rest[..index]
+                .chars()
+                .rev()
+                .take_while(|c| *c == '\\')
+                .count()
+                % 2
+                == 0
+            {
+                return true;
+            }
+
+            rest = &rest[index + flags.quote_style().opposite().as_char().len_utf8()..];
+        }
+
+        false
+    }
 }
 
 #[cfg(test)]

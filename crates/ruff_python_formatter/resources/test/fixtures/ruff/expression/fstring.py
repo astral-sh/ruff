@@ -346,3 +346,6 @@ _ = (
     f'This string uses double quotes in an expression {"it's a quote"}'
     f'This f-string does not use any quotes.'
 )
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14487
+f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"

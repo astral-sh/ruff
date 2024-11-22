@@ -745,6 +745,9 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "Alias": {
+      "type": "string"
+    },
     "AnalyzeOptions": {
       "description": "Configures Ruff's `analyze` command.",
       "type": "object",
@@ -1134,7 +1137,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/definitions/Alias"
           }
         },
         "banned-aliases": {

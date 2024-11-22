@@ -1,5 +1,104 @@
 # Changelog
 
+## 0.8.0
+
+Check out the [blog post](https://astral.sh/blog/ruff-v0.8.0) for a migration guide and overview of the changes!
+
+### Breaking changes
+
+See also, the "Remapped rules" section which may result in disabled rules.
+
+- **Default to Python 3.9**
+
+    Ruff now defaults to Python 3.9 instead of 3.8 if no explicit Python version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version) or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires) ([#13896](https://github.com/astral-sh/ruff/pull/13896))
+
+- **Changed location of `pydoclint` diagnostics**
+
+    [`pydoclint`](https://docs.astral.sh/ruff/rules/#pydoclint-doc) diagnostics now point to the first-line of the problematic docstring. Previously, this was not the case.
+
+    If you've opted into these preview rules but have them suppressed using
+    [`noqa`](https://docs.astral.sh/ruff/linter/#error-suppression) comments in
+    some places, this change may mean that you need to move the `noqa` suppression
+    comments. Most users should be unaffected by this change.
+
+- **Use XDG (i.e. `~/.local/bin`) instead of the Cargo home directory in the standalone installer**
+
+    Previously, Ruff's installer used `$CARGO_HOME` or `~/.cargo/bin` for its target install directory. Now, Ruff will be installed into `$XDG_BIN_HOME`, `$XDG_DATA_HOME/../bin`, or `~/.local/bin` (in that order).
+
+    This change is only relevant to users of the standalone Ruff installer (using the shell or PowerShell script). If you installed Ruff using uv or pip, you should be unaffected.
+
+- **Changes to the line width calculation**
+
+    Ruff now uses a new version of the [unicode-width](https://github.com/unicode-rs/unicode-width) Rust crate to calculate the line width. In very rare cases, this may lead to lines containing Unicode characters being reformatted, or being considered too long when they were not before ([`E501`](https://docs.astral.sh/ruff/rules/line-too-long/)).
+
+### Removed Rules
+
+The following deprecated rules have been removed:
+
+- [`missing-type-self`](https://docs.astral.sh/ruff/rules/missing-type-self/) (`ANN101`)
+- [`missing-type-cls`](https://docs.astral.sh/ruff/rules/missing-type-cls/) (`ANN102`)
+- [`syntax-error`](https://docs.astral.sh/ruff/rules/syntax-error/) (`E999`)
+- [`pytest-missing-fixture-name-underscore`](https://docs.astral.sh/ruff/rules/pytest-missing-fixture-name-underscore/) (`PT004`)
+- [`pytest-incorrect-fixture-name-underscore`](https://docs.astral.sh/ruff/rules/pytest-incorrect-fixture-name-underscore/) (`PT005`)
+- [`unpacked-list-comprehension`](https://docs.astral.sh/ruff/rules/unpacked-list-comprehension/) (`UP027`)
+
+### Remapped rules
+
+The following rules have been remapped to new rule codes:
+
+- [`flake8-type-checking`](https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc): `TCH` to `TC`
+
+### Stabilization
+
+The following rules have been stabilized and are no longer in preview:
+
+- [`builtin-import-shadowing`](https://docs.astral.sh/ruff/rules/builtin-import-shadowing/) (`A004`)
+- [`mutable-contextvar-default`](https://docs.astral.sh/ruff/rules/mutable-contextvar-default/) (`B039`)
+- [`fast-api-redundant-response-model`](https://docs.astral.sh/ruff/rules/fast-api-redundant-response-model/) (`FAST001`)
+- [`fast-api-non-annotated-dependency`](https://docs.astral.sh/ruff/rules/fast-api-non-annotated-dependency/) (`FAST002`)
+- [`dict-index-missing-items`](https://docs.astral.sh/ruff/rules/dict-index-missing-items/) (`PLC0206`)
+- [`pep484-style-positional-only-parameter`](https://docs.astral.sh/ruff/rules/pep484-style-positional-only-parameter/) (`PYI063`)
+- [`redundant-final-literal`](https://docs.astral.sh/ruff/rules/redundant-final-literal/) (`PYI064`)
+- [`bad-version-info-order`](https://docs.astral.sh/ruff/rules/bad-version-info-order/) (`PYI066`)
+- [`parenthesize-chained-operators`](https://docs.astral.sh/ruff/rules/parenthesize-chained-operators/) (`RUF021`)
+- [`unsorted-dunder-all`](https://docs.astral.sh/ruff/rules/unsorted-dunder-all/) (`RUF022`)
+- [`unsorted-dunder-slots`](https://docs.astral.sh/ruff/rules/unsorted-dunder-slots/) (`RUF023`)
+- [`assert-with-print-message`](https://docs.astral.sh/ruff/rules/assert-with-print-message/) (`RUF030`)
+- [`unnecessary-default-type-args`](https://docs.astral.sh/ruff/rules/unnecessary-default-type-args/) (`UP043`)
+
+The following behaviors have been stabilized:
+
+- [`ambiguous-variable-name`](https://docs.astral.sh/ruff/rules/ambiguous-variable-name/) (`E741`): Violations in stub files are now ignored. Stub authors typically don't control variable names.
+- [`printf-string-formatting`](https://docs.astral.sh/ruff/rules/printf-string-formatting/) (`UP031`): Report all `printf`-like usages even if no autofix is available
+
+The following fixes have been stabilized:
+
+- [`zip-instead-of-pairwise`](https://docs.astral.sh/ruff/rules/zip-instead-of-pairwise/) (`RUF007`)
+
+### Preview features
+
+- \[`flake8-datetimez`\] Exempt `min.time()` and `max.time()` (`DTZ901`) ([#14394](https://github.com/astral-sh/ruff/pull/14394))
+- \[`flake8-pie`\] Mark fix as unsafe if the following statement is a string literal (`PIE790`) ([#14393](https://github.com/astral-sh/ruff/pull/14393))
+- \[`flake8-pyi`\] New rule `redundant-none-literal` (`PYI061`) ([#14316](https://github.com/astral-sh/ruff/pull/14316))
+- \[`flake8-pyi`\] Add autofix for `redundant-numeric-union` (`PYI041`) ([#14273](https://github.com/astral-sh/ruff/pull/14273))
+- \[`ruff`\] New rule `map-int-version-parsing` (`RUF048`) ([#14373](https://github.com/astral-sh/ruff/pull/14373))
+- \[`ruff`\] New rule `redundant-bool-literal` (`RUF038`) ([#14319](https://github.com/astral-sh/ruff/pull/14319))
+- \[`ruff`\] New rule `unraw-re-pattern` (`RUF039`) ([#14446](https://github.com/astral-sh/ruff/pull/14446))
+- \[`pycodestyle`\] Exempt `pytest.importorskip()` calls (`E402`) ([#14474](https://github.com/astral-sh/ruff/pull/14474))
+- \[`pylint`\] Autofix suggests using sets when possible (`PLR1714`) ([#14372](https://github.com/astral-sh/ruff/pull/14372))
+
+### Rule changes
+
+- [`invalid-pyproject-toml`](https://docs.astral.sh/ruff/rules/invalid-pyproject-toml/) (`RUF200`): Updated to reflect the provisionally accepted [PEP 639](https://peps.python.org/pep-0639/).
+- \[`flake8-pyi`\] Avoid panic in unfixable case (`PYI041`) ([#14402](https://github.com/astral-sh/ruff/pull/14402))
+- \[`flake8-type-checking`\] Correctly handle quotes in subscript expression when generating an autofix ([#14371](https://github.com/astral-sh/ruff/pull/14371))
+- \[`pylint`\] Suggest correct autofix for `__contains__` (`PLC2801`) ([#14424](https://github.com/astral-sh/ruff/pull/14424))
+
+### Configuration
+
+- Ruff now emits a warning instead of an error when a configuration [`ignore`](https://docs.astral.sh/ruff/settings/#lint_ignore)s a rule that has been removed ([#14435](https://github.com/astral-sh/ruff/pull/14435))
+- Ruff now validates that `lint.flake8-import-conventions.aliases` only uses valid module names and aliases ([#14477](https://github.com/astral-sh/ruff/pull/14477))
+
 ## 0.7.4
 
 ### Preview features
@@ -978,7 +1077,7 @@ The following deprecated CLI commands have been removed:
 ### Preview features
 
 - \[`flake8-bugbear`\] Implement `return-in-generator` (`B901`) ([#11644](https://github.com/astral-sh/ruff/pull/11644))
-- \[`flake8-pyi`\] Implement `PYI063` ([#11699](https://github.com/astral-sh/ruff/pull/11699))
+- \[`flake8-pyi`\] Implement `pep484-style-positional-only-parameter` (`PYI063`) ([#11699](https://github.com/astral-sh/ruff/pull/11699))
 - \[`pygrep_hooks`\] Check blanket ignores via file-level pragmas (`PGH004`) ([#11540](https://github.com/astral-sh/ruff/pull/11540))
 
 ### Rule changes
