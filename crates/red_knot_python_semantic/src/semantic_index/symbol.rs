@@ -116,16 +116,11 @@ impl<'db> ScopeId<'db> {
         // Type parameter scopes behave like function scopes in terms of name resolution; CPython
         // symbol table also uses the term "function-like" for these scopes.
         matches!(
-            self.node(db),
-            NodeWithScopeKind::ClassTypeParameters(_)
-                | NodeWithScopeKind::FunctionTypeParameters(_)
-                | NodeWithScopeKind::Function(_)
-                | NodeWithScopeKind::TypeAlias(_)
-                | NodeWithScopeKind::TypeAliasTypeParameters(_)
-                | NodeWithScopeKind::ListComprehension(_)
-                | NodeWithScopeKind::SetComprehension(_)
-                | NodeWithScopeKind::DictComprehension(_)
-                | NodeWithScopeKind::GeneratorExpression(_)
+            self.node(db).scope_kind(),
+            ScopeKind::Annotation
+                | ScopeKind::Function
+                | ScopeKind::TypeAlias
+                | ScopeKind::Comprehension
         )
     }
 
