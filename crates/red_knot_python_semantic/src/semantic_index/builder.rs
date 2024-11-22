@@ -36,12 +36,25 @@ use super::definition::{
 
 mod except_handlers;
 
+/// Are we in a state where a `break` statement is allowed?
+#[derive(Clone, Copy, Debug)]
+enum LoopState {
+    InLoop,
+    NotInLoop,
+}
+
+impl LoopState {
+    fn is_inside(self) -> bool {
+        matches!(self, LoopState::InLoop)
+    }
+}
+
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
     file: File,
     module: &'db ParsedModule,
-    scope_stack: Vec<FileScopeId>,
+    scope_stack: Vec<(FileScopeId, LoopState)>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
     current_assignments: Vec<CurrentAssignment<'db>>,
@@ -50,10 +63,6 @@ pub(super) struct SemanticIndexBuilder<'db> {
 
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
-    /// Are we in a state where a `break` statement is allowed?
-    /// This stack mirrors `scope_stack`.
-    inside_loop_stack: Vec<bool>,
-
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
 
@@ -82,7 +91,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignments: vec![],
             current_match_case: None,
             loop_break_states: vec![],
-            inside_loop_stack: vec![],
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
@@ -108,21 +116,22 @@ impl<'db> SemanticIndexBuilder<'db> {
         *self
             .scope_stack
             .last()
+            .map(|(scope, _)| scope)
             .expect("Always to have a root scope")
     }
 
-    fn is_inside_loop(&self) -> bool {
-        *self
-            .inside_loop_stack
+    fn loop_state(&self) -> LoopState {
+        self.scope_stack
             .last()
             .expect("Always to have a root scope")
+            .1
     }
 
-    fn set_inside_loop(&mut self, yes: bool) {
-        *self
-            .inside_loop_stack
+    fn set_inside_loop(&mut self, state: LoopState) {
+        self.scope_stack
             .last_mut()
-            .expect("Always to have a root scope") = yes;
+            .expect("Always to have a root scope")
+            .1 = state;
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
@@ -155,13 +164,11 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         debug_assert_eq!(ast_id_scope, file_scope_id);
 
-        self.scope_stack.push(file_scope_id);
-        self.inside_loop_stack.push(false);
+        self.scope_stack.push((file_scope_id, LoopState::NotInLoop));
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
-        self.inside_loop_stack.pop();
-        let id = self.scope_stack.pop().expect("Root scope to be present");
+        let (id, _) = self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
@@ -806,8 +813,8 @@ where
 
                 // TODO: definitions created inside the body should be fully visible
                 // to other statements/expressions inside the body --Alex/Carl
-                let in_nested_loop = self.is_inside_loop();
-                self.set_inside_loop(true);
+                let in_nested_loop = self.loop_state();
+                self.set_inside_loop(LoopState::InLoop);
                 self.visit_body(body);
                 self.set_inside_loop(in_nested_loop);
 
@@ -848,7 +855,7 @@ where
                 self.visit_body(body);
             }
             ast::Stmt::Break(_) => {
-                if self.is_inside_loop() {
+                if self.loop_state().is_inside() {
                     self.loop_break_states.push(self.flow_snapshot());
                 }
             }
@@ -877,8 +884,8 @@ where
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
                 // are fully visible to other statements/expressions inside the body --Alex/Carl
-                let in_nested_loop = self.is_inside_loop();
-                self.set_inside_loop(true);
+                let in_nested_loop = self.loop_state();
+                self.set_inside_loop(LoopState::InLoop);
                 self.visit_body(body);
                 self.set_inside_loop(in_nested_loop);
 
