@@ -4,7 +4,6 @@ use std::io::Write;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
-
 use red_knot_python_semantic::{resolve_module, ModuleName, Program, PythonVersion, SitePackages};
 use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::watch;
@@ -14,7 +13,7 @@ use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ruff_db::testing::setup_logging;
+use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_db::Upcast;
 
 struct TestCase {
@@ -47,6 +46,8 @@ impl TestCase {
     }
 
     fn try_stop_watch(&mut self, timeout: Duration) -> Option<Vec<watch::ChangeEvent>> {
+        tracing::debug!("Try stopping watch with timeout {:?}", timeout);
+
         let watcher = self
             .watcher
             .take()
@@ -56,8 +57,11 @@ impl TestCase {
             .changes_receiver
             .recv_timeout(timeout)
             .unwrap_or_default();
+
         watcher.flush();
+        tracing::debug!("Flushed file watcher");
         watcher.stop();
+        tracing::debug!("Stopping file watcher");
 
         for event in &self.changes_receiver {
             all_events.extend(event);
@@ -600,6 +604,8 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
 
 #[test]
 fn directory_renamed() -> anyhow::Result<()> {
+    let _tracing = setup_logging_with_filter("file_watching=TRACE,red_knot=TRACE");
+
     let mut case = setup([
         ("bar.py", "import sub.a"),
         ("sub/__init__.py", ""),
@@ -639,6 +645,10 @@ fn directory_renamed() -> anyhow::Result<()> {
         .with_context(|| "Failed to move the sub directory")?;
 
     let changes = case.stop_watch();
+
+    for event in &changes {
+        tracing::debug!("Event: {:?}", event);
+    }
 
     case.apply_changes(changes);
 
