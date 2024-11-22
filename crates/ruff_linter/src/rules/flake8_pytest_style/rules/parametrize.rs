@@ -806,12 +806,10 @@ pub(crate) fn parametrize(checker: &mut Checker, call: &ExprCall) {
         }
     }
     if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-				let names = call.arguments.find_argument("argnames", 0) {
+        let names = call.arguments.find_argument("argnames", 0);
         let values = call.arguments.find_argument("argvalues", 1);
-        
         if let (Some(names), Some(values)) = (names, values) {
-                check_values(checker, names, values);
-            }
+            check_values(checker, names, values);
         }
     }
     if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
