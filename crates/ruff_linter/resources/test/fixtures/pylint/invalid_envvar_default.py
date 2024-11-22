@@ -12,3 +12,4 @@ os.getenv("AA", "GOOD %s" % "BAR")
 os.getenv("B", Z)
 os.getenv("AA", "GOOD" if Z else "BAR")
 os.getenv("AA", 1 if Z else "BAR")  # [invalid-envvar-default]
+os.environ.get("TEST", 12)  # [invalid-envvar-default]

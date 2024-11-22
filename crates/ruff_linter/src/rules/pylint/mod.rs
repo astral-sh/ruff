@@ -410,6 +410,7 @@ mod tests {
         Rule::RepeatedEqualityComparison,
         Path::new("repeated_equality_comparison.py")
     )]
+    #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
