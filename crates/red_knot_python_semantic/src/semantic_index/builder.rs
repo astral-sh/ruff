@@ -36,12 +36,25 @@ use super::definition::{
 
 mod except_handlers;
 
+/// Are we in a state where a `break` statement is allowed?
+#[derive(Clone, Copy, Debug)]
+enum LoopState {
+    InLoop,
+    NotInLoop,
+}
+
+impl LoopState {
+    fn is_inside(self) -> bool {
+        matches!(self, LoopState::InLoop)
+    }
+}
+
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
     file: File,
     module: &'db ParsedModule,
-    scope_stack: Vec<FileScopeId>,
+    scope_stack: Vec<(FileScopeId, LoopState)>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
     current_assignments: Vec<CurrentAssignment<'db>>,
@@ -103,7 +116,22 @@ impl<'db> SemanticIndexBuilder<'db> {
         *self
             .scope_stack
             .last()
+            .map(|(scope, _)| scope)
             .expect("Always to have a root scope")
+    }
+
+    fn loop_state(&self) -> LoopState {
+        self.scope_stack
+            .last()
+            .expect("Always to have a root scope")
+            .1
+    }
+
+    fn set_inside_loop(&mut self, state: LoopState) {
+        self.scope_stack
+            .last_mut()
+            .expect("Always to have a root scope")
+            .1 = state;
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
@@ -136,11 +164,11 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         debug_assert_eq!(ast_id_scope, file_scope_id);
 
-        self.scope_stack.push(file_scope_id);
+        self.scope_stack.push((file_scope_id, LoopState::NotInLoop));
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
-        let id = self.scope_stack.pop().expect("Root scope to be present");
+        let (id, _) = self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
@@ -785,7 +813,10 @@ where
 
                 // TODO: definitions created inside the body should be fully visible
                 // to other statements/expressions inside the body --Alex/Carl
+                let outer_loop_state = self.loop_state();
+                self.set_inside_loop(LoopState::InLoop);
                 self.visit_body(body);
+                self.set_inside_loop(outer_loop_state);
 
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
@@ -824,7 +855,9 @@ where
                 self.visit_body(body);
             }
             ast::Stmt::Break(_) => {
-                self.loop_break_states.push(self.flow_snapshot());
+                if self.loop_state().is_inside() {
+                    self.loop_break_states.push(self.flow_snapshot());
+                }
             }
 
             ast::Stmt::For(
@@ -851,7 +884,10 @@ where
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
                 // are fully visible to other statements/expressions inside the body --Alex/Carl
+                let outer_loop_state = self.loop_state();
+                self.set_inside_loop(LoopState::InLoop);
                 self.visit_body(body);
+                self.set_inside_loop(outer_loop_state);
 
                 let break_states =
                     std::mem::replace(&mut self.loop_break_states, saved_break_states);

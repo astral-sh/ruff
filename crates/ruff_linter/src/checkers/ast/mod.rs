@@ -1278,6 +1278,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
+
+                            if self.enabled(Rule::RuntimeCastValue) {
+                                flake8_type_checking::rules::runtime_cast_value(self, arg);
+                            }
                         }
                         for arg in args {
                             self.visit_expr(arg);
