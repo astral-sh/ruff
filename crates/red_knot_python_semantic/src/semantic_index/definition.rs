@@ -83,6 +83,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     For(ForStmtDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
     Class(&'a ast::StmtClassDef),
+    TypeAlias(&'a ast::StmtTypeAlias),
     NamedExpression(&'a ast::ExprNamed),
     Assignment(AssignmentDefinitionNodeRef<'a>),
     AnnotatedAssignment(&'a ast::StmtAnnAssign),
@@ -106,6 +107,12 @@ impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
 impl<'a> From<&'a ast::StmtClassDef> for DefinitionNodeRef<'a> {
     fn from(node: &'a ast::StmtClassDef) -> Self {
         Self::Class(node)
+    }
+}
+
+impl<'a> From<&'a ast::StmtTypeAlias> for DefinitionNodeRef<'a> {
+    fn from(node: &'a ast::StmtTypeAlias) -> Self {
+        Self::TypeAlias(node)
     }
 }
 
@@ -265,6 +272,9 @@ impl<'db> DefinitionNodeRef<'db> {
             DefinitionNodeRef::Class(class) => {
                 DefinitionKind::Class(AstNodeRef::new(parsed, class))
             }
+            DefinitionNodeRef::TypeAlias(type_alias) => {
+                DefinitionKind::TypeAlias(AstNodeRef::new(parsed, type_alias))
+            }
             DefinitionNodeRef::NamedExpression(named) => {
                 DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
@@ -358,6 +368,7 @@ impl<'db> DefinitionNodeRef<'db> {
             }
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
+            Self::TypeAlias(node) => node.into(),
             Self::NamedExpression(node) => node.into(),
             Self::Assignment(AssignmentDefinitionNodeRef {
                 value: _,
@@ -434,6 +445,7 @@ pub enum DefinitionKind<'db> {
     ImportFrom(ImportFromDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
+    TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
     Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
@@ -456,6 +468,7 @@ impl DefinitionKind<'_> {
             // functions, classes, and imports always bind, and we consider them declarations
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
+            | DefinitionKind::TypeAlias(_)
             | DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
             | DefinitionKind::TypeVar(_)
@@ -678,6 +691,12 @@ impl From<&ast::StmtFunctionDef> for DefinitionNodeKey {
 
 impl From<&ast::StmtClassDef> for DefinitionNodeKey {
     fn from(node: &ast::StmtClassDef) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtTypeAlias> for DefinitionNodeKey {
+    fn from(node: &ast::StmtTypeAlias) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

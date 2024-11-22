@@ -1065,7 +1065,10 @@ impl<'db> Type<'db> {
 
             Type::Instance(InstanceType { class }) => match class.known(db) {
                 Some(
-                    KnownClass::NoneType | KnownClass::NoDefaultType | KnownClass::VersionInfo,
+                    KnownClass::NoneType
+                    | KnownClass::NoDefaultType
+                    | KnownClass::VersionInfo
+                    | KnownClass::TypeAliasType,
                 ) => true,
                 Some(
                     KnownClass::Bool
@@ -1536,6 +1539,7 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             // TODO map this to a new `Type::TypeVar` variant
             Type::KnownInstance(KnownInstanceType::TypeVar(_)) => *self,
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => alias.value_ty(db),
             _ => todo_type!(),
         }
     }
@@ -1700,6 +1704,7 @@ pub enum KnownClass {
     // Typing
     SpecialForm,
     TypeVar,
+    TypeAliasType,
     NoDefaultType,
     // sys
     VersionInfo,
@@ -1726,6 +1731,7 @@ impl<'db> KnownClass {
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
+            Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             // This is the name the type of `sys.version_info` has in typeshed,
             // which is different to what `type(sys.version_info).__name__` is at runtime.
@@ -1764,7 +1770,7 @@ impl<'db> KnownClass {
             Self::VersionInfo => CoreStdlibModule::Sys,
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
             Self::NoneType => CoreStdlibModule::Typeshed,
-            Self::SpecialForm | Self::TypeVar => CoreStdlibModule::Typing,
+            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType => CoreStdlibModule::Typing,
             // TODO when we understand sys.version_info, we will need an explicit fallback here,
             // because typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
             // singleton, but not for `typing._NoDefaultType`
@@ -1778,7 +1784,7 @@ impl<'db> KnownClass {
     const fn is_singleton(self) -> bool {
         // TODO there are other singleton types (EllipsisType, NotImplementedType)
         match self {
-            Self::NoneType | Self::NoDefaultType | Self::VersionInfo => true,
+            Self::NoneType | Self::NoDefaultType | Self::VersionInfo | Self::TypeAliasType => true,
             Self::Bool
             | Self::Object
             | Self::Bytes
@@ -1820,6 +1826,7 @@ impl<'db> KnownClass {
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
             "FunctionType" => Self::FunctionType,
+            "TypeAliasType" => Self::TypeAliasType,
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "_version_info" => Self::VersionInfo,
@@ -1853,7 +1860,7 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::FunctionType => module.name() == self.canonical_module().as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
-            Self::SpecialForm | Self::TypeVar | Self::NoDefaultType => {
+            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
                 matches!(module.name().as_str(), "typing" | "typing_extensions")
             }
         }
@@ -1871,6 +1878,8 @@ pub enum KnownInstanceType<'db> {
     Union,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
+    /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
+    TypeAliasType(TypeAliasType<'db>),
     // TODO: fill this enum out with more special forms, etc.
 }
 
@@ -1881,15 +1890,18 @@ impl<'db> KnownInstanceType<'db> {
             KnownInstanceType::Optional => "Optional",
             KnownInstanceType::Union => "Union",
             KnownInstanceType::TypeVar(_) => "TypeVar",
+            KnownInstanceType::TypeAliasType(_) => "TypeAliasType",
         }
     }
 
     /// Evaluate the known instance in boolean context
     pub const fn bool(self) -> Truthiness {
         match self {
-            Self::Literal | Self::Optional | Self::TypeVar(_) | Self::Union => {
-                Truthiness::AlwaysTrue
-            }
+            Self::Literal
+            | Self::Optional
+            | Self::TypeVar(_)
+            | Self::Union
+            | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
         }
     }
 
@@ -1900,6 +1912,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Optional => "typing.Optional",
             Self::Union => "typing.Union",
             Self::TypeVar(typevar) => typevar.name(db),
+            Self::TypeAliasType(_) => "typing.TypeAliasType",
         }
     }
 
@@ -1910,6 +1923,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Optional => KnownClass::SpecialForm,
             Self::Union => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
+            Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
     }
 
@@ -1954,6 +1968,7 @@ impl<'db> KnownInstanceType<'db> {
                 .default_ty(db)
                 .map(|ty| ty.to_meta_type(db))
                 .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
+            (Self::TypeAliasType(alias), "__name__") => Type::string_literal(db, alias.name(db)),
             _ => return self.instance_fallback(db).member(db, name),
         };
         ty.into()
@@ -2776,6 +2791,27 @@ impl<'db> Class<'db> {
 
         self.fully_static_explicit_bases(db)
             .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::new()))
+    }
+}
+
+#[salsa::interned]
+pub struct TypeAliasType<'db> {
+    #[return_ref]
+    pub name: ast::name::Name,
+
+    rhs_scope: ScopeId<'db>,
+}
+
+#[salsa::tracked]
+impl<'db> TypeAliasType<'db> {
+    #[salsa::tracked]
+    pub fn value_ty(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.rhs_scope(db);
+
+        let type_alias_stmt_node = scope.node(db).expect_type_alias();
+        let definition = semantic_index(db, scope.file(db)).definition(type_alias_stmt_node);
+
+        definition_expression_ty(db, definition, &type_alias_stmt_node.value)
     }
 }
 
@@ -3626,6 +3662,35 @@ pub(crate) mod tests {
         let foo_call = semantic_index(&db, bar).expression(call);
 
         assert_function_query_was_not_run(&db, infer_expression_types, foo_call, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn type_alias_types() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/mod.py",
+            r#"
+            type Alias1 = int
+            type Alias2 = int
+        "#,
+        )?;
+
+        let mod_py = system_path_to_file(&db, "src/mod.py")?;
+        let ty_alias1 = global_symbol(&db, mod_py, "Alias1").expect_type();
+        let ty_alias2 = global_symbol(&db, mod_py, "Alias2").expect_type();
+
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias1)) = ty_alias1 else {
+            panic!("Expected TypeAliasType, got {ty_alias1:?}");
+        };
+        assert_eq!(alias1.name(&db), "Alias1");
+        assert_eq!(alias1.value_ty(&db), KnownClass::Int.to_instance(&db));
+
+        // Two type aliases are distinct and disjoint, even if they refer to the same type
+        assert!(!ty_alias1.is_equivalent_to(&db, ty_alias2));
+        assert!(ty_alias1.is_disjoint_from(&db, ty_alias2));
 
         Ok(())
     }

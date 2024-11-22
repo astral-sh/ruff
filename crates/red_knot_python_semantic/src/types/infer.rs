@@ -56,8 +56,8 @@ use crate::types::{
     typing_extensions_symbol, Boundness, Class, ClassLiteralType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
     KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol,
-    Truthiness, TupleType, Type, TypeArrayDisplay, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionBuilder, UnionType,
+    Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -439,6 +439,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             NodeWithScopeKind::FunctionTypeParameters(function) => {
                 self.infer_function_type_params(function.node());
             }
+            NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
+                self.infer_type_alias_type_params(type_alias.node());
+            }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                self.infer_type_alias(type_alias.node());
+            }
             NodeWithScopeKind::ListComprehension(comprehension) => {
                 self.infer_list_comprehension_expression_scope(comprehension.node());
             }
@@ -606,6 +612,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_function_definition(function.node(), definition);
             }
             DefinitionKind::Class(class) => self.infer_class_definition(class.node(), definition),
+            DefinitionKind::TypeAlias(type_alias) => {
+                self.infer_type_alias_definition(type_alias.node(), definition);
+            }
             DefinitionKind::Import(import) => {
                 self.infer_import_definition(import.node(), definition);
             }
@@ -846,6 +855,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
+    }
+
+    fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias) {
+        let type_params = type_alias
+            .type_params
+            .as_ref()
+            .expect("type alias type params scope without type params");
+
+        self.infer_type_parameters(type_params);
+    }
+
+    fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
+        self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -1106,6 +1128,33 @@ impl<'db> TypeInferenceBuilder<'db> {
         for base in class.bases() {
             self.infer_expression(base);
         }
+    }
+
+    fn infer_type_alias_definition(
+        &mut self,
+        type_alias: &ast::StmtTypeAlias,
+        definition: Definition<'db>,
+    ) {
+        self.infer_expression(&type_alias.name);
+
+        let rhs_scope = self
+            .index
+            .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
+            .to_scope_id(self.db, self.file);
+
+        let type_alias_ty =
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::new(
+                self.db,
+                &type_alias.name.as_name_expr().unwrap().id,
+                rhs_scope,
+            )));
+
+        self.add_declaration_with_binding(
+            type_alias.into(),
+            definition,
+            type_alias_ty,
+            type_alias_ty,
+        );
     }
 
     fn infer_if_statement(&mut self, if_statement: &ast::StmtIf) {
@@ -1830,17 +1879,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_augmented_op(assignment, target_type, value_type)
     }
 
-    fn infer_type_alias_statement(&mut self, type_alias_statement: &ast::StmtTypeAlias) {
-        let ast::StmtTypeAlias {
-            range: _,
-            name,
-            type_params: _,
-            value,
-        } = type_alias_statement;
-        self.infer_expression(value);
-        self.infer_expression(name);
-
-        // TODO: properly handle generic type aliases, which need their own annotation scope
+    fn infer_type_alias_statement(&mut self, node: &ast::StmtTypeAlias) {
+        self.infer_definition(node);
     }
 
     fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {
@@ -4578,7 +4618,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 _ => self.infer_type_expression(parameters),
             },
-            KnownInstanceType::TypeVar(_) => todo_type!(),
+            KnownInstanceType::TypeVar(_) => {
+                self.infer_type_expression(parameters);
+                todo_type!()
+            }
+            KnownInstanceType::TypeAliasType(_) => {
+                self.infer_type_expression(parameters);
+                todo_type!("generic type alias")
+            }
         }
     }
 

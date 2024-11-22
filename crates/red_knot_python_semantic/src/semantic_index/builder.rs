@@ -131,7 +131,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
 
         self.scope_ids_by_scope.push(scope_id);
-        self.scopes_by_node.insert(node.node_key(), file_scope_id);
+        let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
+        debug_assert_eq!(previous, None);
 
         debug_assert_eq!(ast_id_scope, file_scope_id);
 
@@ -585,6 +586,27 @@ where
                         builder.push_scope(NodeWithScopeRef::Class(class));
                         builder.visit_body(&class.body);
 
+                        builder.pop_scope()
+                    },
+                );
+            }
+            ast::Stmt::TypeAlias(type_alias) => {
+                let symbol = self.add_symbol(
+                    type_alias
+                        .name
+                        .as_name_expr()
+                        .map(|name| name.id.clone())
+                        .unwrap_or("<unknown>".into()),
+                );
+                self.add_definition(symbol, type_alias);
+                self.visit_expr(&type_alias.name);
+
+                self.with_type_params(
+                    NodeWithScopeRef::TypeAliasTypeParameters(type_alias),
+                    type_alias.type_params.as_ref(),
+                    |builder| {
+                        builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
+                        builder.visit_expr(&type_alias.value);
                         builder.pop_scope()
                     },
                 );

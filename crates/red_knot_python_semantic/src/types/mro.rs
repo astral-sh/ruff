@@ -372,6 +372,7 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_) => None,
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::Literal
                 | KnownInstanceType::Union
                 | KnownInstanceType::Optional => None,
