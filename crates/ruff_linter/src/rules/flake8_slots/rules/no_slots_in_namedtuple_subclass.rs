@@ -78,6 +78,10 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
     stmt: &Stmt,
     class: &StmtClassDef,
 ) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
