@@ -443,12 +443,11 @@ impl NodeWithScopeKind {
         match self {
             Self::Module => ScopeKind::Module,
             Self::Class(_) => ScopeKind::Class,
-            Self::Function(_) => ScopeKind::Function,
-            Self::TypeAlias(_) => ScopeKind::TypeAlias,
-            Self::Lambda(_) => ScopeKind::Function,
+            Self::Function(_) | Self::Lambda(_) => ScopeKind::Function,
             Self::FunctionTypeParameters(_)
             | Self::ClassTypeParameters(_)
             | Self::TypeAliasTypeParameters(_) => ScopeKind::Annotation,
+            Self::TypeAlias(_) => ScopeKind::TypeAlias,
             Self::ListComprehension(_)
             | Self::SetComprehension(_)
             | Self::DictComprehension(_)
