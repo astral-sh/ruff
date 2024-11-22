@@ -396,6 +396,10 @@ mod tests {
         Rule::FunctionCallInDataclassDefaultArgument,
         Path::new("RUF009_attrs.py")
     )]
+    #[test_case(
+        Rule::FunctionCallInDataclassDefaultArgument,
+        Path::new("RUF009_attrs_auto_attribs.py")
+    )]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
