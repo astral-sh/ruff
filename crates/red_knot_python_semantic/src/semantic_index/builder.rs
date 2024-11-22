@@ -813,10 +813,10 @@ where
 
                 // TODO: definitions created inside the body should be fully visible
                 // to other statements/expressions inside the body --Alex/Carl
-                let in_nested_loop = self.loop_state();
+                let outer_loop_state = self.loop_state();
                 self.set_inside_loop(LoopState::InLoop);
                 self.visit_body(body);
-                self.set_inside_loop(in_nested_loop);
+                self.set_inside_loop(outer_loop_state);
 
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
@@ -884,10 +884,10 @@ where
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
                 // are fully visible to other statements/expressions inside the body --Alex/Carl
-                let in_nested_loop = self.loop_state();
+                let outer_loop_state = self.loop_state();
                 self.set_inside_loop(LoopState::InLoop);
                 self.visit_body(body);
-                self.set_inside_loop(in_nested_loop);
+                self.set_inside_loop(outer_loop_state);
 
                 let break_states =
                     std::mem::replace(&mut self.loop_break_states, saved_break_states);
