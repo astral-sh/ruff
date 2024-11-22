@@ -135,9 +135,10 @@ pub(super) fn dataclass_kind(
                 // https://www.attrs.org/en/stable/api.html#attrs.define
                 // https://www.attrs.org/en/stable/api-attr.html#attr.s
                 let Expr::Call(ExprCall { arguments, .. }) = &decorator.expression else {
-                    let auto_attribs = match func.as_ref() {
-                        "s" => AttrsAutoAttribs::False,
-                        _ => AttrsAutoAttribs::None,
+                    let auto_attribs = if *func == "s" {
+                        AttrsAutoAttribs::False
+                    } else {
+                        AttrsAutoAttribs::None
                     };
 
                     return Some(DataclassKind::Attrs(auto_attribs));
@@ -148,10 +149,13 @@ pub(super) fn dataclass_kind(
                 };
 
                 let auto_attribs = match &auto_attribs.value {
-                    Expr::BooleanLiteral(literal) => match literal.value {
-                        true => AttrsAutoAttribs::True,
-                        false => AttrsAutoAttribs::False,
-                    },
+                    Expr::BooleanLiteral(literal) => {
+                        if literal.value {
+                            AttrsAutoAttribs::True
+                        } else {
+                            AttrsAutoAttribs::False
+                        }
+                    }
                     Expr::NoneLiteral(..) => AttrsAutoAttribs::None,
                     _ => AttrsAutoAttribs::Unknown,
                 };

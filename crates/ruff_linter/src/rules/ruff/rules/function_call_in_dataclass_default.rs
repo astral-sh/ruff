@@ -91,10 +91,13 @@ pub(crate) fn function_call_in_dataclass_default(
         DataclassKind::Attrs(attrs_auto_attribs) => match attrs_auto_attribs {
             AttrsAutoAttribs::Unknown => return,
 
-            AttrsAutoAttribs::None => match any_annotated(&class_def.body) {
-                true => Some(AttrsAutoAttribs::True),
-                false => Some(AttrsAutoAttribs::False),
-            },
+            AttrsAutoAttribs::None => {
+                if any_annotated(&class_def.body) {
+                    Some(AttrsAutoAttribs::True)
+                } else {
+                    Some(AttrsAutoAttribs::False)
+                }
+            }
 
             _ => Some(attrs_auto_attribs),
         },
@@ -151,7 +154,7 @@ pub(crate) fn function_call_in_dataclass_default(
 }
 
 #[inline]
-fn any_annotated(class_body: &Vec<Stmt>) -> bool {
+fn any_annotated(class_body: &[Stmt]) -> bool {
     class_body
         .iter()
         .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
