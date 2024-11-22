@@ -1969,10 +1969,6 @@ impl<'db> KnownInstanceType<'db> {
                 .map(|ty| ty.to_meta_type(db))
                 .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
             (Self::TypeAliasType(alias), "__name__") => Type::string_literal(db, alias.name(db)),
-            (Self::TypeAliasType(alias), "__value__") => alias.value_ty(db),
-            (Self::TypeAliasType(_), "__type_params__") => {
-                todo_type!("TypeAliasType __type_params__")
-            }
             _ => return self.instance_fallback(db).member(db, name),
         };
         ty.into()

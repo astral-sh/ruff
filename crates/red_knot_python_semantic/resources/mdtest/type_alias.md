@@ -7,7 +7,6 @@ type IntOrStr = int | str
 
 reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
-reveal_type(IntOrStr.__value__)  # revealed: int | str
 
 x: IntOrStr = 1
 
@@ -15,6 +14,17 @@ reveal_type(x)  # revealed: Literal[1]
 
 def f() -> None:
     reveal_type(x)  # revealed: int | str
+```
+
+## `__value__` attribute
+
+```py
+type IntOrStr = int | str
+
+# TODO: This should either fall back to the specified type from typeshed,
+# which is `Any`, or be the actual type of the runtime value expression
+# `int | str`, i.e. `types.UnionType`.
+reveal_type(IntOrStr.__value__)  # revealed: @Todo(instance attributes)
 ```
 
 ## Invalid assignment
@@ -32,17 +42,17 @@ x: OptionalInt = "1"
 type IntOrStr = int | str
 type IntOrStrOrBytes = IntOrStr | bytes
 
-reveal_type(IntOrStrOrBytes.__value__)  # revealed: int | str | bytes
+x: IntOrStrOrBytes = 1
+
+def f() -> None:
+    reveal_type(x)  # revealed: int | str | bytes
 ```
 
 ## Aliased type aliases
 
 ```py
 type IntOrStr = int | str
-
 MyIntOrStr = IntOrStr
-
-reveal_type(MyIntOrStr.__value__)  # revealed: int | str
 
 x: MyIntOrStr = 1
 
@@ -55,6 +65,7 @@ y: MyIntOrStr = None
 ```py
 type ListOrSet[T] = list[T] | set[T]
 
-# TODO: Should be tuple[typing.TypeVar | typing.ParamSpec | typing.TypeVarTuple, ...]
-reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(TypeAliasType __type_params__)
+# TODO: Should be `tuple[typing.TypeVar | typing.ParamSpec | typing.TypeVarTuple, ...]`,
+# as specified in the `typeshed` stubs.
+reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(instance attributes)
 ```
