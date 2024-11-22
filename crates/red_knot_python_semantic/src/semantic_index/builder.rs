@@ -50,6 +50,9 @@ pub(super) struct SemanticIndexBuilder<'db> {
 
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
+    /// Are we in a state where a `break` statement is allowed?
+    inside_loop: bool,
+
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
 
@@ -78,6 +81,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignments: vec![],
             current_match_case: None,
             loop_break_states: vec![],
+            inside_loop: false,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
@@ -528,6 +532,9 @@ where
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
+                let definition_inside_loop = self.inside_loop;
+                self.inside_loop = false;
+
                 for decorator in &function_def.decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -566,8 +573,13 @@ where
                 // and return-type annotations.
                 let symbol = self.add_symbol(function_def.name.id.clone());
                 self.add_definition(symbol, function_def);
+
+                self.inside_loop = definition_inside_loop;
             }
             ast::Stmt::ClassDef(class) => {
+                let definition_inside_loop = self.inside_loop;
+                self.inside_loop = false;
+
                 for decorator in &class.decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -589,6 +601,8 @@ where
                         builder.pop_scope()
                     },
                 );
+
+                self.inside_loop = definition_inside_loop;
             }
             ast::Stmt::TypeAlias(type_alias) => {
                 let symbol = self.add_symbol(
@@ -785,7 +799,10 @@ where
 
                 // TODO: definitions created inside the body should be fully visible
                 // to other statements/expressions inside the body --Alex/Carl
+                let in_nested_loop = self.inside_loop;
+                self.inside_loop = true;
                 self.visit_body(body);
+                self.inside_loop = in_nested_loop;
 
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
@@ -824,7 +841,9 @@ where
                 self.visit_body(body);
             }
             ast::Stmt::Break(_) => {
-                self.loop_break_states.push(self.flow_snapshot());
+                if self.inside_loop {
+                    self.loop_break_states.push(self.flow_snapshot());
+                }
             }
 
             ast::Stmt::For(
@@ -851,7 +870,10 @@ where
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
                 // are fully visible to other statements/expressions inside the body --Alex/Carl
+                let in_nested_loop = self.inside_loop;
+                self.inside_loop = true;
                 self.visit_body(body);
+                self.inside_loop = in_nested_loop;
 
                 let break_states =
                     std::mem::replace(&mut self.loop_break_states, saved_break_states);
