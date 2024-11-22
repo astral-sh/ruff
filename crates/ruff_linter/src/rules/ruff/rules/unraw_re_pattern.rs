@@ -8,7 +8,6 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::{Modules, SemanticModel};
 
-use memchr::memchr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -167,15 +166,11 @@ fn check_string(checker: &mut Checker, literal: &StringLiteral, module: RegexMod
     if
     // The (no-op) `u` prefix is a syntax error when combined with `r`
     !literal.flags.prefix().is_unicode()
-        && memchr(
-            b'\\',
-            // We are looking for backslash characters
-            // in the raw source code here, because `\n`
-            // gets converted to a single character already
-            // at the lexing stage.
-            checker.locator().slice(literal.range()).as_bytes(),
-        )
-        .is_none()
+    // We are looking for backslash characters
+    // in the raw source code here, because `\n`
+    // gets converted to a single character already
+    // at the lexing stage.
+    &&!checker.locator().slice(literal.range()).contains('\\')
     {
         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
             "r".to_string(),
