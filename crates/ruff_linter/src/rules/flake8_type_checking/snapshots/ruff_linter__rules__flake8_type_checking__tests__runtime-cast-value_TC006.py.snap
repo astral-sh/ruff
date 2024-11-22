@@ -100,8 +100,8 @@ TC006.py:52:12: TC006 [*] Add quotes to type expression in `typing.cast()`
    |
 50 |     import typing as t
 51 | 
-52 |     t.cast(int, 3.0)  # TC006
-   |            ^^^ TC006
+52 |     t.cast(t.Literal["3.0", '3'], 3.0)  # TC006
+   |            ^^^^^^^^^^^^^^^^^^^^^ TC006
    |
    = help: Add quotes
 
@@ -109,8 +109,8 @@ TC006.py:52:12: TC006 [*] Add quotes to type expression in `typing.cast()`
 49 49 | def f():
 50 50 |     import typing as t
 51 51 | 
-52    |-    t.cast(int, 3.0)  # TC006
-   52 |+    t.cast("int", 3.0)  # TC006
+52    |-    t.cast(t.Literal["3.0", '3'], 3.0)  # TC006
+   52 |+    t.cast("t.Literal['3.0', '3']", 3.0)  # TC006
 53 53 | 
 54 54 | 
 55 55 | def f():

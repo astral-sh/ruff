@@ -49,7 +49,7 @@ def f():
 def f():
     import typing as t
 
-    t.cast(int, 3.0)  # TC006
+    t.cast(t.Literal["3.0", '3'], 3.0)  # TC006
 
 
 def f():

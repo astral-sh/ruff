@@ -18,6 +18,7 @@ mod tests {
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TC005.py"))]
+    #[test_case(Rule::RuntimeCastValue, Path::new("TC006.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_1.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_10.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_11.py"))]
@@ -58,20 +59,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::RuntimeCastValue, Path::new("TC006.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("preview__{}_{}", rule_code.as_ref(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
