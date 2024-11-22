@@ -13,7 +13,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
-    use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
