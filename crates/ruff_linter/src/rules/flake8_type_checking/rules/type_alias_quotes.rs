@@ -120,7 +120,7 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
         return None;
     }
 
-    if !binding.is_explicit_type_alias() {
+    if !binding.is_annotated_type_alias() {
         return None;
     }
 
@@ -247,7 +247,7 @@ pub(crate) fn quoted_type_alias(
     }
 
     // explicit type aliases require some additional checks to avoid false positives
-    if checker.semantic().in_explicit_type_alias_value()
+    if checker.semantic().in_annotated_type_alias_value()
         && quotes_are_unremovable(checker.semantic(), expr)
     {
         return;

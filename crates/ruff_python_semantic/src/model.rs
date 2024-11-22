@@ -1755,7 +1755,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the model is visiting the value expression
-    /// of a [PEP 613] explicit type alias.
+    /// of a [PEP 613] type alias.
     ///
     /// For example:
     /// ```python
@@ -1765,13 +1765,13 @@ impl<'a> SemanticModel<'a> {
     /// ```
     ///
     /// [PEP 613]: https://peps.python.org/pep-0613/
-    pub const fn in_explicit_type_alias_value(&self) -> bool {
+    pub const fn in_annotated_type_alias_value(&self) -> bool {
         self.flags
-            .intersects(SemanticModelFlags::EXPLICIT_TYPE_ALIAS)
+            .intersects(SemanticModelFlags::ANNOTATED_TYPE_ALIAS)
     }
 
     /// Return `true` if the model is visiting the value expression
-    /// of a [PEP 695] generic type alias.
+    /// of a [PEP 695] type alias.
     ///
     /// For example:
     /// ```python
@@ -1779,9 +1779,9 @@ impl<'a> SemanticModel<'a> {
     /// ```
     ///
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-    pub const fn in_generic_type_alias_value(&self) -> bool {
+    pub const fn in_deferred_type_alias_value(&self) -> bool {
         self.flags
-            .intersects(SemanticModelFlags::GENERIC_TYPE_ALIAS)
+            .intersects(SemanticModelFlags::DEFERRED_TYPE_ALIAS)
     }
 
     /// Return `true` if the model is visiting the value expression of
@@ -2359,7 +2359,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 613]: https://peps.python.org/pep-0613/
-        const EXPLICIT_TYPE_ALIAS = 1 << 26;
+        const ANNOTATED_TYPE_ALIAS = 1 << 26;
 
         /// The model is in the value expression of a [PEP 695] type statement.
         ///
@@ -2369,7 +2369,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-        const GENERIC_TYPE_ALIAS = 1 << 27;
+        const DEFERRED_TYPE_ALIAS = 1 << 27;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
@@ -2389,7 +2389,7 @@ bitflags! {
             Self::STRING_TYPE_DEFINITION.bits() | Self::TYPE_PARAM_DEFINITION.bits();
 
         /// The context is in any type alias.
-        const TYPE_ALIAS = Self::EXPLICIT_TYPE_ALIAS.bits() | Self::GENERIC_TYPE_ALIAS.bits();
+        const TYPE_ALIAS = Self::ANNOTATED_TYPE_ALIAS.bits() | Self::DEFERRED_TYPE_ALIAS.bits();
     }
 }
 

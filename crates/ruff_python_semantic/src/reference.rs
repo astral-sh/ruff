@@ -86,10 +86,12 @@ impl ResolvedReference {
             .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
     }
 
-    /// Return `true` if the context is in the r.h.s. of an explicit type alias.
-    pub const fn in_explicit_type_alias_value(&self) -> bool {
+    /// Return `true` if the context is in the r.h.s. of a [PEP 613] type alias.
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    pub const fn in_annotated_type_alias_value(&self) -> bool {
         self.flags
-            .intersects(SemanticModelFlags::EXPLICIT_TYPE_ALIAS)
+            .intersects(SemanticModelFlags::ANNOTATED_TYPE_ALIAS)
     }
 }
 

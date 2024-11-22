@@ -155,7 +155,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
                         reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
-                        // TODO: We should check `reference.in_explicit_type_alias()`
+                        // TODO: We should check `reference.in_annotated_type_alias()`
                         //       as well to match the behavior of the flake8 plugin
                         //       although maybe the best way forward is to add an
                         //       additional setting to configure whether quoting

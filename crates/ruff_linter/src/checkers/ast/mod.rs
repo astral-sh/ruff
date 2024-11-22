@@ -882,7 +882,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit_generic_type_alias_value(value);
+                self.visit_deferred_type_alias_value(value);
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -953,7 +953,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 if let Some(expr) = value {
                     if self.semantic.match_typing_expr(annotation, "TypeAlias") {
-                        self.visit_explicit_type_alias_value(expr);
+                        self.visit_annotated_type_alias_value(expr);
                     } else {
                         self.visit_expr(expr);
                     }
@@ -1844,7 +1844,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as the value expression
-    /// of a [PEP 613] explicit type alias.
+    /// of a [PEP 613] type alias.
     ///
     /// For example:
     /// ```python
@@ -1854,15 +1854,15 @@ impl<'a> Checker<'a> {
     /// ```
     ///
     /// [PEP 613]: https://peps.python.org/pep-0613/
-    fn visit_explicit_type_alias_value(&mut self, expr: &'a Expr) {
+    fn visit_annotated_type_alias_value(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
-        self.semantic.flags |= SemanticModelFlags::EXPLICIT_TYPE_ALIAS;
+        self.semantic.flags |= SemanticModelFlags::ANNOTATED_TYPE_ALIAS;
         self.visit_type_definition(expr);
         self.semantic.flags = snapshot;
     }
 
     /// Visit an [`Expr`], and treat it as the value expression
-    /// of a [PEP 695] generic type alias.
+    /// of a [PEP 695] type alias.
     ///
     /// For example:
     /// ```python
@@ -1870,12 +1870,12 @@ impl<'a> Checker<'a> {
     /// ```
     ///
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-    fn visit_generic_type_alias_value(&mut self, expr: &'a Expr) {
+    fn visit_deferred_type_alias_value(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
         // even though we don't visit these nodes immediately we need to
         // modify the semantic flags before we push the expression and its
         // corresponding semantic snapshot
-        self.semantic.flags |= SemanticModelFlags::GENERIC_TYPE_ALIAS;
+        self.semantic.flags |= SemanticModelFlags::DEFERRED_TYPE_ALIAS;
         self.visit
             .type_param_definitions
             .push((expr, self.semantic.snapshot()));
@@ -2042,7 +2042,7 @@ impl<'a> Checker<'a> {
         }
 
         match parent {
-            Stmt::TypeAlias(_) => flags.insert(BindingFlags::GENERIC_TYPE_ALIAS),
+            Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
             Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
                 // TODO: It is a bit unfortunate that we do this check twice
                 //       maybe we should change how we visit this statement
@@ -2050,7 +2050,7 @@ impl<'a> Checker<'a> {
                 //       until after we've handled this store, so we can check
                 //       the flag instead of duplicating this check
                 if self.semantic.match_typing_expr(annotation, "TypeAlias") {
-                    flags.insert(BindingFlags::EXPLICIT_TYPE_ALIAS);
+                    flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
                 }
             }
             _ => {}
