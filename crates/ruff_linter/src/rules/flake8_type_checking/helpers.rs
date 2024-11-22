@@ -269,6 +269,23 @@ pub(crate) fn quote_annotation(
         }
     }
 
+    quote_type_expression(expr, semantic, stylist)
+}
+
+/// Wrap a type expression in quotes.
+///
+/// This function assumes that the callee already expanded expression components
+/// to the minimum acceptable range for quoting, i.e. the parent node may not be
+/// a [`Expr::Subscript`], [`Expr::Attribute`], `[Expr::Call]` or `[Expr::BinOp]`.
+///
+/// In most cases you want to call [`quote_annotation`] instead, which provides
+/// that guarantee by expanding the expression before calling into this function.
+pub(crate) fn quote_type_expression(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    stylist: &Stylist,
+) -> Result<Edit> {
+    // Quote the entire expression.
     let quote = stylist.quote();
     let mut quote_annotator = QuoteAnnotator::new(semantic, stylist);
     quote_annotator.visit_expr(expr);
