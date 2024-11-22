@@ -93,8 +93,8 @@ pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::Expr
         || matches!(
             default,
             Expr::Call(ast::ExprCall { func, .. })
-                if !is_mutable_func(map_subscript(func), checker.semantic())
-                    && !is_immutable_func(map_subscript(func), checker.semantic(), &extend_immutable_calls)))
+                if !is_mutable_func(func, checker.semantic())
+                    && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)))
         && checker
             .semantic()
             .resolve_qualified_name(map_subscript(&call.func))
