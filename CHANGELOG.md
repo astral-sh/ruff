@@ -57,7 +57,7 @@ The following rules have been stabilized and are no longer in preview:
 - [`fast-api-redundant-response-model`](https://docs.astral.sh/ruff/rules/fast-api-redundant-response-model/) (`FAST001`)
 - [`fast-api-non-annotated-dependency`](https://docs.astral.sh/ruff/rules/fast-api-non-annotated-dependency/) (`FAST002`)
 - [`dict-index-missing-items`](https://docs.astral.sh/ruff/rules/dict-index-missing-items/) (`PLC0206`)
-- [`pep484-style-positional-only-argument`](https://docs.astral.sh/ruff/rules/pep484-style-positional-only-argument/) (`PYI063`)
+- [`pep484-style-positional-only-parameter`](https://docs.astral.sh/ruff/rules/pep484-style-positional-only-parameter/) (`PYI063`)
 - [`redundant-final-literal`](https://docs.astral.sh/ruff/rules/redundant-final-literal/) (`PYI064`)
 - [`bad-version-info-order`](https://docs.astral.sh/ruff/rules/bad-version-info-order/) (`PYI066`)
 - [`parenthesize-chained-operators`](https://docs.astral.sh/ruff/rules/parenthesize-chained-operators/) (`RUF021`)
@@ -1077,7 +1077,7 @@ The following deprecated CLI commands have been removed:
 ### Preview features
 
 - \[`flake8-bugbear`\] Implement `return-in-generator` (`B901`) ([#11644](https://github.com/astral-sh/ruff/pull/11644))
-- \[`flake8-pyi`\] Implement `PYI063` ([#11699](https://github.com/astral-sh/ruff/pull/11699))
+- \[`flake8-pyi`\] Implement `pep484-style-positional-only-parameter` (`PYI063`) ([#11699](https://github.com/astral-sh/ruff/pull/11699))
 - \[`pygrep_hooks`\] Check blanket ignores via file-level pragmas (`PGH004`) ([#11540](https://github.com/astral-sh/ruff/pull/11540))
 
 ### Rule changes
