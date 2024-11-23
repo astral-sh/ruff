@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 /// from higher up the stack.
 ///
 /// It's recommended to use a `stacklevel` of 2 or higher, to give the caller
-/// a more appropriate context about the warning.
+/// more context about the warning.
 ///
 /// ## Example
 /// ```python
