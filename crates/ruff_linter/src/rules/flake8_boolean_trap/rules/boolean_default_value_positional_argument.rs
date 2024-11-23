@@ -106,6 +106,10 @@ pub(crate) fn boolean_default_value_positional_argument(
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     // Allow Boolean defaults in explicitly-allowed functions.
     if is_allowed_func_def(name) {
         return;

@@ -59,6 +59,10 @@ impl Violation for TooManyArguments {
 
 /// PLR0913
 pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     let semantic = checker.semantic();
 
     let num_arguments = function_def
