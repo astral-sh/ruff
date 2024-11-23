@@ -430,7 +430,11 @@ fn convert_to_list_extend(
                 generator_str
             };
 
-            let comprehension_body = format!("{variable_name}.extend({generator_str})");
+            let comprehension_body = if for_stmt.is_async {
+                format!("{variable_name}.extend([{generator_str}])")
+            } else {
+                format!("{variable_name}.extend({generator_str})")
+            };
 
             let indentation = if for_loop_inline_comments.is_empty() {
                 String::new()
