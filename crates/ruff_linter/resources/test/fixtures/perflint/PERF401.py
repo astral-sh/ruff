@@ -100,7 +100,7 @@ def f():
     if True:
         for i in range(10):  # single-line comment 1 should be protected
             # single-line comment 2 should be protected
-            if i % 2: # single-line comment 3 should be protected 
+            if i % 2: # single-line comment 3 should be protected
                 result.append(i) # PERF401
 
 
@@ -108,7 +108,7 @@ def f():
     result = [] # comment after assignment should be protected
     for i in range(10):  # single-line comment 1 should be protected
         # single-line comment 2 should be protected
-        if i % 2: # single-line comment 3 should be protected 
+        if i % 2: # single-line comment 3 should be protected
             result.append(i) # PERF401
 
 
@@ -132,3 +132,21 @@ def f():
     async for msg in channel.history():
         if msg.id == 123:
             msgs.append(msg)
+
+
+def f():
+    msgs: list[Message] = []
+    async for msg in channel.history(  # aaa
+        limit=100,  # bbb
+    ):  # ccc
+        if msg.id == 123:  # ddd
+            msgs.append(msg)  # eee
+
+
+def f():
+    msgs = []  # aaa
+    async for msg in channel.history(  # bbb
+        limit=100,  # ccc
+    ):  # ddd
+        if msg.id == 123:  # eee
+            msgs.append(msg)  # fff

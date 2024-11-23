@@ -6,11 +6,11 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
-use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::rules::isort::comments::Comment;
+use crate::{checkers::ast::Checker, rules::isort::comments::collect_comments};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a list comprehension.
@@ -50,7 +50,7 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct ManualListComprehension {
     is_async: bool,
-    comprehension_type: Option<ComprehensionType>,
+    comprehension_type: ComprehensionType,
 }
 
 impl Violation for ManualListComprehension {
@@ -63,14 +63,14 @@ impl Violation for ManualListComprehension {
             comprehension_type,
         } = self;
         let message_str = match comprehension_type {
-            Some(ComprehensionType::Extend) => {
+            ComprehensionType::Extend => {
                 if *is_async {
                     "`list.extend` with an async comprehension"
                 } else {
                     "`list.extend`"
                 }
             }
-            Some(ComprehensionType::ListComprehension) | None => {
+            ComprehensionType::ListComprehension => {
                 if *is_async {
                     "an async list comprehension"
                 } else {
@@ -82,7 +82,7 @@ impl Violation for ManualListComprehension {
     }
 
     fn fix_title(&self) -> Option<String> {
-        match self.comprehension_type? {
+        match self.comprehension_type {
             ComprehensionType::ListComprehension => {
                 Some("Replace for loop with list comprehension".to_string())
             }
@@ -261,7 +261,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
             is_async: for_stmt.is_async,
-            comprehension_type: Some(comprehension_type),
+            comprehension_type,
         },
         *range,
     );
@@ -307,18 +307,13 @@ fn convert_to_list_extend(
     let elt_str = locator.slice(to_append);
     let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
 
-    let comment_strings_in_range = |range| {
-        checker
-            .comment_ranges()
-            .comments_in_range(range)
-            .iter()
-            .map(|range| locator.slice(range).trim_whitespace_start())
-            .collect()
-    };
-    let for_stmt_end = for_stmt.range.end();
-    let for_loop_inline_comments: Vec<&str> = comment_strings_in_range(for_stmt.range);
-    let for_loop_trailing_comment =
-        comment_strings_in_range(TextRange::new(for_stmt_end, locator.line_end(for_stmt_end)));
+    let comment_strings_in_range =
+        |range| collect_comments(range, locator, checker.comment_ranges());
+    let for_loop_inline_comments = comment_strings_in_range(for_stmt.range);
+    let all_comments = for_loop_inline_comments
+        .iter()
+        .filter(|comment| for_stmt.iter.range().intersect(comment.range).is_none())
+        .collect::<Vec<&Comment>>();
     let newline = checker.stylist().line_ending().as_str();
 
     match fix_type {
@@ -331,18 +326,27 @@ fn convert_to_list_extend(
                 format!("{variable_name}.extend({generator_str})")
             };
 
-            let indent_range = TextRange::new(
-                locator.line_start(for_stmt.range.start()),
-                for_stmt.range.start(),
+            if all_comments.is_empty() {
+                return Ok(Fix::unsafe_edit(Edit::range_replacement(
+                    comprehension_body,
+                    for_stmt.range,
+                )));
+            }
+
+            let start = for_stmt.range.start();
+
+            let indentation = format!(
+                "{newline}{}",
+                locator.slice(TextRange::new(locator.line_start(start), start))
             );
-            let indentation = if for_loop_inline_comments.is_empty() {
-                String::new()
-            } else {
-                format!("{newline}{}", locator.slice(indent_range))
-            };
+
             let text_to_replace = format!(
                 "{}{indentation}{comprehension_body}",
-                for_loop_inline_comments.join(&indentation)
+                all_comments
+                    .iter()
+                    .map(|comment| comment.value.to_string())
+                    .collect::<Vec<String>>()
+                    .join(&indentation)
             );
             Ok(Fix::unsafe_edit(Edit::range_replacement(
                 text_to_replace,
@@ -362,31 +366,36 @@ fn convert_to_list_extend(
 
             let comprehension_body = format!("[{generator_str}]");
 
-            let indent_range = TextRange::new(
-                locator.line_start(binding_stmt.range.start()),
-                binding_stmt.range.start(),
-            );
-
-            let mut for_loop_comments = for_loop_inline_comments;
-            for_loop_comments.extend(for_loop_trailing_comment);
-
-            let indentation = if for_loop_comments.is_empty() {
-                String::new()
-            } else {
-                format!("{newline}{}", locator.slice(indent_range))
-            };
-            let leading_comments = format!("{}{indentation}", for_loop_comments.join(&indentation));
-
             let mut additional_fixes = vec![Edit::range_deletion(
                 locator.full_lines_range(for_stmt.range),
             )];
-            // if comments are empty, trying to insert them panics
-            if !leading_comments.is_empty() {
+
+            let for_stmt_end = for_stmt.range.end();
+            let for_loop_trailing_comment = comment_strings_in_range(TextRange::new(
+                for_stmt_end,
+                locator.line_end(for_stmt_end),
+            ));
+
+            let all_comment_strings = all_comments
+                .into_iter()
+                .chain(for_loop_trailing_comment.iter())
+                .map(|comment| comment.value.to_string())
+                .collect::<Vec<String>>();
+
+            if !all_comment_strings.is_empty() {
+                let indent_range = TextRange::new(
+                    locator.line_start(binding_stmt.range.start()),
+                    binding_stmt.range.start(),
+                );
+                let indentation = format!("{newline}{}", locator.slice(indent_range));
+                let leading_comments =
+                    format!("{}{indentation}", all_comment_strings.join(&indentation));
+
                 additional_fixes.push(Edit::insertion(
                     leading_comments,
                     binding_stmt.range.start(),
                 ));
-            }
+            };
             Ok(Fix::unsafe_edits(
                 Edit::range_replacement(comprehension_body, empty_list_to_replace.range),
                 additional_fixes,
