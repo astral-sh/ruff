@@ -325,7 +325,11 @@ fn convert_to_list_extend(
         ComprehensionType::Extend => {
             let variable_name = checker.locator().slice(binding.range);
 
-            let comprehension_body = format!("{variable_name}.extend({generator_str})");
+            let comprehension_body = if for_stmt.is_async {
+                format!("{variable_name}.extend([{generator_str}])")
+            } else {
+                format!("{variable_name}.extend({generator_str})")
+            };
 
             let indent_range = TextRange::new(
                 locator.line_start(for_stmt.range.start()),

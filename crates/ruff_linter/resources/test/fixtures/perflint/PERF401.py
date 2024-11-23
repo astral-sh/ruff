@@ -125,3 +125,10 @@ def f(param):
         new_layers = []
         for value in param:
             new_layers.append(value * 3)
+
+
+def f():
+    msgs: list[Message] = []
+    async for msg in channel.history():
+        if msg.id == 123:
+            msgs.append(msg)

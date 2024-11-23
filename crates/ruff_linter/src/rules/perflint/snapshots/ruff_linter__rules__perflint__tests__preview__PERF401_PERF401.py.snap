@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
-snapshot_kind: text
 ---
 PERF401.py:6:13: PERF401 [*] Use a list comprehension to create a transformed list
   |
@@ -180,3 +179,24 @@ PERF401.py:127:13: PERF401 [*] Use a list comprehension to create a transformed 
 126     |-        for value in param:
 127     |-            new_layers.append(value * 3)
     125 |+        new_layers = [value * 3 for value in param]
+128 126 | 
+129 127 | 
+130 128 | def f():
+
+PERF401.py:134:13: PERF401 [*] Use `list.extend` with an async comprehension to create a transformed list
+    |
+132 |     async for msg in channel.history():
+133 |         if msg.id == 123:
+134 |             msgs.append(msg)
+    |             ^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+129 129 | 
+130 130 | def f():
+131 131 |     msgs: list[Message] = []
+132     |-    async for msg in channel.history():
+133     |-        if msg.id == 123:
+134     |-            msgs.append(msg)
+    132 |+    msgs.extend([msg async for msg in channel.history() if msg.id == 123])
