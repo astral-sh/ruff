@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::{class, function_type};
@@ -62,8 +62,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Python documentation: `functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 /// - [don't lru_cache methods!](https://www.youtube.com/watch?v=sVjtp6tGo0g)
-#[violation]
-pub struct CachedInstanceMethod;
+#[derive(ViolationMetadata)]
+pub(crate) struct CachedInstanceMethod;
 
 impl Violation for CachedInstanceMethod {
     #[derive_message_formats]

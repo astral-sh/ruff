@@ -3,7 +3,7 @@
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Operator};
 use ruff_text_size::Ranged;
 
@@ -46,8 +46,8 @@ use crate::registry::AsRule;
 /// ## References
 /// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
 /// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
-#[violation]
-pub struct SuspiciousPickleUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousPickleUsage;
 
 impl Violation for SuspiciousPickleUsage {
     #[derive_message_formats]
@@ -91,8 +91,8 @@ impl Violation for SuspiciousPickleUsage {
 /// ## References
 /// - [Python documentation: `marshal` — Internal Python object serialization](https://docs.python.org/3/library/marshal.html)
 /// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
-#[violation]
-pub struct SuspiciousMarshalUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousMarshalUsage;
 
 impl Violation for SuspiciousMarshalUsage {
     #[derive_message_formats]
@@ -137,8 +137,8 @@ impl Violation for SuspiciousMarshalUsage {
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
-#[violation]
-pub struct SuspiciousInsecureHashUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousInsecureHashUsage;
 
 impl Violation for SuspiciousInsecureHashUsage {
     #[derive_message_formats]
@@ -175,8 +175,8 @@ impl Violation for SuspiciousInsecureHashUsage {
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
-#[violation]
-pub struct SuspiciousInsecureCipherUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousInsecureCipherUsage;
 
 impl Violation for SuspiciousInsecureCipherUsage {
     #[derive_message_formats]
@@ -215,8 +215,8 @@ impl Violation for SuspiciousInsecureCipherUsage {
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
-#[violation]
-pub struct SuspiciousInsecureCipherModeUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousInsecureCipherModeUsage;
 
 impl Violation for SuspiciousInsecureCipherModeUsage {
     #[derive_message_formats]
@@ -260,8 +260,8 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 ///
 /// ## References
 /// - [Python documentation:`mktemp`](https://docs.python.org/3/library/tempfile.html#tempfile.mktemp)
-#[violation]
-pub struct SuspiciousMktempUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousMktempUsage;
 
 impl Violation for SuspiciousMktempUsage {
     #[derive_message_formats]
@@ -296,8 +296,8 @@ impl Violation for SuspiciousMktempUsage {
 /// - [Python documentation: `eval`](https://docs.python.org/3/library/functions.html#eval)
 /// - [Python documentation: `literal_eval`](https://docs.python.org/3/library/ast.html#ast.literal_eval)
 /// - [_Eval really is dangerous_ by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
-#[violation]
-pub struct SuspiciousEvalUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousEvalUsage;
 
 impl Violation for SuspiciousEvalUsage {
     #[derive_message_formats]
@@ -335,8 +335,8 @@ impl Violation for SuspiciousEvalUsage {
 /// - [Django documentation: `mark_safe`](https://docs.djangoproject.com/en/dev/ref/utils/#django.utils.safestring.mark_safe)
 /// - [Django documentation: Cross Site Scripting (XSS) protection](https://docs.djangoproject.com/en/dev/topics/security/#cross-site-scripting-xss-protection)
 /// - [Common Weakness Enumeration: CWE-80](https://cwe.mitre.org/data/definitions/80.html)
-#[violation]
-pub struct SuspiciousMarkSafeUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousMarkSafeUsage;
 
 impl Violation for SuspiciousMarkSafeUsage {
     #[derive_message_formats]
@@ -383,8 +383,8 @@ impl Violation for SuspiciousMarkSafeUsage {
 ///
 /// ## References
 /// - [Python documentation: `urlopen`](https://docs.python.org/3/library/urllib.request.html#urllib.request.urlopen)
-#[violation]
-pub struct SuspiciousURLOpenUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousURLOpenUsage;
 
 impl Violation for SuspiciousURLOpenUsage {
     #[derive_message_formats]
@@ -421,8 +421,8 @@ impl Violation for SuspiciousURLOpenUsage {
 ///
 /// ## References
 /// - [Python documentation: `random` — Generate pseudo-random numbers](https://docs.python.org/3/library/random.html)
-#[violation]
-pub struct SuspiciousNonCryptographicRandomUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousNonCryptographicRandomUsage;
 
 impl Violation for SuspiciousNonCryptographicRandomUsage {
     #[derive_message_formats]
@@ -461,8 +461,8 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
-#[violation]
-pub struct SuspiciousXMLCElementTreeUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXMLCElementTreeUsage;
 
 impl Violation for SuspiciousXMLCElementTreeUsage {
     #[derive_message_formats]
@@ -501,8 +501,8 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
-#[violation]
-pub struct SuspiciousXMLElementTreeUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXMLElementTreeUsage;
 
 impl Violation for SuspiciousXMLElementTreeUsage {
     #[derive_message_formats]
@@ -541,8 +541,8 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
-#[violation]
-pub struct SuspiciousXMLExpatReaderUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXMLExpatReaderUsage;
 
 impl Violation for SuspiciousXMLExpatReaderUsage {
     #[derive_message_formats]
@@ -581,8 +581,8 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
-#[violation]
-pub struct SuspiciousXMLExpatBuilderUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXMLExpatBuilderUsage;
 
 impl Violation for SuspiciousXMLExpatBuilderUsage {
     #[derive_message_formats]
@@ -621,8 +621,8 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
-#[violation]
-pub struct SuspiciousXMLSaxUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXMLSaxUsage;
 
 impl Violation for SuspiciousXMLSaxUsage {
     #[derive_message_formats]
@@ -661,8 +661,8 @@ impl Violation for SuspiciousXMLSaxUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
-#[violation]
-pub struct SuspiciousXMLMiniDOMUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXMLMiniDOMUsage;
 
 impl Violation for SuspiciousXMLMiniDOMUsage {
     #[derive_message_formats]
@@ -701,8 +701,8 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
-#[violation]
-pub struct SuspiciousXMLPullDOMUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXMLPullDOMUsage;
 
 impl Violation for SuspiciousXMLPullDOMUsage {
     #[derive_message_formats]
@@ -730,8 +730,8 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// - [PyPI: `lxml`](https://pypi.org/project/lxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
-#[violation]
-pub struct SuspiciousXMLETreeUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXMLETreeUsage;
 
 impl Violation for SuspiciousXMLETreeUsage {
     #[derive_message_formats]
@@ -773,8 +773,8 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// - [Python documentation: `ssl` — TLS/SSL wrapper for socket objects](https://docs.python.org/3/library/ssl.html)
 ///
 /// [PEP 476]: https://peps.python.org/pep-0476/
-#[violation]
-pub struct SuspiciousUnverifiedContextUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousUnverifiedContextUsage;
 
 impl Violation for SuspiciousUnverifiedContextUsage {
     #[derive_message_formats]
@@ -794,8 +794,8 @@ impl Violation for SuspiciousUnverifiedContextUsage {
 ///
 /// ## References
 /// - [Python documentation: `telnetlib` — Telnet client](https://docs.python.org/3/library/telnetlib.html)
-#[violation]
-pub struct SuspiciousTelnetUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousTelnetUsage;
 
 impl Violation for SuspiciousTelnetUsage {
     #[derive_message_formats]
@@ -815,8 +815,8 @@ impl Violation for SuspiciousTelnetUsage {
 ///
 /// ## References
 /// - [Python documentation: `ftplib` — FTP protocol client](https://docs.python.org/3/library/ftplib.html)
-#[violation]
-pub struct SuspiciousFTPLibUsage;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousFTPLibUsage;
 
 impl Violation for SuspiciousFTPLibUsage {
     #[derive_message_formats]

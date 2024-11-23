@@ -3,7 +3,7 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
@@ -48,8 +48,8 @@ use crate::Locator;
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct RepeatedEqualityComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
     all_hashable: bool,
 }

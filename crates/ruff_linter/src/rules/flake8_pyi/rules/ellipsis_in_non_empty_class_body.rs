@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
@@ -26,8 +26,8 @@ use crate::fix;
 /// class Foo:
 ///     value: int
 /// ```
-#[violation]
-pub struct EllipsisInNonEmptyClassBody;
+#[derive(ViolationMetadata)]
+pub(crate) struct EllipsisInNonEmptyClassBody;
 
 impl Violation for EllipsisInNonEmptyClassBody {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

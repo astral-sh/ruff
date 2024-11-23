@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{GeneratorKind, ScopeKind};
 use ruff_text_size::Ranged;
 
@@ -38,8 +38,8 @@ use crate::checkers::ast::Checker;
 /// - [PEP 492: Await Expression](https://peps.python.org/pep-0492/#await-expression)
 ///
 /// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
-#[violation]
-pub struct AwaitOutsideAsync;
+#[derive(ViolationMetadata)]
+pub(crate) struct AwaitOutsideAsync;
 
 impl Violation for AwaitOutsideAsync {
     #[derive_message_formats]

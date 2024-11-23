@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -36,8 +36,8 @@ use super::super::helpers::{find_file_opens, FileOpen};
 /// ## References
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
 /// - [Python documentation: `Path.write_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_text)
-#[violation]
-pub struct WriteWholeFile {
+#[derive(ViolationMetadata)]
+pub(crate) struct WriteWholeFile {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
 }

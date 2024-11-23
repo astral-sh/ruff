@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_python_ast::{self as ast};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -39,8 +39,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `re.sub`](https://docs.python.org/3/library/re.html#re.sub)
 /// - [Python documentation: `re.subn`](https://docs.python.org/3/library/re.html#re.subn)
 /// - [Python documentation: `re.split`](https://docs.python.org/3/library/re.html#re.split)
-#[violation]
-pub struct ReSubPositionalArgs {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReSubPositionalArgs {
     method: Method,
 }
 

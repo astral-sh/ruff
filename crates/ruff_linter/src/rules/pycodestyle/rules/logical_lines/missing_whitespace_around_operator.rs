@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
@@ -28,8 +28,8 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E225
-#[violation]
-pub struct MissingWhitespaceAroundOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
     #[derive_message_formats]
@@ -61,8 +61,8 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E226
-#[violation]
-pub struct MissingWhitespaceAroundArithmeticOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundArithmeticOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
     #[derive_message_formats]
@@ -94,8 +94,8 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E227
-#[violation]
-pub struct MissingWhitespaceAroundBitwiseOrShiftOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundBitwiseOrShiftOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
     #[derive_message_formats]
@@ -127,8 +127,8 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E228
-#[violation]
-pub struct MissingWhitespaceAroundModuloOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundModuloOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
     #[derive_message_formats]

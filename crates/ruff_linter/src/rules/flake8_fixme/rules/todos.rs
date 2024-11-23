@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::directives::{TodoComment, TodoDirectiveKind};
 
@@ -21,8 +21,8 @@ use crate::directives::{TodoComment, TodoDirectiveKind};
 /// def greet(name):
 ///     return f"Hello, {name}!"  # TODO: Add support for custom greetings.
 /// ```
-#[violation]
-pub struct LineContainsTodo;
+#[derive(ViolationMetadata)]
+pub(crate) struct LineContainsTodo;
 impl Violation for LineContainsTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,8 +47,8 @@ impl Violation for LineContainsTodo {
 /// def speed(distance, time):
 ///     return distance / time  # FIXME: Raises ZeroDivisionError for time = 0.
 /// ```
-#[violation]
-pub struct LineContainsFixme;
+#[derive(ViolationMetadata)]
+pub(crate) struct LineContainsFixme;
 impl Violation for LineContainsFixme {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -70,8 +70,8 @@ impl Violation for LineContainsFixme {
 /// def speed(distance, time):
 ///     return distance / time  # XXX: Raises ZeroDivisionError for time = 0.
 /// ```
-#[violation]
-pub struct LineContainsXxx;
+#[derive(ViolationMetadata)]
+pub(crate) struct LineContainsXxx;
 impl Violation for LineContainsXxx {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -105,8 +105,8 @@ impl Violation for LineContainsXxx {
 ///         os.rmdir("C:\\Windows\\System32\\")
 ///         return False
 /// ```
-#[violation]
-pub struct LineContainsHack;
+#[derive(ViolationMetadata)]
+pub(crate) struct LineContainsHack;
 impl Violation for LineContainsHack {
     #[derive_message_formats]
     fn message(&self) -> String {

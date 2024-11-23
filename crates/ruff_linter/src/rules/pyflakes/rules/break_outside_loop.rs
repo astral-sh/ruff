@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -19,8 +19,8 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Python documentation: `break`](https://docs.python.org/3/reference/simple_stmts.html#the-break-statement)
-#[violation]
-pub struct BreakOutsideLoop;
+#[derive(ViolationMetadata)]
+pub(crate) struct BreakOutsideLoop;
 
 impl Violation for BreakOutsideLoop {
     #[derive_message_formats]

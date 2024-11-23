@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
@@ -30,8 +30,8 @@ use crate::Locator;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct TooFewSpacesBeforeInlineComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct TooFewSpacesBeforeInlineComment;
 
 impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
     #[derive_message_formats]
@@ -66,8 +66,8 @@ impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct NoSpaceAfterInlineComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSpaceAfterInlineComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
     #[derive_message_formats]
@@ -103,8 +103,8 @@ impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct NoSpaceAfterBlockComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSpaceAfterBlockComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
     #[derive_message_formats]
@@ -149,8 +149,8 @@ impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct MultipleLeadingHashesForBlockComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleLeadingHashesForBlockComment;
 
 impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {
     #[derive_message_formats]

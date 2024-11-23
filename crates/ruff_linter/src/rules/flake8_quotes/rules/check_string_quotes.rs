@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::StringLike;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -36,8 +36,8 @@ use super::super::settings::Quote;
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesInlineString {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesInlineString {
     preferred_quote: Quote,
 }
 
@@ -93,8 +93,8 @@ impl Violation for BadQuotesInlineString {
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesMultilineString {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesMultilineString {
     preferred_quote: Quote,
 }
 
@@ -148,8 +148,8 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesDocstring {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesDocstring {
     preferred_quote: Quote,
 }
 

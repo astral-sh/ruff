@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::{Ranged, TextSize};
@@ -49,8 +49,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `target-version`
-#[violation]
-pub struct FutureRequiredTypeAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct FutureRequiredTypeAnnotation {
     reason: Reason,
 }
 

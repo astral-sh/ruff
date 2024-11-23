@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
@@ -58,8 +58,8 @@ use crate::importer::ImportRequest;
 /// applied to runtime Python (`.py` files). As such, the fix is marked as
 /// unsafe for any `__iter__` or `__aiter__` method in a `.py` file that has
 /// more than two statements (including docstrings) in its body.
-#[violation]
-pub struct GeneratorReturnFromIterMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct GeneratorReturnFromIterMethod {
     return_type: Iterator,
     method: Method,
 }

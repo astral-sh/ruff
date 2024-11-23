@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Alias;
 
 use crate::checkers::ast::Checker;
@@ -41,8 +41,8 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// - `lint.flake8-builtins.builtins-ignorelist`
 /// - `target-version`
 ///
-#[violation]
-pub struct BuiltinImportShadowing {
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinImportShadowing {
     name: String,
 }
 

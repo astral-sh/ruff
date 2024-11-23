@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
@@ -36,8 +36,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: the `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 /// - [Python documentation: the `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#the-nonlocal-statement)
-#[violation]
-pub struct RepeatedGlobal {
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedGlobal {
     global_kind: GlobalKind,
 }
 

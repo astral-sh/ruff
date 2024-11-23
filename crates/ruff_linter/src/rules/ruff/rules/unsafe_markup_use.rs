@@ -1,7 +1,7 @@
 use ruff_python_ast::ExprCall;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -71,8 +71,8 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 ///
 /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
-#[violation]
-pub struct UnsafeMarkupUse {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsafeMarkupUse {
     name: String,
 }
 

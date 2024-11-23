@@ -1,7 +1,7 @@
 use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
@@ -31,8 +31,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
-#[violation]
-pub struct CamelcaseImportedAsConstant {
+#[derive(ViolationMetadata)]
+pub(crate) struct CamelcaseImportedAsConstant {
     name: String,
     asname: String,
 }

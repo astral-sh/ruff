@@ -2,14 +2,14 @@ use ruff_python_ast::{self as ast, Expr};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of `pd.merge` on Pandas objects.
 ///
 /// ## Why is this bad?
-/// In Pandas, the `.merge` method (exposed on, e.g., DataFrame objects) and
+/// In Pandas, the `.merge` method (exposed on, e.g., `DataFrame` objects) and
 /// the `pd.merge` function (exposed on the Pandas module) are equivalent.
 ///
 /// For consistency, prefer calling `.merge` on an object over calling
@@ -41,8 +41,8 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Pandas documentation: `merge`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.merge.html#pandas.DataFrame.merge)
 /// - [Pandas documentation: `pd.merge`](https://pandas.pydata.org/docs/reference/api/pandas.merge.html#pandas.merge)
-#[violation]
-pub struct PandasUseOfPdMerge;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfPdMerge;
 
 impl Violation for PandasUseOfPdMerge {
     #[derive_message_formats]

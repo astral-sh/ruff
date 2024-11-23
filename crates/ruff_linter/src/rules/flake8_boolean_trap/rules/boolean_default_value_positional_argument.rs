@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters};
 use ruff_python_semantic::analyze::visibility;
@@ -89,8 +89,8 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
-#[violation]
-pub struct BooleanDefaultValuePositionalArgument;
+#[derive(ViolationMetadata)]
+pub(crate) struct BooleanDefaultValuePositionalArgument;
 
 impl Violation for BooleanDefaultValuePositionalArgument {
     #[derive_message_formats]

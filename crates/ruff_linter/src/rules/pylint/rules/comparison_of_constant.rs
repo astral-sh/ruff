@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{CmpOp, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -27,8 +27,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
-#[violation]
-pub struct ComparisonOfConstant {
+#[derive(ViolationMetadata)]
+pub(crate) struct ComparisonOfConstant {
     left_constant: String,
     op: CmpOp,
     right_constant: String,

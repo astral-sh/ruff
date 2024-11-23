@@ -7,7 +7,7 @@ use ruff_python_ast::{
 use smallvec::SmallVec;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_semantic::{analyze::visibility::is_overload, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -46,8 +46,8 @@ use crate::checkers::ast::Checker;
 ///         tb: TracebackType | None,
 ///     ) -> None: ...
 /// ```
-#[violation]
-pub struct BadExitAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadExitAnnotation {
     func_kind: FuncKind,
     error_kind: ErrorKind,
 }

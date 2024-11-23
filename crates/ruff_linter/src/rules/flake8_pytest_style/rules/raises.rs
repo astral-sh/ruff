@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
@@ -45,8 +45,8 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[violation]
-pub struct PytestRaisesWithMultipleStatements;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestRaisesWithMultipleStatements;
 
 impl Violation for PytestRaisesWithMultipleStatements {
     #[derive_message_formats]
@@ -96,8 +96,8 @@ impl Violation for PytestRaisesWithMultipleStatements {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[violation]
-pub struct PytestRaisesTooBroad {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestRaisesTooBroad {
     exception: String,
 }
 
@@ -141,8 +141,8 @@ impl Violation for PytestRaisesTooBroad {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[violation]
-pub struct PytestRaisesWithoutException;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestRaisesWithoutException;
 
 impl Violation for PytestRaisesWithoutException {
     #[derive_message_formats]

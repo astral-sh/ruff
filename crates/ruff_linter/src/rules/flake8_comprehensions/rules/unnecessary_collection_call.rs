@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -39,8 +39,8 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 ///
 /// ## Options
 /// - `lint.flake8-comprehensions.allow-dict-calls-with-keyword-arguments`
-#[violation]
-pub struct UnnecessaryCollectionCall {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryCollectionCall {
     obj_type: String,
 }
 

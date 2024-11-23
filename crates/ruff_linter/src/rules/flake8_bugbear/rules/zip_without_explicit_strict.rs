@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -37,8 +37,8 @@ use crate::fix::edits::add_argument;
 ///
 /// ## References
 /// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
-#[violation]
-pub struct ZipWithoutExplicitStrict;
+#[derive(ViolationMetadata)]
+pub(crate) struct ZipWithoutExplicitStrict;
 
 impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
     #[derive_message_formats]

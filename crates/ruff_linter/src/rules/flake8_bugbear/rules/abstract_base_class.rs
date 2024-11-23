@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::SemanticModel;
@@ -53,8 +53,8 @@ use crate::registry::Rule;
 /// ## References
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 /// - [Python documentation: `typing.ClassVar`](https://docs.python.org/3/library/typing.html#typing.ClassVar)
-#[violation]
-pub struct AbstractBaseClassWithoutAbstractMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct AbstractBaseClassWithoutAbstractMethod {
     name: String,
 }
 
@@ -98,8 +98,8 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 ///
 /// ## References
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
-#[violation]
-pub struct EmptyMethodWithoutAbstractDecorator {
+#[derive(ViolationMetadata)]
+pub(crate) struct EmptyMethodWithoutAbstractDecorator {
     name: String,
 }
 

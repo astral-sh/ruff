@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
@@ -39,8 +39,8 @@ use crate::checkers::ast::Checker;
 /// - [Why `preexec_fn` in `subprocess.Popen` may lead to deadlock?](https://discuss.python.org/t/why-preexec-fn-in-subprocess-popen-may-lead-to-deadlock/16908/2)
 ///
 /// [targeted for deprecation]: https://github.com/python/cpython/issues/82616
-#[violation]
-pub struct SubprocessPopenPreexecFn;
+#[derive(ViolationMetadata)]
+pub(crate) struct SubprocessPopenPreexecFn;
 
 impl Violation for SubprocessPopenPreexecFn {
     #[derive_message_formats]

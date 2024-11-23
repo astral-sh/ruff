@@ -3,7 +3,7 @@ use std::string::ToString;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
@@ -36,8 +36,8 @@ use super::super::format::FormatSummary;
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatInvalidFormat {
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatInvalidFormat {
     pub(crate) message: String,
 }
 
@@ -75,8 +75,8 @@ impl Violation for PercentFormatInvalidFormat {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatExpectedMapping;
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatExpectedMapping;
 
 impl Violation for PercentFormatExpectedMapping {
     #[derive_message_formats]
@@ -111,8 +111,8 @@ impl Violation for PercentFormatExpectedMapping {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatExpectedSequence;
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatExpectedSequence;
 
 impl Violation for PercentFormatExpectedSequence {
     #[derive_message_formats]
@@ -140,8 +140,8 @@ impl Violation for PercentFormatExpectedSequence {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatExtraNamedArguments {
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatExtraNamedArguments {
     missing: Vec<String>,
 }
 
@@ -180,8 +180,8 @@ impl AlwaysFixableViolation for PercentFormatExtraNamedArguments {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatMissingArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatMissingArgument {
     missing: Vec<String>,
 }
 
@@ -220,8 +220,8 @@ impl Violation for PercentFormatMissingArgument {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatMixedPositionalAndNamed;
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatMixedPositionalAndNamed;
 
 impl Violation for PercentFormatMixedPositionalAndNamed {
     #[derive_message_formats]
@@ -250,8 +250,8 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatPositionalCountMismatch {
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatPositionalCountMismatch {
     wanted: usize,
     got: usize,
 }
@@ -288,8 +288,8 @@ impl Violation for PercentFormatPositionalCountMismatch {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatStarRequiresSequence;
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatStarRequiresSequence;
 
 impl Violation for PercentFormatStarRequiresSequence {
     #[derive_message_formats]
@@ -318,8 +318,8 @@ impl Violation for PercentFormatStarRequiresSequence {
 ///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
-#[violation]
-pub struct PercentFormatUnsupportedFormatCharacter {
+#[derive(ViolationMetadata)]
+pub(crate) struct PercentFormatUnsupportedFormatCharacter {
     pub(crate) char: char,
 }
 
@@ -349,8 +349,8 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
 ///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
-#[violation]
-pub struct StringDotFormatInvalidFormat {
+#[derive(ViolationMetadata)]
+pub(crate) struct StringDotFormatInvalidFormat {
     pub(crate) message: String,
 }
 
@@ -381,8 +381,8 @@ impl Violation for StringDotFormatInvalidFormat {
 ///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
-#[violation]
-pub struct StringDotFormatExtraNamedArguments {
+#[derive(ViolationMetadata)]
+pub(crate) struct StringDotFormatExtraNamedArguments {
     missing: Vec<Name>,
 }
 
@@ -422,8 +422,8 @@ impl Violation for StringDotFormatExtraNamedArguments {
 ///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
-#[violation]
-pub struct StringDotFormatExtraPositionalArguments {
+#[derive(ViolationMetadata)]
+pub(crate) struct StringDotFormatExtraPositionalArguments {
     missing: Vec<String>,
 }
 
@@ -465,8 +465,8 @@ impl Violation for StringDotFormatExtraPositionalArguments {
 ///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
-#[violation]
-pub struct StringDotFormatMissingArguments {
+#[derive(ViolationMetadata)]
+pub(crate) struct StringDotFormatMissingArguments {
     missing: Vec<String>,
 }
 
@@ -503,8 +503,8 @@ impl Violation for StringDotFormatMissingArguments {
 ///
 /// ## References
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
-#[violation]
-pub struct StringDotFormatMixingAutomatic;
+#[derive(ViolationMetadata)]
+pub(crate) struct StringDotFormatMixingAutomatic;
 
 impl Violation for StringDotFormatMixingAutomatic {
     #[derive_message_formats]

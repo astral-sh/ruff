@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -37,8 +37,8 @@ use crate::rules::flake8_2020::helpers::is_sys;
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersionSlice3;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersionSlice3;
 
 impl Violation for SysVersionSlice3 {
     #[derive_message_formats]
@@ -77,8 +77,8 @@ impl Violation for SysVersionSlice3 {
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersion2;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersion2;
 
 impl Violation for SysVersion2 {
     #[derive_message_formats]
@@ -117,8 +117,8 @@ impl Violation for SysVersion2 {
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersion0;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersion0;
 
 impl Violation for SysVersion0 {
     #[derive_message_formats]
@@ -157,8 +157,8 @@ impl Violation for SysVersion0 {
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersionSlice1;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersionSlice1;
 
 impl Violation for SysVersionSlice1 {
     #[derive_message_formats]

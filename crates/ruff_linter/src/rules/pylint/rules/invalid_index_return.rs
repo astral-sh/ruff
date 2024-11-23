@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// type may cause unexpected behavior.
 ///
 /// Note: `bool` is a subclass of `int`, so it's technically valid for `__index__` to
-/// return `True` or `False`. However, a DeprecationWarning (`DeprecationWarning:
+/// return `True` or `False`. However, a `DeprecationWarning` (`DeprecationWarning:
 /// __index__ returned non-int (type bool)`) for such cases was already introduced,
 /// thus this is a conscious difference between the original pylint rule and the
 /// current ruff implementation.
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `__index__` method](https://docs.python.org/3/reference/datamodel.html#object.__index__)
-#[violation]
-pub struct InvalidIndexReturnType;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidIndexReturnType;
 
 impl Violation for InvalidIndexReturnType {
     #[derive_message_formats]

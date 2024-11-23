@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::Ranged;
@@ -35,8 +35,8 @@ static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// ## References
 /// - [B608: Test for SQL injection](https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html)
 /// - [psycopg3: Server-side binding](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding)
-#[violation]
-pub struct HardcodedSQLExpression;
+#[derive(ViolationMetadata)]
+pub(crate) struct HardcodedSQLExpression;
 
 impl Violation for HardcodedSQLExpression {
     #[derive_message_formats]

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::except;
 use ruff_python_ast::{self as ast, ExceptHandler};
 
@@ -43,8 +43,8 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
-#[violation]
-pub struct DefaultExceptNotLast;
+#[derive(ViolationMetadata)]
+pub(crate) struct DefaultExceptNotLast;
 
 impl Violation for DefaultExceptNotLast {
     #[derive_message_formats]

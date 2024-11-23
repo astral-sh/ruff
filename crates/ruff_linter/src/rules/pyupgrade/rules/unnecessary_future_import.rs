@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -35,8 +35,8 @@ use crate::fix;
 ///
 /// ## References
 /// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
-#[violation]
-pub struct UnnecessaryFutureImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryFutureImport {
     pub names: Vec<String>,
 }
 

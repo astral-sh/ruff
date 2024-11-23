@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
@@ -40,8 +40,8 @@ use crate::docstrings::Docstring;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct NoSignature;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSignature;
 
 impl Violation for NoSignature {
     #[derive_message_formats]

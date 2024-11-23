@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for uses of undefined names.
@@ -25,8 +25,8 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## References
 /// - [Python documentation: Naming and binding](https://docs.python.org/3/reference/executionmodel.html#naming-and-binding)
-#[violation]
-pub struct UndefinedName {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndefinedName {
     pub(crate) name: String,
     pub(crate) minor_version_builtin_added: Option<u8>,
 }

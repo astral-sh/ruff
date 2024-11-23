@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, identifier::Identifier, Arguments, Expr, Stmt, StmtClassDef};
 use ruff_python_semantic::SemanticModel;
 
@@ -46,8 +46,8 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 ///
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
-#[violation]
-pub struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
 
 impl Violation for NoSlotsInNamedtupleSubclass {
     #[derive_message_formats]

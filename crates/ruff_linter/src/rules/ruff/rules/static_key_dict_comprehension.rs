@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## Removed
 /// This rule was implemented in `flake8-bugbear` and has been remapped to [B035]
@@ -26,8 +26,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 ///
 /// [B035]: https://docs.astral.sh/ruff/rules/static-key-dict-comprehension/
-#[violation]
-pub struct RuffStaticKeyDictComprehension;
+#[derive(ViolationMetadata)]
+pub(crate) struct RuffStaticKeyDictComprehension;
 
 impl Violation for RuffStaticKeyDictComprehension {
     #[derive_message_formats]

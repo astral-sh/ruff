@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
@@ -29,8 +29,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Union type](https://docs.python.org/3/library/stdtypes.html#types-union)
 /// - [Python documentation: `typing.Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
-#[violation]
-pub struct NoneNotAtEndOfUnion;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoneNotAtEndOfUnion;
 
 impl Violation for NoneNotAtEndOfUnion {
     #[derive_message_formats]

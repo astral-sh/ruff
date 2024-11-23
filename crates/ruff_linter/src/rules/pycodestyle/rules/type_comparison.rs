@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -48,8 +48,8 @@ use crate::checkers::ast::Checker;
 /// if isinstance(obj, int):
 ///     pass
 /// ```
-#[violation]
-pub struct TypeComparison;
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeComparison;
 
 impl Violation for TypeComparison {
     #[derive_message_formats]

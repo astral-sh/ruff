@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::typing::traverse_literal;
@@ -35,8 +35,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
-#[violation]
-pub struct DuplicateLiteralMember {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateLiteralMember {
     duplicate_name: String,
 }
 

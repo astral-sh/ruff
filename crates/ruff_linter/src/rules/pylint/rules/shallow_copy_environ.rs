@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -35,8 +35,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 ///
 /// [#15373]: https://bugs.python.org/issue15373
-#[violation]
-pub struct ShallowCopyEnviron;
+#[derive(ViolationMetadata)]
+pub(crate) struct ShallowCopyEnviron;
 
 impl AlwaysFixableViolation for ShallowCopyEnviron {
     #[derive_message_formats]
