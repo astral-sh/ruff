@@ -4629,6 +4629,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(parameters);
                 todo_type!("generic type alias")
             }
+            KnownInstanceType::NoReturn | KnownInstanceType::Never => {
+                unreachable!("These are not subscriptible")
+            }
         }
     }
 
