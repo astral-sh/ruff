@@ -25,7 +25,7 @@ use crate::Locator;
 mod annotate;
 pub(crate) mod block;
 pub mod categorize;
-mod comments;
+pub mod comments;
 mod format;
 mod helpers;
 mod normalize;

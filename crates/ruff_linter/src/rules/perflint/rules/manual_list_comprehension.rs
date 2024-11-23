@@ -54,7 +54,7 @@ use ruff_text_size::{Ranged, TextRange};
 #[derive(ViolationMetadata)]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
-    comprehension_type: Option<ComprehensionType>,
+    comprehension_type: ComprehensionType,
 }
 
 impl Violation for ManualListComprehension {
@@ -67,14 +67,14 @@ impl Violation for ManualListComprehension {
             comprehension_type,
         } = self;
         let message_str = match comprehension_type {
-            Some(ComprehensionType::Extend) => {
+            ComprehensionType::Extend => {
                 if *is_async {
                     "`list.extend` with an async comprehension"
                 } else {
                     "`list.extend`"
                 }
             }
-            Some(ComprehensionType::ListComprehension) | None => {
+            ComprehensionType::ListComprehension => {
                 if *is_async {
                     "an async list comprehension"
                 } else {
@@ -86,7 +86,7 @@ impl Violation for ManualListComprehension {
     }
 
     fn fix_title(&self) -> Option<String> {
-        match self.comprehension_type? {
+        match self.comprehension_type {
             ComprehensionType::ListComprehension => {
                 Some("Replace for loop with list comprehension".to_string())
             }
@@ -319,7 +319,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
             is_async: for_stmt.is_async,
-            comprehension_type: Some(comprehension_type),
+            comprehension_type,
         },
         *range,
     );
@@ -443,7 +443,11 @@ fn convert_to_list_extend(
             };
             let text_to_replace = format!(
                 "{}{indentation}{comprehension_body}",
-                for_loop_inline_comments.join(&indentation)
+                all_comments
+                    .iter()
+                    .map(|comment| comment.value.to_string())
+                    .collect::<Vec<String>>()
+                    .join(&indentation)
             );
             Ok(Fix::unsafe_edit(Edit::range_replacement(
                 text_to_replace,
