@@ -309,7 +309,7 @@ jobs:
           # Make executable, since artifact download doesn't preserve this
           chmod +x ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
-          python scripts/fuzz-parser/fuzz.py 0-500 --test-executable ${{ steps.download-cached-binary.outputs.download-path }}/ruff
+          python scripts/fuzz-parser/fuzz.py --bin ruff 0-500 --test-executable ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
   scripts:
     name: "test scripts"
