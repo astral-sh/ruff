@@ -18,8 +18,8 @@ reveal_type(stop())
 a1: NoReturn
 # TODO: Test `Never` is only available in python >= 3.11
 a2: Never
-b: Any
-c: int
+b1: Any
+b2: int
 
 def f():
     # revealed: Never
@@ -30,11 +30,12 @@ def f():
     # Never is compatible with all types.
     v1: int = a1
     v2: str = a1
-    v3: list[str] = a1
     # Other types are not compatible with Never except for Never (and Any).
-    v4: Never = b
-    v5: Never = stop()
-    v6: Any = c
+    v3: Never = b1
+    v4: Never = stop()
+    v5: Any = b2
+    # error: Object of type `Literal[1]` is not assignable to `Never`
+    v6: Never = 1
 ```
 
 ## Typing Extensions
