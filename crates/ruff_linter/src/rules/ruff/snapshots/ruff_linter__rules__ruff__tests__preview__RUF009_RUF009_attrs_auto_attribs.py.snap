@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF009_attrs_auto_attribs.py:12:14: RUF009 Do not perform function call `foo` in dataclass defaults
    |
@@ -99,4 +98,13 @@ RUF009_attrs_auto_attribs.py:100:14: RUF009 Do not perform function call `foo` i
 100 |     c: int = foo()
     |              ^^^^^ RUF009
 101 |     d = list()
+    |
+
+RUF009_attrs_auto_attribs.py:116:14: RUF009 Do not perform function call `foo` in dataclass defaults
+    |
+114 |     a: str = 0
+115 |     b = field()
+116 |     c: int = foo()
+    |              ^^^^^ RUF009
+117 |     d = list()
     |
