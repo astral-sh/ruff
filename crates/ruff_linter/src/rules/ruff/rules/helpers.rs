@@ -1,4 +1,4 @@
-use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::helpers::{map_callable, map_subscript, Truthiness};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::{analyze, BindingKind, Modules, SemanticModel};
 
@@ -148,16 +148,19 @@ pub(super) fn dataclass_kind(
                     return Some(DataclassKind::Attrs(AttrsAutoAttribs::None));
                 };
 
-                let auto_attribs = match &auto_attribs.value {
-                    Expr::BooleanLiteral(literal) => {
-                        if literal.value {
-                            AttrsAutoAttribs::True
-                        } else {
-                            AttrsAutoAttribs::False
-                        }
+                let auto_attribs = match Truthiness::from_expr(&auto_attribs.value, |id| {
+                    semantic.has_builtin_binding(id)
+                }) {
+                    // `auto_attribs` requires an exact `True` to be true
+                    Truthiness::True => AttrsAutoAttribs::True,
+                    // Or an exact `None` to auto-detect.
+                    Truthiness::None => AttrsAutoAttribs::None,
+                    // Otherwise, anything else (even a truthy value, like `1`) is considered `False`.
+                    Truthiness::Truthy | Truthiness::False | Truthiness::Falsey => {
+                        AttrsAutoAttribs::False
                     }
-                    Expr::NoneLiteral(..) => AttrsAutoAttribs::None,
-                    _ => AttrsAutoAttribs::Unknown,
+                    // Unless, of course, we can't determine the value.
+                    Truthiness::Unknown => AttrsAutoAttribs::Unknown,
                 };
 
                 return Some(DataclassKind::Attrs(auto_attribs));
