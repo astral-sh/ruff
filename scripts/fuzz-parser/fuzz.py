@@ -47,11 +47,11 @@ def redknot_contains_bug(code: str, *, red_knot_executable: str) -> bool:
             pyfile.write(code)
 
         completed_process = subprocess.run(
-            [red_knot_executable, "--ignore-errors", "--current-directory", tempdir],
+            [red_knot_executable, "--current-directory", tempdir],
             capture_output=True,
             text=True,
         )
-        return completed_process.returncode != 0
+        return completed_process.returncode != 0 and completed_process.returncode != 1
 
 
 def ruff_contains_bug(code: str, *, ruff_executable: str) -> bool:
