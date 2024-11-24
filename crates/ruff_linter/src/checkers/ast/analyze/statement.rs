@@ -1748,6 +1748,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UselessExceptionStatement) {
                 pylint::rules::useless_exception_statement(checker, expr);
             }
+            if checker.enabled(Rule::DictUpdateSingleItemDict) {
+                ruff::rules::dict_update_single(checker, value);
+            }
         }
         _ => {}
     }

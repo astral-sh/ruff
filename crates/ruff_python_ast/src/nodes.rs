@@ -3829,7 +3829,7 @@ impl Arguments {
     ///
     /// f(*args, a=2, *args2, **kwargs)
     /// ```
-    /// where `*args` and `args2` are `args` while `a=1` and `kwargs` are `keywords`.
+    /// where `*args` and `args2` are `args` while `a=2` and `kwargs` are `keywords`.
     ///
     /// If you would just chain `args` and `keywords` the call would get reordered which we don't
     /// want. This function instead "merge sorts" them into the correct order.

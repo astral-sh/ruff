@@ -1,0 +1,68 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF042.py:5:1: RUF042 [*] `dict.update` with single dictionary argument
+  |
+3 | ### Errors
+4 | 
+5 | d.update({'a': 'b'})                      # Strings
+  | ^^^^^^^^^^^^^^^^^^^^ RUF042
+6 | d.update({a: b})                          # Identifiers
+  |
+  = help: Replace with assign statement
+
+ℹ Unsafe fix
+2 2 | 
+3 3 | ### Errors
+4 4 | 
+5   |-d.update({'a': 'b'})                      # Strings
+  5 |+d['a'] = 'b'                      # Strings
+6 6 | d.update({a: b})                          # Identifiers
+7 7 | 
+8 8 | d.update({                                # Multiline
+
+RUF042.py:6:1: RUF042 [*] `dict.update` with single dictionary argument
+  |
+5 | d.update({'a': 'b'})                      # Strings
+6 | d.update({a: b})                          # Identifiers
+  | ^^^^^^^^^^^^^^^^ RUF042
+7 | 
+8 | d.update({                                # Multiline
+  |
+  = help: Replace with assign statement
+
+ℹ Unsafe fix
+3 3 | ### Errors
+4 4 | 
+5 5 | d.update({'a': 'b'})                      # Strings
+6   |-d.update({a: b})                          # Identifiers
+  6 |+d[a] = b                          # Identifiers
+7 7 | 
+8 8 | d.update({                                # Multiline
+9 9 |                                           # expressions
+
+RUF042.py:8:1: RUF042 [*] `dict.update` with single dictionary argument
+   |
+ 6 |   d.update({a: b})                          # Identifiers
+ 7 |   
+ 8 | / d.update({                                # Multiline
+ 9 | |                                           # expressions
+10 | |     1 + 2: lorem() * ~ipsum() @ dolor()
+11 | | })
+   | |__^ RUF042
+   |
+   = help: Replace with assign statement
+
+ℹ Unsafe fix
+5  5  | d.update({'a': 'b'})                      # Strings
+6  6  | d.update({a: b})                          # Identifiers
+7  7  | 
+8     |-d.update({                                # Multiline
+9     |-                                          # expressions
+10    |-    1 + 2: lorem() * ~ipsum() @ dolor()
+11    |-})
+   8  |+d[1 + 2] = lorem() * ~ipsum() @ dolor()
+12 9  | 
+13 10 | 
+14 11 | # No errors
