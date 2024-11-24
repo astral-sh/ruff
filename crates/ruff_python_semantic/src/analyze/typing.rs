@@ -279,7 +279,7 @@ pub fn is_immutable_func(
     extend_immutable_calls: &[QualifiedName],
 ) -> bool {
     semantic
-        .resolve_qualified_name(func)
+        .resolve_qualified_name(map_subscript(func))
         .is_some_and(|qualified_name| {
             is_immutable_return_type(qualified_name.segments())
                 || extend_immutable_calls
@@ -306,7 +306,7 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
         | Expr::ListComp(_)
         | Expr::DictComp(_)
         | Expr::SetComp(_) => true,
-        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(func, semantic),
+        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(map_subscript(func), semantic),
         _ => false,
     }
 }
