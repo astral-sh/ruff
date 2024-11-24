@@ -83,6 +83,14 @@ to resolve type information for the project's third-party dependencies.",
         short = 'W'
     )]
     watch: bool,
+
+    #[arg(
+        long,
+        hide = true,
+        help = "Return a successful status code even when type-checking fails. \
+                Useful for finding bugs in the type-checker itself"
+    )]
+    ignore_errors: bool,
 }
 
 impl Args {
@@ -214,6 +222,10 @@ fn run() -> anyhow::Result<ExitStatus> {
     tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
 
     std::mem::forget(db);
+
+    if args.ignore_errors {
+        return Ok(ExitStatus::Success);
+    }
 
     Ok(exit_status)
 }

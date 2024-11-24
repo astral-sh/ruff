@@ -6,14 +6,14 @@ To install all dependencies for this script into an environment using `uv`, run:
 
 Example invocations of the script:
 - Run the fuzzer using seeds 0, 1, 2, 78 and 93 to generate the code:
-  `python scripts/fuzz-parser/fuzz.py 0-2 78 93`
+  `python scripts/fuzz-parser/fuzz.py --bin ruff 0-2 78 93`
 - Run the fuzzer concurrently using seeds in range 0-10 inclusive,
   but only reporting bugs that are new on your branch:
-  `python scripts/fuzz-parser/fuzz.py 0-10 --new-bugs-only`
+  `python scripts/fuzz-parser/fuzz.py --bin ruff 0-10 --new-bugs-only`
 - Run the fuzzer concurrently on 10,000 different Python source-code files,
   using a random selection of seeds, and only print a summary at the end
   (the `shuf` command is Unix-specific):
-  `python scripts/fuzz-parser/fuzz.py $(shuf -i 0-1000000 -n 10000) --quiet
+  `python scripts/fuzz-parser/fuzz.py --bin ruff $(shuf -i 0-1000000 -n 10000) --quiet
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ import argparse
 import concurrent.futures
 import os.path
 import subprocess
+import tempfile
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from typing import NewType
@@ -36,7 +37,24 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 
-def contains_bug(code: str, *, ruff_executable: str) -> bool:
+def redknot_contains_bug(code: str, *, red_knot_executable: str) -> bool:
+    """Return `True` if the code triggers a panic in type-checking code."""
+    with tempfile.TemporaryDirectory() as tempdir:
+        with open(os.path.join(tempdir, "pyproject.toml"), "w") as pyproj:
+            pyproj.write('[project]\n\tname = "fuzz-input"')
+
+        with open(os.path.join(tempdir, "input.py"), "w") as pyfile:
+            pyfile.write(code)
+
+        completed_process = subprocess.run(
+            [red_knot_executable, "--ignore-errors", "--current-directory", tempdir],
+            capture_output=True,
+            text=True,
+        )
+        return completed_process.returncode != 0
+
+
+def ruff_contains_bug(code: str, *, ruff_executable: str) -> bool:
     """Return `True` if the code triggers a parser error."""
     completed_process = subprocess.run(
         [ruff_executable, "check", "--config", "lint.select=[]", "--no-cache", "-"],
@@ -47,6 +65,13 @@ def contains_bug(code: str, *, ruff_executable: str) -> bool:
     return completed_process.returncode != 0
 
 
+def contains_bug(code: str, *, executable: str) -> bool:
+    """Return `True` if the code triggers an error."""
+    if "red_knot" in executable.lower():
+        return redknot_contains_bug(code, red_knot_executable=executable)
+    return ruff_contains_bug(code, ruff_executable=executable)
+
+
 def contains_new_bug(
     code: str, *, test_executable: str, baseline_executable: str
 ) -> bool:
@@ -55,8 +80,8 @@ def contains_new_bug(
     A "new" parser error is one that exists with `test_executable`,
     but did not exist with `baseline_executable`.
     """
-    return contains_bug(code, ruff_executable=test_executable) and not contains_bug(
-        code, ruff_executable=baseline_executable
+    return contains_bug(code, executable=test_executable) and not contains_bug(
+        code, executable=baseline_executable
     )
 
 
@@ -101,11 +126,11 @@ def fuzz_code(
             baseline_executable=baseline_executable,
         )
         if only_new_bugs
-        else contains_bug(code, ruff_executable=test_executable)
+        else contains_bug(code, executable=test_executable)
     )
     if has_bug:
         maybe_bug = MinimizedSourceCode(
-            minimize_repro(code, partial(contains_bug, ruff_executable=test_executable))
+            minimize_repro(code, partial(contains_bug, executable=test_executable))
         )
     else:
         maybe_bug = None
@@ -232,7 +257,7 @@ def parse_args() -> ResolvedCliArgs:
         action="store_true",
         help=(
             "Only report bugs if they exist on the current branch, "
-            "but *didn't* exist on the released version of Ruff "
+            "but *didn't* exist on the released version "
             "installed into the Python environment we're running in"
         ),
     )
@@ -244,20 +269,27 @@ def parse_args() -> ResolvedCliArgs:
     parser.add_argument(
         "--test-executable",
         help=(
-            "`ruff` executable to test. "
+            "Executable to test. "
             "Defaults to a fresh build of the currently checked-out branch."
         ),
     )
     parser.add_argument(
         "--baseline-executable",
         help=(
-            "`ruff` executable to compare results against. "
-            "Defaults to whatever `ruff` version is installed "
+            "Executable to compare results against. "
+            "Defaults to whatever version is installed "
             "in the Python environment."
         ),
     )
+    parser.add_argument(
+        "--bin",
+        help=("Name of executable to test. E.g. `ruff` or `red_knot`."),
+        required=True,
+    )
 
     args = parser.parse_args()
+
+    bin: str = args.bin
 
     if args.baseline_executable:
         if not args.only_new_bugs:
@@ -276,25 +308,25 @@ def parse_args() -> ResolvedCliArgs:
             )
     elif args.only_new_bugs:
         try:
-            ruff_version_proc = subprocess.run(
-                ["ruff", "--version"], text=True, capture_output=True, check=True
+            version_proc = subprocess.run(
+                [bin, "--version"], text=True, capture_output=True, check=True
             )
         except FileNotFoundError:
             parser.error(
                 "`--only-new-bugs` was specified without specifying a baseline "
-                "executable, and no released version of Ruff appears to be installed "
+                f"executable, and no released version of {bin} appears to be installed "
                 "in your Python environment"
             )
         else:
             if not args.quiet:
-                ruff_version = ruff_version_proc.stdout.strip().split(" ")[1]
+                version = version_proc.stdout.strip().split(" ")[1]
                 print(
                     f"`--only-new-bugs` was specified without specifying a baseline "
-                    f"executable; falling back to using `ruff=={ruff_version}` as the "
-                    f"baseline (the version of Ruff installed in your current Python "
+                    f"executable; falling back to using `{bin}=={version}` as the "
+                    f"baseline (the version of {bin} installed in your current Python "
                     f"environment)"
                 )
-        args.baseline_executable = "ruff"
+        args.baseline_executable = bin
 
     if not args.test_executable:
         print(
@@ -303,7 +335,16 @@ def parse_args() -> ResolvedCliArgs:
         )
         try:
             subprocess.run(
-                ["cargo", "build", "--release", "--locked", "--color", "always"],
+                [
+                    "cargo",
+                    "build",
+                    "--release",
+                    "--locked",
+                    "--color",
+                    "always",
+                    "--bin",
+                    bin,
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -311,7 +352,7 @@ def parse_args() -> ResolvedCliArgs:
         except subprocess.CalledProcessError as e:
             print(e.stderr)
             raise
-        args.test_executable = os.path.join("target", "release", "ruff")
+        args.test_executable = os.path.join("target", "release", bin)
         assert os.path.exists(args.test_executable)
 
     seed_arguments: list[range | int] = args.seeds
