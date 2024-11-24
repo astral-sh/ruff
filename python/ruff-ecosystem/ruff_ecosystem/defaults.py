@@ -135,4 +135,5 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="encode", name="httpx", ref="master")),
     Project(repo=Repository(owner="mesonbuild", name="meson-python", ref="main")),
     Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
+    Project(repo=Repository(owner="astropy", name="astropy", ref="main")),
 ]
