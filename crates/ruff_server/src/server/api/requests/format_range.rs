@@ -1,3 +1,4 @@
+use anyhow::Context;
 use lsp_types::{self as types, request as req, Range};
 
 use crate::edit::{RangeExt, ToRangeExt};
@@ -32,9 +33,7 @@ fn format_document_range(
     let text_document = snapshot
         .query()
         .as_single_document()
-        .map_err(|err| {
-            anyhow::anyhow!("Failed to get text document for the format range request: {err}")
-        })
+        .context("Failed to get text document for the format range request")
         .unwrap();
     let query = snapshot.query();
     format_text_document_range(text_document, range, query, snapshot.encoding())

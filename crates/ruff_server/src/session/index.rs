@@ -610,10 +610,10 @@ impl DocumentQuery {
                 if let Some(cell_uri) = cell_uri {
                     let cell = notebook
                         .cell_document_by_uri(cell_uri)
-                        .ok_or(SingleDocumentError::CellDoesNotExist(cell_uri))?;
+                        .ok_or_else(|| SingleDocumentError::CellDoesNotExist(cell_uri.clone()))?;
                     Ok(cell)
                 } else {
-                    Err(SingleDocumentError::Notebook(file_url))
+                    Err(SingleDocumentError::Notebook(file_url.clone()))
                 }
             }
         }
@@ -629,9 +629,9 @@ impl DocumentQuery {
 }
 
 #[derive(Debug, Error)]
-pub(crate) enum SingleDocumentError<'a> {
+pub(crate) enum SingleDocumentError {
     #[error("Expected a single text document, but found a notebook document: {0}")]
-    Notebook(&'a Url),
+    Notebook(Url),
     #[error("Cell with URL {0} does not exist in the internal notebook document")]
-    CellDoesNotExist(&'a Url),
+    CellDoesNotExist(Url),
 }

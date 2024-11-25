@@ -1,3 +1,4 @@
+use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use types::TextEdit;
 
@@ -64,7 +65,7 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
     let text_document = snapshot
         .query()
         .as_single_document()
-        .map_err(|err| anyhow::anyhow!("Failed to get text document for the format request: {err}"))
+        .context("Failed to get text document for the format request")
         .unwrap();
     let query = snapshot.query();
     format_text_document(

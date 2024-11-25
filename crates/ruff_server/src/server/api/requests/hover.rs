@@ -1,5 +1,6 @@
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
+use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use regex::Regex;
 use ruff_diagnostics::FixAvailability;
@@ -33,7 +34,7 @@ pub(crate) fn hover(
     let document = snapshot
         .query()
         .as_single_document()
-        .map_err(|err| anyhow::anyhow!("Failed to get text document for the hover request: {err}"))
+        .context("Failed to get text document for the hover request")
         .unwrap();
     let line_number: usize = position
         .position
