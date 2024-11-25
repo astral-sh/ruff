@@ -756,8 +756,6 @@ impl<'db> Type<'db> {
                         },
                     )
             }
-            (Type::Never, Type::Never) => false,
-            (_, Type::Never) => false,
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }

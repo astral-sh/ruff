@@ -1,7 +1,7 @@
 # NoReturn & Never
 
-`NoReturn` to annotate functions that never return normally. `Never` represents the bottom type, a
-type that represents the empty set of Python objects. These two annotations can be used
+`NoReturn` is used to annotate the return type for functions that never return. `Never` is the
+bottom type, representing the empty set of Python objects. These two annotations can be used
 interchangeably.
 
 ## Function Return Type Annotation
