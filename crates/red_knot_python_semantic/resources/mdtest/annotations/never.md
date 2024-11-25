@@ -1,23 +1,28 @@
 # NoReturn & Never
 
-## Annotation
-
 `NoReturn` to annotate functions that never return normally. `Never` represents the bottom type, a
 type that represents the empty set of Python objects. These two annotations can be used
 interchangeably.
 
-```py
-from typing import NoReturn, Never, Any
+## Function Return Type Annotation
 
-# error: [invalid-type-parameter] "Type `typing.Never` expected no type parameter"
-x: Never[int]
+```py
+from typing import NoReturn
 
 def stop() -> NoReturn:
     raise RuntimeError("no way")
 
 # revealed: Never
 reveal_type(stop())
+```
 
+## Assignment
+
+```py
+from typing import NoReturn, Never, Any
+
+# error: [invalid-type-parameter] "Type `typing.Never` expected no type parameter"
+x: Never[int]
 a1: NoReturn
 # TODO: Test `Never` is only available in python >= 3.11
 a2: Never
@@ -30,12 +35,12 @@ def f():
     # revealed: Never
     reveal_type(a2)
 
-    # Never is compatible with all types.
+    # Never is assignable to all types.
     v1: int = a1
     v2: str = a1
-    # Other types are not compatible with Never except for Never (and Any).
+    # Other types are not assignable to Never except for Never (and Any).
     v3: Never = b1
-    v4: Never = stop()
+    v4: Never = a2
     v5: Any = b2
     # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Never`"
     v6: Never = 1
