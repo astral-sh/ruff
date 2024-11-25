@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 use anyhow::anyhow;
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
+use thiserror::Error;
 
 pub(crate) use ruff_settings::RuffSettings;
 
@@ -597,16 +598,24 @@ impl DocumentQuery {
 
     /// Attempt to access the single inner text document selected by the query.
     /// If this query is selecting an entire notebook document, this will return `None`.
-    pub(crate) fn as_single_document(&self) -> Option<&TextDocument> {
+    pub(crate) fn as_single_document(&self) -> Result<&TextDocument, SingleDocumentError> {
         match self {
-            Self::Text { document, .. } => Some(document),
+            Self::Text { document, .. } => Ok(document),
             Self::Notebook {
                 notebook,
+                file_url,
                 cell_url: cell_uri,
                 ..
-            } => cell_uri
-                .as_ref()
-                .and_then(|cell_uri| notebook.cell_document_by_uri(cell_uri)),
+            } => {
+                if let Some(cell_uri) = cell_uri {
+                    let cell = notebook
+                        .cell_document_by_uri(cell_uri)
+                        .ok_or_else(|| SingleDocumentError::CellDoesNotExist(cell_uri.clone()))?;
+                    Ok(cell)
+                } else {
+                    Err(SingleDocumentError::Notebook(file_url.clone()))
+                }
+            }
         }
     }
 
@@ -617,4 +626,12 @@ impl DocumentQuery {
             None
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum SingleDocumentError {
+    #[error("Expected a single text document, but found a notebook document: {0}")]
+    Notebook(Url),
+    #[error("Cell with URL {0} does not exist in the internal notebook document")]
+    CellDoesNotExist(Url),
 }
