@@ -375,6 +375,8 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::Literal
                 | KnownInstanceType::Union
+                | KnownInstanceType::NoReturn
+                | KnownInstanceType::Never
                 | KnownInstanceType::Optional => None,
             },
         }
