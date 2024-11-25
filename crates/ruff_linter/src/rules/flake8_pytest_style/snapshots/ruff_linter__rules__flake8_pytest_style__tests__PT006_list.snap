@@ -190,3 +190,4 @@ PT006.py:69:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    69 |+@pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
 70 70 | def test_csv_with_parens(param1, param2):
 71 71 |     ...
+72 72 |
