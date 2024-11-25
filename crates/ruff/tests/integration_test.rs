@@ -1021,7 +1021,7 @@ fn preview_enabled_all() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "ALL", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1039,7 +1039,8 @@ fn preview_enabled_all() {
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
     warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    ");
+    warning: `noqa-by-code` (RUF102) and `noqa-by-name` (RUF103) are incompatible. Ignoring `noqa-by-name`.
+    "#);
 }
 
 #[test]

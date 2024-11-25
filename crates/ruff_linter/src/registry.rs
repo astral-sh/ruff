@@ -1,6 +1,7 @@
 //! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
 //! with some helper symbols
 
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -16,19 +17,31 @@ pub trait AsRule {
 }
 
 impl Rule {
-    pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
-        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
+    pub fn from_code(code: &str) -> Result<Self, FromCodeOrNameError> {
+        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeOrNameError::UnknownCode)?;
         linter
             .all_rules()
             .find(|rule| rule.noqa_code().suffix() == code)
-            .ok_or(FromCodeError::Unknown)
+            .ok_or(FromCodeOrNameError::UnknownCode)
+    }
+
+    pub fn from_name(name: &str) -> Result<Self, FromCodeOrNameError> {
+        for linter in Linter::iter() {
+            if let Some(rule) = linter.all_rules().find(|rule| rule.as_ref() == name) {
+                return Ok(rule);
+            }
+        }
+
+        Err(FromCodeOrNameError::UnknownName)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum FromCodeError {
+pub enum FromCodeOrNameError {
     #[error("unknown rule code")]
-    Unknown,
+    UnknownCode,
+    #[error("unknown rule name")]
+    UnknownName,
 }
 
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
@@ -249,7 +262,11 @@ impl Rule {
     pub const fn lint_source(&self) -> LintSource {
         match self {
             Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
-            Rule::BlanketNOQA | Rule::RedirectedNOQA | Rule::UnusedNOQA => LintSource::Noqa,
+            Rule::BlanketNOQA
+            | Rule::NOQAByCode
+            | Rule::NOQAByName
+            | Rule::RedirectedNOQA
+            | Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
@@ -354,7 +371,7 @@ impl Rule {
 }
 
 /// Pairs of checks that shouldn't be enabled together.
-pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
+pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 3] = &[
     (
         Rule::BlankLineBeforeClass,
         Rule::OneBlankLineBeforeClass,
@@ -366,6 +383,12 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
         Rule::MultiLineSummarySecondLine,
         "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
          incompatible. Ignoring `multi-line-summary-second-line`.",
+    ),
+    (
+        Rule::NOQAByCode,
+        Rule::NOQAByName,
+        "`noqa-by-code` (RUF102) and `noqa-by-name` (RUF103) are incompatible. Ignoring \
+         `noqa-by-name`.",
     ),
 ];
 

@@ -6,13 +6,13 @@ Ok(
     Some(
         Codes(
             Codes {
-                range: 0..10,
+                range: 0..21,
                 codes: [
                     RuleIdent {
-                        identifier: Code(
-                            "F401",
+                        identifier: Name(
+                            "unused-import",
                         ),
-                        range: 6..10,
+                        range: 8..21,
                     },
                 ],
             },
