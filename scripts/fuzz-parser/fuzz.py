@@ -283,7 +283,7 @@ def parse_args() -> ResolvedCliArgs:
     )
     parser.add_argument(
         "--bin",
-        help="Name of executable to test. E.g. `ruff` or `red_knot`.",
+        help="Name of executable to test.",
         required=True,
         choices=["ruff", "red_knot"],
     )
