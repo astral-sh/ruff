@@ -29,6 +29,19 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// from example import CONSTANT_VALUE
 /// ```
 ///
+/// ## Note
+/// Identifiers consisting of a single uppercase character are ambigous under
+/// the rules of PEP8, which specifies PascalCase for classes and
+/// ALL_CAPS_SNAKE_CASE for constants. Without a second character, it is not
+/// possible to reliably guess whether the identifier is intended to be part
+/// of a PascalCase string for a class or an ALL_CAPS_SNAKE_CASE string for
+/// a constant, since both conventions will produce the same output when given
+/// a single input character. Therefore, this lint rule does not apply to cases
+/// where the imported identifier consists of a single uppercase character.
+///
+/// A common example of a single uppercase character being used for a class
+/// name can be found in Django's `django.db.models.Q` class.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[violation]
 pub struct ConstantImportedAsNonConstant {
