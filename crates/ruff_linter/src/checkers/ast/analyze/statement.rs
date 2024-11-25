@@ -309,6 +309,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     body,
                 );
             }
+            // In preview mode, calls are analyzed. To avoid duplicate diagnostics,
+            // skip analyzing the decorators.
             if !checker.settings.preview.is_enabled()
                 && checker.any_enabled(&[
                     Rule::PytestParametrizeNamesWrongType,

@@ -296,15 +296,18 @@ mod tests {
     #[test_case(
         Rule::PytestParametrizeNamesWrongType,
         Path::new("PT006.py"),
-        Settings::default(),
-        "PT006_default"
+        Settings::default()
     )]
     fn test_pytest_style_preview(
         rule_code: Rule,
         path: &Path,
         plugin_settings: Settings,
-        name: &str,
     ) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
         let diagnostics = test_path(
             Path::new("flake8_pytest_style").join(path).as_path(),
             &settings::LinterSettings {
@@ -313,7 +316,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(name, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }
