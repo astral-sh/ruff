@@ -309,6 +309,19 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     body,
                 );
             }
+            if !checker.settings.preview.is_enabled()
+                && checker.any_enabled(&[
+                    Rule::PytestParametrizeNamesWrongType,
+                    Rule::PytestParametrizeValuesWrongType,
+                    Rule::PytestDuplicateParametrizeTestCases,
+                ])
+            {
+                for decorator in decorator_list {
+                    if let Some(call) = decorator.expression.as_call_expr() {
+                        flake8_pytest_style::rules::parametrize(checker, call);
+                    }
+                }
+            }
             if checker.any_enabled(&[
                 Rule::PytestIncorrectMarkParenthesesStyle,
                 Rule::PytestUseFixturesWithoutParameters,
