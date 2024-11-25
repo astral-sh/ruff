@@ -1,0 +1,105 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF043.py:5:1: RUF043 [*] Literal iterable with single item in `list.extend()` call
+  |
+4 | ### Errors
+5 | l.extend([list])
+  | ^^^^^^^^^^^^^^^^ RUF043
+6 | l.extend((tuple,   ))
+7 | l.extend({  set})
+  |
+  = help: Replace with `.append()`
+
+ℹ Safe fix
+2 2 | 
+3 3 | 
+4 4 | ### Errors
+5   |-l.extend([list])
+  5 |+l.append(list)
+6 6 | l.extend((tuple,   ))
+7 7 | l.extend({  set})
+8 8 | l.extend({dict:
+
+RUF043.py:6:1: RUF043 [*] Literal iterable with single item in `list.extend()` call
+  |
+4 | ### Errors
+5 | l.extend([list])
+6 | l.extend((tuple,   ))
+  | ^^^^^^^^^^^^^^^^^^^^^ RUF043
+7 | l.extend({  set})
+8 | l.extend({dict:
+  |
+  = help: Replace with `.append()`
+
+ℹ Safe fix
+3 3 | 
+4 4 | ### Errors
+5 5 | l.extend([list])
+6   |-l.extend((tuple,   ))
+  6 |+l.append(tuple)
+7 7 | l.extend({  set})
+8 8 | l.extend({dict:
+9 9 |               multiline})
+
+RUF043.py:7:1: RUF043 [*] Literal iterable with single item in `list.extend()` call
+  |
+5 | l.extend([list])
+6 | l.extend((tuple,   ))
+7 | l.extend({  set})
+  | ^^^^^^^^^^^^^^^^^ RUF043
+8 | l.extend({dict:
+9 |               multiline})
+  |
+  = help: Replace with `.append()`
+
+ℹ Safe fix
+4 4 | ### Errors
+5 5 | l.extend([list])
+6 6 | l.extend((tuple,   ))
+7   |-l.extend({  set})
+  7 |+l.append(set)
+8 8 | l.extend({dict:
+9 9 |               multiline})
+10 10 | 
+
+RUF043.py:8:1: RUF043 [*] Literal iterable with single item in `list.extend()` call
+  |
+6 |   l.extend((tuple,   ))
+7 |   l.extend({  set})
+8 | / l.extend({dict:
+9 | |               multiline})
+  | |_________________________^ RUF043
+  |
+  = help: Replace with `.append()`
+
+ℹ Safe fix
+5  5  | l.extend([list])
+6  6  | l.extend((tuple,   ))
+7  7  | l.extend({  set})
+8     |-l.extend({dict:
+9     |-              multiline})
+   8  |+l.append(dict)
+10 9  | 
+11 10 | 
+12 11 | l.extend({dict:            # Unsafe
+
+RUF043.py:12:1: RUF043 [*] Literal iterable with single item in `list.extend()` call
+   |
+12 | / l.extend({dict:            # Unsafe
+13 | |               multiline})
+   | |_________________________^ RUF043
+   |
+   = help: Replace with `.append()`
+
+ℹ Unsafe fix
+9  9  |               multiline})
+10 10 | 
+11 11 | 
+12    |-l.extend({dict:            # Unsafe
+13    |-              multiline})
+   12 |+l.append(dict)
+14 13 | 
+15 14 | 
+16 15 | ### No errors
