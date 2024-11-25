@@ -189,3 +189,31 @@ reveal_type(d)  # revealed: Foo
 ## Parameter
 
 TODO: Add tests once parameter inference is supported
+
+## Invalid expressions
+
+The expressions in these string annotations aren't valid expressions in this context but we
+shouldn't panic.
+
+```py
+a: "1 or 2"
+b: "(x := 1)"
+c: "1 + 2"
+d: "lambda x: x"
+e: "x if True else y"
+f: "{'a': 1, 'b': 2}"
+g: "{1, 2}"
+h: "[i for i in range(5)]"
+i: "{i for i in range(5)}"
+j: "{i: i for i in range(5)}"
+k: "(i for i in range(5))"
+l: "await 1"
+# error: [forward-annotation-syntax-error]
+m: "yield 1"
+# error: [forward-annotation-syntax-error]
+n: "yield from 1"
+o: "1 < 2"
+p: "call()"
+r: "[1, 2]"
+s: "(1, 2)"
+```
