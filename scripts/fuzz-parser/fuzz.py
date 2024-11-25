@@ -1,11 +1,12 @@
 """
-Run the parser on randomly generated (but syntactically valid) Python source-code files.
+Run a Ruff executable on randomly generated (but syntactically valid)
+Python source-code files.
 
 To install all dependencies for this script into an environment using `uv`, run:
     uv pip install -r scripts/fuzz-parser/requirements.txt
 
 Example invocations of the script:
-- Run the fuzzer using seeds 0, 1, 2, 78 and 93 to generate the code:
+- Run the fuzzer on Ruff's parser using seeds 0, 1, 2, 78 and 93 to generate the code:
   `python scripts/fuzz-parser/fuzz.py --bin ruff 0-2 78 93`
 - Run the fuzzer concurrently using seeds in range 0-10 inclusive,
   but only reporting bugs that are new on your branch:
@@ -20,12 +21,13 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
-import os.path
+import enum
 import subprocess
 import tempfile
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
-from typing import NewType
+from pathlib import Path
+from typing import NewType, assert_never
 
 from pysource_codegen import generate as generate_random_code
 from pysource_minimize import minimize as minimize_repro
@@ -37,24 +39,20 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 
-def redknot_contains_bug(code: str, *, red_knot_executable: str) -> bool:
+def redknot_contains_bug(code: str, *, red_knot_executable: Path) -> bool:
     """Return `True` if the code triggers a panic in type-checking code."""
     with tempfile.TemporaryDirectory() as tempdir:
-        with open(os.path.join(tempdir, "pyproject.toml"), "w") as pyproj:
-            pyproj.write('[project]\n\tname = "fuzz-input"')
-
-        with open(os.path.join(tempdir, "input.py"), "w") as pyfile:
-            pyfile.write(code)
-
+        Path(tempdir, "pyproject.toml").write_text('[project]\n\tname = "fuzz-input"')
+        Path(tempdir, "input.py").write_text(code)
         completed_process = subprocess.run(
             [red_knot_executable, "--current-directory", tempdir],
             capture_output=True,
             text=True,
         )
-        return completed_process.returncode != 0 and completed_process.returncode != 1
+    return completed_process.returncode != 0 and completed_process.returncode != 1
 
 
-def ruff_contains_bug(code: str, *, ruff_executable: str) -> bool:
+def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
     """Return `True` if the code triggers a parser error."""
     completed_process = subprocess.run(
         [ruff_executable, "check", "--config", "lint.select=[]", "--no-cache", "-"],
@@ -65,23 +63,33 @@ def ruff_contains_bug(code: str, *, ruff_executable: str) -> bool:
     return completed_process.returncode != 0
 
 
-def contains_bug(code: str, *, executable: str) -> bool:
+def contains_bug(code: str, *, executable: Executable, executable_path: Path) -> bool:
     """Return `True` if the code triggers an error."""
-    if "red_knot" in executable.lower():
-        return redknot_contains_bug(code, red_knot_executable=executable)
-    return ruff_contains_bug(code, ruff_executable=executable)
+    match executable:
+        case Executable.RUFF:
+            return ruff_contains_bug(code, ruff_executable=executable_path)
+        case Executable.RED_KNOT:
+            return redknot_contains_bug(code, red_knot_executable=executable_path)
+        case _ as unreachable:
+            assert_never(unreachable)
 
 
 def contains_new_bug(
-    code: str, *, test_executable: str, baseline_executable: str
+    code: str,
+    *,
+    executable: Executable,
+    test_executable_path: Path,
+    baseline_executable_path: Path,
 ) -> bool:
     """Return `True` if the code triggers a *new* parser error.
 
     A "new" parser error is one that exists with `test_executable`,
     but did not exist with `baseline_executable`.
     """
-    return contains_bug(code, executable=test_executable) and not contains_bug(
-        code, executable=baseline_executable
+    return contains_bug(
+        code, executable=executable, executable_path=test_executable_path
+    ) and not contains_bug(
+        code, executable=executable, executable_path=baseline_executable_path
     )
 
 
@@ -93,6 +101,8 @@ class FuzzResult:
     # If we found a bug, this will be the minimum Python code
     # required to trigger the bug. If not, it will be `None`.
     maybe_bug: MinimizedSourceCode | None
+    # The executable we're testing
+    executable: Executable
 
     def print_description(self, index: int, num_seeds: int) -> None:
         """Describe the results of fuzzing the parser with this seed."""
@@ -103,38 +113,47 @@ class FuzzResult:
             else colored(f"Ran fuzzer successfully on seed {self.seed}", "green")
         )
         print(f"{msg:<60} {progress:>15}", flush=True)
+
         if self.maybe_bug:
-            print(colored("The following code triggers a bug:", "red"))
+            match self.executable:
+                case Executable.RUFF:
+                    panic_message = "The following code triggers a parser bug:"
+                case Executable.RED_KNOT:
+                    panic_message = "The following code triggers a red-knot panic:"
+                case _ as unreachable:
+                    assert_never(unreachable)
+
+            print(colored(panic_message, "red"))
             print()
             print(self.maybe_bug)
             print(flush=True)
 
 
-def fuzz_code(
-    seed: Seed,
-    *,
-    test_executable: str,
-    baseline_executable: str,
-    only_new_bugs: bool,
-) -> FuzzResult:
+def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
     code = generate_random_code(seed)
     has_bug = (
         contains_new_bug(
             code,
-            test_executable=test_executable,
-            baseline_executable=baseline_executable,
+            executable=args.executable,
+            test_executable_path=args.test_executable_path,
+            baseline_executable_path=args.baseline_executable_path,
         )
-        if only_new_bugs
-        else contains_bug(code, executable=test_executable)
+        if args.baseline_executable_path is not None
+        else contains_bug(
+            code, executable=args.executable, executable_path=args.test_executable_path
+        )
     )
     if has_bug:
-        maybe_bug = MinimizedSourceCode(
-            minimize_repro(code, partial(contains_bug, executable=test_executable))
+        callback = partial(
+            contains_bug,
+            executable=args.executable,
+            executable_path=args.test_executable_path,
         )
+        maybe_bug = MinimizedSourceCode(minimize_repro(code, callback))
     else:
         maybe_bug = None
-    return FuzzResult(seed, maybe_bug)
+    return FuzzResult(seed, maybe_bug, args.executable)
 
 
 def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
@@ -146,14 +165,7 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
     bugs: list[FuzzResult] = []
     with concurrent.futures.ProcessPoolExecutor() as executor:
         fuzz_result_futures = [
-            executor.submit(
-                fuzz_code,
-                seed,
-                test_executable=args.test_executable,
-                baseline_executable=args.baseline_executable,
-                only_new_bugs=args.only_new_bugs,
-            )
-            for seed in args.seeds
+            executor.submit(fuzz_code, seed, args) for seed in args.seeds
         ]
         try:
             for i, future in enumerate(
@@ -180,12 +192,7 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
     )
     bugs: list[FuzzResult] = []
     for i, seed in enumerate(args.seeds, start=1):
-        fuzz_result = fuzz_code(
-            seed,
-            test_executable=args.test_executable,
-            baseline_executable=args.baseline_executable,
-            only_new_bugs=args.only_new_bugs,
-        )
+        fuzz_result = fuzz_code(seed, args)
         if not args.quiet:
             fuzz_result.print_description(i, num_seeds)
         if fuzz_result.maybe_bug:
@@ -198,7 +205,7 @@ def main(args: ResolvedCliArgs) -> ExitCode:
         bugs = run_fuzzer_sequentially(args)
     else:
         bugs = run_fuzzer_concurrently(args)
-    noun_phrase = "New bugs" if args.only_new_bugs else "Bugs"
+    noun_phrase = "New bugs" if args.baseline_executable_path is not None else "Bugs"
     if bugs:
         print(colored(f"{noun_phrase} found in the following seeds:", "red"))
         print(*sorted(bug.seed for bug in bugs))
@@ -231,13 +238,18 @@ def parse_seed_argument(arg: str) -> int | range:
     return int(arg)
 
 
+class Executable(enum.StrEnum):
+    RUFF = "ruff"
+    RED_KNOT = "red_knot"
+
+
 @dataclass(slots=True)
 class ResolvedCliArgs:
     seeds: list[Seed]
     _: KW_ONLY
-    test_executable: str
-    baseline_executable: str
-    only_new_bugs: bool
+    executable: Executable
+    test_executable_path: Path
+    baseline_executable_path: Path | None
     quiet: bool
 
 
@@ -272,6 +284,7 @@ def parse_args() -> ResolvedCliArgs:
             "Executable to test. "
             "Defaults to a fresh build of the currently checked-out branch."
         ),
+        type=Path,
     )
     parser.add_argument(
         "--baseline-executable",
@@ -280,17 +293,18 @@ def parse_args() -> ResolvedCliArgs:
             "Defaults to whatever version is installed "
             "in the Python environment."
         ),
+        type=Path,
     )
     parser.add_argument(
         "--bin",
-        help="Name of executable to test.",
+        help="Which executable to test.",
         required=True,
-        choices=["ruff", "red_knot"],
+        choices=[member.value for member in Executable],
     )
 
     args = parser.parse_args()
 
-    bin: str = args.bin
+    executable = Executable(args.bin)
 
     if args.baseline_executable:
         if not args.only_new_bugs:
@@ -310,12 +324,12 @@ def parse_args() -> ResolvedCliArgs:
     elif args.only_new_bugs:
         try:
             version_proc = subprocess.run(
-                [bin, "--version"], text=True, capture_output=True, check=True
+                [executable, "--version"], text=True, capture_output=True, check=True
             )
         except FileNotFoundError:
             parser.error(
                 "`--only-new-bugs` was specified without specifying a baseline "
-                f"executable, and no released version of `{bin}` appears to be "
+                f"executable, and no released version of `{executable}` appears to be "
                 "installed in your Python environment"
             )
         else:
@@ -323,29 +337,29 @@ def parse_args() -> ResolvedCliArgs:
                 version = version_proc.stdout.strip().split(" ")[1]
                 print(
                     f"`--only-new-bugs` was specified without specifying a baseline "
-                    f"executable; falling back to using `{bin}=={version}` as the "
-                    f"baseline (the version of `{bin}` installed in your current "
-                    f"Python environment)"
+                    f"executable; falling back to using `{executable}=={version}` as "
+                    f"the baseline (the version of `{executable}` installed in your "
+                    f"current Python environment)"
                 )
-        args.baseline_executable = bin
 
     if not args.test_executable:
         print(
             "Running `cargo build --release` since no test executable was specified...",
             flush=True,
         )
+        cmd: list[str] = [
+            "cargo",
+            "build",
+            "--release",
+            "--locked",
+            "--color",
+            "always",
+            "--bin",
+            executable,
+        ]
         try:
             subprocess.run(
-                [
-                    "cargo",
-                    "build",
-                    "--release",
-                    "--locked",
-                    "--color",
-                    "always",
-                    "--bin",
-                    bin,
-                ],
+                cmd,
                 check=True,
                 capture_output=True,
                 text=True,
@@ -353,8 +367,8 @@ def parse_args() -> ResolvedCliArgs:
         except subprocess.CalledProcessError as e:
             print(e.stderr)
             raise
-        args.test_executable = os.path.join("target", "release", bin)
-        assert os.path.exists(args.test_executable)
+        args.test_executable = Path("target", "release", executable)
+        assert args.test_executable.is_file()
 
     seed_arguments: list[range | int] = args.seeds
     seen_seeds: set[int] = set()
@@ -366,10 +380,10 @@ def parse_args() -> ResolvedCliArgs:
 
     return ResolvedCliArgs(
         sorted(map(Seed, seen_seeds)),
-        only_new_bugs=args.only_new_bugs,
         quiet=args.quiet,
-        test_executable=args.test_executable,
-        baseline_executable=args.baseline_executable,
+        executable=executable,
+        test_executable_path=args.test_executable,
+        baseline_executable_path=args.baseline_executable,
     )
 
 
