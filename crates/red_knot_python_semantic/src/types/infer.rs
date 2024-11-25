@@ -4589,7 +4589,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         subscript: &ast::ExprSubscript,
         known_instance: KnownInstanceType,
     ) -> Type<'db> {
-        let parameters = &subscript.slice;
+        let parameters = &*subscript.slice;
         match known_instance {
             KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
                 Ok(ty) => ty,
@@ -4611,7 +4611,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let param_type = self.infer_type_expression(parameters);
                 UnionType::from_elements(self.db, [param_type, Type::none(self.db)])
             }
-            KnownInstanceType::Union => match parameters.as_ref() {
+            KnownInstanceType::Union => match parameters {
                 ast::Expr::Tuple(t) => {
                     let union_ty = UnionType::from_elements(
                         self.db,
