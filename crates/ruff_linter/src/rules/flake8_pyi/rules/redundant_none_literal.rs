@@ -99,7 +99,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
             left,
             op: Operator::BitOr,
             right,
-            range: parent_range
+            range: parent_range,
         })) = checker.semantic().current_expression_parent()
         {
             if matches!(**left, Expr::NoneLiteral(_)) || matches!(**right, Expr::NoneLiteral(_)) {
