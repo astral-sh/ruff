@@ -121,30 +121,31 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
 
 fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit> {
     let mut enclosing_union = None;
-    let mut expression_ancestors = semantic.current_expressions().skip(1);
-    let mut parent_expr = expression_ancestors.next();
-    while let Some(Expr::BinOp(ExprBinOp {
-        op: Operator::BitOr,
-        ..
-    })) = parent_expr
-    {
-        enclosing_union = parent_expr;
-        parent_expr = expression_ancestors.next();
+    for expr in semantic.current_expressions().skip(1).take_while(|expr| {
+        matches!(
+            expr,
+            Expr::BinOp(ExprBinOp {
+                op: Operator::BitOr,
+                ..
+            })
+        )
+    }) {
+        enclosing_union = Some(expr);
     }
 
-    let mut is_union_with_bare_none = false;
+    let mut is_fixable = true;
     if let Some(enclosing_union) = enclosing_union {
         traverse_union(
             &mut |expr, _| {
                 if matches!(expr, Expr::NoneLiteral(_)) {
-                    is_union_with_bare_none = true;
+                    is_fixable = false;
                 }
                 if expr != literal_expr {
                     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
                         if semantic.match_typing_expr(value, "Literal")
                             && matches!(**slice, Expr::NoneLiteral(_))
                         {
-                            is_union_with_bare_none = true;
+                            is_fixable = false;
                         }
                     }
                 }
@@ -159,12 +160,5 @@ fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit
     // Instead do not provide a fix. No action needed for `typing.Union`,
     // as `Union[None, None]` is valid Python.
     // See https://github.com/astral-sh/ruff/issues/14567.
-    if is_union_with_bare_none {
-        None
-    } else {
-        Some(Edit::range_replacement(
-            "None".to_string(),
-            literal_expr.range(),
-        ))
-    }
+    is_fixable.then(|| Edit::range_replacement("None".to_string(), literal_expr.range()))
 }

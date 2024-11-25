@@ -17,7 +17,7 @@ def func4(arg1: Literal[int, None, float]):
     ...
 
 
-def func5(arg1: Literal[None, None]): 
+def func5(arg1: Literal[None, None]):
     ...
 
 
@@ -25,13 +25,13 @@ def func6(arg1: Literal[
     "hello",
     None  # Comment 1
     , "world"
-    ]): 
+    ]):
     ...
 
 
 def func7(arg1: Literal[
     None  # Comment 1
-    ]): 
+    ]):
     ...
 
 
