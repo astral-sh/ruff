@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprNoneLiteral};
+use ruff_python_ast::{Expr, ExprBinOp, ExprNoneLiteral, Operator};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::Ranged;
 
@@ -30,6 +30,9 @@ use crate::checkers::ast::Checker;
 /// None
 /// Literal[1, 2, 3, "foo", 5] | None
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe unless the literal contains comments.
 ///
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
@@ -87,8 +90,34 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     let fix = if other_literal_elements_seen {
         None
     } else {
+        // Avoid producing syntax errors when `Literal[None] | None` would be fixed to
+        // `None | None`. Instead fix to `None`. No action needed from `typing.Union`,
+        // as `Union[None, None]` is valid syntax.
+        // See https://github.com/astral-sh/ruff/issues/14567.
+        let replacement_range = if let Some(parent) = checker.semantic().current_expression_parent()
+        {
+            if let Expr::BinOp(ExprBinOp {
+                left,
+                op: Operator::BitOr,
+                right,
+                ..
+            }) = parent
+            {
+                if matches!(**left, Expr::NoneLiteral(_)) || matches!(**right, Expr::NoneLiteral(_))
+                {
+                    parent.range()
+                } else {
+                    literal_expr.range()
+                }
+            } else {
+                literal_expr.range()
+            }
+        } else {
+            literal_expr.range()
+        };
+
         Some(Fix::applicable_edit(
-            Edit::range_replacement("None".to_string(), literal_expr.range()),
+            Edit::range_replacement("None".to_string(), replacement_range),
             if checker.comment_ranges().intersects(literal_expr.range()) {
                 Applicability::Unsafe
             } else {

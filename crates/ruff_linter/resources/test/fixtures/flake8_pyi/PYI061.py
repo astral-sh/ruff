@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Union
 
 
 def func1(arg1: Literal[None]):
@@ -35,6 +35,14 @@ def func7(arg1: Literal[
     ...
 
 
+def func8(arg1: Literal[None] | None):
+    ...
+
+
+def func9(arg1: Union[Literal[None], None]):
+    ...
+
+
 # OK
 def good_func(arg1: Literal[int] | None):
     ...
@@ -58,3 +66,9 @@ Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replac
 # and there are no None members in the Literal[] slice,
 # only emit Y062:
 Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/14567
+x: Literal[None] | None
+y: None | Literal[None]
+z: Union[Literal[None], None]
