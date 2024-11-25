@@ -52,6 +52,11 @@ pub(crate) fn constant_imported_as_non_constant(
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
+    // Single-character names are ambiguous. It could be a class or a constant.
+    if name.chars().count() == 1 {
+        return None;
+    }
+
     if str::is_cased_uppercase(name) && !str::is_cased_uppercase(asname) {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
