@@ -4,7 +4,7 @@ use ruff_text_size::TextSlice;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
-use crate::other::f_string::FormatFString;
+use crate::other::f_string::{FStringLayout, FormatFString};
 use crate::prelude::*;
 use crate::string::implicit::{
     FormatImplicitConcatenatedString, FormatImplicitConcatenatedStringFlat,
@@ -47,7 +47,11 @@ impl NeedsParentheses for ExprFString {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if StringLike::FString(self).is_multiline(context) {
+        } else if StringLike::FString(self).is_multiline(context)
+            || self.value.as_single().is_some_and(|f_string| {
+                FStringLayout::from_f_string(f_string, context.source()).is_multiline()
+            })
+        {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

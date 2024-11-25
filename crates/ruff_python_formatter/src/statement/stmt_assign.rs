@@ -1,7 +1,7 @@
 use ruff_formatter::{format_args, write, FormatError, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
-    AnyNodeRef, Expr, ExprAttribute, ExprCall, ExprFString, FString, FStringPart, Operator,
-    StmtAssign, StringLike, TypeParams,
+    AnyNodeRef, Expr, ExprAttribute, ExprCall, FStringPart, Operator, StmtAssign, StringLike,
+    TypeParams,
 };
 
 use crate::builders::parenthesize_if_expands;
@@ -295,15 +295,15 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 let can_inline_comment = should_inline_comments(value, *statement, f.context());
 
                 let string_like = StringLike::try_from(*value).ok();
-                let format_f_string_assignment = string_like
-                    .and_then(|string| FormatFStringAssignment::new(string, f.context()));
+                let format_f_string =
+                    string_like.and_then(|string| format_f_string_assignment(string, f.context()));
                 let format_implicit_flat = string_like.and_then(|string| {
                     FormatImplicitConcatenatedStringFlat::new(string, f.context())
                 });
 
                 if !can_inline_comment
                     && format_implicit_flat.is_none()
-                    && format_f_string_assignment.is_none()
+                    && format_f_string.is_none()
                 {
                     return maybe_parenthesize_expression(
                         value,
@@ -450,7 +450,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         best_fitting![single_line, joined_parenthesized, implicit_expanded]
                             .with_mode(BestFittingMode::AllLines)
                             .fmt(f)?;
-                    } else if let Some(format_f_string) = format_f_string_assignment {
+                    } else if let Some(format_f_string) = format_f_string {
                         inline_comments.mark_formatted();
 
                         let f_string_flat = format_with(|f| {
@@ -563,8 +563,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 let should_inline_comments = should_inline_comments(value, *statement, f.context());
 
                 let string_like = StringLike::try_from(*value).ok();
-                let format_f_string_assignment = string_like
-                    .and_then(|string| FormatFStringAssignment::new(string, f.context()));
+                let format_f_string =
+                    string_like.and_then(|string| format_f_string_assignment(string, f.context()));
                 let format_implicit_flat = string_like.and_then(|string| {
                     FormatImplicitConcatenatedStringFlat::new(string, f.context())
                 });
@@ -573,7 +573,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 if !should_inline_comments
                     && !should_non_inlineable_use_best_fit(value, *statement, f.context())
                     && format_implicit_flat.is_none()
-                    && format_f_string_assignment.is_none()
+                    && format_f_string.is_none()
                 {
                     return write!(
                         f,
@@ -597,7 +597,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 // Don't inline comments for attribute and call expressions for black compatibility
                 let inline_comments = if should_inline_comments
                     || format_implicit_flat.is_some()
-                    || format_f_string_assignment.is_some()
+                    || format_f_string.is_some()
                 {
                     OptionalParenthesesInlinedComments::new(
                         &expression_comments,
@@ -637,9 +637,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 // This is mainly a performance optimisation that avoids unnecessary memoization
                 // and using the costly `BestFitting` layout if it is already known that only the last variant
                 // can ever fit because the left breaks.
-                if format_implicit_flat.is_none()
-                    && format_f_string_assignment.is_none()
-                    && last_target_breaks
+                if format_implicit_flat.is_none() && format_f_string.is_none() && last_target_breaks
                 {
                     return write!(
                         f,
@@ -666,7 +664,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         } else {
                             format_implicit_flat.fmt(f)
                         }
-                    } else if let Some(format_f_string) = format_f_string_assignment.as_ref() {
+                    } else if let Some(format_f_string) = format_f_string.as_ref() {
                         // Similar to above, remove any soft line breaks emitted by the f-string
                         // formatting.
                         let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
@@ -908,7 +906,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         .with_mode(BestFittingMode::AllLines)
                         .fmt(f)
                     }
-                } else if let Some(format_f_string) = &format_f_string_assignment {
+                } else if let Some(format_f_string) = &format_f_string {
                     // F-String containing an expression with a magic trailing comma, a comment, or a
                     // multiline debug expression should never be joined. Use the default layout.
                     //
@@ -947,7 +945,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     //         aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
                     // )
                     // ```
-
+                    //
                     // Keep the target flat, and use the regular f-string formatting.
                     //
                     // ```python
@@ -1101,52 +1099,39 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 /// The reason for this is because (a) f-string already has a multiline expression thus it tries to
 /// break the expression and (b) the `BestFit` layout doesn't considers the layout where the
 /// multiline f-string isn't surrounded by parentheses.
-struct FormatFStringAssignment<'a> {
-    /// The expression that contains the f-string.
-    expr: &'a ExprFString,
-    /// The only f-string part in the expression.
-    f_string: &'a FString,
-}
-
-impl<'a> FormatFStringAssignment<'a> {
-    fn new(string: StringLike<'a>, context: &PyFormatContext) -> Option<Self> {
-        if !is_f_string_formatting_enabled(context) {
-            return None;
-        }
-
-        let StringLike::FString(expr) = string else {
-            return None;
-        };
-
-        let [FStringPart::FString(f_string)] = expr.value.as_slice() else {
-            return None;
-        };
-
-        // If the f-string is flat, there are no breakpoints from which it can be made multiline.
-        // This is the case when the f-string has no expressions or if it does then the expressions
-        // are flat (no newlines).
-        if FStringLayout::from_f_string(f_string, context.source()).is_flat() {
-            return None;
-        }
-
-        // This checks whether the f-string is multi-line and it can *never* be flattened. Thus,
-        // we cannot try the flattened layout.
-        if string.is_multiline(context) {
-            return None;
-        }
-
-        Some(Self { expr, f_string })
+fn format_f_string_assignment<'a>(
+    string: StringLike<'a>,
+    context: &PyFormatContext,
+) -> Option<FormatFString<'a>> {
+    if !is_f_string_formatting_enabled(context) {
+        return None;
     }
-}
 
-impl Format<PyFormatContext<'_>> for FormatFStringAssignment<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        FormatFString::new(
-            self.f_string,
-            f_string_quoting(self.expr, f.context().source()),
-        )
-        .fmt(f)
+    let StringLike::FString(expr) = string else {
+        return None;
+    };
+
+    let [FStringPart::FString(f_string)] = expr.value.as_slice() else {
+        return None;
+    };
+
+    // If the f-string is flat, there are no breakpoints from which it can be made multiline.
+    // This is the case when the f-string has no expressions or if it does then the expressions
+    // are flat (no newlines).
+    if FStringLayout::from_f_string(f_string, context.source()).is_flat() {
+        return None;
     }
+
+    // This checks whether the f-string is multi-line and it can *never* be flattened. Thus,
+    // it's useless to try the flattened layout.
+    if string.is_multiline(context) {
+        return None;
+    }
+
+    Some(FormatFString::new(
+        f_string,
+        f_string_quoting(expr, context.source()),
+    ))
 }
 
 #[derive(Debug, Default)]

@@ -1,9 +1,6 @@
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::visitor::source_order::{
-    walk_f_string_element, SourceOrderVisitor, TraversalSignal,
-};
-use ruff_python_ast::AstNode;
+use ruff_python_ast::StringLikePart;
 use ruff_python_ast::{
     self as ast,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
@@ -106,85 +103,52 @@ impl StringLikeExtensions for ast::StringLike<'_> {
     }
 
     fn is_multiline(&self, context: &PyFormatContext) -> bool {
-        match self {
-            Self::String(_) | Self::Bytes(_) => self.parts().any(|part| {
+        self.parts().any(|part| match part {
+            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
                 part.flags().is_triple_quoted()
-                    && context.source().contains_line_break(self.range())
-            }),
-            Self::FString(expr) => {
-                let mut visitor = FStringMultilineVisitor::new(context);
-                expr.visit_source_order(&mut visitor);
-                visitor.is_multiline
+                    && context.source().contains_line_break(part.range())
             }
-        }
-    }
-}
-
-struct FStringMultilineVisitor<'a> {
-    context: &'a PyFormatContext<'a>,
-    is_multiline: bool,
-}
-
-impl<'a> FStringMultilineVisitor<'a> {
-    fn new(context: &'a PyFormatContext<'a>) -> Self {
-        Self {
-            context,
-            is_multiline: false,
-        }
-    }
-}
-
-impl<'a> SourceOrderVisitor<'a> for FStringMultilineVisitor<'a> {
-    fn enter_node(&mut self, _node: ast::AnyNodeRef<'a>) -> TraversalSignal {
-        if self.is_multiline {
-            TraversalSignal::Skip
-        } else {
-            TraversalSignal::Traverse
-        }
-    }
-
-    fn visit_string_literal(&mut self, string_literal: &'a ast::StringLiteral) {
-        if string_literal.flags.is_triple_quoted()
-            && self
-                .context
-                .source()
-                .contains_line_break(string_literal.range())
-        {
-            self.is_multiline = true;
-        }
-    }
-
-    fn visit_f_string_element(&mut self, f_string_element: &'a ast::FStringElement) {
-        let is_multiline = match f_string_element {
-            ast::FStringElement::Literal(literal) => {
-                self.context.source().contains_line_break(literal.range())
-            }
-            ast::FStringElement::Expression(expression) => {
-                if is_f_string_formatting_enabled(self.context) {
-                    // Expressions containing comments can't be joined.
-                    self.context.comments().contains_comments(expression.into())
-                } else {
-                    // Multiline f-string expressions can't be joined if the f-string formatting is
-                    // disabled because the string gets inserted in verbatim preserving the
-                    // newlines.
-                    self.context
-                        .source()
-                        .contains_line_break(expression.range())
+            StringLikePart::FString(f_string) => {
+                fn contains_line_break_or_comments(
+                    elements: &ast::FStringElements,
+                    context: &PyFormatContext,
+                ) -> bool {
+                    elements.iter().any(|element| match element {
+                        ast::FStringElement::Literal(literal) => {
+                            context.source().contains_line_break(literal.range())
+                        }
+                        ast::FStringElement::Expression(expression) => {
+                            if is_f_string_formatting_enabled(context) {
+                                // Expressions containing comments can't be joined.
+                                //
+                                // Format specifiers needs to be checked as well. For example, the
+                                // following should be considered multiline because the literal
+                                // part of the format specifier contains a newline at the end
+                                // (`.3f\n`):
+                                //
+                                // ```py
+                                // x = f"hello {a + b + c + d:.3f
+                                // } world"
+                                // ```
+                                context.comments().contains_comments(expression.into())
+                                    || expression.format_spec.as_deref().is_some_and(|spec| {
+                                        contains_line_break_or_comments(&spec.elements, context)
+                                    })
+                            } else {
+                                // Multiline f-string expressions can't be joined if the f-string
+                                // formatting is disabled because the string gets inserted in
+                                // verbatim preserving the newlines.
+                                //
+                                // We don't need to check format specifiers here because the
+                                // expression range already includes them.
+                                context.source().contains_line_break(expression.range())
+                            }
+                        }
+                    })
                 }
+
+                contains_line_break_or_comments(&f_string.elements, context)
             }
-        };
-        if is_multiline {
-            self.is_multiline = true;
-        } else {
-            // Continue walking the f-string elements to visit the ones in format specifiers.
-            //
-            // For example, the following should be considered multiline because the literal part
-            // of the format specifier contains a newline at the end (`.3f\n`):
-            // ```py
-            // x = f"hello {a + b + c + d:.3f
-            // } world"
-            // ```
-            walk_f_string_element(self, f_string_element);
-        }
+        })
     }
 }
