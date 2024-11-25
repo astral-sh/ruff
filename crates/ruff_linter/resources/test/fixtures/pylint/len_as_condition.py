@@ -98,6 +98,9 @@ def github_issue_1331_v3(*args):
 def github_issue_1331_v4(*args):
     assert z and len(args), args  # [PLC1802]
 
+def github_issue_1331_v5(**args):
+    assert z and len(args), args  # [PLC1802]
+
 b = bool(len(z)) # [PLC1802]
 c = bool(len('TEST') or 42) # [PLC1802]
 

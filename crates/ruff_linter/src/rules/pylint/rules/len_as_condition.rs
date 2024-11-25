@@ -2,6 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, ExprCall, Parameter};
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::find_binding_value;
@@ -119,15 +120,21 @@ fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
 
     // Attempt to find the binding's value
     let Some(binding_value) = find_binding_value(binding, semantic) else {
-        // check for `vararg`
-        return binding.kind.is_argument()
-            && binding
-                .statement(semantic)
-                .and_then(|statement| statement.as_function_def_stmt())
-                .and_then(|function| function.parameters.vararg.as_deref())
-                .map_or(false, |Parameter { name: var_arg, .. }| {
-                    var_arg.id() == name
-                });
+        // If the binding is not an argument, return false
+        if !binding.kind.is_argument() {
+            return false;
+        }
+
+        // Attempt to retrieve the function definition statement
+        let Some(function) = binding
+            .statement(semantic)
+            .and_then(|statement| statement.as_function_def_stmt())
+        else {
+            return false;
+        };
+
+        // If not find in non-default params, it must be varargs or kwargs
+        return function.parameters.find(name).is_none();
     };
 
     // If `binding_value` is found, check if it is a sequence
