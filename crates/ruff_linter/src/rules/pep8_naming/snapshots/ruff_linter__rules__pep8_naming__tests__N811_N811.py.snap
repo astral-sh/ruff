@@ -2,30 +2,40 @@
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 snapshot_kind: text
 ---
-N811.py:2:8: N811 Constant `CONST` imported as non-constant `const`
+N811.py:2:8: N811 Constant `CON` imported as non-constant `c`
   |
 1 | # Error
-2 | import mod.CONST as const
+2 | import mod.CON as c
+  |        ^^^^^^^^^^^^ N811
+3 | import mod.CONST as const
+4 | from mod import CONSTANT as constant
+  |
+
+N811.py:3:8: N811 Constant `CONST` imported as non-constant `const`
+  |
+1 | # Error
+2 | import mod.CON as c
+3 | import mod.CONST as const
   |        ^^^^^^^^^^^^^^^^^^ N811
-3 | from mod import CONSTANT as constant
-4 | from mod import ANOTHER_CONSTANT as another_constant
+4 | from mod import CONSTANT as constant
+5 | from mod import ANOTHER_CONSTANT as another_constant
   |
 
-N811.py:3:17: N811 Constant `CONSTANT` imported as non-constant `constant`
+N811.py:4:17: N811 Constant `CONSTANT` imported as non-constant `constant`
   |
-1 | # Error
-2 | import mod.CONST as const
-3 | from mod import CONSTANT as constant
+2 | import mod.CON as c
+3 | import mod.CONST as const
+4 | from mod import CONSTANT as constant
   |                 ^^^^^^^^^^^^^^^^^^^^ N811
-4 | from mod import ANOTHER_CONSTANT as another_constant
+5 | from mod import ANOTHER_CONSTANT as another_constant
   |
 
-N811.py:4:17: N811 Constant `ANOTHER_CONSTANT` imported as non-constant `another_constant`
+N811.py:5:17: N811 Constant `ANOTHER_CONSTANT` imported as non-constant `another_constant`
   |
-2 | import mod.CONST as const
-3 | from mod import CONSTANT as constant
-4 | from mod import ANOTHER_CONSTANT as another_constant
+3 | import mod.CONST as const
+4 | from mod import CONSTANT as constant
+5 | from mod import ANOTHER_CONSTANT as another_constant
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N811
-5 | 
-6 | # Ok
+6 | 
+7 | # Ok
   |
