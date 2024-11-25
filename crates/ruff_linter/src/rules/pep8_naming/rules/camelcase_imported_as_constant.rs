@@ -54,9 +54,7 @@ pub(crate) fn camelcase_imported_as_constant(
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
     // Single-character names are ambiguous. It could be a class or a constant.
-    if asname.chars().count() == 1 {
-        return None;
-    }
+    asname.chars().skip(1).next()?;
 
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
