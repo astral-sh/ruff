@@ -293,16 +293,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(
-        Rule::PytestParametrizeNamesWrongType,
-        Path::new("PT006.py"),
-        Settings::default()
-    )]
-    fn test_pytest_style_preview(
-        rule_code: Rule,
-        path: &Path,
-        plugin_settings: Settings,
-    ) -> Result<()> {
+    #[test_case(Rule::PytestParametrizeNamesWrongType, Path::new("PT006.py"))]
+    fn test_pytest_style_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
             rule_code.noqa_code(),
@@ -312,7 +304,6 @@ mod tests {
             Path::new("flake8_pytest_style").join(path).as_path(),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                flake8_pytest_style: plugin_settings,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
