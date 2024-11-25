@@ -39,7 +39,6 @@ pub(crate) use unused_noqa::*;
 pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
-
 mod ambiguous_unicode_character;
 mod assert_with_print_message;
 mod assignment_in_assert;
@@ -91,4 +90,3 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
-

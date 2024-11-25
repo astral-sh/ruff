@@ -47,6 +47,7 @@ pub(crate) fn invalid_assert_message_literal_argument(checker: &mut Checker, stm
             | Expr::BooleanLiteral(_)
             | Expr::NoneLiteral(_)
             | Expr::EllipsisLiteral(_)
+            | Expr::BytesLiteral(_)
     ) {
         return;
     }
