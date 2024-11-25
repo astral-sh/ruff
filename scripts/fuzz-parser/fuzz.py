@@ -283,8 +283,9 @@ def parse_args() -> ResolvedCliArgs:
     )
     parser.add_argument(
         "--bin",
-        help=("Name of executable to test. E.g. `ruff` or `red_knot`."),
+        help="Name of executable to test. E.g. `ruff` or `red_knot`.",
         required=True,
+        choices=["ruff", "red_knot"],
     )
 
     args = parser.parse_args()
@@ -314,8 +315,8 @@ def parse_args() -> ResolvedCliArgs:
         except FileNotFoundError:
             parser.error(
                 "`--only-new-bugs` was specified without specifying a baseline "
-                f"executable, and no released version of {bin} appears to be installed "
-                "in your Python environment"
+                f"executable, and no released version of `{bin}` appears to be "
+                "installed in your Python environment"
             )
         else:
             if not args.quiet:
@@ -323,8 +324,8 @@ def parse_args() -> ResolvedCliArgs:
                 print(
                     f"`--only-new-bugs` was specified without specifying a baseline "
                     f"executable; falling back to using `{bin}=={version}` as the "
-                    f"baseline (the version of {bin} installed in your current Python "
-                    f"environment)"
+                    f"baseline (the version of `{bin}` installed in your current "
+                    f"Python environment)"
                 )
         args.baseline_executable = bin
 
