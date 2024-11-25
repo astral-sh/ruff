@@ -64,7 +64,8 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
     let text_document = snapshot
         .query()
         .as_single_document()
-        .expect("format should only be called on text documents or notebook cells");
+        .map_err(|err| anyhow::anyhow!("Failed to get text document for the format request: {err}"))
+        .unwrap();
     let query = snapshot.query();
     format_text_document(
         text_document,

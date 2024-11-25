@@ -32,7 +32,10 @@ fn format_document_range(
     let text_document = snapshot
         .query()
         .as_single_document()
-        .expect("format should only be called on text documents or notebook cells");
+        .map_err(|err| {
+            anyhow::anyhow!("Failed to get text document for the format range request: {err}")
+        })
+        .unwrap();
     let query = snapshot.query();
     format_text_document_range(text_document, range, query, snapshot.encoding())
 }

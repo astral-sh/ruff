@@ -33,7 +33,8 @@ pub(crate) fn hover(
     let document = snapshot
         .query()
         .as_single_document()
-        .expect("hover should only be called on text documents or notebook cells");
+        .map_err(|err| anyhow::anyhow!("Failed to get text document for the hover request: {err}"))
+        .unwrap();
     let line_number: usize = position
         .position
         .line
