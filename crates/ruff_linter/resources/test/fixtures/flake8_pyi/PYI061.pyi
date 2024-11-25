@@ -47,3 +47,10 @@ Literal[True, None]  # PYI061 None inside "Literal[]" expression. Replace with "
 x: Literal[None] | None
 y: None | Literal[None]
 z: Union[Literal[None], None]
+
+a: int | Literal[None] | None
+b: None | Literal[None] | None
+c: (None | Literal[None]) | None
+d: None | (Literal[None] | None)
+e: None | ((None | Literal[None]) | None) | None
+f: Literal[None] | Literal[None]

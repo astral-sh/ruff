@@ -1,7 +1,10 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprBinOp, ExprNoneLiteral, Operator};
-use ruff_python_semantic::analyze::typing::traverse_literal;
+use ruff_python_ast::{Expr, ExprBinOp, ExprNoneLiteral, ExprSubscript, Operator};
+use ruff_python_semantic::{
+    analyze::typing::{traverse_literal, traverse_union},
+    SemanticModel,
+};
 use ruff_text_size::Ranged;
 
 use smallvec::SmallVec;
@@ -90,35 +93,16 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     let fix = if other_literal_elements_seen {
         None
     } else {
-        // Avoid producing code that would raise an exception when
-        // `Literal[None] | None` would be fixed to `None | None`.
-        // Instead fix to `None`. No action needed for `typing.Union`,
-        // as `Union[None, None]` is valid Python.
-        // See https://github.com/astral-sh/ruff/issues/14567.
-        let replacement_range = if let Some(Expr::BinOp(ExprBinOp {
-            left,
-            op: Operator::BitOr,
-            right,
-            range: parent_range,
-        })) = checker.semantic().current_expression_parent()
-        {
-            if matches!(**left, Expr::NoneLiteral(_)) || matches!(**right, Expr::NoneLiteral(_)) {
-                *parent_range
-            } else {
-                literal_expr.range()
-            }
-        } else {
-            literal_expr.range()
-        };
-
-        Some(Fix::applicable_edit(
-            Edit::range_replacement("None".to_string(), replacement_range),
-            if checker.comment_ranges().intersects(literal_expr.range()) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            },
-        ))
+        create_fix_edit(checker.semantic(), literal_expr).map(|edit| {
+            Fix::applicable_edit(
+                edit,
+                if checker.comment_ranges().intersects(literal_expr.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            )
+        })
     };
 
     for none_expr in none_exprs {
@@ -132,5 +116,55 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
             diagnostic.set_fix(fix.clone());
         }
         checker.diagnostics.push(diagnostic);
+    }
+}
+
+fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit> {
+    let mut enclosing_union = None;
+    let mut expression_ancestors = semantic.current_expressions().skip(1);
+    let mut parent_expr = expression_ancestors.next();
+    while let Some(Expr::BinOp(ExprBinOp {
+        op: Operator::BitOr,
+        ..
+    })) = parent_expr
+    {
+        enclosing_union = parent_expr;
+        parent_expr = expression_ancestors.next();
+    }
+
+    let mut is_union_with_bare_none = false;
+    if let Some(enclosing_union) = enclosing_union {
+        traverse_union(
+            &mut |expr, _| {
+                if matches!(expr, Expr::NoneLiteral(_)) {
+                    is_union_with_bare_none = true;
+                }
+                if expr != literal_expr {
+                    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
+                        if semantic.match_typing_expr(value, "Literal")
+                            && matches!(**slice, Expr::NoneLiteral(_))
+                        {
+                            is_union_with_bare_none = true;
+                        }
+                    }
+                }
+            },
+            semantic,
+            enclosing_union,
+        );
+    }
+
+    // Avoid producing code that would raise an exception when
+    // `Literal[None] | None` would be fixed to `None | None`.
+    // Instead do not provide a fix. No action needed for `typing.Union`,
+    // as `Union[None, None]` is valid Python.
+    // See https://github.com/astral-sh/ruff/issues/14567.
+    if is_union_with_bare_none {
+        None
+    } else {
+        Some(Edit::range_replacement(
+            "None".to_string(),
+            literal_expr.range(),
+        ))
     }
 }

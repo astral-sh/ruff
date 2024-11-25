@@ -72,3 +72,10 @@ Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
 x: Literal[None] | None
 y: None | Literal[None]
 z: Union[Literal[None], None]
+
+a: int | Literal[None] | None
+b: None | Literal[None] | None
+c: (None | Literal[None]) | None
+d: None | (Literal[None] | None)
+e: None | ((None | Literal[None]) | None) | None
+f: Literal[None] | Literal[None]
