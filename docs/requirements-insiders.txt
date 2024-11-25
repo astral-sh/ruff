@@ -1,5 +1,5 @@
 PyYAML==6.0.2
-ruff==0.7.4
+ruff==0.8.0
 mkdocs==1.6.1
 mkdocs-material @ git+ssh://git@github.com/astral-sh/mkdocs-material-insiders.git@38c0b8187325c3bab386b666daf3518ac036f2f4
 mkdocs-redirects==1.2.2
