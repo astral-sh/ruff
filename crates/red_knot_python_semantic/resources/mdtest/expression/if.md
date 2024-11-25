@@ -27,7 +27,7 @@ reveal_type(1 if 0 else 2)  # revealed: Literal[2]
 
 (issue #14588)
 
-The test inside an if expression should not affect the scope outside of it.
+The test inside an if expression should not affect code outside of the block.
 
 ```py
 def bool_instance() -> bool:
