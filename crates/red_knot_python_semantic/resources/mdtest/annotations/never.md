@@ -37,7 +37,7 @@ def f():
     v3: Never = b1
     v4: Never = stop()
     v5: Any = b2
-    # error: Object of type `Literal[1]` is not assignable to `Never`
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Never`"
     v6: Never = 1
 ```
 
