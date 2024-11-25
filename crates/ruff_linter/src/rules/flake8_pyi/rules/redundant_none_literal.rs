@@ -90,9 +90,9 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     let fix = if other_literal_elements_seen {
         None
     } else {
-        // Avoid producing code that would raise an exception
-        // when `Literal[None] | None` would be fixed to
-        // `None | None`. Instead fix to `None`. No action needed from `typing.Union`,
+        // Avoid producing code that would raise an exception when 
+        // `Literal[None] | None` would be fixed to `None | None`.
+        // Instead fix to `None`. No action needed for `typing.Union`,
         // as `Union[None, None]` is valid Python.
         // See https://github.com/astral-sh/ruff/issues/14567.
         let replacement_range = if let Some(parent) = checker.semantic().current_expression_parent()
