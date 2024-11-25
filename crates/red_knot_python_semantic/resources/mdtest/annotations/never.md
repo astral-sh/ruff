@@ -9,6 +9,9 @@ interchangeably.
 ```py
 from typing import NoReturn, Never, Any
 
+# error: [invalid-type-parameter] "Type `typing.Never` expected no type parameter"
+x: Never[int]
+
 def stop() -> NoReturn:
     raise RuntimeError("no way")
 

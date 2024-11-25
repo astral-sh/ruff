@@ -4574,9 +4574,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         match value_ty {
-            Type::KnownInstance(known_instance) => {
-                self.infer_parameterized_known_instance_type_expression(known_instance, slice)
-            }
+            Type::KnownInstance(known_instance) => self
+                .infer_parameterized_known_instance_type_expression(
+                    subscript,
+                    known_instance,
+                    slice,
+                ),
             _ => {
                 self.infer_type_expression(slice);
                 todo_type!("generics")
@@ -4586,6 +4589,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_parameterized_known_instance_type_expression(
         &mut self,
+        subscript: &ast::ExprSubscript,
         known_instance: KnownInstanceType,
         parameters: &ast::Expr,
     ) -> Type<'db> {
@@ -4630,7 +4634,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("generic type alias")
             }
             KnownInstanceType::NoReturn | KnownInstanceType::Never => {
-                unreachable!("These are not subscriptible")
+                self.diagnostics.add(
+                    subscript.into(),
+                    "invalid-type-parameter",
+                    format_args!(
+                        "Type `{}` expected no type parameter",
+                        known_instance.repr(self.db)
+                    ),
+                );
+                Type::Unknown
             }
         }
     }
