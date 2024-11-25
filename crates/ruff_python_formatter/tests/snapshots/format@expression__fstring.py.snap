@@ -407,6 +407,90 @@ a = f"test{
     joined
 } togethereeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
 
+# The following test cases are adopted from implicit string concatenation but for a
+# single f-string instead.
+
+# Don't inline f-strings that contain expressions that are guaranteed to split, e.g. because of a magic trailing comma
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee" # comment
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee" # comment
+)
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee" # comment
+
+aaaaa[aaaaaaaaaaa] = (f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee" # comment
+)
+
+# Don't inline f-strings that contain commented expressions
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# Don't inline f-strings with multiline debug expressions or format specifiers
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+    b=}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# This is not a multiline f-string even though it has a newline after the format specifier.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# The newline is only considered when it's a tripled-quoted f-string.
+aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"""  # comment
+
+aaaaaaaaaaaaaaaaaa = (
+    f"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"""  # comment
+)
+
 # Indentation
 
 # What should be the indentation?
@@ -883,6 +967,79 @@ a = (
 # Similar to the above example but this fits within the line length limit.
 a = f"test{expression}flatcan be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"  # inline
 
+# The following test cases are adopted from implicit string concatenation but for a
+# single f-string instead.
+
+# Don't inline f-strings that contain expressions that are guaranteed to split, e.g. because of a magic trailing comma
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    [
+        a,
+    ]
+}moreeeeeeeeeeeeeeeeeeee"  # comment
+
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    [
+        a,
+    ]
+}moreeeeeeeeeeeeeeeeeeee"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    [
+        a,
+    ]
+}moreeeeeeeeeeeeeeeeeeee"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    [
+        a,
+    ]
+}moreeeeeeeeeeeeeeeeeeee"  # comment
+
+# Don't inline f-strings that contain commented expressions
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    [
+        a  # comment
+    ]
+}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    [
+        a  # comment
+    ]
+}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+# Don't inline f-strings with multiline debug expressions or format specifiers
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+    b=}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+# This is not a multiline f-string even though it has a newline after the format specifier.
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# The newline is only considered when it's a tripled-quoted f-string.
+aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"""  # comment
+
+aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"""  # comment
+
 # Indentation
 
 # What should be the indentation?
@@ -1338,6 +1495,69 @@ a = (
     joined
 } togethereeeeeeeeeeeeeeeeeeeeeeeeeee"
 )  # inline
+
+# The following test cases are adopted from implicit string concatenation but for a
+# single f-string instead.
+
+# Don't inline f-strings that contain expressions that are guaranteed to split, e.g. because of a magic trailing comma
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee"  # comment
+
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee"  # comment
+
+# Don't inline f-strings that contain commented expressions
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+# Don't inline f-strings with multiline debug expressions or format specifiers
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+    b=}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}moreeeeeeeeeeeeeeeeeetest"  # comment
+
+# This is not a multiline f-string even though it has a newline after the format specifier.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"  # comment
+
+# The newline is only considered when it's a tripled-quoted f-string.
+aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"""  # comment
+
+aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"""  # comment
 
 # Indentation
 
@@ -1815,7 +2035,7 @@ f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccc
  
  # Here, the f-string layout is flat but it exceeds the line length limit. This shouldn't
  # try the custom best fit layout because the f-string doesn't have any split points.
-@@ -373,31 +399,25 @@
+@@ -373,60 +399,66 @@
  
  # But, the following f-string does have a split point because of the multiline expression.
  aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {
@@ -1855,9 +2075,88 @@ f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccc
 -)  # inline
 +a = f"test{expression}flatcan be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"  # inline
  
- # Indentation
+ # The following test cases are adopted from implicit string concatenation but for a
+ # single f-string instead.
  
-@@ -408,29 +428,29 @@
+ # Don't inline f-strings that contain expressions that are guaranteed to split, e.g. because of a magic trailing comma
+ aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+-[a,]
++    [
++        a,
++    ]
+ }moreeeeeeeeeeeeeeeeeeee"  # comment
+ 
+ aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+-[a,]
++    [
++        a,
++    ]
+ }moreeeeeeeeeeeeeeeeeeee"  # comment
+ 
+ aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+-[a,]
++    [
++        a,
++    ]
+ }moreeeeeeeeeeeeeeeeeeee"  # comment
+ 
+ aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+-[a,]
++    [
++        a,
++    ]
+ }moreeeeeeeeeeeeeeeeeeee"  # comment
+ 
+ # Don't inline f-strings that contain commented expressions
+-aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
++aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
++    [
+         a  # comment
+-    ]}moreeeeeeeeeeeeeeeeeetest"  # comment
++    ]
++}moreeeeeeeeeeeeeeeeeetest"  # comment
+ 
+-aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
++aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
++    [
+         a  # comment
+-    ]}moreeeeeeeeeeeeeeeeeetest"  # comment
++    ]
++}moreeeeeeeeeeeeeeeeeetest"  # comment
+ 
+ # Don't inline f-strings with multiline debug expressions or format specifiers
+ aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+@@ -445,21 +477,19 @@
+     =}moreeeeeeeeeeeeeeeeeetest"  # comment
+ 
+ # This is not a multiline f-string even though it has a newline after the format specifier.
+-aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+-    a:.3f
+-    }moreeeeeeeeeeeeeeeeeetest"  # comment
++aaaaaaaaaaaaaaaaaa = (
++    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
++)
+ 
+-aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+-    a:.3f
+-    }moreeeeeeeeeeeeeeeeeetest"  # comment
++aaaaaaaaaaaaaaaaaa = (
++    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
++)
+ 
+ # The newline is only considered when it's a tripled-quoted f-string.
+-aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+-    a:.3f
++aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f
+     }moreeeeeeeeeeeeeeeeeetest"""  # comment
+ 
+-aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+-    a:.3f
++aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{a:.3f
+     }moreeeeeeeeeeeeeeeeeetest"""  # comment
+ 
+ # Indentation
+@@ -471,29 +501,29 @@
          if indent2:
              foo = f"""hello world
  hello {
