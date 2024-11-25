@@ -92,7 +92,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     } else {
         // Avoid producing syntax errors when `Literal[None] | None` would be fixed to
         // `None | None`. Instead fix to `None`. No action needed from `typing.Union`,
-        // as `Union[None, None]` is valid syntax.
+        // as `Union[None, None]` is valid Python.
         // See https://github.com/astral-sh/ruff/issues/14567.
         let replacement_range = if let Some(parent) = checker.semantic().current_expression_parent()
         {
