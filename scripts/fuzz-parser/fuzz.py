@@ -20,6 +20,7 @@ Example invocations of the script:
 from __future__ import annotations
 
 import argparse
+import ast
 import concurrent.futures
 import enum
 import subprocess
@@ -30,6 +31,7 @@ from pathlib import Path
 from typing import NewType, assert_never
 
 from pysource_codegen import generate as generate_random_code
+from pysource_minimize import CouldNotMinimize
 from pysource_minimize import minimize as minimize_repro
 from rich_argparse import RawDescriptionRichHelpFormatter
 from termcolor import colored
@@ -150,7 +152,19 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
             executable=args.executable,
             executable_path=args.test_executable_path,
         )
-        maybe_bug = MinimizedSourceCode(minimize_repro(code, callback))
+        try:
+            maybe_bug = MinimizedSourceCode(minimize_repro(code, callback))
+        except CouldNotMinimize as e:
+            # This is to double-check that there isn't a bug in
+            # `pysource-minimize`/`pysource-codegen`.
+            # `pysource-minimize` *should* never produce code that's invalid syntax.
+            try:
+                ast.parse(code)
+            except SyntaxError:
+                raise e from None
+            else:
+                maybe_bug = MinimizedSourceCode(code)
+
     else:
         maybe_bug = None
     return FuzzResult(seed, maybe_bug, args.executable)
