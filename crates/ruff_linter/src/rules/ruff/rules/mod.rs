@@ -9,6 +9,7 @@ pub(crate) use explicit_f_string_type_conversion::*;
 pub(crate) use function_call_in_dataclass_default::*;
 pub(crate) use implicit_optional::*;
 pub(crate) use incorrectly_parenthesized_tuple_in_subscript::*;
+pub(crate) use invalid_assert_message_literal_argument::*;
 pub(crate) use invalid_formatter_suppression_comment::*;
 pub(crate) use invalid_index_type::*;
 pub(crate) use invalid_pyproject_toml::*;
@@ -38,6 +39,7 @@ pub(crate) use unused_noqa::*;
 pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
+
 mod ambiguous_unicode_character;
 mod assert_with_print_message;
 mod assignment_in_assert;
@@ -51,6 +53,7 @@ mod function_call_in_dataclass_default;
 mod helpers;
 mod implicit_optional;
 mod incorrectly_parenthesized_tuple_in_subscript;
+mod invalid_assert_message_literal_argument;
 mod invalid_formatter_suppression_comment;
 mod invalid_index_type;
 mod invalid_pyproject_toml;
@@ -88,6 +91,4 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
-pub(crate) use non_string_literal_as_assert_message::*;
 
-mod non_string_literal_as_assert_message;

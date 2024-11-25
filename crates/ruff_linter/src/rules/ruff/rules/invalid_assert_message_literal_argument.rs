@@ -6,12 +6,11 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of non-string literal as assert message.
+/// Checks for invalid use of literals in assert message argument.
 ///
 /// ## Why is this bad?
-/// Non-string literal in assert message does not provide any useful
-/// information and is likely an unitentional use of `assert_equal(expr, expr)`
-/// from other languages.
+/// An assert message which is a non-string literal was likely intended
+/// to be used in a comparison assertion, rather than as a message.
 ///
 /// ## Example
 /// ```python
@@ -27,9 +26,9 @@ use crate::checkers::ast::Checker;
 /// assert len(fruits) == 2
 /// ```
 #[violation]
-pub struct NonStringLiteralAsAssertMessage;
+pub struct InvalidAssertMessageLiteralArgument;
 
-impl Violation for NonStringLiteralAsAssertMessage {
+impl Violation for InvalidAssertMessageLiteralArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Non-string literal used as assert message".to_string()
@@ -37,7 +36,7 @@ impl Violation for NonStringLiteralAsAssertMessage {
 }
 
 /// RUF040
-pub(crate) fn non_string_literal_as_assert_message(checker: &mut Checker, stmt: &StmtAssert) {
+pub(crate) fn invalid_assert_message_literal_argument(checker: &mut Checker, stmt: &StmtAssert) {
     let Some(message) = stmt.msg.as_deref() else {
         return;
     };
@@ -53,7 +52,7 @@ pub(crate) fn non_string_literal_as_assert_message(checker: &mut Checker, stmt: 
     }
 
     checker.diagnostics.push(Diagnostic::new(
-        NonStringLiteralAsAssertMessage,
+        InvalidAssertMessageLiteralArgument,
         message.range(),
     ));
 }
