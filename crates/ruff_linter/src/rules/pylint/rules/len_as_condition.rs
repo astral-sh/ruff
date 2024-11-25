@@ -90,24 +90,18 @@ pub(crate) fn len_as_condition(checker: &mut Checker, call: &ExprCall) {
 
     let replacement = checker.locator().slice(argument.range()).to_string();
 
-    let mut diagnostic = Diagnostic::new(
-        LenAsCondition {
-            expression: SourceCodeSnippet::new(replacement.clone()),
-        },
-        call.range(),
+    checker.diagnostics.push(
+        Diagnostic::new(
+            LenAsCondition {
+                expression: SourceCodeSnippet::new(replacement.clone()),
+            },
+            call.range(),
+        )
+        .with_fix(Fix::safe_edit(Edit::range_replacement(
+            replacement,
+            call.range(),
+        ))),
     );
-
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        // Generator without parentheses would create syntax error
-        if argument.is_generator_expr() {
-            format!("({replacement})")
-        } else {
-            replacement
-        },
-        call.range(),
-    )));
-
-    checker.diagnostics.push(diagnostic);
 }
 
 fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
@@ -149,7 +143,6 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
                 | PythonType::List
                 | PythonType::Set
                 | PythonType::Tuple
-                | PythonType::Generator
                 | PythonType::String
         )
     ) {
@@ -162,7 +155,27 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     // Match against specific built-in constructors that return sequences
-    return semantic
-        .resolve_builtin_symbol(func)
-        .is_some_and(|func| matches!(func, "list" | "set" | "dict" | "tuple"));
+    return semantic.resolve_builtin_symbol(func).is_some_and(|func| {
+        matches!(
+            func,
+            "chr"
+                | "format"
+                | "input"
+                | "repr"
+                | "str"
+                | "list"
+                | "sorted"
+                | "dir"
+                | "locals"
+                | "globals"
+                | "vars"
+                | "dict"
+                | "set"
+                | "frozenset"
+                | "tuple"
+                | "range"
+                | "enumerate"
+                | "zip"
+        )
+    });
 }

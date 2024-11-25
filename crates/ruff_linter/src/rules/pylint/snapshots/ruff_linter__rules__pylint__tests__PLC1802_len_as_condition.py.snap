@@ -296,13 +296,34 @@ len_as_condition.py:102:10: PLC1802 [*] `len('TEST')` used as condition without 
 104 104 | def github_issue_1879():
 105 105 | 
 
+len_as_condition.py:123:12: PLC1802 [*] `len(range(0))` used as condition without comparison
+    |
+121 |     assert len(ClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
+122 |     assert len(ChildClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
+123 |     assert len(range(0))  # [PLC1802]
+    |            ^^^^^^^^^^^^^ PLC1802
+124 |     assert len([t + 1 for t in []])  # [PLC1802]
+125 |     # assert len(u + 1 for u in []) generator has no len
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+120 120 |     assert len(ChildClassWithBool())
+121 121 |     assert len(ClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
+122 122 |     assert len(ChildClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
+123     |-    assert len(range(0))  # [PLC1802]
+    123 |+    assert range(0)  # [PLC1802]
+124 124 |     assert len([t + 1 for t in []])  # [PLC1802]
+125 125 |     # assert len(u + 1 for u in []) generator has no len
+126 126 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
+
 len_as_condition.py:124:12: PLC1802 [*] `len([t + 1 for t in []])` used as condition without comparison
     |
 122 |     assert len(ChildClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
-123 |     assert len(range(0))  # in pylint does throw [PLC1802] (stronger type inference), not here
+123 |     assert len(range(0))  # [PLC1802]
 124 |     assert len([t + 1 for t in []])  # [PLC1802]
     |            ^^^^^^^^^^^^^^^^^^^^^^^^ PLC1802
-125 |     assert len(u + 1 for u in [])  # [PLC1802]
+125 |     # assert len(u + 1 for u in []) generator has no len
 126 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
     |
     = help: Remove `len`
@@ -310,38 +331,17 @@ len_as_condition.py:124:12: PLC1802 [*] `len([t + 1 for t in []])` used as condi
 ℹ Safe fix
 121 121 |     assert len(ClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
 122 122 |     assert len(ChildClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
-123 123 |     assert len(range(0))  # in pylint does throw [PLC1802] (stronger type inference), not here
+123 123 |     assert len(range(0))  # [PLC1802]
 124     |-    assert len([t + 1 for t in []])  # [PLC1802]
     124 |+    assert [t + 1 for t in []]  # [PLC1802]
-125 125 |     assert len(u + 1 for u in [])  # [PLC1802]
+125 125 |     # assert len(u + 1 for u in []) generator has no len
 126 126 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
 127 127 |     assert len(set((w + 1) for w in set()))  # [PLC1802]
-
-len_as_condition.py:125:12: PLC1802 [*] `len(u + 1 for u in [])` used as condition without comparison
-    |
-123 |     assert len(range(0))  # in pylint does throw [PLC1802] (stronger type inference), not here
-124 |     assert len([t + 1 for t in []])  # [PLC1802]
-125 |     assert len(u + 1 for u in [])  # [PLC1802]
-    |            ^^^^^^^^^^^^^^^^^^^^^^ PLC1802
-126 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
-127 |     assert len(set((w + 1) for w in set()))  # [PLC1802]
-    |
-    = help: Remove `len`
-
-ℹ Safe fix
-122 122 |     assert len(ChildClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
-123 123 |     assert len(range(0))  # in pylint does throw [PLC1802] (stronger type inference), not here
-124 124 |     assert len([t + 1 for t in []])  # [PLC1802]
-125     |-    assert len(u + 1 for u in [])  # [PLC1802]
-    125 |+    assert (u + 1 for u in [])  # [PLC1802]
-126 126 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
-127 127 |     assert len(set((w + 1) for w in set()))  # [PLC1802]
-128 128 | 
 
 len_as_condition.py:126:12: PLC1802 [*] `len({"1":(v + 1) for v in {}})` used as condition without comparison
     |
 124 |     assert len([t + 1 for t in []])  # [PLC1802]
-125 |     assert len(u + 1 for u in [])  # [PLC1802]
+125 |     # assert len(u + 1 for u in []) generator has no len
 126 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC1802
 127 |     assert len(set((w + 1) for w in set()))  # [PLC1802]
@@ -349,9 +349,9 @@ len_as_condition.py:126:12: PLC1802 [*] `len({"1":(v + 1) for v in {}})` used as
     = help: Remove `len`
 
 ℹ Safe fix
-123 123 |     assert len(range(0))  # in pylint does throw [PLC1802] (stronger type inference), not here
+123 123 |     assert len(range(0))  # [PLC1802]
 124 124 |     assert len([t + 1 for t in []])  # [PLC1802]
-125 125 |     assert len(u + 1 for u in [])  # [PLC1802]
+125 125 |     # assert len(u + 1 for u in []) generator has no len
 126     |-    assert len({"1":(v + 1) for v in {}})  # [PLC1802]
     126 |+    assert {"1":(v + 1) for v in {}}  # [PLC1802]
 127 127 |     assert len(set((w + 1) for w in set()))  # [PLC1802]
@@ -360,7 +360,7 @@ len_as_condition.py:126:12: PLC1802 [*] `len({"1":(v + 1) for v in {}})` used as
 
 len_as_condition.py:127:12: PLC1802 [*] `len(set((w + 1) for w in set()))` used as condition without comparison
     |
-125 |     assert len(u + 1 for u in [])  # [PLC1802]
+125 |     # assert len(u + 1 for u in []) generator has no len
 126 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
 127 |     assert len(set((w + 1) for w in set()))  # [PLC1802]
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC1802
@@ -369,7 +369,7 @@ len_as_condition.py:127:12: PLC1802 [*] `len(set((w + 1) for w in set()))` used 
 
 ℹ Safe fix
 124 124 |     assert len([t + 1 for t in []])  # [PLC1802]
-125 125 |     assert len(u + 1 for u in [])  # [PLC1802]
+125 125 |     # assert len(u + 1 for u in []) generator has no len
 126 126 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
 127     |-    assert len(set((w + 1) for w in set()))  # [PLC1802]
     127 |+    assert set((w + 1) for w in set())  # [PLC1802]

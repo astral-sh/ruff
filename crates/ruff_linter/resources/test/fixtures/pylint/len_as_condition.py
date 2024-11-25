@@ -120,9 +120,9 @@ def github_issue_1879():
     assert len(ChildClassWithBool())
     assert len(ClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
     assert len(ChildClassWithoutBool())  # unintuitive?, in pylint: [PLC1802]
-    assert len(range(0))  # in pylint does throw [PLC1802] (stronger type inference), not here
+    assert len(range(0))  # [PLC1802]
     assert len([t + 1 for t in []])  # [PLC1802]
-    assert len(u + 1 for u in [])  # [PLC1802]
+    # assert len(u + 1 for u in []) generator has no len
     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
     assert len(set((w + 1) for w in set()))  # [PLC1802]
 
