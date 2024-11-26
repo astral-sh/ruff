@@ -31,7 +31,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// ## Note
-/// Identifiers consisting of a single uppercase character are ambigous under
+/// Identifiers consisting of a single uppercase character are ambiguous under
 /// the rules of PEP8, which specifies PascalCase for classes and
 /// ALL_CAPS_SNAKE_CASE for constants. Without a second character, it is not
 /// possible to reliably guess whether the identifier is intended to be part
@@ -68,7 +68,7 @@ pub(crate) fn camelcase_imported_as_constant(
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
     // Single-character names are ambiguous. It could be a class or a constant.
-    asname.chars().skip(1).next()?;
+    asname.chars().nth(1)?;
 
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
