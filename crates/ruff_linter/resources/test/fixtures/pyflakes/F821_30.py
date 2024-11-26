@@ -10,3 +10,9 @@ from typing import no_type_check
 @no_type_check
 def f(arg: "A") -> "R":
     pass
+
+
+@no_type_check
+class C:
+    def f(self, arg: "B") -> "S":
+        pass
