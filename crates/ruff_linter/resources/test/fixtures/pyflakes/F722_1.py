@@ -9,10 +9,10 @@ from typing import no_type_check
 
 @no_type_check
 def f(arg: "this isn't python") -> "this isn't python either":
-    pass
+    x: "this also isn't python" = 0
 
 
 @no_type_check
 class C:
     def f(arg: "this isn't python") -> "this isn't python either":
-        pass
+        x: "this also isn't python" = 1
