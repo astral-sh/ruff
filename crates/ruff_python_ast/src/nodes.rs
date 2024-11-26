@@ -1273,7 +1273,8 @@ impl FStringValue {
         matches!(self.inner, FStringValueInner::Concatenated(_))
     }
 
-    /// Returns the [`FString`] if the value is made up of a single f-string, [`None`] otherwise.
+    /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
+    /// otherwise.
     pub fn as_single(&self) -> Option<&FString> {
         match &self.inner {
             FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),

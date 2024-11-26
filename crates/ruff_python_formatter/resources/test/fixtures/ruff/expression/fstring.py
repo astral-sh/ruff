@@ -485,6 +485,149 @@ aaaaaaaaaaaaaaaaaa = (
     }moreeeeeeeeeeeeeeeeeetest"""  # comment
 )
 
+# Remove the parentheses here
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{[a, b,
+    # comment
+    ]}moee" # comment
+)
+# ... but not here because of the ownline comment
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{[a, b,
+    ]}moee"
+    # comment
+)
+
+# F-strings in other positions
+
+if f"aaaaaaaaaaa {ttttteeeeeeeeest} more {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}": pass
+
+if (
+    f"aaaaaaaaaaa {ttttteeeeeeeeest} more {
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    }"
+): pass
+
+if f"aaaaaaaaaaa {ttttteeeeeeeeest} more {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}": pass
+
+if f"aaaaaaaaaaa {ttttteeeeeeeeest} more {  # comment
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}": pass
+
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest,]} more {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}":
+    pass
+
+if (
+    f"aaaaaaaaaaa {[ttttteeeeeeeeest,]} more {
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    }"
+):
+    pass
+
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest,]} more {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}":
+    pass
+
+# For loops
+for a in f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+        expression}moreeeeeeeeeeeeeeeeeeee":
+    pass
+
+for a in f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeeee":
+    pass
+
+for a in f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+        expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeeee":
+    pass
+
+for a in (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+):
+    pass
+
+# With statements
+with f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+        expression}moreeeeeeeeeeeeeeeeeeee":
+    pass
+
+with f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeeee":
+    pass
+
+with f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+        expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeeee":
+    pass
+
+with (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+):
+    pass
+
+# Assert statements
+assert f"aaaaaaaaa{
+        expression}bbbbbbbbbbbb", f"cccccccccc{
+                expression}dddddddddd"
+
+assert f"aaaaaaaaa{expression}bbbbbbbbbbbb", f"cccccccccccccccc{
+        expression}dddddddddddddddd"
+
+assert f"aaaaaaaaa{expression}bbbbbbbbbbbb", f"cccccccccccccccc{expression}dddddddddddddddd"
+
+assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{
+        expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"ccccccc{expression}dddddddddd"
+
+assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"ccccccc{expression}dddddddddd"
+
+assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{
+        expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"ccccccccccccccccccccc {
+                expression} dddddddddddddddddddddddddd"
+
+assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"cccccccccccccccccccccccccccccccc {expression} ddddddddddddddddddddddddddddddddddddd"
+
+# F-strings as a single argument to a call expression to test whether it's huggable or not.
+call(f"{
+    testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+}")
+
+call(f"{
+    testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+}")
+
+call(f"{  # comment
+    testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+}")
+
+call(f"""aaaaaaaaaaaaaaaa bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee}""")
+
+call(f"""aaaaaaaaaaaaaaaa bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+                }""")
+
+call(f"""aaaaaaaaaaaaaaaa
+     bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+                }""")
+
+call(f"""aaaaaaaaaaaaaaaa
+     bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee  # comment
+                }""")
+
+call(
+    f"""aaaaaaaaaaaaaaaa
+     bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee  # comment
+                }"""
+)
+
+call(f"{
+    aaaaaa
+    + '''test
+    more'''
+}")
+
 # Indentation
 
 # What should be the indentation?
