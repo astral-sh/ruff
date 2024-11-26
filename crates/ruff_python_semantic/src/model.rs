@@ -2222,6 +2222,21 @@ bitflags! {
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 25;
 
+        /// The model is in a [no_type_check] context.
+        ///
+        /// This is used to skip type checking when the `@no_type_check` decorator is found.
+        ///
+        /// For example (adapted from [#13824]):
+        /// ```python
+        /// from typing import no_type_check
+        ///
+        /// @no_type_check
+        /// def fn(arg: "A") -> "R":
+        ///     pass
+        /// ```
+        ///
+        /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
+        /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
         const NO_TYPE_CHECK = 1 << 26;
 
         /// The context is in any type annotation.
