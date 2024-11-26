@@ -672,6 +672,17 @@ impl<'a> SemanticModel<'a> {
     /// Simulates a runtime load of a given [`ast::ExprName`].
     ///
     /// This should not be run until after all the bindings have been visited.
+    ///
+    /// The main purpose of this method and what makes this different from
+    /// methods like [`lookup_symbol`] and [`resolve_name`] is that it may
+    /// be used to perform speculative name lookups.
+    ///
+    /// In most cases a load can be accurately modeled simply by calling
+    /// [`resolve_name`] at the right time during semantic analysis, however
+    /// for speculative lookups this is not the case, since we're aiming to
+    /// change the semantic meaning of our load. E.g. we want to check what
+    /// would happen if we changed a forward reference to an immediate load
+    /// or vice versa.
     pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
         let symbol = name.id.as_str();
         let range = name.range;
