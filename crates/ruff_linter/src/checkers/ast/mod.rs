@@ -1061,10 +1061,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_decorator(&mut self, decorator: &'a ruff_python_ast::Decorator) {
-        if decorator
-            .expression
-            .as_name_expr()
-            .is_some_and(|name| name.id.as_str() == "no_type_check")
+        if self
+            .semantic
+            .match_typing_expr(&decorator.expression, "no_type_check")
         {
             self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
         }
