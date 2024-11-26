@@ -184,9 +184,10 @@ where
 /// when running in release mode.
 #[cfg(not(debug_assertions))]
 fn discard_todo_metadata(ty: &str) -> std::borrow::Cow<'_, str> {
-    regex::Regex::new(r"@Todo\([^)]*\)")
-        .unwrap()
-        .replace_all(ty, "@Todo")
+    static TODO_METADATA_REGEX: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"@Todo\([^)]*\)").unwrap());
+
+    TODO_METADATA_REGEX.replace_all(ty, "@Todo")
 }
 
 struct Matcher {
