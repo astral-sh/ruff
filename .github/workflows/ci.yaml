@@ -213,7 +213,7 @@ jobs:
     name: "cargo build (release)"
     runs-on: macos-latest
     needs: determine_changes
-    if: ${{ github.ref == 'refs/heads/main' }}
+    # if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
