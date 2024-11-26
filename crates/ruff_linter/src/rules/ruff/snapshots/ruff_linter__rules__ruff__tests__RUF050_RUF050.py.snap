@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF050.py:85:5: RUF050 Wrong statement inside class definition
+   |
+84 |       # Conditional logic inside the class (not recommended but valid)
+85 |       if math.pi > 3:
+   |  _____^
+86 | |         def conditionally_defined_method(self):
+87 | |             print("This method exists because math.pi > 3.")
+   | |____________________________________________________________^ RUF050
+88 |       
+89 |       # For loop inside the class (unusual but valid)
+   |
+
+RUF050.py:90:5: RUF050 Wrong statement inside class definition
+   |
+89 |       # For loop inside the class (unusual but valid)
+90 |       for i in range(3):
+   |  _____^
+91 | |         exec(f"def loop_method_{i}(self): print('Loop-defined method {i}')")
+   | |____________________________________________________________________________^ RUF050
+92 |       
+93 |       # Docstrings for the class
+   |

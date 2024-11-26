@@ -37,6 +37,7 @@ pub(crate) use unsafe_markup_use::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
 pub(crate) use useless_if_else::*;
+pub(crate) use wrong_class_body_content::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
 mod ambiguous_unicode_character;
@@ -82,6 +83,7 @@ mod unsafe_markup_use;
 mod unused_async;
 mod unused_noqa;
 mod useless_if_else;
+mod wrong_class_body_content;
 mod zip_instead_of_pairwise;
 
 #[derive(Clone, Copy)]
