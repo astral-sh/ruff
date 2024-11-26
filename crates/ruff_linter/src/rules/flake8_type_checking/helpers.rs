@@ -1,3 +1,4 @@
+use crate::Locator;
 use std::cmp::Reverse;
 
 use anyhow::Result;
@@ -5,9 +6,11 @@ use anyhow::Result;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::str::Quote;
+use ruff_python_ast::visitor::source_order::TraversalSignal;
 use ruff_python_ast::{self as ast, Decorator, Expr};
-use ruff_python_codegen::{Generator, Stylist};
+use ruff_python_codegen::{precedence, ExpressionGenerator, Stylist};
+use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
@@ -228,6 +231,7 @@ pub(crate) fn is_singledispatch_implementation(
 pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
+    locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
     let expr = semantic.expression(node_id).expect("Expression not found");
@@ -238,7 +242,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, stylist);
+                    return quote_annotation(parent_id, semantic, locator, stylist);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -246,7 +250,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, stylist);
+                    return quote_annotation(parent_id, semantic, locator, stylist);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -254,7 +258,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, stylist);
+                    return quote_annotation(parent_id, semantic, locator, stylist);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -262,14 +266,14 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, stylist);
+                    return quote_annotation(parent_id, semantic, locator, stylist);
                 }
             }
             _ => {}
         }
     }
 
-    quote_type_expression(expr, semantic, stylist)
+    quote_type_expression(expr, semantic, locator, stylist)
 }
 
 /// Wrap a type expression in quotes.
@@ -283,18 +287,16 @@ pub(crate) fn quote_annotation(
 pub(crate) fn quote_type_expression(
     expr: &Expr,
     semantic: &SemanticModel,
+    locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
     // Quote the entire expression.
-    let quote = stylist.quote();
-    let mut quote_annotator = QuoteAnnotator::new(semantic, stylist);
-    quote_annotator.visit_expr(expr);
+    let mut quote_annotator = QuoteAnnotator::new(semantic, locator, stylist);
+    // FIXME: Is this always the correct precedence?
+    quote_annotator.unparse_expr(expr, precedence::COMMA);
     let annotation = quote_annotator.into_annotation()?;
 
-    Ok(Edit::range_replacement(
-        format!("{quote}{annotation}{quote}"),
-        expr.range(),
-    ))
+    Ok(Edit::range_replacement(annotation, expr.range()))
 }
 
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
@@ -326,7 +328,8 @@ enum QuoteAnnotatorState {
 }
 
 pub(crate) struct QuoteAnnotator<'a> {
-    stylist: &'a Stylist<'a>,
+    quote: Quote,
+    locator: &'a Locator<'a>,
     semantic: &'a SemanticModel<'a>,
     state: Vec<QuoteAnnotatorState>,
     annotation: String,
@@ -334,9 +337,16 @@ pub(crate) struct QuoteAnnotator<'a> {
 }
 
 impl<'a> QuoteAnnotator<'a> {
-    fn new(semantic: &'a SemanticModel<'a>, stylist: &'a Stylist<'a>) -> Self {
+    fn new(
+        semantic: &'a SemanticModel<'a>,
+        locator: &'a Locator<'a>,
+        stylist: &'a Stylist<'a>,
+    ) -> Self {
         Self {
-            stylist,
+            // since what we're generating will be wrapped inside another
+            // string literal we want the opposite quote
+            quote: stylist.quote().opposite(),
+            locator,
             semantic,
             state: Vec::new(),
             annotation: String::new(),
@@ -350,29 +360,52 @@ impl<'a> QuoteAnnotator<'a> {
                 "Cannot quote annotation because it already contains opposite quote or escape character"
             ))
         } else {
-            Ok(self.annotation)
+            // generate the final annotation including the quotes
+            let mut generator = self.subgenerator_with_opposite_quotes();
+            generator.p_str_repr(self.annotation.as_str());
+            Ok(generator.annotation)
         }
     }
 }
 
-impl<'a> SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
-    fn enter_node(&mut self, _node: ast::AnyNodeRef<'a>) -> TraversalSignal {
-        if self.cannot_fix {
-            TraversalSignal::Skip
-        } else {
-            TraversalSignal::Traverse
+impl<'a> ExpressionGenerator<'a> for QuoteAnnotator<'a> {
+    fn buffer(&mut self) -> &mut String {
+        &mut self.annotation
+    }
+
+    fn quote(&self) -> Quote {
+        self.quote
+    }
+
+    fn subgenerator(&self) -> Self {
+        Self {
+            quote: self.quote,
+            locator: self.locator,
+            semantic: self.semantic,
+            state: Vec::new(),
+            annotation: String::new(),
+            cannot_fix: false,
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        let generator = Generator::from(self.stylist);
+    fn subgenerator_with_opposite_quotes(&self) -> Self {
+        Self {
+            quote: self.quote.opposite(),
+            locator: self.locator,
+            semantic: self.semantic,
+            state: Vec::new(),
+            annotation: String::new(),
+            cannot_fix: false,
+        }
+    }
+
+    fn enter_expr(&mut self, expr: &Expr, level: u8) -> TraversalSignal {
+        if self.cannot_fix {
+            return TraversalSignal::Skip;
+        }
 
         match expr {
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                let value_expr = generator.expr(value);
-                self.annotation.push_str(&value_expr);
-                self.annotation.push('[');
-
+            Expr::Subscript(ast::ExprSubscript { value, .. }) => {
                 if let Some(qualified_name) = self.semantic.resolve_qualified_name(value) {
                     if self
                         .semantic
@@ -388,74 +421,56 @@ impl<'a> SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
                         self.state.push(QuoteAnnotatorState::Other);
                     }
                 }
-
-                self.visit_expr(slice);
-                self.state.pop();
-                self.annotation.push(']');
+                TraversalSignal::Traverse
             }
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let Some((first, remaining)) = elts.split_first() else {
-                    return;
+                    // empty tuple
+                    self.p("()");
+                    return TraversalSignal::Skip;
                 };
-                self.visit_expr(first);
+                self.unparse_expr(first, precedence::COMMA);
                 if let Some(last) = self.state.last_mut() {
                     if *last == QuoteAnnotatorState::AnnotatedFirst {
                         *last = QuoteAnnotatorState::AnnotatedRest;
                     }
                 }
                 for expr in remaining {
-                    self.annotation.push_str(", ");
-                    self.visit_expr(expr);
+                    self.p(", ");
+                    self.unparse_expr(expr, precedence::COMMA);
                 }
-                self.state.pop();
+                self.p_if(elts.len() == 1, ",");
+                // we already performed traversal ourselves
+                TraversalSignal::Skip
             }
-            // For the following expressions, we just need to make sure to visit the nested
-            // expressions using the quote annotator and not use the generator. This is so that any
-            // subscript elements nested within them are identified and quoted correctly.
-            Expr::List(ast::ExprList { elts, .. }) => {
-                let mut first = true;
-                self.annotation.push('[');
-                for expr in elts {
-                    if first {
-                        first = false;
-                    } else {
-                        self.annotation.push_str(", ");
-                    }
-                    self.visit_expr(expr);
-                }
-                self.annotation.push(']');
-            }
-            Expr::BinOp(ast::ExprBinOp {
-                left, op, right, ..
-            }) => {
-                debug_assert_eq!(*op, ast::Operator::BitOr);
-                self.visit_expr(left);
-                self.annotation.push_str(" | ");
-                self.visit_expr(right);
-            }
-            _ => {
-                let source = match self.state.last().copied() {
+            Expr::StringLiteral(literal) => {
+                match self.state.last().copied() {
                     Some(QuoteAnnotatorState::Literal | QuoteAnnotatorState::AnnotatedRest) => {
-                        let mut source = generator.expr(expr);
-                        let opposite_quote = &self.stylist.quote().opposite().as_char().to_string();
-                        // If the quotes we are going to insert in this source already exists set the auto quote outcome
-                        // to failed. Because this means we are inserting quotes that are in the string and they collect.
-                        if source.contains(opposite_quote) || source.contains('\\') {
-                            self.cannot_fix = true;
-                        }
-                        source = source.replace(self.stylist.quote().as_char(), opposite_quote);
-                        source
+                        // just render these normally, no AST manipulation should happen here
+                        TraversalSignal::Traverse
                     }
                     None
                     | Some(QuoteAnnotatorState::AnnotatedFirst | QuoteAnnotatorState::Other) => {
-                        let mut source = generator.expr(expr);
-                        source = source.replace(self.stylist.quote().as_char(), "");
-                        source = source.replace(self.stylist.quote().opposite().as_char(), "");
-                        source
+                        // try to parse the forward reference and traverse it
+                        // this is how we get rid of nested forward references
+                        if let Ok(annotation) =
+                            parse_type_annotation(literal, self.locator.contents())
+                        {
+                            self.unparse_expr(annotation.expression(), level);
+                        } else {
+                            self.cannot_fix = true;
+                        }
+                        TraversalSignal::Skip
                     }
-                };
-                self.annotation.push_str(&source);
+                }
             }
+            _ => TraversalSignal::Traverse,
+        }
+    }
+
+    fn leave_expr(&mut self, expr: &Expr, _level: u8) {
+        if let Expr::Subscript(_) = expr {
+            self.state.pop();
         }
     }
 }

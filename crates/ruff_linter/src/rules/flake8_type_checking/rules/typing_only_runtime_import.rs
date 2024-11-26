@@ -508,6 +508,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                         Some(quote_annotation(
                             reference.expression_id()?,
                             checker.semantic(),
+                            checker.locator(),
                             checker.stylist(),
                         ))
                     } else {

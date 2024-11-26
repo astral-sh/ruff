@@ -54,7 +54,13 @@ pub(crate) fn runtime_cast_value(checker: &mut Checker, type_expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(RuntimeCastValue, type_expr.range());
-    let edit = quote_type_expression(type_expr, checker.semantic(), checker.stylist()).ok();
+    let edit = quote_type_expression(
+        type_expr,
+        checker.semantic(),
+        checker.locator(),
+        checker.stylist(),
+    )
+    .ok();
     if let Some(edit) = edit {
         if checker
             .comment_ranges()

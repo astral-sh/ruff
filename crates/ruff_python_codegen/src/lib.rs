@@ -1,8 +1,11 @@
+pub use expression_generator::ExpressionGenerator;
 pub use generator::Generator;
 use ruff_python_parser::{parse_module, ParseError};
 pub use stylist::Stylist;
 
+mod expression_generator;
 mod generator;
+pub mod precedence;
 mod stylist;
 
 /// Run round-trip source code generation on a given Python code.
