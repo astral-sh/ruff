@@ -154,7 +154,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             }
 
             // Multiline strings can never fit on a single line.
-            if !string.is_fstring() && string.is_multiline(context.source()) {
+            if string.is_multiline(context) {
                 return None;
             }
 
@@ -187,25 +187,6 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 }
 
                 if let StringLikePart::FString(fstring) = part {
-                    if fstring.elements.iter().any(|element| match element {
-                        // Same as for other literals. Multiline literals can't fit on a single line.
-                        FStringElement::Literal(literal) => {
-                            context.source().contains_line_break(literal.range())
-                        }
-                        FStringElement::Expression(expression) => {
-                            if is_f_string_formatting_enabled(context) {
-                                // Expressions containing comments can't be joined.
-                                context.comments().contains_comments(expression.into())
-                            } else {
-                                // Multiline f-string expressions can't be joined if the f-string formatting is disabled because
-                                // the string gets inserted in verbatim preserving the newlines.
-                                context.source().contains_line_break(expression.range())
-                            }
-                        }
-                    }) {
-                        return None;
-                    }
-
                     if context.options().target_version().supports_pep_701() {
                         if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
                             if preserve_quotes_requirement

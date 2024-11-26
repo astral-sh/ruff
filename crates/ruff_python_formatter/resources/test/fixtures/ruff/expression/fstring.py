@@ -313,6 +313,321 @@ f"{  # comment 26
     # comment 28
 } woah {x}"
 
+# Assignment statement
+
+# Even though this f-string has multiline expression, thus allowing us to break it at the
+# curly braces, the f-string fits on a single line if it's moved inside the parentheses.
+# We should prefer doing that instead.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"
+
+# Same as above
+xxxxxxx = f"{
+    {'aaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+}"
+
+# Similar to the previous example, but the f-string will exceed the line length limit,
+# we shouldn't add any parentheses here.
+xxxxxxx = f"{
+    {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
+}"
+
+# Same as above but with an inline comment. The f-string should be formatted inside the
+# parentheses and the comment should be part of the line inside the parentheses.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"  # comment
+
+# Similar to the previous example but this time parenthesizing doesn't work because it
+# exceeds the line length. So, avoid parenthesizing this f-string.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"  # comment loooooooong
+
+# Similar to the previous example but we start with the parenthesized layout. This should
+# remove the parentheses and format the f-string on a single line. This shows that the
+# final layout for the formatter is same for this and the previous case. The only
+# difference is that in the previous case the expression is already mulitline which means
+# the formatter can break it further at the curly braces.
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"  # comment loooooooong
+)
+
+# The following f-strings are going to break because of the trailing comma so we should
+# avoid using the best fit layout and instead use the default layout.
+# left-to-right
+aaaa = f"aaaa {[
+    1, 2,
+]} bbbb"
+# right-to-left
+aaaa, bbbb = f"aaaa {[
+    1, 2,
+]} bbbb"
+
+# Using the right-to-left assignment statement variant.
+aaaaaaaaaaaaaaaaaa, bbbbbbbbbbb = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+    expression}moreeeeeeeeeeeeeeeee"  # comment
+
+# Here, the f-string layout is flat but it exceeds the line length limit. This shouldn't
+# try the custom best fit layout because the f-string doesn't have any split points.
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
+    f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+)
+# Same as above but without the parentheses to test that it gets formatted to the same
+# layout as the previous example.
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+
+# But, the following f-string does have a split point because of the multiline expression.
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
+    f"aaaaaaaaaaaaaaaaaaa {
+        aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
+)
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
+    f"aaaaaaaaaaaaaaaaaaa {
+        aaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbb + cccccccccccccccccccccc + dddddddddddddddddddddddddddd} ddddddddddddddddddd"
+)
+
+# This is an implicitly concatenated f-string but it cannot be joined because otherwise
+# it'll exceed the line length limit. So, the two f-strings will be inside parentheses
+# instead and the inline comment should be outside the parentheses.
+a = f"test{
+    expression
+}flat" f"can be {
+    joined
+} togethereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
+# Similar to the above example but this fits within the line length limit.
+a = f"test{
+    expression
+}flat" f"can be {
+    joined
+} togethereeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
+# The following test cases are adopted from implicit string concatenation but for a
+# single f-string instead.
+
+# Don't inline f-strings that contain expressions that are guaranteed to split, e.g. because of a magic trailing comma
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee" # comment
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee" # comment
+)
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee" # comment
+
+aaaaa[aaaaaaaaaaa] = (f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}moreeeeeeeeeeeeeeeeeeee" # comment
+)
+
+# Don't inline f-strings that contain commented expressions
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# Don't inline f-strings with multiline debug expressions or format specifiers
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+    b=}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# This is not a multiline f-string even though it has a newline after the format specifier.
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"  # comment
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# The newline is only considered when it's a tripled-quoted f-string.
+aaaaaaaaaaaaaaaaaa = f"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"""  # comment
+
+aaaaaaaaaaaaaaaaaa = (
+    f"""testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a:.3f
+    }moreeeeeeeeeeeeeeeeeetest"""  # comment
+)
+
+# Remove the parentheses here
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{[a, b,
+    # comment
+    ]}moee" # comment
+)
+# ... but not here because of the ownline comment
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{[a, b,
+    ]}moee"
+    # comment
+)
+
+# F-strings in other positions
+
+if f"aaaaaaaaaaa {ttttteeeeeeeeest} more {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}": pass
+
+if (
+    f"aaaaaaaaaaa {ttttteeeeeeeeest} more {
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    }"
+): pass
+
+if f"aaaaaaaaaaa {ttttteeeeeeeeest} more {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}": pass
+
+if f"aaaaaaaaaaa {ttttteeeeeeeeest} more {  # comment
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}": pass
+
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest,]} more {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}":
+    pass
+
+if (
+    f"aaaaaaaaaaa {[ttttteeeeeeeeest,]} more {
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    }"
+):
+    pass
+
+if f"aaaaaaaaaaa {[ttttteeeeeeeeest,]} more {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+}":
+    pass
+
+# For loops
+for a in f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+        expression}moreeeeeeeeeeeeeeeeeeee":
+    pass
+
+for a in f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeeee":
+    pass
+
+for a in f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+        expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeeee":
+    pass
+
+for a in (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+):
+    pass
+
+# With statements
+with f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+        expression}moreeeeeeeeeeeeeeeeeeee":
+    pass
+
+with f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeeee":
+    pass
+
+with f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+        expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeeee":
+    pass
+
+with (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+):
+    pass
+
+# Assert statements
+assert f"aaaaaaaaa{
+        expression}bbbbbbbbbbbb", f"cccccccccc{
+                expression}dddddddddd"
+
+assert f"aaaaaaaaa{expression}bbbbbbbbbbbb", f"cccccccccccccccc{
+        expression}dddddddddddddddd"
+
+assert f"aaaaaaaaa{expression}bbbbbbbbbbbb", f"cccccccccccccccc{expression}dddddddddddddddd"
+
+assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{
+        expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"ccccccc{expression}dddddddddd"
+
+assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"ccccccc{expression}dddddddddd"
+
+assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{
+        expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"ccccccccccccccccccccc {
+                expression} dddddddddddddddddddddddddd"
+
+assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"cccccccccccccccccccccccccccccccc {expression} ddddddddddddddddddddddddddddddddddddd"
+
+# F-strings as a single argument to a call expression to test whether it's huggable or not.
+call(f"{
+    testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+}")
+
+call(f"{
+    testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+}")
+
+call(f"{  # comment
+    testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+}")
+
+call(f"""aaaaaaaaaaaaaaaa bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee}""")
+
+call(f"""aaaaaaaaaaaaaaaa bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+                }""")
+
+call(f"""aaaaaaaaaaaaaaaa
+     bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+                }""")
+
+call(f"""aaaaaaaaaaaaaaaa
+     bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee  # comment
+                }""")
+
+call(
+    f"""aaaaaaaaaaaaaaaa
+     bbbbbbbbbb {testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee  # comment
+                }"""
+)
+
+call(f"{
+    aaaaaa
+    + '''test
+    more'''
+}")
+
 # Indentation
 
 # What should be the indentation?

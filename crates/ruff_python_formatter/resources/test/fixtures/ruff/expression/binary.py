@@ -418,3 +418,9 @@ if True:
                     "permissions to manage this role, or else members of this role won't receive "
                     "a notification."
                 )
+
+# This f-string should be flattened
+xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
+    expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (
+    yyyyyyyyyyyyyy + zzzzzzzzzzz
+)
