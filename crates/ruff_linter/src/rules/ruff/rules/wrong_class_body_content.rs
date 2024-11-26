@@ -20,7 +20,7 @@ use crate::checkers::ast::Checker;
 ///     for _ in range(10):
 ///         print("What?!")
 /// ```
-/// 
+///
 /// ## References
 /// - [WPS: wrong class body content](https://wemake-python-styleguide.readthedocs.io/en/0.19.2/pages/usage/violations/oop.html#wemake_python_styleguide.violations.oop.WrongClassBodyContentViolation)
 #[violation]
