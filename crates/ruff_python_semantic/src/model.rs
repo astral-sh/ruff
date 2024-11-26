@@ -1289,6 +1289,7 @@ impl<'a> SemanticModel<'a> {
             "typing" => self.seen.insert(Modules::TYPING),
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
             "attr" | "attrs" => self.seen.insert(Modules::ATTRS),
+            "airflow" => self.seen.insert(Modules::AIRFLOW),
             _ => {}
         }
     }
@@ -1860,6 +1861,7 @@ bitflags! {
         const FLASK = 1 << 24;
         const ATTRS = 1 << 25;
         const REGEX = 1 << 26;
+        const AIRFLOW = 1 << 27;
     }
 }
 

@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 use ruff_python_ast::{self as ast};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -50,6 +51,10 @@ impl Violation for AirflowDagNoScheduleArgument {
 
 /// AIR301
 pub(crate) fn dag_no_schedule_argument(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return;
+    }
+
     // Don't check non-call expressions.
     let Expr::Call(ast::ExprCall {
         func, arguments, ..
