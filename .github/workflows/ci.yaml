@@ -221,9 +221,22 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@v1
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
       - name: "Build"
         run: cargo build --release --locked
+      - name: "Run tests"
+        shell: bash
+        env:
+          NEXTEST_PROFILE: "ci"
+        run: cargo insta test --release --locked --all-features --unreferenced reject --test-runner nextest
 
   cargo-build-msrv:
     name: "cargo build (msrv)"
