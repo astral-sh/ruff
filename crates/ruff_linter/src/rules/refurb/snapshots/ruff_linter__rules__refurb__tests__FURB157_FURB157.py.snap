@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB157.py:5:9: FURB157 [*] Verbose expression in `Decimal` constructor
   |
@@ -207,3 +206,183 @@ FURB157.py:24:9: FURB157 [*] Verbose expression in `Decimal` constructor
 25 25 | 
 26 26 | # Ok
 27 27 | Decimal("2e-4")
+
+FURB157.py:48:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+46 | # Non-finite variants
+47 | # https://github.com/astral-sh/ruff/issues/14587
+48 | Decimal(float(" nan "))          # Decimal(" nan ") 
+   |         ^^^^^^^^^^^^^^ FURB157
+49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
+50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+   |
+   = help: Replace with `" nan "`
+
+ℹ Safe fix
+45 45 | 
+46 46 | # Non-finite variants
+47 47 | # https://github.com/astral-sh/ruff/issues/14587
+48    |-Decimal(float(" nan "))          # Decimal(" nan ") 
+   48 |+Decimal(" nan ")          # Decimal(" nan ") 
+49 49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
+50 50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+51 51 | Decimal(float(" inf "))          # Decimal(" inf ")
+
+FURB157.py:49:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+47 | # https://github.com/astral-sh/ruff/issues/14587
+48 | Decimal(float(" nan "))          # Decimal(" nan ") 
+49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
+   |         ^^^^^^^^^^^^^^^ FURB157
+50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+51 | Decimal(float(" inf "))          # Decimal(" inf ")
+   |
+   = help: Replace with `" +nan "`
+
+ℹ Safe fix
+46 46 | # Non-finite variants
+47 47 | # https://github.com/astral-sh/ruff/issues/14587
+48 48 | Decimal(float(" nan "))          # Decimal(" nan ") 
+49    |-Decimal(float(" +nan "))         # Decimal(" +nan ")
+   49 |+Decimal(" +nan ")         # Decimal(" +nan ")
+50 50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+51 51 | Decimal(float(" inf "))          # Decimal(" inf ")
+52 52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+
+FURB157.py:50:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+48 | Decimal(float(" nan "))          # Decimal(" nan ") 
+49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
+50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+   |         ^^^^^^^^^^^^^^^ FURB157
+51 | Decimal(float(" inf "))          # Decimal(" inf ")
+52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+   |
+   = help: Replace with `" nan "`
+
+ℹ Safe fix
+47 47 | # https://github.com/astral-sh/ruff/issues/14587
+48 48 | Decimal(float(" nan "))          # Decimal(" nan ") 
+49 49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
+50    |-Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+   50 |+Decimal(" nan ")         # Decimal(" nan "), notice the difference!
+51 51 | Decimal(float(" inf "))          # Decimal(" inf ")
+52 52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+53 53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+
+FURB157.py:51:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
+50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+51 | Decimal(float(" inf "))          # Decimal(" inf ")
+   |         ^^^^^^^^^^^^^^ FURB157
+52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+   |
+   = help: Replace with `" inf "`
+
+ℹ Safe fix
+48 48 | Decimal(float(" nan "))          # Decimal(" nan ") 
+49 49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
+50 50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+51    |-Decimal(float(" inf "))          # Decimal(" inf ")
+   51 |+Decimal(" inf ")          # Decimal(" inf ")
+52 52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+53 53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+54 54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+
+FURB157.py:52:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+51 | Decimal(float(" inf "))          # Decimal(" inf ")
+52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+   |         ^^^^^^^^^^^^^^^ FURB157
+53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+   |
+   = help: Replace with `" +inf "`
+
+ℹ Safe fix
+49 49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
+50 50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+51 51 | Decimal(float(" inf "))          # Decimal(" inf ")
+52    |-Decimal(float(" +inf "))         # Decimal(" +inf ")
+   52 |+Decimal(" +inf ")         # Decimal(" +inf ")
+53 53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+54 54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+55 55 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+
+FURB157.py:53:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+51 | Decimal(float(" inf "))          # Decimal(" inf ")
+52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+   |         ^^^^^^^^^^^^^^^ FURB157
+54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+55 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+   |
+   = help: Replace with `" -inf "`
+
+ℹ Safe fix
+50 50 | Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+51 51 | Decimal(float(" inf "))          # Decimal(" inf ")
+52 52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+53    |-Decimal(float(" -inf "))         # Decimal(" -inf ")
+   53 |+Decimal(" -inf ")         # Decimal(" -inf ")
+54 54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+55 55 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+56 56 | Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+
+FURB157.py:54:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+   |         ^^^^^^^^^^^^^^^^^^^ FURB157
+55 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+56 | Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+   |
+   = help: Replace with `" infinity "`
+
+ℹ Safe fix
+51 51 | Decimal(float(" inf "))          # Decimal(" inf ")
+52 52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+53 53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+54    |-Decimal(float(" infinity "))     # Decimal(" infinity ")
+   54 |+Decimal(" infinity ")     # Decimal(" infinity ")
+55 55 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+56 56 | Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+
+FURB157.py:55:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+55 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+   |         ^^^^^^^^^^^^^^^^^^^^ FURB157
+56 | Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+   |
+   = help: Replace with `" +infinity "`
+
+ℹ Safe fix
+52 52 | Decimal(float(" +inf "))         # Decimal(" +inf ")
+53 53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+54 54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+55    |-Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+   55 |+Decimal(" +infinity ")    # Decimal(" +infinity ")
+56 56 | Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+
+FURB157.py:56:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+55 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+56 | Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+   |         ^^^^^^^^^^^^^^^^^^^^ FURB157
+   |
+   = help: Replace with `" -infinity "`
+
+ℹ Safe fix
+53 53 | Decimal(float(" -inf "))         # Decimal(" -inf ")
+54 54 | Decimal(float(" infinity "))     # Decimal(" infinity ")
+55 55 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+56    |-Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+   56 |+Decimal(" -infinity ")    # Decimal(" -infinity ")
