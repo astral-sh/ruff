@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
-use ruff_python_ast::{self as ast, Keyword};
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -20,20 +20,13 @@ use crate::checkers::ast::Checker;
 /// Such a DAG will no longer be scheduled on Airflow 3 at all, without any
 /// exceptions or other messages visible to the user.
 ///
-/// Airflow 2 also provides alternative arguments `schedule_interval` and
-/// `timetable` to specify the DAG schedule. They existed for backward
-/// compatibility, and have been removed from Airflow 3.
-///
 /// ## Example
 /// ```python
 /// from airflow import DAG
 ///
 ///
 /// # Using the implicit default schedule.
-/// dag1 = DAG(dag_id="my_dag_1")
-///
-/// # Using a deprecated argument to set schedule.
-/// dag2 = DAG(dag_id="my_dag_2", schedule_interval="@daily")
+/// dag = DAG(dag_id="my_dag")
 /// ```
 ///
 /// Use instead:
@@ -43,26 +36,15 @@ use crate::checkers::ast::Checker;
 /// from airflow import DAG
 ///
 ///
-/// dag1 = DAG(dag_id="my_dag_1", schedule=timedelta(days=1))
-/// dag2 = DAG(dag_id="my_dag_2", schedule="@daily")
+/// dag = DAG(dag_id="my_dag", schedule=timedelta(days=1))
 /// ```
 #[violation]
-pub struct AirflowDagNoScheduleArgument {
-    deprecated_argument: Option<String>,
-}
+pub struct AirflowDagNoScheduleArgument;
 
 impl Violation for AirflowDagNoScheduleArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AirflowDagNoScheduleArgument {
-            deprecated_argument,
-        } = self;
-        match deprecated_argument {
-            Some(argument) => {
-                format!("argument `{argument}` is deprecated; use `schedule` instead")
-            }
-            None => "DAG should have an explicit `schedule` argument".to_string(),
-        }
+        "DAG should have an explicit `schedule` argument".to_string()
     }
 }
 
@@ -91,28 +73,7 @@ pub(crate) fn dag_no_schedule_argument(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    // Produce a diagnostic on either a deprecated schedule keyword argument,
-    // or no schedule-related keyword arguments at all.
-    let diagnostic = if let Some(keyword) = arguments.keywords.iter().find(|keyword| {
-        let Keyword { arg, .. } = keyword;
-        arg.as_ref()
-            .is_some_and(|arg| matches!(arg.as_str(), "timetable" | "schedule_interval"))
-    }) {
-        // A deprecated argument is used.
-        Diagnostic::new(
-            AirflowDagNoScheduleArgument {
-                deprecated_argument: keyword.arg.as_ref().map(ToString::to_string),
-            },
-            keyword.range(),
-        )
-    } else {
-        // The implicit default is used.
-        Diagnostic::new(
-            AirflowDagNoScheduleArgument {
-                deprecated_argument: None,
-            },
-            expr.range(),
-        )
-    };
+    // Produce a diagnostic when the `schedule` keyword argument is not found.
+    let diagnostic = Diagnostic::new(AirflowDagNoScheduleArgument, expr.range());
     checker.diagnostics.push(diagnostic);
 }
