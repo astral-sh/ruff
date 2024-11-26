@@ -90,3 +90,6 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
+pub(crate) use unused_variable_accessed::*;
+
+mod unused_variable_accessed;

@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF052.py:52:5: RUF052 Local variable `_invalid_var` is marked as unused but is used
+   |
+51 | def fun(_valid_arg):
+52 |     _invalid_var = _valid_arg  # [RUF052]
+   |     ^^^^^^^^^^^^ RUF052
+53 |     return _invalid_var
+   |
+   = help: Remove leading underscores from variable `_invalid_var`
+
+RUF052.py:59:9: RUF052 Local variable `__` is marked as unused but is used
+   |
+57 |     def __init__(self):
+58 |         _ = 1
+59 |         __ = 2  # [RUF052]
+   |         ^^ RUF052
+60 |         ___ = 3
+61 |         _invalid_type = int  # [RUF052]
+   |
+   = help: Remove leading underscores from variable `__`
+
+RUF052.py:61:9: RUF052 Local variable `_invalid_type` is marked as unused but is used
+   |
+59 |         __ = 2  # [RUF052]
+60 |         ___ = 3
+61 |         _invalid_type = int  # [RUF052]
+   |         ^^^^^^^^^^^^^ RUF052
+62 |         isinstance(_, _invalid_type)
+63 |         ___ = __ + _
+   |
+   = help: Remove leading underscores from variable `_invalid_type`
+
+RUF052.py:67:9: RUF052 Local variable `_invalid_var_1` is marked as unused but is used
+   |
+66 |     def met(_valid_arg=3):
+67 |         _invalid_var_1 = _valid_arg  # [RUF052]
+   |         ^^^^^^^^^^^^^^ RUF052
+68 | 
+69 |         _invalid_var_2 = 1  # [RUF052]
+   |
+   = help: Remove leading underscores from variable `_invalid_var_1`
+
+RUF052.py:69:9: RUF052 Local variable `_invalid_var_2` is marked as unused but is used
+   |
+67 |         _invalid_var_1 = _valid_arg  # [RUF052]
+68 | 
+69 |         _invalid_var_2 = 1  # [RUF052]
+   |         ^^^^^^^^^^^^^^ RUF052
+70 |         if _valid_arg:
+71 |             return _invalid_var_1
+   |
+   = help: Remove leading underscores from variable `_invalid_var_2`
