@@ -2222,6 +2222,8 @@ bitflags! {
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 25;
 
+        const NO_TYPE_CHECK = 1 << 26;
+
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
 

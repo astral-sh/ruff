@@ -723,6 +723,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
+                    if decorator
+                        .expression
+                        .as_name_expr()
+                        .is_some_and(|name| name.id.as_str() == "no_type_check")
+                    {
+                        self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
+                    }
                     self.visit_decorator(decorator);
                 }
 
@@ -1851,6 +1858,9 @@ impl<'a> Checker<'a> {
 
     /// Visit an [`Expr`], and treat it as a type definition.
     fn visit_type_definition(&mut self, expr: &'a Expr) {
+        if !(self.semantic.flags & SemanticModelFlags::NO_TYPE_CHECK).is_empty() {
+            return;
+        }
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
