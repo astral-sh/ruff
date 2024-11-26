@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{helpers::is_docstring_stmt, Stmt, StmtClassDef};
+use ruff_python_ast::{helpers::is_docstring_stmt, Stmt, StmtClassDef, StmtExpr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -35,24 +35,10 @@ impl Violation for WrongClassBodyContent {
 
 /// RUF050
 pub(crate) fn wrong_class_body_content(checker: &mut Checker, class: &StmtClassDef) {
-    // If class is not implemented
-    if class.body.len() == 1 {
-        if let Some(first_stmt) = class.body.first() {
-            if first_stmt.is_pass_stmt() {
-                return;
-            }
-            if first_stmt
-                .as_expr_stmt()
-                .is_some_and(|expr| expr.value.is_ellipsis_literal_expr())
-            {
-                return;
-            }
-        }
-    }
-
     let StmtClassDef { body, .. } = class;
+    let is_stub = checker.source_type.is_stub();
     for stmt in body {
-        if !is_docstring_stmt(stmt) && !is_allowed_statement(stmt) {
+        if !is_docstring_stmt(stmt) && !is_allowed_statement(stmt, is_stub) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(WrongClassBodyContent, stmt.range()));
@@ -60,9 +46,19 @@ pub(crate) fn wrong_class_body_content(checker: &mut Checker, class: &StmtClassD
     }
 }
 
-fn is_allowed_statement(stmt: &Stmt) -> bool {
-    matches!(
-        stmt,
-        Stmt::FunctionDef(_) | Stmt::ClassDef(_) | Stmt::Assign(_) | Stmt::AnnAssign(_)
-    )
+fn is_allowed_statement(stmt: &Stmt, is_stub: bool) -> bool {
+    match stmt {
+        Stmt::FunctionDef(_)
+        | Stmt::ClassDef(_)
+        | Stmt::Assign(_)
+        | Stmt::AnnAssign(_)
+        | Stmt::Pass(_) => true,
+        Stmt::Expr(StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+        Stmt::If(_) => {
+            // If statement are allowed in stubs
+            is_stub
+            // TODO: allow also use of if for type checking
+        }
+        _ => false,
+    }
 }
