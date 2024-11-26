@@ -47,7 +47,9 @@ Decimal("10000000000000000000000000000000000000000000000000000000000000000000000
 # https://github.com/astral-sh/ruff/issues/14587
 Decimal(float(" nan "))          # Decimal(" nan ") 
 Decimal(float(" +nan "))         # Decimal(" +nan ")
-Decimal(float(" -nan "))         # Decimal(" nan "), notice the difference!
+# In this one case, " -nan ", the fix has to be
+# `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+Decimal(float(" -nan "))         # Decimal(" nan ")
 Decimal(float(" inf "))          # Decimal(" inf ")
 Decimal(float(" +inf "))         # Decimal(" +inf ")
 Decimal(float(" -inf "))         # Decimal(" -inf ")
