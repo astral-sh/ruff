@@ -192,6 +192,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0208") => (RuleGroup::Stable, rules::pylint::rules::IterationOverSet),
         (Pylint, "C0414") => (RuleGroup::Stable, rules::pylint::rules::UselessImportAlias),
         (Pylint, "C0415") => (RuleGroup::Preview, rules::pylint::rules::ImportOutsideTopLevel),
+        (Pylint, "C1802") => (RuleGroup::Preview, rules::pylint::rules::LenTest),
         (Pylint, "C1901") => (RuleGroup::Preview, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C2401") => (RuleGroup::Stable, rules::pylint::rules::NonAsciiName),
         (Pylint, "C2403") => (RuleGroup::Stable, rules::pylint::rules::NonAsciiImportName),

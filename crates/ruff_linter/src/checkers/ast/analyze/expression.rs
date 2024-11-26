@@ -494,6 +494,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SuperWithoutBrackets) {
                 pylint::rules::super_without_brackets(checker, func);
             }
+            if checker.enabled(Rule::LenTest) {
+                pylint::rules::len_test(checker, call);
+            }
             if checker.enabled(Rule::BitCount) {
                 refurb::rules::bit_count(checker, call);
             }
