@@ -1340,21 +1340,62 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolves the length value of a type.
+    ///
+    /// This is used to determine the value that would be returned
+    /// when `len(x)` is called on an object `x`.
+    fn len(&self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> Len {
+        let [only_arg] = arg_types else {
+            return Len::Unknown;
+        };
+
+        match only_arg {
+            Type::StringLiteral(string) => string.utf8_len(db).into(),
+            Type::BytesLiteral(bytes) => bytes.len(db).into(),
+
+            Type::Tuple(tuple) => {
+                let elements = tuple.elements(db);
+
+                if elements.iter().any(|it| matches!(it, Type::Todo(..))) {
+                    Len::Unknown
+                } else {
+                    elements.len().into()
+                }
+            }
+
+            Type::Never => Len::Never,
+            Type::BooleanLiteral(_) => Len::Never,
+            Type::IntLiteral(_) => Len::Never,
+
+            // Likely unreachable
+            Type::SliceLiteral(_) => Len::Never,
+
+            Type::Instance(instance) => match instance.class.known(db) {
+                Some(KnownClass::Bool) => Len::Never,
+                _ => Len::Unknown,
+            },
+
+            _ => Len::Unknown,
+        }
+    }
+
     /// Return the outcome of calling an object of this type.
     #[must_use]
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
-            Type::FunctionLiteral(function_type) => {
-                if function_type.is_known(db, KnownFunction::RevealType) {
-                    CallOutcome::revealed(
-                        function_type.signature(db).return_ty,
-                        *arg_types.first().unwrap_or(&Type::Unknown),
-                    )
-                } else {
-                    CallOutcome::callable(function_type.signature(db).return_ty)
+            Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                Some(KnownFunction::RevealType) => CallOutcome::revealed(
+                    function_type.signature(db).return_ty,
+                    *arg_types.first().unwrap_or(&Type::Unknown),
+                ),
+
+                Some(KnownFunction::Len) => {
+                    CallOutcome::callable(self.len(db, arg_types).to_type(db))
                 }
-            }
+
+                _ => CallOutcome::callable(function_type.signature(db).return_ty),
+            },
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
@@ -2423,6 +2464,56 @@ impl From<bool> for Truthiness {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Len {
+    /// Can be inferred statically.
+    Known(u64),
+    /// Cannot be inferred statically, falling back to `int`.
+    Unknown,
+    /// `len()` is known to raise an error.
+    Never,
+}
+
+impl Len {
+    fn value(&self) -> Option<u64> {
+        match self {
+            Len::Known(value) => Some(value.clone()),
+            _ => None,
+        }
+    }
+
+    /// A value that fits into [`Type::IntLiteral`]
+    fn int_literal_value(&self) -> Option<i64> {
+        self.value().and_then(|it| i64::try_from(it).ok())
+    }
+
+    fn to_type<'db>(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Len::Unknown => KnownClass::Int.to_instance(db),
+            Len::Never => Type::Never,
+            Len::Known(_) => {
+                let Some(i64_value) = self.int_literal_value() else {
+                    return KnownClass::Int.to_class_literal(db);
+                };
+
+                Type::IntLiteral(i64_value)
+            }
+        }
+    }
+}
+
+impl From<u64> for Len {
+    fn from(value: u64) -> Self {
+        Self::Known(value)
+    }
+}
+
+impl From<usize> for Len {
+    fn from(value: usize) -> Self {
+        u64::try_from(value).ok().map_or(Self::Unknown, Self::from)
+    }
+}
+
 #[salsa::interned]
 pub struct FunctionType<'db> {
     /// name of the function at definition
@@ -2504,13 +2595,15 @@ pub enum KnownFunction {
     ConstraintFunction(KnownConstraintFunction),
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
+    /// `builtins.len`
+    Len,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType => None,
+            _ => None,
         }
     }
 
@@ -2527,6 +2620,7 @@ impl KnownFunction {
             "issubclass" if definition.is_builtin_definition(db) => Some(
                 KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
             ),
+            "len" if definition.is_builtin_definition(db) => Some(KnownFunction::Len),
             _ => None,
         }
     }
@@ -2980,12 +3074,22 @@ impl<'db> StringLiteralType<'db> {
     pub fn len(&self, db: &'db dyn Db) -> usize {
         self.value(db).len()
     }
+
+    pub fn utf8_len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).chars().count()
+    }
 }
 
 #[salsa::interned]
 pub struct BytesLiteralType<'db> {
     #[return_ref]
     value: Box<[u8]>,
+}
+
+impl<'db> BytesLiteralType<'db> {
+    pub fn len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).len()
+    }
 }
 
 #[salsa::interned]
