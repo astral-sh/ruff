@@ -537,6 +537,19 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::IntLiteral variant")
     }
 
+    pub const fn into_known_instance(self) -> Option<KnownInstanceType<'db>> {
+        match self {
+            Type::KnownInstance(known_instance) => Some(known_instance),
+            _ => None,
+        }
+    }
+
+    #[track_caller]
+    pub fn expect_known_instance(self) -> KnownInstanceType<'db> {
+        self.into_known_instance()
+            .expect("Expected a Type::KnownInstance variant")
+    }
+
     pub const fn is_boolean_literal(&self) -> bool {
         matches!(self, Type::BooleanLiteral(..))
     }
@@ -1540,6 +1553,9 @@ impl<'db> Type<'db> {
             // TODO map this to a new `Type::TypeVar` variant
             Type::KnownInstance(KnownInstanceType::TypeVar(_)) => *self,
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => alias.value_ty(db),
+            Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
+                Type::Never
+            }
             _ => todo_type!(),
         }
     }
@@ -1876,6 +1892,10 @@ pub enum KnownInstanceType<'db> {
     Optional,
     /// The symbol `typing.Union` (which can also be found as `typing_extensions.Union`)
     Union,
+    /// The symbol `typing.NoReturn` (which can also be found as `typing_extensions.NoReturn`)
+    NoReturn,
+    /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
+    Never,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
@@ -1886,11 +1906,13 @@ pub enum KnownInstanceType<'db> {
 impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
-            KnownInstanceType::Literal => "Literal",
-            KnownInstanceType::Optional => "Optional",
-            KnownInstanceType::Union => "Union",
-            KnownInstanceType::TypeVar(_) => "TypeVar",
-            KnownInstanceType::TypeAliasType(_) => "TypeAliasType",
+            Self::Literal => "Literal",
+            Self::Optional => "Optional",
+            Self::Union => "Union",
+            Self::TypeVar(_) => "TypeVar",
+            Self::NoReturn => "NoReturn",
+            Self::Never => "Never",
+            Self::TypeAliasType(_) => "TypeAliasType",
         }
     }
 
@@ -1901,6 +1923,8 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Optional
             | Self::TypeVar(_)
             | Self::Union
+            | Self::NoReturn
+            | Self::Never
             | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
         }
     }
@@ -1911,6 +1935,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::Literal => "typing.Literal",
             Self::Optional => "typing.Optional",
             Self::Union => "typing.Union",
+            Self::NoReturn => "typing.NoReturn",
+            Self::Never => "typing.Never",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
         }
@@ -1922,6 +1948,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::Literal => KnownClass::SpecialForm,
             Self::Optional => KnownClass::SpecialForm,
             Self::Union => KnownClass::SpecialForm,
+            Self::NoReturn => KnownClass::SpecialForm,
+            Self::Never => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
@@ -1944,6 +1972,8 @@ impl<'db> KnownInstanceType<'db> {
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
             ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
             ("typing" | "typing_extensions", "Union") => Some(Self::Union),
+            ("typing" | "typing_extensions", "NoReturn") => Some(Self::NoReturn),
+            ("typing" | "typing_extensions", "Never") => Some(Self::Never),
             _ => None,
         }
     }
@@ -1951,23 +1981,6 @@ impl<'db> KnownInstanceType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let ty = match (self, name) {
             (Self::TypeVar(typevar), "__name__") => Type::string_literal(db, typevar.name(db)),
-            (Self::TypeVar(typevar), "__bound__") => typevar
-                .upper_bound(db)
-                .map(|ty| ty.to_meta_type(db))
-                .unwrap_or_else(|| KnownClass::NoneType.to_instance(db)),
-            (Self::TypeVar(typevar), "__constraints__") => {
-                let tuple_elements: Vec<Type<'db>> = typevar
-                    .constraints(db)
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|ty| ty.to_meta_type(db))
-                    .collect();
-                Type::tuple(db, &tuple_elements)
-            }
-            (Self::TypeVar(typevar), "__default__") => typevar
-                .default_ty(db)
-                .map(|ty| ty.to_meta_type(db))
-                .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
             (Self::TypeAliasType(alias), "__name__") => Type::string_literal(db, alias.name(db)),
             _ => return self.instance_fallback(db).member(db, name),
         };
@@ -2000,6 +2013,7 @@ pub struct TypeVarInstance<'db> {
 }
 
 impl<'db> TypeVarInstance<'db> {
+    #[allow(unused)]
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
@@ -2008,6 +2022,7 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
         if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
             Some(tuple.elements(db))

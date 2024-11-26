@@ -493,7 +493,7 @@ fn to_pytest_raises_args<'a>(
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
-    if matches!(truthiness, Truthiness::False | Truthiness::Falsey) {
+    if truthiness.into_bool() == Some(false) {
         checker
             .diagnostics
             .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));

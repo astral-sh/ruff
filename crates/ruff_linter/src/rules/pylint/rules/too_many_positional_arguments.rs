@@ -60,6 +60,10 @@ pub(crate) fn too_many_positional_arguments(
     checker: &mut Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     let semantic = checker.semantic();
 
     // Count the number of positional arguments.

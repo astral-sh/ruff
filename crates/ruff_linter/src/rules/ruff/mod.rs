@@ -66,6 +66,7 @@ mod tests {
     #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.pyi"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.py"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.pyi"))]
+    #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -395,6 +396,10 @@ mod tests {
     #[test_case(
         Rule::FunctionCallInDataclassDefaultArgument,
         Path::new("RUF009_attrs.py")
+    )]
+    #[test_case(
+        Rule::FunctionCallInDataclassDefaultArgument,
+        Path::new("RUF009_attrs_auto_attribs.py")
     )]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]

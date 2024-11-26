@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, Decorator, Expr, Keyword};
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::PythonWhitespace;
 
@@ -38,9 +38,9 @@ pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &Semantic
         })
 }
 
-pub(super) fn is_pytest_parametrize(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_qualified_name(map_callable(&decorator.expression))
+        .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
         })

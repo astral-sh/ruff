@@ -8,7 +8,6 @@ pub(crate) mod elif_else_clause;
 pub(crate) mod except_handler_except_handler;
 pub(crate) mod f_string;
 pub(crate) mod f_string_element;
-pub(crate) mod f_string_part;
 pub(crate) mod identifier;
 pub(crate) mod keyword;
 pub(crate) mod match_case;

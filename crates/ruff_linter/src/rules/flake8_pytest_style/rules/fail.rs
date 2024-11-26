@@ -59,18 +59,12 @@ pub(crate) fn fail_call(checker: &mut Checker, call: &ast::ExprCall) {
     if is_pytest_fail(&call.func, checker.semantic()) {
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or
         // `pytest.fail(msg="...")` (deprecated in pytest 7.0)
-        let msg = call
+        if call
             .arguments
             .find_argument("reason", 0)
-            .or_else(|| call.arguments.find_argument("msg", 0));
-
-        if let Some(msg) = msg {
-            if is_empty_or_null_string(msg) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
-            }
-        } else {
+            .or_else(|| call.arguments.find_argument("msg", 0))
+            .map_or(true, is_empty_or_null_string)
+        {
             checker
                 .diagnostics
                 .push(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));

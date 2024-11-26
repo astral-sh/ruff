@@ -49,7 +49,7 @@ jobs:
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
         run: cargo build --locked
       - name: Fuzz
-        run: python scripts/fuzz-parser/fuzz.py $(shuf -i 0-9999999999999999999 -n 1000) --test-executable target/debug/ruff
+        run: python scripts/fuzz-parser/fuzz.py --bin ruff $(shuf -i 0-9999999999999999999 -n 1000) --test-executable target/debug/ruff
 
   create-issue-on-failure:
     name: Create an issue if the daily fuzz surfaced any bugs

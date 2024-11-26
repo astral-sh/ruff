@@ -11,10 +11,11 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// The `warnings.warn` method uses a `stacklevel` of 1 by default, which
-/// limits the rendered stack trace to that of the line on which the
-/// `warn` method is called.
+/// will output a stack frame of the line on which the "warn" method
+/// is called. Setting it to a higher number will output a stack frame
+/// from higher up the stack.
 ///
-/// It's recommended to use a `stacklevel` of 2 or higher, give the caller
+/// It's recommended to use a `stacklevel` of 2 or higher, to give the caller
 /// more context about the warning.
 ///
 /// ## Example

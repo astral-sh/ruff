@@ -1,6 +1,7 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
+use ruff_python_semantic::{analyze::typing::traverse_union, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -39,7 +40,9 @@ pub struct NeverUnion {
     union_like: UnionLike,
 }
 
-impl AlwaysFixableViolation for NeverUnion {
+impl Violation for NeverUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self {
@@ -56,9 +59,9 @@ impl AlwaysFixableViolation for NeverUnion {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let Self { never_like, .. } = self;
-        format!("Remove `{never_like}`")
+        Some(format!("Remove `{never_like}`"))
     }
 }
 
@@ -81,10 +84,17 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                     },
                     left.range(),
                 );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    checker.locator().slice(right.as_ref()).to_string(),
-                    expr.range(),
-                )));
+                // Avoid producing code that would raise an exception when
+                // `Never | None` would be fixed to `None | None`.
+                // Instead do not provide a fix. No action needed for `typing.Union`,
+                // as `Union[None, None]` is valid Python.
+                // See https://github.com/astral-sh/ruff/issues/14567.
+                if !in_union_with_bare_none(checker.semantic()) {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        checker.locator().slice(right.as_ref()).to_string(),
+                        expr.range(),
+                    )));
+                }
                 checker.diagnostics.push(diagnostic);
             }
 
@@ -97,10 +107,12 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                     },
                     right.range(),
                 );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    checker.locator().slice(left.as_ref()).to_string(),
-                    expr.range(),
-                )));
+                if !in_union_with_bare_none(checker.semantic()) {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        checker.locator().slice(left.as_ref()).to_string(),
+                        expr.range(),
+                    )));
+                }
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -205,4 +217,33 @@ impl std::fmt::Display for NeverLike {
             NeverLike::Never => f.write_str("Never"),
         }
     }
+}
+
+fn in_union_with_bare_none(semantic: &SemanticModel) -> bool {
+    let mut enclosing_union = None;
+    let mut expression_ancestors = semantic.current_expressions().skip(1);
+    let mut parent_expr = expression_ancestors.next();
+    while let Some(Expr::BinOp(ExprBinOp {
+        op: Operator::BitOr,
+        ..
+    })) = parent_expr
+    {
+        enclosing_union = parent_expr;
+        parent_expr = expression_ancestors.next();
+    }
+
+    let mut is_union_with_bare_none = false;
+    if let Some(enclosing_union) = enclosing_union {
+        traverse_union(
+            &mut |expr, _| {
+                if matches!(expr, Expr::NoneLiteral(_)) {
+                    is_union_with_bare_none = true;
+                }
+            },
+            semantic,
+            enclosing_union,
+        );
+    }
+
+    is_union_with_bare_none
 }

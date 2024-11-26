@@ -311,7 +311,8 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 Some(ShellKeyword {
-                    truthiness: Truthiness::False | Truthiness::Falsey | Truthiness::Unknown,
+                    truthiness:
+                        Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
                 }) => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
