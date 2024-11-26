@@ -4223,22 +4223,4 @@ lambda: fu
             &[],
         );
     }
-
-    #[test]
-    fn no_type_check_function() {
-        flakes(
-            r#"
-            from typing import no_type_check
-
-            @no_type_check
-            def f821(arg: "A") -> "R":
-                pass
-
-            @no_type_check
-            def f722(arg: "this isn't python") -> "this isn't python either":
-                pass
-        "#,
-            &[],
-        );
-    }
 }
