@@ -157,6 +157,33 @@ jobs:
           name: ruff
           path: target/debug/ruff
 
+  cargo-test-linux-release:
+    name: "cargo test (linux, release)"
+    runs-on: depot-ubuntu-22.04-16
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests"
+        shell: bash
+        env:
+          NEXTEST_PROFILE: "ci"
+        run: cargo insta test --release --all-features --unreferenced reject --test-runner nextest
+
   cargo-test-windows:
     name: "cargo test (windows)"
     runs-on: windows-latest-xlarge
@@ -212,7 +239,6 @@ jobs:
   cargo-build-release:
     name: "cargo build (release)"
     runs-on: macos-latest
-    needs: determine_changes
     if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
