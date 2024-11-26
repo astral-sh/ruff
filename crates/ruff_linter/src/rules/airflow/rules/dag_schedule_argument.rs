@@ -96,7 +96,7 @@ pub(crate) fn dag_no_schedule_argument(checker: &mut Checker, expr: &Expr) {
     let diagnostic = if let Some(keyword) = arguments.keywords.iter().find(|keyword| {
         let Keyword { arg, .. } = keyword;
         arg.as_ref()
-            .is_some_and(|arg| arg == "timetable" || arg == "schedule_interval")
+            .is_some_and(|arg| matches!(arg.as_str(), "timetable" | "schedule_interval"))
     }) {
         // A deprecated argument is used.
         Diagnostic::new(
