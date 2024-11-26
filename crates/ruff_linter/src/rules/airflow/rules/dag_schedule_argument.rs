@@ -7,13 +7,18 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks that the `DAG()` class or a `@dag()` decorator has an explicit
+/// Checks for a `DAG()` class or `@dag()` decorator without an explicit
 /// `schedule` parameter.
 ///
 /// ## Why is this bad?
 /// The default `schedule` value on Airflow 2 is `timedelta(days=1)`, which is
 /// almost never what a user is looking for. Airflow 3 changes this the default
 /// to *None*, and would break existing DAGs using the implicit default.
+///
+/// If your DAG does not have an explicit `schedule` argument, Airflow 2
+/// schedules a run for it every day (at the time determined by `start_date`).
+/// Such a DAG will no longer be scheduled on Airflow 3 at all, without any
+/// exceptions or other messages visible to the user.
 ///
 /// Airflow 2 also provides alternative arguments `schedule_interval` and
 /// `timetable` to specify the DAG schedule. They existed for backward
