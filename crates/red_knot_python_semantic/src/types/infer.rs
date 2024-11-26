@@ -4229,6 +4229,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "annotation-f-string",
                     format_args!("Type expressions cannot use f-strings"),
                 );
+                self.infer_fstring_expression(fstring);
                 Type::Unknown
             }
 
