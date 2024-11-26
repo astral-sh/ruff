@@ -1862,11 +1862,7 @@ impl<'a> Checker<'a> {
 
     /// Visit an [`Expr`], and treat it as a type definition.
     fn visit_type_definition(&mut self, expr: &'a Expr) {
-        if self
-            .semantic
-            .flags
-            .contains(SemanticModelFlags::NO_TYPE_CHECK)
-        {
+        if self.semantic.in_no_type_check() {
             return;
         }
         let snapshot = self.semantic.flags;

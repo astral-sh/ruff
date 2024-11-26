@@ -1584,6 +1584,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::ANNOTATION)
     }
 
+    /// Return `true` if the model is in a `@no_type_check` context.
+    pub const fn in_no_type_check(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
+    }
+
     /// Return `true` if the model is in a typing-only type annotation.
     pub const fn in_typing_only_annotation(&self) -> bool {
         self.flags
