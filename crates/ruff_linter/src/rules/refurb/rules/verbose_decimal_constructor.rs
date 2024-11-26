@@ -152,14 +152,30 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             let Some(float) = float.as_string_literal_expr() else {
                 return;
             };
+
+            let normalized_float_string = float.value.to_str().trim().to_lowercase();
+
             if !matches!(
-                float.value.to_str().to_lowercase().as_str(),
-                "inf" | "-inf" | "infinity" | "-infinity" | "nan"
+                normalized_float_string.as_str(),
+                "inf"
+                    | "+inf"
+                    | "-inf"
+                    | "infinity"
+                    | "+infinity"
+                    | "-infinity"
+                    | "nan"
+                    | "+nan"
+                    | "-nan"
             ) {
                 return;
             }
 
-            let replacement = checker.locator().slice(float).to_string();
+            let mut replacement = checker.locator().slice(float).to_string();
+            // `Decimal(float("-nan")) == Decimal("nan")`
+            if &normalized_float_string == "-nan" {
+                replacement.remove(replacement.find('-').unwrap());
+            }
+            dbg!(&replacement);
             let mut diagnostic = Diagnostic::new(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
