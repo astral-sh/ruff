@@ -180,6 +180,15 @@ where
     }
 }
 
+/// Discard `@Todo`-type metadata from expected types, which is not available
+/// when running in release mode.
+#[cfg(not(debug_assertions))]
+fn discard_todo_metadata(ty: &str) -> std::borrow::Cow<'_, str> {
+    regex::Regex::new(r"@Todo\([^)]*\)")
+        .unwrap()
+        .replace_all(ty, "@Todo")
+}
+
 struct Matcher {
     line_index: LineIndex,
     source: SourceText,
@@ -276,6 +285,9 @@ impl Matcher {
                 }
             }
             Assertion::Revealed(expected_type) => {
+                #[cfg(not(debug_assertions))]
+                let expected_type = discard_todo_metadata(&expected_type);
+
                 let mut matched_revealed_type = None;
                 let mut matched_undefined_reveal = None;
                 let expected_reveal_type_message = format!("Revealed type is `{expected_type}`");

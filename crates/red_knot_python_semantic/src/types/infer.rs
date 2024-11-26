@@ -5985,7 +5985,11 @@ mod tests {
             "src/a.py",
             &["foo", "<listcomp>"],
             "x",
-            "@Todo(async iterables/iterators)",
+            if cfg!(debug_assertions) {
+                "@Todo(async iterables/iterators)"
+            } else {
+                "@Todo"
+            },
         );
 
         Ok(())
@@ -6015,7 +6019,11 @@ mod tests {
             "src/a.py",
             &["foo", "<listcomp>"],
             "x",
-            "@Todo(async iterables/iterators)",
+            if cfg!(debug_assertions) {
+                "@Todo(async iterables/iterators)"
+            } else {
+                "@Todo"
+            },
         );
 
         Ok(())
