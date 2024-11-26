@@ -166,15 +166,21 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
     );
 
     if let Some(mut fixed) = fixed {
-        // by the looks of it, we don't need to wrap the expression in parens if
-        // it's the only argument to a call expression.
-        // being in any other kind of expression though, we *will* add parens.
-        // e.g. `print(a.__add__(3))` -> `print(a + 3)` instead of `print((a + 3))`
-        // a multiplication expression example: `x = 2 * a.__add__(3)` -> `x = 2 * (a + 3)`
-        let wrap_in_paren = checker
-            .semantic()
-            .current_expression_parent()
-            .is_some_and(|parent| !can_be_represented_without_parentheses(parent));
+        let dunder = DunderReplacement::from_method(attr);
+
+        // We never need to wrap builtin functions in extra parens
+        // since function calls have high precedence
+        let wrap_in_paren = (!matches!(dunder, Some(DunderReplacement::Builtin(_,_))))
+        // By the looks of it, we don't need to wrap the expression in 
+        // parens if it's the only argument to a call expression.
+        // Being in any other kind of expression though, we *will* 
+        // add parens. e.g. `print(a.__add__(3))` -> `print(a + 3)`
+        //  instead of `print((a + 3))`
+        // and  `x = 2 * a.__add__(3)` -> `x = 2 * (a + 3)`
+            && checker
+                .semantic()
+                .current_expression_parent()
+                .is_some_and(|parent| !can_be_represented_without_parentheses(parent));
 
         if wrap_in_paren {
             fixed = format!("({fixed})");
