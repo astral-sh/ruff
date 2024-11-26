@@ -14,6 +14,7 @@ mod tests {
 
     #[test_case(Rule::AirflowVariableNameTaskIdMismatch, Path::new("AIR001.py"))]
     #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR301.py"))]
+    #[test_case(Rule::AirflowDeprecatedTaskConcurrency, Path::new("AIR303.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

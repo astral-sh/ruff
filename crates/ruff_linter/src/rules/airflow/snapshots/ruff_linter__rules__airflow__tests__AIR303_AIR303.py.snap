@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
+---
+AIR303.py:7:5: AIR303 Use `max_active_tis_per_dag` instead of deprecated `task_concurrency` parameter
+  |
+5 | task1 = PythonOperator(
+6 |     task_id="task1",
+7 |     task_concurrency=2,  # This should trigger AIR303
+  |     ^^^^^^^^^^^^^^^^^^ AIR303
+8 |     python_callable=lambda: None,
+9 | )
+  |
+
+AIR303.py:21:5: AIR303 Use `max_active_tis_per_dag` instead of deprecated `task_concurrency` parameter
+   |
+19 | task3 = PythonOperator(
+20 |     task_id="task3",
+21 |     task_concurrency=5,  # This should trigger AIR303
+   |     ^^^^^^^^^^^^^^^^^^ AIR303
+22 |     python_callable=lambda: None,
+23 | )
+   |
