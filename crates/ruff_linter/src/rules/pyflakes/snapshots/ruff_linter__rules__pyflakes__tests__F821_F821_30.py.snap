@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
+---
+F821_30.py:20:23: F821 Undefined name `B`
+   |
+18 | @typing.no_type_check
+19 | class C:
+20 |     def f(self, arg: "B") -> "S":
+   |                       ^ F821
+21 |         x: "B" = 1
+   |
+
+F821_30.py:20:31: F821 Undefined name `S`
+   |
+18 | @typing.no_type_check
+19 | class C:
+20 |     def f(self, arg: "B") -> "S":
+   |                               ^ F821
+21 |         x: "B" = 1
+   |
+
+F821_30.py:21:13: F821 Undefined name `B`
+   |
+19 | class C:
+20 |     def f(self, arg: "B") -> "S":
+21 |         x: "B" = 1
+   |             ^ F821
+   |
