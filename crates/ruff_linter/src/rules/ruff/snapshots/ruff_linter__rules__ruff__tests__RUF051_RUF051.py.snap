@@ -1,0 +1,117 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF051.py:1:7: RUF051 Avoid comparing to a single item container with membership operator
+  |
+1 | x1 in {"TEST"}  # [RUF051]
+  |       ^^^^^^^^ RUF051
+2 | 
+3 | x2 in ["TEST"]  # [RUF051]
+  |
+
+RUF051.py:3:7: RUF051 Avoid comparing to a single item container with membership operator
+  |
+1 | x1 in {"TEST"}  # [RUF051]
+2 | 
+3 | x2 in ["TEST"]  # [RUF051]
+  |       ^^^^^^^^ RUF051
+4 | 
+5 | x3 in {"x": "TEST"}  # [RUF051]
+  |
+
+RUF051.py:5:7: RUF051 Avoid comparing to a single item container with membership operator
+  |
+3 | x2 in ["TEST"]  # [RUF051]
+4 | 
+5 | x3 in {"x": "TEST"}  # [RUF051]
+  |       ^^^^^^^^^^^^^ RUF051
+6 | 
+7 | single = ["TEST"]
+  |
+
+RUF051.py:16:7: RUF051 Avoid comparing to a single item container with membership operator
+   |
+14 | x5 in single
+15 | 
+16 | x6 in [single]  # [RUF051]
+   |       ^^^^^^^^ RUF051
+17 | 
+18 | x7 in [*single]
+   |
+
+RUF051.py:20:27: RUF051 Avoid comparing to a single item container with membership operator
+   |
+18 | x7 in [*single]
+19 | 
+20 | x8 in ["TEST", "TEST"] in ["TEST"]  # [RUF051]
+   |                           ^^^^^^^^ RUF051
+21 | 
+22 | x9 in ["TEST"] in ["TEST", "TEST"]  # [RUF051]
+   |
+
+RUF051.py:22:7: RUF051 Avoid comparing to a single item container with membership operator
+   |
+20 | x8 in ["TEST", "TEST"] in ["TEST"]  # [RUF051]
+21 | 
+22 | x9 in ["TEST"] in ["TEST", "TEST"]  # [RUF051]
+   |       ^^^^^^^^ RUF051
+23 | 
+24 | 2 < x10 in [3]  # [RUF051]
+   |
+
+RUF051.py:24:12: RUF051 Avoid comparing to a single item container with membership operator
+   |
+22 | x9 in ["TEST"] in ["TEST", "TEST"]  # [RUF051]
+23 | 
+24 | 2 < x10 in [3]  # [RUF051]
+   |            ^^^ RUF051
+25 | 
+26 | x10 in (2,)  # [RUF051]
+   |
+
+RUF051.py:26:8: RUF051 Avoid comparing to a single item container with membership operator
+   |
+24 | 2 < x10 in [3]  # [RUF051]
+25 | 
+26 | x10 in (2,)  # [RUF051]
+   |        ^^^^ RUF051
+27 | 
+28 | x11 in {"1": 1, "2": 2}
+   |
+
+RUF051.py:38:8: RUF051 Avoid comparing to a single item container with membership operator
+   |
+36 | x15 in [x for x in range(1)]
+37 | 
+38 | x16 in [1] in [2]  # 2x [RUF051]
+   |        ^^^ RUF051
+39 | 
+40 | 17 in [17] in [[17]]  # 2x [RUF051]
+   |
+
+RUF051.py:38:15: RUF051 Avoid comparing to a single item container with membership operator
+   |
+36 | x15 in [x for x in range(1)]
+37 | 
+38 | x16 in [1] in [2]  # 2x [RUF051]
+   |               ^^^ RUF051
+39 | 
+40 | 17 in [17] in [[17]]  # 2x [RUF051]
+   |
+
+RUF051.py:40:7: RUF051 Avoid comparing to a single item container with membership operator
+   |
+38 | x16 in [1] in [2]  # 2x [RUF051]
+39 | 
+40 | 17 in [17] in [[17]]  # 2x [RUF051]
+   |       ^^^^ RUF051
+   |
+
+RUF051.py:40:15: RUF051 Avoid comparing to a single item container with membership operator
+   |
+38 | x16 in [1] in [2]  # 2x [RUF051]
+39 | 
+40 | 17 in [17] in [[17]]  # 2x [RUF051]
+   |               ^^^^^^ RUF051
+   |

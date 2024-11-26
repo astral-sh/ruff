@@ -1415,6 +1415,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SingleItemMembershipTest) {
                 refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
             }
+            if checker.enabled(Rule::InCompareWithSingleItemContainer) {
+                ruff::rules::in_compare_with_single_item_container(checker, compare);
+            }
         }
         Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::NumericLiteralTooLong) {

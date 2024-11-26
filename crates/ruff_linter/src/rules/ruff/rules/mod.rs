@@ -13,6 +13,7 @@ pub(crate) use invalid_assert_message_literal_argument::*;
 pub(crate) use invalid_formatter_suppression_comment::*;
 pub(crate) use invalid_index_type::*;
 pub(crate) use invalid_pyproject_toml::*;
+pub(crate) use in_compare_with_single_item_container::*;
 pub(crate) use map_int_version_parsing::*;
 pub(crate) use missing_fstring_syntax::*;
 pub(crate) use mutable_class_default::*;
@@ -56,6 +57,7 @@ mod invalid_assert_message_literal_argument;
 mod invalid_formatter_suppression_comment;
 mod invalid_index_type;
 mod invalid_pyproject_toml;
+mod in_compare_with_single_item_container;
 mod map_int_version_parsing;
 mod missing_fstring_syntax;
 mod mutable_class_default;
@@ -90,3 +92,4 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
+
