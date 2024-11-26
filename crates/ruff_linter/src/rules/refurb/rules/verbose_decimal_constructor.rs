@@ -156,7 +156,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             let normalized_float_string = float.value.to_str().trim().to_lowercase();
 
             if !matches!(
-                normalized_float_string.as_str(),
+                &normalized_float_string,
                 "inf"
                     | "+inf"
                     | "-inf"
