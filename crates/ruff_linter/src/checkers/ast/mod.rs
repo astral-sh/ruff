@@ -723,6 +723,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
+                    if self
+                        .semantic
+                        .match_typing_expr(&decorator.expression, "no_type_check")
+                    {
+                        self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
+                    }
                     self.visit_decorator(decorator);
                 }
 
@@ -1058,16 +1064,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags |= SemanticModelFlags::TYPING_ONLY_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = flags_snapshot;
-    }
-
-    fn visit_decorator(&mut self, decorator: &'a ruff_python_ast::Decorator) {
-        if self
-            .semantic
-            .match_typing_expr(&decorator.expression, "no_type_check")
-        {
-            self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
-        }
-        visitor::walk_decorator(self, decorator);
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
