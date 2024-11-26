@@ -1,3 +1,4 @@
+use memchr::memchr2;
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::StringLikePart;
@@ -134,13 +135,19 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                                     || expression.format_spec.as_deref().is_some_and(|spec| {
                                         contains_line_break_or_comments(&spec.elements, context)
                                     })
+                                    || expression.debug_text.as_ref().is_some_and(|debug_text| {
+                                        memchr2(b'\n', b'\r', debug_text.leading.as_bytes())
+                                            .is_some()
+                                            || memchr2(b'\n', b'\r', debug_text.trailing.as_bytes())
+                                                .is_some()
+                                    })
                             } else {
                                 // Multiline f-string expressions can't be joined if the f-string
                                 // formatting is disabled because the string gets inserted in
                                 // verbatim preserving the newlines.
                                 //
-                                // We don't need to check format specifiers here because the
-                                // expression range already includes them.
+                                // We don't need to check format specifiers or debug text here
+                                // because the expression range already includes them.
                                 context.source().contains_line_break(expression.range())
                             }
                         }
