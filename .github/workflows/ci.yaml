@@ -211,8 +211,7 @@ jobs:
 
   cargo-build-release:
     name: "cargo build (release)"
-    runs-on: macos-latest
-    needs: determine_changes
+    runs-on: ubuntu-latest
     # if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
