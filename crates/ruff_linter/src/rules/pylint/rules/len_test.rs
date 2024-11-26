@@ -43,11 +43,11 @@ use ruff_text_size::Ranged;
 /// ## References
 /// [PEP 8: Programming Recommendations](https://peps.python.org/pep-0008/#programming-recommendations)
 #[violation]
-pub struct LenAsCondition {
+pub struct LenTest {
     expression: SourceCodeSnippet,
 }
 
-impl AlwaysFixableViolation for LenAsCondition {
+impl AlwaysFixableViolation for LenTest {
     #[derive_message_formats]
     fn message(&self) -> String {
         if let Some(expression) = self.expression.full_display() {
@@ -63,7 +63,7 @@ impl AlwaysFixableViolation for LenAsCondition {
 }
 
 /// PLC1802
-pub(crate) fn len_as_condition(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn len_test(checker: &mut Checker, call: &ExprCall) {
     let ExprCall {
         func, arguments, ..
     } = call;
@@ -83,7 +83,7 @@ pub(crate) fn len_as_condition(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    // Simple inferred sequence type (e.g., list, set, dict, tuple, string, generator) or a vararg.
+    // Simple inferred sequence type (e.g., list, set, dict, tuple, string, bytes, varargs, kwargs).
     if !is_sequence(argument, semantic) && !is_indirect_sequence(argument, semantic) {
         return;
     }
@@ -92,7 +92,7 @@ pub(crate) fn len_as_condition(checker: &mut Checker, call: &ExprCall) {
 
     checker.diagnostics.push(
         Diagnostic::new(
-            LenAsCondition {
+            LenTest {
                 expression: SourceCodeSnippet::new(replacement.clone()),
             },
             call.range(),
@@ -141,7 +141,7 @@ fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
-    // Check if the expression type is a direct sequence match (dict, list, set, tuple, generator, string)
+    // Check if the expression type is a direct sequence match (dict, list, set, tuple, string or bytes)
     if matches!(
         ResolvedPythonType::from(expr),
         ResolvedPythonType::Atom(
@@ -150,6 +150,7 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
                 | PythonType::Set
                 | PythonType::Tuple
                 | PythonType::String
+                | PythonType::Bytes
         )
     ) {
         return true;
@@ -170,7 +171,6 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
                 | "repr"
                 | "str"
                 | "list"
-                | "sorted"
                 | "dir"
                 | "locals"
                 | "globals"
@@ -180,8 +180,12 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
                 | "frozenset"
                 | "tuple"
                 | "range"
-                | "enumerate"
-                | "zip"
+                | "bin"
+                | "bytes"
+                | "bytearray"
+                | "hex"
+                | "memoryview"
+                | "oct"
         )
     });
 }
