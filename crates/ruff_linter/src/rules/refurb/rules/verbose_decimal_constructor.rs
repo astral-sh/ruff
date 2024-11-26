@@ -175,7 +175,6 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             if &normalized_float_string == "-nan" {
                 replacement.remove(replacement.find('-').unwrap());
             }
-            dbg!(&replacement);
             let mut diagnostic = Diagnostic::new(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
