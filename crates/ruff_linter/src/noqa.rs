@@ -362,7 +362,7 @@ impl<'a> FileNoqaDirectives<'a> {
         let mut lines = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::try_extract(&locator.contents()[range], range.start()) {
+            match ParsedFileExemption::try_extract(range.start(), &locator.contents()[range]) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -435,9 +435,9 @@ pub(crate) enum ParsedFileExemption<'a> {
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn try_extract(line: &'a str, offset: TextSize) -> Result<Option<Self>, ParseError> {
-        let init_line_len = line.len();
-        let line = Self::lex_whitespace(line);
+    fn try_extract(comment_range: TextSize, source: &'a str) -> Result<Option<Self>, ParseError> {
+        let init_line_len = source.len();
+        let line = Self::lex_whitespace(source);
         let Some(line) = Self::lex_char(line, '#') else {
             return Ok(None);
         };
@@ -476,7 +476,7 @@ impl<'a> ParsedFileExemption<'a> {
                 codes.push(Code {
                     code,
                     range: TextRange::at(TextSize::try_from(codes_end).unwrap(), code.text_len())
-                        .add(offset),
+                        .add(comment_range),
                 });
                 line = &line[code.len()..];
 
@@ -499,7 +499,7 @@ impl<'a> ParsedFileExemption<'a> {
                 TextSize::try_from(codes_end).unwrap(),
             );
             Self::Codes(Codes {
-                range: range.add(offset),
+                range: range.add(comment_range),
                 codes,
             })
         }))
@@ -1243,8 +1243,8 @@ mod tests {
     fn flake8_exemption_all() {
         let source = "# flake8: noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextSize::default(),
             source,
-            TextSize::default()
         ));
     }
 
@@ -1252,8 +1252,8 @@ mod tests {
     fn ruff_exemption_all() {
         let source = "# ruff: noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextSize::default(),
             source,
-            TextSize::default()
         ));
     }
 
@@ -1261,8 +1261,8 @@ mod tests {
     fn flake8_exemption_all_no_space() {
         let source = "#flake8:noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextSize::default(),
             source,
-            TextSize::default()
         ));
     }
 
@@ -1270,8 +1270,8 @@ mod tests {
     fn ruff_exemption_all_no_space() {
         let source = "#ruff:noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextSize::default(),
             source,
-            TextSize::default()
         ));
     }
 
@@ -1280,8 +1280,8 @@ mod tests {
         // Note: Flake8 doesn't support this; it's treated as a blanket exemption.
         let source = "# flake8: noqa: F401, F841";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextSize::default(),
             source,
-            TextSize::default()
         ));
     }
 
@@ -1289,8 +1289,8 @@ mod tests {
     fn ruff_exemption_codes() {
         let source = "# ruff: noqa: F401, F841";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextSize::default(),
             source,
-            TextSize::default()
         ));
     }
 
@@ -1298,8 +1298,8 @@ mod tests {
     fn flake8_exemption_all_case_insensitive() {
         let source = "# flake8: NoQa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextSize::default(),
             source,
-            TextSize::default()
         ));
     }
 
@@ -1307,8 +1307,8 @@ mod tests {
     fn ruff_exemption_all_case_insensitive() {
         let source = "# ruff: NoQa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextSize::default(),
             source,
-            TextSize::default()
         ));
     }
 
