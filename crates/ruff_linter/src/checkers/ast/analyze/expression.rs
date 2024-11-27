@@ -108,7 +108,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateLiteralMember,
                 Rule::RedundantBoolLiteral,
                 Rule::RedundantNoneLiteral,
-                Rule::UnnecessaryNestedLiteral
+                Rule::UnnecessaryNestedLiteral,
             ]) {
                 if !checker.semantic.in_nested_literal() {
                     if checker.enabled(Rule::DuplicateLiteralMember) {

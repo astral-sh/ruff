@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprContext, ExprSubscript, ExprTuple};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
@@ -58,8 +58,8 @@ use crate::checkers::ast::Checker;
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 ///
 /// [PEP 586](https://peps.python.org/pep-0586/)
-#[violation]
-pub struct UnnecessaryNestedLiteral;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryNestedLiteral;
 
 impl Violation for UnnecessaryNestedLiteral {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -76,20 +76,16 @@ impl Violation for UnnecessaryNestedLiteral {
 
 /// RUF039
 pub(crate) fn unnecessary_nested_literal<'a>(checker: &mut Checker, literal_expr: &'a Expr) {
-    let mut nodes: Vec<&Expr> = Vec::new();
     let mut is_nested = false;
-
-    let mut check_for_duplicate_members = |expr: &'a Expr, parent: &'a Expr| {
-        // If the parent is not equal to the `literal_expr` then we know we are traversing recursively.
-        if !AnyNodeRef::ptr_eq(parent.into(), literal_expr.into()) {
-            is_nested = true;
-        };
-        nodes.push(expr);
-    };
 
     // Traverse the type expressions in the `Literal`.
     traverse_literal(
-        &mut check_for_duplicate_members,
+        &mut |_: &'a Expr, parent: &'a Expr| {
+            // If the parent is not equal to the `literal_expr` then we know we are traversing recursively.
+            if !AnyNodeRef::ptr_eq(parent.into(), literal_expr.into()) {
+                is_nested = true;
+            };
+        },
         checker.semantic(),
         literal_expr,
     );
@@ -97,6 +93,17 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &mut Checker, literal_expr
     if !is_nested {
         return;
     }
+
+    // Collect the literal nodes for the fix
+    let mut nodes: Vec<&Expr> = Vec::new();
+
+    traverse_literal(
+        &mut |expr, _| {
+            nodes.push(expr);
+        },
+        checker.semantic(),
+        literal_expr,
+    );
 
     let mut diagnostic = Diagnostic::new(UnnecessaryNestedLiteral, literal_expr.range());
 
