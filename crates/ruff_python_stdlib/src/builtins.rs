@@ -379,9 +379,9 @@ pub fn is_python_builtin(name: &str, minor_version: u8, is_notebook: bool) -> bo
                 | "type"
                 | "vars"
                 | "zip"
-        ) | (10..=13, "EncodingWarning" | "aiter" | "anext")
-            | (11..=13, "BaseExceptionGroup" | "ExceptionGroup")
-            | (13, "PythonFinalizationError")
+        ) | (10.., "EncodingWarning" | "aiter" | "anext")
+            | (11.., "BaseExceptionGroup" | "ExceptionGroup")
+            | (13.., "PythonFinalizationError")
     )
 }
 
@@ -489,8 +489,8 @@ pub fn is_exception(name: &str, minor_version: u8) -> bool {
                 | "SyntaxWarning"
                 | "UnicodeWarning"
                 | "UserWarning"
-        ) | (10..=13, "EncodingWarning")
-            | (11..=13, "BaseExceptionGroup" | "ExceptionGroup")
-            | (13, "PythonFinalizationError")
+        ) | (10.., "EncodingWarning")
+            | (11.., "BaseExceptionGroup" | "ExceptionGroup")
+            | (13.., "PythonFinalizationError")
     )
 }
