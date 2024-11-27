@@ -62,9 +62,14 @@ else:
 def optional_int() -> int | None: ...
 
 x = optional_int()
+y = optional_int()
 
 if x is None:
     x = 0
 
+if y is None:
+    pass
+
 reveal_type(x)  # revealed: int
+reveal_type(y)  # revealed: int | None
 ```
