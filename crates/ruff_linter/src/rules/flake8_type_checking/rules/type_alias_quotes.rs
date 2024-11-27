@@ -36,6 +36,12 @@ use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 /// OptFoo: TypeAlias = "Foo | None"
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is currently always marked as unsafe, since runtime
+/// typing libraries may try to access/resolve the type alias in a way
+/// that we can't statically determine during analysis and relies on the
+/// type alias not containing any forward references.
+///
 /// ## References
 /// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
 ///
@@ -92,6 +98,9 @@ impl Violation for UnquotedTypeAlias {
 /// type OptInt = int | None
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the type annotation contains comments.
+///
 /// ## References
 /// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
 /// - [PEP 695: Generic Type Alias](https://peps.python.org/pep-0695/#generic-type-alias)
@@ -144,12 +153,12 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
     // Eventually we may try to be more clever and come up with the
     // minimal set of subexpressions that need to be quoted.
     let parent = expr.range().start();
-    let edit = quote_type_expression(expr, checker.semantic(), checker.stylist()).ok();
+    let edit = quote_type_expression(expr, checker.semantic(), checker.stylist());
     let mut diagnostics = Vec::with_capacity(names.len());
     for name in names {
         let mut diagnostic = Diagnostic::new(UnquotedTypeAlias, name.range());
         diagnostic.set_parent(parent);
-        if let Some(edit) = edit.as_ref() {
+        if let Ok(edit) = edit.as_ref() {
             diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
         }
         diagnostics.push(diagnostic);

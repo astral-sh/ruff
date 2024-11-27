@@ -684,6 +684,16 @@ impl<'a> SemanticModel<'a> {
     /// since we're aiming to change the semantic meaning of our load.
     /// E.g. we want to check what would happen if we changed a forward
     /// reference to an immediate load or vice versa.
+    ///
+    /// Use caution when utilizing this method, since it was primarily designed
+    /// to work for speculative lookups from within type definitions, which
+    /// happen to share some nice properties, where attaching each binding
+    /// to a range in the source code and ordering those bindings based on
+    /// that range is a good enough approximation of which bindings are
+    /// available at runtime for which reference.
+    ///
+    /// References from within an [`ast::Comprehension`] can produce incorrect
+    /// results when referring to a [`BindingKind::NamedExprAssignment`].
     pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
         let symbol = name.id.as_str();
         let range = name.range;
@@ -697,7 +707,14 @@ impl<'a> SemanticModel<'a> {
             // we stop doing source-order lookups. We could e.g. have nested classes
             // where we lookup symbols from the innermost class scope, which can only see
             // things from the outer class(es) that have been defined before the inner
-            // class.
+            // class. Source-order lookups take advantage of the fact that most of the
+            // bindings are created sequentially in source order, so if we want to
+            // determine whether or not a given reference can refer to another binding
+            // we can look at their text ranges to check whether or not the binding
+            // could actually be referred to. This is not as robust as back-tracking
+            // the AST, since that can properly take care of the few out-of order
+            // corner-cases, but back-tracking the AST from the reference to the binding
+            // is a lot more expensive than comparing a pair of text ranges.
             if seen_function && !scope.kind.is_type() {
                 source_order_sensitive_lookup = false;
             }
@@ -737,6 +754,7 @@ impl<'a> SemanticModel<'a> {
                         // to just the target, but the name is not available until the
                         // end of the entire statement
                         let binding_range = match binding.statement(self) {
+                            Some(Stmt::Assign(stmt)) => stmt.range(),
                             Some(Stmt::AnnAssign(stmt)) => stmt.range(),
                             Some(Stmt::ClassDef(stmt)) => stmt.range(),
                             _ => binding.range,
