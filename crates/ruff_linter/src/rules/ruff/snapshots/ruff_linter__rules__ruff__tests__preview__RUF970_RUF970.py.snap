@@ -1,0 +1,103 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF970.py:6:1: RUF970 [*] Plain string pattern passed to `re` function
+  |
+5 | # this should be replaced with s.replace("abc", "")
+6 | re.sub("abc", "", s)
+  | ^^^^^^^^^^^^^^^^^^^^ RUF970
+7 | 
+8 | # this should be replaced with s.startswith("abc")
+  |
+  = help: Replace with `s.replace("abc", "")`
+
+ℹ Safe fix
+3 3 | s = "str"
+4 4 | 
+5 5 | # this should be replaced with s.replace("abc", "")
+6   |-re.sub("abc", "", s)
+  6 |+s.replace("abc", "")
+7 7 | 
+8 8 | # this should be replaced with s.startswith("abc")
+9 9 | re.match("abc", s)
+
+RUF970.py:9:1: RUF970 [*] Plain string pattern passed to `re` function
+   |
+ 8 | # this should be replaced with s.startswith("abc")
+ 9 | re.match("abc", s)
+   | ^^^^^^^^^^^^^^^^^^ RUF970
+10 | 
+11 | # this should be replaced with "abc" in s
+   |
+   = help: Replace with `s.startswith("abc")`
+
+ℹ Safe fix
+6  6  | re.sub("abc", "", s)
+7  7  | 
+8  8  | # this should be replaced with s.startswith("abc")
+9     |-re.match("abc", s)
+   9  |+s.startswith("abc")
+10 10 | 
+11 11 | # this should be replaced with "abc" in s
+12 12 | re.search("abc", s)
+
+RUF970.py:12:1: RUF970 [*] Plain string pattern passed to `re` function
+   |
+11 | # this should be replaced with "abc" in s
+12 | re.search("abc", s)
+   | ^^^^^^^^^^^^^^^^^^^ RUF970
+13 | 
+14 | # this should be replaced with "abc" == s
+   |
+   = help: Replace with `"abc" in s`
+
+ℹ Safe fix
+9  9  | re.match("abc", s)
+10 10 | 
+11 11 | # this should be replaced with "abc" in s
+12    |-re.search("abc", s)
+   12 |+"abc" in s
+13 13 | 
+14 14 | # this should be replaced with "abc" == s
+15 15 | re.fullmatch("abc", s)
+
+RUF970.py:15:1: RUF970 [*] Plain string pattern passed to `re` function
+   |
+14 | # this should be replaced with "abc" == s
+15 | re.fullmatch("abc", s)
+   | ^^^^^^^^^^^^^^^^^^^^^^ RUF970
+16 | 
+17 | # this should be replaced with s.split("abc")
+   |
+   = help: Replace with `"abc" == s`
+
+ℹ Safe fix
+12 12 | re.search("abc", s)
+13 13 | 
+14 14 | # this should be replaced with "abc" == s
+15    |-re.fullmatch("abc", s)
+   15 |+"abc" == s
+16 16 | 
+17 17 | # this should be replaced with s.split("abc")
+18 18 | re.split("abc", s)
+
+RUF970.py:18:1: RUF970 [*] Plain string pattern passed to `re` function
+   |
+17 | # this should be replaced with s.split("abc")
+18 | re.split("abc", s)
+   | ^^^^^^^^^^^^^^^^^^ RUF970
+19 | 
+20 | # these currently should not be modified because the patterns contain regex
+   |
+   = help: Replace with `s.split("abc")`
+
+ℹ Safe fix
+15 15 | re.fullmatch("abc", s)
+16 16 | 
+17 17 | # this should be replaced with s.split("abc")
+18    |-re.split("abc", s)
+   18 |+s.split("abc")
+19 19 | 
+20 20 | # these currently should not be modified because the patterns contain regex
+21 21 | # metacharacters
