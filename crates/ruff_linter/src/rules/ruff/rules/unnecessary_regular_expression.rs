@@ -123,7 +123,7 @@ impl<'a> ReFunc<'a> {
     }
 }
 
-/// RUF970
+/// RUF055
 pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprCall) {
     // adapted from unraw_re_pattern
     let semantic = checker.semantic();

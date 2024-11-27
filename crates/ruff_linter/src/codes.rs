@@ -984,6 +984,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "040") => (RuleGroup::Preview, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
         (Ruff, "041") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryNestedLiteral),
         (Ruff, "048") => (RuleGroup::Preview, rules::ruff::rules::MapIntVersionParsing),
+        (Ruff, "055") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRegularExpression),
+
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
 
@@ -1012,8 +1014,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "950") => (RuleGroup::Stable, rules::ruff::rules::RedirectedToTestRule),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "960") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromPrefixTestRule),
-
-        (Ruff, "970") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRegularExpression),
 
 
         // flake8-django

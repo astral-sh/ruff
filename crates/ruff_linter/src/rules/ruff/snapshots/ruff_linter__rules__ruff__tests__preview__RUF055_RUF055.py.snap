@@ -2,11 +2,11 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF970.py:6:1: RUF970 [*] Plain string pattern passed to `re` function
+RUF055.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
   |
 5 | # this should be replaced with s.replace("abc", "")
 6 | re.sub("abc", "", s)
-  | ^^^^^^^^^^^^^^^^^^^^ RUF970
+  | ^^^^^^^^^^^^^^^^^^^^ RUF055
 7 | 
 8 | # this should be replaced with s.startswith("abc")
   |
@@ -22,11 +22,11 @@ RUF970.py:6:1: RUF970 [*] Plain string pattern passed to `re` function
 8 8 | # this should be replaced with s.startswith("abc")
 9 9 | re.match("abc", s)
 
-RUF970.py:9:1: RUF970 [*] Plain string pattern passed to `re` function
+RUF055.py:9:1: RUF055 [*] Plain string pattern passed to `re` function
    |
  8 | # this should be replaced with s.startswith("abc")
  9 | re.match("abc", s)
-   | ^^^^^^^^^^^^^^^^^^ RUF970
+   | ^^^^^^^^^^^^^^^^^^ RUF055
 10 | 
 11 | # this should be replaced with "abc" in s
    |
@@ -42,11 +42,11 @@ RUF970.py:9:1: RUF970 [*] Plain string pattern passed to `re` function
 11 11 | # this should be replaced with "abc" in s
 12 12 | re.search("abc", s)
 
-RUF970.py:12:1: RUF970 [*] Plain string pattern passed to `re` function
+RUF055.py:12:1: RUF055 [*] Plain string pattern passed to `re` function
    |
 11 | # this should be replaced with "abc" in s
 12 | re.search("abc", s)
-   | ^^^^^^^^^^^^^^^^^^^ RUF970
+   | ^^^^^^^^^^^^^^^^^^^ RUF055
 13 | 
 14 | # this should be replaced with "abc" == s
    |
@@ -62,11 +62,11 @@ RUF970.py:12:1: RUF970 [*] Plain string pattern passed to `re` function
 14 14 | # this should be replaced with "abc" == s
 15 15 | re.fullmatch("abc", s)
 
-RUF970.py:15:1: RUF970 [*] Plain string pattern passed to `re` function
+RUF055.py:15:1: RUF055 [*] Plain string pattern passed to `re` function
    |
 14 | # this should be replaced with "abc" == s
 15 | re.fullmatch("abc", s)
-   | ^^^^^^^^^^^^^^^^^^^^^^ RUF970
+   | ^^^^^^^^^^^^^^^^^^^^^^ RUF055
 16 | 
 17 | # this should be replaced with s.split("abc")
    |
@@ -82,11 +82,11 @@ RUF970.py:15:1: RUF970 [*] Plain string pattern passed to `re` function
 17 17 | # this should be replaced with s.split("abc")
 18 18 | re.split("abc", s)
 
-RUF970.py:18:1: RUF970 [*] Plain string pattern passed to `re` function
+RUF055.py:18:1: RUF055 [*] Plain string pattern passed to `re` function
    |
 17 | # this should be replaced with s.split("abc")
 18 | re.split("abc", s)
-   | ^^^^^^^^^^^^^^^^^^ RUF970
+   | ^^^^^^^^^^^^^^^^^^ RUF055
 19 | 
 20 | # these currently should not be modified because the patterns contain regex
    |
