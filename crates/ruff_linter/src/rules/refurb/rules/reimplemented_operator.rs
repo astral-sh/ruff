@@ -60,14 +60,7 @@ impl Violation for ReimplementedOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ReimplementedOperator { operator, target } = self;
-        match target {
-            FunctionLikeKind::Function => {
-                format!("Use `operator.{operator}` instead of defining a function")
-            }
-            FunctionLikeKind::Lambda => {
-                format!("Use `operator.{operator}` instead of defining a lambda")
-            }
-        }
+        format!("Use `operator.{operator}` instead of defining a {target}")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -78,11 +71,9 @@ impl Violation for ReimplementedOperator {
 
 /// FURB118
 pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
-    // Ignore methods.
-    if target.kind() == FunctionLikeKind::Function {
-        if checker.semantic().current_scope().kind.is_class() {
-            return;
-        }
+    // Ignore methods, whether defined using the `def` keyword or via a `lambda` assignment.
+    if checker.semantic().current_scope().kind.is_class() {
+        return;
     }
 
     let Some(params) = target.parameters() else {
@@ -327,10 +318,25 @@ fn get_operator(expr: &Expr, params: &Parameters, locator: &Locator) -> Option<O
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum FunctionLikeKind {
     Lambda,
     Function,
+}
+
+impl FunctionLikeKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Lambda => "lambda",
+            Self::Function => "function",
+        }
+    }
+}
+
+impl Display for FunctionLikeKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Return the name of the `operator` implemented by the given unary expression.

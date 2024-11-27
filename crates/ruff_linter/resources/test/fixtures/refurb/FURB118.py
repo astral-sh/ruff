@@ -93,3 +93,12 @@ op_itemgetter = lambda x: x[1,          :]
 
 # Without a slice, trivia is retained
 op_itemgetter = lambda x: x[1,          2]
+
+
+# All methods in classes are ignored, even those defined using lambdas:
+class Foo:
+    def x(self, other):
+        return self == other
+
+class Bar:
+    y = lambda selfff, other: self == other

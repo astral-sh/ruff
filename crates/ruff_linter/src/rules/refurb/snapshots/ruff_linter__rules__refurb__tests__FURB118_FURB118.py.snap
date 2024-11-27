@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
 FURB118.py:2:13: FURB118 [*] Use `operator.invert` instead of defining a lambda
   |
@@ -947,3 +946,6 @@ FURB118.py:95:17: FURB118 [*] Use `operator.itemgetter((1,          2))` instead
 94 95 | # Without a slice, trivia is retained
 95    |-op_itemgetter = lambda x: x[1,          2]
    96 |+op_itemgetter = operator.itemgetter((1,          2))
+96 97 | 
+97 98 | 
+98 99 | # All methods in classes are ignored, even those defined using lambdas:
