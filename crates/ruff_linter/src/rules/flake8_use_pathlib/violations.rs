@@ -1110,7 +1110,7 @@ impl Violation for PyPath {
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
 /// the lower-level API offered by `os`. When possible, using `pathlib`'s
-/// `Path.iterdir()` can improve readability over  `os`'s `listdir()`.
+/// `Path.iterdir()` can improve readability over `os.listdir()`.
 ///
 /// ## Example
 ///
@@ -1139,8 +1139,8 @@ impl Violation for PyPath {
 /// if (p / "file").exists():
 ///     ...
 /// ```
-#[violation]
-pub struct OsListdir;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsListdir;
 
 impl Violation for OsListdir {
     #[derive_message_formats]

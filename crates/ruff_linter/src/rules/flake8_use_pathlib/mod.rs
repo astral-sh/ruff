@@ -12,7 +12,6 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
 
     #[test_case(Path::new("full_name.py"))]
@@ -64,29 +63,12 @@ mod tests {
     #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]
     #[test_case(Rule::OsSepSplit, Path::new("PTH206.py"))]
     #[test_case(Rule::Glob, Path::new("PTH207.py"))]
+    #[test_case(Rule::OsListdir, Path::new("PTH208.py"))]
     fn rules_pypath(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::OsListdir, Path::new("PTH208.py"))]
-    fn preview_rules_pth(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("flake8_use_pathlib").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
