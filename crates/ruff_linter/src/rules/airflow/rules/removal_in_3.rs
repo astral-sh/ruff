@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -35,8 +35,8 @@ enum Replacement {
 ///
 /// yesterday = today - timedelta(days=1)
 /// ```
-#[violation]
-pub struct Airflow3Removal {
+#[derive(ViolationMetadata)]
+pub(crate) struct Airflow3Removal {
     deprecated: String,
     replacement: Replacement,
 }
