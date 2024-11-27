@@ -1,5 +1,10 @@
 # `except*`
 
+```toml
+[environment]
+target-version = "3.11"
+```
+
 ## `except*` with `BaseException`
 
 ```py

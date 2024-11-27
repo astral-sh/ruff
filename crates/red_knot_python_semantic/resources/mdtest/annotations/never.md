@@ -1,5 +1,10 @@
 # NoReturn & Never
 
+```toml
+[environment]
+target-version = "3.11"
+```
+
 `NoReturn` is used to annotate the return type for functions that never return. `Never` is the
 bottom type, representing the empty set of Python objects. These two annotations can be used
 interchangeably.
