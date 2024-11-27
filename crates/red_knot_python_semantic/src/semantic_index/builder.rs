@@ -784,18 +784,22 @@ where
                         constraints.push(self.record_expression_constraint(elif_test));
                     }
                     self.visit_body(&clause.body);
-                }
-                for post_clause_state in post_clauses {
-                    self.flow_merge(post_clause_state);
-                }
+                } 
                 let has_else = node
                     .elif_else_clauses
                     .last()
                     .is_some_and(|clause| clause.test.is_none());
                 if !has_else {
-                    // if there's no else clause, then it's possible we took none of the branches,
-                    // and the pre_if state can reach here
-                    self.flow_merge(pre_if);
+                    // if there's no else clause, we should act as if we had an empty else clause,
+                    // by again following the same logic as above for elif/else clauses.
+                    post_clauses.push(self.flow_snapshot());
+                    self.flow_restore(pre_if);
+                    for constraint in &constraints {
+                        self.record_negated_constraint(*constraint);
+                    }
+                }
+                for post_clause_state in post_clauses {
+                    self.flow_merge(post_clause_state);
                 }
             }
             ast::Stmt::While(ast::StmtWhile {
