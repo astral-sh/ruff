@@ -384,12 +384,13 @@ impl<'a> FileNoqaDirectives<'a> {
                         }
                         ParsedFileExemption::Codes(codes) => {
                             codes.iter().filter_map(|code| {
+                                let code = code.as_str();
                                 // Ignore externally-defined rules.
-                                if external.iter().any(|external| code.as_str().starts_with(external)) {
+                                if external.iter().any(|external| code.starts_with(external)) {
                                     return None;
                                 }
 
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
+                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
                                 {
                                     Some(rule.noqa_code())
                                 } else {
