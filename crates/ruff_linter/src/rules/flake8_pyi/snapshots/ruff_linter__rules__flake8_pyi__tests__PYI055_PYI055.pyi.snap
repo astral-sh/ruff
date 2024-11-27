@@ -105,12 +105,12 @@ PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 10 10 | y: Union[Union[Union[type[float, int], type[complex]]]]
 11 11 | z: Union[type[complex], Union[Union[type[float, int]]]]
 
-PYI055.pyi:9:10: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, int, complex]]`.
+PYI055.pyi:9:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, int, complex]]`.
    |
  7 | v: Union[type[float], type[complex]]
  8 | w: Union[type[float, int], type[complex]]
  9 | x: Union[Union[type[float, int], type[complex]]]
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
 10 | y: Union[Union[Union[type[float, int], type[complex]]]]
 11 | z: Union[type[complex], Union[Union[type[float, int]]]]
    |
@@ -121,10 +121,51 @@ PYI055.pyi:9:10: PYI055 [*] Multiple `type` members in a union. Combine them int
 7  7  | v: Union[type[float], type[complex]]
 8  8  | w: Union[type[float, int], type[complex]]
 9     |-x: Union[Union[type[float, int], type[complex]]]
-   9  |+x: Union[type[Union[float, int, complex]]]
+   9  |+x: type[Union[float, int, complex]]
 10 10 | y: Union[Union[Union[type[float, int], type[complex]]]]
 11 11 | z: Union[type[complex], Union[Union[type[float, int]]]]
 12 12 | 
+
+PYI055.pyi:10:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, int, complex]]`.
+   |
+ 8 | w: Union[type[float, int], type[complex]]
+ 9 | x: Union[Union[type[float, int], type[complex]]]
+10 | y: Union[Union[Union[type[float, int], type[complex]]]]
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+11 | z: Union[type[complex], Union[Union[type[float, int]]]]
+   |
+   = help: Combine multiple `type` members
+
+ℹ Safe fix
+7  7  | v: Union[type[float], type[complex]]
+8  8  | w: Union[type[float, int], type[complex]]
+9  9  | x: Union[Union[type[float, int], type[complex]]]
+10    |-y: Union[Union[Union[type[float, int], type[complex]]]]
+   10 |+y: type[Union[float, int, complex]]
+11 11 | z: Union[type[complex], Union[Union[type[float, int]]]]
+12 12 | 
+13 13 | def func(arg: type[int] | str | type[float]) -> None: ...
+
+PYI055.pyi:11:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[complex, float, int]]`.
+   |
+ 9 | x: Union[Union[type[float, int], type[complex]]]
+10 | y: Union[Union[Union[type[float, int], type[complex]]]]
+11 | z: Union[type[complex], Union[Union[type[float, int]]]]
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+12 | 
+13 | def func(arg: type[int] | str | type[float]) -> None: ...
+   |
+   = help: Combine multiple `type` members
+
+ℹ Safe fix
+8  8  | w: Union[type[float, int], type[complex]]
+9  9  | x: Union[Union[type[float, int], type[complex]]]
+10 10 | y: Union[Union[Union[type[float, int], type[complex]]]]
+11    |-z: Union[type[complex], Union[Union[type[float, int]]]]
+   11 |+z: type[Union[complex, float, int]]
+12 12 | 
+13 13 | def func(arg: type[int] | str | type[float]) -> None: ...
+14 14 | 
 
 PYI055.pyi:13:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
    |
