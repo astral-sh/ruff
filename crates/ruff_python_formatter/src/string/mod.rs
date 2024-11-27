@@ -113,10 +113,12 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                 fn contains_line_break_or_comments(
                     elements: &ast::FStringElements,
                     context: &PyFormatContext,
+                    is_triple_quoted: bool,
                 ) -> bool {
                     elements.iter().any(|element| match element {
                         ast::FStringElement::Literal(literal) => {
-                            context.source().contains_line_break(literal.range())
+                            is_triple_quoted
+                                && context.source().contains_line_break(literal.range())
                         }
                         ast::FStringElement::Expression(expression) => {
                             // Expressions containing comments can't be joined.
@@ -132,7 +134,11 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                             // ```
                             context.comments().contains_comments(expression.into())
                                 || expression.format_spec.as_deref().is_some_and(|spec| {
-                                    contains_line_break_or_comments(&spec.elements, context)
+                                    contains_line_break_or_comments(
+                                        &spec.elements,
+                                        context,
+                                        is_triple_quoted,
+                                    )
                                 })
                                 || expression.debug_text.as_ref().is_some_and(|debug_text| {
                                     memchr2(b'\n', b'\r', debug_text.leading.as_bytes()).is_some()
@@ -144,7 +150,11 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                 }
 
                 if is_f_string_formatting_enabled(context) {
-                    contains_line_break_or_comments(&f_string.elements, context)
+                    contains_line_break_or_comments(
+                        &f_string.elements,
+                        context,
+                        f_string.flags.is_triple_quoted(),
+                    )
                 } else {
                     context.source().contains_line_break(f_string.range())
                 }
