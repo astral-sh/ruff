@@ -8,8 +8,8 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 ///
-/// Reports the following `re` and `regex` calls when their first arguments are
-/// plain string literals, and no additional flags are passed:
+/// Reports the following `re` calls when their first arguments are plain string
+/// literals, and no additional flags are passed:
 ///
 /// - `sub`
 /// - `match`
