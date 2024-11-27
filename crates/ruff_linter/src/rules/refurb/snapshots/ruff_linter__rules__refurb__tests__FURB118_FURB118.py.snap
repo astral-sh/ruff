@@ -949,3 +949,61 @@ FURB118.py:95:17: FURB118 [*] Use `operator.itemgetter((1,          2))` instead
 96 97 | 
 97 98 | 
 98 99 | # All methods in classes are ignored, even those defined using lambdas:
+
+FURB118.py:117:14: FURB118 [*] Use `operator.itemgetter(slice(-2, None))` instead of defining a lambda
+    |
+115 |         "slicer, expected",
+116 |         [
+117 |             (lambda x: x[-2:], "foo"),
+    |              ^^^^^^^^^^^^^^^^ FURB118
+118 |             (lambda x: x[-5:-3], "bar"),
+119 |         ],
+    |
+    = help: Replace with `operator.itemgetter(slice(-2, None))`
+
+ℹ Unsafe fix
+104 104 |     y = lambda self, other: self == other
+105 105 | 
+106 106 | from typing import Callable
+    107 |+import operator
+107 108 | class Baz:
+108 109 |     z: Callable = lambda self, other: self == other
+109 110 | 
+--------------------------------------------------------------------------------
+114 115 |     @pytest.mark.parametrize(
+115 116 |         "slicer, expected",
+116 117 |         [
+117     |-            (lambda x: x[-2:], "foo"),
+    118 |+            (operator.itemgetter(slice(-2, None)), "foo"),
+118 119 |             (lambda x: x[-5:-3], "bar"),
+119 120 |         ],
+120 121 |     )
+
+FURB118.py:118:14: FURB118 [*] Use `operator.itemgetter(slice(-5, -3))` instead of defining a lambda
+    |
+116 |         [
+117 |             (lambda x: x[-2:], "foo"),
+118 |             (lambda x: x[-5:-3], "bar"),
+    |              ^^^^^^^^^^^^^^^^^^ FURB118
+119 |         ],
+120 |     )
+    |
+    = help: Replace with `operator.itemgetter(slice(-5, -3))`
+
+ℹ Unsafe fix
+104 104 |     y = lambda self, other: self == other
+105 105 | 
+106 106 | from typing import Callable
+    107 |+import operator
+107 108 | class Baz:
+108 109 |     z: Callable = lambda self, other: self == other
+109 110 | 
+--------------------------------------------------------------------------------
+115 116 |         "slicer, expected",
+116 117 |         [
+117 118 |             (lambda x: x[-2:], "foo"),
+118     |-            (lambda x: x[-5:-3], "bar"),
+    119 |+            (operator.itemgetter(slice(-5, -3)), "bar"),
+119 120 |         ],
+120 121 |     )
+121 122 |     def test_inlet_asset_alias_extra_slice(self, slicer, expected):

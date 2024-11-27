@@ -92,7 +92,13 @@ impl Violation for ReimplementedOperator {
 /// FURB118
 pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
     // Ignore methods, whether defined using the `def` keyword or via a `lambda` assignment.
-    if checker.semantic().current_scope().kind.is_class() {
+    if checker.semantic().current_scope().kind.is_class()
+        && (target.is_function_def()
+            || checker
+                .semantic()
+                .current_statements()
+                .any(|stmt| matches!(stmt, Stmt::AnnAssign(_) | Stmt::Assign(_))))
+    {
         return;
     }
 
@@ -150,6 +156,10 @@ impl FunctionLike<'_> {
             Self::Lambda(expr) => expr.parameters.as_deref(),
             Self::Function(stmt) => Some(&stmt.parameters),
         }
+    }
+
+    const fn is_function_def(&self) -> bool {
+        matches!(self, Self::Function(_))
     }
 
     /// Return the body of the function-like node.
