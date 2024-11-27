@@ -1,15 +1,24 @@
 ---
 source: crates/ruff_linter/src/noqa.rs
-expression: "ParsedFileExemption::try_extract(source)"
+expression: "ParsedFileExemption::try_extract(source, TextSize::default())"
 snapshot_kind: text
 ---
 Ok(
     Some(
         Codes(
-            [
-                "F401",
-                "F841",
-            ],
+            Codes {
+                range: 0..24,
+                codes: [
+                    Code {
+                        code: "F401",
+                        range: 14..18,
+                    },
+                    Code {
+                        code: "F841",
+                        range: 20..24,
+                    },
+                ],
+            },
         ),
     ),
 )
