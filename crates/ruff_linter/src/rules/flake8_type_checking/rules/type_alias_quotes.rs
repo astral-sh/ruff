@@ -153,14 +153,17 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
     // Eventually we may try to be more clever and come up with the
     // minimal set of subexpressions that need to be quoted.
     let parent = expr.range().start();
-    let edit = quote_type_expression(expr, checker.semantic(), checker.stylist());
+    let edit = quote_type_expression(
+        expr,
+        checker.semantic(),
+        checker.stylist(),
+        checker.locator(),
+    );
     let mut diagnostics = Vec::with_capacity(names.len());
     for name in names {
         let mut diagnostic = Diagnostic::new(UnquotedTypeAlias, name.range());
         diagnostic.set_parent(parent);
-        if let Ok(edit) = edit.as_ref() {
-            diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
-        }
+        diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
         diagnostics.push(diagnostic);
     }
     Some(diagnostics)
