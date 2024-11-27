@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
-use crate::noqa::{Directive, FileNoqaDirectives, NoqaDirectives, ParsedFileExemption};
+use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives, ParsedFileExemption};
 use crate::rule_redirects::get_redirect_target;
 
 /// ## What it does
@@ -49,22 +49,7 @@ pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives
             continue;
         };
 
-        for code in directive.iter() {
-            if let Some(redirected) = get_redirect_target(code.as_str()) {
-                let mut diagnostic = Diagnostic::new(
-                    RedirectedNOQA {
-                        original: code.to_string(),
-                        target: redirected.to_string(),
-                    },
-                    code.range(),
-                );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    redirected.to_string(),
-                    code.range(),
-                )));
-                diagnostics.push(diagnostic);
-            }
-        }
+        build_diagnostics(diagnostics, directive);
     }
 }
 
@@ -78,21 +63,26 @@ pub(crate) fn redirected_file_noqa(
             continue;
         };
 
-        for code in codes.iter() {
-            if let Some(redirected) = get_redirect_target(code.as_str()) {
-                let mut diagnostic = Diagnostic::new(
-                    RedirectedNOQA {
-                        original: code.to_string(),
-                        target: redirected.to_string(),
-                    },
-                    code.range(),
-                );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    redirected.to_string(),
-                    code.range(),
-                )));
-                diagnostics.push(diagnostic);
-            }
+        build_diagnostics(diagnostics, codes);
+    }
+}
+
+/// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
+fn build_diagnostics(diagnostics: &mut Vec<Diagnostic>, codes: &Codes<'_>) {
+    for code in codes.iter() {
+        if let Some(redirected) = get_redirect_target(code.as_str()) {
+            let mut diagnostic = Diagnostic::new(
+                RedirectedNOQA {
+                    original: code.to_string(),
+                    target: redirected.to_string(),
+                },
+                code.range(),
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                redirected.to_string(),
+                code.range(),
+            )));
+            diagnostics.push(diagnostic);
         }
     }
 }
