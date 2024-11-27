@@ -70,7 +70,7 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
         // If the symbol is undeclared in some paths, include the inferred type in the public type.
         let undeclared_ty = if declarations.may_be_undeclared() {
             Some(
-                bindings_ty(db, use_def.public_bindings(symbol))
+                bindings_ty(db, use_def.public_bindings(symbol), false)
                     .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
                     .unwrap_or(Symbol::Unbound),
             )
@@ -106,7 +106,7 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
             ),
         }
     } else {
-        bindings_ty(db, use_def.public_bindings(symbol))
+        bindings_ty(db, use_def.public_bindings(symbol), false)
             .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
             .unwrap_or(Symbol::Unbound)
     }
@@ -181,14 +181,18 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
 }
 
 /// Infer the type of a binding.
-pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
-    let inference = infer_definition_types(db, definition);
+pub(crate) fn binding_ty<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    is_unreachable: bool,
+) -> Type<'db> {
+    let inference = infer_definition_types(db, definition, is_unreachable);
     inference.binding_ty(definition)
 }
 
 /// Infer the type of a declaration.
 fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
-    let inference = infer_definition_types(db, definition);
+    let inference = infer_definition_types(db, definition, false);
     inference.declaration_ty(definition)
 }
 
@@ -210,7 +214,7 @@ fn definition_expression_ty<'db>(
     let expr_id = expression.scoped_expression_id(db, scope);
     if scope == definition.scope(db) {
         // expression is in the definition scope
-        let inference = infer_definition_types(db, definition);
+        let inference = infer_definition_types(db, definition, false);
         if let Some(ty) = inference.try_expression_ty(expr_id) {
             ty
         } else {
@@ -228,6 +232,7 @@ fn definition_expression_ty<'db>(
 fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    is_unreachable: bool,
 ) -> Option<Type<'db>> {
     let mut def_types = bindings_with_constraints.map(
         |BindingWithConstraints {
@@ -238,7 +243,7 @@ fn bindings_ty<'db>(
                 .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
                 .peekable();
 
-            let binding_ty = binding_ty(db, binding);
+            let binding_ty = binding_ty(db, binding, is_unreachable);
             if constraint_tys.peek().is_some() {
                 constraint_tys
                     .fold(
