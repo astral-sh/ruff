@@ -362,7 +362,7 @@ impl<'a> FileNoqaDirectives<'a> {
         let mut lines = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::try_extract(range.start(), &locator.contents()[range]) {
+            match ParsedFileExemption::try_extract(range, locator.contents()) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -434,10 +434,13 @@ pub(crate) enum ParsedFileExemption<'a> {
 }
 
 impl<'a> ParsedFileExemption<'a> {
-    /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn try_extract(comment_range: TextSize, source: &'a str) -> Result<Option<Self>, ParseError> {
-        let init_line_len = source.text_len();
-        let line = Self::lex_whitespace(source);
+    /// Return a [`ParsedFileExemption`] for a given `comment_range` in `source`.
+    fn try_extract(comment_range: TextRange, source: &'a str) -> Result<Option<Self>, ParseError> {
+        let line = &source[comment_range];
+        let offset = comment_range.start();
+        let init_line_len = line.text_len();
+
+        let line = Self::lex_whitespace(line);
         let Some(line) = Self::lex_char(line, '#') else {
             return Ok(None);
         };
@@ -475,7 +478,7 @@ impl<'a> ParsedFileExemption<'a> {
                 let codes_end = init_line_len - line.text_len();
                 codes.push(Code {
                     code,
-                    range: TextRange::at(codes_end, code.text_len()).add(comment_range),
+                    range: TextRange::at(codes_end, code.text_len()).add(offset),
                 });
                 line = &line[code.len()..];
 
@@ -495,7 +498,7 @@ impl<'a> ParsedFileExemption<'a> {
             let codes_end = init_line_len - line.text_len();
             let range = TextRange::new(comment_start, codes_end);
             Self::Codes(Codes {
-                range: range.add(comment_range),
+                range: range.add(offset),
                 codes,
             })
         }))
@@ -1071,7 +1074,7 @@ mod tests {
     use ruff_diagnostics::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::LineEnding;
-    use ruff_text_size::{TextRange, TextSize};
+    use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
@@ -1239,7 +1242,7 @@ mod tests {
     fn flake8_exemption_all() {
         let source = "# flake8: noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextSize::default(),
+            TextRange::up_to(source.text_len()),
             source,
         ));
     }
@@ -1248,7 +1251,7 @@ mod tests {
     fn ruff_exemption_all() {
         let source = "# ruff: noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextSize::default(),
+            TextRange::up_to(source.text_len()),
             source,
         ));
     }
@@ -1257,7 +1260,7 @@ mod tests {
     fn flake8_exemption_all_no_space() {
         let source = "#flake8:noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextSize::default(),
+            TextRange::up_to(source.text_len()),
             source,
         ));
     }
@@ -1266,7 +1269,7 @@ mod tests {
     fn ruff_exemption_all_no_space() {
         let source = "#ruff:noqa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextSize::default(),
+            TextRange::up_to(source.text_len()),
             source,
         ));
     }
@@ -1276,7 +1279,7 @@ mod tests {
         // Note: Flake8 doesn't support this; it's treated as a blanket exemption.
         let source = "# flake8: noqa: F401, F841";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextSize::default(),
+            TextRange::up_to(source.text_len()),
             source,
         ));
     }
@@ -1285,7 +1288,7 @@ mod tests {
     fn ruff_exemption_codes() {
         let source = "# ruff: noqa: F401, F841";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextSize::default(),
+            TextRange::up_to(source.text_len()),
             source,
         ));
     }
@@ -1294,7 +1297,7 @@ mod tests {
     fn flake8_exemption_all_case_insensitive() {
         let source = "# flake8: NoQa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextSize::default(),
+            TextRange::up_to(source.text_len()),
             source,
         ));
     }
@@ -1303,7 +1306,7 @@ mod tests {
     fn ruff_exemption_all_case_insensitive() {
         let source = "# ruff: NoQa";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextSize::default(),
+            TextRange::up_to(source.text_len()),
             source,
         ));
     }
