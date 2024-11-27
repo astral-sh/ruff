@@ -441,8 +441,7 @@ impl<'a> ParsedFileExemption<'a> {
         let Some(line) = Self::lex_char(line, '#') else {
             return Ok(None);
         };
-        // -1 to include the comment character
-        let comment_start = init_line_len - line.len() - 1;
+        let comment_start = init_line_len - line.len() - '#'.len_utf8();
         let line = Self::lex_whitespace(line);
 
         let Some(line) = Self::lex_flake8(line).or_else(|| Self::lex_ruff(line)) else {
