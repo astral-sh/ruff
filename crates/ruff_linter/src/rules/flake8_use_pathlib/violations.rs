@@ -1103,3 +1103,48 @@ impl Violation for PyPath {
         "`py.path` is in maintenance mode, use `pathlib` instead".to_string()
     }
 }
+
+/// ## What it does
+/// Checks for uses of `os.listdir`.
+///
+/// ## Why is this bad?
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `pathlib`'s
+/// `Path.iterdir()` can improve readability over `os.listdir()`.
+///
+/// ## Example
+///
+/// ```python
+/// p = "."
+/// for d in os.listdir(p):
+///     ...
+///
+/// if os.listdir(p):
+///     ...
+///
+/// if "file" in os.listdir(p):
+///     ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// p = Path(".")
+/// for d in p.iterdir():
+///     ...
+///
+/// if any(p.iterdir()):
+///     ...
+///
+/// if (p / "file").exists():
+///     ...
+/// ```
+#[derive(ViolationMetadata)]
+pub(crate) struct OsListdir;
+
+impl Violation for OsListdir {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Use `pathlib.Path.iterdir()` instead.".to_string()
+    }
+}
