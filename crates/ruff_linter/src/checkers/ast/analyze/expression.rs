@@ -1076,6 +1076,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::AirflowDagNoScheduleArgument) {
                 airflow::rules::dag_no_schedule_argument(checker, expr);
             }
+            if checker.enabled(Rule::AirflowDeprecatedSubDag) {
+                airflow::rules::subdag_check(checker, expr);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
