@@ -136,3 +136,58 @@ TC006.py:59:9: TC006 [*] Add quotes to type expression in `typing.cast()`
    59 |+        "int | None",
 61 60 |         3.0
 62 61 |     )
+63 62 | 
+
+TC006.py:68:17: TC006 [*] Add quotes to type expression in `typing.cast()`
+   |
+66 |     # Regression test for #14554
+67 |     import typing
+68 |     typing.cast(M-())
+   |                 ^^^^ TC006
+   |
+   = help: Add quotes
+
+ℹ Safe fix
+65 65 | def f():
+66 66 |     # Regression test for #14554
+67 67 |     import typing
+68    |-    typing.cast(M-())
+   68 |+    typing.cast("M - ()")
+69 69 | 
+70 70 | 
+71 71 | def f():
+
+TC006.py:75:10: TC006 [*] Add quotes to type expression in `typing.cast()`
+   |
+73 |     from typing import cast, Literal
+74 | 
+75 |     cast(Literal["A"], 'A')
+   |          ^^^^^^^^^^^^ TC006
+   |
+   = help: Add quotes
+
+ℹ Safe fix
+72 72 |     # Simple case with Literal that should lead to nested quotes
+73 73 |     from typing import cast, Literal
+74 74 | 
+75    |-    cast(Literal["A"], 'A')
+   75 |+    cast("Literal['A']", 'A')
+76 76 | 
+77 77 | 
+78 78 | def f():
+
+TC006.py:82:10: TC006 [*] Add quotes to type expression in `typing.cast()`
+   |
+80 |     from typing import cast, Annotated, Literal
+81 | 
+82 |     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TC006
+   |
+   = help: Add quotes
+
+ℹ Safe fix
+79 79 |     # Really complex case with nested forward references
+80 80 |     from typing import cast, Annotated, Literal
+81 81 | 
+82    |-    cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
+   82 |+    cast("list[Annotated[list[Literal['A']], 'Foo']]", ['A'])
