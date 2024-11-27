@@ -436,12 +436,12 @@ pub(crate) enum ParsedFileExemption<'a> {
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
     fn try_extract(comment_range: TextSize, source: &'a str) -> Result<Option<Self>, ParseError> {
-        let init_line_len = source.len();
+        let init_line_len = source.text_len();
         let line = Self::lex_whitespace(source);
         let Some(line) = Self::lex_char(line, '#') else {
             return Ok(None);
         };
-        let comment_start = init_line_len - line.len() - '#'.len_utf8();
+        let comment_start = init_line_len - line.text_len() - '#'.text_len();
         let line = Self::lex_whitespace(line);
 
         let Some(line) = Self::lex_flake8(line).or_else(|| Self::lex_ruff(line)) else {
@@ -472,11 +472,10 @@ impl<'a> ParsedFileExemption<'a> {
             let mut codes = vec![];
             let mut line = line;
             while let Some(code) = Self::lex_code(line) {
-                let codes_end = init_line_len - line.len();
+                let codes_end = init_line_len - line.text_len();
                 codes.push(Code {
                     code,
-                    range: TextRange::at(TextSize::try_from(codes_end).unwrap(), code.text_len())
-                        .add(comment_range),
+                    range: TextRange::at(codes_end, code.text_len()).add(comment_range),
                 });
                 line = &line[code.len()..];
 
@@ -493,11 +492,8 @@ impl<'a> ParsedFileExemption<'a> {
                 return Err(ParseError::MissingCodes);
             }
 
-            let codes_end = init_line_len - line.len();
-            let range = TextRange::new(
-                TextSize::try_from(comment_start).unwrap(),
-                TextSize::try_from(codes_end).unwrap(),
-            );
+            let codes_end = init_line_len - line.text_len();
+            let range = TextRange::new(comment_start, codes_end);
             Self::Codes(Codes {
                 range: range.add(comment_range),
                 codes,
