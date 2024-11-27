@@ -56,24 +56,11 @@ else:
     reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
-## After if-else statement, final type is the merged type from body of all branches, with explicit else branch
+## After if-statement without explicit else branch, assume else branch with negative clause
 
 ```py
 def optional_int() -> int | None: ...
-x = optional_int()
 
-if x is None:
-    x = 0
-else:
-    pass
-
-reveal_type(x)  # revealed: int
-```
-
-## After if-else statement, final type is the merged type from body of all branches, without explicit else branch
-
-```py
-def optional_int() -> int | None: ...
 x = optional_int()
 
 if x is None:
