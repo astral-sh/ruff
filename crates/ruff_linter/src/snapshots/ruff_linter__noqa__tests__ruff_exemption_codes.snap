@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_linter/src/noqa.rs
-expression: "ParsedFileExemption::try_extract(source, TextSize::default())"
+expression: "ParsedFileExemption::try_extract(TextRange::up_to(source.text_len()), source,)"
 snapshot_kind: text
 ---
 Ok(
