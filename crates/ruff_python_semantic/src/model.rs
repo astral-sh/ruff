@@ -645,6 +645,7 @@ impl<'a> SemanticModel<'a> {
             }
 
             class_variables_visible = scope.kind.is_type() && index == 0;
+            seen_function |= scope.kind.is_function();
 
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
@@ -661,9 +662,6 @@ impl<'a> SemanticModel<'a> {
                     return None;
                 }
             }
-
-            // FIXME: Shouldn't this happen above where `class_variables_visible` is set?
-            seen_function |= scope.kind.is_function();
         }
 
         None
