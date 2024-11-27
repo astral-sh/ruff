@@ -1118,6 +1118,12 @@ impl Violation for PyPath {
 /// p = "."
 /// for d in os.listdir(p):
 ///     ...
+///
+/// if os.listdir(p):
+///     ...
+///
+/// if "file" in os.listdir(p):
+///     ...
 /// ```
 ///
 /// Use instead:
@@ -1125,6 +1131,12 @@ impl Violation for PyPath {
 /// ```python
 /// p = Path(".")
 /// for d in p.iterdir():
+///     ...
+///
+/// if any(p.iterdir()):
+///     ...
+///
+/// if (p / "file").exists():
 ///     ...
 /// ```
 #[violation]

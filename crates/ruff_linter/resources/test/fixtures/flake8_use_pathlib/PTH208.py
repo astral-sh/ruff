@@ -14,3 +14,10 @@ from pathlib import Path
 
 path_path = Path('.')
 os.listdir(path_path)
+
+
+if os.listdir("dir"):
+    ...
+
+if "file" in os.listdir("dir"):
+    ...

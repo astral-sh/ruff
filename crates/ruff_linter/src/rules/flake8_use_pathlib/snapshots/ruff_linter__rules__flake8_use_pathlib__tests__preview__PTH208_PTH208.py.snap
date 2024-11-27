@@ -42,3 +42,19 @@ PTH208.py:16:1: PTH208 Use `pathlib.Path.iterdir()` instead.
 16 | os.listdir(path_path)
    | ^^^^^^^^^^ PTH208
    |
+
+PTH208.py:19:4: PTH208 Use `pathlib.Path.iterdir()` instead.
+   |
+19 | if os.listdir("dir"):
+   |    ^^^^^^^^^^ PTH208
+20 |     ...
+   |
+
+PTH208.py:22:14: PTH208 Use `pathlib.Path.iterdir()` instead.
+   |
+20 |     ...
+21 | 
+22 | if "file" in os.listdir("dir"):
+   |              ^^^^^^^^^^ PTH208
+23 |     ...
+   |
