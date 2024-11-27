@@ -1,7 +1,7 @@
 use ruff_python_ast::Decorator;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 /// def my_handler(sender, instance, created, **kwargs):
 ///     pass
 /// ```
-#[violation]
-pub struct DjangoNonLeadingReceiverDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoNonLeadingReceiverDecorator;
 
 impl Violation for DjangoNonLeadingReceiverDecorator {
     #[derive_message_formats]

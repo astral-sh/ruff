@@ -2,7 +2,7 @@ use std::fmt;
 
 use ast::Stmt;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{analyze::typing, Scope, SemanticModel};
 use ruff_text_size::Ranged;
@@ -50,8 +50,8 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
 /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
-#[violation]
-pub struct AsyncioDanglingTask {
+#[derive(ViolationMetadata)]
+pub(crate) struct AsyncioDanglingTask {
     expr: String,
     method: Method,
 }

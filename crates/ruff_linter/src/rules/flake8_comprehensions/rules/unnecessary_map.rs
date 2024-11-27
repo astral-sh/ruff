@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Stmt};
@@ -45,8 +45,8 @@ use super::helpers;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-#[violation]
-pub struct UnnecessaryMap {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryMap {
     object_type: ObjectType,
 }
 

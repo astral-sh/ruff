@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
@@ -39,8 +39,8 @@ use crate::rules::pep8_naming::helpers;
 /// - `lint.flake8-import-conventions.aliases`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
-#[violation]
-pub struct CamelcaseImportedAsAcronym {
+#[derive(ViolationMetadata)]
+pub(crate) struct CamelcaseImportedAsAcronym {
     name: String,
     asname: String,
 }

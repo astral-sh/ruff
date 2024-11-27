@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::settings::LinterSettings;
@@ -13,8 +13,8 @@ use crate::Locator;
 /// ## Why is this bad?
 /// In some codebases, it's common to have a license header at the top of every
 /// file. This rule ensures that the license header is present.
-#[violation]
-pub struct MissingCopyrightNotice;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingCopyrightNotice;
 
 impl Violation for MissingCopyrightNotice {
     #[derive_message_formats]

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::SourceRow;
 
 /// ## What it does
@@ -22,8 +22,8 @@ use ruff_source_file::SourceRow;
 /// import foo
 /// import bar
 /// ```
-#[violation]
-pub struct RedefinedWhileUnused {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedefinedWhileUnused {
     pub name: String,
     pub row: SourceRow,
 }

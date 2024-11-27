@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
@@ -49,8 +49,8 @@ use crate::settings::types::PythonVersion;
 /// - `lint.pyupgrade.keep-runtime-typing`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
-#[violation]
-pub struct NonPEP604Annotation;
+#[derive(ViolationMetadata)]
+pub(crate) struct NonPEP604Annotation;
 
 impl Violation for NonPEP604Annotation {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

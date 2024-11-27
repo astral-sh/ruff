@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{BindingKind, ScopeKind};
@@ -50,8 +50,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
-#[violation]
-pub struct PrivateMemberAccess {
+#[derive(ViolationMetadata)]
+pub(crate) struct PrivateMemberAccess {
     access: String,
 }
 

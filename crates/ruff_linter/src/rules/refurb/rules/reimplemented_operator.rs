@@ -5,7 +5,7 @@ use anyhow::Result;
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
@@ -48,8 +48,8 @@ use crate::Locator;
 /// `add = lambda x, y: x + y; add(x=1, y=2)`, replacing the lambda with an operator function, e.g.,
 /// `operator.add`, will cause the call to raise a `TypeError`, as functions in `operator` do not allow
 /// keyword arguments.
-#[violation]
-pub struct ReimplementedOperator {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedOperator {
     operator: Operator,
     target: FunctionLikeKind,
 }

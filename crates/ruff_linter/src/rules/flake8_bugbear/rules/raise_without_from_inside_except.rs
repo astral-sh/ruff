@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::RaiseStatementVisitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 
@@ -46,8 +46,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
-#[violation]
-pub struct RaiseWithoutFromInsideExcept;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseWithoutFromInsideExcept;
 
 impl Violation for RaiseWithoutFromInsideExcept {
     #[derive_message_formats]

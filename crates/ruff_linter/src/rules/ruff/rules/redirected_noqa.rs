@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::noqa::{Directive, NoqaDirectives};
@@ -23,8 +23,8 @@ use crate::rule_redirects::get_redirect_target;
 /// ```python
 /// x = eval(command)  # noqa: S307
 /// ```
-#[violation]
-pub struct RedirectedNOQA {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedirectedNOQA {
     original: String,
     target: String,
 }

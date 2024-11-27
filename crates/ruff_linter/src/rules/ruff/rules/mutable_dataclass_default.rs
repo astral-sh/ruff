@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -54,8 +54,8 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation
 /// class A:
 ///     mutable_default: ClassVar[list[int]] = []
 /// ```
-#[violation]
-pub struct MutableDataclassDefault;
+#[derive(ViolationMetadata)]
+pub(crate) struct MutableDataclassDefault;
 
 impl Violation for MutableDataclassDefault {
     #[derive_message_formats]

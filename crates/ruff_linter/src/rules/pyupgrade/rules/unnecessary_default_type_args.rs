@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -59,8 +59,8 @@ use crate::checkers::ast::Checker;
 /// - [Annotating generators and coroutines](https://docs.python.org/3/library/typing.html#annotating-generators-and-coroutines)
 /// - [Python documentation: `typing.Generator`](https://docs.python.org/3/library/typing.html#typing.Generator)
 /// - [Python documentation: `typing.AsyncGenerator`](https://docs.python.org/3/library/typing.html#typing.AsyncGenerator)
-#[violation]
-pub struct UnnecessaryDefaultTypeArgs;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDefaultTypeArgs;
 
 impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
     #[derive_message_formats]

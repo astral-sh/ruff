@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    name::Name, parenthesize::parenthesized_range, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
+    parenthesize::parenthesized_range, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -33,10 +33,8 @@ use crate::checkers::ast::Checker;
 /// if a < b < c:
 ///     pass
 /// ```
-#[violation]
-pub struct BooleanChainedComparison {
-    variable: Name,
-}
+#[derive(ViolationMetadata)]
+pub(crate) struct BooleanChainedComparison;
 
 impl Violation for BooleanChainedComparison {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -120,9 +118,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
             };
 
             let mut diagnostic = Diagnostic::new(
-                BooleanChainedComparison {
-                    variable: left_compare_right.id().clone(),
-                },
+                BooleanChainedComparison,
                 TextRange::new(left_compare.start(), right_compare.end()),
             );
 

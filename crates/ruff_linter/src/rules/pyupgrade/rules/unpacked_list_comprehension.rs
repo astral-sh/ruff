@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::violation;
+use ruff_macros::ViolationMetadata;
 
 /// ## Removed
 /// There's no [evidence](https://github.com/astral-sh/ruff/issues/12754) that generators are
@@ -26,8 +26,8 @@ use ruff_macros::violation;
 /// ## References
 /// - [Python documentation: Generator expressions](https://docs.python.org/3/reference/expressions.html#generator-expressions)
 /// - [Python documentation: List comprehensions](https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions)
-#[violation]
-pub struct UnpackedListComprehension;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnpackedListComprehension;
 
 impl Violation for UnpackedListComprehension {
     fn message(&self) -> String {

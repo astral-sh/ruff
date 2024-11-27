@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
 use ruff_python_semantic::{analyze::typing::traverse_union, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
-#[violation]
-pub struct NeverUnion {
+#[derive(ViolationMetadata)]
+pub(crate) struct NeverUnion {
     never_like: NeverLike,
     union_like: UnionLike,
 }

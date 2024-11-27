@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
@@ -50,8 +50,8 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// with errors.ExceptionRaisedContext():
 ///     _ = obj.attribute
 /// ```
-#[violation]
-pub struct UselessExpression {
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessExpression {
     kind: Kind,
 }
 

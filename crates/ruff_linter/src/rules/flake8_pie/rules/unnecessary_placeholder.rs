@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{Expr, ExprStringLiteral, Stmt, StmtExpr};
@@ -58,8 +58,8 @@ use crate::fix;
 ///
 /// ## References
 /// - [Python documentation: The `pass` statement](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
-#[violation]
-pub struct UnnecessaryPlaceholder {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryPlaceholder {
     kind: Placeholder,
 }
 

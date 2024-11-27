@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -38,8 +38,8 @@ use crate::rules::flake8_comprehensions::fixes;
 /// collection, while `sorted` with `reverse=True` will perform a stable
 /// reverse sort, which will preserve the order of elements that compare as
 /// equal.
-#[violation]
-pub struct UnnecessaryCallAroundSorted {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryCallAroundSorted {
     func: String,
 }
 

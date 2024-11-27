@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -51,8 +51,8 @@ use crate::registry::Rule;
 /// ```
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct BadVersionInfoComparison;
+#[derive(ViolationMetadata)]
+pub(crate) struct BadVersionInfoComparison;
 
 impl Violation for BadVersionInfoComparison {
     #[derive_message_formats]
@@ -100,8 +100,8 @@ impl Violation for BadVersionInfoComparison {
 /// ```
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct BadVersionInfoOrder;
+#[derive(ViolationMetadata)]
+pub(crate) struct BadVersionInfoOrder;
 
 impl Violation for BadVersionInfoOrder {
     #[derive_message_formats]

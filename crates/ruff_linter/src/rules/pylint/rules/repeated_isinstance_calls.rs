@@ -1,5 +1,5 @@
 use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::fix::snippet::SourceCodeSnippet;
 
@@ -48,8 +48,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 ///
 /// [SIM101]: https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
-#[violation]
-pub struct RepeatedIsinstanceCalls {
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedIsinstanceCalls {
     expression: SourceCodeSnippet,
 }
 

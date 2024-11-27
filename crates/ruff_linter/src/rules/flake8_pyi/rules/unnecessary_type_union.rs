@@ -1,6 +1,6 @@
 use ast::ExprContext;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
@@ -31,8 +31,8 @@ use crate::checkers::ast::Checker;
 ///
 /// Note that while the fix may flatten nested unions into a single top-level union,
 /// the semantics of the annotation will remain unchanged.
-#[violation]
-pub struct UnnecessaryTypeUnion {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryTypeUnion {
     members: Vec<Name>,
     union_kind: UnionKind,
 }

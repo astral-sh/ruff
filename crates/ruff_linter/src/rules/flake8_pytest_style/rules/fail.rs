@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -45,8 +45,8 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
-#[violation]
-pub struct PytestFailWithoutMessage;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFailWithoutMessage;
 
 impl Violation for PytestFailWithoutMessage {
     #[derive_message_formats]

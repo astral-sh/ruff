@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 /// if sys.version_info >= (3, 10):
 ///     __all__ += ["C"]
 /// ```
-#[violation]
-pub struct UnsupportedMethodCallOnAll {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsupportedMethodCallOnAll {
     name: String,
 }
 

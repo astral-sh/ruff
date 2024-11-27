@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, comparable::ComparableExpr};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -33,8 +33,8 @@ use crate::Locator;
 /// x: Final = 42
 /// y: Final = 42
 /// ```
-#[violation]
-pub struct RedundantFinalLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantFinalLiteral {
     literal: SourceCodeSnippet,
 }
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_trivia::indentation_at_offset;
@@ -32,8 +32,8 @@ use crate::fix;
 ///     @classmethod
 ///     def bar(cls): ...
 /// ```
-#[violation]
-pub struct NoClassmethodDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoClassmethodDecorator;
 
 impl AlwaysFixableViolation for NoClassmethodDecorator {
     #[derive_message_formats]
@@ -68,8 +68,8 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 ///     @staticmethod
 ///     def bar(arg1, arg2): ...
 /// ```
-#[violation]
-pub struct NoStaticmethodDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoStaticmethodDecorator;
 
 impl AlwaysFixableViolation for NoStaticmethodDecorator {
     #[derive_message_formats]

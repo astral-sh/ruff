@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{
     is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
@@ -61,8 +61,8 @@ use crate::registry::Rule;
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicModule;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicModule;
 
 impl Violation for UndocumentedPublicModule {
     #[derive_message_formats]
@@ -144,8 +144,8 @@ impl Violation for UndocumentedPublicModule {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicClass;
 
 impl Violation for UndocumentedPublicClass {
     #[derive_message_formats]
@@ -226,8 +226,8 @@ impl Violation for UndocumentedPublicClass {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicMethod;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicMethod;
 
 impl Violation for UndocumentedPublicMethod {
     #[derive_message_formats]
@@ -316,8 +316,8 @@ impl Violation for UndocumentedPublicMethod {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicFunction;
 
 impl Violation for UndocumentedPublicFunction {
     #[derive_message_formats]
@@ -359,8 +359,8 @@ impl Violation for UndocumentedPublicFunction {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicPackage;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicPackage;
 
 impl Violation for UndocumentedPublicPackage {
     #[derive_message_formats]
@@ -416,8 +416,8 @@ impl Violation for UndocumentedPublicPackage {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedMagicMethod;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedMagicMethod;
 
 impl Violation for UndocumentedMagicMethod {
     #[derive_message_formats]
@@ -471,8 +471,8 @@ impl Violation for UndocumentedMagicMethod {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicNestedClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicNestedClass;
 
 impl Violation for UndocumentedPublicNestedClass {
     #[derive_message_formats]
@@ -519,8 +519,8 @@ impl Violation for UndocumentedPublicNestedClass {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedPublicInit;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedPublicInit;
 
 impl Violation for UndocumentedPublicInit {
     #[derive_message_formats]

@@ -5,7 +5,7 @@ use std::path::Path;
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
@@ -40,8 +40,8 @@ use crate::rules::flake8_executable::helpers::is_executable;
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
-#[violation]
-pub struct ShebangNotExecutable;
+#[derive(ViolationMetadata)]
+pub(crate) struct ShebangNotExecutable;
 
 impl Violation for ShebangNotExecutable {
     #[derive_message_formats]

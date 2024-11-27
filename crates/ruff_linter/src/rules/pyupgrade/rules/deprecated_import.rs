@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Alias, StmtImportFrom};
 use ruff_python_codegen::Stylist;
@@ -60,8 +60,8 @@ enum Deprecation {
 /// ```python
 /// from collections.abc import Sequence
 /// ```
-#[violation]
-pub struct DeprecatedImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct DeprecatedImport {
     deprecation: Deprecation,
 }
 

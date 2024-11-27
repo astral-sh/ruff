@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
@@ -35,8 +35,8 @@ use super::super::helpers::{find_file_opens, FileOpen};
 /// ## References
 /// - [Python documentation: `Path.read_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_bytes)
 /// - [Python documentation: `Path.read_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text)
-#[violation]
-pub struct ReadWholeFile {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReadWholeFile {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
 }

@@ -1,7 +1,7 @@
 use log::error;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers;
 use ruff_python_ast::{CmpOp, Expr};
 use ruff_python_parser::{TokenKind, Tokens};
@@ -50,8 +50,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 /// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
-#[violation]
-pub struct IsLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct IsLiteral {
     cmp_op: IsCmpOp,
 }
 

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     Expr, ExprCall, ExprName, ExprSlice, ExprSubscript, ExprUnaryOp, Int, StmtAssign, UnaryOp,
 };
@@ -46,8 +46,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
-#[violation]
-pub struct ListReverseCopy {
+#[derive(ViolationMetadata)]
+pub(crate) struct ListReverseCopy {
     name: String,
 }
 

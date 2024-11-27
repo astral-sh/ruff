@@ -1,6 +1,6 @@
 use ast::ExceptHandler;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
@@ -18,8 +18,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-nested-blocks`
-#[violation]
-pub struct TooManyNestedBlocks {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyNestedBlocks {
     nested_blocks: usize,
     max_nested_blocks: usize,
 }

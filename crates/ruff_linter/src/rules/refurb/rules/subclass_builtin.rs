@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Arguments, StmtClassDef};
 use ruff_text_size::Ranged;
 
@@ -40,8 +40,8 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// ## References
 ///
 /// - [Python documentation: `collections`](https://docs.python.org/3/library/collections.html)
-#[violation]
-pub struct SubclassBuiltin {
+#[derive(ViolationMetadata)]
+pub(crate) struct SubclassBuiltin {
     subclass: String,
     replacement: String,
 }

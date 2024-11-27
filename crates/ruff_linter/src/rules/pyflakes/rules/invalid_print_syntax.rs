@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
@@ -46,8 +46,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
-#[violation]
-pub struct InvalidPrintSyntax;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidPrintSyntax;
 
 impl Violation for InvalidPrintSyntax {
     #[derive_message_formats]

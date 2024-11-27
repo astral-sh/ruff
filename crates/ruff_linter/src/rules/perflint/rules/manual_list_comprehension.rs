@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use anyhow::{anyhow, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
@@ -47,8 +47,8 @@ use crate::checkers::ast::Checker;
 /// original = list(range(10000))
 /// filtered.extend(x for x in original if x % 2)
 /// ```
-#[violation]
-pub struct ManualListComprehension {
+#[derive(ViolationMetadata)]
+pub(crate) struct ManualListComprehension {
     is_async: bool,
     comprehension_type: Option<ComprehensionType>,
 }

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_source_file::LineRanges;
 use ruff_text_size::TextRange;
@@ -88,8 +88,8 @@ use crate::rules::ruff::rules::sequence_sorting::{
 /// could be read by code elsewhere that depends on the exact
 /// iteration order of the items in `__all__`, in which case this
 /// rule's fix could theoretically cause breakage.
-#[violation]
-pub struct UnsortedDunderAll;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsortedDunderAll;
 
 impl Violation for UnsortedDunderAll {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

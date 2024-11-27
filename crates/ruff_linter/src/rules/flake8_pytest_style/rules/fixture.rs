@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -60,8 +60,8 @@ use super::helpers::{
 ///
 /// ## References
 /// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
-#[violation]
-pub struct PytestFixtureIncorrectParenthesesStyle {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
     actual: Parentheses,
 }
@@ -111,8 +111,8 @@ impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-#[violation]
-pub struct PytestFixturePositionalArgs {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFixturePositionalArgs {
     function: String,
 }
 
@@ -152,8 +152,8 @@ impl Violation for PytestFixturePositionalArgs {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-#[violation]
-pub struct PytestExtraneousScopeFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestExtraneousScopeFunction;
 
 impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     #[derive_message_formats]
@@ -214,9 +214,9 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-#[violation]
+#[derive(ViolationMetadata)]
 #[deprecated(note = "PT004 has been removed")]
-pub struct PytestMissingFixtureNameUnderscore;
+pub(crate) struct PytestMissingFixtureNameUnderscore;
 
 #[allow(deprecated)]
 impl Violation for PytestMissingFixtureNameUnderscore {
@@ -279,9 +279,9 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-#[violation]
+#[derive(ViolationMetadata)]
 #[deprecated(note = "PT005 has been removed")]
-pub struct PytestIncorrectFixtureNameUnderscore;
+pub(crate) struct PytestIncorrectFixtureNameUnderscore;
 
 #[allow(deprecated)]
 impl Violation for PytestIncorrectFixtureNameUnderscore {
@@ -339,8 +339,8 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
-#[violation]
-pub struct PytestFixtureParamWithoutValue {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFixtureParamWithoutValue {
     name: String,
 }
 
@@ -387,8 +387,8 @@ impl Violation for PytestFixtureParamWithoutValue {
 ///
 /// ## References
 /// - [`pytest` documentation: `yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
-#[violation]
-pub struct PytestDeprecatedYieldFixture;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestDeprecatedYieldFixture;
 
 impl Violation for PytestDeprecatedYieldFixture {
     #[derive_message_formats]
@@ -446,8 +446,8 @@ impl Violation for PytestDeprecatedYieldFixture {
 /// ## References
 /// - [`pytest` documentation: Adding finalizers directly](https://docs.pytest.org/en/latest/how-to/fixtures.html#adding-finalizers-directly)
 /// - [`pytest` documentation: Factories as fixtures](https://docs.pytest.org/en/latest/how-to/fixtures.html#factories-as-fixtures)
-#[violation]
-pub struct PytestFixtureFinalizerCallback;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFixtureFinalizerCallback;
 
 impl Violation for PytestFixtureFinalizerCallback {
     #[derive_message_formats]
@@ -494,8 +494,8 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///
 /// ## References
 /// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
-#[violation]
-pub struct PytestUselessYieldFixture {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUselessYieldFixture {
     name: String,
 }
 
@@ -551,8 +551,8 @@ impl AlwaysFixableViolation for PytestUselessYieldFixture {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
-#[violation]
-pub struct PytestErroneousUseFixturesOnFixture;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestErroneousUseFixturesOnFixture;
 
 impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
     #[derive_message_formats]
@@ -594,8 +594,8 @@ impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
 ///
 /// ## References
 /// - [PyPI: `pytest-asyncio`](https://pypi.org/project/pytest-asyncio/)
-#[violation]
-pub struct PytestUnnecessaryAsyncioMarkOnFixture;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUnnecessaryAsyncioMarkOnFixture;
 
 impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
     #[derive_message_formats]

@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use regex::RegexSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -29,8 +29,8 @@ use crate::Locator;
 /// ```python
 /// # TODO(ruff): this is now fixed!
 /// ```
-#[violation]
-pub struct InvalidTodoTag {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidTodoTag {
     pub tag: String,
 }
 
@@ -59,8 +59,8 @@ impl Violation for InvalidTodoTag {
 /// ```python
 /// # TODO(charlie): now an author is assigned
 /// ```
-#[violation]
-pub struct MissingTodoAuthor;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTodoAuthor;
 
 impl Violation for MissingTodoAuthor {
     #[derive_message_formats]
@@ -94,8 +94,8 @@ impl Violation for MissingTodoAuthor {
 /// # TODO(charlie): this comment has an issue code of (up to) 6 characters, then digits
 /// # SIXCHR-003
 /// ```
-#[violation]
-pub struct MissingTodoLink;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTodoLink;
 
 impl Violation for MissingTodoLink {
     #[derive_message_formats]
@@ -123,8 +123,8 @@ impl Violation for MissingTodoLink {
 /// ```python
 /// # TODO(charlie): colon fixed
 /// ```
-#[violation]
-pub struct MissingTodoColon;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTodoColon;
 
 impl Violation for MissingTodoColon {
     #[derive_message_formats]
@@ -150,8 +150,8 @@ impl Violation for MissingTodoColon {
 /// ```python
 /// # TODO(charlie): fix some issue
 /// ```
-#[violation]
-pub struct MissingTodoDescription;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTodoDescription;
 
 impl Violation for MissingTodoDescription {
     #[derive_message_formats]
@@ -177,8 +177,8 @@ impl Violation for MissingTodoDescription {
 /// ```python
 /// # TODO(charlie): this is capitalized
 /// ```
-#[violation]
-pub struct InvalidTodoCapitalization {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidTodoCapitalization {
     tag: String,
 }
 
@@ -214,8 +214,8 @@ impl AlwaysFixableViolation for InvalidTodoCapitalization {
 /// ```python
 /// # TODO(charlie): fix this
 /// ```
-#[violation]
-pub struct MissingSpaceAfterTodoColon;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingSpaceAfterTodoColon;
 
 impl Violation for MissingSpaceAfterTodoColon {
     #[derive_message_formats]

@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
@@ -58,8 +58,8 @@ use crate::renamer::Renamer;
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-#[violation]
-pub struct InvalidFirstArgumentNameForMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidFirstArgumentNameForMethod {
     argument_name: String,
 }
 
@@ -124,8 +124,8 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-#[violation]
-pub struct InvalidFirstArgumentNameForClassMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidFirstArgumentNameForClassMethod {
     argument_name: String,
 }
 

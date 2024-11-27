@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,8 +41,8 @@ use crate::registry::Rule;
 ///
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
-#[violation]
-pub struct UnrecognizedPlatformCheck;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnrecognizedPlatformCheck;
 
 impl Violation for UnrecognizedPlatformCheck {
     #[derive_message_formats]
@@ -75,8 +75,8 @@ impl Violation for UnrecognizedPlatformCheck {
 ///
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
-#[violation]
-pub struct UnrecognizedPlatformName {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnrecognizedPlatformName {
     platform: String,
 }
 

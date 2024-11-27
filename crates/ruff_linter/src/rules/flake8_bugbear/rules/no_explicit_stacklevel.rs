@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
-#[violation]
-pub struct NoExplicitStacklevel;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoExplicitStacklevel;
 
 impl Violation for NoExplicitStacklevel {
     #[derive_message_formats]

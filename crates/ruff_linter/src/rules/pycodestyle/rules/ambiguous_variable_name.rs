@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
@@ -33,8 +33,8 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// i = 42
 /// ```
 ///
-#[violation]
-pub struct AmbiguousVariableName(pub String);
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousVariableName(pub String);
 
 impl Violation for AmbiguousVariableName {
     #[derive_message_formats]

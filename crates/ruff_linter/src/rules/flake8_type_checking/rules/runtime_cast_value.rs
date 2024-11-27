@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -31,8 +31,8 @@ use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 /// ## Fix safety
 /// This fix is safe as long as the type expression doesn't span multiple
 /// lines and includes comments on any of the lines apart from the last one.
-#[violation]
-pub struct RuntimeCastValue;
+#[derive(ViolationMetadata)]
+pub(crate) struct RuntimeCastValue;
 
 impl Violation for RuntimeCastValue {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

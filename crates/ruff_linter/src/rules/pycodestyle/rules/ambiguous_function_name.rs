@@ -1,7 +1,7 @@
 use ruff_python_ast::Identifier;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
@@ -24,8 +24,8 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// ```python
 /// def long_name(x): ...
 /// ```
-#[violation]
-pub struct AmbiguousFunctionName(pub String);
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousFunctionName(pub String);
 
 impl Violation for AmbiguousFunctionName {
     #[derive_message_formats]

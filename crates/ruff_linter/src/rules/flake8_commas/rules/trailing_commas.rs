@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
@@ -145,8 +145,8 @@ impl Context {
 /// formatter enforces consistent use of trailing commas, making the rule redundant.
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct MissingTrailingComma;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTrailingComma;
 
 impl AlwaysFixableViolation for MissingTrailingComma {
     #[derive_message_formats]
@@ -190,8 +190,8 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 ///
 /// foo = (json.dumps({"bar": 1}))
 /// ```
-#[violation]
-pub struct TrailingCommaOnBareTuple;
+#[derive(ViolationMetadata)]
+pub(crate) struct TrailingCommaOnBareTuple;
 
 impl Violation for TrailingCommaOnBareTuple {
     #[derive_message_formats]
@@ -222,8 +222,8 @@ impl Violation for TrailingCommaOnBareTuple {
 /// formatter enforces consistent use of trailing commas, making the rule redundant.
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct ProhibitedTrailingComma;
+#[derive(ViolationMetadata)]
+pub(crate) struct ProhibitedTrailingComma;
 
 impl AlwaysFixableViolation for ProhibitedTrailingComma {
     #[derive_message_formats]

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -21,8 +21,8 @@ use super::{LogicalLine, Whitespace};
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct MultipleSpacesAfterKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleSpacesAfterKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
     #[derive_message_formats]
@@ -50,8 +50,8 @@ impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct MultipleSpacesBeforeKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleSpacesBeforeKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
     #[derive_message_formats]
@@ -79,8 +79,8 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct TabAfterKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct TabAfterKeyword;
 
 impl AlwaysFixableViolation for TabAfterKeyword {
     #[derive_message_formats]
@@ -108,8 +108,8 @@ impl AlwaysFixableViolation for TabAfterKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct TabBeforeKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct TabBeforeKeyword;
 
 impl AlwaysFixableViolation for TabBeforeKeyword {
     #[derive_message_formats]

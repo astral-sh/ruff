@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
@@ -53,8 +53,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `contextvars` — Context Variables](https://docs.python.org/3/library/contextvars.html)
-#[violation]
-pub struct MutableContextvarDefault;
+#[derive(ViolationMetadata)]
+pub(crate) struct MutableContextvarDefault;
 
 impl Violation for MutableContextvarDefault {
     #[derive_message_formats]

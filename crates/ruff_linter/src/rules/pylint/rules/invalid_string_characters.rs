@@ -1,7 +1,7 @@
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -26,8 +26,8 @@ use crate::Locator;
 /// ```python
 /// x = "\b"
 /// ```
-#[violation]
-pub struct InvalidCharacterBackspace;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidCharacterBackspace;
 
 impl AlwaysFixableViolation for InvalidCharacterBackspace {
     #[derive_message_formats]
@@ -59,8 +59,8 @@ impl AlwaysFixableViolation for InvalidCharacterBackspace {
 /// ```python
 /// x = "\x1a"
 /// ```
-#[violation]
-pub struct InvalidCharacterSub;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidCharacterSub;
 
 impl AlwaysFixableViolation for InvalidCharacterSub {
     #[derive_message_formats]
@@ -92,8 +92,8 @@ impl AlwaysFixableViolation for InvalidCharacterSub {
 /// ```python
 /// x = "\x1b"
 /// ```
-#[violation]
-pub struct InvalidCharacterEsc;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidCharacterEsc;
 
 impl AlwaysFixableViolation for InvalidCharacterEsc {
     #[derive_message_formats]
@@ -125,8 +125,8 @@ impl AlwaysFixableViolation for InvalidCharacterEsc {
 /// ```python
 /// x = "\0"
 /// ```
-#[violation]
-pub struct InvalidCharacterNul;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidCharacterNul;
 
 impl AlwaysFixableViolation for InvalidCharacterNul {
     #[derive_message_formats]
@@ -157,8 +157,8 @@ impl AlwaysFixableViolation for InvalidCharacterNul {
 /// ```python
 /// x = "Dear Sir\u200b/\u200bMadam"  # zero width space
 /// ```
-#[violation]
-pub struct InvalidCharacterZeroWidthSpace;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidCharacterZeroWidthSpace;
 
 impl AlwaysFixableViolation for InvalidCharacterZeroWidthSpace {
     #[derive_message_formats]

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprBinOp, ExprNoneLiteral, ExprSubscript, Operator};
 use ruff_python_semantic::{
     analyze::typing::{traverse_literal, traverse_union},
@@ -39,8 +39,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
-#[violation]
-pub struct RedundantNoneLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantNoneLiteral {
     other_literal_elements_seen: bool,
 }
 

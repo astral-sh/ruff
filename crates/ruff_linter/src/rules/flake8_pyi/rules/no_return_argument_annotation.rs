@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -40,8 +40,8 @@ use crate::settings::types::PythonVersion::Py311;
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
 ///
 /// [bottom type]: https://en.wikipedia.org/wiki/Bottom_type
-#[violation]
-pub struct NoReturnArgumentAnnotationInStub {
+#[derive(ViolationMetadata)]
+pub(crate) struct NoReturnArgumentAnnotationInStub {
     module: TypingModule,
 }
 
