@@ -1,5 +1,10 @@
 # Type aliases
 
+```toml
+[environment]
+target-version = "3.12"
+```
+
 ## Basic
 
 ```py
