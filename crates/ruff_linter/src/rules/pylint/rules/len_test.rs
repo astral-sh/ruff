@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::find_binding_value;
@@ -42,8 +42,8 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// [PEP 8: Programming Recommendations](https://peps.python.org/pep-0008/#programming-recommendations)
-#[violation]
-pub struct LenTest {
+#[derive(ViolationMetadata)]
+pub(crate) struct LenTest {
     expression: SourceCodeSnippet,
 }
 
