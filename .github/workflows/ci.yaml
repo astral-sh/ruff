@@ -330,10 +330,9 @@ jobs:
           chmod +x ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
           (
-            uv run \
-            --no-project \
+            uvx \
             --python=${{ env.PYTHON_VERSION }} \
-            --with=./python/py-fuzzer \
+            --from=./python/py-fuzzer \
             fuzz \
             --test-executable=${{ steps.download-cached-binary.outputs.download-path }}/ruff \
             --bin=ruff \

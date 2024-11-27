@@ -4,19 +4,19 @@ Python source-code files.
 
 This script can be installed into a virtual environment using
 `uv pip install -e ./python/py-fuzzer` from the Ruff repository root,
-or can be run using `uv run --no-project --with ./python/py-fuzzer`
+or can be run using `uvx --from ./python/py-fuzzer fuzz`
 (in which case the virtual environment does not need to be activated).
 
 Example invocations of the script using `uv`:
 - Run the fuzzer on Ruff's parser using seeds 0, 1, 2, 78 and 93 to generate the code:
-  `uv run --no-project --with ./python/py-fuzzer fuzz --bin ruff 0-2 78 93`
+  `uvx --from ./python/py-fuzzer fuzz --bin ruff 0-2 78 93`
 - Run the fuzzer concurrently using seeds in range 0-10 inclusive,
   but only reporting bugs that are new on your branch:
-  `uv run --no-project --with ./python/py-fuzzer fuzz --bin ruff 0-10 --new-bugs-only`
+  `uvx --from ./python/py-fuzzer fuzz --bin ruff 0-10 --new-bugs-only`
 - Run the fuzzer concurrently on 10,000 different Python source-code files,
   using a random selection of seeds, and only print a summary at the end
   (the `shuf` command is Unix-specific):
-  `uv run --no-project --with ./python/py-fuzzer fuzz --bin ruff $(shuf -i 0-1000000 -n 10000) --quiet
+  `uvx --from ./python/py-fuzzer fuzz --bin ruff $(shuf -i 0-1000000 -n 10000) --quiet
 """
 
 from __future__ import annotations
