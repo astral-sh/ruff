@@ -1013,6 +1013,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "960") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromPrefixTestRule),
 
+        (Ruff, "970") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRegularExpression),
+
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Stable, rules::flake8_django::rules::DjangoNullableModelStringField),
