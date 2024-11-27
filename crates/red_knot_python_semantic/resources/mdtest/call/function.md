@@ -36,6 +36,8 @@ from typing import Callable
 def foo() -> int:
     return 42
 
+# TODO: This should be resolved once we understand `Callable` annotations
+# error: [annotation-with-invalid-expression]
 def decorator(func) -> Callable[[], int]:
     return foo
 

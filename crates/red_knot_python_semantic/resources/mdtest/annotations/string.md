@@ -125,7 +125,6 @@ def f7() -> "\x69nt":
 def f8() -> """int""":
     return 1
 
-# error: [annotation-byte-string] "Type expressions cannot use bytes literal"
 def f9() -> "b'int'":
     return 1
 

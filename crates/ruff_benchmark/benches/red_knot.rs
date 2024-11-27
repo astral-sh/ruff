@@ -27,13 +27,17 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     // We don't support `*` imports yet:
     "error[unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
     // We don't support terminal statements in control flow yet:
+    "error[annotation-with-invalid-expression] /src/tomllib/_parser.py:57:71 Invalid expression in type expression",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:66:18 Name `s` used when possibly not defined",
+    "error[annotation-with-invalid-expression] /src/tomllib/_parser.py:69:66 Invalid expression in type expression",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:98:12 Name `char` used when possibly not defined",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:101:12 Name `char` used when possibly not defined",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:104:14 Name `char` used when possibly not defined",
     "error[conflicting-declarations] /src/tomllib/_parser.py:108:17 Conflicting declared types for `second_char`: Unknown, str | None",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:115:14 Name `char` used when possibly not defined",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:126:12 Name `char` used when possibly not defined",
+    "error[annotation-with-invalid-expression] /src/tomllib/_parser.py:145:27 Invalid expression in type expression",
+    "error[annotation-with-invalid-expression] /src/tomllib/_parser.py:196:25 Invalid expression in type expression",
     "error[conflicting-declarations] /src/tomllib/_parser.py:267:9 Conflicting declared types for `char`: Unknown, str | None",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:348:20 Name `nest` used when possibly not defined",
     "error[possibly-unresolved-reference] /src/tomllib/_parser.py:353:5 Name `nest` used when possibly not defined",

@@ -31,6 +31,7 @@ use std::num::NonZeroU32;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, ExprContext, UnaryOp};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -4214,25 +4215,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
 
-            ast::Expr::BytesLiteral(bytes) => {
-                self.diagnostics.add(
-                    bytes.into(),
-                    "annotation-byte-string",
-                    format_args!("Type expressions cannot use bytes literal"),
-                );
-                Type::Unknown
-            }
-
-            ast::Expr::FString(fstring) => {
-                self.diagnostics.add(
-                    fstring.into(),
-                    "annotation-f-string",
-                    format_args!("Type expressions cannot use f-strings"),
-                );
-                self.infer_fstring_expression(fstring);
-                Type::Unknown
-            }
-
             // All other annotation expressions are (possibly) valid type expressions, so handle
             // them there instead.
             type_expr => self.infer_type_expression_no_store(type_expr),
@@ -4241,6 +4223,72 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.store_expression_type(annotation, annotation_ty);
 
         annotation_ty
+    }
+
+    /// Walk child expressions of the given AST node and store the given type for each of them.
+    /// Does not store a type for the root expression. Resets to normal type inference for all
+    /// expressions with a nested scope (lambda, named expression, comprehensions, generators).
+    fn store_type_for_sub_expressions_of(&mut self, expression: &ast::Expr, ty: Type<'db>) {
+        struct StoreTypeVisitor<'a, 'db> {
+            builder: &'a mut TypeInferenceBuilder<'db>,
+            ty: Type<'db>,
+            is_root_node: bool,
+        }
+
+        impl<'a, 'db> StoreTypeVisitor<'a, 'db> {
+            fn new(builder: &'a mut TypeInferenceBuilder<'db>, ty: Type<'db>) -> Self {
+                Self {
+                    builder,
+                    ty,
+                    is_root_node: true,
+                }
+            }
+
+            fn store(&mut self, expr: &ast::Expr) {
+                if self.is_root_node {
+                    self.is_root_node = false;
+                } else {
+                    self.builder.store_expression_type(expr, self.ty);
+                }
+            }
+        }
+
+        impl<'a, 'db, 'ast> Visitor<'ast> for StoreTypeVisitor<'a, 'db> {
+            fn visit_expr(&mut self, expr: &'ast Expr) {
+                match expr {
+                    ast::Expr::Lambda(lambda) => {
+                        self.builder.infer_lambda_expression(lambda);
+                        self.store(expr);
+                    }
+                    ast::Expr::Named(named) => {
+                        self.builder.infer_named_expression(named);
+                        self.store(expr);
+                    }
+                    ast::Expr::ListComp(list_comp) => {
+                        self.builder.infer_list_comprehension_expression(list_comp);
+                        self.store(expr);
+                    }
+                    ast::Expr::SetComp(set_comp) => {
+                        self.builder.infer_set_comprehension_expression(set_comp);
+                        self.store(expr);
+                    }
+                    ast::Expr::DictComp(dict_comp) => {
+                        self.builder.infer_dict_comprehension_expression(dict_comp);
+                        self.store(expr);
+                    }
+                    ast::Expr::Generator(generator) => {
+                        self.builder.infer_generator_expression(generator);
+                        self.store(expr);
+                    }
+                    _ => {
+                        self.store(expr);
+                        visitor::walk_expr(self, expr);
+                    }
+                }
+            }
+        }
+
+        StoreTypeVisitor::new(self, ty).visit_expr(expression);
     }
 
     /// Infer the type of a string annotation expression.
@@ -4324,13 +4372,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             // expressions, but is meaningful in the context of a number of special forms.
             ast::Expr::EllipsisLiteral(_literal) => todo_type!(),
 
-            // Other literals do not have meaningful values in the annotation expression context.
-            // However, we will we want to handle these differently when working with special forms,
-            // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
-            ast::Expr::BytesLiteral(_literal) => todo_type!(),
-            ast::Expr::NumberLiteral(_literal) => todo_type!(),
-            ast::Expr::BooleanLiteral(_literal) => todo_type!(),
-
             ast::Expr::Subscript(subscript) => {
                 let ast::ExprSubscript {
                     value,
@@ -4379,90 +4420,62 @@ impl<'db> TypeInferenceBuilder<'db> {
             // string annotation, as they are not present in the semantic index.
             _ if self.deferred_state.in_string_annotation() => Type::Unknown,
 
-            // Forms which are invalid in the context of annotation expressions: we infer their
-            // nested expressions as normal expressions, but the type of the top-level expression is
-            // always `Type::Unknown` in these cases.
-            ast::Expr::BoolOp(bool_op) => {
-                self.infer_boolean_expression(bool_op);
+            // Forms which are invalid in the context of annotation expressions: we store a type of
+            // `Type::Unknown` for these expressions (and their sub-expressions) to avoid problems
+            // with invalid-syntax examples like `x: f"{x}"` or `x: lambda y: x`, for which we can
+            // not infer a meaningful type for the inner `x` expression. The top-level expression
+            // is also `Type::Unknown` in these cases.
+            ast::Expr::BoolOp(_)
+            | ast::Expr::Named(_)
+            | ast::Expr::UnaryOp(_)
+            | ast::Expr::Lambda(_)
+            | ast::Expr::If(_)
+            | ast::Expr::Dict(_)
+            | ast::Expr::Set(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::SetComp(_)
+            | ast::Expr::DictComp(_)
+            | ast::Expr::Generator(_)
+            | ast::Expr::Await(_)
+            | ast::Expr::Yield(_)
+            | ast::Expr::YieldFrom(_)
+            | ast::Expr::Compare(_)
+            | ast::Expr::Call(_)
+            | ast::Expr::FString(_)
+            | ast::Expr::List(_)
+            | ast::Expr::Tuple(_)
+            | ast::Expr::Slice(_)
+            | ast::Expr::IpyEscapeCommand(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BooleanLiteral(_) => {
+                match expression {
+                    ast::Expr::BytesLiteral(bytes) => {
+                        self.diagnostics.add(
+                            bytes.into(),
+                            "annotation-byte-string",
+                            format_args!("Type expressions cannot use bytes literal"),
+                        );
+                    }
+                    ast::Expr::FString(fstring) => {
+                        self.diagnostics.add(
+                            fstring.into(),
+                            "annotation-f-string",
+                            format_args!("Type expressions cannot use f-strings"),
+                        );
+                    }
+                    _ => {
+                        self.diagnostics.add(
+                            expression.into(),
+                            "annotation-with-invalid-expression",
+                            format_args!("Invalid expression in type expression"),
+                        );
+                    }
+                }
+
+                self.store_type_for_sub_expressions_of(expression, Type::Unknown);
                 Type::Unknown
             }
-            ast::Expr::Named(named) => {
-                self.infer_named_expression(named);
-                Type::Unknown
-            }
-            ast::Expr::UnaryOp(unary) => {
-                self.infer_unary_expression(unary);
-                Type::Unknown
-            }
-            ast::Expr::Lambda(lambda_expression) => {
-                self.infer_lambda_expression(lambda_expression);
-                Type::Unknown
-            }
-            ast::Expr::If(if_expression) => {
-                self.infer_if_expression(if_expression);
-                Type::Unknown
-            }
-            ast::Expr::Dict(dict) => {
-                self.infer_dict_expression(dict);
-                Type::Unknown
-            }
-            ast::Expr::Set(set) => {
-                self.infer_set_expression(set);
-                Type::Unknown
-            }
-            ast::Expr::ListComp(listcomp) => {
-                self.infer_list_comprehension_expression(listcomp);
-                Type::Unknown
-            }
-            ast::Expr::SetComp(setcomp) => {
-                self.infer_set_comprehension_expression(setcomp);
-                Type::Unknown
-            }
-            ast::Expr::DictComp(dictcomp) => {
-                self.infer_dict_comprehension_expression(dictcomp);
-                Type::Unknown
-            }
-            ast::Expr::Generator(generator) => {
-                self.infer_generator_expression(generator);
-                Type::Unknown
-            }
-            ast::Expr::Await(await_expression) => {
-                self.infer_await_expression(await_expression);
-                Type::Unknown
-            }
-            ast::Expr::Yield(yield_expression) => {
-                self.infer_yield_expression(yield_expression);
-                Type::Unknown
-            }
-            ast::Expr::YieldFrom(yield_from) => {
-                self.infer_yield_from_expression(yield_from);
-                Type::Unknown
-            }
-            ast::Expr::Compare(compare) => {
-                self.infer_compare_expression(compare);
-                Type::Unknown
-            }
-            ast::Expr::Call(call_expr) => {
-                self.infer_call_expression(call_expr);
-                Type::Unknown
-            }
-            ast::Expr::FString(fstring) => {
-                self.infer_fstring_expression(fstring);
-                Type::Unknown
-            }
-            ast::Expr::List(list) => {
-                self.infer_list_expression(list);
-                Type::Unknown
-            }
-            ast::Expr::Tuple(tuple) => {
-                self.infer_tuple_expression(tuple);
-                Type::Unknown
-            }
-            ast::Expr::Slice(slice) => {
-                self.infer_slice_expression(slice);
-                Type::Unknown
-            }
-            ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         }
     }
 
