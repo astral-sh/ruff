@@ -1530,14 +1530,28 @@ impl<'a> SemanticModel<'a> {
             return true;
         }
 
-        false
+        // Ex) `Union[Union[int, int]]` or `Union[int | int]`
+        self.current_expression_parent()
+            .and_then(Expr::as_subscript_expr)
+            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Union"))
     }
 
     /// Return `true` if the model is in a nested literal expression (e.g., the inner `Literal` in
     /// `Literal[Literal[int, str], float]`).
     pub fn in_nested_literal(&self) -> bool {
+        // Parent is union or tuple
         // Ex) `Literal[Literal[int, str], float]`
-        self.current_expression_grandparent()
+        if self
+            .current_expression_grandparent()
+            .and_then(Expr::as_subscript_expr)
+            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Literal"))
+        {
+            return true;
+        }
+
+        // Parent is `Literal`
+        // Ex) `Literal[Literal[int]]`
+        self.current_expression_parent()
             .and_then(Expr::as_subscript_expr)
             .is_some_and(|parent| self.match_typing_expr(&parent.value, "Literal"))
     }

@@ -407,6 +407,10 @@ where
                         .for_each(|elem| inner(func, semantic, elem, Some(expr)));
                     return;
                 }
+
+                // Ex) Union[Union[a, b]] and Union[a | b | c]
+                inner(func, semantic, slice, Some(expr));
+                return;
             }
         }
 
@@ -435,7 +439,7 @@ where
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
-        // Ex) Literal[x, y]
+        // Ex) `Literal[x, y]`
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Literal") {
                 match &**slice {
@@ -447,6 +451,7 @@ where
                         }
                     }
                     other => {
+                        // Ex) `Literal[Literal[...]]`
                         inner(func, semantic, other, Some(expr));
                     }
                 }
