@@ -73,30 +73,30 @@ impl<'a> ReFunc<'a> {
         let locate_arg = |name, position| {
             Some(locator.slice(call.arguments.find_argument(name, position)?.range()))
         };
-        match func_name {
-            "sub" if nargs == 3 => Some(ReFunc {
+        match (func_name, nargs) {
+            ("sub", 3) => Some(ReFunc {
                 kind: ReFuncKind::Sub {
                     repl: locate_arg("repl", 1)?,
                 },
                 pattern: locate_arg("pattern", 0)?,
                 string: locate_arg("string", 2)?,
             }),
-            "match" if nargs == 2 => Some(ReFunc {
+            ("match", 2) => Some(ReFunc {
                 kind: ReFuncKind::Match,
                 pattern: locate_arg("pattern", 0)?,
                 string: locate_arg("string", 1)?,
             }),
-            "search" if nargs == 2 => Some(ReFunc {
+            ("search", 2) => Some(ReFunc {
                 kind: ReFuncKind::Search,
                 pattern: locate_arg("pattern", 0)?,
                 string: locate_arg("string", 1)?,
             }),
-            "fullmatch" if nargs == 2 => Some(ReFunc {
+            ("fullmatch", 2) => Some(ReFunc {
                 kind: ReFuncKind::Fullmatch,
                 pattern: locate_arg("pattern", 0)?,
                 string: locate_arg("string", 1)?,
             }),
-            "split" if nargs == 2 => Some(ReFunc {
+            ("split", 2) => Some(ReFunc {
                 kind: ReFuncKind::Split,
                 pattern: locate_arg("pattern", 0)?,
                 string: locate_arg("string", 1)?,
