@@ -73,31 +73,51 @@ impl<'a> ReFunc<'a> {
         let locate_arg = |name, position| {
             Some(locator.slice(call.arguments.find_argument(name, position)?.range()))
         };
+        let semantic = checker.semantic();
+
+        // the proposed fixes for match, search, and fullmatch rely on the
+        // return value only being used for its truth value
+        let in_if_context = semantic.current_statement().is_if_stmt()
+            && !semantic
+                .current_expression_parent()
+                .is_some_and(|expr| expr.is_named_expr());
+
         match (func_name, nargs) {
-            ("sub", 3) => Some(ReFunc {
-                kind: ReFuncKind::Sub {
-                    repl: locate_arg("repl", 1)?,
-                },
+            // `split` is the safest of these to fix, as long as metacharacters
+            // have already been filtered out from the `pattern`
+            ("split", 2) => Some(ReFunc {
+                kind: ReFuncKind::Split,
                 pattern: locate_arg("pattern", 0)?,
-                string: locate_arg("string", 2)?,
+                string: locate_arg("string", 1)?,
             }),
-            ("match", 2) => Some(ReFunc {
+            // `sub` is only safe to fix if `repl` is a string. `re.sub` also
+            // allows it to be a function, which will *not* work in the str
+            // version
+            ("sub", 3) => {
+                let repl = call.arguments.find_argument("repl", 1)?;
+                if !repl.is_string_literal_expr() {
+                    return None;
+                }
+                Some(ReFunc {
+                    kind: ReFuncKind::Sub {
+                        repl: locator.slice(repl.range()),
+                    },
+                    pattern: locate_arg("pattern", 0)?,
+                    string: locate_arg("string", 2)?,
+                })
+            }
+            ("match", 2) if in_if_context => Some(ReFunc {
                 kind: ReFuncKind::Match,
                 pattern: locate_arg("pattern", 0)?,
                 string: locate_arg("string", 1)?,
             }),
-            ("search", 2) => Some(ReFunc {
+            ("search", 2) if in_if_context => Some(ReFunc {
                 kind: ReFuncKind::Search,
                 pattern: locate_arg("pattern", 0)?,
                 string: locate_arg("string", 1)?,
             }),
-            ("fullmatch", 2) => Some(ReFunc {
+            ("fullmatch", 2) if in_if_context => Some(ReFunc {
                 kind: ReFuncKind::Fullmatch,
-                pattern: locate_arg("pattern", 0)?,
-                string: locate_arg("string", 1)?,
-            }),
-            ("split", 2) => Some(ReFunc {
-                kind: ReFuncKind::Split,
                 pattern: locate_arg("pattern", 0)?,
                 string: locate_arg("string", 1)?,
             }),
