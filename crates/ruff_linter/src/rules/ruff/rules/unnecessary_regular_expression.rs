@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ``python
+/// ```python
 /// re.sub("abc", "", s)
 /// ```
 ///
@@ -142,7 +142,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
 
     // skip calls with more than `pattern` and `string` arguments (and `repl`
     // for `sub`)
-    let Some(re_func) = ReFunc::from_call_expr(checker, call, *func) else {
+    let Some(re_func) = ReFunc::from_call_expr(checker, call, func) else {
         return;
     };
 
