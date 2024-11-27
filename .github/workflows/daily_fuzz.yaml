@@ -45,10 +45,9 @@ jobs:
       - name: Fuzz
         run: |
           (
-            uv run \
-            --no-project \
+            uvx \
             --python=3.12 \
-            --with=./python/py-fuzzer \
+            --from=./python/py-fuzzer \
             fuzz \
             --test-executable=target/debug/ruff \
             --bin=ruff \
