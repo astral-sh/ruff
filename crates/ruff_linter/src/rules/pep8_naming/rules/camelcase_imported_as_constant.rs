@@ -32,10 +32,10 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// ## Note
 /// Identifiers consisting of a single uppercase character are ambiguous under
-/// the rules of [PEP 8], which specifies CamelCase for classes and
-/// ALL_CAPS_SNAKE_CASE for constants. Without a second character, it is not
+/// the rules of [PEP 8], which specifies `CamelCase` for classes and
+/// `ALL_CAPS_SNAKE_CASE` for constants. Without a second character, it is not
 /// possible to reliably guess whether the identifier is intended to be part
-/// of a CamelCase string for a class or an ALL_CAPS_SNAKE_CASE string for
+/// of a `CamelCase` string for a class or an `ALL_CAPS_SNAKE_CASE` string for
 /// a constant, since both conventions will produce the same output when given
 /// a single input character. Therefore, this lint rule does not apply to cases
 /// where the alias for the imported identifier consists of a single uppercase
