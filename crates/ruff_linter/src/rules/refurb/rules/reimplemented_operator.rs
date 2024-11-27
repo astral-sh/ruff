@@ -22,7 +22,7 @@ use crate::Locator;
 ///
 /// ## Why is this bad?
 /// The `operator` module provides functions that implement the same functionality as the
-/// corresponding operators. For example, `operator.add` is equivalent to `lambda x, y: x + y`.
+/// corresponding operators. For example, `operator.add` is often equivalent to `lambda x, y: x + y`.
 /// Using the functions from the `operator` module is more concise and communicates the intent of
 /// the code more clearly.
 ///
@@ -44,10 +44,30 @@ use crate::Locator;
 /// ```
 ///
 /// ## Fix safety
-/// This fix is usually safe, but if the lambda is called with keyword arguments, e.g.,
-/// `add = lambda x, y: x + y; add(x=1, y=2)`, replacing the lambda with an operator function, e.g.,
-/// `operator.add`, will cause the call to raise a `TypeError`, as functions in `operator` do not allow
-/// keyword arguments.
+/// The fix offered by this rule is always marked as unsafe. While the changes the fix would make
+/// would rarely break your code, there are two ways in which functions from the `operator` module
+/// differ from user-defined functions. It would be non-trivial for Ruff to detect whether or not
+/// these differences would matter in a specific situation where Ruff is emitting a diagnostic for
+/// this rule.
+///
+/// The first difference is that `operator` functions cannot be called with keyword arguments, but
+/// most user-defined functions can. If an `add` function is defined as `add = lambda x, y: x + y`
+/// replacing this function with `operator.add` will cause the later call to raise `TypeError` if
+/// the function is later called with keyword arguments, e.g. `add(x=1, y=2)`.
+///
+/// The second difference is that user-defined functions are [descriptors], but this is not true of
+/// the functions defined in the `operator` module. Practically speaking, this means that defining
+/// a function in a class body (either using a `def` statement or assigning a `lambda` function to
+/// a variable) is a valid way of defining an instance method on that class; monkeypatching a
+/// user-defined function onto a class after the class has been created also has the same effect.
+/// The same is not true of an `operator` function: assigning an operator function to a variable in
+/// a class body or monkeypatching it onto a class will not create a valid instance method. Ruff
+/// will refrain from emitting diagnostics for this rule on function definitions in class bodies;
+/// however, it does not currently have sophisticated enough type inference to avoid emitting this
+/// diagnostic if a user-defined function is being monkeypatched onto a class after the class has
+/// been constructed.
+///
+/// [descriptors]: https://docs.python.org/3/howto/descriptor.html
 #[derive(ViolationMetadata)]
 pub(crate) struct ReimplementedOperator {
     operator: Operator,

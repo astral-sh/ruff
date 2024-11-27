@@ -101,4 +101,4 @@ class Foo:
         return self == other
 
 class Bar:
-    y = lambda selfff, other: self == other
+    y = lambda self, other: self == other
