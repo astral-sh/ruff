@@ -6,15 +6,16 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::{self as ast, Pattern};
 use ruff_python_ast::{BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
+use crate::semantic_index::constraint::PatternConstraintKind;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
     DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
@@ -24,7 +25,10 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
+use crate::semantic_index::use_def::{
+    FlowSnapshot, ScopedConstraintId, ScopedVisibilityConstraintId, UseDefMapBuilder,
+};
+use crate::semantic_index::visibility_constraint::VisibilityConstraintRef;
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::Unpack;
 use crate::Db;
@@ -157,7 +161,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::default());
-        self.use_def_maps.push(UseDefMapBuilder::default());
+        self.use_def_maps.push(UseDefMapBuilder::new());
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
@@ -279,14 +283,30 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
-    fn record_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
+    fn record_expression_constraint(
+        &mut self,
+        constraint_node: &ast::Expr,
+    ) -> (ScopedConstraintId, Constraint<'db>) {
         let constraint = self.build_constraint(constraint_node);
-        self.record_constraint(constraint);
-        constraint
+        let constraint_id = self.record_constraint(constraint);
+        (constraint_id, constraint)
     }
 
-    fn record_constraint(&mut self, constraint: Constraint<'db>) {
-        self.current_use_def_map_mut().record_constraint(constraint);
+    fn record_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        self.current_use_def_map_mut().record_constraint(constraint)
+    }
+
+    fn record_visibility_constraint(
+        &mut self,
+        constraint: ScopedConstraintId,
+    ) -> ScopedVisibilityConstraintId {
+        self.current_use_def_map_mut()
+            .record_visibility_constraint(&VisibilityConstraintRef::Single(constraint))
+    }
+
+    fn record_negated_visibility_constraint(&mut self, constraint: ScopedVisibilityConstraintId) {
+        self.current_use_def_map_mut()
+            .record_visibility_constraint(&VisibilityConstraintRef::Negated(constraint));
     }
 
     fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
@@ -297,12 +317,13 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) {
-        self.current_use_def_map_mut()
-            .record_constraint(Constraint {
-                node: constraint.node,
-                is_positive: false,
-            });
+    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        let negated = Constraint {
+            node: constraint.node,
+            is_positive: false,
+        };
+        let constraint_id = self.current_use_def_map_mut().record_constraint(negated);
+        constraint_id
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
@@ -324,30 +345,31 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn add_pattern_constraint(
         &mut self,
-        subject: &ast::Expr,
+        subject: Expression<'db>,
         pattern: &ast::Pattern,
-    ) -> PatternConstraint<'db> {
-        #[allow(unsafe_code)]
-        let (subject, pattern) = unsafe {
-            (
-                AstNodeRef::new(self.module.clone(), subject),
-                AstNodeRef::new(self.module.clone(), pattern),
-            )
+    ) -> ScopedConstraintId {
+        let kind = match pattern {
+            Pattern::MatchValue(pattern) => {
+                let value = self.add_standalone_expression(&pattern.value);
+                PatternConstraintKind::Value(value)
+            }
+            Pattern::MatchSingleton(singleton) => PatternConstraintKind::Singleton(singleton.value),
+            _ => PatternConstraintKind::Unsupported,
         };
+
         let pattern_constraint = PatternConstraint::new(
             self.db,
             self.file,
             self.current_scope(),
             subject,
-            pattern,
+            kind,
             countme::Count::default(),
         );
         self.current_use_def_map_mut()
             .record_constraint(Constraint {
                 node: ConstraintNode::Pattern(pattern_constraint),
                 is_positive: true,
-            });
-        pattern_constraint
+            })
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -796,9 +818,13 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                let constraint = self.record_expression_constraint(&node.test);
-                let mut constraints = vec![constraint];
+                let (constraint_id, constraint) = self.record_expression_constraint(&node.test);
+                let mut constraints = vec![(constraint_id, constraint)];
                 self.visit_body(&node.body);
+
+                let visibility_constraint_id = self.record_visibility_constraint(constraint_id);
+                let mut vis_constraints = vec![visibility_constraint_id];
+
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 let elif_else_clauses = node
                     .elif_else_clauses
@@ -822,15 +848,30 @@ where
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
                     self.flow_restore(pre_if.clone());
-                    for constraint in &constraints {
+                    for (_, constraint) in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
-                    if let Some(elif_test) = clause_test {
+
+                    let elif_constraint = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
-                        constraints.push(self.record_expression_constraint(elif_test));
-                    }
+                        let (constraint_id, constraint) =
+                            self.record_expression_constraint(elif_test);
+                        constraints.push((constraint_id, constraint));
+                        Some(constraint_id)
+                    } else {
+                        None
+                    };
                     self.visit_body(clause_body);
+
+                    for id in &vis_constraints {
+                        self.record_negated_visibility_constraint(*id);
+                    }
+                    if let Some(elif_constraint) = elif_constraint {
+                        let id = self.record_visibility_constraint(elif_constraint);
+                        vis_constraints.push(id);
+                    }
                 }
+
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
@@ -844,7 +885,7 @@ where
                 self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
-                let constraint = self.record_expression_constraint(test);
+                let (constraint_id, constraint) = self.record_expression_constraint(test);
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -861,11 +902,15 @@ where
                 let break_states =
                     std::mem::replace(&mut self.loop_break_states, saved_break_states);
 
+                let vis_constraint_id = self.record_visibility_constraint(constraint_id);
+
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop);
                 self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
+
+                self.record_negated_visibility_constraint(vis_constraint_id);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
@@ -947,22 +992,34 @@ where
                 cases,
                 range: _,
             }) => {
-                self.add_standalone_expression(subject);
+                let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
 
                 let after_subject = self.flow_snapshot();
                 let Some((first, remaining)) = cases.split_first() else {
                     return;
                 };
-                self.add_pattern_constraint(subject, &first.pattern);
+
+                let first_constraint_id = self.add_pattern_constraint(subject_expr, &first.pattern);
+
                 self.visit_match_case(first);
+
+                let first_vis_constraint_id =
+                    self.record_visibility_constraint(first_constraint_id);
+                let mut vis_constraints = vec![first_vis_constraint_id];
 
                 let mut post_case_snapshots = vec![];
                 for case in remaining {
                     post_case_snapshots.push(self.flow_snapshot());
                     self.flow_restore(after_subject.clone());
-                    self.add_pattern_constraint(subject, &case.pattern);
+                    let constraint_id = self.add_pattern_constraint(subject_expr, &case.pattern);
                     self.visit_match_case(case);
+
+                    for id in &vis_constraints {
+                        self.record_negated_visibility_constraint(*id);
+                    }
+                    let vis_constraint_id = self.record_visibility_constraint(constraint_id);
+                    vis_constraints.push(vis_constraint_id);
                 }
                 for post_clause_state in post_case_snapshots {
                     self.flow_merge(post_clause_state);
@@ -972,6 +1029,14 @@ where
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
                     self.flow_merge(after_subject);
+
+                    // for post_clause_state in post_case_snapshots {
+                    //     self.flow_merge(post_clause_state);
+                    // }
+
+                    for id in &vis_constraints {
+                        self.record_negated_visibility_constraint(*id);
+                    }
                 }
             }
             ast::Stmt::Try(ast::StmtTry {
@@ -1222,12 +1287,9 @@ where
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
             }) => {
-                // TODO detect statically known truthy or falsy test (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
-                let constraint = self.record_expression_constraint(test);
+                let (_, constraint) = self.record_expression_constraint(test);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
@@ -1291,22 +1353,22 @@ where
                 range: _,
                 op,
             }) => {
-                // TODO detect statically known truthy or falsy values (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
                 let mut snapshots = vec![];
-
+                let mut last_constraint_id = None;
                 for (index, value) in values.iter().enumerate() {
                     self.visit_expr(value);
+                    if let Some(last_constraint_id) = last_constraint_id {
+                        self.record_visibility_constraint(last_constraint_id);
+                    }
                     // In the last value we don't need to take a snapshot nor add a constraint
                     if index < values.len() - 1 {
                         // Snapshot is taken after visiting the expression but before adding the constraint.
                         snapshots.push(self.flow_snapshot());
                         let constraint = self.build_constraint(value);
-                        match op {
+                        last_constraint_id = Some(match op {
                             BoolOp::And => self.record_constraint(constraint),
                             BoolOp::Or => self.record_negated_constraint(constraint),
-                        }
+                        });
                     }
                 }
                 for snapshot in snapshots {
