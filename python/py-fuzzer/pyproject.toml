@@ -1,0 +1,79 @@
+[project]
+name = "py-fuzzer"
+version = "0.0.0"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pysource-codegen>=0.6.0",
+    "pysource-minimize>=0.7.0",
+    "rich-argparse>=1.6.0",
+    "ruff>=0.8.0",
+    "termcolor>=2.5.0",
+]
+
+[project.scripts]
+fuzz = "fuzz:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["mypy", "ruff"]
+
+[tool.hatch.build.targets.wheel]
+include = ["fuzz.py"]
+
+[tool.mypy]
+files = "fuzz.py"
+pretty = true
+strict = true
+warn_unreachable = true
+local_partial_types = true
+enable_error_code = "ignore-without-code,redundant-expr,truthy-bool"
+
+[tool.ruff]
+fix = true
+preview = true
+
+[tool.ruff.format]
+docstring-code-format = true
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint]
+select = [
+    "ARG",
+    "E",
+    "F",
+    "B",
+    "B9",
+    "C4",
+    "SIM",
+    "I",
+    "UP",
+    "PIE",
+    "PGH",
+    "PYI",
+    "RUF",
+]
+ignore = [
+    # only relevant if you run a script with `python -0`,
+    "B011",
+    # These are enforced by, or incompatible with, the ruff formatter:
+    "E203",
+    "E501",
+    # Makes code slower and more verbose
+    # https://github.com/astral-sh/ruff/issues/7871
+    "UP038",
+]
+unfixable = [
+    "F841",   # unused variable. ruff keeps the call, but mostly it's best to get rid of it all
+    "F601",   # automatic fix might obscure issue
+    "F602",   # automatic fix might obscure issue
+    "B018",   # automatic fix might obscure issue
+    "RUF017", # Ruff's fix is faster, but I prefer using itertools.chain_from_iterable
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+split-on-trailing-comma = false

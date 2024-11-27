@@ -49,7 +49,7 @@ jobs:
               - crates/ruff_text_size/**
               - crates/ruff_python_ast/**
               - crates/ruff_python_parser/**
-              - scripts/fuzz-parser/**
+              - python/py-fuzzer/**
               - .github/workflows/ci.yaml
 
             linter:
@@ -317,13 +317,7 @@ jobs:
       FORCE_COLOR: 1
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install Python requirements
-        run: uv pip install -r scripts/fuzz-parser/requirements.txt --system
+      - uses: astral-sh/setup-uv@v4
       - uses: actions/download-artifact@v4
         name: Download Ruff binary to test
         id: download-cached-binary
@@ -335,7 +329,16 @@ jobs:
           # Make executable, since artifact download doesn't preserve this
           chmod +x ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
-          python scripts/fuzz-parser/fuzz.py --bin ruff 0-500 --test-executable ${{ steps.download-cached-binary.outputs.download-path }}/ruff
+          (
+            uv run \
+            --no-project \
+            --python=${{ env.PYTHON_VERSION }} \
+            --with=./python/py-fuzzer \
+            fuzz \
+            --test-executable=${{ steps.download-cached-binary.outputs.download-path }}/ruff \
+            --bin=ruff \
+            0-500
+          )
 
   scripts:
     name: "test scripts"
