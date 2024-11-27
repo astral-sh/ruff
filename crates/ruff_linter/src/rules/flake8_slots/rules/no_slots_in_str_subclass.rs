@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{Arguments, Expr, Stmt, StmtClassDef};
 use ruff_python_semantic::{analyze::class::is_enumeration, SemanticModel};
@@ -38,8 +38,8 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 ///
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
-#[violation]
-pub struct NoSlotsInStrSubclass;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSlotsInStrSubclass;
 
 impl Violation for NoSlotsInStrSubclass {
     #[derive_message_formats]

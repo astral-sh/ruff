@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
@@ -54,8 +54,8 @@ use super::super::visitor::{ReturnVisitor, Stack};
 ///         return
 ///     return
 /// ```
-#[violation]
-pub struct UnnecessaryReturnNone;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryReturnNone;
 
 impl AlwaysFixableViolation for UnnecessaryReturnNone {
     #[derive_message_formats]
@@ -95,8 +95,8 @@ impl AlwaysFixableViolation for UnnecessaryReturnNone {
 ///         return None
 ///     return 1
 /// ```
-#[violation]
-pub struct ImplicitReturnValue;
+#[derive(ViolationMetadata)]
+pub(crate) struct ImplicitReturnValue;
 
 impl AlwaysFixableViolation for ImplicitReturnValue {
     #[derive_message_formats]
@@ -133,8 +133,8 @@ impl AlwaysFixableViolation for ImplicitReturnValue {
 ///         return 1
 ///     return None
 /// ```
-#[violation]
-pub struct ImplicitReturn;
+#[derive(ViolationMetadata)]
+pub(crate) struct ImplicitReturn;
 
 impl AlwaysFixableViolation for ImplicitReturn {
     #[derive_message_formats]
@@ -168,8 +168,8 @@ impl AlwaysFixableViolation for ImplicitReturn {
 /// def foo():
 ///     return 1
 /// ```
-#[violation]
-pub struct UnnecessaryAssign {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryAssign {
     name: String,
 }
 
@@ -210,8 +210,8 @@ impl AlwaysFixableViolation for UnnecessaryAssign {
 ///         return 1
 ///     return baz
 /// ```
-#[violation]
-pub struct SuperfluousElseReturn {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperfluousElseReturn {
     branch: Branch,
 }
 
@@ -254,8 +254,8 @@ impl Violation for SuperfluousElseReturn {
 ///         raise Exception(bar)
 ///     raise Exception(baz)
 /// ```
-#[violation]
-pub struct SuperfluousElseRaise {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperfluousElseRaise {
     branch: Branch,
 }
 
@@ -300,8 +300,8 @@ impl Violation for SuperfluousElseRaise {
 ///             continue
 ///         x = 0
 /// ```
-#[violation]
-pub struct SuperfluousElseContinue {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperfluousElseContinue {
     branch: Branch,
 }
 
@@ -346,8 +346,8 @@ impl Violation for SuperfluousElseContinue {
 ///             break
 ///         x = 0
 /// ```
-#[violation]
-pub struct SuperfluousElseBreak {
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperfluousElseBreak {
     branch: Branch,
 }
 

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::str::Quote;
 use ruff_text_size::Ranged;
 
@@ -37,8 +37,8 @@ use crate::docstrings::Docstring;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct TripleSingleQuotes {
+#[derive(ViolationMetadata)]
+pub(crate) struct TripleSingleQuotes {
     expected_quote: Quote,
 }
 

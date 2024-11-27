@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
@@ -25,8 +25,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1_2)
 /// ```
-#[violation]
-pub struct SslWithNoVersion;
+#[derive(ViolationMetadata)]
+pub(crate) struct SslWithNoVersion;
 
 impl Violation for SslWithNoVersion {
     #[derive_message_formats]

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Line;
 
@@ -70,8 +70,8 @@ use crate::settings::LinterSettings;
 /// - `lint.pycodestyle.ignore-overlong-task-comments`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
-#[violation]
-pub struct DocLineTooLong(usize, usize);
+#[derive(ViolationMetadata)]
+pub(crate) struct DocLineTooLong(usize, usize);
 
 impl Violation for DocLineTooLong {
     #[derive_message_formats]

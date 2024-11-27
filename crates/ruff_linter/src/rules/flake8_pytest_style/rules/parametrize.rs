@@ -1,7 +1,7 @@
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::AstNode;
@@ -66,8 +66,8 @@ use super::helpers::{is_pytest_parametrize, split_names};
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
-#[violation]
-pub struct PytestParametrizeNamesWrongType {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestParametrizeNamesWrongType {
     single_argument: bool,
     expected: types::ParametrizeNameType,
 }
@@ -198,8 +198,8 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
-#[violation]
-pub struct PytestParametrizeValuesWrongType {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestParametrizeValuesWrongType {
     values: types::ParametrizeValuesType,
     row: types::ParametrizeValuesRowType,
 }
@@ -262,8 +262,8 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
-#[violation]
-pub struct PytestDuplicateParametrizeTestCases {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestDuplicateParametrizeTestCases {
     index: usize,
 }
 

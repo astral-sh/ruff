@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
@@ -24,8 +24,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-allowed-modules`
-#[violation]
-pub struct BuiltinModuleShadowing {
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinModuleShadowing {
     name: String,
 }
 

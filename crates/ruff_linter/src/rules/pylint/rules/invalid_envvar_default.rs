@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::Modules;
@@ -32,8 +32,8 @@ use crate::checkers::ast::Checker;
 ///
 /// int(os.getenv("FOO", "1"))
 /// ```
-#[violation]
-pub struct InvalidEnvvarDefault;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidEnvvarDefault;
 
 impl Violation for InvalidEnvvarDefault {
     #[derive_message_formats]

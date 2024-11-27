@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast,
@@ -49,8 +49,8 @@ use crate::settings::types::PythonVersion;
 /// ```
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
-#[violation]
-pub struct NonPEP695TypeAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonPEP695TypeAlias {
     name: String,
     type_alias_kind: TypeAliasKind,
 }

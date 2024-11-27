@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for uses of `os.path.abspath`.
@@ -34,8 +34,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathAbspath;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathAbspath;
 
 impl Violation for OsPathAbspath {
     #[derive_message_formats]
@@ -77,8 +77,8 @@ impl Violation for OsPathAbspath {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsChmod;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsChmod;
 
 impl Violation for OsChmod {
     #[derive_message_formats]
@@ -120,8 +120,8 @@ impl Violation for OsChmod {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsMakedirs;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsMakedirs;
 
 impl Violation for OsMakedirs {
     #[derive_message_formats]
@@ -163,8 +163,8 @@ impl Violation for OsMakedirs {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsMkdir;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsMkdir;
 
 impl Violation for OsMkdir {
     #[derive_message_formats]
@@ -206,8 +206,8 @@ impl Violation for OsMkdir {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsRename;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsRename;
 
 impl Violation for OsRename {
     #[derive_message_formats]
@@ -249,8 +249,8 @@ impl Violation for OsRename {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsReplace;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsReplace;
 
 impl Violation for OsReplace {
     #[derive_message_formats]
@@ -292,8 +292,8 @@ impl Violation for OsReplace {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsRmdir;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsRmdir;
 
 impl Violation for OsRmdir {
     #[derive_message_formats]
@@ -335,8 +335,8 @@ impl Violation for OsRmdir {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsRemove;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsRemove;
 
 impl Violation for OsRemove {
     #[derive_message_formats]
@@ -378,8 +378,8 @@ impl Violation for OsRemove {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsUnlink;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsUnlink;
 
 impl Violation for OsUnlink {
     #[derive_message_formats]
@@ -422,8 +422,8 @@ impl Violation for OsUnlink {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsGetcwd;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsGetcwd;
 
 impl Violation for OsGetcwd {
     #[derive_message_formats]
@@ -465,8 +465,8 @@ impl Violation for OsGetcwd {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathExists;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathExists;
 
 impl Violation for OsPathExists {
     #[derive_message_formats]
@@ -508,8 +508,8 @@ impl Violation for OsPathExists {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathExpanduser;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathExpanduser;
 
 impl Violation for OsPathExpanduser {
     #[derive_message_formats]
@@ -551,8 +551,8 @@ impl Violation for OsPathExpanduser {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathIsdir;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathIsdir;
 
 impl Violation for OsPathIsdir {
     #[derive_message_formats]
@@ -594,8 +594,8 @@ impl Violation for OsPathIsdir {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathIsfile;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathIsfile;
 
 impl Violation for OsPathIsfile {
     #[derive_message_formats]
@@ -637,8 +637,8 @@ impl Violation for OsPathIsfile {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathIslink;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathIslink;
 
 impl Violation for OsPathIslink {
     #[derive_message_formats]
@@ -680,8 +680,8 @@ impl Violation for OsPathIslink {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsReadlink;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsReadlink;
 
 impl Violation for OsReadlink {
     #[derive_message_formats]
@@ -732,8 +732,8 @@ impl Violation for OsReadlink {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsStat;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsStat;
 
 impl Violation for OsStat {
     #[derive_message_formats]
@@ -778,8 +778,8 @@ impl Violation for OsStat {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathIsabs;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathIsabs;
 
 impl Violation for OsPathIsabs {
     #[derive_message_formats]
@@ -821,8 +821,8 @@ impl Violation for OsPathIsabs {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathJoin {
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathJoin {
     pub(crate) module: String,
     pub(crate) joiner: Joiner,
 }
@@ -881,8 +881,8 @@ pub(crate) enum Joiner {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathBasename;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathBasename;
 
 impl Violation for OsPathBasename {
     #[derive_message_formats]
@@ -924,8 +924,8 @@ impl Violation for OsPathBasename {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathDirname;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathDirname;
 
 impl Violation for OsPathDirname {
     #[derive_message_formats]
@@ -967,8 +967,8 @@ impl Violation for OsPathDirname {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathSamefile;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathSamefile;
 
 impl Violation for OsPathSamefile {
     #[derive_message_formats]
@@ -1019,8 +1019,8 @@ impl Violation for OsPathSamefile {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathSplitext;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathSplitext;
 
 impl Violation for OsPathSplitext {
     #[derive_message_formats]
@@ -1059,8 +1059,8 @@ impl Violation for OsPathSplitext {
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct BuiltinOpen;
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinOpen;
 
 impl Violation for BuiltinOpen {
     #[derive_message_formats]
@@ -1094,12 +1094,57 @@ impl Violation for BuiltinOpen {
 /// ## References
 /// - [Python documentation: `Pathlib`](https://docs.python.org/3/library/pathlib.html)
 /// - [Path repository](https://github.com/jaraco/path)
-#[violation]
-pub struct PyPath;
+#[derive(ViolationMetadata)]
+pub(crate) struct PyPath;
 
 impl Violation for PyPath {
     #[derive_message_formats]
     fn message(&self) -> String {
         "`py.path` is in maintenance mode, use `pathlib` instead".to_string()
+    }
+}
+
+/// ## What it does
+/// Checks for uses of `os.listdir`.
+///
+/// ## Why is this bad?
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `pathlib`'s
+/// `Path.iterdir()` can improve readability over `os.listdir()`.
+///
+/// ## Example
+///
+/// ```python
+/// p = "."
+/// for d in os.listdir(p):
+///     ...
+///
+/// if os.listdir(p):
+///     ...
+///
+/// if "file" in os.listdir(p):
+///     ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// p = Path(".")
+/// for d in p.iterdir():
+///     ...
+///
+/// if any(p.iterdir()):
+///     ...
+///
+/// if (p / "file").exists():
+///     ...
+/// ```
+#[derive(ViolationMetadata)]
+pub(crate) struct OsListdir;
+
+impl Violation for OsListdir {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Use `pathlib.Path.iterdir()` instead.".to_string()
     }
 }

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
 use ruff_python_semantic::analyze::typing;
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
-#[violation]
-pub struct EnumerateForLoop {
+#[derive(ViolationMetadata)]
+pub(crate) struct EnumerateForLoop {
     index: String,
 }
 

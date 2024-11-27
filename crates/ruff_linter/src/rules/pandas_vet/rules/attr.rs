@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -32,8 +32,8 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 ///
 /// ## References
 /// - [Pandas documentation: Accessing the values in a Series or Index](https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.24.0.html#accessing-the-values-in-a-series-or-index)
-#[violation]
-pub struct PandasUseOfDotValues;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfDotValues;
 
 impl Violation for PandasUseOfDotValues {
     #[derive_message_formats]

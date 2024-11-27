@@ -3,7 +3,7 @@ use log::error;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -47,8 +47,8 @@ use super::fix_with;
 ///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
-#[violation]
-pub struct MultipleWithStatements;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

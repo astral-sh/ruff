@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -42,8 +42,8 @@ use crate::checkers::ast::Checker;
 /// if any(part in blocklist for part in Path("my/file/path").parts):
 ///     ...
 /// ```
-#[violation]
-pub struct OsSepSplit;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsSepSplit;
 
 impl Violation for OsSepSplit {
     #[derive_message_formats]

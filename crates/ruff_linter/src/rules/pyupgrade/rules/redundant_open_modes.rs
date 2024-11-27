@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
-#[violation]
-pub struct RedundantOpenModes {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantOpenModes {
     replacement: String,
 }
 

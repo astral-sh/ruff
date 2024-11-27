@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -24,8 +24,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// a = 42
 /// ```
-#[violation]
-pub struct NamedExprWithoutContext;
+#[derive(ViolationMetadata)]
+pub(crate) struct NamedExprWithoutContext;
 
 impl Violation for NamedExprWithoutContext {
     #[derive_message_formats]

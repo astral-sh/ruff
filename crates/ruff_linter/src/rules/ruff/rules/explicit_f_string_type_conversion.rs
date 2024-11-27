@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::Ranged;
@@ -37,8 +37,8 @@ use crate::Locator;
 /// a = "some string"
 /// f"{a!r}"
 /// ```
-#[violation]
-pub struct ExplicitFStringTypeConversion;
+#[derive(ViolationMetadata)]
+pub(crate) struct ExplicitFStringTypeConversion;
 
 impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
     #[derive_message_formats]

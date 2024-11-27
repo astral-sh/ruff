@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::Stmt;
 
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 /// ```pyi
 /// def function(): ...
 /// ```
-#[violation]
-pub struct StubBodyMultipleStatements;
+#[derive(ViolationMetadata)]
+pub(crate) struct StubBodyMultipleStatements;
 
 impl Violation for StubBodyMultipleStatements {
     #[derive_message_formats]

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -35,9 +35,8 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 /// ```python
 /// text = text.removeprefix("pre")
 /// ```
-#[violation]
-pub struct SliceToRemovePrefixOrSuffix {
-    string: String,
+#[derive(ViolationMetadata)]
+pub(crate) struct SliceToRemovePrefixOrSuffix {
     affix_kind: AffixKind,
     stmt_or_expression: StmtOrExpr,
 }
@@ -80,7 +79,6 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::E
             let mut diagnostic = Diagnostic::new(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
-                    string: checker.locator().slice(text).to_string(),
                     stmt_or_expression: StmtOrExpr::Expression,
                 },
                 if_expr.range,
@@ -111,7 +109,6 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::S
             let mut diagnostic = Diagnostic::new(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
-                    string: checker.locator().slice(text).to_string(),
                     stmt_or_expression: StmtOrExpr::Statement,
                 },
                 if_stmt.range,

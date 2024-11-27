@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::package::PackageRoot;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 use ruff_python_stdlib::path::is_module_file;
@@ -35,8 +35,8 @@ use ruff_text_size::TextRange;
 /// - Instead of `ExampleModule`, use `example_module`.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#package-and-module-names
-#[violation]
-pub struct InvalidModuleName {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidModuleName {
     name: String,
 }
 

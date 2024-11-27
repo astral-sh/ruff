@@ -72,6 +72,15 @@ not_in_nav: |
 extra:
   analytics:
     provider: fathom
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/astral-sh/ruff
+    - icon: fontawesome/brands/discord
+      link: https://discord.com/invite/astral-sh
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/ruff/
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/astral_sh
 validation:
   omitted_files: warn
   absolute_links: warn

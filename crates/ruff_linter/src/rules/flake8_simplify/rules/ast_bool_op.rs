@@ -7,7 +7,7 @@ use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, 
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{contains_effect, Truthiness};
 use ruff_python_ast::name::Name;
@@ -44,8 +44,8 @@ use crate::fix::edits::pad;
 ///
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
-#[violation]
-pub struct DuplicateIsinstanceCall {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateIsinstanceCall {
     name: Option<String>,
 }
 
@@ -92,8 +92,8 @@ impl Violation for DuplicateIsinstanceCall {
 ///
 /// ## References
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
-#[violation]
-pub struct CompareWithTuple {
+#[derive(ViolationMetadata)]
+pub(crate) struct CompareWithTuple {
     replacement: String,
 }
 
@@ -125,8 +125,8 @@ impl AlwaysFixableViolation for CompareWithTuple {
 ///
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
-#[violation]
-pub struct ExprAndNotExpr {
+#[derive(ViolationMetadata)]
+pub(crate) struct ExprAndNotExpr {
     name: String,
 }
 
@@ -157,8 +157,8 @@ impl AlwaysFixableViolation for ExprAndNotExpr {
 ///
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
-#[violation]
-pub struct ExprOrNotExpr {
+#[derive(ViolationMetadata)]
+pub(crate) struct ExprOrNotExpr {
     name: String,
 }
 
@@ -209,8 +209,8 @@ pub(crate) enum ContentAround {
 ///
 /// a = x or [1]
 /// ```
-#[violation]
-pub struct ExprOrTrue {
+#[derive(ViolationMetadata)]
+pub(crate) struct ExprOrTrue {
     expr: String,
     remove: ContentAround,
 }
@@ -261,8 +261,8 @@ impl AlwaysFixableViolation for ExprOrTrue {
 ///
 /// a = x and []
 /// ```
-#[violation]
-pub struct ExprAndFalse {
+#[derive(ViolationMetadata)]
+pub(crate) struct ExprAndFalse {
     expr: String,
     remove: ContentAround,
 }

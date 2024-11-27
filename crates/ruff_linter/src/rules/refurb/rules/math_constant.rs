@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Number};
 use ruff_text_size::Ranged;
 
@@ -27,8 +27,8 @@ use crate::importer::ImportRequest;
 ///
 /// ## References
 /// - [Python documentation: `math` constants](https://docs.python.org/3/library/math.html#constants)
-#[violation]
-pub struct MathConstant {
+#[derive(ViolationMetadata)]
+pub(crate) struct MathConstant {
     literal: String,
     constant: &'static str,
 }

@@ -4,7 +4,7 @@ use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, St
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -37,8 +37,8 @@ use crate::registry::Rule;
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
-#[violation]
-pub struct UnusedFunctionArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedFunctionArgument {
     name: String,
 }
 
@@ -77,8 +77,8 @@ impl Violation for UnusedFunctionArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
-#[violation]
-pub struct UnusedMethodArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedMethodArgument {
     name: String,
 }
 
@@ -119,8 +119,8 @@ impl Violation for UnusedMethodArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
-#[violation]
-pub struct UnusedClassMethodArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedClassMethodArgument {
     name: String,
 }
 
@@ -161,8 +161,8 @@ impl Violation for UnusedClassMethodArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
-#[violation]
-pub struct UnusedStaticMethodArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedStaticMethodArgument {
     name: String,
 }
 
@@ -200,8 +200,8 @@ impl Violation for UnusedStaticMethodArgument {
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
-#[violation]
-pub struct UnusedLambdaArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedLambdaArgument {
     name: String,
 }
 

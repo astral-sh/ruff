@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
@@ -54,8 +54,8 @@ use crate::settings::types::PythonVersion;
 /// - `lint.pyupgrade.keep-runtime-typing`
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
-#[violation]
-pub struct NonPEP585Annotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonPEP585Annotation {
     from: String,
     to: String,
 }

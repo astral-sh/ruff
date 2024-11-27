@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprStringLiteral, StringFlags, StringLiteral};
 use ruff_python_literal::{
     cformat::{CFormatErrorType, CFormatString},
@@ -26,8 +26,8 @@ use crate::checkers::ast::Checker;
 ///
 /// print("{:z}".format("1"))
 /// ```
-#[violation]
-pub struct BadStringFormatCharacter {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadStringFormatCharacter {
     format_char: char,
 }
 

@@ -1,7 +1,7 @@
 use crate::registry::Rule;
 use ast::{ExprContext, Operator};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::{Binding, SemanticModel};
@@ -46,8 +46,8 @@ use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 /// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
 ///
 /// [PEP 613]: https://peps.python.org/pep-0613/
-#[violation]
-pub struct UnquotedTypeAlias;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -109,8 +109,8 @@ impl Violation for UnquotedTypeAlias {
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [PEP 613]: https://peps.python.org/pep-0613/
 /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-#[violation]
-pub struct QuotedTypeAlias;
+#[derive(ViolationMetadata)]
+pub(crate) struct QuotedTypeAlias;
 
 impl AlwaysFixableViolation for QuotedTypeAlias {
     #[derive_message_formats]

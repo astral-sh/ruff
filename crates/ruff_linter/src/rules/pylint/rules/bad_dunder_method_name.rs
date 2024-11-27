@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
@@ -42,8 +42,8 @@ use crate::rules::pylint::helpers::is_known_dunder_method;
 ///
 /// ## Options
 /// - `lint.pylint.allow-dunder-method-names`
-#[violation]
-pub struct BadDunderMethodName {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadDunderMethodName {
     name: String,
 }
 

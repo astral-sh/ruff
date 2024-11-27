@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -35,8 +35,8 @@ use crate::settings::types::PythonVersion;
 ///     return x > 2
 /// ```
 ///
-#[violation]
-pub struct UnnecessaryDunderCall {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDunderCall {
     method: String,
     replacement: Option<String>,
 }

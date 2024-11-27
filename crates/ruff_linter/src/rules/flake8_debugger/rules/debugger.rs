@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
@@ -30,8 +30,8 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 /// ## References
 /// - [Python documentation: `pdb` — The Python Debugger](https://docs.python.org/3/library/pdb.html)
 /// - [Python documentation: `logging` — Logging facility for Python](https://docs.python.org/3/library/logging.html)
-#[violation]
-pub struct Debugger {
+#[derive(ViolationMetadata)]
+pub(crate) struct Debugger {
     using_type: DebuggerUsingType,
 }
 

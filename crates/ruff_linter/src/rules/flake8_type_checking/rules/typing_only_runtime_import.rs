@@ -4,7 +4,7 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
 use ruff_text_size::Ranged;
 
@@ -72,8 +72,8 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyFirstPartyImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyFirstPartyImport {
     qualified_name: String,
 }
 
@@ -147,8 +147,8 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyThirdPartyImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyThirdPartyImport {
     qualified_name: String,
 }
 
@@ -222,8 +222,8 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct TypingOnlyStandardLibraryImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypingOnlyStandardLibraryImport {
     qualified_name: String,
 }
 

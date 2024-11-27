@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_text_size::Ranged;
@@ -77,8 +77,8 @@ use crate::importer::ImportRequest;
 ///
 /// [breaking change]: https://blog.pecar.me/python-enum
 
-#[violation]
-pub struct ReplaceStrEnum {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReplaceStrEnum {
     name: String,
 }
 

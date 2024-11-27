@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `-O`](https://docs.python.org/3/using/cmdline.html#cmdoption-O)
-#[violation]
-pub struct AssignmentInAssert;
+#[derive(ViolationMetadata)]
+pub(crate) struct AssignmentInAssert;
 
 impl Violation for AssignmentInAssert {
     #[derive_message_formats]

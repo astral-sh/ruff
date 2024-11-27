@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Comprehension, Expr};
 use ruff_text_size::Ranged;
@@ -56,8 +56,8 @@ use crate::rules::flake8_comprehensions::fixes;
 /// Due to the known problem with dictionary comprehensions, this fix is marked as unsafe.
 ///
 /// Additionally, this fix may drop comments when rewriting the comprehension.
-#[violation]
-pub struct UnnecessaryComprehension {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryComprehension {
     obj_type: String,
 }
 

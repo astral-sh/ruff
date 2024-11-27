@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 /// d, e, f = 0, 1, 2
 /// y = (d and e) or f
 /// ```
-#[violation]
-pub struct ParenthesizeChainedOperators;
+#[derive(ViolationMetadata)]
+pub(crate) struct ParenthesizeChainedOperators;
 
 impl AlwaysFixableViolation for ParenthesizeChainedOperators {
     #[derive_message_formats]

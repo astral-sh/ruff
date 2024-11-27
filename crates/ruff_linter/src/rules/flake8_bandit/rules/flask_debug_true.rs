@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::typing;
@@ -36,8 +36,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Flask documentation: Debug Mode](https://flask.palletsprojects.com/en/latest/quickstart/#debug-mode)
-#[violation]
-pub struct FlaskDebugTrue;
+#[derive(ViolationMetadata)]
+pub(crate) struct FlaskDebugTrue;
 
 impl Violation for FlaskDebugTrue {
     #[derive_message_formats]

@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
@@ -55,8 +55,8 @@ use crate::rules::pydocstyle::settings::Convention;
 ///     """
 ///     return distance / time
 /// ```
-#[violation]
-pub struct DocstringMissingReturns;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringMissingReturns;
 
 impl Violation for DocstringMissingReturns {
     #[derive_message_formats]
@@ -105,8 +105,8 @@ impl Violation for DocstringMissingReturns {
 ///     for _ in range(n):
 ///         print("Hello!")
 /// ```
-#[violation]
-pub struct DocstringExtraneousReturns;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringExtraneousReturns;
 
 impl Violation for DocstringExtraneousReturns {
     #[derive_message_formats]
@@ -157,8 +157,8 @@ impl Violation for DocstringExtraneousReturns {
 ///     for i in range(1, n + 1):
 ///         yield i
 /// ```
-#[violation]
-pub struct DocstringMissingYields;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringMissingYields;
 
 impl Violation for DocstringMissingYields {
     #[derive_message_formats]
@@ -207,8 +207,8 @@ impl Violation for DocstringMissingYields {
 ///     for _ in range(n):
 ///         print("Hello!")
 /// ```
-#[violation]
-pub struct DocstringExtraneousYields;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringExtraneousYields;
 
 impl Violation for DocstringExtraneousYields {
     #[derive_message_formats]
@@ -270,8 +270,8 @@ impl Violation for DocstringExtraneousYields {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
-#[violation]
-pub struct DocstringMissingException {
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringMissingException {
     id: String,
 }
 
@@ -330,8 +330,8 @@ impl Violation for DocstringMissingException {
 ///     """
 ///     return distance / time
 /// ```
-#[violation]
-pub struct DocstringExtraneousException {
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringExtraneousException {
     ids: Vec<String>,
 }
 

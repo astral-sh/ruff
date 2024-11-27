@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
@@ -39,8 +39,8 @@ use crate::checkers::ast::Checker;
 ///
 /// dag = DAG(dag_id="my_dag", schedule=timedelta(days=1))
 /// ```
-#[violation]
-pub struct AirflowDagNoScheduleArgument;
+#[derive(ViolationMetadata)]
+pub(crate) struct AirflowDagNoScheduleArgument;
 
 impl Violation for AirflowDagNoScheduleArgument {
     #[derive_message_formats]

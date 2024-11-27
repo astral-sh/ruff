@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for `global` variables that are not assigned a value in the current
@@ -35,8 +35,8 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## References
 /// - [Python documentation: The `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
-#[violation]
-pub struct GlobalVariableNotAssigned {
+#[derive(ViolationMetadata)]
+pub(crate) struct GlobalVariableNotAssigned {
     pub name: String,
 }
 

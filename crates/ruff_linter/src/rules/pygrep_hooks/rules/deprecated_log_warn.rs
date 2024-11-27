@@ -1,5 +1,5 @@
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## Removed
 /// This rule is identical to [G010] which should be used instead.
@@ -32,8 +32,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [Python documentation: `logger.Logger.warning`](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
 ///
 /// [G010]: https://docs.astral.sh/ruff/rules/logging-warn/
-#[violation]
-pub struct DeprecatedLogWarn;
+#[derive(ViolationMetadata)]
+pub(crate) struct DeprecatedLogWarn;
 
 /// PGH002
 impl Violation for DeprecatedLogWarn {

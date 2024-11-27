@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, Parameter, ParameterWithDefault, Parameters};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -38,8 +38,8 @@ use super::super::helpers::{matches_password_name, string_literal};
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
-#[violation]
-pub struct HardcodedPasswordDefault {
+#[derive(ViolationMetadata)]
+pub(crate) struct HardcodedPasswordDefault {
     name: String,
 }
 

@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use itertools::izip;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Binding;
 use ruff_source_file::LineRanges;
@@ -82,8 +82,8 @@ use crate::Locator;
 /// could still be read by code outside of the module in which the
 /// `__slots__` definition occurs, in which case this rule's fix could
 /// theoretically cause breakage.
-#[violation]
-pub struct UnsortedDunderSlots {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsortedDunderSlots {
     class_name: ast::name::Name,
 }
 

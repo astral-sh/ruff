@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprBinOp, ExprNoneLiteral, ExprSubscript, Operator};
 use ruff_python_semantic::{
     analyze::typing::{traverse_literal, traverse_union},
@@ -39,8 +39,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
-#[violation]
-pub struct RedundantNoneLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantNoneLiteral {
     other_literal_elements_seen: bool,
 }
 
@@ -119,22 +119,32 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     }
 }
 
+/// If possible, return a [`Fix`] for a violation of this rule.
+///
+/// Avoid producing code that would raise an exception when
+/// `Literal[None] | None` would be fixed to `None | None`.
+/// Instead, do not provide a fix. We don't need to worry about unions
+/// that use [`typing.Union`], as `Union[None, None]` is valid Python.
+/// See <https://github.com/astral-sh/ruff/issues/14567>.
+///
+/// [`typing.Union`]: https://docs.python.org/3/library/typing.html#typing.Union
 fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit> {
-    let mut enclosing_union = None;
-    for expr in semantic.current_expressions().skip(1).take_while(|expr| {
-        matches!(
-            expr,
-            Expr::BinOp(ExprBinOp {
-                op: Operator::BitOr,
-                ..
-            })
-        )
-    }) {
-        enclosing_union = Some(expr);
-    }
+    let enclosing_pep604_union = semantic
+        .current_expressions()
+        .skip(1)
+        .take_while(|expr| {
+            matches!(
+                expr,
+                Expr::BinOp(ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                })
+            )
+        })
+        .last();
 
     let mut is_fixable = true;
-    if let Some(enclosing_union) = enclosing_union {
+    if let Some(enclosing_pep604_union) = enclosing_pep604_union {
         traverse_union(
             &mut |expr, _| {
                 if matches!(expr, Expr::NoneLiteral(_)) {
@@ -151,14 +161,9 @@ fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit
                 }
             },
             semantic,
-            enclosing_union,
+            enclosing_pep604_union,
         );
     }
 
-    // Avoid producing code that would raise an exception when
-    // `Literal[None] | None` would be fixed to `None | None`.
-    // Instead do not provide a fix. No action needed for `typing.Union`,
-    // as `Union[None, None]` is valid Python.
-    // See https://github.com/astral-sh/ruff/issues/14567.
     is_fixable.then(|| Edit::range_replacement("None".to_string(), literal_expr.range()))
 }

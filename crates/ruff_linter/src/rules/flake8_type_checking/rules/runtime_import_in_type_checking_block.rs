@@ -4,7 +4,7 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{Imported, NodeId, Scope};
 use ruff_text_size::Ranged;
 
@@ -52,8 +52,8 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct RuntimeImportInTypeCheckingBlock {
+#[derive(ViolationMetadata)]
+pub(crate) struct RuntimeImportInTypeCheckingBlock {
     qualified_name: String,
     strategy: Strategy,
 }

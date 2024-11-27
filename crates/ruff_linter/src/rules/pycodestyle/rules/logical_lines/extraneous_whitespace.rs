@@ -2,7 +2,7 @@ use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -31,8 +31,8 @@ use super::{LogicalLine, Whitespace};
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
-#[violation]
-pub struct WhitespaceAfterOpenBracket {
+#[derive(ViolationMetadata)]
+pub(crate) struct WhitespaceAfterOpenBracket {
     symbol: char,
 }
 
@@ -70,8 +70,8 @@ impl AlwaysFixableViolation for WhitespaceAfterOpenBracket {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
-#[violation]
-pub struct WhitespaceBeforeCloseBracket {
+#[derive(ViolationMetadata)]
+pub(crate) struct WhitespaceBeforeCloseBracket {
     symbol: char,
 }
 
@@ -107,8 +107,8 @@ impl AlwaysFixableViolation for WhitespaceBeforeCloseBracket {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
-#[violation]
-pub struct WhitespaceBeforePunctuation {
+#[derive(ViolationMetadata)]
+pub(crate) struct WhitespaceBeforePunctuation {
     symbol: char,
 }
 

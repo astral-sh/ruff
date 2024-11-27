@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableLiteral;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Stmt};
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
 /// ```
-#[violation]
-pub struct IfElseBlockInsteadOfDictLookup;
+#[derive(ViolationMetadata)]
+pub(crate) struct IfElseBlockInsteadOfDictLookup;
 
 impl Violation for IfElseBlockInsteadOfDictLookup {
     #[derive_message_formats]
