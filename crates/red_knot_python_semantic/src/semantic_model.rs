@@ -150,7 +150,7 @@ macro_rules! impl_binding_has_ty {
             fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let index = semantic_index(model.db, model.file);
                 let binding = index.definition(self);
-                binding_ty(model.db, binding, false)
+                binding_ty(model.db, binding)
             }
         }
     };
