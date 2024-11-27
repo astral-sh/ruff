@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+snapshot_kind: text
+---
+PTH209.py:3:1: PTH209 Use `pathlib.Path.iterdir()` instead.
+  |
+1 | import os
+2 | 
+3 | os.scandir('.')
+  | ^^^^^^^^^^ PTH209
+4 | os.scandir(b'.')
+  |
+
+PTH209.py:4:1: PTH209 Use `pathlib.Path.iterdir()` instead.
+  |
+3 | os.scandir('.')
+4 | os.scandir(b'.')
+  | ^^^^^^^^^^ PTH209
+5 | 
+6 | string_path = '.'
+  |
+
+PTH209.py:7:1: PTH209 Use `pathlib.Path.iterdir()` instead.
+  |
+6 | string_path = '.'
+7 | os.scandir(string_path)
+  | ^^^^^^^^^^ PTH209
+8 | 
+9 | bytes_path = b'.'
+  |
+
+PTH209.py:10:1: PTH209 Use `pathlib.Path.iterdir()` instead.
+   |
+ 9 | bytes_path = b'.'
+10 | os.scandir(bytes_path)
+   | ^^^^^^^^^^ PTH209
+   |
+
+PTH209.py:16:1: PTH209 Use `pathlib.Path.iterdir()` instead.
+   |
+15 | path_path = Path('.')
+16 | os.scandir(path_path)
+   | ^^^^^^^^^^ PTH209
+   |

@@ -13,7 +13,7 @@ use crate::rules::flake8_use_pathlib::violations::{
     BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
     OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir, OsPathIsfile,
     OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove, OsRename,
-    OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
+    OsReplace, OsRmdir, OsScandir, OsStat, OsUnlink, PyPath,
 };
 use crate::settings::types::PythonVersion;
 
@@ -155,6 +155,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
             ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {
                 Some(OsReadlink.into())
             }
+            // PTH209
+            ["os", "scandir"] => Some(OsScandir.into()),
             _ => None,
         })
     {
