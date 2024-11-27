@@ -4,7 +4,7 @@ use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
-use crate::rules::pep8_naming::settings::IgnoreNames;
+use crate::rules::pep8_naming::{helpers, settings::IgnoreNames};
 
 /// ## What it does
 /// Checks for constant imports that are aliased to non-constant-style
@@ -65,10 +65,13 @@ pub(crate) fn constant_imported_as_non_constant(
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
-    // Single-character names are ambiguous. It could be a class or a constant.
-    name.chars().nth(1)?;
-
-    if str::is_cased_uppercase(name) && !str::is_cased_uppercase(asname) {
+    if str::is_cased_uppercase(name)
+        && !(str::is_cased_uppercase(asname)
+            // Single-character names are ambiguous.
+            // It could be a class or a constant, so allow it to be imported
+            // as `SCREAMING_SNAKE_CASE` *or* `CamelCase`.
+            || (name.chars().nth(1).is_none() && helpers::is_camelcase(asname)))
+    {
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
             return None;
