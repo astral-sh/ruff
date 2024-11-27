@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
-use crate::noqa::{Directive, NoqaDirectives};
+use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives, ParsedFileExemption};
 use crate::rule_redirects::get_redirect_target;
 
 /// ## What it does
@@ -42,28 +42,47 @@ impl AlwaysFixableViolation for RedirectedNOQA {
     }
 }
 
-/// RUF101
+/// RUF101 for in-line noqa directives
 pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &NoqaDirectives) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
             continue;
         };
 
-        for code in directive.iter() {
-            if let Some(redirected) = get_redirect_target(code.as_str()) {
-                let mut diagnostic = Diagnostic::new(
-                    RedirectedNOQA {
-                        original: code.to_string(),
-                        target: redirected.to_string(),
-                    },
-                    code.range(),
-                );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    redirected.to_string(),
-                    code.range(),
-                )));
-                diagnostics.push(diagnostic);
-            }
+        build_diagnostics(diagnostics, directive);
+    }
+}
+
+/// RUF101 for file noqa directives
+pub(crate) fn redirected_file_noqa(
+    diagnostics: &mut Vec<Diagnostic>,
+    noqa_directives: &FileNoqaDirectives,
+) {
+    for line in noqa_directives.lines() {
+        let ParsedFileExemption::Codes(codes) = &line.parsed_file_exemption else {
+            continue;
+        };
+
+        build_diagnostics(diagnostics, codes);
+    }
+}
+
+/// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
+fn build_diagnostics(diagnostics: &mut Vec<Diagnostic>, codes: &Codes<'_>) {
+    for code in codes.iter() {
+        if let Some(redirected) = get_redirect_target(code.as_str()) {
+            let mut diagnostic = Diagnostic::new(
+                RedirectedNOQA {
+                    original: code.to_string(),
+                    target: redirected.to_string(),
+                },
+                code.range(),
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                redirected.to_string(),
+                code.range(),
+            )));
+            diagnostics.push(diagnostic);
         }
     }
 }
