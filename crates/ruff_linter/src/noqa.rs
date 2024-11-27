@@ -319,7 +319,7 @@ impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
         if directives
             .lines()
             .iter()
-            .any(|line| ParsedFileExemption::All == line.parsed_file_exemption)
+            .any(|line| matches!(line.parsed_file_exemption, ParsedFileExemption::All))
         {
             FileExemption::All(codes)
         } else {
@@ -362,7 +362,7 @@ impl<'a> FileNoqaDirectives<'a> {
         let mut lines = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::try_extract(&locator.contents()[range]) {
+            match ParsedFileExemption::try_extract(&locator.contents()[range], range.start()) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -385,11 +385,11 @@ impl<'a> FileNoqaDirectives<'a> {
                         ParsedFileExemption::Codes(codes) => {
                             codes.iter().filter_map(|code| {
                                 // Ignore externally-defined rules.
-                                if external.iter().any(|external| code.starts_with(external)) {
+                                if external.iter().any(|external| code.as_str().starts_with(external)) {
                                     return None;
                                 }
 
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
+                                if let Ok(rule) = Rule::from_code(get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
                                 {
                                     Some(rule.noqa_code())
                                 } else {
@@ -424,21 +424,23 @@ impl<'a> FileNoqaDirectives<'a> {
 /// An individual file-level exemption (e.g., `# ruff: noqa` or `# ruff: noqa: F401, F841`). Like
 /// [`FileNoqaDirectives`], but only for a single line, as opposed to an aggregated set of exemptions
 /// across a source file.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub(crate) enum ParsedFileExemption<'a> {
     /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
     All,
     /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
-    Codes(Vec<&'a str>),
+    Codes(Codes<'a>),
 }
 
 impl<'a> ParsedFileExemption<'a> {
     /// Return a [`ParsedFileExemption`] for a given comment line.
-    fn try_extract(line: &'a str) -> Result<Option<Self>, ParseError> {
+    fn try_extract(line: &'a str, offset: TextSize) -> Result<Option<Self>, ParseError> {
+        let init_line_len = line.len();
         let line = Self::lex_whitespace(line);
         let Some(line) = Self::lex_char(line, '#') else {
             return Ok(None);
         };
+        let comment_start = init_line_len - line.len();
         let line = Self::lex_whitespace(line);
 
         let Some(line) = Self::lex_flake8(line).or_else(|| Self::lex_ruff(line)) else {
@@ -469,7 +471,12 @@ impl<'a> ParsedFileExemption<'a> {
             let mut codes = vec![];
             let mut line = line;
             while let Some(code) = Self::lex_code(line) {
-                codes.push(code);
+                let codes_end = init_line_len - line.len();
+                codes.push(Code {
+                    code,
+                    range: TextRange::at(TextSize::try_from(codes_end).unwrap(), code.text_len())
+                        .add(offset),
+                });
                 line = &line[code.len()..];
 
                 // Codes can be comma- or whitespace-delimited.
@@ -485,7 +492,15 @@ impl<'a> ParsedFileExemption<'a> {
                 return Err(ParseError::MissingCodes);
             }
 
-            Self::Codes(codes)
+            let codes_end = init_line_len - line.len();
+            let range = TextRange::new(
+                TextSize::try_from(comment_start).unwrap(),
+                TextSize::try_from(codes_end).unwrap(),
+            );
+            Self::Codes(Codes {
+                range: range.add(offset),
+                codes,
+            })
         }))
     }
 
@@ -1226,50 +1241,74 @@ mod tests {
     #[test]
     fn flake8_exemption_all() {
         let source = "# flake8: noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            source,
+            TextSize::default()
+        ));
     }
 
     #[test]
     fn ruff_exemption_all() {
         let source = "# ruff: noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            source,
+            TextSize::default()
+        ));
     }
 
     #[test]
     fn flake8_exemption_all_no_space() {
         let source = "#flake8:noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            source,
+            TextSize::default()
+        ));
     }
 
     #[test]
     fn ruff_exemption_all_no_space() {
         let source = "#ruff:noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            source,
+            TextSize::default()
+        ));
     }
 
     #[test]
     fn flake8_exemption_codes() {
         // Note: Flake8 doesn't support this; it's treated as a blanket exemption.
         let source = "# flake8: noqa: F401, F841";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            source,
+            TextSize::default()
+        ));
     }
 
     #[test]
     fn ruff_exemption_codes() {
         let source = "# ruff: noqa: F401, F841";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            source,
+            TextSize::default()
+        ));
     }
 
     #[test]
     fn flake8_exemption_all_case_insensitive() {
         let source = "# flake8: NoQa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            source,
+            TextSize::default()
+        ));
     }
 
     #[test]
     fn ruff_exemption_all_case_insensitive() {
         let source = "# ruff: NoQa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(source));
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            source,
+            TextSize::default()
+        ));
     }
 
     #[test]
