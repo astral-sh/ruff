@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -9,12 +10,6 @@ use crate::checkers::ast::Checker;
 enum Replacement {
     None,
     Name(String),
-}
-
-impl Replacement {
-    fn name(name: impl Into<String>) -> Self {
-        Self::Name(name.into())
-    }
 }
 
 /// ## What it does
@@ -62,9 +57,41 @@ impl Violation for Airflow3Removal {
     }
 }
 
-/// AIR302
-pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
-    let Some((deprecated, replacement)) =
+struct DeprecatedArgument(Vec<&'static str>, Option<&'static str>);
+
+fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {
+    let deprecations = match qualname.segments() {
+        ["airflow", .., "DAG" | "dag"] => vec![DeprecatedArgument(
+            vec!["timetable", "schedule_interval"],
+            Some("schedule"),
+        )],
+        _ => {
+            return;
+        }
+    };
+    for deprecation in deprecations {
+        for arg in deprecation.0 {
+            if let Some(keyword) = arguments.find_keyword(arg) {
+                checker.diagnostics.push(Diagnostic::new(
+                    Airflow3Removal {
+                        deprecated: arg.to_string(),
+                        replacement: match deprecation.1 {
+                            Some(name) => Replacement::Name(name.to_owned()),
+                            None => Replacement::None,
+                        },
+                    },
+                    keyword
+                        .arg
+                        .as_ref()
+                        .map_or_else(|| keyword.range(), Ranged::range),
+                ));
+            };
+        }
+    }
+}
+
+fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
+    let result =
         checker
             .semantic()
             .resolve_qualified_name(expr)
@@ -74,19 +101,37 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                 }
                 ["airflow", "utils", "dates", "days_ago"] => Some((
                     qualname.to_string(),
-                    Replacement::name("datetime.timedelta()"),
+                    Replacement::Name("datetime.timedelta()".to_string()),
                 )),
                 _ => None,
-            })
-    else {
-        return;
-    };
+            });
+    if let Some((deprecated, replacement)) = result {
+        checker.diagnostics.push(Diagnostic::new(
+            Airflow3Removal {
+                deprecated,
+                replacement,
+            },
+            ranged.range(),
+        ));
+    }
+}
 
-    checker.diagnostics.push(Diagnostic::new(
-        Airflow3Removal {
-            deprecated,
-            replacement,
-        },
-        expr.range(),
-    ));
+/// AIR302
+pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return;
+    }
+
+    match expr {
+        Expr::Call(ExprCall {
+            func, arguments, ..
+        }) => {
+            if let Some(qualname) = checker.semantic().resolve_qualified_name(func) {
+                removed_argument(checker, &qualname, arguments);
+            };
+        }
+        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => removed_name(checker, expr, ranged),
+        ranged @ Expr::Name(_) => removed_name(checker, expr, ranged),
+        _ => {}
+    }
 }

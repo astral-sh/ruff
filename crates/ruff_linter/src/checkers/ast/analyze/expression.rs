@@ -1090,6 +1090,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryRegularExpression) {
                 ruff::rules::unnecessary_regular_expression(checker, call);
             }
+            if checker.enabled(Rule::Airflow3Removal) {
+                airflow::rules::removed_in_3(checker, expr);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
