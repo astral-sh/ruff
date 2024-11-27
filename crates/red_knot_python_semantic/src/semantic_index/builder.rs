@@ -784,7 +784,7 @@ where
                         constraints.push(self.record_expression_constraint(elif_test));
                     }
                     self.visit_body(&clause.body);
-                } 
+                }
                 let has_else = node
                     .elif_else_clauses
                     .last()
