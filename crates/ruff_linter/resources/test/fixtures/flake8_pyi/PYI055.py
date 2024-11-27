@@ -1,11 +1,14 @@
 import builtins
 from typing import Union
 
-w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
-x: type[int] | type[str] | type[float]
-y: builtins.type[int] | type[str] | builtins.type[complex]
-z: Union[type[float], type[complex]]
-z: Union[type[float, int], type[complex]]
+s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
+t: type[int] | type[str] | type[float]
+u: builtins.type[int] | type[str] | builtins.type[complex]
+v: Union[type[float], type[complex]]
+w: Union[type[float, int], type[complex]]
+x: Union[Union[type[float, int], type[complex]]]
+y: Union[Union[Union[type[float, int], type[complex]]]]
+z: Union[type[complex], Union[Union[type[float, int]]]]
 
 
 def func(arg: type[int] | str | type[float]) -> None:

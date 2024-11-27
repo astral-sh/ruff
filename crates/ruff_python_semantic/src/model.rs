@@ -1394,6 +1394,7 @@ impl<'a> SemanticModel<'a> {
             "typing" => self.seen.insert(Modules::TYPING),
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
             "attr" | "attrs" => self.seen.insert(Modules::ATTRS),
+            "airflow" => self.seen.insert(Modules::AIRFLOW),
             _ => {}
         }
     }
@@ -1686,6 +1687,11 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in a type annotation.
     pub const fn in_annotation(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::ANNOTATION)
+    }
+
+    /// Return `true` if the model is in a `@no_type_check` context.
+    pub const fn in_no_type_check(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
     }
 
     /// Return `true` if the model is in a typing-only type annotation.
@@ -2001,6 +2007,7 @@ bitflags! {
         const FLASK = 1 << 24;
         const ATTRS = 1 << 25;
         const REGEX = 1 << 26;
+        const AIRFLOW = 1 << 27;
     }
 }
 
@@ -2361,6 +2368,22 @@ bitflags! {
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 25;
 
+        /// The model is in a [no_type_check] context.
+        ///
+        /// This is used to skip type checking when the `@no_type_check` decorator is found.
+        ///
+        /// For example (adapted from [#13824]):
+        /// ```python
+        /// from typing import no_type_check
+        ///
+        /// @no_type_check
+        /// def fn(arg: "A") -> "R":
+        ///     pass
+        /// ```
+        ///
+        /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
+        /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
+        const NO_TYPE_CHECK = 1 << 26;
         /// The model is in the value expression of a [PEP 613] explicit type alias.
         ///
         /// For example:
@@ -2371,7 +2394,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 613]: https://peps.python.org/pep-0613/
-        const ANNOTATED_TYPE_ALIAS = 1 << 26;
+        const ANNOTATED_TYPE_ALIAS = 1 << 27;
 
         /// The model is in the value expression of a [PEP 695] type statement.
         ///
@@ -2381,7 +2404,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-        const DEFERRED_TYPE_ALIAS = 1 << 27;
+        const DEFERRED_TYPE_ALIAS = 1 << 28;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

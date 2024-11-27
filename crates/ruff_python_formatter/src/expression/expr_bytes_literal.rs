@@ -40,7 +40,7 @@ impl NeedsParentheses for ExprBytesLiteral {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if StringLike::Bytes(self).is_multiline(context.source()) {
+        } else if StringLike::Bytes(self).is_multiline(context) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

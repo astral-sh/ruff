@@ -28,7 +28,7 @@ impl NeedsParentheses for ExprBinOp {
         } else if let Ok(string) = StringLike::try_from(&*self.left) {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
             if !string.is_implicit_concatenated()
-                && string.is_multiline(context.source())
+                && string.is_multiline(context)
                 && has_parentheses(&self.right, context).is_some()
                 && !context.comments().has_dangling(self)
                 && !context.comments().has(string)
