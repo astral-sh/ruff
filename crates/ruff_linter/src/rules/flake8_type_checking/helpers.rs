@@ -391,9 +391,9 @@ impl Transformer for QuoteAnnotator<'_> {
                 // like a regular string literal
                 if let Ok(annotation) = parse_type_annotation(literal, self.locator.contents()) {
                     *expr = annotation.expression().clone();
-                    // we need to walk the parsed expression too
+                    // we need to visit the parsed expression too
                     // since it may contain forward references itself
-                    walk_expr(self, expr);
+                    self.visit_expr(expr);
                 }
             }
             _ => {
