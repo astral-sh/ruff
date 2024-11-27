@@ -16,6 +16,7 @@ pub(crate) use self::infer::{
 pub(crate) use self::signatures::Signature;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -236,6 +237,12 @@ fn definition_expression_ty<'db>(
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UnconditionallyVisible {
+    Yes,
+    No,
+}
+
 /// Infer the combined type of an iterator of bindings.
 ///
 /// Will return a union if there is more than one binding.
@@ -243,28 +250,87 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Option<Type<'db>> {
-    let mut def_types = bindings_with_constraints.map(
+    let def_types = bindings_with_constraints.map(
         |BindingWithConstraints {
              binding,
              constraints,
+             constraints_active_at_binding,
          }| {
-            let mut constraint_tys = constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
-                .peekable();
+            let test_expr_tys = || {
+                constraints_active_at_binding.clone().map(|c| {
+                    let ty = if let ConstraintNode::Expression(test_expr) = c.node {
+                        let inference = infer_expression_types(db, test_expr);
+                        let scope = test_expr.scope(db);
+                        inference
+                            .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope))
+                    } else {
+                        // TODO: handle other constraint nodes
+                        todo_type!()
+                    };
 
-            let binding_ty = binding_ty(db, binding);
-            if constraint_tys.peek().is_some() {
-                constraint_tys
-                    .fold(
-                        IntersectionBuilder::new(db).add_positive(binding_ty),
-                        IntersectionBuilder::add_positive,
-                    )
-                    .build()
+                    (c, ty)
+                })
+            };
+
+            if test_expr_tys().any(|(c, test_expr_ty)| {
+                if c.is_positive {
+                    test_expr_ty.bool(db).is_always_false()
+                } else {
+                    test_expr_ty.bool(db).is_always_true()
+                }
+            }) {
+                // TODO: do we need to call binding_ty(…) even if we don't need the result?
+                (Type::Never, UnconditionallyVisible::No)
             } else {
-                binding_ty
+                let mut test_expr_tys_iter = test_expr_tys().peekable();
+
+                let unconditionally_visible = if test_expr_tys_iter.peek().is_some()
+                    && test_expr_tys_iter.all(|(c, test_expr_ty)| {
+                        if c.is_positive {
+                            test_expr_ty.bool(db).is_always_true()
+                        } else {
+                            test_expr_ty.bool(db).is_always_false()
+                        }
+                    }) {
+                    UnconditionallyVisible::Yes
+                } else {
+                    UnconditionallyVisible::No
+                };
+
+                let mut constraint_tys = constraints
+                    .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+                    .peekable();
+
+                let binding_ty = binding_ty(db, binding);
+                if constraint_tys.peek().is_some() {
+                    let intersection_ty = constraint_tys
+                        .fold(
+                            IntersectionBuilder::new(db).add_positive(binding_ty),
+                            IntersectionBuilder::add_positive,
+                        )
+                        .build();
+                    (intersection_ty, unconditionally_visible)
+                } else {
+                    (binding_ty, unconditionally_visible)
+                }
             }
         },
     );
+
+    // TODO: get rid of all the collects and clean up, obviously
+    let def_types: Vec<_> = def_types.collect();
+
+    // shrink the vector to only include everything from the last unconditionally visible binding
+    let def_types: Vec<_> = def_types
+        .iter()
+        .rev()
+        .take_while_inclusive(|(_, unconditionally_visible)| {
+            *unconditionally_visible != UnconditionallyVisible::Yes
+        })
+        .map(|(ty, _)| *ty)
+        .collect();
+
+    let mut def_types = def_types.into_iter().rev();
 
     if let Some(first) = def_types.next() {
         if let Some(second) = def_types.next() {
@@ -301,7 +367,63 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+    let decl_types = declarations.map(|(declaration, constraints_active_at_declaration)| {
+        let test_expr_tys = || {
+            constraints_active_at_declaration.clone().map(|c| {
+                let ty = if let ConstraintNode::Expression(test_expr) = c.node {
+                    let inference = infer_expression_types(db, test_expr);
+                    let scope = test_expr.scope(db);
+                    inference.expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope))
+                } else {
+                    // TODO: handle other constraint nodes
+                    todo_type!()
+                };
+
+                (c, ty)
+            })
+        };
+
+        if test_expr_tys().any(|(c, test_expr_ty)| {
+            if c.is_positive {
+                test_expr_ty.bool(db).is_always_false()
+            } else {
+                test_expr_ty.bool(db).is_always_true()
+            }
+        }) {
+            (Type::Never, UnconditionallyVisible::No)
+        } else {
+            let mut test_expr_tys_iter = test_expr_tys().peekable();
+
+            if test_expr_tys_iter.peek().is_some()
+                && test_expr_tys_iter.all(|(c, test_expr_ty)| {
+                    if c.is_positive {
+                        test_expr_ty.bool(db).is_always_true()
+                    } else {
+                        test_expr_ty.bool(db).is_always_false()
+                    }
+                })
+            {
+                (declaration_ty(db, declaration), UnconditionallyVisible::Yes)
+            } else {
+                (declaration_ty(db, declaration), UnconditionallyVisible::No)
+            }
+        }
+    });
+
+    // TODO: get rid of all the collects and clean up, obviously
+    let decl_types: Vec<_> = decl_types.collect();
+
+    // shrink the vector to only include everything from the last unconditionally visible binding
+    let decl_types: Vec<_> = decl_types
+        .iter()
+        .rev()
+        .take_while_inclusive(|(_, unconditionally_visible)| {
+            *unconditionally_visible != UnconditionallyVisible::Yes
+        })
+        .map(|(ty, _)| *ty)
+        .collect();
+
+    let decl_types = decl_types.into_iter().rev();
 
     let mut all_types = undeclared_ty.into_iter().chain(decl_types);
 
@@ -825,26 +947,6 @@ impl<'db> Type<'db> {
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         if !(self.is_fully_static(db) && other.is_fully_static(db)) {
             return false;
-        }
-
-        // TODO: The following is a workaround that is required to unify the two different versions
-        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
-        // we understand `sys.version_info` branches.
-        if let (
-            Type::Instance(InstanceType { class: self_class }),
-            Type::Instance(InstanceType {
-                class: target_class,
-            }),
-        ) = (self, other)
-        {
-            let self_known = self_class.known(db);
-            if matches!(
-                self_known,
-                Some(KnownClass::NoneType | KnownClass::NoDefaultType)
-            ) && self_known == target_class.known(db)
-            {
-                return true;
-            }
         }
 
         // type[object] ≡ type
@@ -2520,6 +2622,14 @@ pub enum Truthiness {
 impl Truthiness {
     const fn is_ambiguous(self) -> bool {
         matches!(self, Truthiness::Ambiguous)
+    }
+
+    const fn is_always_false(self) -> bool {
+        matches!(self, Truthiness::AlwaysFalse)
+    }
+
+    const fn is_always_true(self) -> bool {
+        matches!(self, Truthiness::AlwaysTrue)
     }
 
     const fn negate(self) -> Self {

@@ -221,6 +221,8 @@
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
+use std::collections::HashSet;
+
 use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
@@ -268,6 +270,110 @@ pub(crate) struct UseDefMap<'db> {
 }
 
 impl<'db> UseDefMap<'db> {
+    #[cfg(test)]
+    #[allow(clippy::print_stdout)]
+    pub(crate) fn print(&self, db: &dyn crate::db::Db) {
+        use crate::semantic_index::constraint::ConstraintNode;
+
+        println!("all_definitions:");
+        println!("================");
+
+        for (id, d) in self.all_definitions.iter_enumerated() {
+            println!(
+                "{:?}: {:?} {:?} {:?}",
+                id,
+                d.category(db),
+                d.scope(db),
+                d.symbol(db),
+            );
+            println!("    {:?}", d.kind(db));
+            println!();
+        }
+
+        println!("all_constraints:");
+        println!("================");
+
+        for (id, c) in self.all_constraints.iter_enumerated() {
+            println!("{:?}: {:?}", id, c.node);
+            if let ConstraintNode::Expression(e) = c.node {
+                println!("    {:?}", e.node_ref(db));
+            }
+        }
+
+        println!();
+
+        println!("bindings_by_use:");
+        println!("================");
+
+        for (id, bindings) in self.bindings_by_use.iter_enumerated() {
+            println!("{id:?}:");
+            for binding in bindings.iter() {
+                let definition = self.all_definitions[binding.definition];
+                let mut constraint_ids = binding.constraint_ids.peekable();
+                let mut active_constraint_ids =
+                    binding.constraints_active_at_binding_ids.peekable();
+
+                println!("  * {definition:?}");
+
+                if constraint_ids.peek().is_some() {
+                    println!("    Constraints:");
+                    for constraint_id in constraint_ids {
+                        println!("        {:?}", self.all_constraints[constraint_id]);
+                    }
+                } else {
+                    println!("    No constraints");
+                }
+
+                println!();
+
+                if active_constraint_ids.peek().is_some() {
+                    println!("    Active constraints at binding:");
+                    for constraint_id in active_constraint_ids {
+                        println!("        {:?}", self.all_constraints[constraint_id]);
+                    }
+                } else {
+                    println!("    No active constraints at binding");
+                }
+            }
+        }
+
+        println!();
+
+        println!("public_symbols:");
+        println!("================");
+
+        for (id, symbol) in self.public_symbols.iter_enumerated() {
+            println!("{id:?}:");
+            println!("  * Bindings:");
+            for binding in symbol.bindings().iter() {
+                let definition = self.all_definitions[binding.definition];
+                let mut constraint_ids = binding.constraint_ids.peekable();
+
+                println!("    {definition:?}");
+
+                if constraint_ids.peek().is_some() {
+                    println!("      Constraints:");
+                    for constraint_id in constraint_ids {
+                        println!("          {:?}", self.all_constraints[constraint_id]);
+                    }
+                } else {
+                    println!("      No constraints");
+                }
+            }
+
+            println!("  * Declarations:");
+            for (declaration, _) in symbol.declarations().iter() {
+                let definition = self.all_definitions[declaration];
+                println!("    {definition:?}");
+            }
+
+            println!();
+        }
+
+        println!();
+        println!();
+    }
+
     pub(crate) fn bindings_at_use(
         &self,
         use_id: ScopedUseId,
@@ -352,6 +458,7 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'a, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
+            all_constraints: &self.all_constraints,
             inner: declarations.iter(),
             may_be_undeclared: declarations.may_be_undeclared(),
         }
@@ -365,7 +472,7 @@ enum SymbolDefinitions {
     Declarations(SymbolDeclarations),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
@@ -384,6 +491,10 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                     all_constraints: self.all_constraints,
                     constraint_ids: def_id_with_constraints.constraint_ids,
                 },
+                constraints_active_at_binding: ConstraintsIterator {
+                    all_constraints: self.all_constraints,
+                    constraint_ids: def_id_with_constraints.constraints_active_at_binding_ids,
+                },
             })
     }
 }
@@ -393,8 +504,10 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Definition<'db>,
     pub(crate) constraints: ConstraintsIterator<'map, 'db>,
+    pub(crate) constraints_active_at_binding: ConstraintsIterator<'map, 'db>,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     constraint_ids: ConstraintIdIterator<'map>,
@@ -414,6 +527,7 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
+    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     inner: DeclarationIdIterator<'map>,
     may_be_undeclared: bool,
 }
@@ -424,11 +538,19 @@ impl DeclarationsIterator<'_, '_> {
     }
 }
 
-impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
-    type Item = Definition<'db>;
+impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
+    type Item = (Definition<'db>, ConstraintsIterator<'map, 'db>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|def_id| self.all_definitions[def_id])
+        self.inner.next().map(|(def_id, constraints)| {
+            (
+                self.all_definitions[def_id],
+                ConstraintsIterator {
+                    all_constraints: self.all_constraints,
+                    constraint_ids: constraints,
+                },
+            )
+        })
     }
 }
 
@@ -440,6 +562,9 @@ pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct ActiveConstraintsSnapshot(HashSet<ScopedConstraintId>);
+
 #[derive(Debug, Default)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Definition`].
@@ -447,6 +572,8 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Append-only array of [`Constraint`].
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
+
+    active_constraints: HashSet<ScopedConstraintId>,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -471,7 +598,7 @@ impl<'db> UseDefMapBuilder<'db> {
             binding,
             SymbolDefinitions::Declarations(symbol_state.declarations().clone()),
         );
-        symbol_state.record_binding(def_id);
+        symbol_state.record_binding(def_id, &self.active_constraints);
     }
 
     pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
@@ -479,6 +606,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for state in &mut self.symbol_states {
             state.record_constraint(constraint_id);
         }
+        self.active_constraints.insert(constraint_id);
     }
 
     pub(super) fn record_declaration(
@@ -492,7 +620,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declaration,
             SymbolDefinitions::Bindings(symbol_state.bindings().clone()),
         );
-        symbol_state.record_declaration(def_id);
+        symbol_state.record_declaration(def_id, &self.active_constraints);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -503,8 +631,8 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store anything in self.definitions_by_definition.
         let def_id = self.all_definitions.push(definition);
         let symbol_state = &mut self.symbol_states[symbol];
-        symbol_state.record_declaration(def_id);
-        symbol_state.record_binding(def_id);
+        symbol_state.record_declaration(def_id, &self.active_constraints);
+        symbol_state.record_binding(def_id, &self.active_constraints);
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
@@ -523,6 +651,10 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    pub(super) fn constraints_snapshot(&self) -> ActiveConstraintsSnapshot {
+        ActiveConstraintsSnapshot(self.active_constraints.clone())
+    }
+
     /// Restore the current builder symbols state to the given snapshot.
     pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
@@ -539,6 +671,10 @@ impl<'db> UseDefMapBuilder<'db> {
         // snapshot, the correct state to fill them in with is "undefined".
         self.symbol_states
             .resize(num_symbols, SymbolState::undefined());
+    }
+
+    pub(super) fn restore_constraints(&mut self, snapshot: ActiveConstraintsSnapshot) {
+        self.active_constraints = snapshot.0;
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either

@@ -98,6 +98,7 @@ impl<const B: usize> BitSet<B> {
     }
 
     /// Union in-place with another [`BitSet`].
+    #[allow(dead_code)]
     pub(super) fn union(&mut self, other: &BitSet<B>) {
         let mut max_len = self.blocks().len();
         let other_len = other.blocks().len();
@@ -122,7 +123,7 @@ impl<const B: usize> BitSet<B> {
 }
 
 /// Iterator over values in a [`BitSet`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct BitSetIterator<'a, const B: usize> {
     /// The blocks we are iterating over.
     blocks: &'a [u64],

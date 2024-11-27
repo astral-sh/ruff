@@ -95,6 +95,11 @@ def _(t: type[object]):
 
 ### Handling of `None`
 
+```toml
+[environment]
+target-version = "3.10"
+```
+
 ```py
 # TODO: this error should ideally go away once we (1) understand `sys.version_info` branches,
 # and (2) set the target Python version for this test to 3.10.

@@ -1,5 +1,10 @@
 # `LiteralString`
 
+```toml
+[environment]
+target-version = "3.11"
+```
+
 `LiteralString` represents a string that is either defined directly within the source code or is
 made up of such components.
 

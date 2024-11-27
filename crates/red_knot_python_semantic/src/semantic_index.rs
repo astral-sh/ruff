@@ -1251,4 +1251,32 @@ match 1:
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
     }
+
+    #[test]
+    #[ignore]
+    fn if_statement() {
+        let TestCase { db, file } = test_case(
+            "
+x = False
+
+if True:
+    x: bool
+",
+        );
+
+        let index = semantic_index(&db, file);
+        // let global_table = index.symbol_table(FileScopeId::global());
+
+        let use_def = index.use_def_map(FileScopeId::global());
+
+        // use_def
+
+        use_def.print(&db);
+
+        panic!();
+        // let binding = use_def
+        //     .first_public_binding(global_table.symbol_id_by_name(name).expect("symbol exists"))
+        //     .expect("Expected with item definition for {name}");
+        // assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
+    }
 }
