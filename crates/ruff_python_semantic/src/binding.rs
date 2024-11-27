@@ -135,6 +135,35 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::IN_EXCEPT_HANDLER)
     }
 
+    /// Return `true` if this [`Binding`] represents a [PEP 613] type alias
+    /// e.g. `OptString` in:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptString: TypeAlias = str | None
+    /// ```
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    pub const fn is_annotated_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::ANNOTATED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if this [`Binding`] represents a [PEP 695] type alias
+    /// e.g. `OptString` in:
+    /// ```python
+    /// type OptString = str | None
+    /// ```
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    pub const fn is_deferred_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::DEFERRED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if this [`Binding`] represents either kind of type alias
+    pub const fn is_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::TYPE_ALIAS)
+    }
+
     /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
     /// redefinition.
     pub fn redefines(&self, existing: &Binding) -> bool {
@@ -366,6 +395,19 @@ bitflags! {
         ///     y = 42
         /// ```
         const IN_EXCEPT_HANDLER = 1 << 10;
+
+        /// The binding represents a [PEP 613] explicit type alias.
+        ///
+        /// [PEP 613]: https://peps.python.org/pep-0613/
+        const ANNOTATED_TYPE_ALIAS = 1 << 11;
+
+        /// The binding represents a [PEP 695] type statement
+        ///
+        /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+        const DEFERRED_TYPE_ALIAS = 1 << 12;
+
+        /// The binding represents any type alias.
+        const TYPE_ALIAS = Self::ANNOTATED_TYPE_ALIAS.bits() | Self::DEFERRED_TYPE_ALIAS.bits();
     }
 }
 

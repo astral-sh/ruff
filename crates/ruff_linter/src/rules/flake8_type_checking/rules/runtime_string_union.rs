@@ -51,7 +51,7 @@ impl Violation for RuntimeStringUnion {
     }
 }
 
-/// TC006
+/// TC010
 pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
     if !checker.semantic().in_type_definition() {
         return;
