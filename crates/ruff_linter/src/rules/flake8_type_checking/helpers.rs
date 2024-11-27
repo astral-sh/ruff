@@ -1,6 +1,3 @@
-use crate::Locator;
-use ruff_python_codegen::Stylist;
-use ruff_python_parser::typing::parse_type_annotation;
 use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
@@ -8,13 +5,15 @@ use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::transformer::{walk_expr, Transformer};
 use ruff_python_ast::{self as ast, Decorator, Expr};
-use ruff_python_codegen::Generator;
+use ruff_python_codegen::{Generator, Stylist};
+use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::rules::flake8_type_checking::settings::Settings;
+use crate::Locator;
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
 /// context (with quoting enabled).
