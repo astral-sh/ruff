@@ -93,7 +93,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                 // a single parameter. This likely is a confusion with `type[a | b]` or
                 // `type[Union[a, b]]`. Do not emit a diagnostic for invalid type
                 // annotations.
-                if semantic.match_builtin_expr(value, "type") && !matches!(**slice, Expr::Tuple(_))
+                if !matches!(**slice, Expr::Tuple(_)) && semantic.match_builtin_expr(value, "type")
                 {
                     type_exprs.push(slice);
                 } else {
