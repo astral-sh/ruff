@@ -178,8 +178,7 @@ reveal_type(x)  # revealed: Literal[3, 4]
 ```py
 x = 1 if True else 2
 
-# TODO
-reveal_type(x)  # revealed: Never
+reveal_type(x)  # revealed: Literal[1]
 ```
 
 ### Always false
@@ -237,7 +236,7 @@ class C:
 reveal_type(C.x)  # revealed: int | str
 ```
 
-TODO:
+## TODO
 
 - boundness
 - conditional imports

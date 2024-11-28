@@ -549,8 +549,10 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
-    active_constraints: HashSet<ScopedConstraintId>,
 }
+
+#[derive(Clone, Debug)]
+pub(super) struct ActiveConstraintsSnapshot(HashSet<ScopedConstraintId>);
 
 #[derive(Debug, Default)]
 pub(super) struct UseDefMapBuilder<'db> {
@@ -635,8 +637,11 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
             symbol_states: self.symbol_states.clone(),
-            active_constraints: self.active_constraints.clone(),
         }
+    }
+
+    pub(super) fn constraints_snapshot(&self) -> ActiveConstraintsSnapshot {
+        ActiveConstraintsSnapshot(self.active_constraints.clone())
     }
 
     /// Restore the current builder symbols state to the given snapshot.
@@ -650,8 +655,6 @@ impl<'db> UseDefMapBuilder<'db> {
         // Restore the current visible-definitions state to the given snapshot.
         self.symbol_states = snapshot.symbol_states;
 
-        self.active_constraints = snapshot.active_constraints;
-
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
         // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
@@ -659,10 +662,18 @@ impl<'db> UseDefMapBuilder<'db> {
             .resize(num_symbols, SymbolState::undefined());
     }
 
+    pub(super) fn restore_constraints(&mut self, snapshot: ActiveConstraintsSnapshot) {
+        self.active_constraints = snapshot.0;
+    }
+
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new state for each symbol should include definitions from both the
     /// prior state and the snapshot.
-    pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
+    pub(super) fn merge(
+        &mut self,
+        snapshot: FlowSnapshot,
+        active_constraints: ActiveConstraintsSnapshot,
+    ) {
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
         // IDs must line up), so the current number of known symbols must always be equal to or
         // greater than the number of known symbols in a previously-taken snapshot.
@@ -671,7 +682,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.merge(snapshot);
+                current.merge(snapshot, active_constraints.clone());
             } else {
                 // Symbol not present in snapshot, so it's unbound/undeclared from that path.
                 current.set_may_be_unbound();
