@@ -45,3 +45,10 @@ re.match("ab[c]", s)
 re.search("ab[c]", s)
 re.fullmatch("ab[c]", s)
 re.split("ab[c]", s)
+
+# and these should not be modified because they have extra arguments
+re.sub("abc", "", s, flags=re.A)
+re.match("abc", s, flags=re.I)
+re.search("abc", s, flags=re.L)
+re.fullmatch("abc", s, flags=re.M)
+re.split("abc", s, maxsplit=2)
