@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier,
@@ -48,7 +48,7 @@ use crate::checkers::ast::Checker;
 ///
 /// This rule's fix is marked as unsafe if the affected expression contains comments. Otherwise,
 /// the fix can be applied safely.
-/// 
+///
 /// ## References
 /// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
 #[derive(ViolationMetadata)]
@@ -110,21 +110,24 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
     let new_expr = re_func.replacement();
 
     let repl = checker.generator().expr(&new_expr);
-    let mut diagnostic = Diagnostic::new(
+    let diagnostic = Diagnostic::new(
         UnnecessaryRegularExpression {
             replacement: repl.clone(),
         },
         call.range,
     );
 
-let fix = Fix::applicable_edit(
-    Edit::range_replacement(repl, call.range),
-    if checker.comment_ranges().has_comments(call, checker.source() {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    }
-);
+    let fix = Fix::applicable_edit(
+        Edit::range_replacement(repl, call.range),
+        if checker
+            .comment_ranges()
+            .has_comments(call, checker.source())
+        {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    );
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
