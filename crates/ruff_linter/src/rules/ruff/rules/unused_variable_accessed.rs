@@ -81,7 +81,7 @@ pub(crate) fn unused_variable_accessed(
     }
     // This excludes `global` and `nonlocal` variables.
     if binding.is_global() || binding.is_nonlocal() {
-        return None
+        return None;
     }
     // Only variables defined in function scopes
     if !checker.semantic().scopes[binding.scope].kind.is_function() {
