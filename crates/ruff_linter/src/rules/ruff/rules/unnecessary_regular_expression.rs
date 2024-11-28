@@ -249,17 +249,10 @@ impl<'a> ReFunc<'a> {
     }
 
     /// Try to obtain an [ExprStringLiteral] from `self.pattern`.
-    fn pattern_as_string_literal<'model>(
+    fn pattern_as_string_literal<'b>(
         &self,
-        semantic: &'model SemanticModel,
-    ) -> Option<&'model ExprStringLiteral>
-    where
-        'a: 'model,
-    {
-        if self.pattern.is_string_literal_expr() {
-            return self.pattern.as_string_literal_expr();
-        }
-
+        semantic: &'b SemanticModel,
+    ) -> Option<&'b ExprStringLiteral> {
         resolve_name(self.pattern, semantic)
     }
 }
