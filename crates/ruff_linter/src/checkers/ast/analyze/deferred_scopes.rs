@@ -374,7 +374,9 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
-            if checker.enabled(Rule::RuntimeImportInTypeCheckingBlock) {
+            if !checker.source_type.is_stub()
+                && checker.enabled(Rule::RuntimeImportInTypeCheckingBlock)
+            {
                 flake8_type_checking::rules::runtime_import_in_type_checking_block(
                     checker,
                     scope,
