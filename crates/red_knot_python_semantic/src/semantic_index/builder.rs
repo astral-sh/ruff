@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_db::files::File;
@@ -768,8 +769,16 @@ where
                 let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
+                let mut elif_else_clauses = node.elif_else_clauses.iter().map(|clause| (&clause.test, &clause.body[..])).collect_vec();
+                let has_else = elif_else_clauses.last().is_some_and(|clause| clause.0.is_none());
+                if !has_else {
+                    // an if-elif statement without an explicit `else` branch is equivalent to one with a no-op `else` branch
+                    elif_else_clauses.push((&None, &[]));
+                }
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
-                for clause in &node.elif_else_clauses {
+                for clause in elif_else_clauses {
+                    let clause_test = clause.0;
+                    let clause_body = clause.1;
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
@@ -779,24 +788,11 @@ where
                     for constraint in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
-                    if let Some(elif_test) = &clause.test {
+                    if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         constraints.push(self.record_expression_constraint(elif_test));
                     }
-                    self.visit_body(&clause.body);
-                }
-                let has_else = node
-                    .elif_else_clauses
-                    .last()
-                    .is_some_and(|clause| clause.test.is_none());
-                if !has_else {
-                    // if there's no else clause, we should act as if we had an empty else clause,
-                    // by again following the same logic as above for elif/else clauses.
-                    post_clauses.push(self.flow_snapshot());
-                    self.flow_restore(pre_if);
-                    for constraint in &constraints {
-                        self.record_negated_constraint(*constraint);
-                    }
+                    self.visit_body(clause_body);
                 }
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
