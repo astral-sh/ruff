@@ -93,7 +93,6 @@ pub(crate) fn unused_variable_accessed(
 
     let trimmed_name = name.trim_start_matches('_');
     let mut kind = ShadowedKind::None;
-    // let mut fix = trimmed_name.to_string();
 
     if !trimmed_name.is_empty() {
         if is_python_builtin(
