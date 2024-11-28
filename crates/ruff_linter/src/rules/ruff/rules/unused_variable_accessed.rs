@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingKind};
+use ruff_python_semantic::{Binding, BindingFlags, BindingKind};
 use ruff_python_stdlib::builtins::is_python_builtin;
 use ruff_text_size::Ranged;
 
@@ -73,18 +73,21 @@ pub(crate) fn unused_variable_accessed(
         return None;
     }
     // Only variables defined via function arguments or assignments.
-    // This excludes `global` and `nonlocal` variables.
     if !matches!(
         binding.kind,
         BindingKind::Argument | BindingKind::Assignment
     ) {
         return None;
     }
+    // This excludes `global` and `nonlocal` variables.
+    if binding.is_global() || binding.is_nonlocal() {
+        return None
+    }
     // Only variables defined in function scopes
     if !checker.semantic().scopes[binding.scope].kind.is_function() {
         return None;
     }
-    if checker.settings.dummy_variable_rgx.is_match(name) {
+    if !checker.settings.dummy_variable_rgx.is_match(name) {
         return None;
     }
 
