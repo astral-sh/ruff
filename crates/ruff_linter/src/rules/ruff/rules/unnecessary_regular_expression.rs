@@ -10,18 +10,7 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 ///
-/// Reports the following `re` calls when their first arguments are plain string
-/// literals, and no additional flags are passed:
-///
-/// - `sub`
-/// - `match`
-/// - `search`
-/// - `fullmatch`
-/// - `split`
-///
-/// For `sub`, the `repl` (replacement) argument must also be a string literal,
-/// not a function. For `match`, `search`, and `fullmatch`, the return value
-/// must also be used only for its truth value.
+/// Checks for uses of the `re` module that can be replaced with builtin `str` methods.
 ///
 /// ## Why is this bad?
 ///
@@ -39,6 +28,21 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// s.replace("abc", "")
 /// ```
+///
+/// ## Details
+///
+/// Reports the following `re` calls when their first arguments are plain string
+/// literals, and no additional flags are passed:
+///
+/// - `sub`
+/// - `match`
+/// - `search`
+/// - `fullmatch`
+/// - `split`
+///
+/// For `sub`, the `repl` (replacement) argument must also be a string literal,
+/// not a function. For `match`, `search`, and `fullmatch`, the return value
+/// must also be used only for its truth value.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryRegularExpression {
     replacement: String,
