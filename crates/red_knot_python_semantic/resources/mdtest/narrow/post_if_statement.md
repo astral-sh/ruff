@@ -48,7 +48,7 @@ reveal_type(x)  # revealed: int
 reveal_type(y)  # revealed: int | None
 ```
 
-## if-elif without explicit else branch, act similar to empty else branch
+## An if-elif without an explicit else branch is equivalent to one with an empty else branch
 
 ```py
 def optional_int() -> int | None: ...
