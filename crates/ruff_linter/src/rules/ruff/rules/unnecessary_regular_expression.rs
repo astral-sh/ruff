@@ -1,7 +1,8 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::{self as ast, ExprStringLiteral};
 use ruff_python_ast::{
-    Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier,
+    Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier, Stmt,
 };
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::TextRange;
@@ -90,8 +91,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         return;
     };
 
-    // For now, restrict this rule to string literals
-    let Some(string_lit) = re_func.pattern.as_string_literal_expr() else {
+    let Some(string_lit) = re_func.pattern_as_string_literal(semantic) else {
         return;
     };
 
@@ -247,4 +247,65 @@ impl<'a> ReFunc<'a> {
             range: TextRange::default(),
         })
     }
+
+    /// Try to obtain an [ExprStringLiteral] from `self.pattern`.
+    fn pattern_as_string_literal<'model>(
+        &self,
+        semantic: &'model SemanticModel,
+    ) -> Option<&'model ExprStringLiteral>
+    where
+        'a: 'model,
+    {
+        if self.pattern.is_string_literal_expr() {
+            return self.pattern.as_string_literal_expr();
+        }
+
+        resolve_name(self.pattern, semantic)
+    }
+}
+
+fn resolve_name<'a>(name: &Expr, semantic: &'a SemanticModel) -> Option<&'a ExprStringLiteral> {
+    let mut name = Box::new(name.clone());
+
+    while let Some(name_expr) = name.as_name_expr() {
+        let binding = semantic.binding(semantic.only_binding(name_expr)?);
+
+        let value = match binding.kind {
+            ruff_python_semantic::BindingKind::Assignment => match binding.statement(semantic) {
+                Some(Stmt::Assign(ast::StmtAssign { value, .. })) => value,
+                Some(Stmt::AnnAssign(ast::StmtAnnAssign {
+                    value: Some(value), ..
+                })) => value,
+                _ => return None,
+            },
+            // ruff_python_semantic::BindingKind::Argument => todo!(),
+            // ruff_python_semantic::BindingKind::Annotation => todo!(),
+            // ruff_python_semantic::BindingKind::NamedExprAssignment => todo!(),
+            // ruff_python_semantic::BindingKind::TypeParam => todo!(),
+            // ruff_python_semantic::BindingKind::LoopVar => todo!(),
+            // ruff_python_semantic::BindingKind::WithItemVar => todo!(),
+            // ruff_python_semantic::BindingKind::Global(_) => todo!(),
+            // ruff_python_semantic::BindingKind::Nonlocal(_, _) => todo!(),
+            // ruff_python_semantic::BindingKind::Builtin => todo!(),
+            // ruff_python_semantic::BindingKind::ClassDefinition(_) => todo!(),
+            // ruff_python_semantic::BindingKind::FunctionDefinition(_) => todo!(),
+            // ruff_python_semantic::BindingKind::Export(_) => todo!(),
+            // ruff_python_semantic::BindingKind::FutureImport => todo!(),
+            // ruff_python_semantic::BindingKind::Import(_) => todo!(),
+            // ruff_python_semantic::BindingKind::FromImport(_) => todo!(),
+            // ruff_python_semantic::BindingKind::SubmoduleImport(_) => todo!(),
+            // ruff_python_semantic::BindingKind::Deletion => todo!(),
+            // ruff_python_semantic::BindingKind::ConditionalDeletion(_) => todo!(),
+            // ruff_python_semantic::BindingKind::BoundException => todo!(),
+            // ruff_python_semantic::BindingKind::UnboundException(_) => todo!(),
+            _ => return None,
+        };
+
+        if value.is_string_literal_expr() {
+            return value.as_string_literal_expr();
+        }
+        name = value.clone();
+    }
+
+    None
 }
