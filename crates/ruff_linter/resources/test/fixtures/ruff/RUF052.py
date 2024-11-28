@@ -26,7 +26,11 @@ _x = "global"
 
 def fun():
     global _x
-    return _x    
+    return _x
+
+def fun():
+    __dunder__ = "dunder variable"
+    return __dunder__
 
 def fun():
     global _x

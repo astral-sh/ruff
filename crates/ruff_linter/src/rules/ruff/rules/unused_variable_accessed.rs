@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingFlags, BindingKind};
+use ruff_python_semantic::{Binding, BindingKind};
 use ruff_python_stdlib::builtins::is_python_builtin;
 use ruff_text_size::Ranged;
 
@@ -29,6 +29,9 @@ use crate::checkers::ast::Checker;
 ///     variable = 3
 ///     return variable + 1
 /// ```
+///
+/// ## Options
+/// - [`lint.dummy-variable-rgx`]
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedVariableAccessed {
     name: String,
@@ -64,8 +67,8 @@ pub(crate) fn unused_variable_accessed(
 ) -> Option<Vec<Diagnostic>> {
     let name = binding.name(checker.source());
 
-    // only variables marked as private
-    if !name.starts_with('_') || name == "_" || is_dunder(name) {
+    // Ignore `_` and dunder variables
+    if name == "_" || is_dunder(name) {
         return None;
     }
     // only used variables
@@ -123,9 +126,13 @@ pub(crate) fn unused_variable_accessed(
     )
 }
 
+/// Enumeration of various ways in which a binding can shadow other variables
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum ShadowedKind {
+    /// The variable shadows a global, nonlocal or local symbol
     Some,
+    /// The variable shadows a builtin symbol
     BuiltIn,
+    /// The variable does not shadow any other symbols
     None,
 }

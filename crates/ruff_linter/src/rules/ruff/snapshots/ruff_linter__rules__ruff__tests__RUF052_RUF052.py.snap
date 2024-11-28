@@ -2,65 +2,65 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF052.py:76:16: RUF052 Local variable `_var` with leading underscore is accessed
+RUF052.py:80:16: RUF052 Local variable `_var` with leading underscore is accessed
    |
-74 |     def fun(self):
-75 |         _var = "method variable"
-76 |         return _var # [RUF052]
+78 |     def fun(self):
+79 |         _var = "method variable"
+80 |         return _var # [RUF052]
    |                ^^^^ RUF052
-77 | 
-78 | def fun(_var):
+81 | 
+82 | def fun(_var):
    |
    = help: Remove leading underscores
 
-RUF052.py:79:12: RUF052 Local variable `_var` with leading underscore is accessed
+RUF052.py:83:12: RUF052 Local variable `_var` with leading underscore is accessed
    |
-78 | def fun(_var):
-79 |     return _var # [RUF052]
+82 | def fun(_var):
+83 |     return _var # [RUF052]
    |            ^^^^ RUF052
-80 | 
-81 | def fun():
+84 | 
+85 | def fun():
    |
    = help: Remove leading underscores
 
-RUF052.py:83:12: RUF052 Local variable `_list` with leading underscore is accessed
+RUF052.py:87:12: RUF052 Local variable `_list` with leading underscore is accessed
    |
-81 | def fun():
-82 |     _list = "built-in"
-83 |     return _list # [RUF052]
+85 | def fun():
+86 |     _list = "built-in"
+87 |     return _list # [RUF052]
    |            ^^^^^ RUF052
-84 | 
-85 | x = "global"
+88 | 
+89 | x = "global"
    |
    = help: Prefer using trailing underscores to avoid shadowing a built-in
 
-RUF052.py:90:12: RUF052 Local variable `_x` with leading underscore is accessed
+RUF052.py:94:12: RUF052 Local variable `_x` with leading underscore is accessed
    |
-88 |     global x
-89 |     _x = "shadows global"
-90 |     return _x # [RUF052]
+92 |     global x
+93 |     _x = "shadows global"
+94 |     return _x # [RUF052]
    |            ^^ RUF052
-91 | 
-92 | def foo():
+95 | 
+96 | def foo():
    |
    = help: Prefer using trailing underscores to avoid shadowing a variable
 
-RUF052.py:97:12: RUF052 Local variable `_x` with leading underscore is accessed
-   |
-95 |     nonlocal x
-96 |     _x = "shadows nonlocal"
-97 |     return _x # [RUF052]
-   |            ^^ RUF052
-98 |   bar()
-99 |   return x
-   |
-   = help: Prefer using trailing underscores to avoid shadowing a variable
-
-RUF052.py:104:12: RUF052 Local variable `_x` with leading underscore is accessed
+RUF052.py:101:12: RUF052 Local variable `_x` with leading underscore is accessed
     |
-102 |     x = "local"
-103 |     _x = "shadows local"
-104 |     return _x # [RUF052]
+ 99 |     nonlocal x
+100 |     _x = "shadows nonlocal"
+101 |     return _x # [RUF052]
+    |            ^^ RUF052
+102 |   bar()
+103 |   return x
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+RUF052.py:108:12: RUF052 Local variable `_x` with leading underscore is accessed
+    |
+106 |     x = "local"
+107 |     _x = "shadows local"
+108 |     return _x # [RUF052]
     |            ^^ RUF052
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
