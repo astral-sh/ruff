@@ -108,6 +108,18 @@ class Baz:
     z: Callable = lambda self, other: self == other
 
 
+# Lambdas wrapped in function calls could also still be method definitions!
+# To avoid false positives, we shouldn't flag any of these either:
+from typing import final, override, no_type_check
+
+
+class Foo:
+    a = final(lambda self, other: self == other)
+    b = override(lambda self, other: self == other)
+    c = no_type_check(lambda self, other: self == other)
+    d = final(override(no_type_check(lambda self, other: self == other)))
+
+
 # lambdas used in decorators do not constitute method definitions,
 # so these *should* be flagged:
 class TheLambdasHereAreNotMethods:

@@ -91,7 +91,9 @@ impl Violation for ReimplementedOperator {
 
 /// FURB118
 pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
-    // Ignore methods, whether defined using the `def` keyword or via a `lambda` assignment.
+    // Ignore methods.
+    // Methods can be defined via a `def` statement in a class scope,
+    // or via a lambda appearing on the right-hand side of an assignment in a class scope.
     if checker.semantic().current_scope().kind.is_class()
         && (target.is_function_def()
             || checker
