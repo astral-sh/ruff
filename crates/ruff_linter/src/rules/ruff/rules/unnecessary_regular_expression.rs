@@ -183,7 +183,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         return;
     }
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
         return;
     };
 
