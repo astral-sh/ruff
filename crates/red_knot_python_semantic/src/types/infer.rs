@@ -2360,7 +2360,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        KnownClass::EllipsisType.to_instance(self.db)
+        builtins_symbol(self.db, "Ellipsis")
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Unknown)
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -5344,7 +5346,6 @@ mod tests {
             ",
         )?;
 
-        // TODO: sys.version_info
         assert_public_ty(&db, "src/a.py", "x", "EllipsisType");
 
         Ok(())

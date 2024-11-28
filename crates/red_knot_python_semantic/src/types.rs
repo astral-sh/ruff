@@ -1147,8 +1147,7 @@ impl<'db> Type<'db> {
                     KnownClass::NoneType
                     | KnownClass::NoDefaultType
                     | KnownClass::VersionInfo
-                    | KnownClass::TypeAliasType
-                    | KnownClass::EllipsisType,
+                    | KnownClass::TypeAliasType,
                 ) => true,
                 Some(
                     KnownClass::Bool
@@ -1787,7 +1786,6 @@ pub enum KnownClass {
     GenericAlias,
     ModuleType,
     FunctionType,
-    EllipsisType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
@@ -1822,7 +1820,6 @@ impl<'db> KnownClass {
             Self::TypeVar => "TypeVar",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
-            Self::EllipsisType => "EllipsisType",
             // This is the name the type of `sys.version_info` has in typeshed,
             // which is different to what `type(sys.version_info).__name__` is at runtime.
             // (At runtime, `type(sys.version_info).__name__ == "version_info"`,
@@ -1858,9 +1855,7 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::Slice => CoreStdlibModule::Builtins,
             Self::VersionInfo => CoreStdlibModule::Sys,
-            Self::GenericAlias | Self::ModuleType | Self::FunctionType | Self::EllipsisType => {
-                CoreStdlibModule::Types
-            }
+            Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
             Self::NoneType => CoreStdlibModule::Typeshed,
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType => CoreStdlibModule::Typing,
             // TODO when we understand sys.version_info, we will need an explicit fallback here,
@@ -1876,11 +1871,7 @@ impl<'db> KnownClass {
     const fn is_singleton(self) -> bool {
         // TODO there are other singleton types (EllipsisType, NotImplementedType)
         match self {
-            Self::NoneType
-            | Self::NoDefaultType
-            | Self::VersionInfo
-            | Self::TypeAliasType
-            | Self::EllipsisType => true,
+            Self::NoneType | Self::NoDefaultType | Self::VersionInfo | Self::TypeAliasType => true,
             Self::Bool
             | Self::Object
             | Self::Bytes
@@ -1926,7 +1917,6 @@ impl<'db> KnownClass {
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "_version_info" => Self::VersionInfo,
-            "EllipsisType" => Self::EllipsisType,
             _ => return None,
         };
 
@@ -1955,8 +1945,7 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::ModuleType
             | Self::VersionInfo
-            | Self::FunctionType
-            | Self::EllipsisType => module.name() == self.canonical_module().as_str(),
+            | Self::FunctionType => module.name() == self.canonical_module().as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
                 matches!(module.name().as_str(), "typing" | "typing_extensions")
