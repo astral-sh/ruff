@@ -108,3 +108,6 @@ field32: typing.Union[float, typing.Union[int | int | int]]  # Error
 
 # Test case for mixed union type fix
 field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
+
+# Test case for mixed union type
+field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error

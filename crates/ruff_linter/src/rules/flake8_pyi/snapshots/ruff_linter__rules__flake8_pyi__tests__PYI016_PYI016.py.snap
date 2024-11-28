@@ -415,6 +415,8 @@ PYI016.py:110:42: PYI016 Duplicate union member `int`
 109 | # Test case for mixed union type fix
 110 | field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     |                                          ^^^ PYI016
+111 | 
+112 | # Test case for mixed union type
     |
     = help: Remove duplicate union member `int`
 
@@ -423,6 +425,8 @@ PYI016.py:110:62: PYI016 Duplicate union member `int`
 109 | # Test case for mixed union type fix
 110 | field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     |                                                              ^^^ PYI016
+111 | 
+112 | # Test case for mixed union type
     |
     = help: Remove duplicate union member `int`
 
@@ -431,5 +435,15 @@ PYI016.py:110:68: PYI016 Duplicate union member `int`
 109 | # Test case for mixed union type fix
 110 | field33: typing.Union[typing.Union[int | int] | typing.Union[int | int]] # Error
     |                                                                    ^^^ PYI016
+111 | 
+112 | # Test case for mixed union type
     |
     = help: Remove duplicate union member `int`
+
+PYI016.py:113:61: PYI016 Duplicate union member `list[int]`
+    |
+112 | # Test case for mixed union type
+113 | field34: typing.Union[list[int], str] | typing.Union[bytes, list[int]]  # Error
+    |                                                             ^^^^^^^^^ PYI016
+    |
+    = help: Remove duplicate union member `list[int]`
