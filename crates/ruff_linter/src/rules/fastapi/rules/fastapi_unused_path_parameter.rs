@@ -4,7 +4,7 @@ use std::str::CharIndices;
 
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{Modules, SemanticModel};
@@ -62,8 +62,8 @@ use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as modifying a function signature can
 /// change the behavior of the code.
-#[violation]
-pub struct FastApiUnusedPathParameter {
+#[derive(ViolationMetadata)]
+pub(crate) struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,
     is_positional: bool,

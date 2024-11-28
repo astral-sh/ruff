@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -30,8 +30,8 @@ use crate::Locator;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct MultipleImportsOnOneLine;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleImportsOnOneLine;
 
 impl Violation for MultipleImportsOnOneLine {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

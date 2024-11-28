@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for uses of `os.path.getctime`.
@@ -36,8 +36,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[violation]
-pub struct OsPathGetctime;
+#[derive(ViolationMetadata)]
+pub(crate) struct OsPathGetctime;
 
 impl Violation for OsPathGetctime {
     #[derive_message_formats]

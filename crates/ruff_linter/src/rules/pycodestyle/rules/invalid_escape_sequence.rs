@@ -1,7 +1,7 @@
 use memchr::memchr_iter;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringLike, StringLikePart};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -37,8 +37,8 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
-#[violation]
-pub struct InvalidEscapeSequence {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidEscapeSequence {
     ch: char,
     fix_title: FixTitle,
 }

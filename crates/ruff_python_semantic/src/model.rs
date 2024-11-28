@@ -645,6 +645,7 @@ impl<'a> SemanticModel<'a> {
             }
 
             class_variables_visible = scope.kind.is_type() && index == 0;
+            seen_function |= scope.kind.is_function();
 
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
@@ -661,8 +662,128 @@ impl<'a> SemanticModel<'a> {
                     return None;
                 }
             }
+        }
 
+        None
+    }
+
+    /// Simulates a runtime load of a given [`ast::ExprName`].
+    ///
+    /// This should not be run until after all the bindings have been visited.
+    ///
+    /// The main purpose of this method and what makes this different
+    /// from methods like [`SemanticModel::lookup_symbol`] and
+    /// [`SemanticModel::resolve_name`] is that it may be used
+    /// to perform speculative name lookups.
+    ///
+    /// In most cases a load can be accurately modeled simply by calling
+    /// [`SemanticModel::resolve_name`] at the right time during semantic
+    /// analysis, however for speculative lookups this is not the case,
+    /// since we're aiming to change the semantic meaning of our load.
+    /// E.g. we want to check what would happen if we changed a forward
+    /// reference to an immediate load or vice versa.
+    ///
+    /// Use caution when utilizing this method, since it was primarily designed
+    /// to work for speculative lookups from within type definitions, which
+    /// happen to share some nice properties, where attaching each binding
+    /// to a range in the source code and ordering those bindings based on
+    /// that range is a good enough approximation of which bindings are
+    /// available at runtime for which reference.
+    ///
+    /// References from within an [`ast::Comprehension`] can produce incorrect
+    /// results when referring to a [`BindingKind::NamedExprAssignment`].
+    pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
+        let symbol = name.id.as_str();
+        let range = name.range;
+        let mut seen_function = false;
+        let mut class_variables_visible = true;
+        let mut source_order_sensitive_lookup = true;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+
+            // Only once we leave a function scope and its enclosing type scope should
+            // we stop doing source-order lookups. We could e.g. have nested classes
+            // where we lookup symbols from the innermost class scope, which can only see
+            // things from the outer class(es) that have been defined before the inner
+            // class. Source-order lookups take advantage of the fact that most of the
+            // bindings are created sequentially in source order, so if we want to
+            // determine whether or not a given reference can refer to another binding
+            // we can look at their text ranges to check whether or not the binding
+            // could actually be referred to. This is not as robust as back-tracking
+            // the AST, since that can properly take care of the few out-of order
+            // corner-cases, but back-tracking the AST from the reference to the binding
+            // is a lot more expensive than comparing a pair of text ranges.
+            if seen_function && !scope.kind.is_type() {
+                source_order_sensitive_lookup = false;
+            }
+
+            if scope.kind.is_class() {
+                if seen_function && matches!(symbol, "__class__") {
+                    return None;
+                }
+                if !class_variables_visible {
+                    continue;
+                }
+            }
+
+            class_variables_visible = scope.kind.is_type() && index == 0;
             seen_function |= scope.kind.is_function();
+
+            if let Some(binding_id) = scope.get(symbol) {
+                if source_order_sensitive_lookup {
+                    // we need to look through all the shadowed bindings
+                    // since we may be shadowing a source-order accurate
+                    // runtime binding with a source-order inaccurate one
+                    for shadowed_id in scope.shadowed_bindings(binding_id) {
+                        let binding = &self.bindings[shadowed_id];
+                        if binding.context.is_typing() {
+                            continue;
+                        }
+                        if let BindingKind::Annotation
+                        | BindingKind::Deletion
+                        | BindingKind::UnboundException(..)
+                        | BindingKind::ConditionalDeletion(..) = binding.kind
+                        {
+                            continue;
+                        }
+
+                        // This ensures we perform the correct source-order lookup,
+                        // since the ranges for these two types of bindings are trimmed
+                        // to just the target, but the name is not available until the
+                        // end of the entire statement
+                        let binding_range = match binding.statement(self) {
+                            Some(Stmt::Assign(stmt)) => stmt.range(),
+                            Some(Stmt::AnnAssign(stmt)) => stmt.range(),
+                            Some(Stmt::ClassDef(stmt)) => stmt.range(),
+                            _ => binding.range,
+                        };
+
+                        if binding_range.ordering(range).is_lt() {
+                            return Some(shadowed_id);
+                        }
+                    }
+                } else {
+                    let candidate_id = match self.bindings[binding_id].kind {
+                        BindingKind::Annotation => continue,
+                        BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                        BindingKind::ConditionalDeletion(binding_id) => binding_id,
+                        BindingKind::UnboundException(Some(binding_id)) => binding_id,
+                        _ => binding_id,
+                    };
+
+                    if self.bindings[candidate_id].context.is_typing() {
+                        continue;
+                    }
+
+                    return Some(candidate_id);
+                }
+            }
+
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return None;
+                }
+            }
         }
 
         None
@@ -1289,6 +1410,7 @@ impl<'a> SemanticModel<'a> {
             "typing" => self.seen.insert(Modules::TYPING),
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
             "attr" | "attrs" => self.seen.insert(Modules::ATTRS),
+            "airflow" => self.seen.insert(Modules::AIRFLOW),
             _ => {}
         }
     }
@@ -1583,6 +1705,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::ANNOTATION)
     }
 
+    /// Return `true` if the model is in a `@no_type_check` context.
+    pub const fn in_no_type_check(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
+    }
+
     /// Return `true` if the model is in a typing-only type annotation.
     pub const fn in_typing_only_annotation(&self) -> bool {
         self.flags
@@ -1659,6 +1786,42 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_forward_reference(&self) -> bool {
         self.in_string_type_definition()
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
+    }
+
+    /// Return `true` if the model is visiting the value expression
+    /// of a [PEP 613] type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+    /// ```
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    pub const fn in_annotated_type_alias_value(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::ANNOTATED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the model is visiting the value expression
+    /// of a [PEP 695] type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// type OptStr = str | None  # We're visiting the RHS
+    /// ```
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    pub const fn in_deferred_type_alias_value(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DEFERRED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the model is visiting the value expression of
+    /// either kind of type alias.
+    pub const fn in_type_alias_value(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPE_ALIAS)
     }
 
     /// Return `true` if the model is in an exception handler.
@@ -1860,6 +2023,7 @@ bitflags! {
         const FLASK = 1 << 24;
         const ATTRS = 1 << 25;
         const REGEX = 1 << 26;
+        const AIRFLOW = 1 << 27;
     }
 }
 
@@ -2220,6 +2384,44 @@ bitflags! {
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 25;
 
+        /// The model is in a [no_type_check] context.
+        ///
+        /// This is used to skip type checking when the `@no_type_check` decorator is found.
+        ///
+        /// For example (adapted from [#13824]):
+        /// ```python
+        /// from typing import no_type_check
+        ///
+        /// @no_type_check
+        /// def fn(arg: "A") -> "R":
+        ///     pass
+        /// ```
+        ///
+        /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
+        /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
+        const NO_TYPE_CHECK = 1 << 26;
+        /// The model is in the value expression of a [PEP 613] explicit type alias.
+        ///
+        /// For example:
+        /// ```python
+        /// from typing import TypeAlias
+        ///
+        /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+        /// ```
+        ///
+        /// [PEP 613]: https://peps.python.org/pep-0613/
+        const ANNOTATED_TYPE_ALIAS = 1 << 27;
+
+        /// The model is in the value expression of a [PEP 695] type statement.
+        ///
+        /// For example:
+        /// ```python
+        /// type OptStr = str | None  # We're visiting the RHS
+        /// ```
+        ///
+        /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+        const DEFERRED_TYPE_ALIAS = 1 << 28;
+
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
 
@@ -2236,6 +2438,9 @@ bitflags! {
         /// The context is in a typing-only context.
         const TYPING_CONTEXT = Self::TYPE_CHECKING_BLOCK.bits() | Self::TYPING_ONLY_ANNOTATION.bits() |
             Self::STRING_TYPE_DEFINITION.bits() | Self::TYPE_PARAM_DEFINITION.bits();
+
+        /// The context is in any type alias.
+        const TYPE_ALIAS = Self::ANNOTATED_TYPE_ALIAS.bits() | Self::DEFERRED_TYPE_ALIAS.bits();
     }
 }
 

@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -36,8 +36,8 @@ use crate::fix::edits::{remove_argument, Parentheses};
 ///
 /// ## References
 /// - [Python documentation: Class definitions](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
-#[violation]
-pub struct DuplicateBases {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateBases {
     base: String,
     class: String,
 }

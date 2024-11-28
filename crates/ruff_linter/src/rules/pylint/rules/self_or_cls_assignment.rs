@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_python_semantic::ScopeKind;
@@ -42,8 +42,8 @@ use crate::checkers::ast::Checker;
 ///         supercls = cls.__mro__[-1]
 ///         return supercls
 /// ```
-#[violation]
-pub struct SelfOrClsAssignment {
+#[derive(ViolationMetadata)]
+pub(crate) struct SelfOrClsAssignment {
     method_type: MethodType,
 }
 

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::{
@@ -37,8 +37,8 @@ use crate::checkers::ast::Checker;
 ///     def greeting():
 ///         print("Greetings friend!")
 /// ```
-#[violation]
-pub struct NoSelfUse {
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSelfUse {
     method_name: String,
 }
 

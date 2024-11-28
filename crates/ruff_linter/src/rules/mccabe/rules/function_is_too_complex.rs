@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 
 /// ## What it does
@@ -45,8 +45,8 @@ use ruff_python_ast::identifier::Identifier;
 ///
 /// ## Options
 /// - `lint.mccabe.max-complexity`
-#[violation]
-pub struct ComplexStructure {
+#[derive(ViolationMetadata)]
+pub(crate) struct ComplexStructure {
     name: String,
     complexity: usize,
     max_complexity: usize,

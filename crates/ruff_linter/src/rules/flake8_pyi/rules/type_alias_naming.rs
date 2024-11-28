@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -21,8 +21,8 @@ use crate::checkers::ast::Checker;
 /// ```pyi
 /// TypeAliasName: TypeAlias = int
 /// ```
-#[violation]
-pub struct SnakeCaseTypeAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct SnakeCaseTypeAlias {
     name: String,
 }
 
@@ -60,8 +60,8 @@ impl Violation for SnakeCaseTypeAlias {
 ///
 /// ## References
 /// - [PEP 484: Type Aliases](https://peps.python.org/pep-0484/#type-aliases)
-#[violation]
-pub struct TSuffixedTypeAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct TSuffixedTypeAlias {
     name: String,
 }
 

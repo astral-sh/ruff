@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for undefined names in `__all__`.
@@ -38,8 +38,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [Python documentation: `__all__`](https://docs.python.org/3/tutorial/modules.html#importing-from-a-package)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct UndefinedExport {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndefinedExport {
     pub name: String,
 }
 

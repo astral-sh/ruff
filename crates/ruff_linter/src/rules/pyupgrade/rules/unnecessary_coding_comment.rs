@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_index::Indexer;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
@@ -30,8 +30,8 @@ use crate::Locator;
 /// ```
 ///
 /// [PEP 3120]: https://peps.python.org/pep-3120/
-#[violation]
-pub struct UTF8EncodingDeclaration;
+#[derive(ViolationMetadata)]
+pub(crate) struct UTF8EncodingDeclaration;
 
 impl AlwaysFixableViolation for UTF8EncodingDeclaration {
     #[derive_message_formats]

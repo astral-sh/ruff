@@ -424,3 +424,10 @@ xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
     expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (
     yyyyyyyyyyyyyy + zzzzzzzzzzz
 )
+
+# This is not a multiline f-string, but the expression is too long so it should be
+# wrapped in parentheses.
+f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)

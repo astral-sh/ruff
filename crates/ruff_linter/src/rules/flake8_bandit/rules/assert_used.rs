@@ -2,7 +2,7 @@ use ruff_python_ast::Stmt;
 use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -30,8 +30,8 @@ use ruff_text_size::Ranged;
 /// if x <= 0:
 ///     raise ValueError("Expected positive value.")
 /// ```
-#[violation]
-pub struct Assert;
+#[derive(ViolationMetadata)]
+pub(crate) struct Assert;
 
 impl Violation for Assert {
     #[derive_message_formats]

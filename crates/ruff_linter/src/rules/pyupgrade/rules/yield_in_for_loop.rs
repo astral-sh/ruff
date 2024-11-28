@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
@@ -37,8 +37,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `yield` statement](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
 /// - [PEP 380 – Syntax for Delegating to a Subgenerator](https://peps.python.org/pep-0380/)
-#[violation]
-pub struct YieldInForLoop;
+#[derive(ViolationMetadata)]
+pub(crate) struct YieldInForLoop;
 
 impl AlwaysFixableViolation for YieldInForLoop {
     #[derive_message_formats]

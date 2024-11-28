@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
@@ -24,8 +24,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
-#[violation]
-pub struct DeprecatedCElementTree;
+#[derive(ViolationMetadata)]
+pub(crate) struct DeprecatedCElementTree;
 
 impl AlwaysFixableViolation for DeprecatedCElementTree {
     #[derive_message_formats]

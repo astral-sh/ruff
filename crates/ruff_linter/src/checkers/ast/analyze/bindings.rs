@@ -3,7 +3,9 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_import_conventions, flake8_pyi, pyflakes, pylint, ruff};
+use crate::rules::{
+    flake8_import_conventions, flake8_pyi, flake8_type_checking, pyflakes, pylint, ruff,
+};
 
 /// Run lint rules over the [`Binding`]s.
 pub(crate) fn bindings(checker: &mut Checker) {
@@ -15,6 +17,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnconventionalImportAlias,
         Rule::UnsortedDunderSlots,
         Rule::UnusedVariable,
+        Rule::UnquotedTypeAlias,
         Rule::UnusedVariableAccessed,
     ]) {
         return;
@@ -71,6 +74,13 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 flake8_pyi::rules::unaliased_collections_abc_set_import(checker, binding)
             {
                 checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::UnquotedTypeAlias) {
+            if let Some(diagnostics) =
+                flake8_type_checking::rules::unquoted_type_alias(checker, binding)
+            {
+                checker.diagnostics.extend(diagnostics);
             }
         }
         if checker.enabled(Rule::UnsortedDunderSlots) {

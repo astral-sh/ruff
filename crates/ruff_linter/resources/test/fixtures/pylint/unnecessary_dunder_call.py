@@ -102,3 +102,6 @@ blah = lambda: {"a": 1}.__delitem__("a")  # OK
 blah = dict[{"a": 1}.__delitem__("a")]  # OK
 
 "abc".__contains__("a")
+
+# https://github.com/astral-sh/ruff/issues/14597
+assert "abc".__str__() == "abc"

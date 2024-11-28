@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, StmtAssert};
 use ruff_text_size::Ranged;
 
@@ -25,8 +25,8 @@ use crate::checkers::ast::Checker;
 /// fruits.filter(lambda fruit: fruit.startwith("p"))
 /// assert len(fruits) == 2
 /// ```
-#[violation]
-pub struct InvalidAssertMessageLiteralArgument;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidAssertMessageLiteralArgument;
 
 impl Violation for InvalidAssertMessageLiteralArgument {
     #[derive_message_formats]

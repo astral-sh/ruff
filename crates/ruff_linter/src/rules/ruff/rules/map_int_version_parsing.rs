@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [version-specifier]: https://packaging.python.org/en/latest/specifications/version-specifiers/#version-specifiers
-#[violation]
-pub struct MapIntVersionParsing;
+#[derive(ViolationMetadata)]
+pub(crate) struct MapIntVersionParsing;
 
 impl Violation for MapIntVersionParsing {
     #[derive_message_formats]

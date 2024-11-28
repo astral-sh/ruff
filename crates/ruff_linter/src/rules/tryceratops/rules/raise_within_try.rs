@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     comparable::ComparableExpr,
     helpers::{self, map_callable},
@@ -49,8 +49,8 @@ use crate::checkers::ast::Checker;
 ///     except ValueError:
 ///         raise
 /// ```
-#[violation]
-pub struct RaiseWithinTry;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseWithinTry;
 
 impl Violation for RaiseWithinTry {
     #[derive_message_formats]

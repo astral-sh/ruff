@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::analyze::function_type;
@@ -39,8 +39,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// [PEP 484]: https://peps.python.org/pep-0484/#positional-only-arguments
 /// [PEP 570]: https://peps.python.org/pep-0570
-#[violation]
-pub struct Pep484StylePositionalOnlyParameter;
+#[derive(ViolationMetadata)]
+pub(crate) struct Pep484StylePositionalOnlyParameter;
 
 impl Violation for Pep484StylePositionalOnlyParameter {
     #[derive_message_formats]

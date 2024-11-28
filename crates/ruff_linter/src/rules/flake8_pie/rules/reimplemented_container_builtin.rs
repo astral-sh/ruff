@@ -2,7 +2,7 @@ use ruff_python_ast::{Expr, ExprLambda};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -37,8 +37,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
-#[violation]
-pub struct ReimplementedContainerBuiltin {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedContainerBuiltin {
     container: Container,
 }
 

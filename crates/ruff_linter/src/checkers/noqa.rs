@@ -211,6 +211,7 @@ pub(crate) fn check_noqa(
         && !exemption.includes(Rule::RedirectedNOQA)
     {
         ruff::rules::redirected_noqa(diagnostics, &noqa_directives);
+        ruff::rules::redirected_file_noqa(diagnostics, &file_noqa_directives);
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA)

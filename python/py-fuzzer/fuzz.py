@@ -2,19 +2,21 @@
 Run a Ruff executable on randomly generated (but syntactically valid)
 Python source-code files.
 
-To install all dependencies for this script into an environment using `uv`, run:
-    uv pip install -r scripts/fuzz-parser/requirements.txt
+This script can be installed into a virtual environment using
+`uv pip install -e ./python/py-fuzzer` from the Ruff repository root,
+or can be run using `uvx --from ./python/py-fuzzer fuzz`
+(in which case the virtual environment does not need to be activated).
 
-Example invocations of the script:
+Example invocations of the script using `uv`:
 - Run the fuzzer on Ruff's parser using seeds 0, 1, 2, 78 and 93 to generate the code:
-  `python scripts/fuzz-parser/fuzz.py --bin ruff 0-2 78 93`
+  `uvx --from ./python/py-fuzzer fuzz --bin ruff 0-2 78 93`
 - Run the fuzzer concurrently using seeds in range 0-10 inclusive,
   but only reporting bugs that are new on your branch:
-  `python scripts/fuzz-parser/fuzz.py --bin ruff 0-10 --new-bugs-only`
+  `uvx --from ./python/py-fuzzer fuzz --bin ruff 0-10 --new-bugs-only`
 - Run the fuzzer concurrently on 10,000 different Python source-code files,
   using a random selection of seeds, and only print a summary at the end
   (the `shuf` command is Unix-specific):
-  `python scripts/fuzz-parser/fuzz.py --bin ruff $(shuf -i 0-1000000 -n 10000) --quiet
+  `uvx --from ./python/py-fuzzer fuzz --bin ruff $(shuf -i 0-1000000 -n 10000) --quiet
 """
 
 from __future__ import annotations
@@ -28,11 +30,10 @@ import tempfile
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from pathlib import Path
-from typing import NewType, assert_never
+from typing import NewType, NoReturn, assert_never
 
 from pysource_codegen import generate as generate_random_code
-from pysource_minimize import CouldNotMinimize
-from pysource_minimize import minimize as minimize_repro
+from pysource_minimize import CouldNotMinimize, minimize as minimize_repro
 from rich_argparse import RawDescriptionRichHelpFormatter
 from termcolor import colored
 
@@ -214,7 +215,7 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
     return bugs
 
 
-def main(args: ResolvedCliArgs) -> ExitCode:
+def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
     if len(args.seeds) <= 5:
         bugs = run_fuzzer_sequentially(args)
     else:
@@ -372,12 +373,7 @@ def parse_args() -> ResolvedCliArgs:
             executable,
         ]
         try:
-            subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as e:
             print(e.stderr)
             raise
@@ -401,6 +397,10 @@ def parse_args() -> ResolvedCliArgs:
     )
 
 
-if __name__ == "__main__":
+def main() -> NoReturn:
     args = parse_args()
-    raise SystemExit(main(args))
+    raise SystemExit(run_fuzzer(args))
+
+
+if __name__ == "__main__":
+    main()

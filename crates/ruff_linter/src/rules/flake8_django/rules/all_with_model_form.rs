@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -37,8 +37,8 @@ use crate::rules::flake8_django::rules::helpers::is_model_form;
 ///         model = Post
 ///         fields = ["title", "content"]
 /// ```
-#[violation]
-pub struct DjangoAllWithModelForm;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoAllWithModelForm;
 
 impl Violation for DjangoAllWithModelForm {
     #[derive_message_formats]

@@ -1,7 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -30,8 +31,8 @@ use crate::checkers::ast::Checker;
 ///
 /// my_task = PythonOperator(task_id="my_task")
 /// ```
-#[violation]
-pub struct AirflowVariableNameTaskIdMismatch {
+#[derive(ViolationMetadata)]
+pub(crate) struct AirflowVariableNameTaskIdMismatch {
     task_id: String,
 }
 
@@ -49,6 +50,10 @@ pub(crate) fn variable_name_task_id(
     targets: &[Expr],
     value: &Expr,
 ) -> Option<Diagnostic> {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return None;
+    }
+
     // If we have more than one target, we can't do anything.
     let [target] = targets else {
         return None;
@@ -69,7 +74,7 @@ pub(crate) fn variable_name_task_id(
     if !checker
         .semantic()
         .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments()[0], "airflow"))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["airflow", ..]))
     {
         return None;
     }

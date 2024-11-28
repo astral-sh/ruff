@@ -61,13 +61,16 @@ mod tests {
     #[test_case(Rule::IncorrectlyParenthesizedTupleInSubscript, Path::new("RUF031.py"))]
     #[test_case(Rule::DecimalFromFloatLiteral, Path::new("RUF032.py"))]
     #[test_case(Rule::UselessIfElse, Path::new("RUF034.py"))]
-    #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
+    #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
+    #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
     #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.py"))]
     #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.pyi"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.py"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.pyi"))]
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
+    #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
+    #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

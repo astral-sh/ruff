@@ -1,7 +1,7 @@
 use itertools::{EitherOrBoth, Itertools};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
@@ -36,8 +36,8 @@ use crate::Locator;
 /// import numpy as np
 /// import pandas
 /// ```
-#[violation]
-pub struct UnsortedImports;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsortedImports;
 
 impl Violation for UnsortedImports {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

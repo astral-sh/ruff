@@ -2,8 +2,9 @@
 
 use crate::cache_key::derive_cache_key;
 use crate::newtype_index::generate_newtype_index;
+use crate::violation_metadata::violation_metadata;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, ItemFn, ItemStruct};
+use syn::{parse_macro_input, DeriveInput, Error, ItemFn, ItemStruct};
 
 mod cache_key;
 mod combine_options;
@@ -13,7 +14,7 @@ mod map_codes;
 mod newtype_index;
 mod rule_code_prefix;
 mod rule_namespace;
-mod violation;
+mod violation_metadata;
 
 #[proc_macro_derive(OptionsMetadata, attributes(option, doc, option_group))]
 pub fn derive_options_metadata(input: TokenStream) -> TokenStream {
@@ -47,12 +48,12 @@ pub fn cache_key(input: TokenStream) -> TokenStream {
     TokenStream::from(stream)
 }
 
-/// Adds an `explanation()` method from the doc comment.
-#[proc_macro_attribute]
-pub fn violation(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let violation = parse_macro_input!(item as ItemStruct);
-    violation::violation(&violation)
-        .unwrap_or_else(syn::Error::into_compile_error)
+#[proc_macro_derive(ViolationMetadata)]
+pub fn derive_violation_metadata(item: TokenStream) -> TokenStream {
+    let input: DeriveInput = parse_macro_input!(item);
+
+    violation_metadata(input)
+        .unwrap_or_else(Error::into_compile_error)
         .into()
 }
 

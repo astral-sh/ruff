@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -26,8 +26,8 @@ use crate::fix;
 /// class MyClass:
 ///     x: int
 /// ```
-#[violation]
-pub struct PassInClassBody;
+#[derive(ViolationMetadata)]
+pub(crate) struct PassInClassBody;
 
 impl AlwaysFixableViolation for PassInClassBody {
     #[derive_message_formats]

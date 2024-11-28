@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::SourceRow;
 
 /// ## What it does
@@ -29,8 +29,8 @@ use ruff_source_file::SourceRow;
 /// for filename in files:
 ///     print(filename)
 /// ```
-#[violation]
-pub struct ImportShadowedByLoopVar {
+#[derive(ViolationMetadata)]
+pub(crate) struct ImportShadowedByLoopVar {
     pub(crate) name: String,
     pub(crate) row: SourceRow,
 }
@@ -70,8 +70,8 @@ impl Violation for ImportShadowedByLoopVar {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct UndefinedLocalWithImportStar {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndefinedLocalWithImportStar {
     pub(crate) name: String,
 }
 
@@ -108,8 +108,8 @@ impl Violation for UndefinedLocalWithImportStar {
 ///
 /// ## References
 /// - [Python documentation: Future statements](https://docs.python.org/3/reference/simple_stmts.html#future)
-#[violation]
-pub struct LateFutureImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct LateFutureImport;
 
 impl Violation for LateFutureImport {
     #[derive_message_formats]
@@ -152,8 +152,8 @@ impl Violation for LateFutureImport {
 /// def area(radius):
 ///     return pi * radius**2
 /// ```
-#[violation]
-pub struct UndefinedLocalWithImportStarUsage {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndefinedLocalWithImportStarUsage {
     pub(crate) name: String,
 }
 
@@ -193,8 +193,8 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct UndefinedLocalWithNestedImportStarUsage {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndefinedLocalWithNestedImportStarUsage {
     pub(crate) name: String,
 }
 

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -38,8 +38,8 @@ use crate::rules::pylint::helpers::type_param_name;
 /// - [PEP 484 – Type Hints: Generics](https://peps.python.org/pep-0484/#generics)
 ///
 /// [PEP 484]:https://peps.python.org/pep-0484/#generics
-#[violation]
-pub struct TypeParamNameMismatch {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeParamNameMismatch {
     kind: VarKind,
     var_name: String,
     param_name: String,

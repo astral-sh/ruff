@@ -1,7 +1,7 @@
 use ruff_python_ast::Alias;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_stdlib::future::is_feature_name;
 use ruff_text_size::Ranged;
 
@@ -17,8 +17,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html)
-#[violation]
-pub struct FutureFeatureNotDefined {
+#[derive(ViolationMetadata)]
+pub(crate) struct FutureFeatureNotDefined {
     name: String,
 }
 

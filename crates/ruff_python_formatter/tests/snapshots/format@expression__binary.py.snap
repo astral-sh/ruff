@@ -430,6 +430,13 @@ xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
     expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (
     yyyyyyyyyyyyyy + zzzzzzzzzzz
 )
+
+# This is not a multiline f-string, but the expression is too long so it should be
+# wrapped in parentheses.
+f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
 ```
 
 ## Output
@@ -906,6 +913,17 @@ if True:
 # This f-string should be flattened
 xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
     expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (yyyyyyyyyyyyyy + zzzzzzzzzzz)
+
+# This is not a multiline f-string, but the expression is too long so it should be
+# wrapped in parentheses.
+f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (
+    aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb
+)
+aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (
+    aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb
+)
 ```
 
 
@@ -913,7 +931,7 @@ xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
 ```diff
 --- Stable
 +++ Preview
-@@ -468,5 +468,6 @@
+@@ -468,16 +468,19 @@
                  )
  
  # This f-string should be flattened
@@ -922,4 +940,23 @@ xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
 +xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {expression} bbbbbbbbbbbbbbbbbbbbbbbb" + (
 +    yyyyyyyyyyyyyy + zzzzzzzzzzz
 +)
+ 
+ # This is not a multiline f-string, but the expression is too long so it should be
+ # wrapped in parentheses.
+-f"hellooooooooooooooooooooooo \
+-        worlddddddddddddddddddddddddddddddddd" + (
+-    aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb
++(
++    f"hellooooooooooooooooooooooo \
++        worlddddddddddddddddddddddddddddddddd"
++    + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+ )
+-aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
+-        worlddddddddddddddddddddddddddddddddd" + (
+-    aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb
++aaaaaaaaaaa = (
++    f"hellooooooooooooooooooooooo \
++        worlddddddddddddddddddddddddddddddddd"
++    + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+ )
 ```

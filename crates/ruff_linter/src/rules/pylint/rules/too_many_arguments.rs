@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::{function_type, visibility};
@@ -43,8 +43,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-args`
-#[violation]
-pub struct TooManyArguments {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyArguments {
     c_args: usize,
     max_args: usize,
 }

@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -16,21 +16,21 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// > ### Global Variable Names
 /// > (Let’s hope that these variables are meant for use inside one module
-/// only.) The conventions are about the same as those for functions.
+/// > only.) The conventions are about the same as those for functions.
 /// >
 /// > Modules that are designed for use via from M import * should use the
-/// __all__ mechanism to prevent exporting globals, or use the older
-/// convention of prefixing such globals with an underscore (which you might
-/// want to do to indicate these globals are “module non-public”).
+/// > __all__ mechanism to prevent exporting globals, or use the older
+/// > convention of prefixing such globals with an underscore (which you might
+/// > want to do to indicate these globals are “module non-public”).
 /// >
 /// > ### Function and Variable Names
 /// > Function names should be lowercase, with words separated by underscores
-/// as necessary to improve readability.
+/// > as necessary to improve readability.
 /// >
 /// > Variable names follow the same convention as function names.
 /// >
 /// > mixedCase is allowed only in contexts where that’s already the prevailing
-/// style (e.g. threading.py), to retain backwards compatibility.
+/// > style (e.g. threading.py), to retain backwards compatibility.
 ///
 /// ## Example
 /// ```python
@@ -47,8 +47,8 @@ use crate::rules::pep8_naming::helpers;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#global-variable-names
-#[violation]
-pub struct MixedCaseVariableInGlobalScope {
+#[derive(ViolationMetadata)]
+pub(crate) struct MixedCaseVariableInGlobalScope {
     name: String,
 }
 

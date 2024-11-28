@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, StmtIf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::stmt_if::if_elif_branches;
 use ruff_text_size::Ranged;
 
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
-#[violation]
-pub struct IfTuple;
+#[derive(ViolationMetadata)]
+pub(crate) struct IfTuple;
 
 impl Violation for IfTuple {
     #[derive_message_formats]

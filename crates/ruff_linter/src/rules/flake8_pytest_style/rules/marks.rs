@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -49,8 +49,8 @@ use super::helpers::{get_mark_decorators, Parentheses};
 ///
 /// ## References
 /// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
-#[violation]
-pub struct PytestIncorrectMarkParenthesesStyle {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,
     expected_parens: Parentheses,
     actual_parens: Parentheses,
@@ -105,8 +105,8 @@ impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 
-#[violation]
-pub struct PytestUseFixturesWithoutParameters;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUseFixturesWithoutParameters;
 
 impl AlwaysFixableViolation for PytestUseFixturesWithoutParameters {
     #[derive_message_formats]

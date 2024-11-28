@@ -4229,6 +4229,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "annotation-f-string",
                     format_args!("Type expressions cannot use f-strings"),
                 );
+                self.infer_fstring_expression(fstring);
                 Type::Unknown
             }
 
@@ -5985,7 +5986,11 @@ mod tests {
             "src/a.py",
             &["foo", "<listcomp>"],
             "x",
-            "@Todo(async iterables/iterators)",
+            if cfg!(debug_assertions) {
+                "@Todo(async iterables/iterators)"
+            } else {
+                "@Todo"
+            },
         );
 
         Ok(())
@@ -6015,7 +6020,11 @@ mod tests {
             "src/a.py",
             &["foo", "<listcomp>"],
             "x",
-            "@Todo(async iterables/iterators)",
+            if cfg!(debug_assertions) {
+                "@Todo(async iterables/iterators)"
+            } else {
+                "@Todo"
+            },
         );
 
         Ok(())

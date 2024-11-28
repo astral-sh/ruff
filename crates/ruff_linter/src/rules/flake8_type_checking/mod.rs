@@ -63,6 +63,23 @@ mod tests {
         Ok(())
     }
 
+    // we test these rules as a pair, since they're opposites of one another
+    // so we want to make sure their fixes are not going around in circles.
+    #[test_case(Rule::UnquotedTypeAlias, Path::new("TC007.py"))]
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008.py"))]
+    fn type_alias_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnquotedTypeAlias,
+                Rule::QuotedTypeAlias,
+            ]),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]
@@ -430,6 +447,29 @@ mod tests {
             pass
     ",
         "multiple_modules_different_types"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING, TypeAlias
+        if TYPE_CHECKING:
+            from foo import Foo  # TC004
+
+        a: TypeAlias = Foo | None  # OK
+    ",
+        "tc004_precedence_over_tc007"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TypeAlias
+
+        a: TypeAlias = 'int | None'  # TC008
+        b: TypeAlias = 'int' | None  # TC010
+    ",
+        "tc010_precedence_over_tc008"
     )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(

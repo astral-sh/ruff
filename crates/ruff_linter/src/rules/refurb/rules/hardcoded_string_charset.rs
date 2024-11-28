@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
 
@@ -27,8 +27,8 @@ use ruff_text_size::TextRange;
 ///
 /// ## References
 /// - [Python documentation: String constants](https://docs.python.org/3/library/string.html#string-constants)
-#[violation]
-pub struct HardcodedStringCharset {
+#[derive(ViolationMetadata)]
+pub(crate) struct HardcodedStringCharset {
     name: &'static str,
 }
 

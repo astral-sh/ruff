@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
@@ -41,8 +41,8 @@ use super::helpers::{self, DatetimeModuleAntipattern};
 ///
 /// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.UTC)
 /// ```
-#[violation]
-pub struct CallDatetimeWithoutTzinfo(DatetimeModuleAntipattern);
+#[derive(ViolationMetadata)]
+pub(crate) struct CallDatetimeWithoutTzinfo(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeWithoutTzinfo {
     #[derive_message_formats]

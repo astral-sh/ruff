@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::StoredNameFinder;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
@@ -30,8 +30,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// data = ["some", "Data"]
 /// {value: value.upper() for value in data}
 /// ```
-#[violation]
-pub struct StaticKeyDictComprehension {
+#[derive(ViolationMetadata)]
+pub(crate) struct StaticKeyDictComprehension {
     key: SourceCodeSnippet,
 }
 

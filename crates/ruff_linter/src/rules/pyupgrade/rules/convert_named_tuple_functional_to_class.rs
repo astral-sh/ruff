@@ -1,7 +1,7 @@
 use log::debug;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
@@ -43,8 +43,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
-#[violation]
-pub struct ConvertNamedTupleFunctionalToClass {
+#[derive(ViolationMetadata)]
+pub(crate) struct ConvertNamedTupleFunctionalToClass {
     name: String,
 }
 

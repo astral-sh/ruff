@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::Modules;
@@ -63,8 +63,8 @@ use crate::settings::types::PythonVersion;
 /// [fastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
 /// [typing.Annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
 /// [typing_extensions]: https://typing-extensions.readthedocs.io/en/stable/
-#[violation]
-pub struct FastApiNonAnnotatedDependency {
+#[derive(ViolationMetadata)]
+pub(crate) struct FastApiNonAnnotatedDependency {
     py_version: PythonVersion,
 }
 

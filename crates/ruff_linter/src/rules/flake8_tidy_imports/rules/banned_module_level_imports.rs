@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -39,8 +39,8 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 ///
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-module-level-imports`
-#[violation]
-pub struct BannedModuleLevelImports {
+#[derive(ViolationMetadata)]
+pub(crate) struct BannedModuleLevelImports {
     name: String,
 }
 

@@ -1,6 +1,6 @@
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
@@ -27,8 +27,8 @@ use crate::registry::Rule;
 /// if X.B not in Y:
 ///     pass
 /// ```
-#[violation]
-pub struct NotInTest;
+#[derive(ViolationMetadata)]
+pub(crate) struct NotInTest;
 
 impl AlwaysFixableViolation for NotInTest {
     #[derive_message_formats]
@@ -63,8 +63,8 @@ impl AlwaysFixableViolation for NotInTest {
 /// ```
 ///
 /// [PEP8]: https://peps.python.org/pep-0008/#programming-recommendations
-#[violation]
-pub struct NotIsTest;
+#[derive(ViolationMetadata)]
+pub(crate) struct NotIsTest;
 
 impl AlwaysFixableViolation for NotIsTest {
     #[derive_message_formats]

@@ -272,8 +272,7 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP039.py", true, false),
     // related to circular references in type aliases (salsa cycle panic):
     ("crates/ruff_python_parser/resources/inline/err/type_alias_invalid_value_expr.py", true, true),
-    // related to string annotations (https://github.com/astral-sh/ruff/issues/14440)
+    // related to circular references in f-string annotations (invalid syntax)
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_14.py", false, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F632.py", true, true),
 ];

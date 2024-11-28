@@ -1,6 +1,6 @@
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
@@ -23,8 +23,8 @@ use super::{DefinitionState, LogicalLine};
 /// ```python
 /// a = (1, 2)
 /// ```
-#[violation]
-pub struct MissingWhitespace {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespace {
     token: TokenKind,
 }
 

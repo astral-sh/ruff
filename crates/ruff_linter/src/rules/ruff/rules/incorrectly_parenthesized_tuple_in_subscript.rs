@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprSubscript};
 use ruff_text_size::Ranged;
 
@@ -37,8 +37,8 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 ///
 /// ## Options
 /// - `lint.ruff.parenthesize-tuple-in-subscript`
-#[violation]
-pub struct IncorrectlyParenthesizedTupleInSubscript {
+#[derive(ViolationMetadata)]
+pub(crate) struct IncorrectlyParenthesizedTupleInSubscript {
     prefer_parentheses: bool,
 }
 

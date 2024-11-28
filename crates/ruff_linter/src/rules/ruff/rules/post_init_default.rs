@@ -1,7 +1,7 @@
 use anyhow::Context;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
@@ -66,8 +66,8 @@ use super::helpers::{dataclass_kind, DataclassKind};
 /// - [Python documentation: Init-only variables](https://docs.python.org/3/library/dataclasses.html#init-only-variables)
 ///
 /// [documentation]: https://docs.python.org/3/library/dataclasses.html#init-only-variables
-#[violation]
-pub struct PostInitDefault;
+#[derive(ViolationMetadata)]
+pub(crate) struct PostInitDefault;
 
 impl Violation for PostInitDefault {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
