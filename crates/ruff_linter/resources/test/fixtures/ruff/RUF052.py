@@ -18,11 +18,8 @@ def _valid_fun():
 
 _valid_fun()
 
-def fun(_valid_arg):
-    return _valid_arg
-
-def fun(_valid_arg):
-    _valid_unused_var = _valid_arg
+def fun(arg):
+    _valid_unused_var = arg
     pass
 
 class _ValidClass:
@@ -42,31 +39,55 @@ class ClassOk:
     def _valid_method(self):
         return self._valid_private_ins_attr
 
-    def method(_valid_arg=3):
-        _valid_unused_var = _valid_arg
+    def method(arg):
+        _valid_unused_var = arg
         return 
+    
+# Correct if dummy_variable_re = "_+"
+
+def fun(x):
+    _ = 1
+    __ = 2
+    ___ = 3
+    if x == 1:
+        return _
+    if x == 2:
+        return __
+    if x == 3:
+        return ___
+    return x
 
 # Incorrect
 
-def fun(_valid_arg):
-    _invalid_var = _valid_arg  # [RUF052]
-    return _invalid_var
+class Class_:
+    def fun(self):
+        _var = "method variable"
+        return _var # [RUF052]
 
-class ClassOk:
+def fun(_var):
+    return _var # [RUF052]
 
-    def __init__(self):
-        _ = 1
-        __ = 2  # [RUF052]
-        ___ = 3
-        _invalid_type = int  # [RUF052]
-        isinstance(_, _invalid_type)
-        ___ = __ + _
-        self._private_ins_attr_ok = 2
+def fun():
+    _list = "built-in"
+    return _list # [RUF052]
 
-    def met(_valid_arg=3):
-        _invalid_var_1 = _valid_arg  # [RUF052]
+x = "global"
 
-        _invalid_var_2 = 1  # [RUF052]
-        if _valid_arg:
-            return _invalid_var_1
-        return _invalid_var_2
+def fun():
+    global x
+    _x = "shadows global"
+    return _x # [RUF052]
+
+def foo():
+  x = "outer"
+  def bar():
+    nonlocal x
+    _x = "shadows nonlocal"
+    return _x # [RUF052]
+  bar()
+  return x
+
+def fun():
+    x = "local"
+    _x = "shadows local"
+    return _x # [RUF052]

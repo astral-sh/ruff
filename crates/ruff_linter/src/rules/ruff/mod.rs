@@ -10,6 +10,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use regex::Regex;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
@@ -67,7 +68,6 @@ mod tests {
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.py"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.pyi"))]
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
-    #[test_case(Rule::UnusedVariableAccessed, Path::new("RUF052.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -444,6 +444,18 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+    #[test]
+    fn dummy_variable_unset() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF052.py"),
+            &LinterSettings {
+                dummy_variable_rgx: Regex::new(r"^_+$").unwrap(),
+                ..LinterSettings::for_rule(Rule::UnusedVariableAccessed)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

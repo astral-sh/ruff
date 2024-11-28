@@ -1,0 +1,66 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF052.py:65:16: RUF052 Local variable `_var` marked as unused is accessed
+   |
+63 |     def fun(self):
+64 |         _var = "method variable"
+65 |         return _var
+   |                ^^^^ RUF052
+66 | 
+67 | def fun(_var):
+   |
+   = help: Consider removing leading underscores.
+
+RUF052.py:68:12: RUF052 Local variable `_var` marked as unused is accessed
+   |
+67 | def fun(_var):
+68 |     return _var
+   |            ^^^^ RUF052
+69 | 
+70 | def fun():
+   |
+   = help: Consider removing leading underscores.
+
+RUF052.py:72:12: RUF052 Local variable `_list` marked as unused is accessed
+   |
+70 | def fun():
+71 |     _list = "built-in"
+72 |     return _list
+   |            ^^^^^ RUF052
+73 | 
+74 | x = "global"
+   |
+   = help: Consider using prefered trailing underscores to avoid shadowing a built-in.
+
+RUF052.py:79:12: RUF052 Local variable `_x` marked as unused is accessed
+   |
+77 |     global x
+78 |     _x = "shadows global"
+79 |     return _x
+   |            ^^ RUF052
+80 | 
+81 | def foo():
+   |
+   = help: Consider using prefered trailing underscores to avoid shadowing a variable.
+
+RUF052.py:86:12: RUF052 Local variable `_x` marked as unused is accessed
+   |
+84 |     nonlocal x
+85 |     _x = "shadows nonlocal"
+86 |     return _x
+   |            ^^ RUF052
+87 |   bar()
+88 |   return x
+   |
+   = help: Consider using prefered trailing underscores to avoid shadowing a variable.
+
+RUF052.py:93:12: RUF052 Local variable `_x` marked as unused is accessed
+   |
+91 |     x = "local"
+92 |     _x = "shadows local"
+93 |     return _x
+   |            ^^ RUF052
+   |
+   = help: Consider using prefered trailing underscores to avoid shadowing a variable.

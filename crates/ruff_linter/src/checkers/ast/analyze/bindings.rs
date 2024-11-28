@@ -79,8 +79,8 @@ pub(crate) fn bindings(checker: &mut Checker) {
             }
         }
         if checker.enabled(Rule::UnusedVariableAccessed) {
-            if let Some(diagnostic) = ruff::rules::unused_variable_accessed(checker, binding) {
-                checker.diagnostics.push(diagnostic);
+            if let Some(diagnostics) = ruff::rules::unused_variable_accessed(checker, binding) {
+                checker.diagnostics.extend(diagnostics);
             }
         }
     }
