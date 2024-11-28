@@ -1,7 +1,8 @@
-use indexmap::IndexSet;
-use itertools::Itertools;
 use std::hash::Hash;
 use std::num::TryFromIntError;
+
+use indexmap::IndexSet;
+use itertools::Itertools;
 
 use ruff_db::files::File;
 use ruff_python_ast as ast;
@@ -1372,28 +1373,17 @@ impl<'db> Type<'db> {
     fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::BytesLiteral(bytes) => return bytes.len(db).try_into().ok(),
-            Type::StringLiteral(string) => {
-                return string.as_str(db).chars().count().try_into().ok()
-            }
-
+            Type::StringLiteral(string) => return string.python_len(db).try_into().ok(),
             Type::Tuple(tuple) => return tuple.elements(db).len().try_into().ok(),
-
-            ty if !matches!(ty, Type::Instance(..)) => return None,
-
             _ => {}
         }
 
-        let Type::Instance(instance) = self else {
-            return None;
+        let return_ty = match self.call_dunder(db, "__len__", &[*self]) {
+            CallDunderResult::MethodNotAvailable => return None,
+            CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
+                outcome.return_ty(db)?
+            }
         };
-        let Symbol::Type(dunder_len, _) = instance.class.class_member(db, "__len__") else {
-            return None;
-        };
-        let Type::FunctionLiteral(function) = dunder_len else {
-            return None;
-        };
-
-        let return_ty = function.signature(db).return_ty;
 
         let Type::Union(union) = return_ty else {
             return return_ty.as_len_int_literal();
@@ -2593,7 +2583,7 @@ impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            _ => None,
+            Self::RevealType | Self::Len => None,
         }
     }
 
@@ -3037,14 +3027,6 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
-
-    pub fn filter_map(
-        &self,
-        db: &'db dyn Db,
-        transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
-    ) -> Type<'db> {
-        Self::from_elements(db, self.elements(db).iter().filter_map(transform_fn))
-    }
 }
 
 #[salsa::interned]
@@ -3069,12 +3051,9 @@ pub struct StringLiteralType<'db> {
 }
 
 impl<'db> StringLiteralType<'db> {
-    pub fn len(&self, db: &'db dyn Db) -> usize {
-        self.value(db).len()
-    }
-
-    pub fn as_str(&self, db: &'db dyn Db) -> &str {
-        self.value(db).as_ref()
+    /// The length of the string, as would be returned by Python's `len()`.
+    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).as_ref().chars().count()
     }
 }
 
