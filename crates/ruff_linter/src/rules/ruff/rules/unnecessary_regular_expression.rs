@@ -117,15 +117,14 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         call.range,
     );
 
-    let edit = Edit::range_replacement(repl, call.range);
-    let fix = if checker
-        .comment_ranges()
-        .has_comments(call, checker.source())
-    {
-        Fix::unsafe_edit(edit)
+let fix = Fix::applicable_edit(
+    Edit::range_replacement(repl, call.range),
+    if checker.comment_ranges().has_comments(call, checker.source() {
+        Applicability::Unsafe
     } else {
-        Fix::safe_edit(edit)
-    };
+        Applicability::Safe
+    }
+);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
