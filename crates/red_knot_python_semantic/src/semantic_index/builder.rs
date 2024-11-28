@@ -769,8 +769,14 @@ where
                 let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
-                let mut elif_else_clauses = node.elif_else_clauses.iter().map(|clause| (&clause.test, &clause.body[..])).collect_vec();
-                let has_else = elif_else_clauses.last().is_some_and(|clause| clause.0.is_none());
+                let mut elif_else_clauses = node
+                    .elif_else_clauses
+                    .iter()
+                    .map(|clause| (&clause.test, &clause.body[..]))
+                    .collect_vec();
+                let has_else = elif_else_clauses
+                    .last()
+                    .is_some_and(|clause| clause.0.is_none());
                 if !has_else {
                     // an if-elif statement without an explicit `else` branch is equivalent to one with a no-op `else` branch
                     elif_else_clauses.push((&None, &[]));
