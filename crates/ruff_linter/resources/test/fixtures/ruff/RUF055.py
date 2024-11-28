@@ -46,6 +46,19 @@ re.search("ab[c]", s)
 re.fullmatch("ab[c]", s)
 re.split("ab[c]", s)
 
+# test that all of the metacharacters prevent the rule from triggering, also
+# use raw strings in line with RUF039
+re.sub(r"abc.", "", s)
+re.sub(r"^abc", "", s)
+re.sub(r"abc$", "", s)
+re.sub(r"abc*", "", s)
+re.sub(r"abc+", "", s)
+re.sub(r"abc?", "", s)
+re.sub(r"abc{2,3}", "", s)
+re.sub(r"abc\n", "", s)  # this one could be fixed but is not currently
+re.sub(r"abc|def", "", s)
+re.sub(r"(a)bc", "", s)
+
 # and these should not be modified because they have extra arguments
 re.sub("abc", "", s, flags=re.A)
 re.match("abc", s, flags=re.I)
