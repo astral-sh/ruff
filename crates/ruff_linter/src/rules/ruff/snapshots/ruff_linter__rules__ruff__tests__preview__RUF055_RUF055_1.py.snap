@@ -2,58 +2,58 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF055_1.py:9:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_1.py:10:1: RUF055 [*] Plain string pattern passed to `re` function
    |
- 7 | pat3 = pat2
- 8 | 
- 9 | re.sub(pat3, "", haystack)
+ 8 | pat3 = pat2
+ 9 | 
+10 | re.sub(pat3, "", haystack)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
-10 | 
-11 | if pat4 := pat3:
+11 | 
+12 | if pat4 := pat3:
    |
    = help: Replace with `haystack.replace(pat3, "")`
 
 ℹ Safe fix
-6  6  | pat2 = pat1
-7  7  | pat3 = pat2
-8  8  | 
-9     |-re.sub(pat3, "", haystack)
-   9  |+haystack.replace(pat3, "")
-10 10 | 
-11 11 | if pat4 := pat3:
-12 12 |     re.sub(pat4, "", haystack)
+7  7  | pat2 = pat1
+8  8  | pat3 = pat2
+9  9  | 
+10    |-re.sub(pat3, "", haystack)
+   10 |+haystack.replace(pat3, "")
+11 11 | 
+12 12 | if pat4 := pat3:
+13 13 |     re.sub(pat4, "", haystack)
 
-RUF055_1.py:12:5: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_1.py:13:5: RUF055 [*] Plain string pattern passed to `re` function
    |
-11 | if pat4 := pat3:
-12 |     re.sub(pat4, "", haystack)
+12 | if pat4 := pat3:
+13 |     re.sub(pat4, "", haystack)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
-13 | 
-14 | repl = "new"
+14 | 
+15 | repl = "new"
    |
    = help: Replace with `haystack.replace(pat4, "")`
 
 ℹ Safe fix
-9  9  | re.sub(pat3, "", haystack)
-10 10 | 
-11 11 | if pat4 := pat3:
-12    |-    re.sub(pat4, "", haystack)
-   12 |+    haystack.replace(pat4, "")
-13 13 | 
-14 14 | repl = "new"
-15 15 | re.sub(r"abc", repl, haystack)
+10 10 | re.sub(pat3, "", haystack)
+11 11 | 
+12 12 | if pat4 := pat3:
+13    |-    re.sub(pat4, "", haystack)
+   13 |+    haystack.replace(pat4, "")
+14 14 | 
+15 15 | repl = "new"
+16 16 | re.sub(r"abc", repl, haystack)
 
-RUF055_1.py:15:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_1.py:16:1: RUF055 [*] Plain string pattern passed to `re` function
    |
-14 | repl = "new"
-15 | re.sub(r"abc", repl, haystack)
+15 | repl = "new"
+16 | re.sub(r"abc", repl, haystack)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
    |
    = help: Replace with `haystack.replace("abc", repl)`
 
 ℹ Safe fix
-12 12 |     re.sub(pat4, "", haystack)
-13 13 | 
-14 14 | repl = "new"
-15    |-re.sub(r"abc", repl, haystack)
-   15 |+haystack.replace("abc", repl)
+13 13 |     re.sub(pat4, "", haystack)
+14 14 | 
+15 15 | repl = "new"
+16    |-re.sub(r"abc", repl, haystack)
+   16 |+haystack.replace("abc", repl)
