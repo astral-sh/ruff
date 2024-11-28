@@ -17,6 +17,10 @@ use crate::checkers::ast::Checker;
 /// - `fullmatch`
 /// - `split`
 ///
+/// For `sub`, the `repl` (replacement) argument must also be a string literal,
+/// not a function. For `match`, `search`, and `fullmatch`, the return value
+/// must also be used only for its truth value.
+///
 /// ## Why is this bad?
 ///
 /// Performing checks on strings directly can make the code simpler, may require
