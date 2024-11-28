@@ -43,6 +43,11 @@ use crate::checkers::ast::Checker;
 /// For `sub`, the `repl` (replacement) argument must also be a string literal,
 /// not a function. For `match`, `search`, and `fullmatch`, the return value
 /// must also be used only for its truth value.
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe if the affected expression contains comments. Otherwise,
+/// the fix can be applied safely.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryRegularExpression {
     replacement: String,
@@ -109,11 +114,17 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         call.range,
     );
 
-    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-        repl,
-        call.range.start(),
-        call.range.end(),
-    )));
+    let edit = Edit::range_replacement(repl, call.range);
+    let fix = if checker
+        .comment_ranges()
+        .has_comments(call, checker.source())
+    {
+        Fix::unsafe_edit(edit)
+    } else {
+        Fix::safe_edit(edit)
+    };
+
+    diagnostic.set_fix(fix);
 
     checker.diagnostics.push(diagnostic);
 }

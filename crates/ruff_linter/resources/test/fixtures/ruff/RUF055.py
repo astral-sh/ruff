@@ -52,3 +52,12 @@ re.match("abc", s, flags=re.I)
 re.search("abc", s, flags=re.L)
 re.fullmatch("abc", s, flags=re.M)
 re.split("abc", s, maxsplit=2)
+
+# this should trigger an unsafe fix because of the presence of comments
+re.sub(
+    # pattern
+    "abc",
+    # repl
+    "",
+    s,  # string
+)
