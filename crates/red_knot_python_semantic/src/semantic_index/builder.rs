@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
-use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_db::files::File;
@@ -769,19 +768,24 @@ where
                 let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
-                let mut elif_else_clauses = node
+                let mut post_clauses: Vec<FlowSnapshot> = vec![];
+                let elif_else_clauses = node
                     .elif_else_clauses
                     .iter()
-                    .map(|clause| (&clause.test, &clause.body[..]))
-                    .collect_vec();
-                let has_else = elif_else_clauses
+                    .map(|clause| (&clause.test, &clause.body[..]));
+                let has_else = node
+                    .elif_else_clauses
                     .last()
-                    .is_some_and(|clause| clause.0.is_none());
-                if !has_else {
-                    // an if-elif statement without an explicit `else` branch is equivalent to one with a no-op `else` branch
-                    elif_else_clauses.push((&None, &[]));
-                }
-                let mut post_clauses: Vec<FlowSnapshot> = vec![];
+                    .is_some_and(|clause| clause.test.is_none());
+                let elif_else_clauses = elif_else_clauses.chain(
+                    if has_else {
+                        // if there's an `else` clause already, we don't need to add another
+                        None 
+                    } else {
+                        // if there's no `else` branch, we should add a no-op `else` branch
+                        Some((&None, &[][..]))
+                    },
+                );
                 for clause in elif_else_clauses {
                     let clause_test = clause.0;
                     let clause_body = clause.1;
