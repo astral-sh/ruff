@@ -203,7 +203,9 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
 
     // For now, reject any regex metacharacters. Compare to the complete list
     // from https://docs.python.org/3/howto/regex.html#matching-characters
-    let has_metacharacters = string_lit.value.to_str().contains(['.',  '^', '$', '*', '+', '?', '{', '}', '[', ']', '\\', '|', '(', ')']);
+    let has_metacharacters = string_lit.value.to_str().contains([
+        '.', '^', '$', '*', '+', '?', '{', '}', '[', ']', '\\', '|', '(', ')',
+    ]);
 
     if has_metacharacters {
         return;
