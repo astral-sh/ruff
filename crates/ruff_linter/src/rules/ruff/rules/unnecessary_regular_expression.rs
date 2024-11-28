@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier,
 };
-use ruff_python_semantic::Modules;
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -78,7 +78,7 @@ struct ReFunc<'a> {
 
 impl<'a> ReFunc<'a> {
     fn from_call_expr(
-        checker: &'a mut Checker,
+        semantic: &SemanticModel,
         call: &'a ExprCall,
         func_name: &str,
     ) -> Option<Self> {
@@ -86,7 +86,7 @@ impl<'a> ReFunc<'a> {
 
         // the proposed fixes for match, search, and fullmatch rely on the
         // return value only being used for its truth value
-        let in_if_context = checker.semantic().in_boolean_test();
+        let in_if_context = semantic.in_boolean_test();
 
         match (func_name, nargs) {
             // `split` is the safest of these to fix, as long as metacharacters
@@ -196,7 +196,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
 
     // skip calls with more than `pattern` and `string` arguments (and `repl`
     // for `sub`)
-    let Some(re_func) = ReFunc::from_call_expr(checker, call, func) else {
+    let Some(re_func) = ReFunc::from_call_expr(semantic, call, func) else {
         return;
     };
 
