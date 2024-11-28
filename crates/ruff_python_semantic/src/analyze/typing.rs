@@ -373,7 +373,7 @@ where
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
-        // Ex) x | y
+        // Ex) `x | y`
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::BitOr,
             left,
@@ -396,19 +396,19 @@ where
             return;
         }
 
-        // Ex) Union[x, y]
+        // Ex) `Union[x, y]`
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Union") {
                 if let Expr::Tuple(tuple) = &**slice {
                     // Traverse each element of the tuple within the union recursively to handle cases
-                    // such as `Union[..., Union[...]]
+                    // such as `Union[..., Union[...]]`
                     tuple
                         .iter()
                         .for_each(|elem| inner(func, semantic, elem, Some(expr)));
                     return;
                 }
 
-                // Ex) Union[Union[a, b]] and Union[a | b | c]
+                // Ex) `Union[Union[a, b]]` and `Union[a | b | c]`
                 inner(func, semantic, slice, Some(expr));
                 return;
             }
@@ -445,7 +445,7 @@ where
                 match &**slice {
                     Expr::Tuple(tuple) => {
                         // Traverse each element of the tuple within the literal recursively to handle cases
-                        // such as `Literal[..., Literal[...]]
+                        // such as `Literal[..., Literal[...]]`
                         for element in tuple {
                             inner(func, semantic, element, Some(expr));
                         }
