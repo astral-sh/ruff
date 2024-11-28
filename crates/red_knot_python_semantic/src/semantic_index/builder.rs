@@ -777,15 +777,13 @@ where
                     .elif_else_clauses
                     .last()
                     .is_some_and(|clause| clause.test.is_none());
-                let elif_else_clauses = elif_else_clauses.chain(
-                    if has_else {
-                        // if there's an `else` clause already, we don't need to add another
-                        None 
-                    } else {
-                        // if there's no `else` branch, we should add a no-op `else` branch
-                        Some((&None, &[][..]))
-                    },
-                );
+                let elif_else_clauses = elif_else_clauses.chain(if has_else {
+                    // if there's an `else` clause already, we don't need to add another
+                    None
+                } else {
+                    // if there's no `else` branch, we should add a no-op `else` branch
+                    Some((&None, &[][..]))
+                });
                 for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
