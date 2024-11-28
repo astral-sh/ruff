@@ -1191,9 +1191,6 @@ where
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
             }) => {
-                // TODO detect statically known truthy or falsy test (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
                 let constraint = self.record_expression_constraint(test);
@@ -1260,9 +1257,6 @@ where
                 range: _,
                 op,
             }) => {
-                // TODO detect statically known truthy or falsy values (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
                 let mut snapshots = vec![];
 
                 for (index, value) in values.iter().enumerate() {
