@@ -8,22 +8,6 @@ from types import FrameType, ModuleType, TracebackType
 from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeVar, final
 from typing_extensions import TypeAlias
 
-
-@final
-class _version_info(_UninstantiableStructseq, tuple[int, int, int, _ReleaseLevel, int]):
-    @property
-    def major(self) -> int: ...
-    @property
-    def minor(self) -> int: ...
-    @property
-    def micro(self) -> int: ...
-    @property
-    def releaselevel(self) -> _ReleaseLevel: ...
-    @property
-    def serial(self) -> int: ...
-
-version_info: _version_info
-
 _T = TypeVar("_T")
 
 # see https://github.com/python/typeshed/issues/8513#issue-1333671093 for the rationale behind this alias
@@ -239,6 +223,21 @@ class _thread_info(_UninstantiableStructseq, tuple[_ThreadInfoName, _ThreadInfoL
 
 thread_info: _thread_info
 _ReleaseLevel: TypeAlias = Literal["alpha", "beta", "candidate", "final"]
+
+@final
+class _version_info(_UninstantiableStructseq, tuple[int, int, int, _ReleaseLevel, int]):
+    @property
+    def major(self) -> int: ...
+    @property
+    def minor(self) -> int: ...
+    @property
+    def micro(self) -> int: ...
+    @property
+    def releaselevel(self) -> _ReleaseLevel: ...
+    @property
+    def serial(self) -> int: ...
+
+version_info: _version_info
 
 def call_tracing(func: Callable[..., _T], args: Any, /) -> _T: ...
 def _clear_type_cache() -> None: ...
