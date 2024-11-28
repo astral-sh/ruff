@@ -21,7 +21,6 @@ reveal_type(x)  # revealed: int | None
 def optional_int() -> int | None: ...
 
 x = optional_int()
-y = optional_int()
 
 if x is None:
     x = 10
