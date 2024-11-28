@@ -73,14 +73,10 @@ impl<'a> ReFunc<'a> {
         let locate_arg = |name, position| {
             Some(locator.slice(call.arguments.find_argument(name, position)?.range()))
         };
-        let semantic = checker.semantic();
 
         // the proposed fixes for match, search, and fullmatch rely on the
         // return value only being used for its truth value
-        let in_if_context = semantic.current_statement().is_if_stmt()
-            && !semantic
-                .current_expression_parent()
-                .is_some_and(|expr| expr.is_named_expr());
+        let in_if_context = checker.semantic().in_boolean_test();
 
         match (func_name, nargs) {
             // `split` is the safest of these to fix, as long as metacharacters
