@@ -210,14 +210,14 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
 
     // For now, reject any regex metacharacters. Compare to the complete list
     // from https://docs.python.org/3/howto/regex.html#matching-characters
-    let is_plain_string = !string_lit.value.chars().any(|c| {
+    let has_metacharacters = string_lit.value.chars().any(|c| {
         matches!(
             c,
             '.' | '^' | '$' | '*' | '+' | '?' | '{' | '}' | '[' | ']' | '\\' | '|' | '(' | ')'
         )
     });
 
-    if !is_plain_string {
+    if has_metacharacters {
         return;
     }
 
