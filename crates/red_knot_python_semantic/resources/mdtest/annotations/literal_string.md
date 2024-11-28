@@ -33,9 +33,8 @@ T1 = TypeVar("T1", bound=LiteralString)
 variable_annotation: LiteralString
 
 class Foo:
-    annotated: Annotated[
-        int, Literal[LiteralString]  # fine: Second arguments and later must be ignored.
-    ]
+    # fine: Second arguments and later must be ignored.
+    annotated: Annotated[int, Literal[LiteralString]]
 ```
 
 ### Within `Literal`
@@ -99,17 +98,17 @@ reveal_type(template.format(foo, bar))  # revealed: @Todo(call todo)
 
 ### Assignability
 
-`Literal[""]` is assignable to `LiteralString`, and `LiteralString` is assignable to `str`, but
-not vice versa.
+`Literal[""]` is assignable to `LiteralString`, and `LiteralString` is assignable to `str`, but not
+vice versa.
 
 ```py
+def coinflip() -> bool:
+    return True
+
 foo_1: Literal["foo"] = "foo"
 bar_1: LiteralString = foo_1  # fine
 
-if bool():
-    foo_2 = "foo"
-else:
-    foo_2 = "bar"
+foo_2 = "foo" if coinflip() else "bar"
 reveal_type(foo_2)  # revealed: Literal["foo", "bar"]
 bar_2: LiteralString = foo_2  # fine
 
@@ -122,10 +121,7 @@ qux_1: LiteralString = baz_1  # error: [invalid-assignment]
 baz_2: LiteralString = "baz" * 1_000_000_000
 qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]
 
-if bool():
-    baz_3 = "foo"
-else:
-    baz_3 = 1
+baz_3 = "foo" if coinflip() else 1
 reveal_type(baz_3)  # revealed: Literal["foo"] | Literal[1]
 qux_3: LiteralString = baz_3  # error: [invalid-assignment]
 ```
