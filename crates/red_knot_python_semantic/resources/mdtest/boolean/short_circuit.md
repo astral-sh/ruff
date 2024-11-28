@@ -29,8 +29,7 @@ if (x := 1) or bool_instance():
     reveal_type(x)  # revealed: Literal[1]
 
 if (x := 1) and bool_instance():
-    # TODO
-    reveal_type(x)  # revealed: Never
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Statically known truthiness
@@ -39,13 +38,12 @@ if (x := 1) and bool_instance():
 if True or (x := 1):
     # TODO: infer that the second arm is never executed, and raise `unresolved-reference`.
     # error: [possibly-unresolved-reference]
-    reveal_type(x)  # revealed: Never
+    reveal_type(x)  # revealed: Literal[1]
 
 if True and (x := 1):
     # TODO: infer that the second arm is always executed, do not raise a diagnostic
-    # TODO
     # error: [possibly-unresolved-reference]
-    reveal_type(x)  # revealed: Never
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Later expressions can always use variables from earlier expressions
