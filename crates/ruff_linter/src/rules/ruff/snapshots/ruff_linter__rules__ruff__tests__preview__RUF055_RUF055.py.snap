@@ -101,29 +101,29 @@ RUF055.py:39:1: RUF055 [*] Plain string pattern passed to `re` function
 41 41 | # these currently should not be modified because the patterns contain regex
 42 42 | # metacharacters
 
-RUF055.py:57:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055.py:70:1: RUF055 [*] Plain string pattern passed to `re` function
    |
-56 |   # this should trigger an unsafe fix because of the presence of comments
-57 | / re.sub(
-58 | |     # pattern
-59 | |     "abc",
-60 | |     # repl
-61 | |     "",
-62 | |     s,  # string
-63 | | )
+69 |   # this should trigger an unsafe fix because of the presence of comments
+70 | / re.sub(
+71 | |     # pattern
+72 | |     "abc",
+73 | |     # repl
+74 | |     "",
+75 | |     s,  # string
+76 | | )
    | |_^ RUF055
    |
    = help: Replace with `s.replace("abc", "")`
 
 ℹ Unsafe fix
-54 54 | re.split("abc", s, maxsplit=2)
-55 55 | 
-56 56 | # this should trigger an unsafe fix because of the presence of comments
-57    |-re.sub(
-58    |-    # pattern
-59    |-    "abc",
-60    |-    # repl
-61    |-    "",
-62    |-    s,  # string
-63    |-)
-   57 |+s.replace("abc", "")
+67 67 | re.split("abc", s, maxsplit=2)
+68 68 | 
+69 69 | # this should trigger an unsafe fix because of the presence of comments
+70    |-re.sub(
+71    |-    # pattern
+72    |-    "abc",
+73    |-    # repl
+74    |-    "",
+75    |-    s,  # string
+76    |-)
+   70 |+s.replace("abc", "")
