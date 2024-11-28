@@ -1081,6 +1081,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::AirflowDagNoScheduleArgument) {
                 airflow::rules::dag_no_schedule_argument(checker, expr);
             }
+            if checker.enabled(Rule::UnnecessaryRegularExpression) {
+                ruff::rules::unnecessary_regular_expression(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
