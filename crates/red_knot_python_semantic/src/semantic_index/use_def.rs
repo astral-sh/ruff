@@ -272,6 +272,8 @@ pub(crate) struct UseDefMap<'db> {
 impl<'db> UseDefMap<'db> {
     #[cfg(test)]
     pub(crate) fn print(&self, db: &dyn crate::db::Db) {
+        use crate::semantic_index::constraint::ConstraintNode;
+
         println!("all_definitions:");
         println!("================");
 
@@ -291,7 +293,10 @@ impl<'db> UseDefMap<'db> {
         println!("================");
 
         for (id, c) in self.all_constraints.iter_enumerated() {
-            println!("{:?}: {:?}", id, c);
+            println!("{:?}: {:?}", id, c.node);
+            if let ConstraintNode::Expression(e) = c.node {
+                println!("    {:?}", e.node_ref(db));
+            }
         }
 
         println!();
