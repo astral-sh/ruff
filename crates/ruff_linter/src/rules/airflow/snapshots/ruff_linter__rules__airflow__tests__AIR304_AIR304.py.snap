@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
+---
+AIR304.py:6:9: AIR304 SubDags have been removed in Airflow 3.0, use TaskGroups instead
+  |
+5 | # This should trigger AIR304
+6 | task1 = SubDagOperator(
+  |         ^^^^^^^^^^^^^^ AIR304
+7 |     task_id="subdag_task",
+8 |     subdag=some_subdag,
+  |
+
+AIR304.py:27:9: AIR304 SubDags have been removed in Airflow 3.0, use TaskGroups instead
+   |
+25 | from airflow.operators.subdag_operator import SubDagOperator
+26 | 
+27 | task3 = SubDagOperator(
+   |         ^^^^^^^^^^^^^^ AIR304
+28 |     task_id="another_subdag",
+29 |     subdag=another_subdag,
+   |
