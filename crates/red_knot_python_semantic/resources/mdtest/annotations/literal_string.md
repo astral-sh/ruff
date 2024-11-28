@@ -1,11 +1,9 @@
 # `LiteralString`
 
-`LiteralString` signifies a strings that is either
-defined directly within the source code or is made up of such components.
+`LiteralString` signifies a strings that is either defined directly within the source code or is
+made up of such components.
 
-Part of the testcases defined here were adapted from [the specification's examples][1].
-
-[1]: https://typing.readthedocs.io/en/latest/spec/literal.html#literalstring
+Parts of the testcases defined here were adapted from [the specification's examples][1].
 
 ## Usages
 
@@ -62,8 +60,7 @@ class Foo:
     class_var: ClassVar[Old] = "foo"
     final: Final[New] = "bar"
     annotated_class_var: Annotated[
-        ClassVar[Backported],
-        Literal[LiteralString]  # Second arguments and later must be ignored.
+        ClassVar[Backported], Literal[LiteralString]  # Second arguments and later must be ignored.
     ] = "foobar"
 
 # TODO: Support new-style generic classes
@@ -72,8 +69,7 @@ class PEP695[L: LiteralString](Protocol):
     def f[S: Old](self: L | S | New) -> Backported: ...
     #                   ^^^^^^^^^^^ This is valid, as the class is a protocol.
 
-class GenericParameter(PEP695[LiteralString]):
-    ...
+class GenericParameter(PEP695[LiteralString]): ...
 
 # TODO: Support TypedDict
 class TD(TypedDict):  # error: [invalid-base]
@@ -167,8 +163,8 @@ reveal_type(template.format(foo, bar))  # revealed: @Todo(call type)
 
 ### Compatibility
 
-`Literal["", ...]` is compatible with `LiteralString`,
-`LiteralString` is compatible with `str`, but not vice versa.
+`Literal["", ...]` is compatible with `LiteralString`, `LiteralString` is compatible with `str`, but
+not vice versa.
 
 ```py
 foo_1: Literal["foo"] = "foo"
@@ -207,3 +203,5 @@ reveal_type(lorem)  # revealed: LiteralString
 if lorem == "ipsum":
     reveal_type(lorem)  # revealed: Literal["ipsum"]
 ```
+
+[1]: https://typing.readthedocs.io/en/latest/spec/literal.html#literalstring
