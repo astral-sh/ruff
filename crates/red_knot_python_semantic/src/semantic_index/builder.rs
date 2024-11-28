@@ -786,9 +786,7 @@ where
                         Some((&None, &[][..]))
                     },
                 );
-                for clause in elif_else_clauses {
-                    let clause_test = clause.0;
-                    let clause_body = clause.1;
+                for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
