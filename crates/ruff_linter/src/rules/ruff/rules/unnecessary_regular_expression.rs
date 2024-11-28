@@ -59,6 +59,65 @@ impl AlwaysFixableViolation for UnnecessaryRegularExpression {
     }
 }
 
+/// RUF055
+pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprCall) {
+    // adapted from unraw_re_pattern
+    let semantic = checker.semantic();
+
+    if !semantic.seen_module(Modules::RE) {
+        return;
+    }
+
+    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
+        return;
+    };
+
+    let ["re", func] = qualified_name.segments() else {
+        return;
+    };
+
+    // skip calls with more than `pattern` and `string` arguments (and `repl`
+    // for `sub`)
+    let Some(re_func) = ReFunc::from_call_expr(semantic, call, func) else {
+        return;
+    };
+
+    // For now, restrict this rule to string literals
+    let Some(string_lit) = re_func.pattern.as_string_literal_expr() else {
+        return;
+    };
+
+    // For now, reject any regex metacharacters. Compare to the complete list
+    // from https://docs.python.org/3/howto/regex.html#matching-characters
+    let has_metacharacters = string_lit.value.to_str().contains([
+        '.', '^', '$', '*', '+', '?', '{', '}', '[', ']', '\\', '|', '(', ')',
+    ]);
+
+    if has_metacharacters {
+        return;
+    }
+
+    // Here we know the pattern is a string literal with no metacharacters, so
+    // we can proceed with the str method replacement
+    let new_expr = re_func.replacement();
+
+    let repl = checker.generator().expr(&new_expr);
+    let mut diagnostic = Diagnostic::new(
+        UnnecessaryRegularExpression {
+            replacement: repl.clone(),
+        },
+        call.range,
+    );
+
+    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+        repl,
+        call.range.start(),
+        call.range.end(),
+    )));
+
+    checker.diagnostics.push(diagnostic);
+}
+
 /// The `re` functions supported by this rule.
 #[derive(Debug)]
 enum ReFuncKind<'a> {
@@ -175,63 +234,4 @@ impl<'a> ReFunc<'a> {
             range: TextRange::default(),
         })
     }
-}
-
-/// RUF055
-pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprCall) {
-    // adapted from unraw_re_pattern
-    let semantic = checker.semantic();
-
-    if !semantic.seen_module(Modules::RE) {
-        return;
-    }
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-        return;
-    };
-
-    let ["re", func] = qualified_name.segments() else {
-        return;
-    };
-
-    // skip calls with more than `pattern` and `string` arguments (and `repl`
-    // for `sub`)
-    let Some(re_func) = ReFunc::from_call_expr(semantic, call, func) else {
-        return;
-    };
-
-    // For now, restrict this rule to string literals
-    let Some(string_lit) = re_func.pattern.as_string_literal_expr() else {
-        return;
-    };
-
-    // For now, reject any regex metacharacters. Compare to the complete list
-    // from https://docs.python.org/3/howto/regex.html#matching-characters
-    let has_metacharacters = string_lit.value.to_str().contains([
-        '.', '^', '$', '*', '+', '?', '{', '}', '[', ']', '\\', '|', '(', ')',
-    ]);
-
-    if has_metacharacters {
-        return;
-    }
-
-    // Here we know the pattern is a string literal with no metacharacters, so
-    // we can proceed with the str method replacement
-    let new_expr = re_func.replacement();
-
-    let repl = checker.generator().expr(&new_expr);
-    let mut diagnostic = Diagnostic::new(
-        UnnecessaryRegularExpression {
-            replacement: repl.clone(),
-        },
-        call.range,
-    );
-
-    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-        repl,
-        call.range.start(),
-        call.range.end(),
-    )));
-
-    checker.diagnostics.push(diagnostic);
 }
