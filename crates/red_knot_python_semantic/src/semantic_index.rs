@@ -1235,20 +1235,16 @@ match 1:
     fn if_statement() {
         let TestCase { db, file } = test_case(
             "
-x = 1
-if False:
-    x = 2
-else:
+if (x := 1) or False:
     pass
 
-x
+if x := 1:
+    x
 ",
         );
 
         let index = semantic_index(&db, file);
         let global_table = index.symbol_table(FileScopeId::global());
-
-        assert_eq!(names(&global_table), vec!["x"]);
 
         let use_def = index.use_def_map(FileScopeId::global());
 
