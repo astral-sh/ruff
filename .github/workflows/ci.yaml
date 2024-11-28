@@ -82,6 +82,7 @@ jobs:
             code:
               - "**/*"
               - "!**/*.md"
+              - "crates/red_knot_python_semantic/resources/mdtest/**/*.md"
               - "!docs/**"
               - "!assets/**"
 
