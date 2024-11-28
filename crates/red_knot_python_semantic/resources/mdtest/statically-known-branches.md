@@ -242,3 +242,5 @@ TODO:
 - boundness
 - conditional imports
 - conditional class definitions
+- compare with tests in if.md=>Statically known branches
+- is the change here correct: <https://github.com/astral-sh/ruff/pull/14590/files>

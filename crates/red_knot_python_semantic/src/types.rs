@@ -1624,7 +1624,9 @@ impl<'db> Type<'db> {
                 Type::Never
             }
             _ => {
-                // dbg!(self);
+                // if *self == Type::Never {
+                //     panic!();
+                // }
                 todo_type!()
             }
         }
