@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF055_1.py:9:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+ 7 | pat3 = pat2
+ 8 | 
+ 9 | re.sub(pat3, "", haystack)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+10 | 
+11 | if pat4 := pat3:
+   |
+   = help: Replace with `haystack.replace(pat3, "")`
+
+ℹ Safe fix
+6  6  | pat2 = pat1
+7  7  | pat3 = pat2
+8  8  | 
+9     |-re.sub(pat3, "", haystack)
+   9  |+haystack.replace(pat3, "")
+10 10 | 
+11 11 | if pat4 := pat3:
+12 12 |     re.sub(pat4, "", haystack)
+
+RUF055_1.py:12:5: RUF055 [*] Plain string pattern passed to `re` function
+   |
+11 | if pat4 := pat3:
+12 |     re.sub(pat4, "", haystack)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `haystack.replace(pat4, "")`
+
+ℹ Safe fix
+9  9  | re.sub(pat3, "", haystack)
+10 10 | 
+11 11 | if pat4 := pat3:
+12    |-    re.sub(pat4, "", haystack)
+   12 |+    haystack.replace(pat4, "")
