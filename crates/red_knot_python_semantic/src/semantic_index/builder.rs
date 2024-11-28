@@ -772,7 +772,7 @@ where
                 let elif_else_clauses = node
                     .elif_else_clauses
                     .iter()
-                    .map(|clause| (&clause.test, &clause.body[..]));
+                    .map(|clause| (clause.test.as_ref(), clause.body.as_slice()));
                 let has_else = node
                     .elif_else_clauses
                     .last()
@@ -782,7 +782,7 @@ where
                     None
                 } else {
                     // if there's no `else` branch, we should add a no-op `else` branch
-                    Some((&None, &[][..]))
+                    Some((None, [].as_slice()))
                 });
                 for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
