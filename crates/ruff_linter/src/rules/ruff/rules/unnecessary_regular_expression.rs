@@ -150,13 +150,11 @@ impl<'a> ReFunc<'a> {
         call: &'a ExprCall,
         func_name: &str,
     ) -> Option<Self> {
-        let nargs = call.arguments.len();
-
         // the proposed fixes for match, search, and fullmatch rely on the
         // return value only being used for its truth value
         let in_if_context = semantic.in_boolean_test();
 
-        match (func_name, nargs) {
+        match (func_name, call.arguments.len()) {
             // `split` is the safest of these to fix, as long as metacharacters
             // have already been filtered out from the `pattern`
             ("split", 2) => Some(ReFunc {
