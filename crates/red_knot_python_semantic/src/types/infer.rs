@@ -4642,6 +4642,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
+            KnownInstanceType::LiteralString => {
+                self.diagnostics.add(
+                    subscript.into(),
+                    "invalid-type-parameter",
+                    format_args!(
+                        "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
+                        known_instance.repr(self.db)
+                    ),
+                );
+                Type::Unknown
+            }
         }
     }
 

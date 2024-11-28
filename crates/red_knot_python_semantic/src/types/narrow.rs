@@ -291,8 +291,15 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
         let mut constraints = NarrowingConstraints::default();
+
+        let mut last_rhs_ty: Option<Type> = None;
+
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
+            let lhs_ty = last_rhs_ty.unwrap_or_else(|| {
+                inference.expression_ty(left.scoped_expression_id(self.db, scope))
+            });
             let rhs_ty = inference.expression_ty(right.scoped_expression_id(self.db, scope));
+            last_rhs_ty = Some(rhs_ty);
 
             match left {
                 ast::Expr::Name(ast::ExprName {
@@ -326,6 +333,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                                     .build();
                                 constraints.insert(symbol, ty);
                             }
+                        }
+                        ast::CmpOp::Eq if lhs_ty.is_literal_string() => {
+                            let ty = IntersectionBuilder::new(self.db)
+                                .add_positive(rhs_ty)
+                                .build();
+                            constraints.insert(symbol, ty);
                         }
                         _ => {
                             // TODO other comparison types
