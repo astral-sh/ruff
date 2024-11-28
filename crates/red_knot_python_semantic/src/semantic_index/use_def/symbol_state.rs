@@ -421,7 +421,7 @@ pub(super) struct BindingIdWithConstraints<'a> {
     pub(super) constraints_active_at_binding_ids: ConstraintIdIterator<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct BindingIdWithConstraintsIterator<'a> {
     definitions: BindingsIterator<'a>,
     constraints: ConstraintsIterator<'a>,
@@ -457,7 +457,7 @@ impl<'a> Iterator for BindingIdWithConstraintsIterator<'a> {
 
 impl std::iter::FusedIterator for BindingIdWithConstraintsIterator<'_> {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct ConstraintIdIterator<'a> {
     wrapped: BitSetIterator<'a, INLINE_CONSTRAINT_BLOCKS>,
 }

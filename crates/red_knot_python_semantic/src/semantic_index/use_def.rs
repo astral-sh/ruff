@@ -465,7 +465,7 @@ enum SymbolDefinitions {
     Declarations(SymbolDeclarations),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
@@ -500,6 +500,7 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) constraints_active_at_binding: ConstraintsIterator<'map, 'db>,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     constraint_ids: ConstraintIdIterator<'map>,
@@ -543,6 +544,7 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
+    active_constraints: HashSet<ScopedConstraintId>,
 }
 
 #[derive(Debug, Default)]
@@ -628,6 +630,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
             symbol_states: self.symbol_states.clone(),
+            active_constraints: self.active_constraints.clone(),
         }
     }
 
@@ -641,6 +644,8 @@ impl<'db> UseDefMapBuilder<'db> {
 
         // Restore the current visible-definitions state to the given snapshot.
         self.symbol_states = snapshot.symbol_states;
+
+        self.active_constraints = snapshot.active_constraints;
 
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
         // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
