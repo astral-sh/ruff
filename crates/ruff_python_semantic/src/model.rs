@@ -1839,6 +1839,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
     }
 
+    /// Return `true` if the model is in an `assert` statement.
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
+    }
+
     /// Return `true` if the model is in an f-string.
     pub const fn in_f_string(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::F_STRING)
@@ -2431,6 +2436,14 @@ bitflags! {
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
         const DEFERRED_TYPE_ALIAS = 1 << 28;
+
+        /// The model is visiting an `assert` statement.
+        ///
+        /// For example, the model might be visiting `y` in
+        /// ```python
+        /// assert (y := x**2) > 42, y
+        /// ```
+        const ASSERT_STATEMENT = 1 << 29;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

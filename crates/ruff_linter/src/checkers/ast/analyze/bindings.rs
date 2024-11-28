@@ -18,6 +18,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnsortedDunderSlots,
         Rule::UnusedVariable,
         Rule::UnquotedTypeAlias,
+        Rule::AssignmentInAssert,
     ]) {
         return;
     }
@@ -84,6 +85,11 @@ pub(crate) fn bindings(checker: &mut Checker) {
         }
         if checker.enabled(Rule::UnsortedDunderSlots) {
             if let Some(diagnostic) = ruff::rules::sort_dunder_slots(checker, binding) {
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::AssignmentInAssert) {
+            if let Some(diagnostic) = ruff::rules::assignment_in_assert(checker, binding) {
                 checker.diagnostics.push(diagnostic);
             }
         }

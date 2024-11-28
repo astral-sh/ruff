@@ -1,7 +1,6 @@
-use ruff_python_ast::Expr;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -23,12 +22,27 @@ use crate::checkers::ast::Checker;
 /// ## Examples
 /// ```python
 /// assert (x := 0) == 0
+/// print(x)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// x = 0
 /// assert x == 0
+/// print(x)
+/// ```
+///
+/// The rule avoids flagging named expressions that define variables which are
+/// only referenced from inside `assert` statements; the following will not
+/// trigger the rule:
+/// ```python
+/// assert (x := y**2) > 42, f"Expected >42 but got {x}"
+/// ```
+///
+/// Nor will this:
+/// ```python
+/// assert (x := y**2) > 42
+/// assert x < 1_000_000
 /// ```
 ///
 /// ## References
@@ -44,10 +58,24 @@ impl Violation for AssignmentInAssert {
 }
 
 /// RUF018
-pub(crate) fn assignment_in_assert(checker: &mut Checker, value: &Expr) {
-    if checker.semantic().current_statement().is_assert_stmt() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(AssignmentInAssert, value.range()));
+pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+    if !binding.in_assert_statement() {
+        return None;
     }
+
+    let semantic = checker.semantic();
+
+    let parent_expression = binding.parent_expression(semantic)?.as_named_expr()?;
+
+    if binding
+        .references()
+        .all(|reference| semantic.reference(reference).in_assert_statement())
+    {
+        return None;
+    }
+
+    Some(Diagnostic::new(
+        AssignmentInAssert,
+        parent_expression.range(),
+    ))
 }
