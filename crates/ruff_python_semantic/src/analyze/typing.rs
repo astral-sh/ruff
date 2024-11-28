@@ -665,14 +665,6 @@ impl BuiltinTypeChecker for IntChecker {
     const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Integer);
 }
 
-struct StrChecker;
-
-impl BuiltinTypeChecker for StrChecker {
-    const BUILTIN_TYPE_NAME: &'static str = "str";
-    const TYPING_NAME: Option<&'static str> = None;
-    const EXPR_TYPE: PythonType = PythonType::String;
-}
-
 pub struct IoBaseChecker;
 
 impl TypeChecker for IoBaseChecker {
@@ -785,11 +777,6 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// Test whether the given binding can be considered an integer.
 pub fn is_int(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<IntChecker>(binding, semantic)
-}
-
-/// Test whether the given binding can be considered a string.
-pub fn is_str(binding: &Binding, semantic: &SemanticModel) -> bool {
-    check_type::<StrChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered a set.
