@@ -1229,4 +1229,36 @@ match 1:
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
     }
+
+    #[test]
+    fn if_statement() {
+        let TestCase { db, file } = test_case(
+            "
+x = 1
+if False:
+    x = 2
+else:
+    pass
+
+x
+",
+        );
+
+        let index = semantic_index(&db, file);
+        let global_table = index.symbol_table(FileScopeId::global());
+
+        assert_eq!(names(&global_table), vec!["x"]);
+
+        let use_def = index.use_def_map(FileScopeId::global());
+
+        // use_def
+
+        use_def.print(&db);
+
+        assert!(false);
+        // let binding = use_def
+        //     .first_public_binding(global_table.symbol_id_by_name(name).expect("symbol exists"))
+        //     .expect("Expected with item definition for {name}");
+        // assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
+    }
 }

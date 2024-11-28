@@ -15,6 +15,7 @@ pub(crate) use self::infer::{
 pub(crate) use self::signatures::Signature;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -233,21 +234,37 @@ fn bindings_ty<'db>(
         |BindingWithConstraints {
              binding,
              constraints,
+             mut constraints_active_at_binding,
          }| {
-            let mut constraint_tys = constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
-                .peekable();
-
-            let binding_ty = binding_ty(db, binding);
-            if constraint_tys.peek().is_some() {
-                constraint_tys
-                    .fold(
-                        IntersectionBuilder::new(db).add_positive(binding_ty),
-                        IntersectionBuilder::add_positive,
-                    )
-                    .build()
+            if constraints_active_at_binding.any(|c| {
+                // TODO: handle other constraint nodes
+                if let ConstraintNode::Expression(expr) = c.node {
+                    // TODO: handle c.is_positive
+                    expr.node_ref(db)
+                        .as_boolean_literal_expr()
+                        .is_some_and(|v| !v.value)
+                } else {
+                    false
+                }
+            }) {
+                // TODO: do we need to call binding_ty(…) even if we don't need the result?
+                Type::Never
             } else {
-                binding_ty
+                let mut constraint_tys = constraints
+                    .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+                    .peekable();
+
+                let binding_ty = binding_ty(db, binding);
+                if constraint_tys.peek().is_some() {
+                    constraint_tys
+                        .fold(
+                            IntersectionBuilder::new(db).add_positive(binding_ty),
+                            IntersectionBuilder::add_positive,
+                        )
+                        .build()
+                } else {
+                    binding_ty
+                }
             }
         },
     );
