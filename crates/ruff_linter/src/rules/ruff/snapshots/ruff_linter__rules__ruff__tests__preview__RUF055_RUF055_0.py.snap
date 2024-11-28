@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF055.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_0.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
   |
 5 | # this should be replaced with s.replace("abc", "")
 6 | re.sub("abc", "", s)
@@ -20,7 +20,7 @@ RUF055.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
 8 8 | 
 9 9 | # this example, adapted from https://docs.python.org/3/library/re.html#re.sub,
 
-RUF055.py:22:4: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_0.py:22:4: RUF055 [*] Plain string pattern passed to `re` function
    |
 20 | # this one should be replaced with s.startswith("abc") because the Match is
 21 | # used in an if context for its truth value
@@ -41,7 +41,7 @@ RUF055.py:22:4: RUF055 [*] Plain string pattern passed to `re` function
 24 24 | if m := re.match("abc", s):  # this should *not* be replaced
 25 25 |     pass
 
-RUF055.py:29:4: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_0.py:29:4: RUF055 [*] Plain string pattern passed to `re` function
    |
 28 | # this should be replaced with "abc" in s
 29 | if re.search("abc", s):
@@ -61,7 +61,7 @@ RUF055.py:29:4: RUF055 [*] Plain string pattern passed to `re` function
 31 31 | re.search("abc", s)  # this should not be replaced
 32 32 | 
 
-RUF055.py:34:4: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_0.py:34:4: RUF055 [*] Plain string pattern passed to `re` function
    |
 33 | # this should be replaced with "abc" == s
 34 | if re.fullmatch("abc", s):
@@ -81,7 +81,7 @@ RUF055.py:34:4: RUF055 [*] Plain string pattern passed to `re` function
 36 36 | re.fullmatch("abc", s)  # this should not be replaced
 37 37 | 
 
-RUF055.py:39:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_0.py:39:1: RUF055 [*] Plain string pattern passed to `re` function
    |
 38 | # this should be replaced with s.split("abc")
 39 | re.split("abc", s)
@@ -101,7 +101,7 @@ RUF055.py:39:1: RUF055 [*] Plain string pattern passed to `re` function
 41 41 | # these currently should not be modified because the patterns contain regex
 42 42 | # metacharacters
 
-RUF055.py:70:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_0.py:70:1: RUF055 [*] Plain string pattern passed to `re` function
    |
 69 |   # this should trigger an unsafe fix because of the presence of comments
 70 | / re.sub(
