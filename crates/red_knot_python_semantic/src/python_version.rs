@@ -39,7 +39,7 @@ impl PythonVersion {
 
 impl Default for PythonVersion {
     fn default() -> Self {
-        Self::PY39
+        Self::PY313 // TODO: temporarily changed to 3.13 to activate all sys.version_info branches
     }
 }
 

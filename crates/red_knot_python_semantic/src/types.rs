@@ -246,9 +246,6 @@ fn bindings_ty<'db>(
                     // TODO: handle c.is_positive
 
                     test_expr_ty.bool(db).is_always_false()
-                    // expr.node_ref(db)
-                    //     .as_boolean_literal_expr()
-                    //     .is_some_and(|v| !v.value)
                 } else {
                     false
                 }

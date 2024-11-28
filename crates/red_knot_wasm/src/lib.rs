@@ -185,11 +185,11 @@ impl Settings {
 pub enum TargetVersion {
     Py37,
     Py38,
-    #[default]
     Py39,
     Py310,
     Py311,
     Py312,
+    #[default]
     Py313,
 }
 

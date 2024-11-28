@@ -49,14 +49,14 @@ sometimes not:
 ```py
 import sys
 
-reveal_type(sys.version_info >= (3, 9, 1))  # revealed: bool
-reveal_type(sys.version_info >= (3, 9, 1, "final", 0))  # revealed: bool
+reveal_type(sys.version_info >= (3, 9, 1))  # revealed: Literal[True]
+reveal_type(sys.version_info >= (3, 9, 1, "final", 0))  # revealed: Literal[True]
 
 # TODO: While this won't fail at runtime, the user has probably made a mistake
 # if they're comparing a tuple of length >5 with `sys.version_info`
 # (`sys.version_info` is a tuple of length 5). It might be worth
 # emitting a lint diagnostic of some kind warning them about the probable error?
-reveal_type(sys.version_info >= (3, 9, 1, "final", 0, 5))  # revealed: bool
+reveal_type(sys.version_info >= (3, 9, 1, "final", 0, 5))  # revealed: Literal[True]
 
 reveal_type(sys.version_info == (3, 8, 1, "finallllll", 0))  # revealed: Literal[False]
 ```
@@ -102,8 +102,8 @@ The fields of `sys.version_info` can be accessed by name:
 import sys
 
 reveal_type(sys.version_info.major >= 3)  # revealed: Literal[True]
-reveal_type(sys.version_info.minor >= 9)  # revealed: Literal[True]
-reveal_type(sys.version_info.minor >= 10)  # revealed: Literal[False]
+reveal_type(sys.version_info.minor >= 13)  # revealed: Literal[True]
+reveal_type(sys.version_info.minor >= 14)  # revealed: Literal[False]
 ```
 
 But the `micro`, `releaselevel` and `serial` fields are inferred as `@Todo` until we support
@@ -125,14 +125,14 @@ The fields of `sys.version_info` can be accessed by index or by slice:
 import sys
 
 reveal_type(sys.version_info[0] < 3)  # revealed: Literal[False]
-reveal_type(sys.version_info[1] > 9)  # revealed: Literal[False]
+reveal_type(sys.version_info[1] > 13)  # revealed: Literal[False]
 
-# revealed: tuple[Literal[3], Literal[9], int, Literal["alpha", "beta", "candidate", "final"], int]
+# revealed: tuple[Literal[3], Literal[13], int, Literal["alpha", "beta", "candidate", "final"], int]
 reveal_type(sys.version_info[:5])
 
-reveal_type(sys.version_info[:2] >= (3, 9))  # revealed: Literal[True]
-reveal_type(sys.version_info[0:2] >= (3, 10))  # revealed: Literal[False]
-reveal_type(sys.version_info[:3] >= (3, 10, 1))  # revealed: Literal[False]
+reveal_type(sys.version_info[:2] >= (3, 13))  # revealed: Literal[True]
+reveal_type(sys.version_info[0:2] >= (3, 14))  # revealed: Literal[False]
+reveal_type(sys.version_info[:3] >= (3, 14, 1))  # revealed: Literal[False]
 reveal_type(sys.version_info[3] == "final")  # revealed: bool
 reveal_type(sys.version_info[3] == "finalllllll")  # revealed: Literal[False]
 ```

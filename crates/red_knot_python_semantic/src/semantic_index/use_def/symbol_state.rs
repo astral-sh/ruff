@@ -347,10 +347,11 @@ impl SymbolState {
                         let a_constraints = a_constraints_iter
                             .next()
                             .expect("definitions and constraints length mismatch");
-                        let a_constraints_active_at_binding =
+                        let _a_constraints_active_at_binding =
                             a_constraints_active_at_binding_iter.next().expect(
                                 "definitions and constraints_active_at_binding length mismatch",
-                            );
+                            ); // TODO: perform check that we see the same constraints in both paths
+
                         // If the same definition is visible through both paths, any constraint
                         // that applies on only one path is irrelevant to the resulting type from
                         // unioning the two paths, so we intersect the constraints.
@@ -359,11 +360,6 @@ impl SymbolState {
                             .last_mut()
                             .unwrap()
                             .intersect(&a_constraints);
-
-                        // debug_assert!(
-                        //     self.bindings.constraints_active_at_binding.last().unwrap()
-                        //         == a_constraints_active_at_binding
-                        // );
 
                         opt_a_def = a_defs_iter.next();
                         opt_b_def = b_defs_iter.next();
