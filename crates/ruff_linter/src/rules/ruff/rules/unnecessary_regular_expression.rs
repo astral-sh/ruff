@@ -1,8 +1,10 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::{
+    Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier,
+};
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
@@ -56,7 +58,7 @@ impl AlwaysFixableViolation for UnnecessaryRegularExpression {
 /// The `re` functions supported by this rule.
 #[derive(Debug)]
 enum ReFuncKind<'a> {
-    Sub { repl: &'a str },
+    Sub { repl: &'a Expr },
     Match,
     Search,
     Fullmatch,
@@ -66,17 +68,18 @@ enum ReFuncKind<'a> {
 #[derive(Debug)]
 struct ReFunc<'a> {
     kind: ReFuncKind<'a>,
-    pattern: &'a str,
-    string: &'a str,
+    pattern: &'a Expr,
+    string: &'a Expr,
 }
 
 impl<'a> ReFunc<'a> {
-    fn from_call_expr(checker: &'a mut Checker, call: &ExprCall, func_name: &str) -> Option<Self> {
-        let locator = checker.locator();
+    fn from_call_expr(
+        checker: &'a mut Checker,
+        call: &'a ExprCall,
+        func_name: &str,
+    ) -> Option<Self> {
         let nargs = call.arguments.len();
-        let locate_arg = |name, position| {
-            Some(locator.slice(call.arguments.find_argument(name, position)?.range()))
-        };
+        let locate_arg = |name, position| call.arguments.find_argument(name, position);
 
         // the proposed fixes for match, search, and fullmatch rely on the
         // return value only being used for its truth value
@@ -99,9 +102,7 @@ impl<'a> ReFunc<'a> {
                     return None;
                 }
                 Some(ReFunc {
-                    kind: ReFuncKind::Sub {
-                        repl: locator.slice(repl.range()),
-                    },
+                    kind: ReFuncKind::Sub { repl },
                     pattern: locate_arg("pattern", 0)?,
                     string: locate_arg("string", 2)?,
                 })
@@ -125,21 +126,51 @@ impl<'a> ReFunc<'a> {
         }
     }
 
-    fn replacement(&self) -> String {
-        let Self {
-            kind,
-            pattern,
-            string,
-        } = &self;
-        match kind {
+    fn replacement(&self) -> Expr {
+        match self.kind {
+            // string.replace(pattern, repl)
             ReFuncKind::Sub { repl } => {
-                format!("{string}.replace({pattern}, {repl})")
+                self.method_expr("replace", vec![self.pattern.clone(), repl.clone()])
             }
-            ReFuncKind::Match => format!("{string}.startswith({pattern})"),
-            ReFuncKind::Search => format!("{pattern} in {string}"),
-            ReFuncKind::Fullmatch => format!("{pattern} == {string}"),
-            ReFuncKind::Split => format!("{string}.split({pattern})"),
+            // string.startswith(pattern)
+            ReFuncKind::Match => self.method_expr("startswith", vec![self.pattern.clone()]),
+            // pattern in string
+            ReFuncKind::Search => self.compare_expr(CmpOp::In),
+            // string == pattern
+            ReFuncKind::Fullmatch => self.compare_expr(CmpOp::Eq),
+            // string.split(pattern)
+            ReFuncKind::Split => self.method_expr("split", vec![self.pattern.clone()]),
         }
+    }
+
+    /// Return a new compare expr of the form `self.pattern op self.string`
+    fn compare_expr(&self, op: CmpOp) -> Expr {
+        Expr::Compare(ExprCompare {
+            left: Box::new(self.pattern.clone()),
+            ops: Box::new([op]),
+            comparators: Box::new([self.string.clone()]),
+            range: TextRange::default(),
+        })
+    }
+
+    /// Return a new method call expression on `self.string` with `args` like
+    /// `self.string.method(args...)`
+    fn method_expr(&self, method: &str, args: Vec<Expr>) -> Expr {
+        let method = Expr::Attribute(ExprAttribute {
+            value: Box::new(self.string.clone()),
+            attr: Identifier::new(method, TextRange::default()),
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
+        });
+        Expr::Call(ExprCall {
+            func: Box::new(method),
+            arguments: Arguments {
+                args: args.into_boxed_slice(),
+                keywords: Box::new([]),
+                range: TextRange::default(),
+            },
+            range: TextRange::default(),
+        })
     }
 }
 
@@ -192,8 +223,9 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
 
     // Here we know the pattern is a string literal with no metacharacters, so
     // we can proceed with the str method replacement
-    let repl = re_func.replacement();
+    let new_expr = re_func.replacement();
 
+    let repl = checker.generator().expr(&new_expr);
     let mut diagnostic = Diagnostic::new(
         UnnecessaryRegularExpression {
             replacement: repl.clone(),
