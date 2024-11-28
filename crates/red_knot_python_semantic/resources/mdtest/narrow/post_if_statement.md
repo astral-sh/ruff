@@ -30,7 +30,7 @@ else:
 reveal_type(x)  # revealed: int
 ```
 
-## if statement without explicit else branch, act similar to empty else branch
+## An if statement without an explicit `else` branch is equivalent to one with a no-op `else` branch
 
 ```py
 def optional_int() -> int | None: ...
