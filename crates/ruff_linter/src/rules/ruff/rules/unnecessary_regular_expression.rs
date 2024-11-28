@@ -92,7 +92,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         return;
     };
 
-    let Some(string_lit) = re_func.pattern_as_string_literal(semantic) else {
+    let Some(string_lit) = resolve_name(re_func.pattern, semantic) else {
         return;
     };
 
@@ -174,9 +174,8 @@ impl<'a> ReFunc<'a> {
             // version
             ("sub", 3) => {
                 let repl = call.arguments.find_argument("repl", 1)?;
-                if !repl.is_string_literal_expr() {
-                    return None;
-                }
+                // make sure repl can be resolved to a string literal
+                resolve_name(repl, semantic)?;
                 Some(ReFunc {
                     kind: ReFuncKind::Sub { repl },
                     pattern: call.arguments.find_argument("pattern", 0)?,
@@ -248,29 +247,29 @@ impl<'a> ReFunc<'a> {
             range: TextRange::default(),
         })
     }
+}
 
-    /// Recursively try to resolve `self.pattern` to an [`ExprStringLiteral`] in `semantic`.
-    fn pattern_as_string_literal<'b>(
-        &self,
-        semantic: &'b SemanticModel,
-    ) -> Option<&'b ExprStringLiteral>
-    where
-        'a: 'b,
-    {
-        if self.pattern.is_string_literal_expr() {
-            return self.pattern.as_string_literal_expr();
-        }
-
-        let mut name = self.pattern;
-        while let Some(name_expr) = name.as_name_expr() {
-            let binding = semantic.binding(semantic.only_binding(name_expr)?);
-            let value = find_binding_value(binding, semantic)?;
-            if value.is_string_literal_expr() {
-                return value.as_string_literal_expr();
-            }
-            name = value;
-        }
-
-        None
+/// Recursively try to resolve `name` to an [`ExprStringLiteral`] in `semantic`.
+fn resolve_name<'a, 'b>(
+    name: &'a Expr,
+    semantic: &'b SemanticModel,
+) -> Option<&'b ExprStringLiteral>
+where
+    'a: 'b,
+{
+    if name.is_string_literal_expr() {
+        return name.as_string_literal_expr();
     }
+
+    let mut name = name;
+    while let Some(name_expr) = name.as_name_expr() {
+        let binding = semantic.binding(semantic.only_binding(name_expr)?);
+        let value = find_binding_value(binding, semantic)?;
+        if value.is_string_literal_expr() {
+            return value.as_string_literal_expr();
+        }
+        name = value;
+    }
+
+    None
 }
