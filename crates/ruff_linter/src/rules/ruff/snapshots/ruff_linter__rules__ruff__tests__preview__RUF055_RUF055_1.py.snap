@@ -28,6 +28,8 @@ RUF055_1.py:12:5: RUF055 [*] Plain string pattern passed to `re` function
 11 | if pat4 := pat3:
 12 |     re.sub(pat4, "", haystack)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+13 | 
+14 | repl = "new"
    |
    = help: Replace with `haystack.replace(pat4, "")`
 
@@ -37,3 +39,21 @@ RUF055_1.py:12:5: RUF055 [*] Plain string pattern passed to `re` function
 11 11 | if pat4 := pat3:
 12    |-    re.sub(pat4, "", haystack)
    12 |+    haystack.replace(pat4, "")
+13 13 | 
+14 14 | repl = "new"
+15 15 | re.sub(r"abc", repl, haystack)
+
+RUF055_1.py:15:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+14 | repl = "new"
+15 | re.sub(r"abc", repl, haystack)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `haystack.replace("abc", repl)`
+
+ℹ Safe fix
+12 12 |     re.sub(pat4, "", haystack)
+13 13 | 
+14 14 | repl = "new"
+15    |-re.sub(r"abc", repl, haystack)
+   15 |+haystack.replace("abc", repl)
