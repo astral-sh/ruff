@@ -124,9 +124,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         Fix::safe_edit(edit)
     };
 
-    diagnostic.set_fix(fix);
-
-    checker.diagnostics.push(diagnostic);
+    checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
 /// The `re` functions supported by this rule.
