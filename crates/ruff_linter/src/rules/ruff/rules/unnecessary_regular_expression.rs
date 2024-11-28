@@ -48,6 +48,9 @@ use crate::checkers::ast::Checker;
 ///
 /// This rule's fix is marked as unsafe if the affected expression contains comments. Otherwise,
 /// the fix can be applied safely.
+/// 
+/// ## References
+/// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryRegularExpression {
     replacement: String,
