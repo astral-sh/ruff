@@ -238,11 +238,17 @@ fn bindings_ty<'db>(
          }| {
             if constraints_active_at_binding.any(|c| {
                 // TODO: handle other constraint nodes
-                if let ConstraintNode::Expression(expr) = c.node {
+                if let ConstraintNode::Expression(test_expr) = c.node {
+                    let inference = infer_expression_types(db, test_expr);
+                    let scope = test_expr.scope(db);
+                    let test_expr_ty = inference
+                        .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope));
                     // TODO: handle c.is_positive
-                    expr.node_ref(db)
-                        .as_boolean_literal_expr()
-                        .is_some_and(|v| !v.value)
+
+                    test_expr_ty.bool(db).is_always_false()
+                    // expr.node_ref(db)
+                    //     .as_boolean_literal_expr()
+                    //     .is_some_and(|v| !v.value)
                 } else {
                     false
                 }
@@ -2411,6 +2417,10 @@ pub enum Truthiness {
 impl Truthiness {
     const fn is_ambiguous(self) -> bool {
         matches!(self, Truthiness::Ambiguous)
+    }
+
+    const fn is_always_false(self) -> bool {
+        matches!(self, Truthiness::AlwaysFalse)
     }
 
     const fn negate(self) -> Self {
