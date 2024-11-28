@@ -1,86 +1,124 @@
-from typing import Literal
-
 # Length (`len()`)
 
-
 ## Literal and constructed iterables
-
 
 ### Strings and bytes literals
 
 ```py
-reveal_type(len("no\rmal"))                                 # revealed: Literal[6]
-reveal_type(len(r"aw stri\ng"))                             # revealed: Literal[10]
-reveal_type(len(r"conca\t" "ena\tion"))                     # revealed: Literal[14]
-reveal_type(len(b"ytes lite" br"al"))                       # revealed: Literal[11]
-reveal_type(len("𝒰𝕹🄸©🕲𝕕ℇ"))                            # revealed: Literal[7]
+reveal_type(len("no\rmal"))  # revealed: Literal[6]
+reveal_type(len(r"aw stri\ng"))  # revealed: Literal[10]
+reveal_type(len(r"conca\t" "ena\tion"))  # revealed: Literal[14]
+reveal_type(len(b"ytes lite" rb"al"))  # revealed: Literal[11]
+reveal_type(len("𝒰𝕹🄸©🕲𝕕ℇ"))  # revealed: Literal[7]
 
-reveal_type(                                                # revealed: Literal[7]
-    len('''foo
-bar''')
+reveal_type(  # revealed: Literal[7]
+    len(
+        """foo
+bar"""
+    )
 )
-reveal_type(                                                # revealed: Literal[9]
-    len(r"""foo\r
-bar""")
+reveal_type(  # revealed: Literal[9]
+    len(
+        r"""foo\r
+bar"""
+    )
 )
-reveal_type(                                                # revealed: Literal[7]
-    len(b"""foo
-bar""")
+reveal_type(  # revealed: Literal[7]
+    len(
+        b"""foo
+bar"""
+    )
 )
-reveal_type(                                                # revealed: Literal[9]
-    len(br"""foo\r
-bar""")
+reveal_type(  # revealed: Literal[9]
+    len(
+        rb"""foo\r
+bar"""
+    )
 )
 ```
-
 
 ### Tuples
 
 ```py
-reveal_type(len(()))                                        # revealed: Literal[0]
-reveal_type(len((1,)))                                      # revealed: Literal[1]
-reveal_type(len((1, 2)))                                    # revealed: Literal[2]
+reveal_type(len(()))  # revealed: Literal[0]
+reveal_type(len((1,)))  # revealed: Literal[1]
+reveal_type(len((1, 2)))  # revealed: Literal[2]
 
-reveal_type(len((*[],)))                                    # revealed: int
-reveal_type(len((*[], 1,)))                                 # revealed: int
-reveal_type(len((*[], 1, 2)))                               # revealed: int
-reveal_type(len((*[], *{})))                                # revealed: int
+# TODO: Handle unpacks
+reveal_type(len((*[],)))  # revealed: Literal[1]
+reveal_type(  # revealed: Literal[2]
+    len(
+        (
+            *[],
+            1,
+        )
+    )
+)
+reveal_type(len((*[], 1, 2)))  # revealed: Literal[3]
+reveal_type(len((*[], *{})))  # revealed: Literal[2]
 ```
-
 
 ### Lists, sets and dictionaries
 
 ```py
-reveal_type(len([]))                                        # revealed: int
-reveal_type(len([1]))                                       # revealed: int
-reveal_type(len([1, 2]))                                    # revealed: int
-reveal_type(len([*{}, *dict()]))                            # revealed: int
+reveal_type(len([]))  # revealed: int
+reveal_type(len([1]))  # revealed: int
+reveal_type(len([1, 2]))  # revealed: int
+reveal_type(len([*{}, *dict()]))  # revealed: int
 
-reveal_type(len({}))                                        # revealed: int
-reveal_type(len({**{}}))                                    # revealed: int
-reveal_type(len({**{}, **{}}))                              # revealed: int
+reveal_type(len({}))  # revealed: int
+reveal_type(len({**{}}))  # revealed: int
+reveal_type(len({**{}, **{}}))  # revealed: int
 
-reveal_type(len({1}))                                       # revealed: int
-reveal_type(len({1, 2}))                                    # revealed: int
-reveal_type(len({*[], 2}))                                  # revealed: int
+reveal_type(len({1}))  # revealed: int
+reveal_type(len({1, 2}))  # revealed: int
+reveal_type(len({*[], 2}))  # revealed: int
 
-reveal_type(len(list()))                                    # revealed: int
-reveal_type(len(set()))                                     # revealed: int
-reveal_type(len(dict()))                                    # revealed: int
-reveal_type(len(frozenset()))                               # revealed: int
+reveal_type(len(list()))  # revealed: int
+reveal_type(len(set()))  # revealed: int
+reveal_type(len(dict()))  # revealed: int
+reveal_type(len(frozenset()))  # revealed: int
 ```
-
 
 ## `__len__`
 
 The returned value of `__len__` is implicitly and recursively converted to `int`.
 
+### Literal integers
+
+```py
+from typing import Literal
+
+class Zero:
+    def __len__(self) -> Literal[0]: ...
+
+class ZeroOrOne:
+    def __len__(self) -> Literal[0, 1]: ...
+
+class ZeroOrTrue:
+    def __len__(self) -> Literal[0, True]: ...
+
+class OneOrFalse:
+    def __len__(self) -> Literal[1] | Literal[False]: ...
+
+class OneOrFoo:
+    def __len__(self) -> Literal[1, "foo"]: ...
+
+class ZeroOrStr:
+    def __len__(self) -> Literal[0] | str: ...
+
+reveal_type(len(Zero()))  # revealed: Literal[0]
+reveal_type(len(ZeroOrOne()))  # revealed: Literal[0, 1]
+reveal_type(len(ZeroOrTrue()))  # revealed: Literal[0, 1]
+reveal_type(len(OneOrFalse()))  # revealed: Literal[0, 1]
+reveal_type(len(OneOrFoo()))  # revealed: int
+reveal_type(len(ZeroOrStr()))  # revealed: int
+```
 
 ### Literal booleans
 
 ```py
 from typing import Literal
-
 
 class LiteralTrue:
     def __len__(self) -> Literal[True]: ...
@@ -88,12 +126,9 @@ class LiteralTrue:
 class LiteralFalse:
     def __len__(self) -> Literal[False]: ...
 
-
-# Should be: Literal[1], Literal[0]
-reveal_type(len(LiteralTrue()))                             # revealed: int
-reveal_type(len(LiteralFalse()))                            # revealed: int
+reveal_type(len(LiteralTrue()))  # revealed: Literal[1]
+reveal_type(len(LiteralFalse()))  # revealed: Literal[0]
 ```
-
 
 ### Enums
 
@@ -101,31 +136,39 @@ reveal_type(len(LiteralFalse()))                            # revealed: int
 from enum import Enum, auto
 from typing import Literal
 
-
-# TODO: Support enums
 class SomeEnum(Enum):
     AUTO = auto()
-    KNOWN = 2
-
+    INT = 2
+    STR = "4"
+    TUPLE = (8, "16")
+    INT_2 = 3_2
 
 class Auto:
     def __len__(self) -> Literal[SomeEnum.AUTO]: ...
 
-class Known:
-    def __len__(self) -> Literal[SomeEnum.KNOWN]: ...
+class Int:
+    def __len__(self) -> Literal[SomeEnum.INT]: ...
 
+class Str:
+    def __len__(self) -> Literal[SomeEnum.STR]: ...
 
-# Should be: int, Literal[2]
-reveal_type(len(Auto()))                                    # revealed: int
-reveal_type(len(Known()))                                   # revealed: int
+class Tuple:
+    def __len__(self) -> Literal[SomeEnum.TUPLE]: ...
+
+class IntUnion:
+    def __len__(self) -> Literal[SomeEnum.INT, SomeEnum.INT_2]: ...
+
+reveal_type(len(Auto()))  # revealed: int
+reveal_type(len(Int()))  # revealed: Literal[2]
+reveal_type(len(Str()))  # revealed: int
+reveal_type(len(Tuple()))  # revealed: int
+reveal_type(len(IntUnion()))  # revealed: Literal[2, 32]
 ```
-
 
 ### Deep conversion
 
 ```py
 from typing import Literal
-
 
 # TODO: Support `__int__`
 class A:
@@ -137,25 +180,38 @@ class B:
     def __index__(self) -> Literal[37]: ...
 
 class C:
-  def __len__(self) -> B: ...
-
+    def __len__(self) -> B: ...
 
 # Should be: Literal[42], Literal[37]
-reveal_type(len(B()))                                       # revealed: int
-reveal_type(len(C()))                                       # revealed: int
+reveal_type(len(B()))  # revealed: int
+reveal_type(len(C()))  # revealed: int
 ```
 
-
-### Unsemantical cases
+### Negative literal integer
 
 ```py
 from typing import Literal
 
-
 class A:
+    # TODO: Emit a diagnostic
     def __len__(self) -> Literal[-1]: ...
 
+reveal_type(len(A()))  # revealed: int
+```
 
-# Should be: Never
-reveal_type(len(A()))                                       # revealed: int
+### Wrong signature
+
+```py
+from typing import Literal
+
+class SecondOptionalArgument:
+    # TODO: Emit a diagnostic
+    def __len__(self, v: int = 0) -> Literal[0]: ...
+
+class SecondRequiredArgument:
+    # TODO: Emit a diagnostic
+    def __len__(self, v: int) -> Literal[1]: ...
+
+reveal_type(len(SecondOptionalArgument()))  # revealed: Literal[0]
+reveal_type(len(SecondRequiredArgument()))  # revealed: Literal[1]
 ```

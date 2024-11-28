@@ -1,7 +1,7 @@
-use std::hash::Hash;
-
 use indexmap::IndexSet;
 use itertools::Itertools;
+use std::hash::Hash;
+use std::num::TryFromIntError;
 
 use ruff_db::files::File;
 use ruff_python_ast as ast;
@@ -435,6 +435,14 @@ pub enum Type<'db> {
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
+impl TryFrom<usize> for Type<'_> {
+    type Error = TryFromIntError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        i64::try_from(value).map(Type::IntLiteral)
+    }
+}
+
 impl<'db> Type<'db> {
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
@@ -527,6 +535,7 @@ impl<'db> Type<'db> {
     pub const fn into_int_literal(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),
+            Type::BooleanLiteral(value) => Some(if value { 1 } else { 0 }),
             _ => None,
         }
     }
@@ -548,6 +557,22 @@ impl<'db> Type<'db> {
     pub fn expect_known_instance(self) -> KnownInstanceType<'db> {
         self.into_known_instance()
             .expect("Expected a Type::KnownInstance variant")
+    }
+
+    pub fn as_int_literal(&self) -> Option<Type<'db>> {
+        match self {
+            int_literal @ Type::IntLiteral(_) => Some(*int_literal),
+            Type::BooleanLiteral(value) => Some(Type::IntLiteral(i64::from(*value))),
+            _ => None,
+        }
+    }
+
+    /// Returns the result of [`Type::as_int_literal`] if that value is not negative.
+    pub fn as_len_int_literal(&self) -> Option<Type<'db>> {
+        self.as_int_literal().take_if(|it| match it {
+            Type::IntLiteral(value) => *value >= 0,
+            _ => false,
+        })
     }
 
     pub const fn is_boolean_literal(&self) -> bool {
@@ -1344,39 +1369,47 @@ impl<'db> Type<'db> {
     ///
     /// This is used to determine the value that would be returned
     /// when `len(x)` is called on an object `x`.
-    fn len(&self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> Len {
-        let [only_arg] = arg_types else {
-            return Len::Unknown;
-        };
-
-        match only_arg {
-            Type::StringLiteral(string) => string.utf8_len(db).into(),
-            Type::BytesLiteral(bytes) => bytes.len(db).into(),
-
-            Type::Tuple(tuple) => {
-                let elements = tuple.elements(db);
-
-                if elements.iter().any(|it| matches!(it, Type::Todo(..))) {
-                    Len::Unknown
-                } else {
-                    elements.len().into()
-                }
+    fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::BytesLiteral(bytes) => return bytes.len(db).try_into().ok(),
+            Type::StringLiteral(string) => {
+                return string.as_str(db).chars().count().try_into().ok()
             }
 
-            Type::Never => Len::Never,
-            Type::BooleanLiteral(_) => Len::Never,
-            Type::IntLiteral(_) => Len::Never,
+            Type::Tuple(tuple) => return tuple.elements(db).len().try_into().ok(),
 
-            // Likely unreachable
-            Type::SliceLiteral(_) => Len::Never,
+            ty if !matches!(ty, Type::Instance(..)) => return None,
 
-            Type::Instance(instance) => match instance.class.known(db) {
-                Some(KnownClass::Bool) => Len::Never,
-                _ => Len::Unknown,
-            },
-
-            _ => Len::Unknown,
+            _ => {}
         }
+
+        let Type::Instance(instance) = self else {
+            return None;
+        };
+        let Symbol::Type(dunder_len, _) = instance.class.class_member(db, "__len__") else {
+            return None;
+        };
+        let Type::FunctionLiteral(function) = dunder_len else {
+            return None;
+        };
+
+        let return_ty = function.signature(db).return_ty;
+
+        let Type::Union(union) = return_ty else {
+            return return_ty.as_len_int_literal();
+        };
+
+        let converted = union
+            .elements(db)
+            .iter()
+            .map(|e| e.as_len_int_literal().unwrap_or(Type::Unknown))
+            .collect::<Vec<_>>();
+
+        if converted.iter().any(|e| matches!(e, Type::Unknown)) {
+            return None;
+        }
+
+        Some(UnionType::from_elements(db, converted))
     }
 
     /// Return the outcome of calling an object of this type.
@@ -1391,7 +1424,14 @@ impl<'db> Type<'db> {
                 ),
 
                 Some(KnownFunction::Len) => {
-                    CallOutcome::callable(self.len(db, arg_types).to_type(db))
+                    let normal_return_ty = function_type.signature(db).return_ty;
+
+                    let [only_arg] = arg_types else {
+                        return CallOutcome::callable(normal_return_ty);
+                    };
+                    let len_ty = only_arg.len(db);
+
+                    CallOutcome::callable(len_ty.unwrap_or(normal_return_ty))
                 }
 
                 _ => CallOutcome::callable(function_type.signature(db).return_ty),
@@ -2464,56 +2504,6 @@ impl From<bool> for Truthiness {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Len {
-    /// Can be inferred statically.
-    Known(u64),
-    /// Cannot be inferred statically, falling back to `int`.
-    Unknown,
-    /// `len()` is known to raise an error.
-    Never,
-}
-
-impl Len {
-    fn value(&self) -> Option<u64> {
-        match self {
-            Len::Known(value) => Some(value.clone()),
-            _ => None,
-        }
-    }
-
-    /// A value that fits into [`Type::IntLiteral`]
-    fn int_literal_value(&self) -> Option<i64> {
-        self.value().and_then(|it| i64::try_from(it).ok())
-    }
-
-    fn to_type<'db>(&self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Len::Unknown => KnownClass::Int.to_instance(db),
-            Len::Never => Type::Never,
-            Len::Known(_) => {
-                let Some(i64_value) = self.int_literal_value() else {
-                    return KnownClass::Int.to_class_literal(db);
-                };
-
-                Type::IntLiteral(i64_value)
-            }
-        }
-    }
-}
-
-impl From<u64> for Len {
-    fn from(value: u64) -> Self {
-        Self::Known(value)
-    }
-}
-
-impl From<usize> for Len {
-    fn from(value: usize) -> Self {
-        u64::try_from(value).ok().map_or(Self::Unknown, Self::from)
-    }
-}
-
 #[salsa::interned]
 pub struct FunctionType<'db> {
     /// name of the function at definition
@@ -3047,6 +3037,14 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
+
+    pub fn filter_map(
+        &self,
+        db: &'db dyn Db,
+        transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
+    ) -> Type<'db> {
+        Self::from_elements(db, self.elements(db).iter().filter_map(transform_fn))
+    }
 }
 
 #[salsa::interned]
@@ -3075,8 +3073,8 @@ impl<'db> StringLiteralType<'db> {
         self.value(db).len()
     }
 
-    pub fn utf8_len(&self, db: &'db dyn Db) -> usize {
-        self.value(db).chars().count()
+    pub fn as_str(&self, db: &'db dyn Db) -> &str {
+        self.value(db).as_ref()
     }
 }
 
