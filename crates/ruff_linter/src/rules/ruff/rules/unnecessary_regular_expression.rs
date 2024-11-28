@@ -1,9 +1,10 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, ExprStringLiteral};
+use ruff_python_ast::ExprStringLiteral;
 use ruff_python_ast::{
-    Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier, Stmt,
+    Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier,
 };
+use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::TextRange;
 
@@ -248,57 +249,22 @@ impl<'a> ReFunc<'a> {
         })
     }
 
-    /// Try to obtain an [ExprStringLiteral] from `self.pattern`.
+    /// Recursively try to resolve `self.pattern` to an [ExprStringLiteral] in `semantic`.
     fn pattern_as_string_literal<'b>(
         &self,
         semantic: &'b SemanticModel,
     ) -> Option<&'b ExprStringLiteral> {
-        resolve_name(self.pattern, semantic)
-    }
-}
+        let mut name = self.pattern;
 
-fn resolve_name<'a>(name: &Expr, semantic: &'a SemanticModel) -> Option<&'a ExprStringLiteral> {
-    let mut name = Box::new(name.clone());
-
-    while let Some(name_expr) = name.as_name_expr() {
-        let binding = semantic.binding(semantic.only_binding(name_expr)?);
-
-        let value = match binding.kind {
-            ruff_python_semantic::BindingKind::Assignment => match binding.statement(semantic) {
-                Some(Stmt::Assign(ast::StmtAssign { value, .. })) => value,
-                Some(Stmt::AnnAssign(ast::StmtAnnAssign {
-                    value: Some(value), ..
-                })) => value,
-                _ => return None,
-            },
-            // ruff_python_semantic::BindingKind::Argument => todo!(),
-            // ruff_python_semantic::BindingKind::Annotation => todo!(),
-            // ruff_python_semantic::BindingKind::NamedExprAssignment => todo!(),
-            // ruff_python_semantic::BindingKind::TypeParam => todo!(),
-            // ruff_python_semantic::BindingKind::LoopVar => todo!(),
-            // ruff_python_semantic::BindingKind::WithItemVar => todo!(),
-            // ruff_python_semantic::BindingKind::Global(_) => todo!(),
-            // ruff_python_semantic::BindingKind::Nonlocal(_, _) => todo!(),
-            // ruff_python_semantic::BindingKind::Builtin => todo!(),
-            // ruff_python_semantic::BindingKind::ClassDefinition(_) => todo!(),
-            // ruff_python_semantic::BindingKind::FunctionDefinition(_) => todo!(),
-            // ruff_python_semantic::BindingKind::Export(_) => todo!(),
-            // ruff_python_semantic::BindingKind::FutureImport => todo!(),
-            // ruff_python_semantic::BindingKind::Import(_) => todo!(),
-            // ruff_python_semantic::BindingKind::FromImport(_) => todo!(),
-            // ruff_python_semantic::BindingKind::SubmoduleImport(_) => todo!(),
-            // ruff_python_semantic::BindingKind::Deletion => todo!(),
-            // ruff_python_semantic::BindingKind::ConditionalDeletion(_) => todo!(),
-            // ruff_python_semantic::BindingKind::BoundException => todo!(),
-            // ruff_python_semantic::BindingKind::UnboundException(_) => todo!(),
-            _ => return None,
-        };
-
-        if value.is_string_literal_expr() {
-            return value.as_string_literal_expr();
+        while let Some(name_expr) = name.as_name_expr() {
+            let binding = semantic.binding(semantic.only_binding(name_expr)?);
+            let value = find_binding_value(binding, semantic)?;
+            if value.is_string_literal_expr() {
+                return value.as_string_literal_expr();
+            }
+            name = value;
         }
-        name = value.clone();
-    }
 
-    None
+        None
+    }
 }
