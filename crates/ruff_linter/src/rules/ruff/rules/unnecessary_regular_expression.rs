@@ -31,18 +31,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Details
 ///
-/// Reports the following `re` calls when their first arguments are plain string
-/// literals, and no additional flags are passed:
+/// The rule reports the following calls when the first argument to the call is
+/// a plain string literals, and no additional flags are passed:
 ///
-/// - `sub`
-/// - `match`
-/// - `search`
-/// - `fullmatch`
-/// - `split`
+/// - `re.sub`
+/// - `re.match`
+/// - `re.search`
+/// - `re.fullmatch`
+/// - `re.split`
 ///
-/// For `sub`, the `repl` (replacement) argument must also be a string literal,
-/// not a function. For `match`, `search`, and `fullmatch`, the return value
-/// must also be used only for its truth value.
+/// For `re.sub`, the `repl` (replacement) argument must also be a string literal,
+/// not a function. For `re.match`, `re.search`, and `re.fullmatch`, the return
+/// value must also be used only for its truth value.
 ///
 /// ## Fix safety
 ///
