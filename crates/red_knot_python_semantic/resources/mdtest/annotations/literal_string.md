@@ -92,7 +92,7 @@ reveal_type(foo.join(qux))  # revealed: @Todo(call todo)
 
 template: LiteralString = "{}, {}"
 reveal_type(template)  # revealed: Literal["{}, {}"]
-# TODO: Infer "foo, bar"
+# TODO: Infer `LiteralString`
 reveal_type(template.format(foo, bar))  # revealed: @Todo(call todo)
 ```
 
@@ -130,10 +130,13 @@ qux_3: LiteralString = baz_3  # error: [invalid-assignment]
 
 ```py
 lorem: LiteralString = "lorem" * 1_000_000_000
+
 reveal_type(lorem)  # revealed: LiteralString
 
 if lorem == "ipsum":
     reveal_type(lorem)  # revealed: Literal["ipsum"]
+
+reveal_type(lorem)  # revealed: LiteralString
 
 if "" < lorem == "ipsum":
     reveal_type(lorem)  # revealed: Literal["ipsum"]
