@@ -135,8 +135,10 @@ class TheLambdasHereAreNotMethods:
 
 
 class NotAMethodButHardToDetect:
-    # in an ideal world, perhaps we'd flag this,
-    # but practically speaking it's hard to see how we'd accurately determine
+    # In an ideal world, perhaps we'd emit a diagnostic here,
+    # since this `lambda` is clearly not a method definition,
+    # and *could* be safely replaced with an `operator` function.
+    # Practically speaking, however, it's hard to see how we'd accurately determine
     # that the `lambda` is *not* a method definition
     # without risking false positives elsewhere or introducing complex heuristics
     # that users would find surprising and confusing
