@@ -249,7 +249,7 @@ impl<'a> ReFunc<'a> {
         })
     }
 
-    /// Recursively try to resolve `self.pattern` to an [ExprStringLiteral] in `semantic`.
+    /// Recursively try to resolve `self.pattern` to an [`ExprStringLiteral`] in `semantic`.
     fn pattern_as_string_literal<'b>(
         &self,
         semantic: &'b SemanticModel,
