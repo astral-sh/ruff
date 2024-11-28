@@ -1,6 +1,6 @@
 # Consolidating narrowed types after if statement
 
-## After if-else statements, narrowing has no-effect if variable is not mutated
+## After if-else statements, narrowing has no effect if the variable is not mutated in any branch
 
 ```py
 def optional_int() -> int | None: ...
