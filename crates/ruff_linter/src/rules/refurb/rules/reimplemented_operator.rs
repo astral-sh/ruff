@@ -51,21 +51,21 @@ use crate::Locator;
 /// this rule.
 ///
 /// The first difference is that `operator` functions cannot be called with keyword arguments, but
-/// most user-defined functions can. If an `add` function is defined as `add = lambda x, y: x + y`
+/// most user-defined functions can. If an `add` function is defined as `add = lambda x, y: x + y`,
 /// replacing this function with `operator.add` will cause the later call to raise `TypeError` if
 /// the function is later called with keyword arguments, e.g. `add(x=1, y=2)`.
 ///
 /// The second difference is that user-defined functions are [descriptors], but this is not true of
 /// the functions defined in the `operator` module. Practically speaking, this means that defining
-/// a function in a class body (either using a `def` statement or assigning a `lambda` function to
-/// a variable) is a valid way of defining an instance method on that class; monkeypatching a
+/// a function in a class body (either by using a `def` statement or assigning a `lambda` function
+/// to a variable) is a valid way of defining an instance method on that class; monkeypatching a
 /// user-defined function onto a class after the class has been created also has the same effect.
-/// The same is not true of an `operator` function: assigning an operator function to a variable in
-/// a class body or monkeypatching it onto a class will not create a valid instance method. Ruff
-/// will refrain from emitting diagnostics for this rule on function definitions in class bodies;
-/// however, it does not currently have sophisticated enough type inference to avoid emitting this
-/// diagnostic if a user-defined function is being monkeypatched onto a class after the class has
-/// been constructed.
+/// The same is not true of an `operator` function: assigning an `operator` function to a variable
+/// in a class body or monkeypatching one onto a class will not create a valid instance method.
+/// Ruff will refrain from emitting diagnostics for this rule on function definitions in class
+/// bodies; however, it does not currently have sophisticated enough type inference to avoid
+/// emitting this diagnostic if a user-defined function is being monkeypatched onto a class after
+/// the class has been constructed.
 ///
 /// [descriptors]: https://docs.python.org/3/howto/descriptor.html
 #[derive(ViolationMetadata)]
