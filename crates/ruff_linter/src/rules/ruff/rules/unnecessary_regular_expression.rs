@@ -32,7 +32,7 @@ use crate::checkers::ast::Checker;
 /// ## Details
 ///
 /// The rule reports the following calls when the first argument to the call is
-/// a plain string literals, and no additional flags are passed:
+/// a plain string literal, and no additional flags are passed:
 ///
 /// - `re.sub`
 /// - `re.match`
