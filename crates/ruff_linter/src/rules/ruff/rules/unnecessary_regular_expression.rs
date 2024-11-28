@@ -253,9 +253,15 @@ impl<'a> ReFunc<'a> {
     fn pattern_as_string_literal<'b>(
         &self,
         semantic: &'b SemanticModel,
-    ) -> Option<&'b ExprStringLiteral> {
-        let mut name = self.pattern;
+    ) -> Option<&'b ExprStringLiteral>
+    where
+        'a: 'b,
+    {
+        if self.pattern.is_string_literal_expr() {
+            return self.pattern.as_string_literal_expr();
+        }
 
+        let mut name = self.pattern;
         while let Some(name_expr) = name.as_name_expr() {
             let binding = semantic.binding(semantic.only_binding(name_expr)?);
             let value = find_binding_value(binding, semantic)?;
