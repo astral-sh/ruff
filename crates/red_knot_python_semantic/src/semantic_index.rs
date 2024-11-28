@@ -1244,7 +1244,7 @@ x
         );
 
         let index = semantic_index(&db, file);
-        let global_table = index.symbol_table(FileScopeId::global());
+        // let global_table = index.symbol_table(FileScopeId::global());
 
         let use_def = index.use_def_map(FileScopeId::global());
 

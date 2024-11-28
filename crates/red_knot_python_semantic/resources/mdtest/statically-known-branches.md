@@ -238,8 +238,8 @@ reveal_type(C.x)  # revealed: int | str
 
 ## TODO
 
-- boundness
+- declarations vs bindings => NoDefault: \_NoDefaultType
 - conditional imports
 - conditional class definitions
 - compare with tests in if.md=>Statically known branches
-- is the change here correct: <https://github.com/astral-sh/ruff/pull/14590/files>
+- boundness
