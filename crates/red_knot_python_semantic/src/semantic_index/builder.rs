@@ -782,7 +782,7 @@ where
                     None
                 } else {
                     // if there's no `else` branch, we should add a no-op `else` branch
-                    Some((None, [].as_slice()))
+                    Some((None, Default::default()))
                 });
                 for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
