@@ -97,7 +97,7 @@ impl<'a> ReFunc<'a> {
             // allows it to be a function, which will *not* work in the str
             // version
             ("sub", 3) => {
-                let repl = call.arguments.find_argument("repl", 1)?;
+                let repl = locate_arg("repl", 1)?;
                 if !repl.is_string_literal_expr() {
                     return None;
                 }
