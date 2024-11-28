@@ -15,7 +15,7 @@ else:
 reveal_type(x)  # revealed: int | None
 ```
 
-## After if-else statements, narrowing has an effect if variable is mutated
+## Narrowing can have a persistent effect if the variable is mutated in one branch
 
 ```py
 def optional_int() -> int | None: ...
