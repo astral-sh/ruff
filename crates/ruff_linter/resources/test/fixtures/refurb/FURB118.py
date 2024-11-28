@@ -132,3 +132,12 @@ class TheLambdasHereAreNotMethods:
     )
     def test_inlet_asset_alias_extra_slice(self, slicer, expected):
         assert slice("whatever") == expected
+
+
+class NotAMethodButHardToDetect:
+    # in an ideal world, perhaps we'd flag this,
+    # but practically speaking it's hard to see how we'd accurately determine
+    # that the `lambda` is *not* a method definition
+    # without risking false positives elsewhere or introducing complex heuristics
+    # that users would find surprising and confusing
+    FOO = sorted([x for x in BAR], key=lambda x: x.baz)
