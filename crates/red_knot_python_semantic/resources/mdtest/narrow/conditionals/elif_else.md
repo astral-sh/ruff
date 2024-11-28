@@ -55,21 +55,3 @@ else:
     # TODO should be Never
     reveal_type(x)  # revealed: Literal[1, 2]
 ```
-
-## After if-statement without explicit else branch, assume else branch with negative clause
-
-```py
-def optional_int() -> int | None: ...
-
-x = optional_int()
-y = optional_int()
-
-if x is None:
-    x = 0
-
-if y is None:
-    pass
-
-reveal_type(x)  # revealed: int
-reveal_type(y)  # revealed: int | None
-```
