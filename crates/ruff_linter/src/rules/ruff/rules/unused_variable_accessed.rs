@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Binding;
 use ruff_python_stdlib::builtins::is_python_builtin;
 use ruff_text_size::Ranged;
@@ -29,10 +29,10 @@ use crate::checkers::ast::Checker;
 ///     variable = 3
 ///     return variable + 1
 /// ```
-#[violation]
-pub struct UnusedVariableAccessed {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedVariableAccessed {
     name: String,
-    fix: String,
+    // fix: String,
     shadowed_kind: ShadowedKind,
 }
 
@@ -48,11 +48,11 @@ impl Violation for UnusedVariableAccessed {
     fn fix_title(&self) -> Option<String> {
         Some(match self.shadowed_kind {
             ShadowedKind::BuiltIn => {
-                "Consider using prefered trailing underscores to avoid shadowing a built-in."
+                "Consider using preferred trailing underscores to avoid shadowing a built-in."
                     .to_string()
             }
             ShadowedKind::Some => {
-                "Consider using prefered trailing underscores to avoid shadowing a variable."
+                "Consider using preferred trailing underscores to avoid shadowing a variable."
                     .to_string()
             }
             ShadowedKind::None => "Consider removing leading underscores.".to_string(),
@@ -82,7 +82,7 @@ pub(crate) fn unused_variable_accessed(
 
     let trimmed_name = name.trim_start_matches('_');
     let mut kind = ShadowedKind::None;
-    let mut fix = trimmed_name.to_string();
+    // let mut fix = trimmed_name.to_string();
 
     if !trimmed_name.is_empty() {
         if is_python_builtin(
@@ -91,10 +91,10 @@ pub(crate) fn unused_variable_accessed(
             checker.source_type.is_ipynb(),
         ) {
             kind = ShadowedKind::BuiltIn;
-            fix += "_";
+            // fix += "_";
         } else if checker.semantic().scopes[binding.scope].has(trimmed_name) {
             kind = ShadowedKind::Some;
-            fix += "_";
+            // fix += "_";
         }
     }
 
@@ -106,7 +106,7 @@ pub(crate) fn unused_variable_accessed(
                 Diagnostic::new(
                     UnusedVariableAccessed {
                         name: name.to_string(),
-                        fix: fix.clone(),
+                        // fix: fix.clone(),
                         shadowed_kind: kind,
                     },
                     checker.semantic().reference(*ref_id).range(),
