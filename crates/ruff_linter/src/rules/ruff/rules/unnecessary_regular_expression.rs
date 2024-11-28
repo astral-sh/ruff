@@ -197,14 +197,8 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         return;
     };
 
-    let Some(pat) = call.arguments.find_argument("pattern", 0) else {
-        // this should be unreachable given the checks above, so it might be
-        // safe to unwrap here instead
-        return;
-    };
-
     // For now, restrict this rule to string literals
-    let Some(string_lit) = pat.as_string_literal_expr() else {
+    let Some(string_lit) = re_func.pattern.as_string_literal_expr() else {
         return;
     };
 
