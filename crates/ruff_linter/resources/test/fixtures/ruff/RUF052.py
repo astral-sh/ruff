@@ -22,6 +22,17 @@ def fun(arg):
     _valid_unused_var = arg
     pass
 
+_x = "global"
+
+def fun():
+    global _x
+    return _x    
+
+def fun():
+    global _x
+    _x = "reassigned global"
+    return _x  
+
 class _ValidClass:
     pass
 

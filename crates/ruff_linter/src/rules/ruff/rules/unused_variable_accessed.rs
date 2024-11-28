@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::Binding;
+use ruff_python_ast::helpers::is_dunder;
+use ruff_python_semantic::{Binding, BindingKind};
 use ruff_python_stdlib::builtins::is_python_builtin;
 use ruff_text_size::Ranged;
 
@@ -8,7 +9,6 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for usages of variables marked as unused (variable names starting with an underscore, except '_') in functions.
-/// Forbid using method and function variables that are marked as unused.
 ///
 /// ## Why is this bad?
 /// Marking variables with a leading underscore conveys that they are intentionally unused within the function or method.
@@ -32,7 +32,6 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedVariableAccessed {
     name: String,
-    // fix: String,
     shadowed_kind: ShadowedKind,
 }
 
@@ -40,7 +39,7 @@ impl Violation for UnusedVariableAccessed {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Local variable `{}` marked as unused is accessed",
+            "Local variable `{}` with leading underscore is accessed",
             self.name
         )
     }
@@ -48,14 +47,12 @@ impl Violation for UnusedVariableAccessed {
     fn fix_title(&self) -> Option<String> {
         Some(match self.shadowed_kind {
             ShadowedKind::BuiltIn => {
-                "Consider using preferred trailing underscores to avoid shadowing a built-in."
-                    .to_string()
+                "Prefer using trailing underscores to avoid shadowing a built-in".to_string()
             }
             ShadowedKind::Some => {
-                "Consider using preferred trailing underscores to avoid shadowing a variable."
-                    .to_string()
+                "Prefer using trailing underscores to avoid shadowing a variable".to_string()
             }
-            ShadowedKind::None => "Consider removing leading underscores.".to_string(),
+            ShadowedKind::None => "Remove leading underscores".to_string(),
         })
     }
 }
@@ -67,16 +64,27 @@ pub(crate) fn unused_variable_accessed(
 ) -> Option<Vec<Diagnostic>> {
     let name = binding.name(checker.source());
 
+    // only variables marked as private
+    if !name.starts_with('_') || name == "_" || is_dunder(name) {
+        return None;
+    }
     // only used variables
-    if !name.starts_with('_')
-        || name == "_"
-        || binding.is_unused()
-        || binding.is_global()
-        || binding.is_nonlocal()
-        || (!binding.kind.is_argument() && !binding.kind.is_assignment())
-        || !checker.semantic().scopes[binding.scope].kind.is_function()
-        || checker.settings.dummy_variable_rgx.is_match(name)
-    {
+    if binding.is_unused() {
+        return None;
+    }
+    // Only variables defined via function arguments or assignments.
+    // This excludes `global` and `nonlocal` variables.
+    if !matches!(
+        binding.kind,
+        BindingKind::Argument | BindingKind::Assignment
+    ) {
+        return None;
+    }
+    // Only variables defined in function scopes
+    if !checker.semantic().scopes[binding.scope].kind.is_function() {
+        return None;
+    }
+    if checker.settings.dummy_variable_rgx.is_match(name) {
         return None;
     }
 
@@ -91,10 +99,8 @@ pub(crate) fn unused_variable_accessed(
             checker.source_type.is_ipynb(),
         ) {
             kind = ShadowedKind::BuiltIn;
-            // fix += "_";
         } else if checker.semantic().scopes[binding.scope].has(trimmed_name) {
             kind = ShadowedKind::Some;
-            // fix += "_";
         }
     }
 
@@ -106,7 +112,6 @@ pub(crate) fn unused_variable_accessed(
                 Diagnostic::new(
                     UnusedVariableAccessed {
                         name: name.to_string(),
-                        // fix: fix.clone(),
                         shadowed_kind: kind,
                     },
                     checker.semantic().reference(*ref_id).range(),
