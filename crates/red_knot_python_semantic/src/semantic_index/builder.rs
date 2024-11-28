@@ -14,7 +14,6 @@ use ruff_python_ast::{AnyParameterRef, BoolOp, Expr};
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
-use crate::semantic_index::constraint::ConstraintKind;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
     DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
@@ -239,9 +238,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category();
-
-        // let constraints = self.current_use_def_map().
-
         let definition = Definition::new(
             self.db,
             self.file,
@@ -249,7 +245,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             symbol,
             kind,
             countme::Count::default(),
-            vec![],
         );
 
         let existing_definition = self
@@ -294,7 +289,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         let expression = self.add_standalone_expression(constraint_node);
         Constraint {
             node: ConstraintNode::Expression(expression),
-            kind: ConstraintKind::Narrowing,
             is_positive: true,
         }
     }
@@ -303,7 +297,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut()
             .record_constraint(Constraint {
                 node: constraint.node,
-                kind: constraint.kind,
                 is_positive: false,
             });
     }
@@ -348,7 +341,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut()
             .record_constraint(Constraint {
                 node: ConstraintNode::Pattern(pattern_constraint),
-                kind: ConstraintKind::Narrowing,
                 is_positive: true,
             });
         pattern_constraint

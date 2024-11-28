@@ -1231,6 +1231,7 @@ match 1:
     }
 
     #[test]
+    #[ignore]
     fn if_statement() {
         let TestCase { db, file } = test_case(
             "

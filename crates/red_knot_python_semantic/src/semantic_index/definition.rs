@@ -6,7 +6,6 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_resolver::file_to_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
-use crate::semantic_index::Expression;
 use crate::unpack::Unpack;
 use crate::Db;
 
@@ -24,7 +23,7 @@ use crate::Db;
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
 #[salsa::tracked]
-pub(crate) struct Definition<'db> {
+pub struct Definition<'db> {
     /// The file in which the definition occurs.
     #[id]
     pub(crate) file: File,
@@ -43,8 +42,6 @@ pub(crate) struct Definition<'db> {
 
     #[no_eq]
     count: countme::Count<Definition<'static>>,
-
-    constraints: Vec<Expression<'db>>,
 }
 
 impl<'db> Definition<'db> {
