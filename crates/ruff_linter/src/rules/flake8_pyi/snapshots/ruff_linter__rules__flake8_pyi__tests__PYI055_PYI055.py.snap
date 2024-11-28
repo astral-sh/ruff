@@ -167,3 +167,4 @@ PYI055.py:68:9: PYI055 [*] Multiple `type` members in a union. Combine them into
    68 |+        type[_T | Converter[_T]] | str | Converter[_T] | Callable[[str], _T], ...  # PYI055
 69 69 |     ] = union.__args__
 70 70 |     ...
+71 71 |
