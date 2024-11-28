@@ -335,10 +335,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             }
                         }
                         ast::CmpOp::Eq if lhs_ty.is_literal_string() => {
-                            let ty = IntersectionBuilder::new(self.db)
-                                .add_positive(rhs_ty)
-                                .build();
-                            constraints.insert(symbol, ty);
+                            constraints.insert(symbol, rhs_ty);
                         }
                         _ => {
                             // TODO other comparison types

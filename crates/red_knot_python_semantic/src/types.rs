@@ -629,11 +629,6 @@ impl<'db> Type<'db> {
                 Type::StringLiteral(_) | Type::LiteralString,
                 Type::Instance(InstanceType { class }),
             ) if class.is_known(db, KnownClass::Str) => true,
-            (
-                Type::Instance(InstanceType { class }),
-                Type::StringLiteral(_) | Type::LiteralString,
-            ) if class.is_known(db, KnownClass::Str) => false,
-            (Type::LiteralString, Type::StringLiteral(_)) => false,
             (Type::BytesLiteral(_), Type::Instance(InstanceType { class }))
                 if class.is_known(db, KnownClass::Bytes) =>
             {
@@ -1408,7 +1403,7 @@ impl<'db> Type<'db> {
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
 
-            Type::Todo(_) => CallOutcome::callable(todo_type!("call type")),
+            Type::Todo(_) => CallOutcome::callable(todo_type!("call todo")),
 
             Type::Unknown => CallOutcome::callable(Type::Unknown),
 

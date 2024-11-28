@@ -1,6 +1,6 @@
 # `LiteralString`
 
-`LiteralString` signifies a strings that is either defined directly within the source code or is
+`LiteralString` represents a string that is either defined directly within the source code or is
 made up of such components.
 
 Parts of the testcases defined here were adapted from [the specification's examples][1].
@@ -23,60 +23,19 @@ from typing import (
     ReadOnly,
     Required,
     TypedDict,
-    TypeAlias,
-    # TODO: Blocking on `sys.version_info` support.
-    # See `issubclass.md`, section "Handling of `None`"
-    TypeAliasType,  # error: [possibly-unbound-import]
     TypeVar,
 )
 
-Old: TypeAlias = LiteralString
-type New = LiteralString
-Backported = TypeAliasType("Backported", LiteralString)
+TA: TypeAlias = LiteralString
 
 T1 = TypeVar("T1", bound=LiteralString)
-T2 = TypeVar("T2", bound=Old)
-T3 = TypeVar("T3", bound=New)
-T4 = TypeVar("T4", bound=Backported)
 
-variable_annotation_1: LiteralString
-variable_annotation_2: Old
-variable_annotation_3: New
-variable_annotation_4: Backported
-
-type_argument_1: list[LiteralString]
-type_argument_2: dict[Old, New]
-type_argument_3: set[Backported]
-
-type TA1[LS: LiteralString] = Old
-type TA2[LS: Old] = New
-type TA3[LS: New] = Backported
-type TA4[LS: Backported] = LiteralString
-
-def my_function(literal_string: LiteralString, *args: Old, **kwargs: New) -> Backported: ...
+variable_annotation: LiteralString
 
 class Foo:
-    my_attribute: LiteralString
-    class_var: ClassVar[Old] = "foo"
-    final: Final[New] = "bar"
-    annotated_class_var: Annotated[
-        ClassVar[Backported], Literal[LiteralString]  # Second arguments and later must be ignored.
-    ] = "foobar"
-
-# TODO: Support new-style generic classes
-# error: [invalid-base]
-class PEP695[L: LiteralString](Protocol):
-    def f[S: Old](self: L | S | New) -> Backported: ...
-    #                   ^^^^^^^^^^^ This is valid, as the class is a protocol.
-
-class GenericParameter(PEP695[LiteralString]): ...
-
-# TODO: Support TypedDict
-class TD(TypedDict):  # error: [invalid-base]
-    normal: LiteralString
-    readonly: ReadOnly[Old]
-    required: Required[New]
-    not_required: NotRequired[Backported]
+    annotated: Annotated[
+        int, Literal[LiteralString]  # fine: Second arguments and later must be ignored.
+    ]
 ```
 
 ### Within `Literal`
@@ -95,33 +54,10 @@ bad_nesting: Literal[LiteralString]  # error: [invalid-literal-parameter]
 `LiteralString` cannot be parametrized.
 
 ```py
-# TODO: See above.
-# error: [possibly-unbound-import]
-from typing import LiteralString, TypeAlias, TypeAliasType
-
-Old: TypeAlias = LiteralString
-type New = LiteralString
-Backported = TypeAliasType("Backported", LiteralString)
+from typing import LiteralString
 
 a: LiteralString[str]  # error: [invalid-type-parameter]
 b: LiteralString["foo"]  # error: [invalid-type-parameter]
-
-c: Old[str]  # error: [invalid-type-parameter]
-d: Old["foo"]  # error: [invalid-type-parameter]
-
-# TODO: Emit invalid-type-parameter for the following
-e: New[str]
-f: New["int"]
-
-g: Backported[str]
-h: Backported["int"]
-
-# fine: TypeAliasType instances are subscriptable.
-# These are not required to have a meaning outside annotation contexts.
-New[str]
-New["int"]
-Backported[str]
-Backported["int"]
 ```
 
 ### As a base class
@@ -153,17 +89,17 @@ qux = (foo, bar)
 reveal_type(qux)  # revealed: tuple[Literal["foo"], Literal["bar"]]
 
 # TODO: Infer "LiteralString"
-reveal_type(foo.join(qux))  # revealed: @Todo(call type)
+reveal_type(foo.join(qux))  # revealed: @Todo(call todo)
 
 template: LiteralString = "{}, {}"
 reveal_type(template)  # revealed: Literal["{}, {}"]
 # TODO: Infer "foo, bar"
-reveal_type(template.format(foo, bar))  # revealed: @Todo(call type)
+reveal_type(template.format(foo, bar))  # revealed: @Todo(call todo)
 ```
 
-### Compatibility
+### Assignability
 
-`Literal["", ...]` is compatible with `LiteralString`, `LiteralString` is compatible with `str`, but
+`Literal[""]` is assignable to `LiteralString`, and `LiteralString` is assignable to `str`, but
 not vice versa.
 
 ```py
@@ -201,6 +137,9 @@ lorem: LiteralString = "lorem" * 1_000_000_000
 reveal_type(lorem)  # revealed: LiteralString
 
 if lorem == "ipsum":
+    reveal_type(lorem)  # revealed: Literal["ipsum"]
+
+if "" < lorem == "ipsum":
     reveal_type(lorem)  # revealed: Literal["ipsum"]
 ```
 
