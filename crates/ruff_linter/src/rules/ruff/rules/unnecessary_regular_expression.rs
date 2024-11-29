@@ -92,6 +92,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         return;
     };
 
+    // For now, restrict this rule to string literals and variables that can be resolved to literals
     let Some(string_lit) = resolve_name(re_func.pattern, semantic) else {
         return;
     };
