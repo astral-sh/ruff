@@ -140,34 +140,39 @@ impl From<IsMetaclass> for bool {
 /// `IsMetaclass::No` if it's definitely *not* a metaclass, and
 /// `IsMetaclass::Maybe` otherwise.
 pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
-    let mut maybe = false;
-    let is_base_class = iter_base_classes(class_def, semantic).any(|expr| match expr {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
-            maybe = true;
-            // Ex) `class Foo(type(Protocol)): ...`
-            arguments.len() == 1 && semantic.match_builtin_expr(func.as_ref(), "type")
+    for expr in iter_base_classes(class_def, semantic) {
+        match expr {
+            Expr::Call(ast::ExprCall {
+                func, arguments, ..
+            }) => {
+                // Ex) `class Foo(type(Protocol)): ...`
+                if arguments.len() == 1 && semantic.match_builtin_expr(func.as_ref(), "type") {
+                    return IsMetaclass::Maybe;
+                }
+            }
+            Expr::Subscript(ast::ExprSubscript { value, .. }) => {
+                // Ex) `class Foo(type[int]): ...`
+                if semantic.match_builtin_expr(value.as_ref(), "type") {
+                    return IsMetaclass::Yes;
+                }
+            }
+            _ => {
+                if semantic
+                    .resolve_qualified_name(expr)
+                    .is_some_and(|qualified_name| {
+                        matches!(
+                            qualified_name.segments(),
+                            ["" | "builtins", "type"]
+                                | ["abc", "ABCMeta"]
+                                | ["enum", "EnumMeta" | "EnumType"]
+                        )
+                    })
+                {
+                    return IsMetaclass::Yes;
+                }
+            }
         }
-        Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-            // Ex) `class Foo(type[int]): ...`
-            semantic.match_builtin_expr(value.as_ref(), "type")
-        }
-        _ => semantic
-            .resolve_qualified_name(expr)
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["" | "builtins", "type"]
-                        | ["abc", "ABCMeta"]
-                        | ["enum", "EnumMeta" | "EnumType"]
-                )
-            }),
-    });
-
-    match (is_base_class, maybe) {
-        (true, true) => IsMetaclass::Maybe,
-        (true, false) => IsMetaclass::Yes,
-        (false, _) => IsMetaclass::No,
     }
+
+    IsMetaclass::No
 }
