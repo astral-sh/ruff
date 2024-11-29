@@ -15,3 +15,8 @@ if pat4 := pat1:
 # also works for the `repl` argument in sub
 repl = "new"
 re.sub(r"abc", repl, haystack)
+
+
+# repl can also be identified in annoted function arguments
+def foo(input_str: str, repl: str):
+    re.sub("foobar", repl, input_str)
