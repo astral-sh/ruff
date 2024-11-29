@@ -5031,7 +5031,7 @@ mod tests {
 
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
+    use crate::python_version::{self, PythonVersion};
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
@@ -5041,10 +5041,11 @@ mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use test_case::test_case;
 
     use super::*;
 
-    fn setup_db() -> TestDb {
+    fn setup_db_with_python_version(python_version: PythonVersion) -> TestDb {
         let db = TestDb::new();
 
         let src_root = SystemPathBuf::from("/src");
@@ -5055,13 +5056,17 @@ mod tests {
         Program::from_settings(
             &db,
             &ProgramSettings {
-                target_version: PythonVersion::default(),
+                target_version: python_version,
                 search_paths: SearchPathSettings::new(src_root),
             },
         )
         .expect("Valid search path settings");
 
         db
+    }
+
+    fn setup_db() -> TestDb {
+        setup_db_with_python_version(PythonVersion::default())
     }
 
     fn setup_db_with_custom_typeshed<'a>(
@@ -5335,9 +5340,10 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn ellipsis_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
+    #[test_case(PythonVersion::PY39, "ellipsis")]
+    #[test_case(PythonVersion::PY310, "EllipsisType")]
+    fn ellipsis_type(version: PythonVersion, expected_type: &str) -> anyhow::Result<()> {
+        let mut db = setup_db_with_python_version(version);
 
         db.write_dedented(
             "src/a.py",
@@ -5346,7 +5352,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "EllipsisType");
+        assert_public_ty(&db, "src/a.py", "x", expected_type);
 
         Ok(())
     }

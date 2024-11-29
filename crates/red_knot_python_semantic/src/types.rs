@@ -1662,12 +1662,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
                 Type::Never
             }
-            _ => {
-                // if *self == Type::Never {
-                //     panic!();
-                // }
-                todo_type!()
-            }
+            _ => todo_type!(),
         }
     }
 
