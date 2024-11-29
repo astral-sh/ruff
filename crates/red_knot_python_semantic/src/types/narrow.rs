@@ -36,7 +36,7 @@ pub(crate) fn narrowing_constraint<'db>(
     db: &'db dyn Db,
     constraint: Constraint<'db>,
     definition: Definition<'db>,
-) -> Option<Type<'db>> {
+) -> Option<NarrowingType<'db>> {
     let constraints = match constraint.node {
         ConstraintNode::Expression(expression) => {
             if constraint.is_positive {
@@ -103,7 +103,174 @@ where
     }
 }
 
-type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, Type<'db>>;
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub(crate) enum NarrowingType<'db> {
+    Deferred(DeferredType),
+    Eager(Type<'db>),
+    Intersection(NarrowingIntersectionType<'db>),
+    Union(NarrowingUnionType<'db>),
+}
+
+impl<'db> NarrowingType<'db> {
+    /// A simplified version of `NarrowingIntersectionBuilder`.
+    ///
+    /// TODO: Further normalization needed (e.g., ignore if an identical `DeferredType` already exists).
+    fn intersection(
+        db: &'db dyn Db,
+        left: NarrowingType<'db>,
+        right: NarrowingType<'db>,
+    ) -> NarrowingType<'db> {
+        match (left, right) {
+            (NarrowingType::Deferred(deferred_left), NarrowingType::Deferred(deferred_right)) => {
+                deferred_left.intersection(db, deferred_right)
+            }
+            (NarrowingType::Eager(eager_left), NarrowingType::Eager(eager_right)) => {
+                NarrowingType::Eager(
+                    IntersectionBuilder::new(db)
+                        .add_positive(eager_left)
+                        .add_positive(eager_right)
+                        .build(),
+                )
+            }
+            (left, right) => NarrowingType::Intersection(NarrowingIntersectionType::new(
+                db,
+                Box::new([left, right]) as Box<[NarrowingType<'db>]>,
+            )),
+        }
+    }
+
+    /// A simplified version of `NarrowingUnionBuilder`.
+    ///
+    /// TODO: Further normalization needed (e.g., ignore if an identical `DeferredType` already exists).
+    fn union(
+        db: &'db dyn Db,
+        left: NarrowingType<'db>,
+        right: NarrowingType<'db>,
+    ) -> NarrowingType<'db> {
+        match (left, right) {
+            (NarrowingType::Deferred(deferred_left), NarrowingType::Deferred(deferred_right)) => {
+                deferred_left.union(db, deferred_right)
+            }
+            (NarrowingType::Eager(eager_left), NarrowingType::Eager(eager_right)) => {
+                NarrowingType::Eager(
+                    UnionBuilder::new(db)
+                        .add(eager_left)
+                        .add(eager_right)
+                        .build(),
+                )
+            }
+            (left, right) => NarrowingType::Union(NarrowingUnionType::new(
+                db,
+                Box::new([left, right]) as Box<[NarrowingType<'db>]>,
+            )),
+        }
+    }
+
+    pub(crate) fn evaluate(&self, db: &'db dyn Db, base_type: Type<'db>) -> Type<'db> {
+        match self {
+            NarrowingType::Deferred(deferred_type) => deferred_type.evaluate(db, base_type),
+            NarrowingType::Eager(ty) => *ty,
+            NarrowingType::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                for element in intersection.elements(db) {
+                    builder = builder.add_positive(element.evaluate(db, base_type));
+                }
+                builder.build()
+            }
+            NarrowingType::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+                for element in union.elements(db) {
+                    builder = builder.add(element.evaluate(db, base_type));
+                }
+                builder.build()
+            }
+        }
+    }
+}
+
+/// A collection of temporary types that can only be used during the narrowing phase.
+/// The sets in this enum must meet the following criteria:
+/// - Represent sets that are difficult to express with a single `Type`.
+/// - Ensure no information is lost during the process of building narrowing constraints.
+///
+/// These enums remain unevaluated during the narrowing constraint building phase
+/// and are eventually intersected with bindings at the final stage.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub(crate) enum DeferredType {
+    // Truthiness Sets
+    Truthy, // AlwaysTruthy + AmbiguousTruthiness
+    Falsy,  // AlwaysFalsy + AmbiguousTruthiness
+            // TODO?: EqualTo Sets
+            // EqualTo(Type<'db>) ? // AlwaysEqualTo(..) + AmbiguousEqualTo(..)
+            // NotEqualTo(Type<'db>)  ? // NeverEqualTo(..) + AmbiguousEqualTo(..)
+}
+
+impl DeferredType {
+    fn evaluate<'db>(self, db: &'db dyn Db, base_type: Type<'db>) -> Type<'db> {
+        match self {
+            DeferredType::Truthy => base_type.exclude_always_falsy(db),
+            DeferredType::Falsy => base_type.exclude_always_truthy(db),
+        }
+    }
+
+    fn intersection<'db>(self, db: &'db dyn Db, other: DeferredType) -> NarrowingType<'db> {
+        match (self, other) {
+            (DeferredType::Truthy, DeferredType::Truthy)
+            | (DeferredType::Falsy, DeferredType::Falsy) => NarrowingType::Deferred(self),
+            (DeferredType::Truthy, DeferredType::Falsy)
+            | (DeferredType::Falsy, DeferredType::Truthy) => {
+                // (Truthy & Falsy) is not an empty set.
+                // The result will be an AmbiguousTruthiness set,
+                // which includes mutable instances like (`list()`, `set()`),
+                // or instances with custom __bool__ implementations that return random results.
+                NarrowingType::Intersection(NarrowingIntersectionType::<'db>::new(
+                    db,
+                    Box::new([
+                        NarrowingType::Deferred(self),
+                        NarrowingType::Deferred(other),
+                    ]) as Box<[NarrowingType<'db>]>,
+                ))
+            }
+        }
+    }
+
+    fn union(self, db: &'_ dyn Db, other: DeferredType) -> NarrowingType<'_> {
+        match (self, other) {
+            (DeferredType::Truthy, DeferredType::Truthy)
+            | (DeferredType::Falsy, DeferredType::Falsy) => NarrowingType::Deferred(self),
+            (DeferredType::Truthy, DeferredType::Falsy)
+            | (DeferredType::Falsy, DeferredType::Truthy) => {
+                NarrowingType::Eager(KnownClass::Object.to_instance(db))
+            }
+        }
+    }
+}
+
+#[salsa::interned]
+pub(crate) struct NarrowingIntersectionType<'db> {
+    #[return_ref]
+    elements_boxed: Box<[NarrowingType<'db>]>,
+}
+
+impl<'db> NarrowingIntersectionType<'db> {
+    fn elements(self, db: &'db dyn Db) -> &'db [NarrowingType<'db>] {
+        self.elements_boxed(db)
+    }
+}
+
+#[salsa::interned]
+pub(crate) struct NarrowingUnionType<'db> {
+    #[return_ref]
+    elements_boxed: Box<[NarrowingType<'db>]>,
+}
+
+impl<'db> NarrowingUnionType<'db> {
+    fn elements(self, db: &'db dyn Db) -> &'db [NarrowingType<'db>] {
+        self.elements_boxed(db)
+    }
+}
+
+type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, NarrowingType<'db>>;
 
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
@@ -113,10 +280,7 @@ fn merge_constraints_and<'db>(
     for (key, value) in from {
         match into.entry(key) {
             Entry::Occupied(mut entry) => {
-                *entry.get_mut() = IntersectionBuilder::new(db)
-                    .add_positive(*entry.get())
-                    .add_positive(value)
-                    .build();
+                *entry.get_mut() = NarrowingType::intersection(db, *entry.get(), value);
             }
             Entry::Vacant(entry) => {
                 entry.insert(value);
@@ -133,16 +297,16 @@ fn merge_constraints_or<'db>(
     for (key, value) in from {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
-                *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
+                *entry.get_mut() = NarrowingType::union(db, *entry.get(), *value);
             }
             Entry::Vacant(entry) => {
-                entry.insert(KnownClass::Object.to_instance(db));
+                entry.insert(NarrowingType::Eager(KnownClass::Object.to_instance(db)));
             }
         }
     }
     for (key, value) in into.iter_mut() {
         if !from.contains_key(key) {
-            *value = KnownClass::Object.to_instance(db);
+            *value = NarrowingType::Eager(KnownClass::Object.to_instance(db));
         }
     }
 }
@@ -193,6 +357,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
+            ast::Expr::Name(name) => Some(self.evaluate_expr_name(name, is_positive)),
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
             }
@@ -249,6 +414,28 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             ConstraintNode::Expression(expression) => expression.scope(self.db),
             ConstraintNode::Pattern(pattern) => pattern.scope(self.db),
         }
+    }
+
+    fn evaluate_expr_name(
+        &mut self,
+        expr_name: &ast::ExprName,
+        is_positive: bool,
+    ) -> NarrowingConstraints<'db> {
+        let ast::ExprName { id, .. } = expr_name;
+
+        let symbol = self
+            .symbols()
+            .symbol_id_by_name(id)
+            .expect("Should always have a symbol for every Name node");
+        let mut constraints = NarrowingConstraints::default();
+
+        if is_positive {
+            constraints.insert(symbol, NarrowingType::Deferred(DeferredType::Truthy));
+        } else {
+            constraints.insert(symbol, NarrowingType::Deferred(DeferredType::Falsy));
+        }
+
+        constraints
     }
 
     fn evaluate_expr_compare(
@@ -311,20 +498,20 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                                 let ty = IntersectionBuilder::new(self.db)
                                     .add_negative(rhs_ty)
                                     .build();
-                                constraints.insert(symbol, ty);
+                                constraints.insert(symbol, NarrowingType::Eager(ty));
                             } else {
                                 // Non-singletons cannot be safely narrowed using `is not`
                             }
                         }
                         ast::CmpOp::Is => {
-                            constraints.insert(symbol, rhs_ty);
+                            constraints.insert(symbol, NarrowingType::Eager(rhs_ty));
                         }
                         ast::CmpOp::NotEq => {
                             if rhs_ty.is_single_valued(self.db) {
                                 let ty = IntersectionBuilder::new(self.db)
                                     .add_negative(rhs_ty)
                                     .build();
-                                constraints.insert(symbol, ty);
+                                constraints.insert(symbol, NarrowingType::Eager(ty));
                             }
                         }
                         _ => {
@@ -367,7 +554,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             .symbols()
                             .symbol_id_by_name(id)
                             .expect("Should always have a symbol for every Name node");
-                        constraints.insert(symbol, rhs_ty.to_instance(self.db));
+                        constraints
+                            .insert(symbol, NarrowingType::Eager(rhs_ty.to_instance(self.db)));
                     }
                 }
                 _ => {}
@@ -418,7 +606,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
                         |constraint| {
                             let mut constraints = NarrowingConstraints::default();
-                            constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
+                            constraints.insert(
+                                symbol,
+                                NarrowingType::Eager(constraint.negate_if(self.db, !is_positive)),
+                            );
                             constraints
                         },
                     )
@@ -445,7 +636,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 ast::Singleton::False => Type::BooleanLiteral(false),
             };
             let mut constraints = NarrowingConstraints::default();
-            constraints.insert(symbol, ty);
+            constraints.insert(symbol, NarrowingType::Eager(ty));
             Some(constraints)
         } else {
             None
