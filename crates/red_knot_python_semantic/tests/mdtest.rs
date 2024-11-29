@@ -17,10 +17,9 @@ fn test_name(test_func_name: &str, fixture_path: &Path) -> String {
     let mut test_name = test_func_name.to_owned();
     test_name.push_str("__");
 
-    let components: Vec<_> = rel_path.iter().collect();
-
-    for component in &components[0..components.len() - 1] {
+    for component in rel_path.parent().unwrap().components() {
         let component = component
+            .as_os_str()
             .to_string_lossy()
             .replace(|c: char| c.is_ascii_punctuation(), "_");
         test_name.push_str(&component);
