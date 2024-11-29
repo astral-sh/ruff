@@ -401,7 +401,7 @@ pub(super) struct DeclarationIdIterator<'a> {
     inner: DeclarationsIterator<'a>,
 }
 
-impl<'a> Iterator for DeclarationIdIterator<'a> {
+impl Iterator for DeclarationIdIterator<'_> {
     type Item = ScopedDefinitionId;
 
     fn next(&mut self) -> Option<Self::Item> {

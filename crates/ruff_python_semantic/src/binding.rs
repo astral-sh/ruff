@@ -446,7 +446,7 @@ impl<'a> Deref for Bindings<'a> {
     }
 }
 
-impl<'a> DerefMut for Bindings<'a> {
+impl DerefMut for Bindings<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -749,7 +749,7 @@ pub enum AnyImport<'a, 'ast> {
     FromImport(&'a FromImport<'ast>),
 }
 
-impl<'a, 'ast> Imported<'ast> for AnyImport<'a, 'ast> {
+impl<'ast> Imported<'ast> for AnyImport<'_, 'ast> {
     fn qualified_name(&self) -> &QualifiedName<'ast> {
         match self {
             Self::Import(import) => import.qualified_name(),

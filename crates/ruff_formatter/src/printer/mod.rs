@@ -905,7 +905,7 @@ struct PrinterState<'a> {
     fits_queue: Vec<std::slice::Iter<'a, FormatElement>>,
 }
 
-impl<'a> PrinterState<'a> {
+impl PrinterState<'_> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             buffer: String::with_capacity(capacity),
@@ -1049,7 +1049,7 @@ struct FitsMeasurer<'a, 'print> {
     bomb: DebugDropBomb,
 }
 
-impl<'a, 'print> FitsMeasurer<'a, 'print> {}
+impl FitsMeasurer<'_, '_> {}
 
 impl<'a, 'print> FitsMeasurer<'a, 'print> {
     fn new_flat(

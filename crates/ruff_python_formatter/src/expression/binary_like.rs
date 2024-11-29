@@ -881,7 +881,7 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let expression = self.expression();
 
-        return if is_expression_parenthesized(
+        if is_expression_parenthesized(
             expression.into(),
             f.context().comments().ranges(),
             f.context().source(),
@@ -1017,7 +1017,7 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
             Ok(())
         } else {
             expression.format().with_options(Parentheses::Never).fmt(f)
-        };
+        }
     }
 }
 

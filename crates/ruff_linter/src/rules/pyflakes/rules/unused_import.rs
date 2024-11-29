@@ -462,7 +462,7 @@ struct ImportBinding<'a> {
     parent_range: Option<TextRange>,
 }
 
-impl<'a> ImportBinding<'a> {
+impl ImportBinding<'_> {
     /// The symbol that is stored in the outer scope as a result of this import.
     ///
     /// For example:

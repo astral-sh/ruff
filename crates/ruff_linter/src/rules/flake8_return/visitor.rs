@@ -59,7 +59,7 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
     }
 }
 
-impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
+impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. }) => {

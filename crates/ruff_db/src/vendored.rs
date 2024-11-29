@@ -270,7 +270,7 @@ impl VendoredZipArchive {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct NormalizedVendoredPath<'a>(Cow<'a, str>);
 
-impl<'a> NormalizedVendoredPath<'a> {
+impl NormalizedVendoredPath<'_> {
     fn with_trailing_slash(self) -> Self {
         debug_assert!(!self.0.ends_with('/'));
         let mut data = self.0.into_owned();

@@ -149,7 +149,7 @@ fn is_same_expr(left: &Expr, right: &Expr) -> bool {
 
 /// Collect all named variables in an expression consisting solely of tuples and
 /// names.
-fn collect_names<'a>(expr: &'a Expr) -> Box<dyn Iterator<Item = &ast::ExprName> + 'a> {
+fn collect_names<'a>(expr: &'a Expr) -> Box<dyn Iterator<Item = &'a ast::ExprName> + 'a> {
     Box::new(
         expr.as_name_expr().into_iter().chain(
             expr.as_tuple_expr()

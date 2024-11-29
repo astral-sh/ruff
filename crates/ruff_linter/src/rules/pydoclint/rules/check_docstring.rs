@@ -878,7 +878,7 @@ pub(crate) fn check_docstring(
         {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
-                if body_entries.returns.first().is_some() {
+                if !body_entries.returns.is_empty() {
                     match function_def.returns.as_deref() {
                         Some(returns) => {
                             // Ignore it if it's annotated as returning `None`
@@ -915,7 +915,7 @@ pub(crate) fn check_docstring(
     // DOC402
     if checker.enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
-            if body_entries.yields.first().is_some() {
+            if !body_entries.yields.is_empty() {
                 match function_def.returns.as_deref() {
                     Some(returns)
                         if !generator_annotation_arguments(returns, semantic).is_some_and(

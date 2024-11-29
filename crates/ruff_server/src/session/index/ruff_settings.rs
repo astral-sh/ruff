@@ -334,7 +334,7 @@ impl RuffSettingsIndex {
 
 struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
 
-impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
+impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
     fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
         let ResolvedEditorSettings {
             configuration,
