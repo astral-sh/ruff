@@ -527,7 +527,6 @@ impl<'db> Type<'db> {
     pub const fn into_int_literal(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),
-            Type::BooleanLiteral(value) => Some(if value { 1 } else { 0 }),
             _ => None,
         }
     }
@@ -549,22 +548,6 @@ impl<'db> Type<'db> {
     pub fn expect_known_instance(self) -> KnownInstanceType<'db> {
         self.into_known_instance()
             .expect("Expected a Type::KnownInstance variant")
-    }
-
-    pub fn as_int_literal(&self) -> Option<Type<'db>> {
-        match self {
-            int_literal @ Type::IntLiteral(_) => Some(*int_literal),
-            Type::BooleanLiteral(value) => Some(Type::IntLiteral(i64::from(*value))),
-            _ => None,
-        }
-    }
-
-    /// Returns the result of [`Type::as_int_literal`] if that value is not negative.
-    pub fn as_len_int_literal(&self) -> Option<Type<'db>> {
-        self.as_int_literal().take_if(|it| match it {
-            Type::IntLiteral(value) => *value >= 0,
-            _ => false,
-        })
     }
 
     pub const fn is_boolean_literal(&self) -> bool {
@@ -1362,6 +1345,22 @@ impl<'db> Type<'db> {
     /// This is used to determine the value that would be returned
     /// when `len(x)` is called on an object `x`.
     fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+            match ty {
+                // TODO: Emit diagnostic for negative integers
+                Type::IntLiteral(value) => (value >= 0).then_some(ty),
+                Type::BooleanLiteral(value) => Some(Type::IntLiteral(value.into())),
+                Type::Union(union) => {
+                    let mut builder = UnionBuilder::new(db);
+                    for element in union.elements(db) {
+                        builder = builder.add(non_negative_int_literal(db, *element)?);
+                    }
+                    Some(builder.build())
+                }
+                _ => None,
+            }
+        }
+
         let usize_len = match self {
             Type::BytesLiteral(bytes) => Some(bytes.len(db)),
             Type::StringLiteral(string) => Some(string.python_len(db)),
@@ -1380,21 +1379,7 @@ impl<'db> Type<'db> {
             }
         };
 
-        let Type::Union(union) = return_ty else {
-            return return_ty.as_len_int_literal();
-        };
-
-        let converted = union
-            .elements(db)
-            .iter()
-            .map(|e| e.as_len_int_literal().unwrap_or(Type::Unknown))
-            .collect::<Vec<_>>();
-
-        if converted.iter().any(|e| matches!(e, Type::Unknown)) {
-            return None;
-        }
-
-        Some(UnionType::from_elements(db, converted))
+        non_negative_int_literal(db, return_ty)
     }
 
     /// Return the outcome of calling an object of this type.
