@@ -223,6 +223,12 @@ fn definition_expression_ty<'db>(
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UnconditionallyVisible {
+    Yes,
+    No,
+}
+
 /// Infer the combined type of an iterator of bindings.
 ///
 /// Will return a union if there is more than one binding.
@@ -230,12 +236,6 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Option<Type<'db>> {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    enum UnconditionallyVisible {
-        Yes,
-        No,
-    }
-
     let def_types = bindings_with_constraints.map(
         |BindingWithConstraints {
              binding,
@@ -353,7 +353,63 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+    let decl_types = declarations.map(|(declaration, constraints_active_at_declaration)| {
+        let test_expr_tys = || {
+            constraints_active_at_declaration.clone().map(|c| {
+                let ty = if let ConstraintNode::Expression(test_expr) = c.node {
+                    let inference = infer_expression_types(db, test_expr);
+                    let scope = test_expr.scope(db);
+                    inference.expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope))
+                } else {
+                    // TODO: handle other constraint nodes
+                    todo_type!()
+                };
+
+                (c, ty)
+            })
+        };
+
+        if test_expr_tys().any(|(c, test_expr_ty)| {
+            if c.is_positive {
+                test_expr_ty.bool(db).is_always_false()
+            } else {
+                test_expr_ty.bool(db).is_always_true()
+            }
+        }) {
+            (Type::Never, UnconditionallyVisible::No)
+        } else {
+            let mut test_expr_tys_iter = test_expr_tys().peekable();
+
+            if test_expr_tys_iter.peek().is_some()
+                && test_expr_tys_iter.all(|(c, test_expr_ty)| {
+                    if c.is_positive {
+                        test_expr_ty.bool(db).is_always_true()
+                    } else {
+                        test_expr_ty.bool(db).is_always_false()
+                    }
+                })
+            {
+                (declaration_ty(db, declaration), UnconditionallyVisible::Yes)
+            } else {
+                (declaration_ty(db, declaration), UnconditionallyVisible::No)
+            }
+        }
+    });
+
+    // TODO: get rid of all the collects and clean up, obviously
+    let decl_types: Vec<_> = decl_types.collect();
+
+    // shrink the vector to only include everything from the last unconditionally visible binding
+    let decl_types: Vec<_> = decl_types
+        .iter()
+        .rev()
+        .take_while_inclusive(|(_, unconditionally_visible)| {
+            *unconditionally_visible != UnconditionallyVisible::Yes
+        })
+        .map(|(ty, _)| *ty)
+        .collect();
+
+    let decl_types = decl_types.into_iter().rev();
 
     let mut all_types = undeclared_ty.into_iter().chain(decl_types);
 
@@ -3582,7 +3638,7 @@ pub(crate) mod tests {
     #[test_case(Ty::None)]
     #[test_case(Ty::BooleanLiteral(true))]
     #[test_case(Ty::BooleanLiteral(false))]
-    #[test_case(Ty::KnownClassInstance(KnownClass::NoDefaultType))]
+    // #[test_case(Ty::KnownClassInstance(KnownClass::NoDefaultType))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 

@@ -1235,11 +1235,10 @@ match 1:
     fn if_statement() {
         let TestCase { db, file } = test_case(
             "
-x = 1 if flag else \"a\"
+x = False
 
-_ = ... if isinstance(x, str) else ...
-
-x
+if True:
+    x: bool
 ",
         );
 

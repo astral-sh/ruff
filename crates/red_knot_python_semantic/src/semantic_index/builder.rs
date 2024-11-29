@@ -211,10 +211,9 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn flow_merge(&mut self, state: FlowSnapshot, active_constraints: ActiveConstraintsSnapshot) {
+        self.current_use_def_map_mut().merge(state);
         self.current_use_def_map_mut()
-            .merge(state, active_constraints.clone());
-        self.current_use_def_map_mut()
-            .restore_constraints(active_constraints); // TODO: is this also needed?
+            .restore_constraints(active_constraints);
     }
 
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {

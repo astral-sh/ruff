@@ -207,6 +207,64 @@ reveal_type(x)  # revealed: Literal[1]
 reveal_type(x)  # revealed: Literal[2]
 ```
 
+## Conditional declarations
+
+```py path=if_false.py
+x: str
+
+if False:
+    x: int
+
+def f() -> None:
+    reveal_type(x)  # revealed: str
+```
+
+```py path=if_true_else.py
+x: str
+
+if True:
+    pass
+else:
+    x: int
+
+def f() -> None:
+    reveal_type(x)  # revealed: str
+```
+
+```py path=if_true.py
+x: str
+
+if True:
+    x: int
+
+def f() -> None:
+    reveal_type(x)  # revealed: int
+```
+
+```py path=if_false_else.py
+x: str
+
+if False:
+    pass
+else:
+    x: int
+
+def f() -> None:
+    reveal_type(x)  # revealed: int
+```
+
+```py path=if_bool.py
+def flag() -> bool: ...
+
+x: str
+
+if flag():
+    x: int
+
+def f() -> None:
+    reveal_type(x)  # revealed: str | int
+```
+
 ## Conditionally defined functions
 
 ```py
@@ -232,13 +290,12 @@ class C:
     else:
         x: str = "a"
 
-# TODO
-reveal_type(C.x)  # revealed: int | str
+reveal_type(C.x)  # revealed: int
 ```
 
 ## TODO
 
-- declarations vs bindings => NoDefault: \_NoDefaultType
+- declarations vs bindings => NoDefault: NoDefaultType
 - conditional imports
 - conditional class definitions
 - compare with tests in if.md=>Statically known branches

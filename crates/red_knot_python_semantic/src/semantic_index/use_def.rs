@@ -361,7 +361,7 @@ impl<'db> UseDefMap<'db> {
             }
 
             println!("  * Declarations:");
-            for declaration in symbol.declarations().iter() {
+            for (declaration, _) in symbol.declarations().iter() {
                 let definition = self.all_definitions[declaration];
                 println!("    {:?}", definition);
             }
@@ -457,6 +457,7 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'a, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
+            all_constraints: &self.all_constraints,
             inner: declarations.iter(),
             may_be_undeclared: declarations.may_be_undeclared(),
         }
@@ -525,6 +526,7 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
+    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     inner: DeclarationIdIterator<'map>,
     may_be_undeclared: bool,
 }
@@ -536,10 +538,18 @@ impl DeclarationsIterator<'_, '_> {
 }
 
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
-    type Item = Definition<'db>;
+    type Item = (Definition<'db>, ConstraintsIterator<'map, 'db>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|def_id| self.all_definitions[def_id])
+        self.inner.next().map(|(def_id, constraints)| {
+            (
+                self.all_definitions[def_id],
+                ConstraintsIterator {
+                    all_constraints: self.all_constraints,
+                    constraint_ids: constraints,
+                },
+            )
+        })
     }
 }
 
@@ -609,7 +619,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declaration,
             SymbolDefinitions::Bindings(symbol_state.bindings().clone()),
         );
-        symbol_state.record_declaration(def_id);
+        symbol_state.record_declaration(def_id, &self.active_constraints);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -620,7 +630,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store anything in self.definitions_by_definition.
         let def_id = self.all_definitions.push(definition);
         let symbol_state = &mut self.symbol_states[symbol];
-        symbol_state.record_declaration(def_id);
+        symbol_state.record_declaration(def_id, &self.active_constraints);
         symbol_state.record_binding(def_id, &self.active_constraints);
     }
 
@@ -669,11 +679,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new state for each symbol should include definitions from both the
     /// prior state and the snapshot.
-    pub(super) fn merge(
-        &mut self,
-        snapshot: FlowSnapshot,
-        active_constraints: ActiveConstraintsSnapshot,
-    ) {
+    pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
         // IDs must line up), so the current number of known symbols must always be equal to or
         // greater than the number of known symbols in a previously-taken snapshot.
@@ -682,7 +688,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.merge(snapshot, active_constraints.clone());
+                current.merge(snapshot);
             } else {
                 // Symbol not present in snapshot, so it's unbound/undeclared from that path.
                 current.set_may_be_unbound();
