@@ -126,7 +126,7 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if analyze::class::is_metaclass(class_def, semantic) {
+    if analyze::class::is_metaclass(class_def, semantic).into() {
         return;
     }
 
