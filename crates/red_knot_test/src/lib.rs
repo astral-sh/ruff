@@ -21,7 +21,7 @@ const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &Path, long_title: &str, short_title: &str) {
+pub fn run(path: &Path, long_title: &str, short_title: &str, test_name: &str) {
     let source = std::fs::read_to_string(path).unwrap();
     let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
@@ -67,7 +67,7 @@ pub fn run(path: &Path, long_title: &str, short_title: &str) {
                 test.name()
             );
             println!(
-                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest",
+                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
                 test.name()
             );
         }
