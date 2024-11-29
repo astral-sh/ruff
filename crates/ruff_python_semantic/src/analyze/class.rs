@@ -121,6 +121,7 @@ pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -
     })
 }
 
+/// Whether or not a class is a metaclass. Constructed by [`is_metaclass`].
 pub enum IsMetaclass {
     Yes,
     No,
@@ -133,7 +134,9 @@ impl From<IsMetaclass> for bool {
     }
 }
 
-/// Returns `true` if the given class is a metaclass.
+/// Returns `IsMetaclass::Yes` if the given class is definitely a metaclass,
+/// `IsMetaclass::No` if it's definitely *not* a metaclass, and
+/// `IsMetaclass::Maybe` otherwise.
 pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
     let mut maybe = false;
     let is_base_class = any_base_class(class_def, semantic, &mut |expr| match expr {
