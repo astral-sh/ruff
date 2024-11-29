@@ -76,11 +76,9 @@ pub(crate) fn get_section_contexts<'a>(
 ) -> SectionContexts<'a> {
     match convention {
         Some(Convention::Google) => {
-            return SectionContexts::from_docstring(docstring, SectionStyle::Google);
+            SectionContexts::from_docstring(docstring, SectionStyle::Google)
         }
-        Some(Convention::Numpy) => {
-            return SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
-        }
+        Some(Convention::Numpy) => SectionContexts::from_docstring(docstring, SectionStyle::Numpy),
         Some(Convention::Pep257) | None => {
             // There are some overlapping section names, between the Google and NumPy conventions
             // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the

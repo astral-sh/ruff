@@ -1,3 +1,5 @@
+#![allow(clippy::ref_option)]
+
 use crate::db::Db;
 use crate::db::RootDatabase;
 use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};

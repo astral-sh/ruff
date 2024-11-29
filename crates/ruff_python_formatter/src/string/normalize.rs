@@ -778,7 +778,7 @@ impl<'str> CharIndicesWithOffset<'str> {
     }
 }
 
-impl<'str> Iterator for CharIndicesWithOffset<'str> {
+impl Iterator for CharIndicesWithOffset<'_> {
     type Item = (usize, char);
 
     fn next(&mut self) -> Option<Self::Item> {

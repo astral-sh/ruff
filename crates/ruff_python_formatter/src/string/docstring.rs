@@ -267,7 +267,7 @@ struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     code_example: CodeExample<'src>,
 }
 
-impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
+impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
     /// Print all of the lines in the given iterator to this
     /// printer's formatter.
     ///
@@ -665,7 +665,7 @@ struct OutputDocstringLine<'src> {
     is_last: bool,
 }
 
-impl<'src> OutputDocstringLine<'src> {
+impl OutputDocstringLine<'_> {
     /// Return this reformatted line, but with the given function applied to
     /// the text of the line.
     fn map(self, mut map: impl FnMut(&str) -> String) -> OutputDocstringLine<'static> {
@@ -1026,7 +1026,7 @@ impl<'src> CodeExampleRst<'src> {
     ///
     /// [literal block]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
     /// [code block directive]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
-    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleRst> {
+    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleRst<'src>> {
         let (opening_indent, rest) = indent_with_suffix(original.line);
         if rest.starts_with(".. ") {
             if let Some(litblock) = CodeExampleRst::new_code_block(original) {
@@ -1061,7 +1061,7 @@ impl<'src> CodeExampleRst<'src> {
     /// Attempts to create a new reStructuredText code example from a
     /// `code-block` or `sourcecode` directive. If one couldn't be found, then
     /// `None` is returned.
-    fn new_code_block(original: InputDocstringLine<'src>) -> Option<CodeExampleRst> {
+    fn new_code_block(original: InputDocstringLine<'src>) -> Option<CodeExampleRst<'src>> {
         // This regex attempts to parse the start of a reStructuredText code
         // block [directive]. From the reStructuredText spec:
         //

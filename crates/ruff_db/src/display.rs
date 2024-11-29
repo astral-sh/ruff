@@ -22,7 +22,7 @@ pub struct Join<'a, 'b> {
     seen_first: bool,
 }
 
-impl<'a, 'b> Join<'a, 'b> {
+impl Join<'_, '_> {
     pub fn entry(&mut self, item: &dyn Display) -> &mut Self {
         if self.seen_first {
             self.result = self

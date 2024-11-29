@@ -227,7 +227,7 @@ impl Display for Code<'_> {
     }
 }
 
-impl<'a> Ranged for Code<'a> {
+impl Ranged for Code<'_> {
     /// The range of the rule code.
     fn range(&self) -> TextRange {
         self.range
@@ -240,7 +240,7 @@ pub(crate) struct Codes<'a> {
     codes: Vec<Code<'a>>,
 }
 
-impl<'a> Codes<'a> {
+impl Codes<'_> {
     /// Returns an iterator over the [`Code`]s in the `noqa` directive.
     pub(crate) fn iter(&self) -> std::slice::Iter<Code> {
         self.codes.iter()
@@ -287,7 +287,7 @@ pub(crate) enum FileExemption<'a> {
     Codes(Vec<&'a NoqaCode>),
 }
 
-impl<'a> FileExemption<'a> {
+impl FileExemption<'_> {
     /// Returns `true` if the file is exempt from the given rule.
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         let needle = needle.noqa_code();
@@ -817,7 +817,7 @@ struct NoqaEdit<'a> {
     line_ending: LineEnding,
 }
 
-impl<'a> NoqaEdit<'a> {
+impl NoqaEdit<'_> {
     fn into_edit(self) -> Edit {
         let mut edit_content = String::new();
         self.write(&mut edit_content);
@@ -849,7 +849,7 @@ impl<'a> NoqaEdit<'a> {
     }
 }
 
-impl<'a> Ranged for NoqaEdit<'a> {
+impl Ranged for NoqaEdit<'_> {
     fn range(&self) -> TextRange {
         self.edit_range
     }

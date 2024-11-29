@@ -315,7 +315,7 @@ enum DisplayKind<'a> {
     Dict { items: &'a [ast::DictItem] },
 }
 
-impl<'a> DisplayKind<'a> {
+impl DisplayKind<'_> {
     const fn is_set_literal(self) -> bool {
         matches!(self, Self::Sequence(SequenceKind::Set))
     }

@@ -209,7 +209,7 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
 
         struct AnyNameImportsVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for AnyNameImportsVisitor {
+        impl serde::de::Visitor<'_> for AnyNameImportsVisitor {
             type Value = NameImports;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

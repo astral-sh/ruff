@@ -133,9 +133,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         // ```
         // In all other cases comments get assigned to a list element
         match elts.as_slice() {
-            [] => {
-                return empty_parenthesized("(", dangling, ")").fmt(f);
-            }
+            [] => empty_parenthesized("(", dangling, ")").fmt(f),
             [single] => match self.parentheses {
                 TupleParentheses::Preserve if !is_parenthesized => {
                     single.format().fmt(f)?;
