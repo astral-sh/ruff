@@ -2,6 +2,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr, Int};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -68,6 +69,10 @@ pub(crate) fn nunique_constant_series_check(
     ops: &[CmpOp],
     comparators: &[Expr],
 ) {
+    if !checker.semantic().seen_module(Modules::PANDAS) {
+        return;
+    }
+
     let ([op], [right]) = (ops, comparators) else {
         return;
     };
