@@ -31,12 +31,9 @@ fn iter_base_classes<'a>(
         exprs: &mut Vec<&'a Expr>,
     ) {
         for expr in class_def.bases() {
-            // If the base class itself matches the pattern, then this does too.
-            // Ex) `class Foo(BaseModel): ...`
+            // Include `expr` itself.
             exprs.push(expr);
-
-            // If the base class extends a class that matches the pattern, then this does too.
-            // Ex) `class Bar(BaseModel): ...; class Foo(Bar): ...`
+            // Then recurse into its base classes.
             if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
                 if seen.insert(id) {
                     let binding = semantic.binding(id);
