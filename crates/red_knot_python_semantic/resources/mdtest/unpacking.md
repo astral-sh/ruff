@@ -34,7 +34,7 @@ reveal_type(d)  # revealed: Literal[4]
 
 ```py
 a, b = c = 1, 2
-reveal_type(a)  # revealed: Literal[14]
+reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
 reveal_type(c)  # revealed: tuple[Literal[1], Literal[2]]
 ```
