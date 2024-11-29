@@ -300,3 +300,4 @@ reveal_type(C.x)  # revealed: int
 - conditional class definitions
 - compare with tests in if.md=>Statically known branches
 - boundness
+    - TODO in `issubclass.md`
