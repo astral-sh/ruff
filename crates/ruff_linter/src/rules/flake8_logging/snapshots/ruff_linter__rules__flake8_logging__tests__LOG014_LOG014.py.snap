@@ -1,0 +1,134 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
+snapshot_kind: text
+---
+LOG014.py:8:1: LOG014 Use of `exc_info` outside an exception handler
+  |
+6 | logging.exception("foo", exc_info=False)  # OK
+7 | logging.exception("foo", exc_info=[])  # OK
+8 | logging.exception("foo", exc_info=True)  # LOG014
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+9 | logging.exception("foo", exc_info=[1])  # LOG014
+  |
+
+LOG014.py:9:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+ 7 | logging.exception("foo", exc_info=[])  # OK
+ 8 | logging.exception("foo", exc_info=True)  # LOG014
+ 9 | logging.exception("foo", exc_info=[1])  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+10 | 
+11 | logging.error("foo", exc_info=False)  # OK
+   |
+
+LOG014.py:12:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+11 | logging.error("foo", exc_info=False)  # OK
+12 | logging.error("foo", exc_info=True)  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+13 | 
+14 | logging.info("foo", exc_info=False)  # OK
+   |
+
+LOG014.py:15:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+14 | logging.info("foo", exc_info=False)  # OK
+15 | logging.info("foo", exc_info=True)  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+16 | 
+17 | try:
+   |
+
+LOG014.py:39:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+37 | logger.exception("foo", exc_info=False)  # OK
+38 | logger.exception("foo", exc_info=[])  # OK
+39 | logger.exception("foo", exc_info=True)  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+40 | logger.exception("foo", exc_info=[1])  # LOG014
+   |
+
+LOG014.py:40:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+38 | logger.exception("foo", exc_info=[])  # OK
+39 | logger.exception("foo", exc_info=True)  # LOG014
+40 | logger.exception("foo", exc_info=[1])  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+41 | 
+42 | logger.error("foo", exc_info=False)  # OK
+   |
+
+LOG014.py:43:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+42 | logger.error("foo", exc_info=False)  # OK
+43 | logger.error("foo", exc_info=True)  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+44 | 
+45 | logger.info("foo", exc_info=False)  # OK
+   |
+
+LOG014.py:46:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+45 | logger.info("foo", exc_info=False)  # OK
+46 | logger.info("foo", exc_info=True)  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+47 | 
+48 | try:
+   |
+
+LOG014.py:70:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+68 | exception("foo", exc_info=False)  # OK
+69 | exception("foo", exc_info=[])  # OK
+70 | exception("foo", exc_info=True)  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+71 | exception("foo", exc_info=[1])  # LOG014
+   |
+
+LOG014.py:71:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+69 | exception("foo", exc_info=[])  # OK
+70 | exception("foo", exc_info=True)  # LOG014
+71 | exception("foo", exc_info=[1])  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+72 | 
+73 | error("foo", exc_info=False)  # OK
+   |
+
+LOG014.py:74:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+73 | error("foo", exc_info=False)  # OK
+74 | error("foo", exc_info=True)  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+75 | 
+76 | info("foo", exc_info=False)  # OK
+   |
+
+LOG014.py:77:1: LOG014 Use of `exc_info` outside an exception handler
+   |
+76 | info("foo", exc_info=False)  # OK
+77 | info("foo", exc_info=True)  # LOG014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+78 | 
+79 | try:
+   |
+
+LOG014.py:139:9: LOG014 Use of `exc_info` outside an exception handler
+    |
+137 | def apple_2():
+138 |     def banana():
+139 |         logging.exception("foo", exc_info=True)  # LOG014
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+140 | 
+141 |     try:
+    |
+
+LOG014.py:149:9: LOG014 Use of `exc_info` outside an exception handler
+    |
+147 | def apple_3():
+148 |     def banana():
+149 |         logging.exception("foo", exc_info=True)  # LOG014
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG014
+150 | 
+151 |     try:
+    |

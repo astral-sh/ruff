@@ -4,6 +4,7 @@ use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_logging::helpers;
 
 /// ## What it does
 /// Checks for usages of the following `logging` top-level functions:
@@ -56,7 +57,7 @@ pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
     };
 
     let attr = match qualified_name.segments() {
-        ["logging", attr] if is_logger_method_name(attr) => attr,
+        ["logging", attr] if helpers::is_logger_method_name(attr) => attr,
         _ => return,
     };
 
@@ -66,12 +67,4 @@ pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
     let diagnostic = Diagnostic::new(kind, call.range);
 
     checker.diagnostics.push(diagnostic);
-}
-
-#[inline]
-fn is_logger_method_name(attr: &str) -> bool {
-    matches!(
-        attr,
-        "debug" | "info" | "warn" | "warning" | "error" | "critical" | "log" | "exception"
-    )
 }
