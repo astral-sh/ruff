@@ -15,7 +15,7 @@ mod diagnostic;
 mod matcher;
 mod parser;
 
-const MDTEST_FILE_FILTER: &str = "MDTEST_FILE_FILTER";
+const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 
 /// Run `path` as a markdown test suite with given `title`.
 ///
@@ -32,7 +32,7 @@ pub fn run(path: &Path, long_title: &str, short_title: &str) {
 
     let mut db = db::Db::setup(SystemPathBuf::from("/src"));
 
-    let filter = std::env::var(MDTEST_FILE_FILTER).ok();
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
         if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
@@ -63,11 +63,11 @@ pub fn run(path: &Path, long_title: &str, short_title: &str) {
             }
 
             println!(
-                "\nTo rerun this specific test, add the environment variable: {MDTEST_FILE_FILTER}=\"{}\"",
+                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}=\"{}\"",
                 test.name()
             );
             println!(
-                "{MDTEST_FILE_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest",
+                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest",
                 test.name()
             );
         }

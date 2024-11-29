@@ -184,8 +184,11 @@ The tests are run independently, in independent in-memory file systems and with 
 [Salsa](https://github.com/salsa-rs/salsa) databases. This means that each is a from-scratch run of
 the type checker, with no data persisting from any previous test.
 
-Due to `cargo test` limitations, an entire test suite (Markdown file) is run as a single Rust test,
-so it's not possible to select individual tests within it to run.
+It is possible to filter to individual tests within a single markdown file using the
+`MDTEST_TEST_FILTER` environment variable. This variable will match any tests which contain the
+value as a case-sensitive substring in its name. An example test name is
+`unpacking.md - Unpacking - Tuple - Multiple assignment`, which contains the name of the markdown
+file and its parent headers joined together with hyphens.
 
 ## Structured test suites
 
