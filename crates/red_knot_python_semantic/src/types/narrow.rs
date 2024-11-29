@@ -428,7 +428,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 }
             }
             _ => {
-                if expr_call.arguments.args.len() == 1
+                let is_valid_bool_invocation =
+                    expr_call.arguments.args.len() == 1 && expr_call.arguments.keywords.is_empty();
+
+                if is_valid_bool_invocation
                     && expr_ty
                         .into_class_literal()
                         .is_some_and(|lit| lit.class.is_known(self.db, KnownClass::Bool))
