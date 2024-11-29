@@ -2,8 +2,8 @@ use std::string::ToString;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{Scope, ScopeId};
 use ruff_python_semantic::BindingKind::SubmoduleImport;
+use ruff_python_semantic::{Scope, ScopeId};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;

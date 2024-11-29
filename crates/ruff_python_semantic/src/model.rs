@@ -373,9 +373,7 @@ impl<'a> SemanticModel<'a> {
         binding_id: BindingId,
         name_expr: &ExprName,
         scope_id: &ScopeId,
-    ) -> Option<ReadResult>
-    {
-
+    ) -> Option<ReadResult> {
         let reference_id = self.resolved_references.push(
             self.scope_id,
             self.node_id,
@@ -386,11 +384,9 @@ impl<'a> SemanticModel<'a> {
 
         self.bindings[binding_id].references.push(reference_id);
 
-        if let Some(binding_id) = self.resolve_submodule(
-            name_expr.id.as_str(),
-            *scope_id,
-            binding_id,
-        ) {
+        if let Some(binding_id) =
+            self.resolve_submodule(name_expr.id.as_str(), *scope_id, binding_id)
+        {
             let reference_id = self.resolved_references.push(
                 self.scope_id,
                 self.node_id,
@@ -483,11 +479,9 @@ impl<'a> SemanticModel<'a> {
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) = self.resolve_submodule(
-                    name_expr.id.as_str(),
-                    *scope_id,
-                    binding_id,
-                ) {
+                if let Some(binding_id) =
+                    self.resolve_submodule(name_expr.id.as_str(), *scope_id, binding_id)
+                {
                     let reference_id = self.resolved_references.push(
                         self.scope_id,
                         self.node_id,
@@ -498,13 +492,11 @@ impl<'a> SemanticModel<'a> {
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
-                self.resolved_names
-                    .insert(name_expr.into(), binding_id);
+                self.resolved_names.insert(name_expr.into(), binding_id);
                 Some(ReadResult::Resolved(binding_id))
             }
 
-            BindingKind::Global(Some(binding_id))
-            | BindingKind::Nonlocal(binding_id, _) => {
+            BindingKind::Global(Some(binding_id)) | BindingKind::Nonlocal(binding_id, _) => {
                 // Mark the shadowed binding as used.
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
@@ -516,15 +508,13 @@ impl<'a> SemanticModel<'a> {
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Treat it as resolved.
-                self.resolved_names
-                    .insert(name_expr.into(), binding_id);
+                self.resolved_names.insert(name_expr.into(), binding_id);
                 Some(ReadResult::Resolved(binding_id))
             }
 
             _ => {
                 // Otherwise, treat it as resolved.
-                self.resolved_names
-                    .insert(name_expr.into(), binding_id);
+                self.resolved_names.insert(name_expr.into(), binding_id);
                 Some(ReadResult::Resolved(binding_id))
             }
         }
@@ -562,20 +552,17 @@ impl<'a> SemanticModel<'a> {
         let mut binding_ids: Vec<(BindingId, ScopeId)> = vec![];
 
         for (_index, scope_id) in ancestor_scope_ids.into_iter().enumerate() {
-            for binding_id in self.scopes[scope_id].get_all(name_expr.unwrap().id.as_str()){
+            for binding_id in self.scopes[scope_id].get_all(name_expr.unwrap().id.as_str()) {
                 binding_ids.push((binding_id, scope_id));
             }
         }
 
         for (binding_id, scope_id) in binding_ids.iter() {
-            if let BindingKind::SubmoduleImport(binding_kind) = &self.binding(*binding_id).kind
-            {
+            if let BindingKind::SubmoduleImport(binding_kind) = &self.binding(*binding_id).kind {
                 if binding_kind.qualified_name.to_string() == full_name {
-                    if let Some(result) = self.resolve_binding(
-                        *binding_id,
-                        &name_expr.unwrap(),
-                        scope_id,
-                    ) {
+                    if let Some(result) =
+                        self.resolve_binding(*binding_id, &name_expr.unwrap(), scope_id)
+                    {
                         return result;
                     }
                 }
@@ -591,33 +578,28 @@ impl<'a> SemanticModel<'a> {
             let Some(import) = self.binding(*binding_id).as_any_import() else {
                 continue;
             };
-            let name = &import.qualified_name().to_string()
-                .split(".").next().unwrap_or("").to_owned();
+            let name = &import
+                .qualified_name()
+                .to_string()
+                .split(".")
+                .next()
+                .unwrap_or("")
+                .to_owned();
 
             match self.bindings[*binding_id].kind {
                 BindingKind::SubmoduleImport(_) if !is_name_exist => continue,
                 BindingKind::WithItemVar => continue,
                 BindingKind::SubmoduleImport(_) => {
-                    result = self.resolve_binding(
-                        *binding_id,
-                        &name_expr.unwrap(),
-                        scope_id,
-                    );
-                },
+                    result = self.resolve_binding(*binding_id, &name_expr.unwrap(), scope_id);
+                }
                 BindingKind::Import(_) => {
-
-                    if already_checked_imports.contains(&name.to_string())
-                    {
+                    if already_checked_imports.contains(&name.to_string()) {
                         continue;
                     } else {
                         already_checked_imports.insert(name.to_string());
                     }
 
-                    result = self.resolve_binding(
-                        *binding_id,
-                        &name_expr.unwrap(),
-                        scope_id,
-                    );
+                    result = self.resolve_binding(*binding_id, &name_expr.unwrap(), scope_id);
                 }
                 _ => {}
             }
@@ -728,15 +710,14 @@ impl<'a> SemanticModel<'a> {
 
                 // Todo: Move the implementation here
                 for temp_binding_id in scope.get_all(name.id.as_str()) {
-                    if let BindingKind::SubmoduleImport(_) = &self
-                        .bindings[temp_binding_id].kind {
-
+                    if let BindingKind::SubmoduleImport(_) = &self.bindings[temp_binding_id].kind {
                         if !is_name {
                             return ReadResult::NotFound;
                         }
 
                         for reference_id in self.bindings[temp_binding_id].references() {
-                            if self.resolved_references[reference_id].range()
+                            if self.resolved_references[reference_id]
+                                .range()
                                 .contains_range(self.bindings[temp_binding_id].range)
                             {
                                 return ReadResult::Resolved(temp_binding_id);
@@ -745,11 +726,7 @@ impl<'a> SemanticModel<'a> {
                     }
                 }
 
-                result = self.resolve_binding(
-                    binding_id,
-                    &name,
-                    &scope_id,
-                );
+                result = self.resolve_binding(binding_id, &name, &scope_id);
 
                 if !result.is_none() {
                     return result.unwrap();
