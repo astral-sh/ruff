@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast};
 use ruff_python_ast::{ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -33,8 +33,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
-#[violation]
-pub struct ExceptWithEmptyTuple;
+#[derive(ViolationMetadata)]
+pub(crate) struct ExceptWithEmptyTuple;
 
 impl Violation for ExceptWithEmptyTuple {
     #[derive_message_formats]

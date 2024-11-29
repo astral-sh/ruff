@@ -4,10 +4,12 @@ use ruff_text_size::TextSlice;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
-use crate::other::f_string_part::FormatFStringPart;
+use crate::other::f_string::{FStringLayout, FormatFString};
 use crate::prelude::*;
-use crate::string::implicit::FormatImplicitConcatenatedStringFlat;
-use crate::string::{implicit::FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
+use crate::string::implicit::{
+    FormatImplicitConcatenatedString, FormatImplicitConcatenatedStringFlat,
+};
+use crate::string::{Quoting, StringLikeExtensions};
 
 #[derive(Default)]
 pub struct FormatExprFString;
@@ -17,8 +19,11 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
         let ExprFString { value, .. } = item;
 
         if let [f_string_part] = value.as_slice() {
-            FormatFStringPart::new(f_string_part, f_string_quoting(item, f.context().source()))
-                .fmt(f)
+            // SAFETY: A single string literal cannot be an f-string. This is guaranteed by the
+            // [`ruff_python_ast::FStringValue::single`] constructor.
+            let f_string = f_string_part.as_f_string().unwrap();
+
+            FormatFString::new(f_string, f_string_quoting(item, f.context().source())).fmt(f)
         } else {
             // Always join fstrings that aren't parenthesized and thus, are always on a single line.
             if !f.context().node_level().is_parenthesized() {
@@ -42,26 +47,11 @@ impl NeedsParentheses for ExprFString {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        }
-        // TODO(dhruvmanila): Ideally what we want here is a new variant which
-        // is something like:
-        // - If the expression fits by just adding the parentheses, then add them and
-        //   avoid breaking the f-string expression. So,
-        //   ```
-        //   xxxxxxxxx = (
-        //       f"aaaaaaaaaaaa { xxxxxxx + yyyyyyyy } bbbbbbbbbbbbb"
-        //   )
-        //   ```
-        // - But, if the expression is too long to fit even with parentheses, then
-        //   don't add the parentheses and instead break the expression at `soft_line_break`.
-        //   ```
-        //   xxxxxxxxx = f"aaaaaaaaaaaa {
-        //       xxxxxxxxx + yyyyyyyyyy
-        //   } bbbbbbbbbbbbb"
-        //   ```
-        // This isn't decided yet, refer to the relevant discussion:
-        // https://github.com/astral-sh/ruff/discussions/9785
-        else if StringLike::FString(self).is_multiline(context.source()) {
+        } else if StringLike::FString(self).is_multiline(context)
+            || self.value.as_single().is_some_and(|f_string| {
+                FStringLayout::from_f_string(f_string, context.source()).is_multiline()
+            })
+        {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

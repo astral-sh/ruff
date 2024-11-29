@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, whitespace::indentation, AnyStringFlags, Expr, StringFlags};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
@@ -73,8 +73,8 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
-#[violation]
-pub struct PrintfStringFormatting;
+#[derive(ViolationMetadata)]
+pub(crate) struct PrintfStringFormatting;
 
 impl Violation for PrintfStringFormatting {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

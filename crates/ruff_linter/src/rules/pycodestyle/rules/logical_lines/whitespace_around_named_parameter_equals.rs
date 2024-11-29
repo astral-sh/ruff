@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -31,8 +31,8 @@ use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLi
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
-#[violation]
-pub struct UnexpectedSpacesAroundKeywordParameterEquals;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnexpectedSpacesAroundKeywordParameterEquals;
 
 impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
     #[derive_message_formats]
@@ -70,8 +70,8 @@ impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
-#[violation]
-pub struct MissingWhitespaceAroundParameterEquals;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundParameterEquals;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
     #[derive_message_formats]

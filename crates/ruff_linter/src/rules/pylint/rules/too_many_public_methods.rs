@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
@@ -82,8 +82,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-public-methods`
-#[violation]
-pub struct TooManyPublicMethods {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyPublicMethods {
     methods: usize,
     max_methods: usize,
 }
@@ -105,6 +105,10 @@ pub(crate) fn too_many_public_methods(
     class_def: &ast::StmtClassDef,
     max_methods: usize,
 ) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     let methods = class_def
         .body
         .iter()

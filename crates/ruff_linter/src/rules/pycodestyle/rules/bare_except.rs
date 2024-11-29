@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::except;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
 
@@ -44,8 +44,8 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 /// - [Google Python Style Guide: "Exceptions"](https://google.github.io/styleguide/pyguide.html#24-exceptions)
-#[violation]
-pub struct BareExcept;
+#[derive(ViolationMetadata)]
+pub(crate) struct BareExcept;
 
 impl Violation for BareExcept {
     #[derive_message_formats]

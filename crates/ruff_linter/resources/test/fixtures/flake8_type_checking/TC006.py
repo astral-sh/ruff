@@ -60,3 +60,23 @@ def f():
         | None,
         3.0
     )
+
+
+def f():
+    # Regression test for #14554
+    import typing
+    typing.cast(M-())
+
+
+def f():
+    # Simple case with Literal that should lead to nested quotes
+    from typing import cast, Literal
+
+    cast(Literal["A"], 'A')
+
+
+def f():
+    # Really complex case with nested forward references
+    from typing import cast, Annotated, Literal
+
+    cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])

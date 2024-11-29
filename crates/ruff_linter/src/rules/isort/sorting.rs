@@ -59,7 +59,7 @@ impl<'a> From<&'a str> for NatOrdStr<'a> {
     }
 }
 
-impl<'a> From<String> for NatOrdStr<'a> {
+impl From<String> for NatOrdStr<'_> {
     fn from(s: String) -> Self {
         NatOrdStr(Cow::Owned(s))
     }

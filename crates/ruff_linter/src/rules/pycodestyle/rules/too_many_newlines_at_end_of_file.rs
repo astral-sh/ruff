@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -20,8 +20,8 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 /// ```python
 /// spam(1)\n
 /// ```
-#[violation]
-pub struct TooManyNewlinesAtEndOfFile {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyNewlinesAtEndOfFile {
     num_trailing_newlines: u32,
 }
 

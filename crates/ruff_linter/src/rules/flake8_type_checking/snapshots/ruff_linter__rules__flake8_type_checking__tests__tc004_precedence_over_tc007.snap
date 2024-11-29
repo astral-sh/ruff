@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+<filename>:6:21: TC004 [*] Move import `foo.Foo` out of type-checking block. Import is used for more than type hinting.
+  |
+4 | from typing import TYPE_CHECKING, TypeAlias
+5 | if TYPE_CHECKING:
+6 |     from foo import Foo  # TC004
+  |                     ^^^ TC004
+7 | 
+8 | a: TypeAlias = Foo | None  # OK
+  |
+  = help: Move out of type-checking block
+
+ℹ Unsafe fix
+2 2 | from __future__ import annotations
+3 3 | 
+4 4 | from typing import TYPE_CHECKING, TypeAlias
+  5 |+from foo import Foo
+5 6 | if TYPE_CHECKING:
+6   |-    from foo import Foo  # TC004
+  7 |+    pass  # TC004
+7 8 | 
+8 9 | a: TypeAlias = Foo | None  # OK

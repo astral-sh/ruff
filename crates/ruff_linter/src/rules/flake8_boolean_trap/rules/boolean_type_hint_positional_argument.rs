@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
 use ruff_python_semantic::analyze::visibility;
@@ -98,8 +98,8 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct BooleanTypeHintPositionalArgument;
+#[derive(ViolationMetadata)]
+pub(crate) struct BooleanTypeHintPositionalArgument;
 
 impl Violation for BooleanTypeHintPositionalArgument {
     #[derive_message_formats]
@@ -115,6 +115,10 @@ pub(crate) fn boolean_type_hint_positional_argument(
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     // Allow Boolean type hints in explicitly-allowed functions.
     if is_allowed_func_def(name) {
         return;

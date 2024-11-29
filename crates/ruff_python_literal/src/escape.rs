@@ -202,7 +202,7 @@ impl UnicodeEscape<'_> {
     }
 }
 
-impl<'a> Escape for UnicodeEscape<'a> {
+impl Escape for UnicodeEscape<'_> {
     fn source_len(&self) -> usize {
         self.source.len()
     }
@@ -337,7 +337,7 @@ impl AsciiEscape<'_> {
     }
 }
 
-impl<'a> Escape for AsciiEscape<'a> {
+impl Escape for AsciiEscape<'_> {
     fn source_len(&self) -> usize {
         self.source.len()
     }

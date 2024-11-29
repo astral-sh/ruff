@@ -14,6 +14,8 @@ ContextVar("cv", default=frozenset())
 ContextVar("cv", default=MappingProxyType({}))
 ContextVar("cv", default=re.compile("foo"))
 ContextVar("cv", default=float(1))
+ContextVar("cv", default=frozenset[str]())
+ContextVar[frozenset[str]]("cv", default=frozenset[str]())
 
 # Bad
 ContextVar("cv", default=[])
@@ -25,6 +27,8 @@ ContextVar("cv", default=[char for char in "foo"])
 ContextVar("cv", default={char for char in "foo"})
 ContextVar("cv", default={char: idx for idx, char in enumerate("foo")})
 ContextVar("cv", default=collections.deque())
+ContextVar("cv", default=set[str]())
+ContextVar[set[str]]("cv", default=set[str]())
 
 def bar() -> list[int]:
     return [1, 2, 3]

@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for variables defined in `for`, `try`, `with` statements
@@ -29,8 +29,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## References
 /// - [Pylint documentation](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/redefined-argument-from-local.html)
 
-#[violation]
-pub struct RedefinedArgumentFromLocal {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedefinedArgumentFromLocal {
     pub(crate) name: String,
 }
 

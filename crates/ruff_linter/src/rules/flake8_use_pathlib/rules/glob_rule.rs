@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for the use of `glob` and `iglob`.
@@ -41,8 +41,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [Python documentation: `Path.rglob`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.rglob)
 /// - [Python documentation: `glob.glob`](https://docs.python.org/3/library/glob.html#glob.glob)
 /// - [Python documentation: `glob.iglob`](https://docs.python.org/3/library/glob.html#glob.iglob)
-#[violation]
-pub struct Glob {
+#[derive(ViolationMetadata)]
+pub(crate) struct Glob {
     pub function: String,
 }
 

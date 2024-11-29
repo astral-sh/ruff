@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -25,8 +25,8 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
-#[violation]
-pub struct WhitespaceBeforeParameters {
+#[derive(ViolationMetadata)]
+pub(crate) struct WhitespaceBeforeParameters {
     bracket: TokenKind,
 }
 

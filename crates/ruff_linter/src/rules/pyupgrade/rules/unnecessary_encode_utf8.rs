@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
@@ -27,8 +27,8 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Python documentation: `str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)
-#[violation]
-pub struct UnnecessaryEncodeUTF8 {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }
 

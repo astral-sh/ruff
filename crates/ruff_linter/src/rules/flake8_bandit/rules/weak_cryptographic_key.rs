@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -32,8 +32,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [CSRC: Transitioning the Use of Cryptographic Algorithms and Key Lengths](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final)
-#[violation]
-pub struct WeakCryptographicKey {
+#[derive(ViolationMetadata)]
+pub(crate) struct WeakCryptographicKey {
     cryptographic_key: CryptographicKey,
 }
 

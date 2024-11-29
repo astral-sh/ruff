@@ -416,7 +416,7 @@ impl<'db> Iterator for SearchPathIterator<'db> {
     }
 }
 
-impl<'db> FusedIterator for SearchPathIterator<'db> {}
+impl FusedIterator for SearchPathIterator<'_> {}
 
 /// Represents a single `.pth` file in a `site-packages` directory.
 /// One or more lines in a `.pth` file may be a (relative or absolute)

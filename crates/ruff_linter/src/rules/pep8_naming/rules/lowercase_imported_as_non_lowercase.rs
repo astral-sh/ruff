@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
@@ -29,8 +29,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
-#[violation]
-pub struct LowercaseImportedAsNonLowercase {
+#[derive(ViolationMetadata)]
+pub(crate) struct LowercaseImportedAsNonLowercase {
     name: String,
     asname: String,
 }

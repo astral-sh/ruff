@@ -418,3 +418,16 @@ if True:
                     "permissions to manage this role, or else members of this role won't receive "
                     "a notification."
                 )
+
+# This f-string should be flattened
+xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
+    expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (
+    yyyyyyyyyyyyyy + zzzzzzzzzzz
+)
+
+# This is not a multiline f-string, but the expression is too long so it should be
+# wrapped in parentheses.
+f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)

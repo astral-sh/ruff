@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -45,8 +45,8 @@ use crate::rules::pylint::settings::ConstantType;
 /// - `lint.pylint.allow-magic-value-types`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
-#[violation]
-pub struct MagicValueComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct MagicValueComparison {
     value: String,
 }
 

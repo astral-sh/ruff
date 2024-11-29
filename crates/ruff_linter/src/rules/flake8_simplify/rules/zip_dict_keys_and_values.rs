@@ -1,5 +1,5 @@
 use ast::{ExprAttribute, ExprName, Identifier};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
@@ -31,8 +31,8 @@ use ruff_python_semantic::analyze::typing::is_dict;
 ///
 /// ## References
 /// - [Python documentation: `dict.items`](https://docs.python.org/3/library/stdtypes.html#dict.items)
-#[violation]
-pub struct ZipDictKeysAndValues {
+#[derive(ViolationMetadata)]
+pub(crate) struct ZipDictKeysAndValues {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
 }

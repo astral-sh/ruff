@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::Line;
 
 const BIDI_UNICODE: [char; 10] = [
@@ -41,8 +41,8 @@ const BIDI_UNICODE: [char; 10] = [
 ///
 /// ## References
 /// - [PEP 672: Bidirectional Text](https://peps.python.org/pep-0672/#bidirectional-text)
-#[violation]
-pub struct BidirectionalUnicode;
+#[derive(ViolationMetadata)]
+pub(crate) struct BidirectionalUnicode;
 
 impl Violation for BidirectionalUnicode {
     #[derive_message_formats]

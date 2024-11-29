@@ -1,15 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
 2 | from typing import Union
 3 | 
-4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
+4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-5 | x: type[int] | type[str] | type[float]
-6 | y: builtins.type[int] | type[str] | builtins.type[complex]
+5 | t: type[int] | type[str] | type[float]
+6 | u: builtins.type[int] | type[str] | builtins.type[complex]
   |
   = help: Combine multiple `type` members
 
@@ -17,194 +16,260 @@ PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 1 1 | import builtins
 2 2 | from typing import Union
 3 3 | 
-4   |-w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
-  4 |+w: type[int | str | complex]
-5 5 | x: type[int] | type[str] | type[float]
-6 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
-7 7 | z: Union[type[float], type[complex]]
+4   |-s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
+  4 |+s: type[int | str | complex]
+5 5 | t: type[int] | type[str] | type[float]
+6 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
+7 7 | v: Union[type[float], type[complex]]
 
 PYI055.pyi:5:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | float]`.
   |
-4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
-5 | x: type[int] | type[str] | type[float]
+4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
+5 | t: type[int] | type[str] | type[float]
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-6 | y: builtins.type[int] | type[str] | builtins.type[complex]
-7 | z: Union[type[float], type[complex]]
+6 | u: builtins.type[int] | type[str] | builtins.type[complex]
+7 | v: Union[type[float], type[complex]]
   |
   = help: Combine multiple `type` members
 
 ℹ Safe fix
 2 2 | from typing import Union
 3 3 | 
-4 4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
-5   |-x: type[int] | type[str] | type[float]
-  5 |+x: type[int | str | float]
-6 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
-7 7 | z: Union[type[float], type[complex]]
-8 8 | z: Union[type[float, int], type[complex]]
+4 4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
+5   |-t: type[int] | type[str] | type[float]
+  5 |+t: type[int | str | float]
+6 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
+7 7 | v: Union[type[float], type[complex]]
+8 8 | w: Union[type[Union[float, int]], type[complex]]
 
 PYI055.pyi:6:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
-4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
-5 | x: type[int] | type[str] | type[float]
-6 | y: builtins.type[int] | type[str] | builtins.type[complex]
+4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
+5 | t: type[int] | type[str] | type[float]
+6 | u: builtins.type[int] | type[str] | builtins.type[complex]
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-7 | z: Union[type[float], type[complex]]
-8 | z: Union[type[float, int], type[complex]]
+7 | v: Union[type[float], type[complex]]
+8 | w: Union[type[Union[float, int]], type[complex]]
   |
   = help: Combine multiple `type` members
 
 ℹ Safe fix
 3 3 | 
-4 4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
-5 5 | x: type[int] | type[str] | type[float]
-6   |-y: builtins.type[int] | type[str] | builtins.type[complex]
-  6 |+y: type[int | str | complex]
-7 7 | z: Union[type[float], type[complex]]
-8 8 | z: Union[type[float, int], type[complex]]
-9 9 | 
+4 4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
+5 5 | t: type[int] | type[str] | type[float]
+6   |-u: builtins.type[int] | type[str] | builtins.type[complex]
+  6 |+u: type[int | str | complex]
+7 7 | v: Union[type[float], type[complex]]
+8 8 | w: Union[type[Union[float, int]], type[complex]]
+9 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
 
 PYI055.pyi:7:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, complex]]`.
   |
-5 | x: type[int] | type[str] | type[float]
-6 | y: builtins.type[int] | type[str] | builtins.type[complex]
-7 | z: Union[type[float], type[complex]]
+5 | t: type[int] | type[str] | type[float]
+6 | u: builtins.type[int] | type[str] | builtins.type[complex]
+7 | v: Union[type[float], type[complex]]
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-8 | z: Union[type[float, int], type[complex]]
+8 | w: Union[type[Union[float, int]], type[complex]]
+9 | x: Union[Union[type[Union[float, int]], type[complex]]]
   |
   = help: Combine multiple `type` members
 
 ℹ Safe fix
-4 4 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
-5 5 | x: type[int] | type[str] | type[float]
-6 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
-7   |-z: Union[type[float], type[complex]]
-  7 |+z: type[Union[float, complex]]
-8 8 | z: Union[type[float, int], type[complex]]
-9 9 | 
-10 10 | def func(arg: type[int] | str | type[float]) -> None: ...
+4 4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
+5 5 | t: type[int] | type[str] | type[float]
+6 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
+7   |-v: Union[type[float], type[complex]]
+  7 |+v: type[Union[float, complex]]
+8 8 | w: Union[type[Union[float, int]], type[complex]]
+9 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
+10 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
 
-PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, int, complex]]`.
+PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
    |
- 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
- 7 | z: Union[type[float], type[complex]]
- 8 | z: Union[type[float, int], type[complex]]
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
- 9 | 
-10 | def func(arg: type[int] | str | type[float]) -> None: ...
+ 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
+ 7 | v: Union[type[float], type[complex]]
+ 8 | w: Union[type[Union[float, int]], type[complex]]
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+ 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
+10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
    |
    = help: Combine multiple `type` members
 
 ℹ Safe fix
-5 5 | x: type[int] | type[str] | type[float]
-6 6 | y: builtins.type[int] | type[str] | builtins.type[complex]
-7 7 | z: Union[type[float], type[complex]]
-8   |-z: Union[type[float, int], type[complex]]
-  8 |+z: type[Union[float, int, complex]]
-9 9 | 
-10 10 | def func(arg: type[int] | str | type[float]) -> None: ...
-11 11 | 
+5 5 | t: type[int] | type[str] | type[float]
+6 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
+7 7 | v: Union[type[float], type[complex]]
+8   |-w: Union[type[Union[float, int]], type[complex]]
+  8 |+w: type[Union[Union[float, int], complex]]
+9 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
+10 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
+11 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
 
-PYI055.pyi:10:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
+PYI055.pyi:9:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
    |
- 8 | z: Union[type[float, int], type[complex]]
- 9 | 
-10 | def func(arg: type[int] | str | type[float]) -> None: ...
+ 7 | v: Union[type[float], type[complex]]
+ 8 | w: Union[type[Union[float, int]], type[complex]]
+ 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
+11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
+   |
+   = help: Combine multiple `type` members
+
+ℹ Safe fix
+6  6  | u: builtins.type[int] | type[str] | builtins.type[complex]
+7  7  | v: Union[type[float], type[complex]]
+8  8  | w: Union[type[Union[float, int]], type[complex]]
+9     |-x: Union[Union[type[Union[float, int]], type[complex]]]
+   9  |+x: type[Union[Union[float, int], complex]]
+10 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
+11 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
+12 12 | 
+
+PYI055.pyi:10:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
+   |
+ 8 | w: Union[type[Union[float, int]], type[complex]]
+ 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
+10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
+   |
+   = help: Combine multiple `type` members
+
+ℹ Safe fix
+7  7  | v: Union[type[float], type[complex]]
+8  8  | w: Union[type[Union[float, int]], type[complex]]
+9  9  | x: Union[Union[type[Union[float, int]], type[complex]]]
+10    |-y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
+   10 |+y: type[Union[Union[float, int], complex]]
+11 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
+12 12 | 
+13 13 | def func(arg: type[int] | str | type[float]) -> None: ...
+
+PYI055.pyi:11:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[complex, Union[float, int]]]`.
+   |
+ 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
+10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
+11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+12 | 
+13 | def func(arg: type[int] | str | type[float]) -> None: ...
+   |
+   = help: Combine multiple `type` members
+
+ℹ Safe fix
+8  8  | w: Union[type[Union[float, int]], type[complex]]
+9  9  | x: Union[Union[type[Union[float, int]], type[complex]]]
+10 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
+11    |-z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
+   11 |+z: type[Union[complex, Union[float, int]]]
+12 12 | 
+13 13 | def func(arg: type[int] | str | type[float]) -> None: ...
+14 14 | 
+
+PYI055.pyi:13:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
+   |
+11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
+12 | 
+13 | def func(arg: type[int] | str | type[float]) -> None: ...
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-11 | 
-12 | # OK
+14 | 
+15 | # OK
    |
    = help: Combine multiple `type` members
 
 ℹ Safe fix
-7  7  | z: Union[type[float], type[complex]]
-8  8  | z: Union[type[float, int], type[complex]]
-9  9  | 
-10    |-def func(arg: type[int] | str | type[float]) -> None: ...
-   10 |+def func(arg: type[int | float] | str) -> None: ...
-11 11 | 
-12 12 | # OK
-13 13 | x: type[int, str, float]
+10 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
+11 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
+12 12 | 
+13    |-def func(arg: type[int] | str | type[float]) -> None: ...
+   13 |+def func(arg: type[int | float] | str) -> None: ...
+14 14 | 
+15 15 | # OK
+16 16 | x: type[int | str | float]
 
-PYI055.pyi:20:7: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty]`.
+PYI055.pyi:23:7: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty]`.
    |
-19 | # PYI055
-20 | item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
+22 | # PYI055
+23 | item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-21 | 
-22 | def func():
+24 | 
+25 | def func():
    |
    = help: Combine multiple `type` members
 
 ℹ Safe fix
-17 17 | def func(arg: type[int, float] | str) -> None: ...
-18 18 | 
-19 19 | # PYI055
-20    |-item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
-   20 |+item: type[requests_mock.Mocker | httpretty] = requests_mock.Mocker
+20 20 | def func(arg: type[int, float] | str) -> None: ...
 21 21 | 
-22 22 | def func():
-23 23 |     # PYI055
+22 22 | # PYI055
+23    |-item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
+   23 |+item: type[requests_mock.Mocker | httpretty] = requests_mock.Mocker
+24 24 | 
+25 25 | def func():
+26 26 |     # PYI055
 
-PYI055.pyi:24:11: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
+PYI055.pyi:27:11: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
    |
-22 | def func():
-23 |     # PYI055
-24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+25 | def func():
+26 |     # PYI055
+27 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-26 |     item3: Union[  # comment
+28 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+29 |     item3: Union[  # comment
    |
    = help: Combine multiple `type` members
 
 ℹ Safe fix
-21 21 | 
-22 22 | def func():
-23 23 |     # PYI055
-24    |-    item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-   24 |+    item: type[requests_mock.Mocker | httpretty | str] = requests_mock.Mocker
-25 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-26 26 |     item3: Union[  # comment
-27 27 |         type[requests_mock.Mocker], # another comment
+24 24 | 
+25 25 | def func():
+26 26 |     # PYI055
+27    |-    item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+   27 |+    item: type[requests_mock.Mocker | httpretty | str] = requests_mock.Mocker
+28 28 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+29 29 |     item3: Union[  # comment
+30 30 |         type[requests_mock.Mocker], # another comment
 
-PYI055.pyi:25:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.pyi:28:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
-23 |     # PYI055
-24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+26 |     # PYI055
+27 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+28 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-26 |     item3: Union[  # comment
-27 |         type[requests_mock.Mocker], # another comment
+29 |     item3: Union[  # comment
+30 |         type[requests_mock.Mocker], # another comment
    |
    = help: Combine multiple `type` members
 
 ℹ Safe fix
-22 22 | def func():
-23 23 |     # PYI055
-24 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-25    |-    item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-   25 |+    item2: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
-26 26 |     item3: Union[  # comment
-27 27 |         type[requests_mock.Mocker], # another comment
-28 28 |         type[httpretty], type[str]] = requests_mock.Mocker
+25 25 | def func():
+26 26 |     # PYI055
+27 27 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+28    |-    item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+   28 |+    item2: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
+29 29 |     item3: Union[  # comment
+30 30 |         type[requests_mock.Mocker], # another comment
+31 31 |         type[httpretty], type[str]] = requests_mock.Mocker
 
-PYI055.pyi:26:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.pyi:29:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
-24 |       item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-25 |       item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-26 |       item3: Union[  # comment
+27 |       item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+28 |       item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+29 |       item3: Union[  # comment
    |  ____________^
-27 | |         type[requests_mock.Mocker], # another comment
-28 | |         type[httpretty], type[str]] = requests_mock.Mocker
+30 | |         type[requests_mock.Mocker], # another comment
+31 | |         type[httpretty], type[str]] = requests_mock.Mocker
    | |___________________________________^ PYI055
    |
    = help: Combine multiple `type` members
 
 ℹ Unsafe fix
-23 23 |     # PYI055
-24 24 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-25 25 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-26    |-    item3: Union[  # comment
-27    |-        type[requests_mock.Mocker], # another comment
-28    |-        type[httpretty], type[str]] = requests_mock.Mocker
-   26 |+    item3: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
+26 26 |     # PYI055
+27 27 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+28 28 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+29    |-    item3: Union[  # comment
+30    |-        type[requests_mock.Mocker], # another comment
+31    |-        type[httpretty], type[str]] = requests_mock.Mocker
+   29 |+    item3: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
+32 30 | 
+33 31 | 
+34 32 | # OK

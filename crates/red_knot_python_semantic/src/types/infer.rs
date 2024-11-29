@@ -4229,6 +4229,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "annotation-f-string",
                     format_args!("Type expressions cannot use f-strings"),
                 );
+                self.infer_fstring_expression(fstring);
                 Type::Unknown
             }
 
@@ -4374,6 +4375,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!()
             }
 
+            // Avoid inferring the types of invalid type expressions that have been parsed from a
+            // string annotation, as they are not present in the semantic index.
+            _ if self.deferred_state.in_string_annotation() => Type::Unknown,
+
             // Forms which are invalid in the context of annotation expressions: we infer their
             // nested expressions as normal expressions, but the type of the top-level expression is
             // always `Type::Unknown` in these cases.
@@ -4457,7 +4462,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_slice_expression(slice);
                 Type::Unknown
             }
-
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         }
     }
@@ -4572,7 +4576,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match value_ty {
             Type::KnownInstance(known_instance) => {
-                self.infer_parameterized_known_instance_type_expression(known_instance, slice)
+                self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
             }
             _ => {
                 self.infer_type_expression(slice);
@@ -4583,9 +4587,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_parameterized_known_instance_type_expression(
         &mut self,
+        subscript: &ast::ExprSubscript,
         known_instance: KnownInstanceType,
-        parameters: &ast::Expr,
     ) -> Type<'db> {
+        let parameters = &*subscript.slice;
         match known_instance {
             KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
                 Ok(ty) => ty,
@@ -4625,6 +4630,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             KnownInstanceType::TypeAliasType(_) => {
                 self.infer_type_expression(parameters);
                 todo_type!("generic type alias")
+            }
+            KnownInstanceType::NoReturn | KnownInstanceType::Never => {
+                self.diagnostics.add(
+                    subscript.into(),
+                    "invalid-type-parameter",
+                    format_args!(
+                        "Type `{}` expected no type parameter",
+                        known_instance.repr(self.db)
+                    ),
+                );
+                Type::Unknown
             }
         }
     }
@@ -5970,7 +5986,11 @@ mod tests {
             "src/a.py",
             &["foo", "<listcomp>"],
             "x",
-            "@Todo(async iterables/iterators)",
+            if cfg!(debug_assertions) {
+                "@Todo(async iterables/iterators)"
+            } else {
+                "@Todo"
+            },
         );
 
         Ok(())
@@ -6000,7 +6020,11 @@ mod tests {
             "src/a.py",
             &["foo", "<listcomp>"],
             "x",
-            "@Todo(async iterables/iterators)",
+            if cfg!(debug_assertions) {
+                "@Todo(async iterables/iterators)"
+            } else {
+                "@Todo"
+            },
         );
 
         Ok(())
@@ -6033,6 +6057,72 @@ mod tests {
             "/src/a.py",
             &["Object of type `NotIterable` is not iterable"],
         );
+    }
+
+    #[test]
+    fn pep695_type_params() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            def f[T, U: A, V: (A, B), W = A, X: A = A1, Y: (int,)]():
+                pass
+
+            class A: ...
+            class B: ...
+            class A1(A): ...
+            ",
+        )
+        .unwrap();
+
+        let check_typevar = |var: &'static str,
+                             upper_bound: Option<&'static str>,
+                             constraints: Option<&[&'static str]>,
+                             default: Option<&'static str>| {
+            let var_ty = get_symbol(&db, "src/a.py", &["f"], var).expect_type();
+            assert_eq!(var_ty.display(&db).to_string(), var);
+
+            let expected_name_ty = format!(r#"Literal["{var}"]"#);
+            let name_ty = var_ty.member(&db, "__name__").expect_type();
+            assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
+
+            let KnownInstanceType::TypeVar(typevar) = var_ty.expect_known_instance() else {
+                panic!("expected TypeVar");
+            };
+
+            assert_eq!(
+                typevar
+                    .upper_bound(&db)
+                    .map(|ty| ty.display(&db).to_string()),
+                upper_bound.map(std::borrow::ToOwned::to_owned)
+            );
+            assert_eq!(
+                typevar.constraints(&db).map(|tys| tys
+                    .iter()
+                    .map(|ty| ty.display(&db).to_string())
+                    .collect::<Vec<_>>()),
+                constraints.map(|strings| strings
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<_>>())
+            );
+            assert_eq!(
+                typevar
+                    .default_ty(&db)
+                    .map(|ty| ty.display(&db).to_string()),
+                default.map(std::borrow::ToOwned::to_owned)
+            );
+        };
+
+        check_typevar("T", None, None, None);
+        check_typevar("U", Some("A"), None, None);
+        check_typevar("V", None, Some(&["A", "B"]), None);
+        check_typevar("W", None, None, Some("A"));
+        check_typevar("X", Some("A"), None, Some("A1"));
+
+        // a typevar with less than two constraints is treated as unconstrained
+        check_typevar("Y", None, None, None);
     }
 
     // Incremental inference tests

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -46,8 +46,8 @@ use super::helpers;
 /// when rewriting the call. In most cases, though, comments will be preserved.
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct UnnecessaryLiteralWithinTupleCall {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryLiteralWithinTupleCall {
     literal_kind: TupleLiteralKind,
 }
 

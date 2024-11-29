@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -31,8 +31,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
-#[violation]
-pub struct LiteralMembership;
+#[derive(ViolationMetadata)]
+pub(crate) struct LiteralMembership;
 
 impl AlwaysFixableViolation for LiteralMembership {
     #[derive_message_formats]

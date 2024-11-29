@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -32,8 +32,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// datetime.max.replace(tzinfo=datetime.UTC)
 /// ```
-#[violation]
-pub struct DatetimeMinMax {
+#[derive(ViolationMetadata)]
+pub(crate) struct DatetimeMinMax {
     min_max: MinMax,
 }
 

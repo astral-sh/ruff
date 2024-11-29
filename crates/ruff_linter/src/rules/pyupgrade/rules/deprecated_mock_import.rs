@@ -6,7 +6,7 @@ use libcst_native::{
 use log::error;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Stmt};
@@ -47,8 +47,8 @@ pub(crate) enum MockReference {
 /// ## References
 /// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
 /// - [PyPI: `mock`](https://pypi.org/project/mock/)
-#[violation]
-pub struct DeprecatedMockImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct DeprecatedMockImport {
     reference_type: MockReference,
 }
 

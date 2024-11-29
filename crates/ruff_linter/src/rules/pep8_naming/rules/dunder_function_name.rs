@@ -1,7 +1,7 @@
 use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Scope, ScopeKind};
@@ -32,8 +32,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
-#[violation]
-pub struct DunderFunctionName;
+#[derive(ViolationMetadata)]
+pub(crate) struct DunderFunctionName;
 
 impl Violation for DunderFunctionName {
     #[derive_message_formats]

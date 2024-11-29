@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 
 use crate::rules::pep8_naming::settings::IgnoreNames;
@@ -29,8 +29,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#exception-names
-#[violation]
-pub struct ErrorSuffixOnExceptionName {
+#[derive(ViolationMetadata)]
+pub(crate) struct ErrorSuffixOnExceptionName {
     name: String,
 }
 

@@ -769,7 +769,22 @@ where
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
-                for clause in &node.elif_else_clauses {
+                let elif_else_clauses = node
+                    .elif_else_clauses
+                    .iter()
+                    .map(|clause| (clause.test.as_ref(), clause.body.as_slice()));
+                let has_else = node
+                    .elif_else_clauses
+                    .last()
+                    .is_some_and(|clause| clause.test.is_none());
+                let elif_else_clauses = elif_else_clauses.chain(if has_else {
+                    // if there's an `else` clause already, we don't need to add another
+                    None
+                } else {
+                    // if there's no `else` branch, we should add a no-op `else` branch
+                    Some((None, Default::default()))
+                });
+                for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
@@ -779,23 +794,14 @@ where
                     for constraint in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
-                    if let Some(elif_test) = &clause.test {
+                    if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         constraints.push(self.record_expression_constraint(elif_test));
                     }
-                    self.visit_body(&clause.body);
+                    self.visit_body(clause_body);
                 }
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
-                }
-                let has_else = node
-                    .elif_else_clauses
-                    .last()
-                    .is_some_and(|clause| clause.test.is_none());
-                if !has_else {
-                    // if there's no else clause, then it's possible we took none of the branches,
-                    // and the pre_if state can reach here
-                    self.flow_merge(pre_if);
                 }
             }
             ast::Stmt::While(ast::StmtWhile {
@@ -1189,8 +1195,8 @@ where
                 // AST inspection, so we can't simplify here, need to record test expression for
                 // later checking)
                 self.visit_expr(test);
-                let constraint = self.record_expression_constraint(test);
                 let pre_if = self.flow_snapshot();
+                let constraint = self.record_expression_constraint(test);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);

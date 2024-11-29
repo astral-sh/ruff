@@ -1,0 +1,129 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF055.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
+  |
+5 | # this should be replaced with s.replace("abc", "")
+6 | re.sub("abc", "", s)
+  | ^^^^^^^^^^^^^^^^^^^^ RUF055
+  |
+  = help: Replace with `s.replace("abc", "")`
+
+ℹ Safe fix
+3 3 | s = "str"
+4 4 | 
+5 5 | # this should be replaced with s.replace("abc", "")
+6   |-re.sub("abc", "", s)
+  6 |+s.replace("abc", "")
+7 7 | 
+8 8 | 
+9 9 | # this example, adapted from https://docs.python.org/3/library/re.html#re.sub,
+
+RUF055.py:22:4: RUF055 [*] Plain string pattern passed to `re` function
+   |
+20 | # this one should be replaced with s.startswith("abc") because the Match is
+21 | # used in an if context for its truth value
+22 | if re.match("abc", s):
+   |    ^^^^^^^^^^^^^^^^^^ RUF055
+23 |     pass
+24 | if m := re.match("abc", s):  # this should *not* be replaced
+   |
+   = help: Replace with `s.startswith("abc")`
+
+ℹ Safe fix
+19 19 | 
+20 20 | # this one should be replaced with s.startswith("abc") because the Match is
+21 21 | # used in an if context for its truth value
+22    |-if re.match("abc", s):
+   22 |+if s.startswith("abc"):
+23 23 |     pass
+24 24 | if m := re.match("abc", s):  # this should *not* be replaced
+25 25 |     pass
+
+RUF055.py:29:4: RUF055 [*] Plain string pattern passed to `re` function
+   |
+28 | # this should be replaced with "abc" in s
+29 | if re.search("abc", s):
+   |    ^^^^^^^^^^^^^^^^^^^ RUF055
+30 |     pass
+31 | re.search("abc", s)  # this should not be replaced
+   |
+   = help: Replace with `"abc" in s`
+
+ℹ Safe fix
+26 26 | re.match("abc", s)  # this should not be replaced because match returns a Match
+27 27 | 
+28 28 | # this should be replaced with "abc" in s
+29    |-if re.search("abc", s):
+   29 |+if "abc" in s:
+30 30 |     pass
+31 31 | re.search("abc", s)  # this should not be replaced
+32 32 | 
+
+RUF055.py:34:4: RUF055 [*] Plain string pattern passed to `re` function
+   |
+33 | # this should be replaced with "abc" == s
+34 | if re.fullmatch("abc", s):
+   |    ^^^^^^^^^^^^^^^^^^^^^^ RUF055
+35 |     pass
+36 | re.fullmatch("abc", s)  # this should not be replaced
+   |
+   = help: Replace with `"abc" == s`
+
+ℹ Safe fix
+31 31 | re.search("abc", s)  # this should not be replaced
+32 32 | 
+33 33 | # this should be replaced with "abc" == s
+34    |-if re.fullmatch("abc", s):
+   34 |+if "abc" == s:
+35 35 |     pass
+36 36 | re.fullmatch("abc", s)  # this should not be replaced
+37 37 | 
+
+RUF055.py:39:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+38 | # this should be replaced with s.split("abc")
+39 | re.split("abc", s)
+   | ^^^^^^^^^^^^^^^^^^ RUF055
+40 | 
+41 | # these currently should not be modified because the patterns contain regex
+   |
+   = help: Replace with `s.split("abc")`
+
+ℹ Safe fix
+36 36 | re.fullmatch("abc", s)  # this should not be replaced
+37 37 | 
+38 38 | # this should be replaced with s.split("abc")
+39    |-re.split("abc", s)
+   39 |+s.split("abc")
+40 40 | 
+41 41 | # these currently should not be modified because the patterns contain regex
+42 42 | # metacharacters
+
+RUF055.py:70:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+69 |   # this should trigger an unsafe fix because of the presence of comments
+70 | / re.sub(
+71 | |     # pattern
+72 | |     "abc",
+73 | |     # repl
+74 | |     "",
+75 | |     s,  # string
+76 | | )
+   | |_^ RUF055
+   |
+   = help: Replace with `s.replace("abc", "")`
+
+ℹ Unsafe fix
+67 67 | re.split("abc", s, maxsplit=2)
+68 68 | 
+69 69 | # this should trigger an unsafe fix because of the presence of comments
+70    |-re.sub(
+71    |-    # pattern
+72    |-    "abc",
+73    |-    # repl
+74    |-    "",
+75    |-    s,  # string
+76    |-)
+   70 |+s.replace("abc", "")

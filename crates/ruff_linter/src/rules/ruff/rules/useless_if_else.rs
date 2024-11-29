@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 
@@ -25,8 +25,8 @@ use ruff_python_ast::comparable::ComparableExpr;
 /// # Good
 /// foo = x
 /// ```
-#[violation]
-pub struct UselessIfElse;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessIfElse;
 
 impl Violation for UselessIfElse {
     #[derive_message_formats]

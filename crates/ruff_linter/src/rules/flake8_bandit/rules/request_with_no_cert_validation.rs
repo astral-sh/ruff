@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_const_false;
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-295](https://cwe.mitre.org/data/definitions/295.html)
-#[violation]
-pub struct RequestWithNoCertValidation {
+#[derive(ViolationMetadata)]
+pub(crate) struct RequestWithNoCertValidation {
     string: String,
 }
 

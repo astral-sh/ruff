@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::script::ScriptTag;
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::CommentRanges;
@@ -31,8 +31,8 @@ use crate::Locator;
 ///
 /// ## Options
 /// - `namespace-packages`
-#[violation]
-pub struct ImplicitNamespacePackage {
+#[derive(ViolationMetadata)]
+pub(crate) struct ImplicitNamespacePackage {
     filename: String,
     parent: Option<String>,
 }

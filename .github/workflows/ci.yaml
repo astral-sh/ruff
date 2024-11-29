@@ -49,7 +49,7 @@ jobs:
               - crates/ruff_text_size/**
               - crates/ruff_python_ast/**
               - crates/ruff_python_parser/**
-              - scripts/fuzz-parser/**
+              - python/py-fuzzer/**
               - .github/workflows/ci.yaml
 
             linter:
@@ -82,6 +82,7 @@ jobs:
             code:
               - "**/*"
               - "!**/*.md"
+              - "crates/red_knot_python_semantic/resources/mdtest/**/*.md"
               - "!docs/**"
               - "!assets/**"
 
@@ -157,6 +158,33 @@ jobs:
           name: ruff
           path: target/debug/ruff
 
+  cargo-test-linux-release:
+    name: "cargo test (linux, release)"
+    runs-on: depot-ubuntu-22.04-16
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests"
+        shell: bash
+        env:
+          NEXTEST_PROFILE: "ci"
+        run: cargo insta test --release --all-features --unreferenced reject --test-runner nextest
+
   cargo-test-windows:
     name: "cargo test (windows)"
     runs-on: windows-latest-xlarge
@@ -212,7 +240,6 @@ jobs:
   cargo-build-release:
     name: "cargo build (release)"
     runs-on: macos-latest
-    needs: determine_changes
     if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
@@ -291,13 +318,7 @@ jobs:
       FORCE_COLOR: 1
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install Python requirements
-        run: uv pip install -r scripts/fuzz-parser/requirements.txt --system
+      - uses: astral-sh/setup-uv@v4
       - uses: actions/download-artifact@v4
         name: Download Ruff binary to test
         id: download-cached-binary
@@ -309,7 +330,15 @@ jobs:
           # Make executable, since artifact download doesn't preserve this
           chmod +x ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
-          python scripts/fuzz-parser/fuzz.py 0-500 --test-executable ${{ steps.download-cached-binary.outputs.download-path }}/ruff
+          (
+            uvx \
+            --python=${{ env.PYTHON_VERSION }} \
+            --from=./python/py-fuzzer \
+            fuzz \
+            --test-executable=${{ steps.download-cached-binary.outputs.download-path }}/ruff \
+            --bin=ruff \
+            0-500
+          )
 
   scripts:
     name: "test scripts"

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI062.pyi:5:25: PYI062 [*] Duplicate literal member `True`
   |
@@ -317,3 +316,38 @@ PYI062.pyi:25:46: PYI062 [*] Duplicate literal member `True`
    25 |+MyType = Literal["foo", True, False, "bar"]  # PYI062
 26 26 | 
 27 27 | n: Literal["No", "duplicates", "here", 1, "1"]
+28 28 | 
+
+PYI062.pyi:32:37: PYI062 [*] Duplicate literal member `1`
+   |
+30 | # nested literals, all equivalent to `Literal[1]`
+31 | Literal[Literal[1]]  # no duplicate
+32 | Literal[Literal[Literal[1], Literal[1]]]  # once
+   |                                     ^ PYI062
+33 | Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+29 29 | 
+30 30 | # nested literals, all equivalent to `Literal[1]`
+31 31 | Literal[Literal[1]]  # no duplicate
+32    |-Literal[Literal[Literal[1], Literal[1]]]  # once
+   32 |+Literal[1]  # once
+33 33 | Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
+
+PYI062.pyi:33:45: PYI062 [*] Duplicate literal member `1`
+   |
+31 | Literal[Literal[1]]  # no duplicate
+32 | Literal[Literal[Literal[1], Literal[1]]]  # once
+33 | Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
+   |                                             ^ PYI062
+   |
+   = help: Remove duplicates
+
+ℹ Safe fix
+30 30 | # nested literals, all equivalent to `Literal[1]`
+31 31 | Literal[Literal[1]]  # no duplicate
+32 32 | Literal[Literal[Literal[1], Literal[1]]]  # once
+33    |-Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
+   33 |+Literal[1]  # once

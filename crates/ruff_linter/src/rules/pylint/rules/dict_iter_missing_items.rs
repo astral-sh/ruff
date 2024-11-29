@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
@@ -49,8 +49,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 /// Due to the known problem with tuple keys, this fix is unsafe.
-#[violation]
-pub struct DictIterMissingItems;
+#[derive(ViolationMetadata)]
+pub(crate) struct DictIterMissingItems;
 
 impl AlwaysFixableViolation for DictIterMissingItems {
     #[derive_message_formats]

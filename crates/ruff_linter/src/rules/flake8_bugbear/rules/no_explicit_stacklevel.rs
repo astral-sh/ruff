@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -11,10 +11,11 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// The `warnings.warn` method uses a `stacklevel` of 1 by default, which
-/// limits the rendered stack trace to that of the line on which the
-/// `warn` method is called.
+/// will output a stack frame of the line on which the "warn" method
+/// is called. Setting it to a higher number will output a stack frame
+/// from higher up the stack.
 ///
-/// It's recommended to use a `stacklevel` of 2 or higher, give the caller
+/// It's recommended to use a `stacklevel` of 2 or higher, to give the caller
 /// more context about the warning.
 ///
 /// ## Example
@@ -29,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
-#[violation]
-pub struct NoExplicitStacklevel;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoExplicitStacklevel;
 
 impl Violation for NoExplicitStacklevel {
     #[derive_message_formats]

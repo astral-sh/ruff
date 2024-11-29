@@ -1,0 +1,5 @@
+---
+source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+snapshot_kind: text
+---
+

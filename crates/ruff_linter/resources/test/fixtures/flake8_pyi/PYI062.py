@@ -25,3 +25,9 @@ Literal[
 MyType = Literal["foo", Literal[True, False, True], "bar"]  # PYI062
 
 n: Literal["No", "duplicates", "here", 1, "1"]
+
+
+# nested literals, all equivalent to `Literal[1]`
+Literal[Literal[1]]  # no duplicate
+Literal[Literal[Literal[1], Literal[1]]]  # once
+Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_mutable_expr;
@@ -48,8 +48,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
-#[violation]
-pub struct MutableFromkeysValue;
+#[derive(ViolationMetadata)]
+pub(crate) struct MutableFromkeysValue;
 
 impl Violation for MutableFromkeysValue {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

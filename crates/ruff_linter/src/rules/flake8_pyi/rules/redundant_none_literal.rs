@@ -1,7 +1,10 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprNoneLiteral};
-use ruff_python_semantic::analyze::typing::traverse_literal;
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::{Expr, ExprBinOp, ExprNoneLiteral, ExprSubscript, Operator};
+use ruff_python_semantic::{
+    analyze::typing::{traverse_literal, traverse_union},
+    SemanticModel,
+};
 use ruff_text_size::Ranged;
 
 use smallvec::SmallVec;
@@ -31,10 +34,13 @@ use crate::checkers::ast::Checker;
 /// Literal[1, 2, 3, "foo", 5] | None
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe unless the literal contains comments.
+///
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
-#[violation]
-pub struct RedundantNoneLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantNoneLiteral {
     other_literal_elements_seen: bool,
 }
 
@@ -87,14 +93,16 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     let fix = if other_literal_elements_seen {
         None
     } else {
-        Some(Fix::applicable_edit(
-            Edit::range_replacement("None".to_string(), literal_expr.range()),
-            if checker.comment_ranges().intersects(literal_expr.range()) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            },
-        ))
+        create_fix_edit(checker.semantic(), literal_expr).map(|edit| {
+            Fix::applicable_edit(
+                edit,
+                if checker.comment_ranges().intersects(literal_expr.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            )
+        })
     };
 
     for none_expr in none_exprs {
@@ -109,4 +117,53 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
         }
         checker.diagnostics.push(diagnostic);
     }
+}
+
+/// If possible, return a [`Fix`] for a violation of this rule.
+///
+/// Avoid producing code that would raise an exception when
+/// `Literal[None] | None` would be fixed to `None | None`.
+/// Instead, do not provide a fix. We don't need to worry about unions
+/// that use [`typing.Union`], as `Union[None, None]` is valid Python.
+/// See <https://github.com/astral-sh/ruff/issues/14567>.
+///
+/// [`typing.Union`]: https://docs.python.org/3/library/typing.html#typing.Union
+fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit> {
+    let enclosing_pep604_union = semantic
+        .current_expressions()
+        .skip(1)
+        .take_while(|expr| {
+            matches!(
+                expr,
+                Expr::BinOp(ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                })
+            )
+        })
+        .last();
+
+    let mut is_fixable = true;
+    if let Some(enclosing_pep604_union) = enclosing_pep604_union {
+        traverse_union(
+            &mut |expr, _| {
+                if matches!(expr, Expr::NoneLiteral(_)) {
+                    is_fixable = false;
+                }
+                if expr != literal_expr {
+                    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
+                        if semantic.match_typing_expr(value, "Literal")
+                            && matches!(**slice, Expr::NoneLiteral(_))
+                        {
+                            is_fixable = false;
+                        }
+                    }
+                }
+            },
+            semantic,
+            enclosing_pep604_union,
+        );
+    }
+
+    is_fixable.then(|| Edit::range_replacement("None".to_string(), literal_expr.range()))
 }

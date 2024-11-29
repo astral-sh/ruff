@@ -1,12 +1,14 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     BytesLiteral, Expr, ExprBytesLiteral, ExprCall, ExprStringLiteral, StringLiteral,
 };
 use ruff_python_semantic::{Modules, SemanticModel};
+
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -33,14 +35,15 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// re.compile(r"foo\bar")
 /// ```
-#[violation]
-pub struct UnrawRePattern {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnrawRePattern {
     module: RegexModule,
     func: String,
     kind: PatternKind,
 }
 
 impl Violation for UnrawRePattern {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { module, func, kind } = &self;
@@ -158,8 +161,22 @@ fn check_string(checker: &mut Checker, literal: &StringLiteral, module: RegexMod
     let kind = PatternKind::String;
     let func = func.to_string();
     let range = literal.range;
-    let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
+    let mut diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
 
+    if
+    // The (no-op) `u` prefix is a syntax error when combined with `r`
+    !literal.flags.prefix().is_unicode()
+    // We are looking for backslash characters
+    // in the raw source code here, because `\n`
+    // gets converted to a single character already
+    // at the lexing stage.
+    &&!checker.locator().slice(literal.range()).contains('\\')
+    {
+        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+            "r".to_string(),
+            literal.range().start(),
+        )));
+    }
     checker.diagnostics.push(diagnostic);
 }
 

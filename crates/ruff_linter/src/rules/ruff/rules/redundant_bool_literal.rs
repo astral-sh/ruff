@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::Ranged;
@@ -54,8 +54,8 @@ use crate::checkers::ast::Checker;
 /// [mypy]: https://github.com/python/mypy/blob/master/mypy/typeops.py#L985
 /// [#14764]: https://github.com/python/mypy/issues/14764
 /// [#5421]: https://github.com/microsoft/pyright/issues/5421
-#[violation]
-pub struct RedundantBoolLiteral {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantBoolLiteral {
     seen_others: bool,
 }
 

@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -109,8 +109,8 @@ impl fmt::Display for LiteralType {
 /// - [Python documentation: `int`](https://docs.python.org/3/library/functions.html#int)
 /// - [Python documentation: `float`](https://docs.python.org/3/library/functions.html#float)
 /// - [Python documentation: `bool`](https://docs.python.org/3/library/functions.html#bool)
-#[violation]
-pub struct NativeLiterals {
+#[derive(ViolationMetadata)]
+pub(crate) struct NativeLiterals {
     literal_type: LiteralType,
 }
 

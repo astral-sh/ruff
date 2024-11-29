@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
@@ -20,8 +20,8 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 ///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-ignorelist`
-#[violation]
-pub struct BuiltinLambdaArgumentShadowing {
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinLambdaArgumentShadowing {
     name: String,
 }
 

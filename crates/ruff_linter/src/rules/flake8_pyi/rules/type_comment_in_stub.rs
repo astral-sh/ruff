@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 
 use crate::Locator;
@@ -26,8 +26,8 @@ use crate::Locator;
 /// ```pyi
 /// x: int = 1
 /// ```
-#[violation]
-pub struct TypeCommentInStub;
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeCommentInStub;
 
 impl Violation for TypeCommentInStub {
     #[derive_message_formats]

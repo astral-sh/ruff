@@ -1,11 +1,11 @@
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::AstNode;
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprContext};
+use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -66,8 +66,8 @@ use super::helpers::{is_pytest_parametrize, split_names};
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
-#[violation]
-pub struct PytestParametrizeNamesWrongType {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestParametrizeNamesWrongType {
     single_argument: bool,
     expected: types::ParametrizeNameType,
 }
@@ -198,8 +198,8 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
-#[violation]
-pub struct PytestParametrizeValuesWrongType {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestParametrizeValuesWrongType {
     values: types::ParametrizeValuesType,
     row: types::ParametrizeValuesRowType,
 }
@@ -262,8 +262,8 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
-#[violation]
-pub struct PytestDuplicateParametrizeTestCases {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestDuplicateParametrizeTestCases {
     index: usize,
 }
 
@@ -317,23 +317,21 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
 ///
 /// This method assumes that the first argument is a string.
 fn get_parametrize_name_range(
-    decorator: &Decorator,
+    call: &ExprCall,
     expr: &Expr,
     comment_ranges: &CommentRanges,
     source: &str,
 ) -> Option<TextRange> {
-    decorator.expression.as_call_expr().and_then(|call| {
-        parenthesized_range(
-            expr.into(),
-            call.arguments.as_any_node_ref(),
-            comment_ranges,
-            source,
-        )
-    })
+    parenthesized_range(
+        expr.into(),
+        call.arguments.as_any_node_ref(),
+        comment_ranges,
+        source,
+    )
 }
 
 /// PT006
-fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
+fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
@@ -343,7 +341,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
                         let name_range = get_parametrize_name_range(
-                            decorator,
+                            call,
                             expr,
                             checker.comment_ranges(),
                             checker.locator().contents(),
@@ -378,7 +376,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     }
                     types::ParametrizeNameType::List => {
                         let name_range = get_parametrize_name_range(
-                            decorator,
+                            call,
                             expr,
                             checker.comment_ranges(),
                             checker.locator().contents(),
@@ -797,30 +795,42 @@ fn handle_value_rows(
     }
 }
 
-pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
-    for decorator in decorators {
-        if is_pytest_parametrize(decorator, checker.semantic()) {
-            if let Expr::Call(ast::ExprCall {
-                arguments: Arguments { args, .. },
-                ..
-            }) = &decorator.expression
-            {
-                if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-                    if let [names, ..] = &**args {
-                        check_names(checker, decorator, names);
-                    }
-                }
-                if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-                    if let [names, values, ..] = &**args {
-                        check_values(checker, names, values);
-                    }
-                }
-                if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-                    if let [_, values, ..] = &**args {
-                        check_duplicates(checker, values);
-                    }
-                }
-            }
+pub(crate) fn parametrize(checker: &mut Checker, call: &ExprCall) {
+    if !is_pytest_parametrize(call, checker.semantic()) {
+        return;
+    }
+
+    if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
+        if let Some(names) = if checker.settings.preview.is_enabled() {
+            call.arguments.find_argument("argnames", 0)
+        } else {
+            call.arguments.find_positional(0)
+        } {
+            check_names(checker, call, names);
+        }
+    }
+    if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
+        let names = if checker.settings.preview.is_enabled() {
+            call.arguments.find_argument("argnames", 0)
+        } else {
+            call.arguments.find_positional(0)
+        };
+        let values = if checker.settings.preview.is_enabled() {
+            call.arguments.find_argument("argvalues", 1)
+        } else {
+            call.arguments.find_positional(1)
+        };
+        if let (Some(names), Some(values)) = (names, values) {
+            check_values(checker, names, values);
+        }
+    }
+    if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
+        if let Some(values) = if checker.settings.preview.is_enabled() {
+            call.arguments.find_argument("argvalues", 1)
+        } else {
+            call.arguments.find_positional(1)
+        } {
+            check_duplicates(checker, values);
         }
     }
 }

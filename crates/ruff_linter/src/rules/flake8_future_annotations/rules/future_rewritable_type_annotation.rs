@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -63,8 +63,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `target-version`
-#[violation]
-pub struct FutureRewritableTypeAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct FutureRewritableTypeAnnotation {
     name: String,
 }
 

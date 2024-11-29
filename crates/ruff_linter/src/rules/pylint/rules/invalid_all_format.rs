@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
@@ -25,8 +25,8 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Python documentation: The `import` statement](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
-#[violation]
-pub struct InvalidAllFormat;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidAllFormat;
 
 impl Violation for InvalidAllFormat {
     #[derive_message_formats]

@@ -60,18 +60,19 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                     return QuoteStyle::Preserve;
                 }
 
-                // There are two cases where it's necessary to preserve the quotes
-                // if the target version is pre 3.12 and the part is an f-string.
-                if !self.context.options().target_version().supports_pep_701() {
-                    if let StringLikePart::FString(fstring) = string {
+                if let StringLikePart::FString(fstring) = string {
+                    // There are two cases where it's necessary to preserve the quotes if the
+                    // target version is pre 3.12 and the part is an f-string.
+                    if !self.context.options().target_version().supports_pep_701() {
                         // An f-string expression contains a debug text with a quote character
-                        // because the formatter will emit the debug expression **exactly** the same as in the source text.
+                        // because the formatter will emit the debug expression **exactly** the
+                        // same as in the source text.
                         if is_fstring_with_quoted_debug_expression(fstring, self.context) {
                             return QuoteStyle::Preserve;
                         }
 
-                        // An f-string expression that contains a triple quoted string literal expression
-                        // that contains a quote.
+                        // An f-string expression that contains a triple quoted string literal
+                        // expression that contains a quote.
                         if is_fstring_with_triple_quoted_literal_expression_containing_quotes(
                             fstring,
                             self.context,
@@ -79,7 +80,9 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                             return QuoteStyle::Preserve;
                         }
                     }
-                } else if let StringLikePart::FString(fstring) = string {
+
+                    // An f-string expression element contains a debug text and the corresponding
+                    // format specifier has a literal element with a quote character.
                     if is_fstring_with_quoted_format_spec_and_debug(fstring, self.context) {
                         return QuoteStyle::Preserve;
                     }
@@ -775,7 +778,7 @@ impl<'str> CharIndicesWithOffset<'str> {
     }
 }
 
-impl<'str> Iterator for CharIndicesWithOffset<'str> {
+impl Iterator for CharIndicesWithOffset<'_> {
     type Item = (usize, char);
 
     fn next(&mut self) -> Option<Self::Item> {

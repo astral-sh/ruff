@@ -669,7 +669,7 @@ impl<'a> Deref for SegmentsVec<'a> {
     }
 }
 
-impl<'a, 'b> PartialEq<SegmentsVec<'b>> for SegmentsVec<'a> {
+impl<'b> PartialEq<SegmentsVec<'b>> for SegmentsVec<'_> {
     fn eq(&self, other: &SegmentsVec<'b>) -> bool {
         self.as_slice() == other.as_slice()
     }

@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{Expr, Parameters, TypeParam, TypeParams};
@@ -56,8 +56,8 @@ use ruff_text_size::{Ranged, TextRange};
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
 /// [PEP 695]: https://peps.python.org/pep-0695/
-#[violation]
-pub struct CustomTypeVarReturnType {
+#[derive(ViolationMetadata)]
+pub(crate) struct CustomTypeVarReturnType {
     method_name: String,
     in_stub: bool,
 }
@@ -146,7 +146,7 @@ enum Method<'a> {
     Instance(InstanceMethod<'a>),
 }
 
-impl<'a> Method<'a> {
+impl Method<'_> {
     fn uses_custom_var(&self) -> bool {
         match self {
             Self::Class(class_method) => class_method.uses_custom_var(),
@@ -162,7 +162,7 @@ struct ClassMethod<'a> {
     type_params: Option<&'a TypeParams>,
 }
 
-impl<'a> ClassMethod<'a> {
+impl ClassMethod<'_> {
     /// Returns `true` if the class method is annotated with
     /// a custom `TypeVar` that is likely private.
     fn uses_custom_var(&self) -> bool {
@@ -203,7 +203,7 @@ struct InstanceMethod<'a> {
     type_params: Option<&'a TypeParams>,
 }
 
-impl<'a> InstanceMethod<'a> {
+impl InstanceMethod<'_> {
     /// Returns `true` if the instance method is annotated with
     /// a custom `TypeVar` that is likely private.
     fn uses_custom_var(&self) -> bool {

@@ -1,7 +1,7 @@
 use ruff_python_ast::{ExceptHandler, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -37,8 +37,8 @@ use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-703](https://cwe.mitre.org/data/definitions/703.html)
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
-#[violation]
-pub struct TryExceptPass;
+#[derive(ViolationMetadata)]
+pub(crate) struct TryExceptPass;
 
 impl Violation for TryExceptPass {
     #[derive_message_formats]

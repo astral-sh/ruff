@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::ExprSubscript;
 use ruff_python_semantic::SemanticModel;
 
@@ -35,8 +35,8 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 /// the fix should be safe to apply.
 ///
 /// [PEP 646]: https://peps.python.org/pep-0646/
-#[violation]
-pub struct NonPEP646Unpack;
+#[derive(ViolationMetadata)]
+pub(crate) struct NonPEP646Unpack;
 
 impl Violation for NonPEP646Unpack {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;

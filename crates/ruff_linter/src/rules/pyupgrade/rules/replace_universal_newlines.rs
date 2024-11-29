@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -34,8 +34,8 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ## References
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
-#[violation]
-pub struct ReplaceUniversalNewlines;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReplaceUniversalNewlines;
 
 impl AlwaysFixableViolation for ReplaceUniversalNewlines {
     #[derive_message_formats]

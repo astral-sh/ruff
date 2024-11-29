@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/binary.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -425,6 +424,19 @@ if True:
                     "permissions to manage this role, or else members of this role won't receive "
                     "a notification."
                 )
+
+# This f-string should be flattened
+xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
+    expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (
+    yyyyyyyyyyyyyy + zzzzzzzzzzz
+)
+
+# This is not a multiline f-string, but the expression is too long so it should be
+# wrapped in parentheses.
+f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
 ```
 
 ## Output
@@ -897,4 +909,54 @@ if True:
                     "permissions to manage this role, or else members of this role won't receive "
                     "a notification."
                 )
+
+# This f-string should be flattened
+xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
+    expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (yyyyyyyyyyyyyy + zzzzzzzzzzz)
+
+# This is not a multiline f-string, but the expression is too long so it should be
+# wrapped in parentheses.
+f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (
+    aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb
+)
+aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
+        worlddddddddddddddddddddddddddddddddd" + (
+    aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb
+)
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -468,16 +468,19 @@
+                 )
+ 
+ # This f-string should be flattened
+-xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {
+-    expression } bbbbbbbbbbbbbbbbbbbbbbbb" + (yyyyyyyyyyyyyy + zzzzzzzzzzz)
++xxxxxxxxxxxxxxxx = f"aaaaaaaaaaaaaaaaaaaaa {expression} bbbbbbbbbbbbbbbbbbbbbbbb" + (
++    yyyyyyyyyyyyyy + zzzzzzzzzzz
++)
+ 
+ # This is not a multiline f-string, but the expression is too long so it should be
+ # wrapped in parentheses.
+-f"hellooooooooooooooooooooooo \
+-        worlddddddddddddddddddddddddddddddddd" + (
+-    aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb
++(
++    f"hellooooooooooooooooooooooo \
++        worlddddddddddddddddddddddddddddddddd"
++    + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+ )
+-aaaaaaaaaaa = f"hellooooooooooooooooooooooo \
+-        worlddddddddddddddddddddddddddddddddd" + (
+-    aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb
++aaaaaaaaaaa = (
++    f"hellooooooooooooooooooooooo \
++        worlddddddddddddddddddddddddddddddddd"
++    + (aaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbb)
+ )
 ```

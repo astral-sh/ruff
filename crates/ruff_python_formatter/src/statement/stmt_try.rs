@@ -47,12 +47,10 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
 }
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ExceptHandler,
-        FormatExceptHandler,
-        PyFormatContext<'ast>,
-    > where Self: 'a;
+    type Format<'a>
+        = FormatRefWithRule<'a, ExceptHandler, FormatExceptHandler, PyFormatContext<'ast>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatExceptHandler::default())

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -29,8 +29,8 @@ use crate::docstrings::Docstring;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct FirstLineCapitalized {
+#[derive(ViolationMetadata)]
+pub(crate) struct FirstLineCapitalized {
     first_word: String,
     capitalized_word: String,
 }

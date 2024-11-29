@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
@@ -38,8 +38,8 @@ use crate::rules::pep8_naming::helpers;
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
-#[violation]
-pub struct NonLowercaseVariableInFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonLowercaseVariableInFunction {
     name: String,
 }
 

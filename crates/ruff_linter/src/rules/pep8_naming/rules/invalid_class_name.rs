@@ -1,7 +1,7 @@
 use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 
 use crate::rules::pep8_naming::settings::IgnoreNames;
@@ -35,8 +35,8 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#class-names
-#[violation]
-pub struct InvalidClassName {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidClassName {
     name: String,
 }
 

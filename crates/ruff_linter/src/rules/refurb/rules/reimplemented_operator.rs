@@ -5,7 +5,7 @@ use anyhow::Result;
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
@@ -22,7 +22,7 @@ use crate::Locator;
 ///
 /// ## Why is this bad?
 /// The `operator` module provides functions that implement the same functionality as the
-/// corresponding operators. For example, `operator.add` is equivalent to `lambda x, y: x + y`.
+/// corresponding operators. For example, `operator.add` is often equivalent to `lambda x, y: x + y`.
 /// Using the functions from the `operator` module is more concise and communicates the intent of
 /// the code more clearly.
 ///
@@ -44,12 +44,32 @@ use crate::Locator;
 /// ```
 ///
 /// ## Fix safety
-/// This fix is usually safe, but if the lambda is called with keyword arguments, e.g.,
-/// `add = lambda x, y: x + y; add(x=1, y=2)`, replacing the lambda with an operator function, e.g.,
-/// `operator.add`, will cause the call to raise a `TypeError`, as functions in `operator` do not allow
-/// keyword arguments.
-#[violation]
-pub struct ReimplementedOperator {
+/// The fix offered by this rule is always marked as unsafe. While the changes the fix would make
+/// would rarely break your code, there are two ways in which functions from the `operator` module
+/// differ from user-defined functions. It would be non-trivial for Ruff to detect whether or not
+/// these differences would matter in a specific situation where Ruff is emitting a diagnostic for
+/// this rule.
+///
+/// The first difference is that `operator` functions cannot be called with keyword arguments, but
+/// most user-defined functions can. If an `add` function is defined as `add = lambda x, y: x + y`,
+/// replacing this function with `operator.add` will cause the later call to raise `TypeError` if
+/// the function is later called with keyword arguments, e.g. `add(x=1, y=2)`.
+///
+/// The second difference is that user-defined functions are [descriptors], but this is not true of
+/// the functions defined in the `operator` module. Practically speaking, this means that defining
+/// a function in a class body (either by using a `def` statement or assigning a `lambda` function
+/// to a variable) is a valid way of defining an instance method on that class; monkeypatching a
+/// user-defined function onto a class after the class has been created also has the same effect.
+/// The same is not true of an `operator` function: assigning an `operator` function to a variable
+/// in a class body or monkeypatching one onto a class will not create a valid instance method.
+/// Ruff will refrain from emitting diagnostics for this rule on function definitions in class
+/// bodies; however, it does not currently have sophisticated enough type inference to avoid
+/// emitting this diagnostic if a user-defined function is being monkeypatched onto a class after
+/// the class has been constructed.
+///
+/// [descriptors]: https://docs.python.org/3/howto/descriptor.html
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedOperator {
     operator: Operator,
     target: FunctionLikeKind,
 }
@@ -60,14 +80,7 @@ impl Violation for ReimplementedOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ReimplementedOperator { operator, target } = self;
-        match target {
-            FunctionLikeKind::Function => {
-                format!("Use `operator.{operator}` instead of defining a function")
-            }
-            FunctionLikeKind::Lambda => {
-                format!("Use `operator.{operator}` instead of defining a lambda")
-            }
-        }
+        format!("Use `operator.{operator}` instead of defining a {target}")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -79,10 +92,16 @@ impl Violation for ReimplementedOperator {
 /// FURB118
 pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
     // Ignore methods.
-    if target.kind() == FunctionLikeKind::Function {
-        if checker.semantic().current_scope().kind.is_class() {
-            return;
-        }
+    // Methods can be defined via a `def` statement in a class scope,
+    // or via a lambda appearing on the right-hand side of an assignment in a class scope.
+    if checker.semantic().current_scope().kind.is_class()
+        && (target.is_function_def()
+            || checker
+                .semantic()
+                .current_statements()
+                .any(|stmt| matches!(stmt, Stmt::AnnAssign(_) | Stmt::Assign(_))))
+    {
+        return;
     }
 
     let Some(params) = target.parameters() else {
@@ -139,6 +158,10 @@ impl FunctionLike<'_> {
             Self::Lambda(expr) => expr.parameters.as_deref(),
             Self::Function(stmt) => Some(&stmt.parameters),
         }
+    }
+
+    const fn is_function_def(&self) -> bool {
+        matches!(self, Self::Function(_))
     }
 
     /// Return the body of the function-like node.
@@ -327,10 +350,25 @@ fn get_operator(expr: &Expr, params: &Parameters, locator: &Locator) -> Option<O
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum FunctionLikeKind {
     Lambda,
     Function,
+}
+
+impl FunctionLikeKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Lambda => "lambda",
+            Self::Function => "function",
+        }
+    }
+}
+
+impl Display for FunctionLikeKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Return the name of the `operator` implemented by the given unary expression.

@@ -85,6 +85,19 @@ impl ResolvedReference {
         self.flags
             .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
     }
+
+    /// Return `true` if the context is in the r.h.s. of a [PEP 613] type alias.
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    pub const fn in_annotated_type_alias_value(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::ANNOTATED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the context is inside an `assert` statement
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
+    }
 }
 
 impl Ranged for ResolvedReference {

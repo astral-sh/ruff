@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::StringLiteral;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -24,8 +24,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Unicode HOWTO](https://docs.python.org/3/howto/unicode.html)
-#[violation]
-pub struct UnicodeKindPrefix;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnicodeKindPrefix;
 
 impl AlwaysFixableViolation for UnicodeKindPrefix {
     #[derive_message_formats]

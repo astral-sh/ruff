@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr, Int};
 use ruff_text_size::Ranged;
 
@@ -31,8 +31,8 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
-#[violation]
-pub struct ZipInsteadOfPairwise;
+#[derive(ViolationMetadata)]
+pub(crate) struct ZipInsteadOfPairwise;
 
 impl Violation for ZipInsteadOfPairwise {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

@@ -11,8 +11,8 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::{
-    flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
+    airflow, flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
+    flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
     flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_use_pathlib, flynt, numpy,
@@ -108,6 +108,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateLiteralMember,
                 Rule::RedundantBoolLiteral,
                 Rule::RedundantNoneLiteral,
+                Rule::UnnecessaryNestedLiteral,
             ]) {
                 if !checker.semantic.in_nested_literal() {
                     if checker.enabled(Rule::DuplicateLiteralMember) {
@@ -118,6 +119,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::RedundantNoneLiteral) {
                         flake8_pyi::rules::redundant_none_literal(checker, expr);
+                    }
+                    if checker.enabled(Rule::UnnecessaryNestedLiteral) {
+                        ruff::rules::unnecessary_nested_literal(checker, expr);
                     }
                 }
             }
@@ -494,6 +498,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SuperWithoutBrackets) {
                 pylint::rules::super_without_brackets(checker, func);
             }
+            if checker.enabled(Rule::LenTest) {
+                pylint::rules::len_test(checker, call);
+            }
             if checker.enabled(Rule::BitCount) {
                 refurb::rules::bit_count(checker, call);
             }
@@ -856,6 +863,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.settings.preview.is_enabled()
+                && checker.any_enabled(&[
+                    Rule::PytestParametrizeNamesWrongType,
+                    Rule::PytestParametrizeValuesWrongType,
+                    Rule::PytestDuplicateParametrizeTestCases,
+                ])
+            {
+                flake8_pytest_style::rules::parametrize(checker, call);
+            }
             if checker.enabled(Rule::PytestUnittestAssertion) {
                 if let Some(diagnostic) = flake8_pytest_style::rules::unittest_assertion(
                     checker, expr, func, args, keywords,
@@ -953,6 +969,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathGetmtime,
                 Rule::OsPathGetctime,
                 Rule::Glob,
+                Rule::OsListdir,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
@@ -1060,6 +1077,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnrawRePattern) {
                 ruff::rules::unraw_re_pattern(checker, call);
+            }
+            if checker.enabled(Rule::AirflowDagNoScheduleArgument) {
+                airflow::rules::dag_no_schedule_argument(checker, expr);
+            }
+            if checker.enabled(Rule::UnnecessaryRegularExpression) {
+                ruff::rules::unnecessary_regular_expression(checker, call);
             }
         }
         Expr::Dict(dict) => {
@@ -1625,9 +1648,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }
-        Expr::Named(..) => {
-            if checker.enabled(Rule::AssignmentInAssert) {
-                ruff::rules::assignment_in_assert(checker, expr);
+        Expr::Lambda(lambda_expr) => {
+            if checker.enabled(Rule::ReimplementedOperator) {
+                refurb::rules::reimplemented_operator(checker, &lambda_expr.into());
             }
         }
         _ => {}

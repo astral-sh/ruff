@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange};
@@ -32,8 +32,8 @@ use crate::Locator;
 /// This rule's fix is marked as unsafe because it changes the underlying value
 /// of the `Decimal` instance that is constructed. This can lead to unexpected
 /// behavior if your program relies on the previous value (whether deliberately or not).
-#[violation]
-pub struct DecimalFromFloatLiteral;
+#[derive(ViolationMetadata)]
+pub(crate) struct DecimalFromFloatLiteral;
 
 impl AlwaysFixableViolation for DecimalFromFloatLiteral {
     #[derive_message_formats]

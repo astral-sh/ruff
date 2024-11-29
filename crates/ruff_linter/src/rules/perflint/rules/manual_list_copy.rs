@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_list;
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// original = list(range(10000))
 /// filtered = list(original)
 /// ```
-#[violation]
-pub struct ManualListCopy;
+#[derive(ViolationMetadata)]
+pub(crate) struct ManualListCopy;
 
 impl Violation for ManualListCopy {
     #[derive_message_formats]
