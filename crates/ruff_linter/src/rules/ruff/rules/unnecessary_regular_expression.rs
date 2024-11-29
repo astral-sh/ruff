@@ -176,9 +176,7 @@ impl<'a> ReFunc<'a> {
             ("sub", 3) => {
                 let repl = call.arguments.find_argument("repl", 1)?;
                 // make sure repl can be resolved to a string literal
-                if !is_str(repl, semantic) {
-                    return None;
-                }
+                resolve_string_literal(repl, semantic)?;
                 Some(ReFunc {
                     kind: ReFuncKind::Sub { repl },
                     pattern: call.arguments.find_argument("pattern", 0)?,
@@ -250,21 +248,6 @@ impl<'a> ReFunc<'a> {
             range: TextRange::default(),
         })
     }
-}
-
-/// Return `true` if `name` is a string literal or otherwise inferred to be a
-/// string.
-fn is_str(name: &Expr, semantic: &SemanticModel) -> bool {
-    if name.is_string_literal_expr() {
-        return true;
-    }
-    let Some(name_expr) = name.as_name_expr() else {
-        return false;
-    };
-    let Some(bid) = semantic.only_binding(name_expr) else {
-        return false;
-    };
-    ruff_python_semantic::analyze::typing::is_str(semantic.binding(bid), semantic)
 }
 
 /// Try to resolve `name` to an [`ExprStringLiteral`] in `semantic`.

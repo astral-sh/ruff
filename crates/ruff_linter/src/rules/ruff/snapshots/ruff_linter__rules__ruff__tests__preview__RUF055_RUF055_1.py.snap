@@ -38,22 +38,3 @@ RUF055_1.py:17:1: RUF055 [*] Plain string pattern passed to `re` function
 16 16 | repl = "new"
 17    |-re.sub(r"abc", repl, haystack)
    17 |+haystack.replace("abc", repl)
-18 18 | 
-19 19 | 
-20 20 | # repl can also be identified in annoted function arguments
-
-RUF055_1.py:22:5: RUF055 [*] Plain string pattern passed to `re` function
-   |
-20 | # repl can also be identified in annoted function arguments
-21 | def foo(input_str: str, repl: str):
-22 |     re.sub("foobar", repl, input_str)
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
-   |
-   = help: Replace with `input_str.replace("foobar", repl)`
-
-ℹ Safe fix
-19 19 | 
-20 20 | # repl can also be identified in annoted function arguments
-21 21 | def foo(input_str: str, repl: str):
-22    |-    re.sub("foobar", repl, input_str)
-   22 |+    input_str.replace("foobar", repl)
