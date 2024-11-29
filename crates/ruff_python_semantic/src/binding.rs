@@ -135,6 +135,15 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::IN_EXCEPT_HANDLER)
     }
 
+    /// Return `true` if this [`Binding`] took place inside an `assert` statement,
+    /// e.g. `y` in:
+    /// ```python
+    /// assert (y := x**2), y
+    /// ```
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.contains(BindingFlags::IN_ASSERT_STATEMENT)
+    }
+
     /// Return `true` if this [`Binding`] represents a [PEP 613] type alias
     /// e.g. `OptString` in:
     /// ```python
@@ -264,6 +273,15 @@ impl<'a> Binding<'a> {
     pub fn statement<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b Stmt> {
         self.source
             .map(|statement_id| semantic.statement(statement_id))
+    }
+
+    /// Returns the expression in which the binding was defined
+    /// (e.g. for the binding `x` in `y = (x := 1)`, return the node representing `x := 1`).
+    ///
+    /// This is only really applicable for assignment expressions.
+    pub fn expression<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b ast::Expr> {
+        self.source
+            .and_then(|expression_id| semantic.parent_expression(expression_id))
     }
 
     /// Returns the range of the binding's parent.
@@ -405,6 +423,14 @@ bitflags! {
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
         const DEFERRED_TYPE_ALIAS = 1 << 12;
+
+        /// The binding took place inside an `assert` statement
+        ///
+        /// For example, `x` in the following snippet:
+        /// ```python
+        /// assert (x := y**2) > 42, x
+        /// ```
+        const IN_ASSERT_STATEMENT = 1 << 13;
 
         /// The binding represents any type alias.
         const TYPE_ALIAS = Self::ANNOTATED_TYPE_ALIAS.bits() | Self::DEFERRED_TYPE_ALIAS.bits();

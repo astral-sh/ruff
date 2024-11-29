@@ -1648,11 +1648,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }
-        Expr::Named(..) => {
-            if checker.enabled(Rule::AssignmentInAssert) {
-                ruff::rules::assignment_in_assert(checker, expr);
-            }
-        }
         Expr::Lambda(lambda_expr) => {
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &lambda_expr.into());
