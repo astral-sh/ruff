@@ -44,15 +44,6 @@ pub(crate) fn core_module_symbol<'db>(
     core_module: CoreStdlibModule,
     symbol: &str,
 ) -> Symbol<'db> {
-    // if core_module == CoreStdlibModule::Sys && symbol == "version_info" {
-    //     return Symbol::Type(KnownClass::VersionInfo.to_instance(db), Boundness::Bound);
-    // } else if core_module == CoreStdlibModule::Sys && symbol == "_version_info" {
-    //     return Symbol::Type(
-    //         KnownClass::VersionInfo.to_class_literal(db),
-    //         Boundness::Bound,
-    //     );
-    // }
-
     resolve_module(db, &core_module.name())
         .map(|module| global_symbol(db, module.file(), symbol))
         .unwrap_or(Symbol::Unbound)

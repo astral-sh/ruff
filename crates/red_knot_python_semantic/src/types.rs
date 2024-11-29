@@ -890,23 +890,7 @@ impl<'db> Type<'db> {
 
         // TODO: Once we have support for final classes, we can establish that
         // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
-
-        // TODO: The following is a workaround that is required to unify the two different versions
-        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
-        // we understand `sys.version_info` branches.
-        self == other
-            || matches!((self, other), (Type::Todo(_), Type::Todo(_)))
-            || matches!((self, other),
-                (
-                    Type::Instance(InstanceType { class: self_class }),
-                    Type::Instance(InstanceType { class: target_class })
-                )
-                if {
-                    let self_known = self_class.known(db);
-                    matches!(self_known, Some(KnownClass::NoneType | KnownClass::NoDefaultType)) // TODO: remove this
-                        && self_known == target_class.known(db)
-                }
-            )
+        self == other || matches!((self, other), (Type::Todo(_), Type::Todo(_)))
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -1890,13 +1874,13 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        core_module_symbol(db, self.canonical_module(), self.as_str())
+        core_module_symbol(db, self.canonical_module(db), self.as_str())
             .ignore_possibly_unbound()
             .unwrap_or(Type::Unknown)
     }
 
     /// Return the module in which we should look up the definition for this class
-    pub(crate) const fn canonical_module(self) -> CoreStdlibModule {
+    pub(crate) fn canonical_module(self, db: &'db dyn Db) -> CoreStdlibModule {
         match self {
             Self::Bool
             | Self::Object
@@ -1914,10 +1898,18 @@ impl<'db> KnownClass {
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
             Self::NoneType => CoreStdlibModule::Typeshed,
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType => CoreStdlibModule::Typing,
-            // TODO when we understand sys.version_info, we will need an explicit fallback here,
-            // because typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
-            // singleton, but not for `typing._NoDefaultType`
-            Self::NoDefaultType => CoreStdlibModule::TypingExtensions,
+            Self::NoDefaultType => {
+                let python_version = Program::get(db).target_version(db);
+
+                // typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
+                // singleton, but not for `typing._NoDefaultType`. So we need to switch
+                // to `typing.NoDefault` for newer versions:
+                if python_version.major >= 3 && python_version.minor >= 13 {
+                    CoreStdlibModule::Typing
+                } else {
+                    CoreStdlibModule::TypingExtensions
+                }
+            }
         }
     }
 
@@ -1977,11 +1969,11 @@ impl<'db> KnownClass {
         };
 
         let module = file_to_module(db, file)?;
-        candidate.check_module(&module).then_some(candidate)
+        candidate.check_module(db, &module).then_some(candidate)
     }
 
     /// Return `true` if the module of `self` matches `module_name`
-    fn check_module(self, module: &Module) -> bool {
+    fn check_module(self, db: &dyn Db, module: &Module) -> bool {
         if !module.search_path().is_standard_library() {
             return false;
         }
@@ -2001,7 +1993,7 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::ModuleType
             | Self::VersionInfo
-            | Self::FunctionType => module.name() == self.canonical_module().as_str(),
+            | Self::FunctionType => module.name() == self.canonical_module(db).as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
                 matches!(module.name().as_str(), "typing" | "typing_extensions")
@@ -3171,7 +3163,7 @@ pub(crate) mod tests {
     use ruff_python_ast as ast;
     use test_case::test_case;
 
-    pub(crate) fn setup_db() -> TestDb {
+    pub(crate) fn setup_db_with_python_version(python_version: PythonVersion) -> TestDb {
         let db = TestDb::new();
 
         let src_root = SystemPathBuf::from("/src");
@@ -3182,13 +3174,17 @@ pub(crate) mod tests {
         Program::from_settings(
             &db,
             &ProgramSettings {
-                target_version: PythonVersion::default(),
+                target_version: python_version,
                 search_paths: SearchPathSettings::new(src_root),
             },
         )
         .expect("Valid search path settings");
 
         db
+    }
+
+    pub(crate) fn setup_db() -> TestDb {
+        setup_db_with_python_version(PythonVersion::default())
     }
 
     /// A test representation of a type that can be transformed unambiguously into a real Type,
@@ -3638,11 +3634,21 @@ pub(crate) mod tests {
     #[test_case(Ty::None)]
     #[test_case(Ty::BooleanLiteral(true))]
     #[test_case(Ty::BooleanLiteral(false))]
-    // #[test_case(Ty::KnownClassInstance(KnownClass::NoDefaultType))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_singleton(&db));
+    }
+
+    /// TODO: test documentation
+    #[test_case(PythonVersion::PY312)]
+    #[test_case(PythonVersion::PY313)]
+    fn no_default_type_is_singleton(python_version: PythonVersion) {
+        let db = setup_db_with_python_version(python_version);
+
+        let no_default = Ty::KnownClassInstance(KnownClass::NoDefaultType).into_type(&db);
+
+        assert!(no_default.is_singleton(&db));
     }
 
     #[test_case(Ty::None)]
@@ -3736,7 +3742,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    #[ignore]
     fn typing_vs_typeshed_no_default() {
         let db = setup_db();
 
