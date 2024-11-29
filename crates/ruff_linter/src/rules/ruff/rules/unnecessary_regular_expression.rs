@@ -251,13 +251,7 @@ impl<'a> ReFunc<'a> {
 }
 
 /// Recursively try to resolve `name` to an [`ExprStringLiteral`] in `semantic`.
-fn resolve_name<'a, 'b>(
-    name: &'a Expr,
-    semantic: &'b SemanticModel,
-) -> Option<&'b ExprStringLiteral>
-where
-    'a: 'b,
-{
+fn resolve_name<'a>(name: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a ExprStringLiteral> {
     if name.is_string_literal_expr() {
         return name.as_string_literal_expr();
     }
