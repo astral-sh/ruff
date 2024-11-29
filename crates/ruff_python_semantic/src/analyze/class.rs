@@ -12,31 +12,28 @@ pub fn any_qualified_base_class(
     semantic: &SemanticModel,
     func: &dyn Fn(QualifiedName) -> bool,
 ) -> bool {
-    any_base_class(class_def, semantic, &mut |expr| {
+    any_base_class(class_def, semantic, &|expr| {
         semantic
             .resolve_qualified_name(map_subscript(expr))
             .is_some_and(func)
     })
 }
 
-/// Return `true` if any base class matches an [`Expr`] predicate.
-pub fn any_base_class(
-    class_def: &ast::StmtClassDef,
-    semantic: &SemanticModel,
-    func: &mut dyn FnMut(&Expr) -> bool,
-) -> bool {
-    fn inner(
-        class_def: &ast::StmtClassDef,
-        semantic: &SemanticModel,
-        func: &mut dyn FnMut(&Expr) -> bool,
+/// Iterate recursively over the base classes of `class_def`.
+fn iter_base_classes<'a>(
+    class_def: &'a ruff_python_ast::StmtClassDef,
+    semantic: &'a SemanticModel,
+) -> impl Iterator<Item = &'a Expr> {
+    fn inner<'a>(
+        class_def: &'a ast::StmtClassDef,
+        semantic: &'a SemanticModel,
         seen: &mut FxHashSet<BindingId>,
-    ) -> bool {
-        class_def.bases().iter().any(|expr| {
+        exprs: &mut Vec<&'a Expr>,
+    ) {
+        for expr in class_def.bases() {
             // If the base class itself matches the pattern, then this does too.
             // Ex) `class Foo(BaseModel): ...`
-            if func(expr) {
-                return true;
-            }
+            exprs.push(expr);
 
             // If the base class extends a class that matches the pattern, then this does too.
             // Ex) `class Bar(BaseModel): ...; class Foo(Bar): ...`
@@ -49,21 +46,26 @@ pub fn any_base_class(
                         .map(|id| &semantic.scopes[*id])
                         .and_then(|scope| scope.kind.as_class())
                     {
-                        if inner(base_class, semantic, func, seen) {
-                            return true;
-                        }
+                        inner(base_class, semantic, seen, exprs);
                     }
                 }
             }
-            false
-        })
+        }
     }
 
-    if class_def.bases().is_empty() {
-        return false;
-    }
+    let mut exprs = Vec::new();
+    inner(class_def, semantic, &mut FxHashSet::default(), &mut exprs);
 
-    inner(class_def, semantic, func, &mut FxHashSet::default())
+    exprs.into_iter()
+}
+
+/// Return `true` if any base class matches an [`Expr`] predicate.
+pub fn any_base_class(
+    class_def: &ast::StmtClassDef,
+    semantic: &SemanticModel,
+    func: &dyn Fn(&Expr) -> bool,
+) -> bool {
+    iter_base_classes(class_def, semantic).any(func)
 }
 
 /// Return `true` if any base class matches an [`ast::StmtClassDef`] predicate.
@@ -139,7 +141,7 @@ impl From<IsMetaclass> for bool {
 /// `IsMetaclass::Maybe` otherwise.
 pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
     let mut maybe = false;
-    let is_base_class = any_base_class(class_def, semantic, &mut |expr| match expr {
+    let is_base_class = iter_base_classes(class_def, semantic).any(|expr| match expr {
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
