@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -143,6 +144,10 @@ impl Violation for PandasUseOfDotIat {
 }
 
 pub(crate) fn subscript(checker: &mut Checker, value: &Expr, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::PANDAS) {
+        return;
+    }
+
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = value else {
         return;
     };
