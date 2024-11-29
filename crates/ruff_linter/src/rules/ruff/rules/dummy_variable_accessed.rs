@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of variables marked as unused (variable names starting with an underscore, except '_') in functions.
+/// Checks for usages of variables marked as unused in functions (dummy variable names starting with an underscore, except '_').
 ///
 /// ## Why is this bad?
 /// Marking variables with a leading underscore conveys that they are intentionally unused within the function or method.
@@ -33,12 +33,12 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
 #[derive(ViolationMetadata)]
-pub(crate) struct UnusedVariableAccessed {
+pub(crate) struct DummyVariableAccessed {
     name: String,
     shadowed_kind: ShadowedKind,
 }
 
-impl Violation for UnusedVariableAccessed {
+impl Violation for DummyVariableAccessed {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -61,7 +61,7 @@ impl Violation for UnusedVariableAccessed {
 }
 
 /// RUF052
-pub(crate) fn unused_variable_accessed(
+pub(crate) fn dummy_variable_accessed(
     checker: &Checker,
     binding: &Binding,
 ) -> Option<Vec<Diagnostic>> {
@@ -115,7 +115,7 @@ pub(crate) fn unused_variable_accessed(
             .iter()
             .map(|ref_id| {
                 Diagnostic::new(
-                    UnusedVariableAccessed {
+                    DummyVariableAccessed {
                         name: name.to_string(),
                         shadowed_kind: kind,
                     },

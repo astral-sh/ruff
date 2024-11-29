@@ -5,6 +5,7 @@ pub(crate) use asyncio_dangling_task::*;
 pub(crate) use collection_literal_concatenation::*;
 pub(crate) use decimal_from_float_literal::*;
 pub(crate) use default_factory_kwarg::*;
+pub(crate) use dummy_variable_accessed::*;
 pub(crate) use explicit_f_string_type_conversion::*;
 pub(crate) use function_call_in_dataclass_default::*;
 pub(crate) use implicit_optional::*;
@@ -48,6 +49,7 @@ mod collection_literal_concatenation;
 mod confusables;
 mod decimal_from_float_literal;
 mod default_factory_kwarg;
+mod dummy_variable_accessed;
 mod explicit_f_string_type_conversion;
 mod function_call_in_dataclass_default;
 mod helpers;
@@ -92,6 +94,3 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
-pub(crate) use unused_variable_accessed::*;
-
-mod unused_variable_accessed;

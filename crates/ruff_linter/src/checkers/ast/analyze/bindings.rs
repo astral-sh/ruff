@@ -18,7 +18,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnsortedDunderSlots,
         Rule::UnusedVariable,
         Rule::UnquotedTypeAlias,
-        Rule::UnusedVariableAccessed,
+        Rule::DummyVariableAccessed,
     ]) {
         return;
     }
@@ -88,8 +88,8 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        if checker.enabled(Rule::UnusedVariableAccessed) {
-            if let Some(diagnostics) = ruff::rules::unused_variable_accessed(checker, binding) {
+        if checker.enabled(Rule::DummyVariableAccessed) {
+            if let Some(diagnostics) = ruff::rules::dummy_variable_accessed(checker, binding) {
                 checker.diagnostics.extend(diagnostics);
             }
         }
