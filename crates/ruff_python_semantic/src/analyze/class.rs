@@ -121,6 +121,7 @@ pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -
 }
 
 /// Whether or not a class is a metaclass. Constructed by [`is_metaclass`].
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IsMetaclass {
     Yes,
     No,
