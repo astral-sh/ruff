@@ -93,7 +93,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
     };
 
     // For now, restrict this rule to string literals and variables that can be resolved to literals
-    let Some(string_lit) = resolve_name(re_func.pattern, semantic) else {
+    let Some(string_lit) = resolve_string_literal(re_func.pattern, semantic) else {
         return;
     };
 
@@ -176,7 +176,7 @@ impl<'a> ReFunc<'a> {
             ("sub", 3) => {
                 let repl = call.arguments.find_argument("repl", 1)?;
                 // make sure repl can be resolved to a string literal
-                resolve_name(repl, semantic)?;
+                resolve_string_literal(repl, semantic)?;
                 Some(ReFunc {
                     kind: ReFuncKind::Sub { repl },
                     pattern: call.arguments.find_argument("pattern", 0)?,
@@ -251,7 +251,10 @@ impl<'a> ReFunc<'a> {
 }
 
 /// Recursively try to resolve `name` to an [`ExprStringLiteral`] in `semantic`.
-fn resolve_name<'a>(name: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a ExprStringLiteral> {
+fn resolve_string_literal<'a>(
+    name: &'a Expr,
+    semantic: &'a SemanticModel,
+) -> Option<&'a ExprStringLiteral> {
     if name.is_string_literal_expr() {
         return name.as_string_literal_expr();
     }
