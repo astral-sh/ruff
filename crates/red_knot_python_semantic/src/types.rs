@@ -1,5 +1,4 @@
 use std::hash::Hash;
-use std::num::TryFromIntError;
 
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -434,14 +433,6 @@ pub enum Type<'db> {
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
-}
-
-impl TryFrom<usize> for Type<'_> {
-    type Error = TryFromIntError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        i64::try_from(value).map(Type::IntLiteral)
-    }
 }
 
 impl<'db> Type<'db> {
@@ -1371,11 +1362,15 @@ impl<'db> Type<'db> {
     /// This is used to determine the value that would be returned
     /// when `len(x)` is called on an object `x`.
     fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        match self {
-            Type::BytesLiteral(bytes) => return bytes.len(db).try_into().ok(),
-            Type::StringLiteral(string) => return string.python_len(db).try_into().ok(),
-            Type::Tuple(tuple) => return tuple.elements(db).len().try_into().ok(),
-            _ => {}
+        let usize_len = match self {
+            Type::BytesLiteral(bytes) => Some(bytes.len(db)),
+            Type::StringLiteral(string) => Some(string.python_len(db)),
+            Type::Tuple(tuple) => Some(tuple.elements(db).len()),
+            _ => None,
+        };
+
+        if let Some(usize_len) = usize_len {
+            return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
         let return_ty = match self.call_dunder(db, "__len__", &[*self]) {
