@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::ExprStringLiteral;
@@ -175,8 +176,14 @@ impl<'a> ReFunc<'a> {
             // version
             ("sub", 3) => {
                 let repl = call.arguments.find_argument("repl", 1)?;
-                // make sure repl can be resolved to a string literal
-                resolve_string_literal(repl, semantic)?;
+                // make sure repl can be resolved to a string literal without
+                // backslash escapes other than ascii control characters
+                let lit = resolve_string_literal(repl, semantic)?;
+                for (c, next) in lit.value.chars().tuple_windows() {
+                    if c == '\\' && !"abfnrtv".contains(next) {
+                        return None;
+                    }
+                }
                 Some(ReFunc {
                     kind: ReFuncKind::Sub { repl },
                     pattern: call.arguments.find_argument("pattern", 0)?,
