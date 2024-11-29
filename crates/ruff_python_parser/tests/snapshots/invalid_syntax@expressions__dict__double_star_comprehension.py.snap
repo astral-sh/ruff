@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/double_star_comprehension.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -41,7 +40,7 @@ Module(
                                         ExprName {
                                             range: 130..133,
                                             id: Name("for"),
-                                            ctx: Load,
+                                            ctx: Invalid,
                                         },
                                     ),
                                 },

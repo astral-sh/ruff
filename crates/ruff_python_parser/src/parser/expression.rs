@@ -7,7 +7,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, UnaryOp,
+    Identifier, IpyEscapeKind, Number, Operator, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -446,18 +446,13 @@ impl<'src> Parser<'src> {
 
     /// Parses a name.
     ///
-    /// For an invalid name, the `id` field will be an empty string and the `ctx`
-    /// field will be [`ExprContext::Invalid`].
+    /// For an invalid name, the `id` field will be an empty string and if a keyword is used,
+    /// the `id` field will be the keyword name. In both cases, the `ctx` field will be
+    /// [`ExprContext::Invalid`].
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
     pub(super) fn parse_name(&mut self) -> ast::ExprName {
-        let identifier = self.parse_identifier();
-
-        let ctx = if identifier.is_valid() {
-            ExprContext::Load
-        } else {
-            ExprContext::Invalid
-        };
+        let (identifier, ctx) = self.parse_identifier().unwrap_with_context();
 
         ast::ExprName {
             range: identifier.range,
@@ -471,20 +466,20 @@ impl<'src> Parser<'src> {
     /// For an invalid identifier, the `id` field will be an empty string.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
-    pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
+    pub(super) fn parse_identifier(&mut self) -> IdentifierParseResult {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
             let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
-            return ast::Identifier { id: name, range };
+            return IdentifierParseResult::ok(name, range);
         }
 
         if self.current_token_kind().is_soft_keyword() {
-            let id = Name::new(self.src_text(range));
+            let name = Name::new(self.src_text(range));
             self.bump_soft_keyword_as_name();
-            return ast::Identifier { id, range };
+            return IdentifierParseResult::ok(name, range);
         }
 
         if self.current_token_kind().is_keyword() {
@@ -497,19 +492,16 @@ impl<'src> Parser<'src> {
                 range,
             );
 
-            let id = Name::new(self.src_text(range));
+            let name = Name::new(self.src_text(range));
             self.bump_any();
-            ast::Identifier { id, range }
+            IdentifierParseResult::err(name, range)
         } else {
             self.add_error(
                 ParseErrorType::OtherError("Expected an identifier".into()),
                 range,
             );
 
-            ast::Identifier {
-                id: Name::empty(),
-                range: self.missing_node_range(),
-            }
+            IdentifierParseResult::err(Name::empty(), self.missing_node_range())
         }
     }
 
@@ -942,12 +934,12 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprAttribute {
         self.bump(TokenKind::Dot);
 
-        let attr = self.parse_identifier();
+        let (attr, ctx) = self.parse_identifier().unwrap_with_context();
 
         ast::ExprAttribute {
             value: Box::new(value),
             attr,
-            ctx: ExprContext::Load,
+            ctx,
             range: self.node_range(start),
         }
     }
@@ -2584,6 +2576,39 @@ impl ExpressionContext {
             StarredExpressionPrecedence::BitwiseOr
         } else {
             StarredExpressionPrecedence::Conditional
+        }
+    }
+}
+
+/// A result-like type that represents the result of parsing an identifier.
+pub(super) struct IdentifierParseResult(Result<Identifier, Identifier>);
+
+impl IdentifierParseResult {
+    fn ok(name: Name, range: TextRange) -> Self {
+        IdentifierParseResult(Ok(Identifier { id: name, range }))
+    }
+
+    fn err(name: Name, range: TextRange) -> Self {
+        IdentifierParseResult(Err(Identifier { id: name, range }))
+    }
+
+    /// Unwraps the result and returns the inner [`Identifier`].
+    pub(super) fn into_inner(self) -> Identifier {
+        match self.0 {
+            Ok(identifier) | Err(identifier) => identifier,
+        }
+    }
+
+    /// Unwraps the result and returns the inner [`Identifier`] along with the [`ExprContext`].
+    ///
+    /// If the result is [`Ok`], the context is [`Load`], otherwise it's [`Invalid`].
+    ///
+    /// [`Load`]: ExprContext::Load
+    /// [`Invalid`]: ExprContext::Invalid
+    fn unwrap_with_context(self) -> (Identifier, ExprContext) {
+        match self.0 {
+            Ok(identifier) => (identifier, ExprContext::Load),
+            Err(identifier) => (identifier, ExprContext::Invalid),
         }
     }
 }

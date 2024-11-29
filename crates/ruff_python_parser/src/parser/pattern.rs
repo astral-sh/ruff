@@ -120,7 +120,7 @@ impl Parser<'_> {
                 self.add_error(ParseErrorType::InvalidStarPatternUsage, &lhs);
             }
 
-            let ident = self.parse_identifier();
+            let ident = self.parse_identifier().into_inner();
             lhs = Pattern::MatchAs(ast::PatternMatchAs {
                 range: self.node_range(start),
                 name: Some(ident),
@@ -183,7 +183,7 @@ impl Parser<'_> {
             let mapping_item_start = parser.node_start();
 
             if parser.eat(TokenKind::DoubleStar) {
-                let identifier = parser.parse_identifier();
+                let identifier = parser.parse_identifier().into_inner();
                 if rest.is_some() {
                     parser.add_error(
                         ParseErrorType::OtherError(
@@ -258,7 +258,7 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
-        let ident = self.parse_identifier();
+        let ident = self.parse_identifier().into_inner();
 
         ast::PatternMatchStar {
             range: self.node_range(start),
@@ -490,7 +490,7 @@ impl Parser<'_> {
                         //     case case: ...
                         //     case match: ...
                         //     case type: ...
-                        let ident = self.parse_identifier();
+                        let ident = self.parse_identifier().into_inner();
 
                         // test_ok match_as_pattern
                         // match foo:

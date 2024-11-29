@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/invalid_order.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -106,7 +105,7 @@ Module(
                                 ExprName {
                                     range: 126..128,
                                     id: Name("is"),
-                                    ctx: Load,
+                                    ctx: Invalid,
                                 },
                             ),
                         },

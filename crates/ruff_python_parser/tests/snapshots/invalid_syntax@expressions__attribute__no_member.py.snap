@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/no_member.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -27,7 +26,7 @@ Module(
                                 id: Name(""),
                                 range: 93..93,
                             },
-                            ctx: Load,
+                            ctx: Invalid,
                         },
                     ),
                 },
@@ -61,7 +60,7 @@ Module(
                                 id: Name(""),
                                 range: 141..141,
                             },
-                            ctx: Load,
+                            ctx: Invalid,
                         },
                     ),
                 },

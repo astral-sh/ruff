@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/missing_closing_brace_0.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -31,7 +30,7 @@ Module(
                                         ExprName {
                                             range: 5..8,
                                             id: Name("def"),
-                                            ctx: Load,
+                                            ctx: Invalid,
                                         },
                                     ),
                                 },
@@ -59,7 +58,7 @@ Module(
                                         ExprName {
                                             range: 20..24,
                                             id: Name("pass"),
-                                            ctx: Load,
+                                            ctx: Invalid,
                                         },
                                     ),
                                 },

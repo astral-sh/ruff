@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/aug_assign_stmt_invalid_target.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -134,7 +133,7 @@ Module(
                         ExprName {
                             range: 41..45,
                             id: Name("pass"),
-                            ctx: Load,
+                            ctx: Invalid,
                         },
                     ),
                 },

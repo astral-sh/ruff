@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missing_expression_2.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -27,7 +26,7 @@ Module(
                                 ExprName {
                                     range: 68..71,
                                     id: Name("def"),
-                                    ctx: Load,
+                                    ctx: Invalid,
                                 },
                             ),
                         },
@@ -58,7 +57,7 @@ Module(
                         ExprName {
                             range: 83..87,
                             id: Name("pass"),
-                            ctx: Load,
+                            ctx: Invalid,
                         },
                     ),
                     value: None,

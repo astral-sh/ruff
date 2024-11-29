@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/assert_invalid_test_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -36,7 +35,7 @@ Module(
                         ExprName {
                             range: 17..23,
                             id: Name("assert"),
-                            ctx: Load,
+                            ctx: Invalid,
                         },
                     ),
                     msg: None,

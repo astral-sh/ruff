@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/multiple_dots.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -30,7 +29,7 @@ Module(
                                         id: Name(""),
                                         range: 6..6,
                                     },
-                                    ctx: Load,
+                                    ctx: Invalid,
                                 },
                             ),
                             attr: Identifier {
@@ -104,7 +103,7 @@ Module(
                                         id: Name(""),
                                         range: 40..40,
                                     },
-                                    ctx: Load,
+                                    ctx: Invalid,
                                 },
                             ),
                             attr: Identifier {
