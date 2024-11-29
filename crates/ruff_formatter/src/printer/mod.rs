@@ -1049,8 +1049,6 @@ struct FitsMeasurer<'a, 'print> {
     bomb: DebugDropBomb,
 }
 
-impl FitsMeasurer<'_, '_> {}
-
 impl<'a, 'print> FitsMeasurer<'a, 'print> {
     fn new_flat(
         print_queue: &'print PrintQueue<'a>,
