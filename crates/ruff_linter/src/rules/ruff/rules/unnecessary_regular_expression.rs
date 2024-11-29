@@ -250,7 +250,7 @@ impl<'a> ReFunc<'a> {
     }
 }
 
-/// Recursively try to resolve `name` to an [`ExprStringLiteral`] in `semantic`.
+/// Try to resolve `name` to an [`ExprStringLiteral`] in `semantic`.
 fn resolve_string_literal<'a>(
     name: &'a Expr,
     semantic: &'a SemanticModel,
@@ -259,14 +259,12 @@ fn resolve_string_literal<'a>(
         return name.as_string_literal_expr();
     }
 
-    let mut name = name;
-    while let Some(name_expr) = name.as_name_expr() {
+    if let Some(name_expr) = name.as_name_expr() {
         let binding = semantic.binding(semantic.only_binding(name_expr)?);
         let value = find_binding_value(binding, semantic)?;
         if value.is_string_literal_expr() {
             return value.as_string_literal_expr();
         }
-        name = value;
     }
 
     None

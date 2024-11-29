@@ -1,16 +1,17 @@
-"""Test that RUF055 can follow a chain of str assignments for both the pattern
-and the replacement argument to re.sub"""
+"""Test that RUF055 can follow a single str assignment for both the pattern and
+the replacement argument to re.sub
+"""
 
 import re
 
 pat1 = "needle"
-pat2 = pat1
-pat3 = pat2
 
-re.sub(pat3, "", haystack)
+re.sub(pat1, "", haystack)
 
-if pat4 := pat3:
+# aliases are not followed, so this one should not trigger the rule
+if pat4 := pat1:
     re.sub(pat4, "", haystack)
 
+# also works for the `repl` argument in sub
 repl = "new"
 re.sub(r"abc", repl, haystack)
