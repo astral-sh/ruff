@@ -1,6 +1,7 @@
 //! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
 //! with some helper symbols
 
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -16,19 +17,27 @@ pub trait AsRule {
 }
 
 impl Rule {
-    pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
-        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
+    pub fn from_code(code: &str) -> Result<Self, RuleRegistryError> {
+        let (linter, code) = Linter::parse_code(code).ok_or(RuleRegistryError::UnknownCode)?;
         linter
             .all_rules()
             .find(|rule| rule.noqa_code().suffix() == code)
-            .ok_or(FromCodeError::Unknown)
+            .ok_or(RuleRegistryError::UnknownCode)
+    }
+
+    pub fn from_name(name: &str) -> Result<Self, RuleRegistryError> {
+        Rule::iter()
+            .find(|rule| rule.as_ref() == name)
+            .ok_or(RuleRegistryError::UnknownName)
     }
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum FromCodeError {
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum RuleRegistryError {
     #[error("unknown rule code")]
-    Unknown,
+    UnknownCode,
+    #[error("unknown rule name")]
+    UnknownName,
 }
 
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
@@ -400,7 +409,9 @@ pub mod clap_completion {
                 .to_str()
                 .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-            Rule::from_code(value).map_err(|_| {
+            let rule = Rule::from_code(value).or_else(|_| Rule::from_name(value));
+
+            rule.map_err(|_| {
                 let mut error =
                     clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
                 if let Some(arg) = arg {
@@ -485,6 +496,14 @@ mod tests {
             let (linter, rest) =
                 Linter::parse_code(&code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
+        }
+    }
+
+    #[test]
+    fn linter_from_name() {
+        for rule in Rule::iter() {
+            let name = rule.as_ref();
+            assert_eq!(Ok(rule), Rule::from_name(name));
         }
     }
 

@@ -208,7 +208,7 @@ impl Violation for StartProcessWithAShell {
 ///     os.spawnlp(os.P_NOWAIT, "/bin/mycmd", "mycmd", arbitrary_user_input)
 /// ```
 ///
-/// [start-process-with-a-shell]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell/#start-process-with-a-shell-s605
+/// [start-process-with-a-shell]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell/
 #[derive(ViolationMetadata)]
 pub(crate) struct StartProcessWithNoShell;
 
