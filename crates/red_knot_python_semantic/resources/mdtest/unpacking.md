@@ -271,17 +271,28 @@ reveal_type(c)  # revealed: @Todo(starred unpacking)
 ### Unicode
 
 ```py
+# TODO: Add diagnostic (need more values to unpack)
 (a, b) = "é"
 
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: Unknown
 ```
 
-### Unicode escape
+### Unicode escape (1)
 
 ```py
 # TODO: Add diagnostic (need more values to unpack)
 (a, b) = "\u9E6C"
+
+reveal_type(a)  # revealed: LiteralString
+reveal_type(b)  # revealed: Unknown
+```
+
+### Unicode escape (2)
+
+```py
+# TODO: Add diagnostic (need more values to unpack)
+(a, b) = "\U0010FFFF"
 
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: Unknown
