@@ -65,7 +65,7 @@ pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) -> Opti
 
     let semantic = checker.semantic();
 
-    let parent_expression = binding.parent_expression(semantic)?.as_named_expr()?;
+    let parent_expression = binding.expression(semantic)?.as_named_expr()?;
 
     if binding
         .references()

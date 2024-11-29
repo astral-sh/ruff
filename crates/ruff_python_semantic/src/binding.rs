@@ -275,10 +275,11 @@ impl<'a> Binding<'a> {
             .map(|statement_id| semantic.statement(statement_id))
     }
 
-    /// Returns the parent of the expression in which the binding was defined.
+    /// Returns the expression in which the binding was defined
+    /// (e.g. for the binding `x` in `y = (x := 1)`, return the node representing `x := 1`).
     ///
     /// This is only really applicable for assignment expressions.
-    pub fn parent_expression<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b ast::Expr> {
+    pub fn expression<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b ast::Expr> {
         self.source
             .and_then(|expression_id| semantic.parent_expression(expression_id))
     }
