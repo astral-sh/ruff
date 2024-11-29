@@ -1364,7 +1364,7 @@ impl<'db> Type<'db> {
         let usize_len = match self {
             Type::BytesLiteral(bytes) => Some(bytes.len(db)),
             Type::StringLiteral(string) => Some(string.python_len(db)),
-            Type::Tuple(tuple) => Some(tuple.elements(db).len()),
+            Type::Tuple(tuple) => Some(tuple.len(db)),
             _ => None,
         };
 

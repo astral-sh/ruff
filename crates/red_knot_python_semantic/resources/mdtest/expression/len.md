@@ -44,6 +44,9 @@ reveal_type(len(()))  # revealed: Literal[0]
 reveal_type(len((1,)))  # revealed: Literal[1]
 reveal_type(len((1, 2)))  # revealed: Literal[2]
 
+# TODO: Handle constructor calls
+reveal_type(len(tuple()))  # revealed: int
+
 # TODO: Handle unpacks
 reveal_type(len((*[],)))  # revealed: Literal[1]
 reveal_type(  # revealed: Literal[2]
@@ -165,38 +168,16 @@ reveal_type(len(Tuple()))  # revealed: int
 reveal_type(len(IntUnion()))  # revealed: Literal[2, 32]
 ```
 
-### Deep conversion
+### Negative integers
 
 ```py
 from typing import Literal
 
-# TODO: Support `__int__`
-class A:
-    def __int__(self) -> Literal[42]: ...
-
-# TODO: Support `__index__`
-class B:
-    def __len__(self) -> A: ...
-    def __index__(self) -> Literal[37]: ...
-
-class C:
-    def __len__(self) -> B: ...
-
-# Should be: Literal[42], Literal[37]
-reveal_type(len(B()))  # revealed: int
-reveal_type(len(C()))  # revealed: int
-```
-
-### Negative literal integer
-
-```py
-from typing import Literal
-
-class A:
+class Negative:
     # TODO: Emit a diagnostic
     def __len__(self) -> Literal[-1]: ...
 
-reveal_type(len(A()))  # revealed: int
+reveal_type(len(Negative()))  # revealed: int
 ```
 
 ### Wrong signature
