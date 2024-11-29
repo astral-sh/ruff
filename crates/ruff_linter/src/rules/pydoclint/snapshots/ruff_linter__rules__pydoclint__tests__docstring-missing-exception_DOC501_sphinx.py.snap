@@ -1,0 +1,61 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC501_sphinx.py:39:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
+   |
+37 |         return distance / time
+38 |     except ZeroDivisionError as exc:
+39 |         raise FasterThanLightError from exc
+   |               ^^^^^^^^^^^^^^^^^^^^ DOC501
+   |
+   = help: Add `FasterThanLightError` to the docstring
+
+DOC501_sphinx.py:57:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
+   |
+55 |         return distance / time
+56 |     except ZeroDivisionError as exc:
+57 |         raise FasterThanLightError from exc
+   |               ^^^^^^^^^^^^^^^^^^^^ DOC501
+58 |     except:
+59 |         raise ValueError
+   |
+   = help: Add `FasterThanLightError` to the docstring
+
+DOC501_sphinx.py:59:15: DOC501 Raised exception `ValueError` missing from docstring
+   |
+57 |         raise FasterThanLightError from exc
+58 |     except:
+59 |         raise ValueError
+   |               ^^^^^^^^^^ DOC501
+   |
+   = help: Add `ValueError` to the docstring
+
+DOC501_sphinx.py:82:9: DOC501 Raised exception `TypeError` missing from docstring
+   |
+80 |     except TypeError:
+81 |         print("Not a number? Shame on you!")
+82 |         raise
+   |         ^^^^^ DOC501
+   |
+   = help: Add `TypeError` to the docstring
+
+DOC501_sphinx.py:111:15: DOC501 Raised exception `TypeError` missing from docstring
+    |
+109 |     """
+110 |     if True:
+111 |         raise TypeError  # DOC501
+    |               ^^^^^^^^^ DOC501
+112 |     else:
+113 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+    |
+    = help: Add `TypeError` to the docstring
+
+DOC501_sphinx.py:114:11: DOC501 Raised exception `ValueError` missing from docstring
+    |
+112 |     else:
+113 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+114 |     raise ValueError  # DOC501
+    |           ^^^^^^^^^^ DOC501
+115 |     return 42
+    |
+    = help: Add `ValueError` to the docstring

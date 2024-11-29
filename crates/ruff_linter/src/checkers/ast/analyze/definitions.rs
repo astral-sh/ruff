@@ -311,6 +311,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(
                     &docstring,
                     checker.settings.pydocstyle.convention(),
+                    checker,
                 );
 
                 if enforce_sections {

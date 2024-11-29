@@ -416,16 +416,22 @@ impl<'a> DocstringSections<'a> {
         for section in sections {
             match section.kind() {
                 SectionKind::Raises => {
+                    if matches!(style, Some(SectionStyle::Sphinx)) {
+                        continue;
+                    }
                     docstring_sections.raises = Some(RaisesSection::from_section(&section, style));
                 }
-                SectionKind::Returns => {
+                SectionKind::Returns | SectionKind::Return => {
                     docstring_sections.returns = Some(GenericSection::from_section(&section));
                 }
-                SectionKind::Yields => {
+                SectionKind::Yields | SectionKind::Yield => {
                     docstring_sections.yields = Some(GenericSection::from_section(&section));
                 }
                 _ => continue,
             }
+        }
+        if matches!(style, Some(SectionStyle::Sphinx)) {
+            docstring_sections.raises = parse_raises_sphinx(sections);
         }
         docstring_sections
     }
@@ -437,6 +443,7 @@ impl<'a> DocstringSections<'a> {
 /// entries are found.
 fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName> {
     match style {
+        Some(SectionStyle::Sphinx) => panic!("Cannot process Sphinx style section"),
         Some(SectionStyle::Google) => parse_entries_google(content),
         Some(SectionStyle::Numpy) => parse_entries_numpy(content),
         None => {
@@ -496,6 +503,44 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
         }
     }
     entries
+}
+
+/// Parses Sphinx-style docstring sections of the form:
+///
+/// ```python
+/// :raises FasterThanLightError: If speed is greater than the speed of light.
+/// :raises DivisionByZero: If attempting to divide by zero.
+/// ```
+fn parse_raises_sphinx<'a>(sections: &'a SectionContexts) -> Option<RaisesSection<'a>> {
+    let mut entries: Vec<QualifiedName> = Vec::new();
+    let mut range_start = None;
+    let mut range_end = None;
+    for section in sections {
+        if matches!(section.kind(), SectionKind::Raises) {
+            if range_start.is_none() {
+                range_start = Some(section.start());
+            }
+            range_end = Some(section.end());
+            let mut line = section.summary_line().split(':');
+            let _indent = line.next();
+            if let Some(header) = line.next() {
+                let mut header = header.split(' ');
+                let _raises = header.next();
+                if let Some(exception) = header.next() {
+                    entries.push(QualifiedName::user_defined(exception));
+                }
+            }
+        }
+    }
+    if let Some(range_start) = range_start {
+        if let Some(range_end) = range_end {
+            return Some(RaisesSection {
+                raised_exceptions: entries,
+                range: TextRange::new(range_start, range_end),
+            });
+        }
+    }
+    None
 }
 
 /// An individual `yield` expression in a function body.
@@ -862,7 +907,15 @@ pub(crate) fn check_docstring(
         Some(Convention::Numpy) => {
             DocstringSections::from_sections(section_contexts, Some(SectionStyle::Numpy))
         }
-        Some(Convention::Pep257) | None => DocstringSections::from_sections(section_contexts, None),
+        Some(Convention::Sphinx) => {
+            DocstringSections::from_sections(section_contexts, Some(SectionStyle::Sphinx))
+        }
+        Some(Convention::Pep257) | None => match section_contexts.style() {
+            SectionStyle::Sphinx => {
+                DocstringSections::from_sections(section_contexts, Some(SectionStyle::Sphinx))
+            }
+            _ => DocstringSections::from_sections(section_contexts, None),
+        },
     };
 
     let body_entries = {

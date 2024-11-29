@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC403_sphinx.py:19:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+   |
+17 |       :param num: A number
+18 |       :type num: int
+19 | /     :yield: A string
+20 | |     :rtype: str
+   | |_^ DOC403
+21 |       """
+22 |       print('test')
+   |
+   = help: Remove the "Yields" section
+
+DOC403_sphinx.py:34:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+   |
+32 |           :param num: A number
+33 |           :type num: int
+34 | /         :yield: A string
+35 | |         :rtype: str
+   | |_^ DOC403
+36 |           """
+37 |           print('test')
+   |
+   = help: Remove the "Yields" section

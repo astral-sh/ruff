@@ -619,3 +619,16 @@ def another_valid_google_style_docstring(a: str) -> str:
 
     """
     return a
+
+
+def foo(dag_id: str, keep_records_in_log: bool = True) -> int:
+    """
+    Delete a DAG by a dag_id.
+
+    :param dag_id: the dag_id of the DAG to delete
+    :param keep_records_in_log: whether keep records of the given dag_id
+        in the Log table in the backend database (for reasons like auditing).
+        The default value is True.
+    :return: count of deleted dags
+    """
+    return 0

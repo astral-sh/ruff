@@ -9,6 +9,7 @@ pub(crate) mod extraction;
 pub(crate) mod google;
 pub(crate) mod numpy;
 pub(crate) mod sections;
+pub(crate) mod sphinx;
 pub(crate) mod styles;
 
 #[derive(Debug)]
