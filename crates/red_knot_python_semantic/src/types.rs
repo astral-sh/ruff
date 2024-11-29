@@ -1397,6 +1397,8 @@ impl<'db> Type<'db> {
                     let normal_return_ty = function_type.signature(db).return_ty;
 
                     let [only_arg] = arg_types else {
+                        // TODO: Return a variant indicating wrong number of arguments
+                        // (we don't have that yet)
                         return CallOutcome::callable(normal_return_ty);
                     };
                     let len_ty = only_arg.len(db);
@@ -3033,7 +3035,7 @@ pub struct StringLiteralType<'db> {
 impl<'db> StringLiteralType<'db> {
     /// The length of the string, as would be returned by Python's `len()`.
     pub fn python_len(&self, db: &'db dyn Db) -> usize {
-        self.value(db).as_ref().chars().count()
+        self.value(db).chars().count()
     }
 }
 
