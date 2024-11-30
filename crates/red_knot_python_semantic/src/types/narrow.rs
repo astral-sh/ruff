@@ -54,6 +54,7 @@ pub(crate) fn narrowing_constraint<'db>(
     }
 }
 
+#[allow(clippy::ref_option)]
 #[salsa::tracked(return_ref)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
@@ -62,6 +63,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Pattern(pattern), true).finish()
 }
 
+#[allow(clippy::ref_option)]
 #[salsa::tracked(return_ref)]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -70,6 +72,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), true).finish()
 }
 
+#[allow(clippy::ref_option)]
 #[salsa::tracked(return_ref)]
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,

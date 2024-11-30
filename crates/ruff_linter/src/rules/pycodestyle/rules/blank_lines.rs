@@ -420,7 +420,7 @@ impl<'a> LinePreprocessor<'a> {
     }
 }
 
-impl<'a> Iterator for LinePreprocessor<'a> {
+impl Iterator for LinePreprocessor<'_> {
     type Item = LogicalLineInfo;
 
     fn next(&mut self) -> Option<LogicalLineInfo> {

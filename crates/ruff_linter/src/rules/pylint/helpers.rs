@@ -113,7 +113,7 @@ impl SequenceIndexVisitor<'_> {
     }
 }
 
-impl<'a> Visitor<'_> for SequenceIndexVisitor<'a> {
+impl Visitor<'_> for SequenceIndexVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if self.modified {
             return;

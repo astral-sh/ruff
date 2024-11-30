@@ -1081,6 +1081,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::AirflowDagNoScheduleArgument) {
                 airflow::rules::dag_no_schedule_argument(checker, expr);
             }
+            if checker.enabled(Rule::UnnecessaryRegularExpression) {
+                ruff::rules::unnecessary_regular_expression(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
@@ -1645,9 +1648,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }
-        Expr::Named(..) => {
-            if checker.enabled(Rule::AssignmentInAssert) {
-                ruff::rules::assignment_in_assert(checker, expr);
+        Expr::Lambda(lambda_expr) => {
+            if checker.enabled(Rule::ReimplementedOperator) {
+                refurb::rules::reimplemented_operator(checker, &lambda_expr.into());
             }
         }
         _ => {}

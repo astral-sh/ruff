@@ -156,7 +156,7 @@ pub(crate) fn check(
         .map(|(diagnostic, noqa_edit)| {
             to_lsp_diagnostic(
                 diagnostic,
-                &noqa_edit,
+                noqa_edit,
                 &source_kind,
                 locator.to_index(),
                 encoding,
@@ -234,7 +234,7 @@ pub(crate) fn fixes_for_diagnostics(
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
     diagnostic: Diagnostic,
-    noqa_edit: &Option<Edit>,
+    noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -261,9 +261,9 @@ fn to_lsp_diagnostic(
                     new_text: edit.content().unwrap_or_default().to_string(),
                 })
                 .collect();
-            let noqa_edit = noqa_edit.as_ref().map(|noqa_edit| lsp_types::TextEdit {
+            let noqa_edit = noqa_edit.map(|noqa_edit| lsp_types::TextEdit {
                 range: diagnostic_edit_range(noqa_edit.range(), source_kind, index, encoding),
-                new_text: noqa_edit.content().unwrap_or_default().to_string(),
+                new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
                 kind: kind.clone(),

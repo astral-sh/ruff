@@ -144,7 +144,7 @@ struct InnerForWithAssignTargetsVisitor<'a, 'b> {
     assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
+impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Collect target expressions.
         match stmt {

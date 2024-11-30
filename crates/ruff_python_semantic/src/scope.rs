@@ -255,7 +255,7 @@ impl<'a> Deref for Scopes<'a> {
     }
 }
 
-impl<'a> DerefMut for Scopes<'a> {
+impl DerefMut for Scopes<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

@@ -21,10 +21,11 @@ reveal_type(Identity[0])  # revealed: str
 ## Class getitem union
 
 ```py
-flag = True
+def bool_instance() -> bool:
+    return True
 
 class UnionClassGetItem:
-    if flag:
+    if bool_instance():
 
         def __class_getitem__(cls, item: int) -> str:
             return item
@@ -59,9 +60,10 @@ reveal_type(x[0])  # revealed: str | int
 ## Class getitem with unbound method union
 
 ```py
-flag = True
+def bool_instance() -> bool:
+    return True
 
-if flag:
+if bool_instance():
     class Spam:
         def __class_getitem__(self, x: int) -> str:
             return "foo"
@@ -77,9 +79,10 @@ reveal_type(Spam[42])
 ## TODO: Class getitem non-class union
 
 ```py
-flag = True
+def bool_instance() -> bool:
+    return True
 
-if flag:
+if bool_instance():
     class Eggs:
         def __class_getitem__(self, x: int) -> str:
             return "foo"

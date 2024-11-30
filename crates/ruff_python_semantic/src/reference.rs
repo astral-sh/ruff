@@ -93,6 +93,11 @@ impl ResolvedReference {
         self.flags
             .intersects(SemanticModelFlags::ANNOTATED_TYPE_ALIAS)
     }
+
+    /// Return `true` if the context is inside an `assert` statement
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
+    }
 }
 
 impl Ranged for ResolvedReference {

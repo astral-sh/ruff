@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -1506,38 +1506,48 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in a nested union expression (e.g., the inner `Union` in
     /// `Union[Union[int, str], float]`).
     pub fn in_nested_union(&self) -> bool {
-        // Ex) `Union[Union[int, str], float]`
-        if self
-            .current_expression_grandparent()
-            .and_then(Expr::as_subscript_expr)
-            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Union"))
-        {
-            return true;
-        }
+        let mut parent_expressions = self.current_expressions().skip(1);
 
-        // Ex) `int | Union[str, float]`
-        if self.current_expression_parent().is_some_and(|parent| {
-            matches!(
-                parent,
-                Expr::BinOp(ast::ExprBinOp {
-                    op: Operator::BitOr,
-                    ..
-                })
-            )
-        }) {
-            return true;
+        match parent_expressions.next() {
+            // The parent expression is of the inner union is a single `typing.Union`.
+            // Ex) `Union[Union[a, b]]`
+            Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Union"),
+            // The parent expression is of the inner union is a tuple with two or more
+            // comma-separated elements and the parent of that tuple is a `typing.Union`.
+            // Ex) `Union[Union[a, b], Union[c, d]]`
+            Some(Expr::Tuple(_)) => parent_expressions
+                .next()
+                .and_then(Expr::as_subscript_expr)
+                .is_some_and(|grandparent| self.match_typing_expr(&grandparent.value, "Union")),
+            // The parent expression of the inner union is a PEP604-style union.
+            // Ex) `a | b | c` or `Union[a, b] | c`
+            // In contrast to `typing.Union`, PEP604-style unions are always binary operations, e.g.
+            // the expression `a | b | c` is represented by two binary unions: `(a | b) | c`.
+            Some(Expr::BinOp(bin_op)) => bin_op.op.is_bit_or(),
+            // Not a nested union otherwise.
+            _ => false,
         }
-
-        false
     }
 
     /// Return `true` if the model is in a nested literal expression (e.g., the inner `Literal` in
     /// `Literal[Literal[int, str], float]`).
     pub fn in_nested_literal(&self) -> bool {
-        // Ex) `Literal[Literal[int, str], float]`
-        self.current_expression_grandparent()
-            .and_then(Expr::as_subscript_expr)
-            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Literal"))
+        let mut parent_expressions = self.current_expressions().skip(1);
+
+        match parent_expressions.next() {
+            // The parent expression of the current `Literal` is a tuple, and the
+            // grandparent is a `Literal`.
+            // Ex) `Literal[Literal[str], Literal[int]]`
+            Some(Expr::Tuple(_)) => parent_expressions
+                .next()
+                .and_then(Expr::as_subscript_expr)
+                .is_some_and(|grandparent| self.match_typing_expr(&grandparent.value, "Literal")),
+            // The parent expression of the current `Literal` is also a `Literal`.
+            // Ex) `Literal[Literal[str]]`
+            Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Literal"),
+            // Not a nested literal otherwise
+            _ => false,
+        }
     }
 
     /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
@@ -1827,6 +1837,11 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
+    }
+
+    /// Return `true` if the model is in an `assert` statement.
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
     }
 
     /// Return `true` if the model is in an f-string.
@@ -2421,6 +2436,14 @@ bitflags! {
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
         const DEFERRED_TYPE_ALIAS = 1 << 28;
+
+        /// The model is visiting an `assert` statement.
+        ///
+        /// For example, the model might be visiting `y` in
+        /// ```python
+        /// assert (y := x**2) > 42, y
+        /// ```
+        const ASSERT_STATEMENT = 1 << 29;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

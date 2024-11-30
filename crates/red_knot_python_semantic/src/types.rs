@@ -2023,7 +2023,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     #[allow(unused)]
-    pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
+    pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
         if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
             Some(tuple.elements(db))
         } else {
@@ -2567,7 +2567,7 @@ impl<'db> Class<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    fn explicit_bases(self, db: &'db dyn Db) -> &[Type<'db>] {
+    fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         self.explicit_bases_query(db)
     }
 
@@ -2995,7 +2995,7 @@ pub struct SliceLiteralType<'db> {
     step: Option<i32>,
 }
 
-impl<'db> SliceLiteralType<'db> {
+impl SliceLiteralType<'_> {
     fn as_tuple(self, db: &dyn Db) -> (Option<i32>, Option<i32>, Option<i32>) {
         (self.start(db), self.stop(db), self.step(db))
     }

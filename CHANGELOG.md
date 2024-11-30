@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.8.1
+
+### Preview features
+
+- Formatter: Avoid invalid syntax for format-spec with quotes for all Python versions ([#14625](https://github.com/astral-sh/ruff/pull/14625))
+- Formatter: Consider quotes inside format-specs when choosing the quotes for an f-string ([#14493](https://github.com/astral-sh/ruff/pull/14493))
+- Formatter: Do not consider f-strings with escaped newlines as multiline ([#14624](https://github.com/astral-sh/ruff/pull/14624))
+- Formatter: Fix f-string formatting in assignment statement ([#14454](https://github.com/astral-sh/ruff/pull/14454))
+- Formatter: Fix unnecessary space around power operator (`**`) in overlong f-string expressions ([#14489](https://github.com/astral-sh/ruff/pull/14489))
+- \[`airflow`\] Avoid implicit `schedule` argument to `DAG` and `@dag` (`AIR301`) ([#14581](https://github.com/astral-sh/ruff/pull/14581))
+- \[`flake8-builtins`\] Exempt private built-in modules (`A005`) ([#14505](https://github.com/astral-sh/ruff/pull/14505))
+- \[`flake8-pytest-style`\] Fix `pytest.mark.parametrize` rules to check calls instead of decorators ([#14515](https://github.com/astral-sh/ruff/pull/14515))
+- \[`flake8-type-checking`\] Implement `runtime-cast-value` (`TC006`) ([#14511](https://github.com/astral-sh/ruff/pull/14511))
+- \[`flake8-type-checking`\] Implement `unquoted-type-alias` (`TC007`) and `quoted-type-alias` (`TC008`) ([#12927](https://github.com/astral-sh/ruff/pull/12927))
+- \[`flake8-use-pathlib`\] Recommend `Path.iterdir()` over `os.listdir()` (`PTH208`) ([#14509](https://github.com/astral-sh/ruff/pull/14509))
+- \[`pylint`\] Extend `invalid-envvar-default` to detect `os.environ.get` (`PLW1508`) ([#14512](https://github.com/astral-sh/ruff/pull/14512))
+- \[`pylint`\] Implement `len-test` (`PLC1802`) ([#14309](https://github.com/astral-sh/ruff/pull/14309))
+- \[`refurb`\] Fix bug where methods defined using lambdas were flagged by `FURB118` ([#14639](https://github.com/astral-sh/ruff/pull/14639))
+- \[`ruff`\] Auto-add `r` prefix when string has no backslashes for `unraw-re-pattern` (`RUF039`) ([#14536](https://github.com/astral-sh/ruff/pull/14536))
+- \[`ruff`\] Implement `invalid-assert-message-literal-argument` (`RUF040`) ([#14488](https://github.com/astral-sh/ruff/pull/14488))
+- \[`ruff`\] Implement `unnecessary-nested-literal` (`RUF041`) ([#14323](https://github.com/astral-sh/ruff/pull/14323))
+- \[`ruff`\] Implement `unnecessary-regular-expression` (`RUF055`) ([#14659](https://github.com/astral-sh/ruff/pull/14659))
+
+### Rule changes
+
+- Ignore more rules for stub files ([#14541](https://github.com/astral-sh/ruff/pull/14541))
+- \[`pep8-naming`\] Eliminate false positives for single-letter names (`N811`, `N814`) ([#14584](https://github.com/astral-sh/ruff/pull/14584))
+- \[`pyflakes`\] Avoid false positives in `@no_type_check` contexts (`F821`, `F722`) ([#14615](https://github.com/astral-sh/ruff/pull/14615))
+- \[`ruff`\] Detect redirected-noqa in file-level comments (`RUF101`) ([#14635](https://github.com/astral-sh/ruff/pull/14635))
+- \[`ruff`\] Mark fixes for `unsorted-dunder-all` and `unsorted-dunder-slots` as unsafe when there are complex comments in the sequence (`RUF022`, `RUF023`) ([#14560](https://github.com/astral-sh/ruff/pull/14560))
+
+### Bug fixes
+
+- Avoid fixing code to `None | None` for `redundant-none-literal` (`PYI061`) and `never-union` (`RUF020`) ([#14583](https://github.com/astral-sh/ruff/pull/14583), [#14589](https://github.com/astral-sh/ruff/pull/14589))
+- \[`flake8-bugbear`\] Fix `mutable-contextvar-default` to resolve annotated function calls properly (`B039`) ([#14532](https://github.com/astral-sh/ruff/pull/14532))
+- \[`flake8-pyi`, `ruff`\] Fix traversal of nested literals and unions (`PYI016`, `PYI051`, `PYI055`, `PYI062`, `RUF041`) ([#14641](https://github.com/astral-sh/ruff/pull/14641))
+- \[`flake8-pyi`\] Avoid rewriting invalid type expressions in `unnecessary-type-union` (`PYI055`) ([#14660](https://github.com/astral-sh/ruff/pull/14660))
+- \[`flake8-type-checking`\] Avoid syntax errors and type checking problem for quoted annotations autofix (`TC003`, `TC006`) ([#14634](https://github.com/astral-sh/ruff/pull/14634))
+- \[`pylint`\] Do not wrap function calls in parentheses in the fix for unnecessary-dunder-call (`PLC2801`) ([#14601](https://github.com/astral-sh/ruff/pull/14601))
+- \[`ruff`\] Handle `attrs`'s `auto_attribs` correctly (`RUF009`) ([#14520](https://github.com/astral-sh/ruff/pull/14520))
+
 ## 0.8.0
 
 Check out the [blog post](https://astral.sh/blog/ruff-v0.8.0) for a migration guide and overview of the changes!

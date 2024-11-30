@@ -203,7 +203,7 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
     }
 }
 
-impl<'src, 'loc> CaptureSuppressionComment<'src> for UselessSuppressionComments<'src, 'loc> {
+impl<'src> CaptureSuppressionComment<'src> for UselessSuppressionComments<'src, '_> {
     fn capture(&mut self, comment: SuppressionCommentData<'src>) {
         match self.check_suppression_comment(&comment) {
             Ok(()) => {}

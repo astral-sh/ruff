@@ -10,6 +10,7 @@ use crate::rules::{
 /// Run lint rules over the [`Binding`]s.
 pub(crate) fn bindings(checker: &mut Checker) {
     if !checker.any_enabled(&[
+        Rule::DummyVariableAccessed,
         Rule::InvalidAllFormat,
         Rule::InvalidAllObject,
         Rule::NonAsciiName,
@@ -18,7 +19,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnsortedDunderSlots,
         Rule::UnusedVariable,
         Rule::UnquotedTypeAlias,
-        Rule::DummyVariableAccessed,
+        Rule::AssignmentInAssert,
     ]) {
         return;
     }
@@ -91,6 +92,11 @@ pub(crate) fn bindings(checker: &mut Checker) {
         if checker.enabled(Rule::DummyVariableAccessed) {
             if let Some(diagnostics) = ruff::rules::dummy_variable_accessed(checker, binding) {
                 checker.diagnostics.extend(diagnostics);
+            }
+        }
+        if checker.enabled(Rule::AssignmentInAssert) {
+            if let Some(diagnostic) = ruff::rules::assignment_in_assert(checker, binding) {
+                checker.diagnostics.push(diagnostic);
             }
         }
     }

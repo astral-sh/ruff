@@ -113,33 +113,29 @@ impl From<&Expr> for ResolvedPythonType {
 
             // Unary operators.
             Expr::UnaryOp(ast::ExprUnaryOp { operand, op, .. }) => match op {
-                UnaryOp::Invert => {
-                    return match ResolvedPythonType::from(operand.as_ref()) {
-                        ResolvedPythonType::Atom(PythonType::Number(
-                            NumberLike::Bool | NumberLike::Integer,
-                        )) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
-                        ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
-                        _ => ResolvedPythonType::Unknown,
-                    }
-                }
+                UnaryOp::Invert => match ResolvedPythonType::from(operand.as_ref()) {
+                    ResolvedPythonType::Atom(PythonType::Number(
+                        NumberLike::Bool | NumberLike::Integer,
+                    )) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
+                    ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
+                    _ => ResolvedPythonType::Unknown,
+                },
                 // Ex) `not 1.0`
                 UnaryOp::Not => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool)),
                 // Ex) `+1` or `-1`
-                UnaryOp::UAdd | UnaryOp::USub => {
-                    return match ResolvedPythonType::from(operand.as_ref()) {
-                        ResolvedPythonType::Atom(PythonType::Number(number)) => {
-                            ResolvedPythonType::Atom(PythonType::Number(
-                                if number == NumberLike::Bool {
-                                    NumberLike::Integer
-                                } else {
-                                    number
-                                },
-                            ))
-                        }
-                        ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
-                        _ => ResolvedPythonType::Unknown,
+                UnaryOp::UAdd | UnaryOp::USub => match ResolvedPythonType::from(operand.as_ref()) {
+                    ResolvedPythonType::Atom(PythonType::Number(number)) => {
+                        ResolvedPythonType::Atom(PythonType::Number(
+                            if number == NumberLike::Bool {
+                                NumberLike::Integer
+                            } else {
+                                number
+                            },
+                        ))
                     }
-                }
+                    ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
+                    _ => ResolvedPythonType::Unknown,
+                },
             },
 
             // Binary operators.
