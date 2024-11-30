@@ -186,6 +186,8 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
                 | "hex"
                 | "memoryview"
                 | "oct"
+                | "ascii"
+                | "sorted"
         )
     })
 }

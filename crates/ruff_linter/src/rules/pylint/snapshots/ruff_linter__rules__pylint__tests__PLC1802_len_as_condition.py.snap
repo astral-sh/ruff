@@ -434,3 +434,38 @@ len_as_condition.py:233:8: PLC1802 [*] `len(x)` used as condition without compar
 233     |-    if len(x): # [PLC1802] should be fine
     233 |+    if x: # [PLC1802] should be fine
 234 234 |         print(x)
+235 235 | 
+236 236 | # regression tests for https://github.com/astral-sh/ruff/issues/14690
+
+len_as_condition.py:237:6: PLC1802 [*] `len(ascii(1))` used as condition without comparison
+    |
+236 | # regression tests for https://github.com/astral-sh/ruff/issues/14690
+237 | bool(len(ascii(1)))
+    |      ^^^^^^^^^^^^^ PLC1802
+238 | bool(len(sorted("")))
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+234 234 |         print(x)
+235 235 | 
+236 236 | # regression tests for https://github.com/astral-sh/ruff/issues/14690
+237     |-bool(len(ascii(1)))
+    237 |+bool(ascii(1))
+238 238 | bool(len(sorted("")))
+
+len_as_condition.py:238:6: PLC1802 [*] `len(sorted(""))` used as condition without comparison
+    |
+236 | # regression tests for https://github.com/astral-sh/ruff/issues/14690
+237 | bool(len(ascii(1)))
+238 | bool(len(sorted("")))
+    |      ^^^^^^^^^^^^^^^ PLC1802
+    |
+    = help: Remove `len`
+
+ℹ Safe fix
+235 235 | 
+236 236 | # regression tests for https://github.com/astral-sh/ruff/issues/14690
+237 237 | bool(len(ascii(1)))
+238     |-bool(len(sorted("")))
+    238 |+bool(sorted(""))
