@@ -1,7 +1,8 @@
-use ruff_python_ast::{self as ast, Decorator, Expr};
+use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
+use ruff_python_ast::{self as ast, Decorator, Expr};
 
 use crate::model::SemanticModel;
 use crate::{Module, ModuleSource};
@@ -10,6 +11,41 @@ use crate::{Module, ModuleSource};
 pub enum Visibility {
     Public,
     Private,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum AbstractDecoratorKind {
+    /// `abc.abstractmethod`
+    AbstractMethod,
+    /// `abc.abstractclassmethod`
+    AbstractClassMethod,
+    /// `abc.abstractstaticmethod`
+    AbstractStaticMethod,
+    /// `abc.abstractproperty`
+    AbstractProperty,
+}
+
+impl AbstractDecoratorKind {
+    fn from(name: &str) -> Option<Self> {
+        match name {
+            "abstractmethod" => Some(AbstractDecoratorKind::AbstractMethod),
+            "abstractclassmethod" => Some(AbstractDecoratorKind::AbstractClassMethod),
+            "abstractstaticmethod" => Some(AbstractDecoratorKind::AbstractStaticMethod),
+            "abstractproperty" => Some(AbstractDecoratorKind::AbstractProperty),
+            _ => None,
+        }
+    }
+}
+
+impl Display for AbstractDecoratorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            AbstractDecoratorKind::AbstractMethod => "abstractmethod",
+            AbstractDecoratorKind::AbstractClassMethod => "abstractclassmethod",
+            AbstractDecoratorKind::AbstractStaticMethod => "abstractstaticmethod",
+            AbstractDecoratorKind::AbstractProperty => "abstractproperty",
+        })
+    }
 }
 
 /// Returns `true` if a function is a "static method".
@@ -42,21 +78,20 @@ pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
 pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    decorator_list.iter().any(|decorator| {
-        semantic
-            .resolve_qualified_name(&decorator.expression)
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    [
-                        "abc",
-                        "abstractmethod"
-                            | "abstractclassmethod"
-                            | "abstractstaticmethod"
-                            | "abstractproperty"
-                    ]
-                )
-            })
+    abstract_decorator_kind(decorator_list, semantic).is_some()
+}
+
+pub fn abstract_decorator_kind(
+    decorator_list: &[Decorator],
+    semantic: &SemanticModel,
+) -> Option<AbstractDecoratorKind> {
+    decorator_list.iter().find_map(|decorator| {
+        let qualified_name = semantic.resolve_qualified_name(&decorator.expression)?;
+
+        match qualified_name.segments() {
+            ["abc", name] => AbstractDecoratorKind::from(name),
+            _ => None,
+        }
     })
 }
 
