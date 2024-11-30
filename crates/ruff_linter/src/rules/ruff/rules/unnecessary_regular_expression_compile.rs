@@ -33,6 +33,15 @@ use crate::checkers::ast::Checker;
 /// result = re.match(pattern, string)
 /// ```
 ///
+/// or assign the compiled regular expression pattern to a variable:
+///
+/// ```python
+/// import re
+///
+/// PATTERN = re.compile(pattern)
+/// result = PATTERN.match(string)
+/// ```
+///
 /// ## References
 /// - [Python documentation: `re.compile`](https://docs.python.org/3/library/re.html#re.compile)
 #[derive(ViolationMetadata)]
