@@ -43,7 +43,7 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 ///
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
-/// 
+///
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
