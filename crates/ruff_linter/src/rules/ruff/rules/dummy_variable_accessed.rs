@@ -8,14 +8,16 @@ use ruff_text_size::Ranged;
 use crate::{checkers::ast::Checker, renamer::Renamer};
 
 /// ## What it does
-/// Checks for accesses of local dummy variable (specified by `dummy-variable-rgx` setting), except dunder names and '_'.
-/// Provides auto fix for identifiers with a leading underscore if possible.
+/// Checks for accesses of local dummy variables, excluding `_` and dunder variables.
+///
+/// By default, "dummy variables" are any variables with names that start with leading
+/// underscores. However, this is customisable using the `dummy-variable-rgx` setting).
 ///
 /// ## Why is this bad?
-/// Marking variables with a leading underscore conveys that they are intentionally unused within the function or method.
+/// Marking a variable with a leading underscore conveys that it is intentionally unused within the function or method.
 /// When these variables are later referenced in the code, it causes confusion and potential misunderstandings about
-/// the code's intention. A variable marked as "unused" but subsequently used suggests oversight or unintentional use
-/// and detracts from the clarity and maintainability of the codebase.
+/// the code's intention. A variable marked as "unused" being subsequently used suggests oversight or unintentional use.
+/// This detracts from the clarity and maintainability of the codebase.
 ///
 /// ## Example
 /// ```python
@@ -30,6 +32,9 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 ///     variable = 3
 ///     return variable + 1
 /// ```
+///
+/// ## Fix availability
+/// An fix is only available for variables that start with leading underscores.
 ///
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
