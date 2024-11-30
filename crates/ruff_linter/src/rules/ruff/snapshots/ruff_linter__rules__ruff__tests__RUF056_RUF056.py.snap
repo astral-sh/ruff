@@ -1,0 +1,65 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF056.py:4:1: RUF056 Use of `re.compile().match()`
+  |
+2 | from re import compile as rec
+3 | 
+4 | re.compile(r"hello").match("world")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF056
+5 | re.compile("hello world").search("world")
+6 | re.compile(r"hello", re.IGNORECASE).findall("world")
+  |
+  = help: Replace with `re.match()`
+
+RUF056.py:5:1: RUF056 Use of `re.compile().search()`
+  |
+4 | re.compile(r"hello").match("world")
+5 | re.compile("hello world").search("world")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF056
+6 | re.compile(r"hello", re.IGNORECASE).findall("world")
+7 | re.compile(r"hello", re.I | re.M).finditer("world")
+  |
+  = help: Replace with `re.search()`
+
+RUF056.py:7:1: RUF056 Use of `re.compile().finditer()`
+  |
+5 | re.compile("hello world").search("world")
+6 | re.compile(r"hello", re.IGNORECASE).findall("world")
+7 | re.compile(r"hello", re.I | re.M).finditer("world")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF056
+8 | rec(r"hello").match("world")
+9 | rec("hello world").search("world")
+  |
+  = help: Replace with `re.finditer()`
+
+RUF056.py:8:1: RUF056 Use of `re.compile().match()`
+   |
+ 6 | re.compile(r"hello", re.IGNORECASE).findall("world")
+ 7 | re.compile(r"hello", re.I | re.M).finditer("world")
+ 8 | rec(r"hello").match("world")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF056
+ 9 | rec("hello world").search("world")
+10 | rec(r"hello", re.IGNORECASE).findall("world")
+   |
+   = help: Replace with `re.match()`
+
+RUF056.py:9:1: RUF056 Use of `re.compile().search()`
+   |
+ 7 | re.compile(r"hello", re.I | re.M).finditer("world")
+ 8 | rec(r"hello").match("world")
+ 9 | rec("hello world").search("world")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF056
+10 | rec(r"hello", re.IGNORECASE).findall("world")
+11 | rec(r"hello", re.I | re.M).finditer("world")
+   |
+   = help: Replace with `re.search()`
+
+RUF056.py:11:1: RUF056 Use of `re.compile().finditer()`
+   |
+ 9 | rec("hello world").search("world")
+10 | rec(r"hello", re.IGNORECASE).findall("world")
+11 | rec(r"hello", re.I | re.M).finditer("world")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF056
+   |
+   = help: Replace with `re.finditer()`

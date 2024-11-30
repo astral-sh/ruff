@@ -671,6 +671,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::HashlibDigestHex) {
                 refurb::rules::hashlib_digest_hex(checker, call);
             }
+            if checker.enabled(Rule::UnnecessaryRegularExpressionCompile) {
+                ruff::rules::unnecessary_regular_expression_compile(checker, call);
+            }
             if checker.enabled(Rule::RequestWithoutTimeout) {
                 flake8_bandit::rules::request_without_timeout(checker, call);
             }
