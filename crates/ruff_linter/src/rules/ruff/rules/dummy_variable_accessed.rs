@@ -2,7 +2,9 @@ use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violatio
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_semantic::{Binding, BindingKind, Scope};
-use ruff_python_stdlib::{builtins::is_python_builtin, identifiers::is_identifier};
+use ruff_python_stdlib::{
+    builtins::is_python_builtin, identifiers::is_identifier, keyword::is_keyword,
+};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, renamer::Renamer};
@@ -72,10 +74,7 @@ impl Violation for DummyVariableAccessed {
 }
 
 /// RUF052
-pub(crate) fn dummy_variable_accessed(
-    checker: &Checker,
-    binding: &Binding,
-) -> Option<Vec<Diagnostic>> {
+pub(crate) fn dummy_variable_accessed(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     let name = binding.name(checker.source());
 
     // Ignore `_` and dunder variables
@@ -108,39 +107,28 @@ pub(crate) fn dummy_variable_accessed(
 
     let possible_fix_kind = get_possible_fix_kind(name, scope, checker);
 
-    let mut diagnostics: Vec<Diagnostic> = binding
-        .references
-        .iter()
-        .map(|ref_id| {
-            Diagnostic::new(
-                DummyVariableAccessed {
-                    name: name.to_string(),
-                    fix_kind: possible_fix_kind,
-                },
-                checker.semantic().reference(*ref_id).range(),
-            )
-            .with_parent(binding.start())
-        })
-        .collect();
+    let mut diagnostic = Diagnostic::new(
+        DummyVariableAccessed {
+            name: name.to_string(),
+            fix_kind: possible_fix_kind,
+        },
+        binding.range(),
+    );
 
-    // Try at most one auto-fix for first diagnostic instance
+    // If fix available
     if let Some(fix_kind) = possible_fix_kind {
         // Get the possible fix based on the scope
         if let Some(fix) = get_possible_fix(name, fix_kind, scope) {
-            // Fix is available
-            if let Some(diagnostic) = diagnostics.first_mut() {
-                // Try to set the fix
-                diagnostic.try_set_fix(|| {
-                    let (edit, rest) =
-                        Renamer::rename(name, &fix, scope, checker.semantic(), checker.stylist())?;
-                    let applicability = Applicability::Safe;
-                    Ok(Fix::applicable_edits(edit, rest, applicability))
-                });
-            }
+            diagnostic.try_set_fix(|| {
+                let (edit, rest) =
+                    Renamer::rename(name, &fix, scope, checker.semantic(), checker.stylist())?;
+                let applicability = Applicability::Safe;
+                Ok(Fix::applicable_edits(edit, rest, applicability))
+            });
         }
     }
 
-    Some(diagnostics)
+    Some(diagnostic)
 }
 
 /// Enumeration of various ways in which a binding can shadow other variables
@@ -207,45 +195,4 @@ fn get_possible_fix_kind(name: &str, scope: &Scope, checker: &Checker) -> Option
 
     // Default to no shadowing
     Some(ShadowedKind::None)
-}
-
-fn is_keyword(name: &str) -> bool {
-    matches!(
-        name,
-        "False"
-            | "None"
-            | "True"
-            | "and"
-            | "as"
-            | "assert"
-            | "async"
-            | "await"
-            | "break"
-            | "class"
-            | "continue"
-            | "def"
-            | "del"
-            | "elif"
-            | "else"
-            | "except"
-            | "finally"
-            | "for"
-            | "from"
-            | "global"
-            | "if"
-            | "import"
-            | "in"
-            | "is"
-            | "lambda"
-            | "nonlocal"
-            | "not"
-            | "or"
-            | "pass"
-            | "raise"
-            | "return"
-            | "try"
-            | "while"
-            | "with"
-            | "yield",
-    )
 }

@@ -57,8 +57,6 @@ class ClassOk:
     def method(arg):
         _valid_unused_var = arg
         return 
-    
-# Correct if dummy_variable_re = "_+"
 
 def fun(x):
     _ = 1
@@ -76,33 +74,33 @@ def fun(x):
 
 class Class_:
     def fun(self):
-        _var = "method variable"
-        return _var # [RUF052]
+        _var = "method variable" # [RUF052]
+        return _var
 
-def fun(_var):
-    return _var # [RUF052]
+def fun(_var): # [RUF052]
+    return _var
 
 def fun():
-    _list = "built-in"
-    return _list # [RUF052]
+    _list = "built-in" # [RUF052]
+    return _list
 
 x = "global"
 
 def fun():
     global x
-    _x = "shadows global"
-    return _x # [RUF052]
+    _x = "shadows global" # [RUF052]
+    return _x
 
 def foo():
   x = "outer"
   def bar():
     nonlocal x
-    _x = "shadows nonlocal"
-    return _x # [RUF052]
+    _x = "shadows nonlocal" # [RUF052]
+    return _x
   bar()
   return x
 
 def fun():
     x = "local"
-    _x = "shadows local"
-    return _x # [RUF052]
+    _x = "shadows local" # [RUF052]
+    return _x

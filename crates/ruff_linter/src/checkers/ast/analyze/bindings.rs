@@ -90,8 +90,8 @@ pub(crate) fn bindings(checker: &mut Checker) {
             }
         }
         if checker.enabled(Rule::DummyVariableAccessed) {
-            if let Some(diagnostics) = ruff::rules::dummy_variable_accessed(checker, binding) {
-                checker.diagnostics.extend(diagnostics);
+            if let Some(diagnostic) = ruff::rules::dummy_variable_accessed(checker, binding) {
+                checker.diagnostics.push(diagnostic);
             }
         }
         if checker.enabled(Rule::AssignmentInAssert) {
