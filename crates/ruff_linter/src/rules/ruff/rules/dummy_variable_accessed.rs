@@ -1,7 +1,7 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingKind, Scope};
+use ruff_python_semantic::{Binding, BindingKind, SemanticModel};
 use ruff_python_stdlib::{
     builtins::is_python_builtin, identifiers::is_identifier, keyword::is_keyword,
 };
@@ -20,6 +20,9 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// When these variables are later referenced in the code, it causes confusion and potential misunderstandings about
 /// the code's intention. A variable marked as "unused" being subsequently used suggests oversight or unintentional use.
 /// This detracts from the clarity and maintainability of the codebase.
+///
+/// Sometimes leading underscores are used to avoid variables shadowing other variables, Python builtins, or Python
+/// keywords. However, [PEP 8] recommends to use trailing underscores for this rather than leading underscores.
 ///
 /// ## Example
 /// ```python
@@ -40,6 +43,9 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 ///
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
+/// 
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
 pub(crate) struct DummyVariableAccessed {
     name: String,
@@ -96,8 +102,11 @@ pub(crate) fn dummy_variable_accessed(checker: &Checker, binding: &Binding) -> O
     if binding.is_global() || binding.is_nonlocal() {
         return None;
     }
+
+    let semantic = checker.semantic();
+
     // Only variables defined in function scopes
-    let scope = &checker.semantic().scopes[binding.scope];
+    let scope = &semantic.scopes[binding.scope];
     if !scope.kind.is_function() {
         return None;
     }
@@ -105,7 +114,7 @@ pub(crate) fn dummy_variable_accessed(checker: &Checker, binding: &Binding) -> O
         return None;
     }
 
-    let possible_fix_kind = get_possible_fix_kind(name, scope, checker);
+    let possible_fix_kind = get_possible_fix_kind(name, checker);
 
     let mut diagnostic = Diagnostic::new(
         DummyVariableAccessed {
@@ -118,12 +127,10 @@ pub(crate) fn dummy_variable_accessed(checker: &Checker, binding: &Binding) -> O
     // If fix available
     if let Some(fix_kind) = possible_fix_kind {
         // Get the possible fix based on the scope
-        if let Some(fix) = get_possible_fix(name, fix_kind, scope) {
+        if let Some(fix) = get_possible_fix(name, fix_kind, semantic) {
             diagnostic.try_set_fix(|| {
-                let (edit, rest) =
-                    Renamer::rename(name, &fix, scope, checker.semantic(), checker.stylist())?;
-                let applicability = Applicability::Safe;
-                Ok(Fix::applicable_edits(edit, rest, applicability))
+                Renamer::rename(name, &fix, scope, semantic, checker.stylist())
+                    .map(|(edit, rest)| Fix::safe_edits(edit, rest))
             });
         }
     }
@@ -145,7 +152,7 @@ enum ShadowedKind {
 }
 
 /// Suggests a potential alternative name to resolve a shadowing conflict.
-fn get_possible_fix(name: &str, kind: ShadowedKind, scope: &Scope) -> Option<String> {
+fn get_possible_fix(name: &str, kind: ShadowedKind, semantic: &SemanticModel) -> Option<String> {
     // Remove leading underscores for processing
     let trimmed_name = name.trim_start_matches('_');
 
@@ -157,8 +164,8 @@ fn get_possible_fix(name: &str, kind: ShadowedKind, scope: &Scope) -> Option<Str
         ShadowedKind::None => trimmed_name.to_string(),
     };
 
-    // Ensure the fix name is not already taken in the scope
-    if scope.has(&fix_name) {
+    // Ensure the fix name is not already taken in the scope or enclosing scopes
+    if !semantic.is_available(&fix_name) {
         return None;
     }
 
@@ -167,7 +174,7 @@ fn get_possible_fix(name: &str, kind: ShadowedKind, scope: &Scope) -> Option<Str
 }
 
 /// Determines the kind of shadowing or conflict for a given variable name.
-fn get_possible_fix_kind(name: &str, scope: &Scope, checker: &Checker) -> Option<ShadowedKind> {
+fn get_possible_fix_kind(name: &str, checker: &Checker) -> Option<ShadowedKind> {
     // If the name starts with an underscore, we don't consider it
     if !name.starts_with('_') {
         return None;
@@ -189,7 +196,7 @@ fn get_possible_fix_kind(name: &str, scope: &Scope, checker: &Checker) -> Option
         return Some(ShadowedKind::BuiltIn);
     }
 
-    if scope.has(trimmed_name) {
+    if !checker.semantic().is_available(trimmed_name) {
         return Some(ShadowedKind::Some);
     }
 
