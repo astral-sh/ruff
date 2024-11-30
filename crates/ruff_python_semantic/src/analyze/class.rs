@@ -12,28 +12,34 @@ pub fn any_qualified_base_class(
     semantic: &SemanticModel,
     func: &dyn Fn(QualifiedName) -> bool,
 ) -> bool {
-    any_base_class(class_def, semantic, &|expr| {
+    any_base_class(class_def, semantic, &mut |expr| {
         semantic
             .resolve_qualified_name(map_subscript(expr))
             .is_some_and(func)
     })
 }
 
-/// Iterate recursively over the base classes of `class_def`.
-fn iter_base_classes<'a>(
-    class_def: &'a ruff_python_ast::StmtClassDef,
-    semantic: &'a SemanticModel,
-) -> impl Iterator<Item = &'a Expr> {
-    fn inner<'a>(
-        class_def: &'a ast::StmtClassDef,
-        semantic: &'a SemanticModel,
+/// Return `true` if any base class matches an [`Expr`] predicate.
+pub fn any_base_class(
+    class_def: &ast::StmtClassDef,
+    semantic: &SemanticModel,
+    func: &mut dyn FnMut(&Expr) -> bool,
+) -> bool {
+    fn inner(
+        class_def: &ast::StmtClassDef,
+        semantic: &SemanticModel,
+        func: &mut dyn FnMut(&Expr) -> bool,
         seen: &mut FxHashSet<BindingId>,
-        exprs: &mut Vec<&'a Expr>,
-    ) {
-        for expr in class_def.bases() {
-            // Include `expr` itself.
-            exprs.push(expr);
-            // Then recurse into its base classes.
+    ) -> bool {
+        class_def.bases().iter().any(|expr| {
+            // If the base class itself matches the pattern, then this does too.
+            // Ex) `class Foo(BaseModel): ...`
+            if func(expr) {
+                return true;
+            }
+
+            // If the base class extends a class that matches the pattern, then this does too.
+            // Ex) `class Bar(BaseModel): ...; class Foo(Bar): ...`
             if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
                 if seen.insert(id) {
                     let binding = semantic.binding(id);
@@ -43,26 +49,21 @@ fn iter_base_classes<'a>(
                         .map(|id| &semantic.scopes[*id])
                         .and_then(|scope| scope.kind.as_class())
                     {
-                        inner(base_class, semantic, seen, exprs);
+                        if inner(base_class, semantic, func, seen) {
+                            return true;
+                        }
                     }
                 }
             }
-        }
+            false
+        })
     }
 
-    let mut exprs = Vec::new();
-    inner(class_def, semantic, &mut FxHashSet::default(), &mut exprs);
+    if class_def.bases().is_empty() {
+        return false;
+    }
 
-    exprs.into_iter()
-}
-
-/// Return `true` if any base class matches an [`Expr`] predicate.
-pub fn any_base_class(
-    class_def: &ast::StmtClassDef,
-    semantic: &SemanticModel,
-    func: &dyn Fn(&Expr) -> bool,
-) -> bool {
-    iter_base_classes(class_def, semantic).any(func)
+    inner(class_def, semantic, func, &mut FxHashSet::default())
 }
 
 /// Return `true` if any base class matches an [`ast::StmtClassDef`] predicate.
@@ -138,39 +139,34 @@ impl From<IsMetaclass> for bool {
 /// `IsMetaclass::No` if it's definitely *not* a metaclass, and
 /// `IsMetaclass::Maybe` otherwise.
 pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
-    for expr in iter_base_classes(class_def, semantic) {
-        match expr {
-            Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) => {
-                // Ex) `class Foo(type(Protocol)): ...`
-                if arguments.len() == 1 && semantic.match_builtin_expr(func.as_ref(), "type") {
-                    return IsMetaclass::Maybe;
-                }
-            }
-            Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-                // Ex) `class Foo(type[int]): ...`
-                if semantic.match_builtin_expr(value.as_ref(), "type") {
-                    return IsMetaclass::Yes;
-                }
-            }
-            _ => {
-                if semantic
-                    .resolve_qualified_name(expr)
-                    .is_some_and(|qualified_name| {
-                        matches!(
-                            qualified_name.segments(),
-                            ["" | "builtins", "type"]
-                                | ["abc", "ABCMeta"]
-                                | ["enum", "EnumMeta" | "EnumType"]
-                        )
-                    })
-                {
-                    return IsMetaclass::Yes;
-                }
-            }
+    let mut maybe = false;
+    let is_base_class = any_base_class(class_def, semantic, &mut |expr| match expr {
+        Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) => {
+            maybe = true;
+            // Ex) `class Foo(type(Protocol)): ...`
+            arguments.len() == 1 && semantic.match_builtin_expr(func.as_ref(), "type")
         }
-    }
+        Expr::Subscript(ast::ExprSubscript { value, .. }) => {
+            // Ex) `class Foo(type[int]): ...`
+            semantic.match_builtin_expr(value.as_ref(), "type")
+        }
+        _ => semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["" | "builtins", "type"]
+                        | ["abc", "ABCMeta"]
+                        | ["enum", "EnumMeta" | "EnumType"]
+                )
+            }),
+    });
 
-    IsMetaclass::No
+    match (is_base_class, maybe) {
+        (true, true) => IsMetaclass::Maybe,
+        (true, false) => IsMetaclass::Yes,
+        (false, _) => IsMetaclass::No,
+    }
 }
