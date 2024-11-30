@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF044.py:6:9: RUF044 Abstract method defined in non-abstract class
+  |
+4 | class NoBase:
+5 |     @abstractmethod
+6 |     def abstract_instance_method(self): ...
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^ RUF044
+7 | 
+8 |     @abstractclassmethod
+  |
+  = help: Remove `@abstractmethod` or make `NoBase` inherit from `abc.ABC`
+
+RUF044.py:9:9: RUF044 Abstract method defined in non-abstract class
+   |
+ 8 |     @abstractclassmethod
+ 9 |     def abstract_class_method(cls): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^ RUF044
+10 | 
+11 |     @abstractstaticmethod
+   |
+   = help: Remove `@abstractclassmethod` or make `NoBase` inherit from `abc.ABC`
+
+RUF044.py:12:9: RUF044 Abstract method defined in non-abstract class
+   |
+11 |     @abstractstaticmethod
+12 |     def abstract_static_method(): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^ RUF044
+13 | 
+14 |     @abstractproperty
+   |
+   = help: Remove `@abstractstaticmethod` or make `NoBase` inherit from `abc.ABC`
+
+RUF044.py:15:9: RUF044 Abstract method defined in non-abstract class
+   |
+14 |     @abstractproperty
+15 |     def abstract_property(self): ...
+   |         ^^^^^^^^^^^^^^^^^ RUF044
+   |
+   = help: Remove `@abstractproperty` or make `NoBase` inherit from `abc.ABC`
