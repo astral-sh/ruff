@@ -2322,6 +2322,7 @@ name = "red_knot_test"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "camino",
  "colored",
  "memchr",
  "red_knot_python_semantic",
