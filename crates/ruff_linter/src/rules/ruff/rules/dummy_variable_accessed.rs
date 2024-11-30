@@ -1,14 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingKind};
-use ruff_python_stdlib::builtins::is_python_builtin;
+use ruff_python_semantic::{Binding, BindingKind, Scope};
+use ruff_python_stdlib::{builtins::is_python_builtin, identifiers::is_identifier};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::{checkers::ast::Checker, renamer::Renamer};
 
 /// ## What it does
-/// Checks for usages of variables marked as unused in functions (dummy variable names starting with an underscore, except '_').
+/// Checks for accesses of local dummy variable (specified by `dummy-variable-rgx` setting), except dunder names and '_'.
+/// Provides auto fix for identifiers with a leading underscore if possible.
 ///
 /// ## Why is this bad?
 /// Marking variables with a leading underscore conveys that they are intentionally unused within the function or method.
@@ -35,28 +36,33 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 pub(crate) struct DummyVariableAccessed {
     name: String,
-    shadowed_kind: ShadowedKind,
+    fix_kind: Option<ShadowedKind>,
 }
 
 impl Violation for DummyVariableAccessed {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Local variable `{}` with leading underscore is accessed",
-            self.name
-        )
+        format!("Local dummy variable `{}` is accessed", self.name)
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(match self.shadowed_kind {
-            ShadowedKind::BuiltIn => {
-                "Prefer using trailing underscores to avoid shadowing a built-in".to_string()
-            }
-            ShadowedKind::Some => {
-                "Prefer using trailing underscores to avoid shadowing a variable".to_string()
-            }
-            ShadowedKind::None => "Remove leading underscores".to_string(),
-        })
+        if let Some(fix_kind) = self.fix_kind {
+            return Some(match fix_kind {
+                ShadowedKind::BuiltIn => {
+                    "Prefer using trailing underscores to avoid shadowing a built-in".to_string()
+                }
+                ShadowedKind::Keyword => {
+                    "Prefer using trailing underscores to avoid shadowing a keyword".to_string()
+                }
+                ShadowedKind::Some => {
+                    "Prefer using trailing underscores to avoid shadowing a variable".to_string()
+                }
+                ShadowedKind::None => "Remove leading underscores".to_string(),
+            });
+        }
+        None
     }
 }
 
@@ -87,43 +93,49 @@ pub(crate) fn dummy_variable_accessed(
         return None;
     }
     // Only variables defined in function scopes
-    if !checker.semantic().scopes[binding.scope].kind.is_function() {
+    let scope = &checker.semantic().scopes[binding.scope];
+    if !scope.kind.is_function() {
         return None;
     }
     if !checker.settings.dummy_variable_rgx.is_match(name) {
         return None;
     }
 
-    let trimmed_name = name.trim_start_matches('_');
-    let mut kind = ShadowedKind::None;
+    let possible_fix_kind = get_possible_fix_kind(name, scope, checker);
 
-    if !trimmed_name.is_empty() {
-        if is_python_builtin(
-            trimmed_name,
-            checker.settings.target_version.minor(),
-            checker.source_type.is_ipynb(),
-        ) {
-            kind = ShadowedKind::BuiltIn;
-        } else if checker.semantic().scopes[binding.scope].has(trimmed_name) {
-            kind = ShadowedKind::Some;
+    let mut diagnostics: Vec<Diagnostic> = binding
+        .references
+        .iter()
+        .map(|ref_id| {
+            Diagnostic::new(
+                DummyVariableAccessed {
+                    name: name.to_string(),
+                    fix_kind: possible_fix_kind,
+                },
+                checker.semantic().reference(*ref_id).range(),
+            )
+            .with_parent(binding.start())
+        })
+        .collect();
+
+    // Try at most one auto-fix for first diagnostic instance
+    if let Some(fix_kind) = possible_fix_kind {
+        // Get the possible fix based on the scope
+        if let Some(fix) = get_possible_fix(name, fix_kind, scope) {
+            // Fix is available
+            if let Some(diagnostic) = diagnostics.first_mut() {
+                // Try to set the fix
+                diagnostic.try_set_fix(|| {
+                    let (edit, rest) =
+                        Renamer::rename(name, &fix, scope, checker.semantic(), checker.stylist())?;
+                    let applicability = Applicability::Safe;
+                    Ok(Fix::applicable_edits(edit, rest, applicability))
+                });
+            }
         }
     }
 
-    Some(
-        binding
-            .references
-            .iter()
-            .map(|ref_id| {
-                Diagnostic::new(
-                    DummyVariableAccessed {
-                        name: name.to_string(),
-                        shadowed_kind: kind,
-                    },
-                    checker.semantic().reference(*ref_id).range(),
-                )
-            })
-            .collect(),
-    )
+    Some(diagnostics)
 }
 
 /// Enumeration of various ways in which a binding can shadow other variables
@@ -133,6 +145,102 @@ enum ShadowedKind {
     Some,
     /// The variable shadows a builtin symbol
     BuiltIn,
+    /// The variable shadows a keyword
+    Keyword,
     /// The variable does not shadow any other symbols
     None,
+}
+
+/// Suggests a potential alternative name to resolve a shadowing conflict.
+fn get_possible_fix(name: &str, kind: ShadowedKind, scope: &Scope) -> Option<String> {
+    // Remove leading underscores for processing
+    let trimmed_name = name.trim_start_matches('_');
+
+    // Construct the potential fix name based on ShadowedKind
+    let fix_name = match kind {
+        ShadowedKind::Some | ShadowedKind::BuiltIn | ShadowedKind::Keyword => {
+            format!("{trimmed_name}_") // Append an underscore
+        }
+        ShadowedKind::None => trimmed_name.to_string(),
+    };
+
+    // Ensure the fix name is not already taken in the scope
+    if scope.has(&fix_name) {
+        return None;
+    }
+
+    // Check if the fix name is a valid identifier
+    is_identifier(&fix_name).then_some(fix_name)
+}
+
+/// Determines the kind of shadowing or conflict for a given variable name.
+fn get_possible_fix_kind(name: &str, scope: &Scope, checker: &Checker) -> Option<ShadowedKind> {
+    // If the name starts with an underscore, we don't consider it
+    if !name.starts_with('_') {
+        return None;
+    }
+
+    // Trim the leading underscores for further checks
+    let trimmed_name = name.trim_start_matches('_');
+
+    // Check the kind in order of precedence
+    if is_keyword(trimmed_name) {
+        return Some(ShadowedKind::Keyword);
+    }
+
+    if is_python_builtin(
+        trimmed_name,
+        checker.settings.target_version.minor(),
+        checker.source_type.is_ipynb(),
+    ) {
+        return Some(ShadowedKind::BuiltIn);
+    }
+
+    if scope.has(trimmed_name) {
+        return Some(ShadowedKind::Some);
+    }
+
+    // Default to no shadowing
+    Some(ShadowedKind::None)
+}
+
+fn is_keyword(name: &str) -> bool {
+    matches!(
+        name,
+        "False"
+            | "None"
+            | "True"
+            | "and"
+            | "as"
+            | "assert"
+            | "async"
+            | "await"
+            | "break"
+            | "class"
+            | "continue"
+            | "def"
+            | "del"
+            | "elif"
+            | "else"
+            | "except"
+            | "finally"
+            | "for"
+            | "from"
+            | "global"
+            | "if"
+            | "import"
+            | "in"
+            | "is"
+            | "lambda"
+            | "nonlocal"
+            | "not"
+            | "or"
+            | "pass"
+            | "raise"
+            | "return"
+            | "try"
+            | "while"
+            | "with"
+            | "yield",
+    )
 }
