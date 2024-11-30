@@ -76,3 +76,8 @@ class RenamingInMethodBodyClass(ABCMeta):
 
 def func(x):
     return x
+
+foo = {}
+class Bar(type(foo)):
+    def foo_method(self):
+        pass
