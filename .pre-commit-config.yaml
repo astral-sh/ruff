@@ -88,5 +88,11 @@ repos:
       - id: prettier
         types: [yaml]
 
+  - repo: https://github.com/shssoichiro/oxipng
+    rev: v9.1.3
+    hooks:
+      - id: oxipng
+        args: ["-o", "max", "--strip", "safe", "--alpha"]
+
 ci:
   skip: [cargo-fmt, dev-generate-all]
