@@ -226,7 +226,7 @@ FURB157.py:48:9: FURB157 [*] Verbose expression in `Decimal` constructor
    48 |+Decimal(" nan ")          # Decimal(" nan ") 
 49 49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
 50 50 | # In this one case, " -nan ", the fix has to be
-51 51 | # `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+51 51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
 
 FURB157.py:49:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
@@ -235,7 +235,7 @@ FURB157.py:49:9: FURB157 [*] Verbose expression in `Decimal` constructor
 49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
    |         ^^^^^^^^^^^^^^^ FURB157
 50 | # In this one case, " -nan ", the fix has to be
-51 | # `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
    |
    = help: Replace with `" +nan "`
 
@@ -246,13 +246,13 @@ FURB157.py:49:9: FURB157 [*] Verbose expression in `Decimal` constructor
 49    |-Decimal(float(" +nan "))         # Decimal(" +nan ")
    49 |+Decimal(" +nan ")         # Decimal(" +nan ")
 50 50 | # In this one case, " -nan ", the fix has to be
-51 51 | # `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+51 51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
 52 52 | Decimal(float(" -nan "))         # Decimal(" nan ")
 
 FURB157.py:52:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
 50 | # In this one case, " -nan ", the fix has to be
-51 | # `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
 52 | Decimal(float(" -nan "))         # Decimal(" nan ")
    |         ^^^^^^^^^^^^^^^ FURB157
 53 | Decimal(float(" inf "))          # Decimal(" inf ")
@@ -263,7 +263,7 @@ FURB157.py:52:9: FURB157 [*] Verbose expression in `Decimal` constructor
 ℹ Safe fix
 49 49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
 50 50 | # In this one case, " -nan ", the fix has to be
-51 51 | # `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+51 51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
 52    |-Decimal(float(" -nan "))         # Decimal(" nan ")
    52 |+Decimal(" nan ")         # Decimal(" nan ")
 53 53 | Decimal(float(" inf "))          # Decimal(" inf ")
@@ -272,7 +272,7 @@ FURB157.py:52:9: FURB157 [*] Verbose expression in `Decimal` constructor
 
 FURB157.py:53:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
-51 | # `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
 52 | Decimal(float(" -nan "))         # Decimal(" nan ")
 53 | Decimal(float(" inf "))          # Decimal(" inf ")
    |         ^^^^^^^^^^^^^^ FURB157
@@ -283,7 +283,7 @@ FURB157.py:53:9: FURB157 [*] Verbose expression in `Decimal` constructor
 
 ℹ Safe fix
 50 50 | # In this one case, " -nan ", the fix has to be
-51 51 | # `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+51 51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
 52 52 | Decimal(float(" -nan "))         # Decimal(" nan ")
 53    |-Decimal(float(" inf "))          # Decimal(" inf ")
    53 |+Decimal(" inf ")          # Decimal(" inf ")
@@ -303,7 +303,7 @@ FURB157.py:54:9: FURB157 [*] Verbose expression in `Decimal` constructor
    = help: Replace with `" +inf "`
 
 ℹ Safe fix
-51 51 | # `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+51 51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
 52 52 | Decimal(float(" -nan "))         # Decimal(" nan ")
 53 53 | Decimal(float(" inf "))          # Decimal(" inf ")
 54    |-Decimal(float(" +inf "))         # Decimal(" +inf ")
