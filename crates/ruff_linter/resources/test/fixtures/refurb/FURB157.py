@@ -48,7 +48,7 @@ Decimal("10000000000000000000000000000000000000000000000000000000000000000000000
 Decimal(float(" nan "))          # Decimal(" nan ") 
 Decimal(float(" +nan "))         # Decimal(" +nan ")
 # In this one case, " -nan ", the fix has to be
-# `Decimal(" nan ")`` because `Deimcal("-nan") != Decimal(float("-nan"))`
+# `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
 Decimal(float(" -nan "))         # Decimal(" nan ")
 Decimal(float(" inf "))          # Decimal(" inf ")
 Decimal(float(" +inf "))         # Decimal(" +inf ")
