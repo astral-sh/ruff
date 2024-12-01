@@ -494,3 +494,52 @@ annotation_presence.py:194:5: ANN201 [*] Missing return type annotation for publ
 194     |-def h(x: "'Non\x65'"):
     194 |+def h(x: "'Non\x65'") -> None:
 195 195 |     pass
+196 196 | 
+197 197 | def f4(x: "'in''\x74'"): 
+
+annotation_presence.py:197:5: ANN201 [*] Missing return type annotation for public function `f4`
+    |
+195 |     pass
+196 | 
+197 | def f4(x: "'in''\x74'"): 
+    |     ^^ ANN201
+198 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+194 194 | def h(x: "'Non\x65'"):
+195 195 |     pass
+196 196 | 
+197     |-def f4(x: "'in''\x74'"): 
+    197 |+def f4(x: "'in''\x74'") -> None: 
+198 198 |     pass
+199 199 | 
+200 200 | def f5(x: "'An''\x79'"): 
+
+annotation_presence.py:200:5: ANN201 [*] Missing return type annotation for public function `f5`
+    |
+198 |     pass
+199 | 
+200 | def f5(x: "'An''\x79'"): 
+    |     ^^ ANN201
+201 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+197 197 | def f4(x: "'in''\x74'"): 
+198 198 |     pass
+199 199 | 
+200     |-def f5(x: "'An''\x79'"): 
+    200 |+def f5(x: "'An''\x79'") -> None: 
+201 201 |     pass
+
+annotation_presence.py:200:11: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`
+    |
+198 |     pass
+199 | 
+200 | def f5(x: "'An''\x79'"): 
+    |           ^^^^^^^^^^^^ ANN401
+201 |     pass
+    |

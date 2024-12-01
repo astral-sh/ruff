@@ -96,14 +96,10 @@ fn parse_complex_type_annotation(string_expr: &ExprStringLiteral) -> AnnotationP
     // Remove quotes from nested forward reference type annotations
     let range_excluding_quotes =
         if let Expr::StringLiteral(ExprStringLiteral { ref value, .. }) = *parsed.syntax.body {
-            if let [sl] = value.as_slice() {
-                string_expr
-                    .range()
-                    .add_start(sl.flags.opener_len())
-                    .sub_end(sl.flags.closer_len())
-            } else {
-                string_expr.range()
-            }
+            let string_parts = value.as_slice();
+            let start = string_parts[0].flags.closer_len();
+            let end = string_parts[string_parts.len() - 1].flags.closer_len();
+            string_expr.range().add_start(start).sub_end(end)
         } else {
             string_expr.range()
         };

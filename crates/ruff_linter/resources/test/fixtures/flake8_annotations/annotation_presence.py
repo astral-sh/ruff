@@ -193,3 +193,9 @@ def g4(x: "Any"):
 
 def h(x: "'Non\x65'"):
     pass
+
+def f4(x: "'in''\x74'"): 
+    pass
+
+def f5(x: "'An''\x79'"): 
+    pass
