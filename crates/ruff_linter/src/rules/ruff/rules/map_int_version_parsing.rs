@@ -52,7 +52,7 @@ pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ast::ExprCal
         return;
     };
 
-    if is_dunder_version_split_dot(second) && semantic.match_builtin_expr(first, "int") {
+    if is_version_split_dot(second, semantic) && semantic.match_builtin_expr(first, "int") {
         checker
             .diagnostics
             .push(Diagnostic::new(MapIntVersionParsing, call.range()));
@@ -89,8 +89,9 @@ fn map_call_with_two_arguments<'a>(
     Some((first, second))
 }
 
-/// Whether `expr` has the form `__version__.split(".")` or `something.__version__.split(".")`.
-fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
+/// Whether `expr` has the form `__version__.split(".")`, `something.__version__.split(".")`
+/// or `importlib.metadata.version("something").split(".")`.
+fn is_version_split_dot(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     let ast::Expr::Call(ast::ExprCall {
         func, arguments, ..
     }) = expr
@@ -112,10 +113,10 @@ fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
         return false;
     }
 
-    is_dunder_version_split(func)
+    is_version_split(func, semantic)
 }
 
-fn is_dunder_version_split(func: &ast::Expr) -> bool {
+fn is_version_split(func: &ast::Expr, semantic: &SemanticModel) -> bool {
     // foo.__version__.split(".")
     // ---- value ---- ^^^^^ attr
     let ast::Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
@@ -124,19 +125,21 @@ fn is_dunder_version_split(func: &ast::Expr) -> bool {
     if attr != "split" {
         return false;
     }
-    is_dunder_version(value)
+    is_version(value, semantic)
 }
 
-fn is_dunder_version(expr: &ast::Expr) -> bool {
-    if let ast::Expr::Name(ast::ExprName { id, .. }) = expr {
-        return id == "__version__";
+fn is_version(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        // __version__.split(".")
+        ast::Expr::Name(ast::ExprName { id, .. }) => id == "__version__",
+        // foo.__version__.split(".")
+        ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "__version__",
+        // importlib.metadata.version("foo").split(".")
+        ast::Expr::Call(ast::ExprCall { func, .. }) => semantic
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| {
+                qualified_name.segments() == ["importlib", "metadata", "version"]
+            }),
+        _ => false,
     }
-
-    // foo.__version__.split(".")
-    //     ^^^^^^^^^^^ attr
-    let ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr else {
-        return false;
-    };
-
-    attr == "__version__"
 }
