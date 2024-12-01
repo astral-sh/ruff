@@ -6,7 +6,7 @@ use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{
     infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass,
-    KnownConstraintFunction, KnownFunction, Truthiness, Type, UnionBuilder,
+    KnownConstraintFunction, KnownFunction, Truthiness, Type, UnionBuilder, UnionType,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -134,7 +134,7 @@ impl<'db> NarrowingType<'db> {
             }
             (left, right) => NarrowingType::Intersection(NarrowingIntersectionType::new(
                 db,
-                Box::new([left, right]) as Box<[NarrowingType<'db>]>,
+                Box::from([left, right]),
             )),
         }
     }
@@ -152,12 +152,7 @@ impl<'db> NarrowingType<'db> {
                 deferred_left.union(db, deferred_right)
             }
             (NarrowingType::Eager(eager_left), NarrowingType::Eager(eager_right)) => {
-                NarrowingType::Eager(
-                    UnionBuilder::new(db)
-                        .add(eager_left)
-                        .add(eager_right)
-                        .build(),
-                )
+                NarrowingType::Eager(UnionType::from_elements(db, [eager_left, eager_right]))
             }
             (left, right) => NarrowingType::Union(NarrowingUnionType::new(
                 db,
@@ -178,11 +173,12 @@ impl<'db> NarrowingType<'db> {
                 builder.build()
             }
             NarrowingType::Union(union) => {
-                let mut builder = UnionBuilder::new(db);
-                for element in union.elements(db) {
-                    builder = builder.add(element.evaluate(db, base_type));
-                }
-                builder.build()
+                let elements = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| element.evaluate(db, base_type));
+
+                UnionType::from_elements(db, elements)
             }
         }
     }
@@ -225,10 +221,10 @@ impl DeferredType {
                 // or instances with custom __bool__ implementations that return random results.
                 NarrowingType::Intersection(NarrowingIntersectionType::<'db>::new(
                     db,
-                    Box::new([
+                    Box::from([
                         NarrowingType::Deferred(self),
                         NarrowingType::Deferred(other),
-                    ]) as Box<[NarrowingType<'db>]>,
+                    ]),
                 ))
             }
         }

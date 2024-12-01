@@ -1761,24 +1761,25 @@ impl<'db> Type<'db> {
             }
             _ => {
                 if let Truthiness::AlwaysTrue = self.bool(db) {
-                    return Type::Never;
+                    Type::Never
+                } else {
+                    self
                 }
-
-                self
             }
         }
     }
 
     pub fn falsy_literals(db: &'db dyn Db) -> Type<'db> {
-        UnionBuilder::new(db)
-            .add(Type::none(db))
-            .add(Type::BooleanLiteral(false))
-            .add(Type::IntLiteral(0))
-            .add(Type::string_literal(db, ""))
-            .add(Type::bytes_literal(db, b""))
+        let elements = Box::from([
+            Type::none(db),
+            Type::BooleanLiteral(false),
+            Type::IntLiteral(0),
+            Type::string_literal(db, ""),
+            Type::bytes_literal(db, b""),
             // TODO: tuple literal should be included
-            // .add(Type::tuple(db, &[]))
-            .build()
+            // Type::tuple(db, &[])
+        ]);
+        Type::Union(UnionType::new(db, elements))
     }
 
     /// Implements the Truthy Intersection for a type within practical limitations.
@@ -1787,13 +1788,13 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn exclude_always_falsy(self, db: &'db dyn Db) -> Type<'db> {
         if let Truthiness::AlwaysFalse = self.bool(db) {
-            return Type::Never;
+            Type::Never
+        } else {
+            IntersectionBuilder::new(db)
+                .add_positive(self)
+                .add_negative(Type::falsy_literals(db))
+                .build()
         }
-
-        IntersectionBuilder::new(db)
-            .add_positive(self)
-            .add_negative(Type::falsy_literals(db))
-            .build()
     }
 }
 
