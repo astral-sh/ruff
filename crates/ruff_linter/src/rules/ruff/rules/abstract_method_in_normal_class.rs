@@ -11,7 +11,52 @@ use crate::checkers::ast::Checker;
 /// but defined within a normal class's body.
 ///
 /// ## Why is this bad?
-/// Such abstract method decorators are only effective in an abstract class.
+/// The abstract method decorators prevent users from instantiating abstract classes,
+/// or inheriting from abstract classes without implementing all abstract methods
+/// by throwing an exception. Such abstract method decorators are only effective
+/// in an abstract class.
+///
+/// For a mixin class, it is not enough that `abc.ABC` is included in the eventual MRO.
+/// The mixin class must also inherit directly from `ABC` for the decorators to take effect.
+///
+/// ```python
+/// from abc import ABC, abstractmethod
+///
+///
+/// class Base(ABC):
+///     @abstractmethod
+///     def hello(self) -> None: ...
+///
+///     def __repr__(self) -> str:
+///         return f"message={self.msg!r}"
+///
+///
+/// class Mixin:  # should be: `Mixin(ABC)`:
+///     @abstractmethod
+///     def world(self) -> None:
+///         self.msg += " goodbye"
+///
+///
+/// class FooBar(Mixin, Base):
+///     def __init__(self):
+///         self.msg = ""
+///
+///     def hello(self) -> None:
+///         self.msg += "hello"
+///
+///     # without `Mixin(ABC)`, omitting this does not raise an exception
+///     # def world(self) -> None:
+///     #     self.msg += " world"
+///
+///
+/// # `ABC` is part of the MRO
+/// print(FooBar.mro())  # [FooBar, Mixin, Base, ABC, object]
+///
+/// fb = FooBar()
+/// fb.hello()
+/// fb.world()
+/// print(str(fb))  # message='hello goodbye'
+/// ```
 ///
 /// ## Example
 ///
