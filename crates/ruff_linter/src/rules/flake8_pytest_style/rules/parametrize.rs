@@ -711,7 +711,9 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalue
     // def test_foo(x):  # `x` is a tuple, not an int
     //     ...
     // ```
-    if let Expr::List(ast::ExprList { elts, .. }) = argvalues {
+    if let Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) =
+        argvalues
+    {
         if elts.iter().any(is_single_element_sequence) {
             checker.diagnostics.push(diagnostic);
             return;

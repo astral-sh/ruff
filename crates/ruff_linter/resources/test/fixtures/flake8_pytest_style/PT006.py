@@ -84,10 +84,10 @@ def test_keyword_arguments(param1, param2):
 
 
 @pytest.mark.parametrize(("param",), [(1,), (2,)])
-def test_argvalues_single_element_tuple(param):
+def test_single_element_tuple(param):
     ...
 
 
 @pytest.mark.parametrize(("param",), [[1], [2]])
-def test_argvalues_single_element_list(param):
+def test_single_element_list(param):
     ...

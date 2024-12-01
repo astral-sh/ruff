@@ -196,7 +196,7 @@ PT006.py:86:26: PT006 Wrong type passed to first argument of `@pytest.mark.param
    |
 86 | @pytest.mark.parametrize(("param",), [(1,), (2,)])
    |                          ^^^^^^^^^^ PT006
-87 | def test_argvalues_single_element_tuple(param):
+87 | def test_single_element_tuple(param):
 88 |     ...
    |
    = help: Use a string for the first argument
@@ -205,7 +205,7 @@ PT006.py:91:26: PT006 Wrong type passed to first argument of `@pytest.mark.param
    |
 91 | @pytest.mark.parametrize(("param",), [[1], [2]])
    |                          ^^^^^^^^^^ PT006
-92 | def test_argvalues_single_element_list(param):
+92 | def test_single_element_list(param):
 93 |     ...
    |
    = help: Use a string for the first argument
