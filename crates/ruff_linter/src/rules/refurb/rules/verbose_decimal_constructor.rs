@@ -153,26 +153,31 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
                 return;
             };
 
-            let normalized_float_string = float.value.to_str().trim().to_lowercase();
-
-            if !matches!(
-                normalized_float_string.as_str(),
-                "inf"
-                    | "+inf"
-                    | "-inf"
-                    | "infinity"
-                    | "+infinity"
-                    | "-infinity"
-                    | "nan"
-                    | "+nan"
-                    | "-nan"
-            ) {
+            let trimmed = float.value.to_str().trim();
+            let mut matches_non_finite_keyword = false;
+            for non_finite_keyword in [
+                "inf",
+                "+inf",
+                "-inf",
+                "infinity",
+                "+infinity",
+                "-infinity",
+                "nan",
+                "+nan",
+                "-nan",
+            ] {
+                if trimmed.eq_ignore_ascii_case(non_finite_keyword) {
+                    matches_non_finite_keyword = true;
+                    break;
+                }
+            }
+            if !matches_non_finite_keyword {
                 return;
             }
 
             let mut replacement = checker.locator().slice(float).to_string();
             // `Decimal(float("-nan")) == Decimal("nan")`
-            if &normalized_float_string == "-nan" {
+            if trimmed.eq_ignore_ascii_case("-nan") {
                 replacement.remove(replacement.find('-').unwrap());
             }
             let mut diagnostic = Diagnostic::new(
