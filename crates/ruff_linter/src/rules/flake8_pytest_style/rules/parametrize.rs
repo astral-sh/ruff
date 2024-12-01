@@ -331,7 +331,7 @@ fn get_parametrize_name_range(
 }
 
 /// PT006
-fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr) {
+fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
@@ -414,7 +414,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr) {
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             if elts.len() == 1 {
-                handle_single_name(checker, expr, &elts[0]);
+                handle_single_name(checker, expr, &elts[0], argvalues);
             } else {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
@@ -458,7 +458,7 @@ fn check_names(checker: &mut Checker, call: &ExprCall, expr: &Expr) {
         }
         Expr::List(ast::ExprList { elts, .. }) => {
             if elts.len() == 1 {
-                handle_single_name(checker, expr, &elts[0]);
+                handle_single_name(checker, expr, &elts[0], argvalues);
             } else {
                 match names_type {
                     types::ParametrizeNameType::List => {}
@@ -678,7 +678,17 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     }
 }
 
-fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
+/// Returns `true` if the expression is a single-element sequence (e.g., `(1,)`).
+fn is_single_element_sequence(expr: &Expr) -> bool {
+    match expr {
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.len() == 1
+        }
+        _ => false,
+    }
+}
+
+fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalues: &Expr) {
     let mut diagnostic = Diagnostic::new(
         PytestParametrizeNamesWrongType {
             single_argument: true,
@@ -686,6 +696,27 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
         },
         expr.range(),
     );
+
+    // Avoid suggesting a fix if both the `argnames` and `argvalues` are single-element sequences.
+    // Here's an example where the fix would break the test:
+    //
+    // ```python
+    // @pytest.mark.parametrize(("x",), [(1,), (2,)])
+    // def test_foo(x):  # `x` is an int
+    //     ...
+    //
+    // # The test above can't be fixed to:
+    //
+    // @pytest.mark.parametrize("x", [(1,), (2,)])
+    // def test_foo(x):  # `x` is a tuple, not an int
+    //     ...
+    // ```
+    if let Expr::List(ast::ExprList { elts, .. }) = argvalues {
+        if elts.iter().any(is_single_element_sequence) {
+            checker.diagnostics.push(diagnostic);
+            return;
+        }
+    }
 
     let node = value.clone();
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -801,12 +832,18 @@ pub(crate) fn parametrize(checker: &mut Checker, call: &ExprCall) {
     }
 
     if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-        if let Some(names) = if checker.settings.preview.is_enabled() {
+        let names = if checker.settings.preview.is_enabled() {
             call.arguments.find_argument("argnames", 0)
         } else {
             call.arguments.find_positional(0)
-        } {
-            check_names(checker, call, names);
+        };
+        let values = if checker.settings.preview.is_enabled() {
+            call.arguments.find_argument("argvalues", 1)
+        } else {
+            call.arguments.find_positional(1)
+        };
+        if let (Some(names), Some(values)) = (names, values) {
+            check_names(checker, call, names, values);
         }
     }
     if checker.enabled(Rule::PytestParametrizeValuesWrongType) {

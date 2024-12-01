@@ -228,4 +228,22 @@ PT006.py:69:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    69 |+@pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
 70 70 | def test_csv_with_parens(param1, param2):
 71 71 |     ...
-72 72 |
+72 72 | 
+
+PT006.py:86:26: PT006 Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+   |
+86 | @pytest.mark.parametrize(("param",), [(1,), (2,)])
+   |                          ^^^^^^^^^^ PT006
+87 | def test_argvalues_single_element_tuple(param):
+88 |     ...
+   |
+   = help: Use a string for the first argument
+
+PT006.py:91:26: PT006 Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+   |
+91 | @pytest.mark.parametrize(("param",), [[1], [2]])
+   |                          ^^^^^^^^^^ PT006
+92 | def test_argvalues_single_element_list(param):
+93 |     ...
+   |
+   = help: Use a string for the first argument

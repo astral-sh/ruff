@@ -81,3 +81,13 @@ def test_not_decorator(param1, param2):
 @pytest.mark.parametrize(argnames=("param1,param2"), argvalues=[(1, 2), (3, 4)])
 def test_keyword_arguments(param1, param2):
     ...
+
+
+@pytest.mark.parametrize(("param",), [(1,), (2,)])
+def test_argvalues_single_element_tuple(param):
+    ...
+
+
+@pytest.mark.parametrize(("param",), [[1], [2]])
+def test_argvalues_single_element_list(param):
+    ...
