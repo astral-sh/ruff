@@ -93,7 +93,21 @@ fn parse_simple_type_annotation(
 
 fn parse_complex_type_annotation(string_expr: &ExprStringLiteral) -> AnnotationParseResult {
     let mut parsed = parse_expression(string_expr.value.to_str())?;
-    relocate_expr(parsed.expr_mut(), string_expr.range());
+    // Remove quotes from nested forward reference type annotations
+    let range_excluding_quotes =
+        if let Expr::StringLiteral(ExprStringLiteral { ref value, .. }) = *parsed.syntax.body {
+            if let [sl] = value.as_slice() {
+                string_expr
+                    .range()
+                    .add_start(sl.flags.opener_len())
+                    .sub_end(sl.flags.closer_len())
+            } else {
+                string_expr.range()
+            }
+        } else {
+            string_expr.range()
+        };
+    relocate_expr(parsed.expr_mut(), range_excluding_quotes);
     Ok(ParsedAnnotation {
         parsed,
         kind: AnnotationKind::Complex,

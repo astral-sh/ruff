@@ -164,3 +164,32 @@ class Foo:
 class Class:
     def __init__(self):
         print(f"{self.attr=}")
+
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/14695
+# Checked for being valid Python using `typing.get_type_hints`
+
+def f2(x: "'int'"): 
+    pass
+
+def f(x: "'in\x74'"): 
+    pass
+
+def f3(x: "'HelloWorld'"): 
+    pass
+
+def g(x: "'An\x79'"): 
+    pass
+
+def g2(x: "'Any'"): 
+    pass
+
+def g3(x: "An\x79"): 
+    pass
+
+def g4(x: "Any"): 
+    pass
+
+def h(x: "'Non\x65'"):
+    pass

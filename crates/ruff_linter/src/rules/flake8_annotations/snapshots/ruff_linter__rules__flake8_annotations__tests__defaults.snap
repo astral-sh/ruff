@@ -298,3 +298,199 @@ annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for spec
 165     |-    def __init__(self):
     165 |+    def __init__(self) -> None:
 166 166 |         print(f"{self.attr=}")
+167 167 | 
+168 168 | 
+
+annotation_presence.py:173:5: ANN201 [*] Missing return type annotation for public function `f2`
+    |
+171 | # Checked for being valid Python using `typing.get_type_hints`
+172 | 
+173 | def f2(x: "'int'"): 
+    |     ^^ ANN201
+174 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+170 170 | # Regression test for: https://github.com/astral-sh/ruff/issues/14695
+171 171 | # Checked for being valid Python using `typing.get_type_hints`
+172 172 | 
+173     |-def f2(x: "'int'"): 
+    173 |+def f2(x: "'int'") -> None: 
+174 174 |     pass
+175 175 | 
+176 176 | def f(x: "'in\x74'"): 
+
+annotation_presence.py:176:5: ANN201 [*] Missing return type annotation for public function `f`
+    |
+174 |     pass
+175 | 
+176 | def f(x: "'in\x74'"): 
+    |     ^ ANN201
+177 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+173 173 | def f2(x: "'int'"): 
+174 174 |     pass
+175 175 | 
+176     |-def f(x: "'in\x74'"): 
+    176 |+def f(x: "'in\x74'") -> None: 
+177 177 |     pass
+178 178 | 
+179 179 | def f3(x: "'HelloWorld'"): 
+
+annotation_presence.py:179:5: ANN201 [*] Missing return type annotation for public function `f3`
+    |
+177 |     pass
+178 | 
+179 | def f3(x: "'HelloWorld'"): 
+    |     ^^ ANN201
+180 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+176 176 | def f(x: "'in\x74'"): 
+177 177 |     pass
+178 178 | 
+179     |-def f3(x: "'HelloWorld'"): 
+    179 |+def f3(x: "'HelloWorld'") -> None: 
+180 180 |     pass
+181 181 | 
+182 182 | def g(x: "'An\x79'"): 
+
+annotation_presence.py:182:5: ANN201 [*] Missing return type annotation for public function `g`
+    |
+180 |     pass
+181 | 
+182 | def g(x: "'An\x79'"): 
+    |     ^ ANN201
+183 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+179 179 | def f3(x: "'HelloWorld'"): 
+180 180 |     pass
+181 181 | 
+182     |-def g(x: "'An\x79'"): 
+    182 |+def g(x: "'An\x79'") -> None: 
+183 183 |     pass
+184 184 | 
+185 185 | def g2(x: "'Any'"): 
+
+annotation_presence.py:182:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`
+    |
+180 |     pass
+181 | 
+182 | def g(x: "'An\x79'"): 
+    |          ^^^^^^^^^^ ANN401
+183 |     pass
+    |
+
+annotation_presence.py:185:5: ANN201 [*] Missing return type annotation for public function `g2`
+    |
+183 |     pass
+184 | 
+185 | def g2(x: "'Any'"): 
+    |     ^^ ANN201
+186 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+182 182 | def g(x: "'An\x79'"): 
+183 183 |     pass
+184 184 | 
+185     |-def g2(x: "'Any'"): 
+    185 |+def g2(x: "'Any'") -> None: 
+186 186 |     pass
+187 187 | 
+188 188 | def g3(x: "An\x79"): 
+
+annotation_presence.py:185:11: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`
+    |
+183 |     pass
+184 | 
+185 | def g2(x: "'Any'"): 
+    |           ^^^^^^^ ANN401
+186 |     pass
+    |
+
+annotation_presence.py:188:5: ANN201 [*] Missing return type annotation for public function `g3`
+    |
+186 |     pass
+187 | 
+188 | def g3(x: "An\x79"): 
+    |     ^^ ANN201
+189 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+185 185 | def g2(x: "'Any'"): 
+186 186 |     pass
+187 187 | 
+188     |-def g3(x: "An\x79"): 
+    188 |+def g3(x: "An\x79") -> None: 
+189 189 |     pass
+190 190 | 
+191 191 | def g4(x: "Any"): 
+
+annotation_presence.py:188:11: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`
+    |
+186 |     pass
+187 | 
+188 | def g3(x: "An\x79"): 
+    |           ^^^^^^^^ ANN401
+189 |     pass
+    |
+
+annotation_presence.py:191:5: ANN201 [*] Missing return type annotation for public function `g4`
+    |
+189 |     pass
+190 | 
+191 | def g4(x: "Any"): 
+    |     ^^ ANN201
+192 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+188 188 | def g3(x: "An\x79"): 
+189 189 |     pass
+190 190 | 
+191     |-def g4(x: "Any"): 
+    191 |+def g4(x: "Any") -> None: 
+192 192 |     pass
+193 193 | 
+194 194 | def h(x: "'Non\x65'"):
+
+annotation_presence.py:191:11: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`
+    |
+189 |     pass
+190 | 
+191 | def g4(x: "Any"): 
+    |           ^^^^^ ANN401
+192 |     pass
+    |
+
+annotation_presence.py:194:5: ANN201 [*] Missing return type annotation for public function `h`
+    |
+192 |     pass
+193 | 
+194 | def h(x: "'Non\x65'"):
+    |     ^ ANN201
+195 |     pass
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+191 191 | def g4(x: "Any"): 
+192 192 |     pass
+193 193 | 
+194     |-def h(x: "'Non\x65'"):
+    194 |+def h(x: "'Non\x65'") -> None:
+195 195 |     pass
