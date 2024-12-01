@@ -19,10 +19,9 @@ from _typeshed import (
     WriteableBuffer,
     structseq,
 )
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import OSError
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping, Sequence
-from contextlib import AbstractContextManager
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from subprocess import Popen
 from types import TracebackType
@@ -47,6 +46,446 @@ from . import path as _path
 
 if sys.version_info >= (3, 9):
     from types import GenericAlias
+
+__all__ = [
+    "F_OK",
+    "O_APPEND",
+    "O_CREAT",
+    "O_EXCL",
+    "O_RDONLY",
+    "O_RDWR",
+    "O_TRUNC",
+    "O_WRONLY",
+    "P_NOWAIT",
+    "P_NOWAITO",
+    "P_WAIT",
+    "R_OK",
+    "SEEK_CUR",
+    "SEEK_END",
+    "SEEK_SET",
+    "TMP_MAX",
+    "W_OK",
+    "X_OK",
+    "DirEntry",
+    "_exit",
+    "abort",
+    "access",
+    "altsep",
+    "chdir",
+    "chmod",
+    "close",
+    "closerange",
+    "cpu_count",
+    "curdir",
+    "defpath",
+    "device_encoding",
+    "devnull",
+    "dup",
+    "dup2",
+    "environ",
+    "error",
+    "execl",
+    "execle",
+    "execlp",
+    "execlpe",
+    "execv",
+    "execve",
+    "execvp",
+    "execvpe",
+    "extsep",
+    "fdopen",
+    "fsdecode",
+    "fsencode",
+    "fspath",
+    "fstat",
+    "fsync",
+    "ftruncate",
+    "get_exec_path",
+    "get_inheritable",
+    "get_terminal_size",
+    "getcwd",
+    "getcwdb",
+    "getenv",
+    "getlogin",
+    "getpid",
+    "getppid",
+    "isatty",
+    "kill",
+    "linesep",
+    "link",
+    "listdir",
+    "lseek",
+    "lstat",
+    "makedirs",
+    "mkdir",
+    "name",
+    "open",
+    "pardir",
+    "path",
+    "pathsep",
+    "pipe",
+    "popen",
+    "putenv",
+    "read",
+    "readlink",
+    "remove",
+    "removedirs",
+    "rename",
+    "renames",
+    "replace",
+    "rmdir",
+    "scandir",
+    "sep",
+    "set_inheritable",
+    "spawnl",
+    "spawnle",
+    "spawnv",
+    "spawnve",
+    "stat",
+    "stat_result",
+    "statvfs_result",
+    "strerror",
+    "supports_bytes_environ",
+    "symlink",
+    "system",
+    "terminal_size",
+    "times",
+    "times_result",
+    "truncate",
+    "umask",
+    "uname_result",
+    "unlink",
+    "urandom",
+    "utime",
+    "waitpid",
+    "walk",
+    "write",
+]
+if sys.version_info >= (3, 9):
+    __all__ += ["waitstatus_to_exitcode"]
+if sys.platform == "darwin" and sys.version_info >= (3, 12):
+    __all__ += ["PRIO_DARWIN_BG", "PRIO_DARWIN_NONUI", "PRIO_DARWIN_PROCESS", "PRIO_DARWIN_THREAD"]
+if sys.platform == "darwin" and sys.version_info >= (3, 10):
+    __all__ += ["O_EVTONLY", "O_NOFOLLOW_ANY", "O_SYMLINK"]
+if sys.platform == "linux":
+    __all__ += [
+        "GRND_NONBLOCK",
+        "GRND_RANDOM",
+        "MFD_ALLOW_SEALING",
+        "MFD_CLOEXEC",
+        "MFD_HUGETLB",
+        "MFD_HUGE_16GB",
+        "MFD_HUGE_16MB",
+        "MFD_HUGE_1GB",
+        "MFD_HUGE_1MB",
+        "MFD_HUGE_256MB",
+        "MFD_HUGE_2GB",
+        "MFD_HUGE_2MB",
+        "MFD_HUGE_32MB",
+        "MFD_HUGE_512KB",
+        "MFD_HUGE_512MB",
+        "MFD_HUGE_64KB",
+        "MFD_HUGE_8MB",
+        "MFD_HUGE_MASK",
+        "MFD_HUGE_SHIFT",
+        "O_DIRECT",
+        "O_LARGEFILE",
+        "O_NOATIME",
+        "O_PATH",
+        "O_RSYNC",
+        "O_TMPFILE",
+        "RTLD_DEEPBIND",
+        "SCHED_BATCH",
+        "SCHED_IDLE",
+        "SCHED_RESET_ON_FORK",
+        "XATTR_CREATE",
+        "XATTR_REPLACE",
+        "XATTR_SIZE_MAX",
+        "copy_file_range",
+        "getrandom",
+        "getxattr",
+        "listxattr",
+        "memfd_create",
+        "removexattr",
+        "setxattr",
+    ]
+if sys.platform == "linux" and sys.version_info >= (3, 13):
+    __all__ += [
+        "POSIX_SPAWN_CLOSEFROM",
+        "TFD_CLOEXEC",
+        "TFD_NONBLOCK",
+        "TFD_TIMER_ABSTIME",
+        "TFD_TIMER_CANCEL_ON_SET",
+        "timerfd_create",
+        "timerfd_gettime",
+        "timerfd_gettime_ns",
+        "timerfd_settime",
+        "timerfd_settime_ns",
+    ]
+if sys.platform == "linux" and sys.version_info >= (3, 12):
+    __all__ += [
+        "CLONE_FILES",
+        "CLONE_FS",
+        "CLONE_NEWCGROUP",
+        "CLONE_NEWIPC",
+        "CLONE_NEWNET",
+        "CLONE_NEWNS",
+        "CLONE_NEWPID",
+        "CLONE_NEWUSER",
+        "CLONE_NEWUTS",
+        "CLONE_SIGHAND",
+        "CLONE_SYSVSEM",
+        "CLONE_THREAD",
+        "CLONE_VM",
+        "setns",
+        "unshare",
+    ]
+if sys.platform == "linux" and sys.version_info >= (3, 10):
+    __all__ += [
+        "EFD_CLOEXEC",
+        "EFD_NONBLOCK",
+        "EFD_SEMAPHORE",
+        "RWF_APPEND",
+        "SPLICE_F_MORE",
+        "SPLICE_F_MOVE",
+        "SPLICE_F_NONBLOCK",
+        "eventfd",
+        "eventfd_read",
+        "eventfd_write",
+        "splice",
+    ]
+if sys.platform == "linux" and sys.version_info >= (3, 9):
+    __all__ += ["P_PIDFD", "pidfd_open"]
+if sys.platform == "win32":
+    __all__ += [
+        "O_BINARY",
+        "O_NOINHERIT",
+        "O_RANDOM",
+        "O_SEQUENTIAL",
+        "O_SHORT_LIVED",
+        "O_TEMPORARY",
+        "O_TEXT",
+        "P_DETACH",
+        "P_OVERLAY",
+        "get_handle_inheritable",
+        "set_handle_inheritable",
+        "startfile",
+    ]
+if sys.platform == "win32" and sys.version_info >= (3, 12):
+    __all__ += ["listdrives", "listmounts", "listvolumes"]
+if sys.platform != "win32":
+    __all__ += [
+        "CLD_CONTINUED",
+        "CLD_DUMPED",
+        "CLD_EXITED",
+        "CLD_TRAPPED",
+        "EX_CANTCREAT",
+        "EX_CONFIG",
+        "EX_DATAERR",
+        "EX_IOERR",
+        "EX_NOHOST",
+        "EX_NOINPUT",
+        "EX_NOPERM",
+        "EX_NOUSER",
+        "EX_OSERR",
+        "EX_OSFILE",
+        "EX_PROTOCOL",
+        "EX_SOFTWARE",
+        "EX_TEMPFAIL",
+        "EX_UNAVAILABLE",
+        "EX_USAGE",
+        "F_LOCK",
+        "F_TEST",
+        "F_TLOCK",
+        "F_ULOCK",
+        "NGROUPS_MAX",
+        "O_ACCMODE",
+        "O_ASYNC",
+        "O_CLOEXEC",
+        "O_DIRECTORY",
+        "O_DSYNC",
+        "O_NDELAY",
+        "O_NOCTTY",
+        "O_NOFOLLOW",
+        "O_NONBLOCK",
+        "O_SYNC",
+        "POSIX_SPAWN_CLOSE",
+        "POSIX_SPAWN_DUP2",
+        "POSIX_SPAWN_OPEN",
+        "PRIO_PGRP",
+        "PRIO_PROCESS",
+        "PRIO_USER",
+        "P_ALL",
+        "P_PGID",
+        "P_PID",
+        "RTLD_GLOBAL",
+        "RTLD_LAZY",
+        "RTLD_LOCAL",
+        "RTLD_NODELETE",
+        "RTLD_NOLOAD",
+        "RTLD_NOW",
+        "SCHED_FIFO",
+        "SCHED_OTHER",
+        "SCHED_RR",
+        "SEEK_DATA",
+        "SEEK_HOLE",
+        "ST_NOSUID",
+        "ST_RDONLY",
+        "WCONTINUED",
+        "WCOREDUMP",
+        "WEXITED",
+        "WEXITSTATUS",
+        "WIFCONTINUED",
+        "WIFEXITED",
+        "WIFSIGNALED",
+        "WIFSTOPPED",
+        "WNOHANG",
+        "WNOWAIT",
+        "WSTOPPED",
+        "WSTOPSIG",
+        "WTERMSIG",
+        "WUNTRACED",
+        "chown",
+        "chroot",
+        "confstr",
+        "confstr_names",
+        "ctermid",
+        "environb",
+        "fchdir",
+        "fchown",
+        "fork",
+        "forkpty",
+        "fpathconf",
+        "fstatvfs",
+        "fwalk",
+        "getegid",
+        "getenvb",
+        "geteuid",
+        "getgid",
+        "getgrouplist",
+        "getgroups",
+        "getloadavg",
+        "getpgid",
+        "getpgrp",
+        "getpriority",
+        "getsid",
+        "getuid",
+        "initgroups",
+        "killpg",
+        "lchown",
+        "lockf",
+        "major",
+        "makedev",
+        "minor",
+        "mkfifo",
+        "mknod",
+        "nice",
+        "openpty",
+        "pathconf",
+        "pathconf_names",
+        "posix_spawn",
+        "posix_spawnp",
+        "pread",
+        "preadv",
+        "pwrite",
+        "pwritev",
+        "readv",
+        "register_at_fork",
+        "sched_get_priority_max",
+        "sched_get_priority_min",
+        "sched_yield",
+        "sendfile",
+        "setegid",
+        "seteuid",
+        "setgid",
+        "setgroups",
+        "setpgid",
+        "setpgrp",
+        "setpriority",
+        "setregid",
+        "setreuid",
+        "setsid",
+        "setuid",
+        "spawnlp",
+        "spawnlpe",
+        "spawnvp",
+        "spawnvpe",
+        "statvfs",
+        "sync",
+        "sysconf",
+        "sysconf_names",
+        "tcgetpgrp",
+        "tcsetpgrp",
+        "ttyname",
+        "uname",
+        "wait",
+        "wait3",
+        "wait4",
+        "writev",
+    ]
+if sys.platform != "win32" and sys.version_info >= (3, 13):
+    __all__ += ["grantpt", "posix_openpt", "ptsname", "unlockpt"]
+if sys.platform != "win32" and sys.version_info >= (3, 11):
+    __all__ += ["login_tty"]
+if sys.platform != "win32" and sys.version_info >= (3, 10):
+    __all__ += ["O_FSYNC"]
+if sys.platform != "win32" and sys.version_info >= (3, 9):
+    __all__ += ["CLD_KILLED", "CLD_STOPPED"]
+if sys.platform != "darwin" and sys.platform != "win32":
+    __all__ += [
+        "POSIX_FADV_DONTNEED",
+        "POSIX_FADV_NOREUSE",
+        "POSIX_FADV_NORMAL",
+        "POSIX_FADV_RANDOM",
+        "POSIX_FADV_SEQUENTIAL",
+        "POSIX_FADV_WILLNEED",
+        "RWF_DSYNC",
+        "RWF_HIPRI",
+        "RWF_NOWAIT",
+        "RWF_SYNC",
+        "ST_APPEND",
+        "ST_MANDLOCK",
+        "ST_NOATIME",
+        "ST_NODEV",
+        "ST_NODIRATIME",
+        "ST_NOEXEC",
+        "ST_RELATIME",
+        "ST_SYNCHRONOUS",
+        "ST_WRITE",
+        "fdatasync",
+        "getresgid",
+        "getresuid",
+        "pipe2",
+        "posix_fadvise",
+        "posix_fallocate",
+        "sched_getaffinity",
+        "sched_getparam",
+        "sched_getscheduler",
+        "sched_param",
+        "sched_rr_get_interval",
+        "sched_setaffinity",
+        "sched_setparam",
+        "sched_setscheduler",
+        "setresgid",
+        "setresuid",
+    ]
+if sys.platform != "linux" and sys.platform != "win32":
+    __all__ += ["O_EXLOCK", "O_SHLOCK", "chflags", "lchflags"]
+if sys.platform != "linux" and sys.platform != "win32" and sys.version_info >= (3, 13):
+    __all__ += ["O_EXEC", "O_SEARCH"]
+if sys.platform != "darwin" or sys.version_info >= (3, 13):
+    if sys.platform != "win32":
+        __all__ += ["waitid", "waitid_result"]
+if sys.platform != "win32" or sys.version_info >= (3, 13):
+    __all__ += ["fchmod"]
+    if sys.platform != "linux":
+        __all__ += ["lchmod"]
+if sys.platform != "win32" or sys.version_info >= (3, 12):
+    __all__ += ["get_blocking", "set_blocking"]
+if sys.platform != "win32" or sys.version_info >= (3, 11):
+    __all__ += ["EX_OK"]
+if sys.platform != "win32" or sys.version_info >= (3, 9):
+    __all__ += ["unsetenv"]
 
 # This unnecessary alias is to work around various errors
 path = _path
@@ -125,15 +564,16 @@ if sys.platform != "win32":
         CLD_KILLED: int
         CLD_STOPPED: int
 
-    # TODO: SCHED_RESET_ON_FORK not available on darwin?
-    # TODO: SCHED_BATCH and SCHED_IDLE are linux only?
-    SCHED_OTHER: int  # some flavors of Unix
-    SCHED_BATCH: int  # some flavors of Unix
-    SCHED_IDLE: int  # some flavors of Unix
-    SCHED_SPORADIC: int  # some flavors of Unix
-    SCHED_FIFO: int  # some flavors of Unix
-    SCHED_RR: int  # some flavors of Unix
-    SCHED_RESET_ON_FORK: int  # some flavors of Unix
+    SCHED_OTHER: int
+    SCHED_FIFO: int
+    SCHED_RR: int
+    if sys.platform != "darwin" and sys.platform != "linux":
+        SCHED_SPORADIC: int
+
+if sys.platform == "linux":
+    SCHED_BATCH: int
+    SCHED_IDLE: int
+    SCHED_RESET_ON_FORK: int
 
 if sys.platform != "win32":
     RTLD_LAZY: int
@@ -158,8 +598,8 @@ SEEK_SET: int
 SEEK_CUR: int
 SEEK_END: int
 if sys.platform != "win32":
-    SEEK_DATA: int  # some flavors of Unix
-    SEEK_HOLE: int  # some flavors of Unix
+    SEEK_DATA: int
+    SEEK_HOLE: int
 
 O_RDONLY: int
 O_WRONLY: int
@@ -168,34 +608,50 @@ O_APPEND: int
 O_CREAT: int
 O_EXCL: int
 O_TRUNC: int
-# We don't use sys.platform for O_* flags to denote platform-dependent APIs because some codes,
-# including tests for mypy, use a more finer way than sys.platform before using these APIs
-# See https://github.com/python/typeshed/pull/2286 for discussions
-O_DSYNC: int  # Unix only
-O_RSYNC: int  # Unix only
-O_SYNC: int  # Unix only
-O_NDELAY: int  # Unix only
-O_NONBLOCK: int  # Unix only
-O_NOCTTY: int  # Unix only
-O_CLOEXEC: int  # Unix only
-O_SHLOCK: int  # Unix only
-O_EXLOCK: int  # Unix only
-O_BINARY: int  # Windows only
-O_NOINHERIT: int  # Windows only
-O_SHORT_LIVED: int  # Windows only
-O_TEMPORARY: int  # Windows only
-O_RANDOM: int  # Windows only
-O_SEQUENTIAL: int  # Windows only
-O_TEXT: int  # Windows only
-O_ASYNC: int  # Gnu extension if in C library
-O_DIRECT: int  # Gnu extension if in C library
-O_DIRECTORY: int  # Gnu extension if in C library
-O_NOFOLLOW: int  # Gnu extension if in C library
-O_NOATIME: int  # Gnu extension if in C library
-O_PATH: int  # Gnu extension if in C library
-O_TMPFILE: int  # Gnu extension if in C library
-O_LARGEFILE: int  # Gnu extension if in C library
-O_ACCMODE: int  # TODO: when does this exist?
+if sys.platform == "win32":
+    O_BINARY: int
+    O_NOINHERIT: int
+    O_SHORT_LIVED: int
+    O_TEMPORARY: int
+    O_RANDOM: int
+    O_SEQUENTIAL: int
+    O_TEXT: int
+
+if sys.platform != "win32":
+    O_DSYNC: int
+    O_SYNC: int
+    O_NDELAY: int
+    O_NONBLOCK: int
+    O_NOCTTY: int
+    O_CLOEXEC: int
+    O_ASYNC: int  # Gnu extension if in C library
+    O_DIRECTORY: int  # Gnu extension if in C library
+    O_NOFOLLOW: int  # Gnu extension if in C library
+    O_ACCMODE: int  # TODO: when does this exist?
+
+if sys.platform == "linux":
+    O_RSYNC: int
+    O_DIRECT: int  # Gnu extension if in C library
+    O_NOATIME: int  # Gnu extension if in C library
+    O_PATH: int  # Gnu extension if in C library
+    O_TMPFILE: int  # Gnu extension if in C library
+    O_LARGEFILE: int  # Gnu extension if in C library
+
+if sys.platform != "linux" and sys.platform != "win32":
+    O_SHLOCK: int
+    O_EXLOCK: int
+
+if sys.platform == "darwin" and sys.version_info >= (3, 10):
+    O_EVTONLY: int
+    O_NOFOLLOW_ANY: int
+    O_SYMLINK: int
+
+if sys.platform != "win32" and sys.version_info >= (3, 10):
+    O_FSYNC: int
+
+if sys.platform != "linux" and sys.platform != "win32" and sys.version_info >= (3, 13):
+    O_EXEC: int
+    O_SEARCH: int
 
 if sys.platform != "win32" and sys.platform != "darwin":
     # posix, but apparently missing on macos
@@ -413,8 +869,11 @@ In the future, this property will contain the last metadata change time."""
     # Attributes documented as sometimes appearing, but deliberately omitted from the stub: `st_creator`, `st_rsize`, `st_type`.
     # See https://github.com/python/typeshed/pull/6560#issuecomment-991253327
 
+# mypy and pyright object to this being both ABC and Protocol.
+# At runtime it inherits from ABC and is not a Protocol, but it will be
+# on the allowlist for use as a Protocol starting in 3.14.
 @runtime_checkable
-class PathLike(Protocol[AnyStr_co]):
+class PathLike(ABC, Protocol[AnyStr_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     @abstractmethod
     def __fspath__(self) -> AnyStr_co: ...
 
@@ -794,9 +1253,12 @@ def replace(
     src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None = None, dst_dir_fd: int | None = None
 ) -> None: ...
 def rmdir(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None: ...
-
-class _ScandirIterator(Iterator[DirEntry[AnyStr]], AbstractContextManager[_ScandirIterator[AnyStr], None]):
+@final
+class _ScandirIterator(Generic[AnyStr]):
+    def __del__(self) -> None: ...
+    def __iter__(self) -> Self: ...
     def __next__(self) -> DirEntry[AnyStr]: ...
+    def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...
     def close(self) -> None: ...
 

@@ -1,6 +1,7 @@
 import ctypes
+from _ctypes import _CData
 from collections.abc import Callable, Iterable, Sequence
-from ctypes import _CData, _SimpleCData, c_char
+from ctypes import _SimpleCData, c_char
 from multiprocessing.context import BaseContext
 from multiprocessing.synchronize import _LockLike
 from types import TracebackType

@@ -1,6 +1,7 @@
+import sys
+from _hashlib import HASH as _HashlibHash
 from _typeshed import ReadableBuffer, SizedBuffer
 from collections.abc import Callable
-from hashlib import _Hash as _HashlibHash
 from types import ModuleType
 from typing import AnyStr, overload
 from typing_extensions import TypeAlias
@@ -30,8 +31,12 @@ class HMAC:
     def hexdigest(self) -> str: ...
     def copy(self) -> HMAC: ...
 
-@overload
-def compare_digest(a: ReadableBuffer, b: ReadableBuffer, /) -> bool: ...
-@overload
-def compare_digest(a: AnyStr, b: AnyStr, /) -> bool: ...
 def digest(key: SizedBuffer, msg: ReadableBuffer, digest: _DigestMod) -> bytes: ...
+
+if sys.version_info >= (3, 9):
+    from _hashlib import compare_digest as compare_digest
+else:
+    @overload
+    def compare_digest(a: ReadableBuffer, b: ReadableBuffer, /) -> bool: ...
+    @overload
+    def compare_digest(a: AnyStr, b: AnyStr, /) -> bool: ...

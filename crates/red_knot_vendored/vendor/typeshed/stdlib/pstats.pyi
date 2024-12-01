@@ -1,10 +1,15 @@
 import sys
-from _typeshed import StrEnum, StrOrBytesPath
+from _typeshed import StrOrBytesPath
 from collections.abc import Iterable
 from cProfile import Profile as _cProfile
 from profile import Profile
 from typing import IO, Any, Literal, overload
 from typing_extensions import Self, TypeAlias
+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    from enum import Enum
 
 if sys.version_info >= (3, 9):
     __all__ = ["Stats", "SortKey", "FunctionProfile", "StatsProfile"]
@@ -13,16 +18,29 @@ else:
 
 _Selector: TypeAlias = str | float | int
 
-class SortKey(StrEnum):
-    CALLS = "calls"
-    CUMULATIVE = "cumulative"
-    FILENAME = "filename"
-    LINE = "line"
-    NAME = "name"
-    NFL = "nfl"
-    PCALLS = "pcalls"
-    STDNAME = "stdname"
-    TIME = "time"
+if sys.version_info >= (3, 11):
+    class SortKey(StrEnum):
+        CALLS = "calls"
+        CUMULATIVE = "cumulative"
+        FILENAME = "filename"
+        LINE = "line"
+        NAME = "name"
+        NFL = "nfl"
+        PCALLS = "pcalls"
+        STDNAME = "stdname"
+        TIME = "time"
+
+else:
+    class SortKey(str, Enum):
+        CALLS = "calls"
+        CUMULATIVE = "cumulative"
+        FILENAME = "filename"
+        LINE = "line"
+        NAME = "name"
+        NFL = "nfl"
+        PCALLS = "pcalls"
+        STDNAME = "stdname"
+        TIME = "time"
 
 if sys.version_info >= (3, 9):
     from dataclasses import dataclass

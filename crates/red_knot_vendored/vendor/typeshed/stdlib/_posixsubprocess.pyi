@@ -4,7 +4,6 @@ from collections.abc import Callable, Sequence
 from typing import SupportsIndex
 
 if sys.platform != "win32":
-    def cloexec_pipe() -> tuple[int, int]: ...
     def fork_exec(
         args: Sequence[StrOrBytesPath] | None,
         executable_list: Sequence[bytes],

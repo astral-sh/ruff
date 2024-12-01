@@ -10,3 +10,5 @@ if sys.version_info >= (3, 11):
         Traversable as Traversable,
         TraversableResources as TraversableResources,
     )
+
+    __all__ = ["ResourceReader", "Traversable", "TraversableResources"]

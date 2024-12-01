@@ -8,8 +8,6 @@ from _csv import (
     __version__ as __version__,
     _DialectLike,
     _QuotingType,
-    _reader,
-    _writer,
     field_size_limit as field_size_limit,
     get_dialect as get_dialect,
     list_dialects as list_dialects,
@@ -21,6 +19,10 @@ from _csv import (
 
 if sys.version_info >= (3, 12):
     from _csv import QUOTE_NOTNULL as QUOTE_NOTNULL, QUOTE_STRINGS as QUOTE_STRINGS
+if sys.version_info >= (3, 10):
+    from _csv import Reader, Writer
+else:
+    from _csv import _reader as Reader, _writer as Writer
 
 from _typeshed import SupportsWrite
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -77,7 +79,7 @@ class DictReader(Generic[_T]):
     fieldnames: Sequence[_T] | None
     restkey: _T | None
     restval: str | Any | None
-    reader: _reader
+    reader: Reader
     dialect: _DialectLike
     line_num: int
     @overload
@@ -125,7 +127,7 @@ class DictWriter(Generic[_T]):
     fieldnames: Collection[_T]
     restval: Any | None
     extrasaction: Literal["raise", "ignore"]
-    writer: _writer
+    writer: Writer
     def __init__(
         self,
         f: SupportsWrite[str],

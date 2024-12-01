@@ -24,7 +24,8 @@ from _decimal import (
     setcontext as setcontext,
 )
 from collections.abc import Container, Sequence
-from typing import Any, ClassVar, Literal, NamedTuple, overload
+from types import TracebackType
+from typing import Any, ClassVar, Literal, NamedTuple, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 _Decimal: TypeAlias = Decimal | int
@@ -34,6 +35,14 @@ _TrapType: TypeAlias = type[DecimalException]
 
 # At runtime, these classes are implemented in C as part of "_decimal".
 # However, they consider themselves to live in "decimal", so we'll put them here.
+
+# This type isn't exposed at runtime. It calls itself decimal.ContextManager
+@final
+@type_check_only
+class _ContextManager:
+    def __init__(self, new_context: Context) -> None: ...
+    def __enter__(self) -> Context: ...
+    def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None: ...
 
 class DecimalTuple(NamedTuple):
     sign: int
