@@ -4,7 +4,7 @@ from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
 from token import *
 from token import EXACT_TOKEN_TYPES as EXACT_TOKEN_TYPES
-from typing import Any, NamedTuple, TextIO
+from typing import Any, NamedTuple, TextIO, type_check_only
 from typing_extensions import TypeAlias
 
 __all__ = [
@@ -98,6 +98,8 @@ blank_re: Pattern[bytes]
 
 _Position: TypeAlias = tuple[int, int]
 
+# This class is not exposed. It calls itself tokenize.TokenInfo.
+@type_check_only
 class _TokenInfo(NamedTuple):
     type: int
     string: str

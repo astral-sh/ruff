@@ -1,3 +1,4 @@
+from threading import RLock
 from typing import Any
 from typing_extensions import Self, TypeAlias
 from weakref import ReferenceType
@@ -8,6 +9,9 @@ _LocalDict: TypeAlias = dict[Any, Any]
 class _localimpl:
     key: str
     dicts: dict[int, tuple[ReferenceType[Any], _LocalDict]]
+    # Keep localargs in sync with the *args, **kwargs annotation on local.__new__
+    localargs: tuple[list[Any], dict[str, Any]]
+    locallock: RLock
     def get_dict(self) -> _LocalDict: ...
     def create_dict(self) -> _LocalDict: ...
 

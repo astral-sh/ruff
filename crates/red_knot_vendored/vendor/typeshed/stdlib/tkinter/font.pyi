@@ -1,7 +1,8 @@
 import _tkinter
+import itertools
 import sys
 import tkinter
-from typing import Any, Final, Literal, TypedDict, overload
+from typing import Any, ClassVar, Final, Literal, TypedDict, overload
 from typing_extensions import TypeAlias
 
 if sys.version_info >= (3, 9):
@@ -40,6 +41,7 @@ class _MetricsDict(TypedDict):
 class Font:
     name: str
     delete_font: bool
+    counter: ClassVar[itertools.count[int]]  # undocumented
     def __init__(
         self,
         # In tkinter, 'root' refers to tkinter.Tk by convention, but the code

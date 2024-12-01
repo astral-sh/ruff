@@ -12,6 +12,8 @@ _ReadWriteBinaryMode: TypeAlias = Literal["r", "w", "rb", "wb"]
 _ZF = TypeVar("_ZF", bound=ZipFile)
 
 if sys.version_info >= (3, 12):
+    __all__ = ["Path"]
+
     class InitializedState:
         def __init__(self, *args: object, **kwargs: object) -> None: ...
         def __getstate__(self) -> tuple[list[object], dict[object, object]]: ...
