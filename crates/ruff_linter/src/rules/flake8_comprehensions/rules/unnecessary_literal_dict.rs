@@ -10,10 +10,10 @@ use crate::rules::flake8_comprehensions::fixes;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary `list` or `tuple` literals.
+/// Checks for unnecessary list or tuple literals.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to use a list or tuple literal within a call to `dict`.
+/// It's unnecessary to use a list or tuple literal within a call to `dict()`.
 /// It can be rewritten as a dict literal (`{}`).
 ///
 /// ## Examples
@@ -35,18 +35,18 @@ use super::helpers;
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryLiteralDict {
-    obj_type: String,
+    obj_type: LiteralKind,
 }
 
 impl AlwaysFixableViolation for UnnecessaryLiteralDict {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryLiteralDict { obj_type } = self;
-        format!("Unnecessary `{obj_type}` literal (rewrite as a `dict` literal)")
+        format!("Unnecessary {obj_type} literal (rewrite as a dict literal)")
     }
 
     fn fix_title(&self) -> String {
-        "Rewrite as a `dict` literal".to_string()
+        "Rewrite as a dict literal".to_string()
     }
 }
 
@@ -63,12 +63,9 @@ pub(crate) fn unnecessary_literal_dict(
     else {
         return;
     };
-    if !checker.semantic().has_builtin_binding("dict") {
-        return;
-    }
     let (kind, elts) = match argument {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => ("tuple", elts),
-        Expr::List(ast::ExprList { elts, .. }) => ("list", elts),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => (LiteralKind::Tuple, elts),
+        Expr::List(ast::ExprList { elts, .. }) => (LiteralKind::List, elts),
         _ => return,
     };
     // Accept `dict((1, 2), ...))` `dict([(1, 2), ...])`.
@@ -78,13 +75,32 @@ pub(crate) fn unnecessary_literal_dict(
     {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
-        UnnecessaryLiteralDict {
-            obj_type: kind.to_string(),
-        },
-        expr.range(),
-    );
+    if !checker.semantic().has_builtin_binding("dict") {
+        return;
+    }
+    let mut diagnostic = Diagnostic::new(UnnecessaryLiteralDict { obj_type: kind }, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::unsafe_edit));
     checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum LiteralKind {
+    Tuple,
+    List,
+}
+
+impl LiteralKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Tuple => "tuple",
+            Self::List => "list",
+        }
+    }
+}
+
+impl std::fmt::Display for LiteralKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }

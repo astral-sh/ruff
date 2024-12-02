@@ -9,10 +9,10 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
-/// Checks for unnecessary `dict`, `list`, and `set` comprehension.
+/// Checks for unnecessary dict, list, and set comprehension.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to use a `dict`/`list`/`set` comprehension to build a data structure if the
+/// It's unnecessary to use a dict/list/set comprehension to build a data structure if the
 /// elements are unchanged. Wrap the iterable with `dict()`, `list()`, or `set()` instead.
 ///
 /// ## Examples
@@ -32,9 +32,9 @@ use crate::rules::flake8_comprehensions::fixes;
 /// ## Known problems
 ///
 /// This rule may produce false positives for dictionary comprehensions that iterate over a mapping.
-/// The `dict` constructor behaves differently depending on if it receives a sequence (e.g., a
-/// `list`) or a mapping (e.g., a `dict`). When a comprehension iterates over the keys of a mapping,
-/// replacing it with a `dict` constructor call will give a different result.
+/// The dict constructor behaves differently depending on if it receives a sequence (e.g., a
+/// list) or a mapping (e.g., a dict). When a comprehension iterates over the keys of a mapping,
+/// replacing it with a `dict()` constructor call will give a different result.
 ///
 /// For example:
 ///
@@ -58,36 +58,36 @@ use crate::rules::flake8_comprehensions::fixes;
 /// Additionally, this fix may drop comments when rewriting the comprehension.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryComprehension {
-    obj_type: String,
+    kind: ComprehensionKind,
 }
 
 impl AlwaysFixableViolation for UnnecessaryComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryComprehension { obj_type } = self;
-        format!("Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`)")
+        let UnnecessaryComprehension { kind } = self;
+        format!("Unnecessary {kind} comprehension (rewrite using `{kind}()`)")
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryComprehension { obj_type } = self;
-        format!("Rewrite using `{obj_type}()`")
+        let UnnecessaryComprehension { kind } = self;
+        format!("Rewrite using `{kind}()`")
     }
 }
 
 /// Add diagnostic for C416 based on the expression node id.
 fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
-    let id = match expr {
-        Expr::ListComp(_) => "list",
-        Expr::SetComp(_) => "set",
-        Expr::DictComp(_) => "dict",
-        _ => return,
+    let Some(comprehension_kind) = ComprehensionKind::try_from_expr(expr) else {
+        return;
     };
-    if !checker.semantic().has_builtin_binding(id) {
+    if !checker
+        .semantic()
+        .has_builtin_binding(comprehension_kind.as_str())
+    {
         return;
     }
     let mut diagnostic = Diagnostic::new(
         UnnecessaryComprehension {
-            obj_type: id.to_string(),
+            kind: comprehension_kind,
         },
         expr.range(),
     );
@@ -144,4 +144,36 @@ pub(crate) fn unnecessary_list_set_comprehension(
         return;
     }
     add_diagnostic(checker, expr);
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ComprehensionKind {
+    List,
+    Set,
+    Dict,
+}
+
+impl ComprehensionKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::List => "list",
+            Self::Dict => "dict",
+            Self::Set => "set",
+        }
+    }
+
+    const fn try_from_expr(expr: &Expr) -> Option<Self> {
+        match expr {
+            Expr::ListComp(_) => Some(Self::List),
+            Expr::DictComp(_) => Some(Self::Dict),
+            Expr::SetComp(_) => Some(Self::Set),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ComprehensionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
