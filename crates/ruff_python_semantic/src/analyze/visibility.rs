@@ -78,18 +78,18 @@ pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
 pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    abstract_decorator(decorator_list, semantic).is_some()
+    abstract_decorator_kind(decorator_list, semantic).is_some()
 }
 
-pub fn abstract_decorator<'a>(
+pub fn abstract_decorator_kind<'a>(
     decorator_list: &'a [Decorator],
     semantic: &SemanticModel,
-) -> Option<(&'a Decorator, AbstractDecoratorKind)> {
+) -> Option<AbstractDecoratorKind> {
     decorator_list.iter().find_map(|decorator| {
         let qualified_name = semantic.resolve_qualified_name(&decorator.expression)?;
 
         match qualified_name.segments() {
-            ["abc", name] => AbstractDecoratorKind::from(name).map(|kind| (decorator, kind)),
+            ["abc", name] => AbstractDecoratorKind::from(name),
             _ => None,
         }
     })

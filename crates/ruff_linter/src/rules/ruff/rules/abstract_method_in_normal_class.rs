@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
-use ruff_python_semantic::analyze::visibility::{abstract_decorator, AbstractDecoratorKind};
+use ruff_python_semantic::analyze::visibility::{abstract_decorator_kind, AbstractDecoratorKind};
 
 use crate::checkers::ast::Checker;
 
@@ -132,7 +132,7 @@ fn check_class_stmt(checker: &mut Checker, class_name: &str, stmt: &Stmt) {
         return;
     };
 
-    let Some((_, decorator_kind)) = abstract_decorator(decorator_list, checker.semantic()) else {
+    let Some(decorator_kind) = abstract_decorator_kind(decorator_list, checker.semantic()) else {
         return;
     };
 
