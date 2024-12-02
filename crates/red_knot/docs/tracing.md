@@ -103,7 +103,7 @@ called **once**.
 
 ## Profiling
 
-Red Knot generates a folded stack trace  to the current directory named `tracing.folded` when setting the environment variable `RED_KNOT_LOG_PROFILE` to `1` or `true`.
+Red Knot generates a folded stack trace to the current directory named `tracing.folded` when setting the environment variable `RED_KNOT_LOG_PROFILE` to `1` or `true`.
 
 ```bash
 RED_KNOT_LOG_PROFILE=1 red_knot -- --current-directory=../test -vvv

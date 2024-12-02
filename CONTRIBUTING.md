@@ -863,7 +863,7 @@ each configuration file.
 
 The package root is used to determine a file's "module path". Consider, again, `baz.py`. In that
 case, `./my_project/src/foo` was identified as the package root, so the module path for `baz.py`
-would resolve to  `foo.bar.baz` — as computed by taking the relative path from the package root
+would resolve to `foo.bar.baz` — as computed by taking the relative path from the package root
 (inclusive of the root itself). The module path can be thought of as "the path you would use to
 import the module" (e.g., `import foo.bar.baz`).
 
