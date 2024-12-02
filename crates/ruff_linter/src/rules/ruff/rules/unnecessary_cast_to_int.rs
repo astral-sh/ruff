@@ -119,9 +119,9 @@ fn handle_round(checker: &Checker, outer_range: TextRange, arguments: &Arguments
     let number_expr = checker.locator().slice(number);
     let new_content = match ndigits {
         Some(Expr::NumberLiteral(ExprNumberLiteral { value, .. })) if is_literal_zero(value) => {
-            format!("round({})", number_expr)
+            format!("round({number_expr})")
         }
-        Some(Expr::NoneLiteral(_)) | None => format!("round({})", number_expr),
+        Some(Expr::NoneLiteral(_)) | None => format!("round({number_expr})"),
         _ => return None,
     };
 
