@@ -153,114 +153,97 @@ fn get_cached_db() -> MutexGuard<'static, TestDb> {
     db.lock().unwrap()
 }
 
-/// `T` is equivalent to itself.
-#[quickcheck]
-fn equivalent_to_is_reflexive(t: Ty) -> bool {
-    let db = get_cached_db();
-    let t = t.into_type(&db);
+macro_rules! type_property_test {
+    ($name:ident, $db:ident, ($($types:ident),+), $body:expr) => {
+        #[quickcheck]
+        fn $name($($types: Ty),+) -> bool {
+            let db_cached = get_cached_db();
+            let $db = &*db_cached;
+            $(let $types = $types.into_type($db);)+
 
-    t.is_equivalent_to(&*db, t)
+            $body
+        }
+    };
+    // A property test with a logical implication.
+    ($name:ident, $db:ident, ($($types:ident),+), $premise:expr => $conclusion:expr) => {
+        type_property_test!($name, $db, ($($types),+), !($premise) || ($conclusion));
+    };
+    // A property test with a single type argument
+    ($name:ident, $db:ident, $type:ident, $body:expr) => {
+        type_property_test!($name, $db, ($type), $body);
+    };
+    // Same, for the implication branch
+    ($name:ident, $db:ident, $type:ident, $premise:expr => $conclusion:expr) => {
+        type_property_test!($name, $db, ($type), $premise => $conclusion);
+    };
 }
 
-/// `T` is a subtype of itself.
-#[quickcheck]
-fn subtype_of_is_reflexive(t: Ty) -> bool {
-    let db = get_cached_db();
-    let t = t.into_type(&db);
+// `T` is equivalent to itself.
+type_property_test!(equivalent_to_is_reflexive, db, t, t.is_equivalent_to(db, t));
 
-    t.is_subtype_of(&*db, t)
-}
+// `T` is a subtype of itself.
+type_property_test!(subtype_of_is_reflexive, db, t, t.is_subtype_of(db, t));
 
-/// `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
-#[quickcheck]
-#[ignore] // Produces too many false positives at the moment because `is_equivalent_to` can return false negative answers
-fn subtype_of_is_antisymmetric(s: Ty, t: Ty) -> bool {
-    let db = get_cached_db();
-    let s = s.into_type(&db);
-    let t = t.into_type(&db);
+// `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
+type_property_test!(
+    subtype_of_is_antisymmetric,
+    db,
+    (s, t),
+    s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
+);
 
-    !(s.is_subtype_of(&*db, t) && t.is_subtype_of(&*db, s)) || (s.is_equivalent_to(&*db, t))
-}
+// `S <: T` and `T <: U` implies that `S <: U`.
+type_property_test!(
+    subtype_of_is_transitive,
+    db,
+    (s, t, u),
+    s.is_subtype_of(db, t) && t.is_subtype_of(db, u) => s.is_subtype_of(db, u)
+);
 
-/// `S <: T` and `T <: U` implies that `S <: U`.
-#[quickcheck]
-fn subtype_of_is_transitive(s: Ty, t: Ty, u: Ty) -> bool {
-    let db = get_cached_db();
-    let s = s.into_type(&db);
-    let t = t.into_type(&db);
-    let u = u.into_type(&db);
+// `T` is not disjoint from itself, unless `T` is `Never`.
+type_property_test!(
+    disjoint_from_is_irreflexive,
+    db,
+    t,
+    t.is_disjoint_from(db, t) => t.contains_never(db)
+);
 
-    !(s.is_subtype_of(&*db, t) && t.is_subtype_of(&*db, u)) || s.is_subtype_of(&*db, u)
-}
+// `S` is disjoint from `T` implies that `T` is disjoint from `S`.
+type_property_test!(
+    disjoint_from_is_symmetric,
+    db,
+    (s, t),
+    s.is_disjoint_from(db, t) == t.is_disjoint_from(db, s)
+);
 
-/// `T` is not disjoint from itself, unless `T` is `Never`.
-#[quickcheck]
-fn disjoint_from_is_irreflexive(t: Ty) -> bool {
-    let db = get_cached_db();
-    let t = t.into_type(&db);
+// `S <: T` implies that `S` is not disjoint from `T`, unless `S` is `Never`.
+type_property_test!(subtype_of_implies_not_disjoint_from, db, (s, t),
+    s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.contains_never(db)
+);
 
-    t.contains_never(&*db) || !t.is_disjoint_from(&*db, t)
-}
+// `T` can be assigned to itself.
+type_property_test!(assignable_to_is_reflexive, db, t, t.is_assignable_to(db, t));
 
-/// `S` is disjoint from `T` implies that `T` is disjoint from `S`.
-#[quickcheck]
-fn disjoint_from_is_symmetric(s: Ty, t: Ty) -> bool {
-    let db = get_cached_db();
-    let s = s.into_type(&db);
-    let t = t.into_type(&db);
+// `S <: T` implies that `S` can be assigned to `T`.
+type_property_test!(
+    subtype_of_implies_assignable_to,
+    db,
+    (s, t),
+    s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
+);
 
-    s.is_disjoint_from(&*db, t) == t.is_disjoint_from(&*db, s)
-}
+// If `T` is a singleton, it is also single-valued.
+type_property_test!(
+    singleton_implies_single_valued,
+    db,
+    t,
+    t.is_singleton(db) => t.is_single_valued(db)
+);
 
-/// `S <: T` implies that `S` is not disjoint from `T`, unless `S` is `Never`.
-#[quickcheck]
-fn subtype_of_implies_not_disjoint_from(s: Ty, t: Ty) -> bool {
-    let db = get_cached_db();
-    let s = s.into_type(&db);
-    let t = t.into_type(&db);
-
-    if s.contains_never(&*db) {
-        return true;
-    }
-
-    !s.is_subtype_of(&*db, t) || !s.is_disjoint_from(&*db, t)
-}
-
-/// `T` can be assigned to itself.
-#[quickcheck]
-fn assignable_to_is_reflexive(t: Ty) -> bool {
-    let db = get_cached_db();
-    let t = t.into_type(&db);
-
-    t.is_assignable_to(&*db, t)
-}
-
-/// `S <: T` implies that `S` can be assigned to `T`.
-#[quickcheck]
-fn subtype_of_implies_assignable_to(s: Ty, t: Ty) -> bool {
-    let db = get_cached_db();
-
-    let s = s.into_type(&db);
-    let t = t.into_type(&db);
-
-    !s.is_subtype_of(&*db, t) || s.is_assignable_to(&*db, t)
-}
-
-/// If `T` is a singleton, it is also single-valued.
-#[quickcheck]
-fn singleton_implies_single_valued(t: Ty) -> bool {
-    let db = get_cached_db();
-    let t = t.into_type(&db);
-
-    !t.is_singleton(&*db) || t.is_single_valued(&*db)
-}
-
-/// Negating `T` twice is equivalent to `T`.
-#[quickcheck]
-#[ignore] // Produces too many false positives at the moment because `is_equivalent_to` can return false negative answers
-fn double_negation_is_identity(t: Ty) -> bool {
-    let db = get_cached_db();
-    let t = t.into_type(&db);
-
-    t.negate(&*db).negate(&*db).is_equivalent_to(&*db, t)
-}
+// Negating `T` twice is equivalent to `T`.
+type_property_test!(
+    double_negation_is_identity,
+    db,
+    t,
+    t.negate(db).negate(db).is_equivalent_to(db, t)
+);
