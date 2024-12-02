@@ -349,6 +349,8 @@ fn collect_packages(
         packages.push(package);
     }
 
+    packages.sort_unstable_by(|a, b| a.root().cmp(b.root()));
+
     Ok(CollectedPackagesOrStandalone::Packages(packages))
 }
 
