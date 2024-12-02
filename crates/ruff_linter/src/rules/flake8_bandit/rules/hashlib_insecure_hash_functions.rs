@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_ast::{self as ast, Arguments};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -64,6 +65,13 @@ impl Violation for HashlibInsecureHashFunction {
 
 /// S324
 pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker
+        .semantic()
+        .seen_module(Modules::HASHLIB | Modules::CRYPT)
+    {
+        return;
+    }
+
     if let Some(weak_hash_call) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
