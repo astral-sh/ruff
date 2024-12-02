@@ -385,11 +385,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
-        let expr_ty = inference.expression_ty(expr_call.func.scoped_expression_id(self.db, scope));
+        let callable_ty =
+            inference.expression_ty(expr_call.func.scoped_expression_id(self.db, scope));
 
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
-        match expr_ty
+        match callable_ty
             .into_function_literal()
             .and_then(|f| f.known(self.db))
             .and_then(KnownFunction::constraint_function)
@@ -432,7 +433,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     expr_call.arguments.args.len() == 1 && expr_call.arguments.keywords.is_empty();
 
                 if is_valid_bool_invocation
-                    && expr_ty
+                    && callable_ty
                         .into_class_literal()
                         .is_some_and(|lit| lit.class.is_known(self.db, KnownClass::Bool))
                 {

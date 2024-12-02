@@ -300,7 +300,7 @@ if not bool(x is not None):
 
 # no args/narrowing
 reveal_type(x)  # revealed: Literal[1] | None
-if bool():
+if not bool():
     reveal_type(x)  # revealed: Literal[1] | None
 
 # invalid invocation, too many positional args
