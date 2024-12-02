@@ -1,0 +1,107 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
+---
+ASYNC102_ruff.py:44:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
+   |
+42 |     except Exception as e:
+43 |         with anyio.CancelScope(deadline=30, shield=False):
+44 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+45 |         with anyio.CancelScope():
+46 |             await asyncio.sleep(1)  # fail
+   |
+
+ASYNC102_ruff.py:46:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
+   |
+44 |             await asyncio.sleep(1)  # fail
+45 |         with anyio.CancelScope():
+46 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+47 |         with anyio.move_on_after(deadline=30, shield=False):
+48 |             await asyncio.sleep(1)  # fail
+   |
+
+ASYNC102_ruff.py:48:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
+   |
+46 |             await asyncio.sleep(1)  # fail
+47 |         with anyio.move_on_after(deadline=30, shield=False):
+48 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+49 |         with anyio.move_on_after():
+50 |             await asyncio.sleep(1)  # fail
+   |
+
+ASYNC102_ruff.py:50:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
+   |
+48 |             await asyncio.sleep(1)  # fail
+49 |         with anyio.move_on_after():
+50 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+51 |         with anyio.fail_after(deadline=30, shield=False):
+52 |             await asyncio.sleep(1)  # fail
+   |
+
+ASYNC102_ruff.py:52:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
+   |
+50 |             await asyncio.sleep(1)  # fail
+51 |         with anyio.fail_after(deadline=30, shield=False):
+52 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+53 |         with anyio.fail_after():
+54 |             await asyncio.sleep(1)  # fail
+   |
+
+ASYNC102_ruff.py:54:13: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
+   |
+52 |             await asyncio.sleep(1)  # fail
+53 |         with anyio.fail_after():
+54 |             await asyncio.sleep(1)  # fail
+   |             ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+   |
+
+ASYNC102_ruff.py:68:9: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
+   |
+66 |         pass
+67 |     except Exception as e:
+68 |         await asyncio.sleep(1)  # fail
+   |         ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+   |
+
+ASYNC102_ruff.py:75:9: ASYNC102 await inside asyncio.CancelledError must have shielded cancel scope with a timeout
+   |
+73 |         pass
+74 |     except asyncio.CancelledError as e:
+75 |         await asyncio.sleep(1)  # fail
+   |         ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+   |
+
+ASYNC102_ruff.py:82:9: ASYNC102 await inside Exception must have shielded cancel scope with a timeout
+   |
+80 |         pass
+81 |     except ((ZeroDivisionError, Exception), ValueError) as e:
+82 |         await asyncio.sleep(1)  # fail
+   |         ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+   |
+
+ASYNC102_ruff.py:89:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
+   |
+87 |         pass
+88 |     finally:
+89 |         await asyncio.sleep(1)  # fail
+   |         ^^^^^^^^^^^^^^^^^^^^^^ ASYNC102
+90 | 
+91 | async def fail_async_with():
+   |
+
+ASYNC102_ruff.py:95:9: ASYNC102 await inside finally must have shielded cancel scope with a timeout
+   |
+93 |           pass
+94 |       finally:
+95 |           async with my_own_async_manager():  # fail
+   |  _________^
+96 | |             pass
+   | |________________^ ASYNC102
+97 |   
+98 |   async def pass_variable_for_exception_types(exceptions_to_process: BaseException) -> Iterator[None]:
+   |
