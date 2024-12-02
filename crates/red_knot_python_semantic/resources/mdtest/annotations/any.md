@@ -33,17 +33,16 @@ def f():
 If you define your own class named `Any`, using that in a type expression refers to your class, and
 isn't a spelling of the Any type.
 
-> Note that the real name of the class shouldn't be `Any`, so that we can distinguish it from the
-> Any type in the assertion below.
-
 ```py
-class LocalAny:
+class Any:
     pass
 
-Any = LocalAny
-
-x: Any = Any()
+x: Any
 
 def f():
-    reveal_type(x)  # revealed: LocalAny
+    reveal_type(x)  # revealed: Any
+
+# This verifies that we're not accidentally seeing typing.Any, since str is assignable
+# to that but not to our locally defined class.
+y: Any = "not an Any"  # error: [invalid-assignment]
 ```
