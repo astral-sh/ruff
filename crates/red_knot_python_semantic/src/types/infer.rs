@@ -4642,6 +4642,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
+            KnownInstanceType::Any => Type::Any,
         }
     }
 

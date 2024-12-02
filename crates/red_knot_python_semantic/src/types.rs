@@ -1556,6 +1556,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
                 Type::Never
             }
+            Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
             _ => todo_type!(),
         }
     }
@@ -1896,6 +1897,8 @@ pub enum KnownInstanceType<'db> {
     NoReturn,
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
+    /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
+    Any,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
@@ -1912,6 +1915,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(_) => "TypeVar",
             Self::NoReturn => "NoReturn",
             Self::Never => "Never",
+            Self::Any => "Any",
             Self::TypeAliasType(_) => "TypeAliasType",
         }
     }
@@ -1925,6 +1929,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Union
             | Self::NoReturn
             | Self::Never
+            | Self::Any
             | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
         }
     }
@@ -1937,6 +1942,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Union => "typing.Union",
             Self::NoReturn => "typing.NoReturn",
             Self::Never => "typing.Never",
+            Self::Any => "typing.Any",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
         }
@@ -1950,6 +1956,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Union => KnownClass::SpecialForm,
             Self::NoReturn => KnownClass::SpecialForm,
             Self::Never => KnownClass::SpecialForm,
+            Self::Any => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
@@ -1969,6 +1976,7 @@ impl<'db> KnownInstanceType<'db> {
             return None;
         }
         match (module.name().as_str(), instance_name) {
+            ("typing" | "typing_extensions", "Any") => Some(Self::Any),
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
             ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
             ("typing" | "typing_extensions", "Union") => Some(Self::Union),

@@ -131,8 +131,6 @@ if sys.version_info >= (3, 12):
 if sys.version_info >= (3, 13):
     __all__ += ["get_protocol_members", "is_protocol", "NoDefault", "TypeIs", "ReadOnly"]
 
-Any = object()
-
 class _Final: ...
 
 def final(f: _T) -> _T: ...
@@ -199,6 +197,7 @@ class _SpecialForm(_Final):
         def __or__(self, other: Any) -> _SpecialForm: ...
         def __ror__(self, other: Any) -> _SpecialForm: ...
 
+Any: _SpecialForm
 Union: _SpecialForm
 Generic: _SpecialForm
 # Protocol is only present in 3.8 and later, but mypy needs it unconditionally
