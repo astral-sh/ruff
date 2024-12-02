@@ -81,8 +81,8 @@ pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
     abstract_decorator_kind(decorator_list, semantic).is_some()
 }
 
-pub fn abstract_decorator_kind<'a>(
-    decorator_list: &'a [Decorator],
+pub fn abstract_decorator_kind(
+    decorator_list: &[Decorator],
     semantic: &SemanticModel,
 ) -> Option<AbstractDecoratorKind> {
     decorator_list.iter().find_map(|decorator| {
