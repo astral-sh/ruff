@@ -6,12 +6,9 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.resolve()` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.resolve()` can improve readability over the `os.path`
 /// module's counterparts (e.g., `os.path.abspath()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -26,6 +23,11 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 ///
 /// file_path = Path("../path/to/file").resolve()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.resolve`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.resolve)
@@ -53,9 +55,6 @@ impl Violation for OsPathAbspath {
 /// methods such as `Path.chmod()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.chmod()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -69,6 +68,11 @@ impl Violation for OsPathAbspath {
 ///
 /// Path("file.py").chmod(0o444)
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.chmod`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.chmod)
@@ -96,9 +100,6 @@ impl Violation for OsChmod {
 /// methods such as `Path.mkdir(parents=True)` can improve readability over the
 /// `os` module's counterparts (e.g., `os.makedirs()`.
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -112,6 +113,11 @@ impl Violation for OsChmod {
 ///
 /// Path("./nested/directory/").mkdir(parents=True)
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.mkdir`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.mkdir)
@@ -139,9 +145,6 @@ impl Violation for OsMakedirs {
 /// methods such as `Path.mkdir()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.mkdir()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -155,6 +158,11 @@ impl Violation for OsMakedirs {
 ///
 /// Path("./directory/").mkdir()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.mkdir`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.mkdir)
@@ -182,9 +190,6 @@ impl Violation for OsMkdir {
 /// methods such as `Path.rename()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.rename()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -198,6 +203,11 @@ impl Violation for OsMkdir {
 ///
 /// Path("old.py").rename("new.py")
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.rename`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.rename)
@@ -242,6 +252,11 @@ impl Violation for OsRename {
 /// Path("old.py").replace("new.py")
 /// ```
 ///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
+///
 /// ## References
 /// - [Python documentation: `Path.replace`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.replace)
 /// - [Python documentation: `os.replace`](https://docs.python.org/3/library/os.html#os.replace)
@@ -268,9 +283,6 @@ impl Violation for OsReplace {
 /// methods such as `Path.rmdir()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.rmdir()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -284,6 +296,11 @@ impl Violation for OsReplace {
 ///
 /// Path("folder/").rmdir()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.rmdir`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.rmdir)
@@ -311,9 +328,6 @@ impl Violation for OsRmdir {
 /// methods such as `Path.unlink()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.remove()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -327,6 +341,11 @@ impl Violation for OsRmdir {
 ///
 /// Path("file.py").unlink()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.unlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.unlink)
@@ -354,9 +373,6 @@ impl Violation for OsRemove {
 /// methods such as `Path.unlink()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.unlink()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -370,6 +386,11 @@ impl Violation for OsRemove {
 ///
 /// Path("file.py").unlink()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.unlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.unlink)
@@ -397,9 +418,6 @@ impl Violation for OsUnlink {
 /// methods such as `Path.cwd()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.getcwd()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -413,6 +431,11 @@ impl Violation for OsUnlink {
 ///
 /// cwd = Path.cwd()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
@@ -437,12 +460,9 @@ impl Violation for OsGetcwd {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.exists()` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.exists()` can improve readability over the `os.path`
 /// module's counterparts (e.g., `os.path.exists()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -457,6 +477,11 @@ impl Violation for OsGetcwd {
 ///
 /// Path("file.py").exists()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.exists`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.exists)
@@ -480,12 +505,9 @@ impl Violation for OsPathExists {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.expanduser()` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.expanduser()` can improve readability over the `os.path`
 /// module's counterparts (e.g., as `os.path.expanduser()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -500,6 +522,11 @@ impl Violation for OsPathExists {
 ///
 /// Path("~/films/Monty Python").expanduser()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.expanduser`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.expanduser)
@@ -523,12 +550,9 @@ impl Violation for OsPathExpanduser {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.is_dir()` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.is_dir()` can improve readability over the `os.path`
 /// module's counterparts (e.g., `os.path.isdir()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -543,6 +567,11 @@ impl Violation for OsPathExpanduser {
 ///
 /// Path("docs").is_dir()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.is_dir`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.is_dir)
@@ -566,12 +595,9 @@ impl Violation for OsPathIsdir {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.is_file()` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.is_file()` can improve readability over the `os.path`
 /// module's counterparts (e.g., `os.path.isfile()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -586,6 +612,11 @@ impl Violation for OsPathIsdir {
 ///
 /// Path("docs").is_file()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.is_file`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.is_file)
@@ -609,12 +640,9 @@ impl Violation for OsPathIsfile {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.is_symlink()` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.is_symlink()` can improve readability over the `os.path`
 /// module's counterparts (e.g., `os.path.islink()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -629,6 +657,11 @@ impl Violation for OsPathIsfile {
 ///
 /// Path("docs").is_symlink()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.is_symlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.is_symlink)
@@ -656,9 +689,6 @@ impl Violation for OsPathIslink {
 /// methods such as `Path.readlink()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.readlink()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -672,6 +702,11 @@ impl Violation for OsPathIslink {
 ///
 /// Path(file_name).readlink()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.readlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.readline)
@@ -699,9 +734,6 @@ impl Violation for OsReadlink {
 /// methods such as `Path.stat()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.path.stat()`).
 ///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
-///
 /// ## Examples
 /// ```python
 /// import os
@@ -722,6 +754,11 @@ impl Violation for OsReadlink {
 /// owner_name = file_path.owner()
 /// group_name = file_path.group()
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
@@ -748,12 +785,9 @@ impl Violation for OsStat {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.is_absolute()` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.is_absolute()` can improve readability over the `os.path`
 /// module's counterparts (e.g.,  as `os.path.isabs()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -770,6 +804,11 @@ impl Violation for OsStat {
 /// if Path(file_name).is_absolute():
 ///     print("Absolute path!")
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `PurePath.is_absolute`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.is_absolute)
@@ -793,12 +832,9 @@ impl Violation for OsPathIsabs {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
 /// methods such as `Path.joinpath()` or the `/` operator can improve
-/// readability over the `os` module's counterparts (e.g., `os.path.join()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
+/// readability over the `os.path` module's counterparts (e.g., `os.path.join()`).
 ///
 /// ## Examples
 /// ```python
@@ -813,6 +849,11 @@ impl Violation for OsPathIsabs {
 ///
 /// Path(ROOT_PATH) / "folder" / "file.py"
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `PurePath.joinpath`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.joinpath)
@@ -853,12 +894,9 @@ pub(crate) enum Joiner {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.name` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.name` can improve readability over the `os.path`
 /// module's counterparts (e.g., `os.path.basename()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -873,6 +911,11 @@ pub(crate) enum Joiner {
 ///
 /// Path(__file__).name
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `PurePath.name`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.name)
@@ -896,12 +939,9 @@ impl Violation for OsPathBasename {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.parent` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.parent` can improve readability over the `os.path`
 /// module's counterparts (e.g., `os.path.dirname()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -916,6 +956,11 @@ impl Violation for OsPathBasename {
 ///
 /// Path(__file__).parent
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `PurePath.parent`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.parent)
@@ -939,12 +984,9 @@ impl Violation for OsPathDirname {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.samefile()` can improve readability over the `os`
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
+/// methods such as `Path.samefile()` can improve readability over the `os.path`
 /// module's counterparts (e.g., `os.path.samefile()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -959,6 +1001,11 @@ impl Violation for OsPathDirname {
 ///
 /// Path("f1.py").samefile("f2.py")
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.samefile`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.samefile)
@@ -982,18 +1029,15 @@ impl Violation for OsPathSamefile {
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
+/// the lower-level API offered by `os.path`. When possible, using `Path` object
 /// methods such as `Path.suffix` and `Path.stem` can improve readability over
-/// the `os` module's counterparts (e.g., `os.path.splitext()`).
+/// the `os.path` module's counterparts (e.g., `os.path.splitext()`).
 ///
 /// `os.path.splitext()` specifically returns a tuple of the file root and
 /// extension (e.g., given `splitext('/foo/bar.py')`, `os.path.splitext()`
 /// returns `("foo/bar", ".py")`. These outputs can be reconstructed through a
 /// combination of `Path.suffix` (`".py"`), `Path.stem` (`"bar"`), and
 /// `Path.parent` (`"foo"`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -1010,6 +1054,11 @@ impl Violation for OsPathSamefile {
 /// root = path.parent / path.stem
 /// ext = path.suffix
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.suffix`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.suffix)
@@ -1031,7 +1080,7 @@ impl Violation for OsPathSplitext {
 }
 
 /// ## What it does
-/// Checks for uses of the `open` builtin.
+/// Checks for uses of the `open()` builtin.
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation. When possible,
@@ -1051,6 +1100,11 @@ impl Violation for OsPathSplitext {
 /// with Path("f1.py").open("wb") as fp:
 ///     ...
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than working directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.open`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.open)
@@ -1139,6 +1193,19 @@ impl Violation for PyPath {
 /// if (p / "file").exists():
 ///     ...
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
+///
+/// ## References
+/// - [Python documentation: `Path.iterdir`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.iterdir)
+/// - [Python documentation: `os.listdir`](https://docs.python.org/3/library/os.html#os.listdir)
+/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
+/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
 pub(crate) struct OsListdir;
 
