@@ -9,11 +9,11 @@ use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use super::helpers;
 
 /// ## What it does
-/// Checks for `set` calls that take unnecessary `list` or `tuple` literals
+/// Checks for `set()` calls that take unnecessary list or tuple literals
 /// as arguments.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to use a list or tuple literal within a call to `set`.
+/// It's unnecessary to use a list or tuple literal within a call to `set()`.
 /// Instead, the expression can be rewritten as a set literal.
 ///
 /// ## Examples
@@ -35,18 +35,18 @@ use super::helpers;
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryLiteralSet {
-    obj_type: String,
+    kind: UnnecessaryLiteral,
 }
 
 impl AlwaysFixableViolation for UnnecessaryLiteralSet {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralSet { obj_type } = self;
-        format!("Unnecessary `{obj_type}` literal (rewrite as a `set` literal)")
+        let UnnecessaryLiteralSet { kind } = self;
+        format!("Unnecessary {kind} literal (rewrite as a set literal)")
     }
 
     fn fix_title(&self) -> String {
-        "Rewrite as a `set` literal".to_string()
+        "Rewrite as a set literal".to_string()
     }
 }
 
@@ -60,21 +60,14 @@ pub(crate) fn unnecessary_literal_set(checker: &mut Checker, call: &ast::ExprCal
     ) else {
         return;
     };
+    let Some(kind) = UnnecessaryLiteral::try_from_expr(argument) else {
+        return;
+    };
     if !checker.semantic().has_builtin_binding("set") {
         return;
     }
-    let kind = match argument {
-        Expr::List(_) => "list",
-        Expr::Tuple(_) => "tuple",
-        _ => return,
-    };
 
-    let mut diagnostic = Diagnostic::new(
-        UnnecessaryLiteralSet {
-            obj_type: kind.to_string(),
-        },
-        call.range(),
-    );
+    let mut diagnostic = Diagnostic::new(UnnecessaryLiteralSet { kind }, call.range());
 
     // Convert `set((1, 2))` to `{1, 2}`.
     diagnostic.set_fix({
@@ -133,4 +126,33 @@ pub(crate) fn unnecessary_literal_set(checker: &mut Checker, call: &ast::ExprCal
     });
 
     checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnnecessaryLiteral {
+    List,
+    Tuple,
+}
+
+impl UnnecessaryLiteral {
+    const fn try_from_expr(expr: &Expr) -> Option<Self> {
+        match expr {
+            Expr::List(_) => Some(Self::List),
+            Expr::Tuple(_) => Some(Self::Tuple),
+            _ => None,
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Tuple => "tuple",
+            Self::List => "list",
+        }
+    }
+}
+
+impl std::fmt::Display for UnnecessaryLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }

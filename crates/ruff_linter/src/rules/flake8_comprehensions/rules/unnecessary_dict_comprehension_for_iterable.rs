@@ -9,11 +9,11 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for unnecessary `dict` comprehension when creating a dictionary from
+/// Checks for unnecessary dict comprehension when creating a dictionary from
 /// an iterable.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to use a `dict` comprehension to build a dictionary from
+/// It's unnecessary to use a dict comprehension to build a dictionary from
 /// an iterable when the value is static.
 ///
 /// Prefer `dict.fromkeys(iterable)` over `{value: None for value in iterable}`,
@@ -155,7 +155,7 @@ fn is_constant_like(expr: &Expr) -> bool {
     })
 }
 
-/// Generate a [`Fix`] to replace `dict` comprehension with `dict.fromkeys`.
+/// Generate a [`Fix`] to replace a dict comprehension with `dict.fromkeys`.
 ///
 /// For example:
 /// - Given `{n: None for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3])`.

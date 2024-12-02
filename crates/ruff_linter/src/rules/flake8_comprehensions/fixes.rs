@@ -295,7 +295,7 @@ pub(crate) fn fix_unnecessary_collection_call(
 
 /// Re-formats the given expression for use within a formatted string.
 ///
-/// For example, when converting a `dict` call to a dictionary literal within
+/// For example, when converting a `dict()` call to a dictionary literal within
 /// a formatted string, we might naively generate the following code:
 ///
 /// ```python

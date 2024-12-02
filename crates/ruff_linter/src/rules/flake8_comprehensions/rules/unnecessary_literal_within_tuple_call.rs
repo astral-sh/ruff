@@ -56,20 +56,23 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
     fn message(&self) -> String {
         match self.literal_kind {
             TupleLiteralKind::List => {
-                "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)".to_string()
+                "Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)"
+                    .to_string()
             }
             TupleLiteralKind::Tuple => {
-                "Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)".to_string()
+                "Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)"
+                    .to_string()
             }
             TupleLiteralKind::ListComp => {
-                "Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)".to_string()
+                "Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)"
+                    .to_string()
             }
         }
     }
 
     fn fix_title(&self) -> String {
         let title = match self.literal_kind {
-            TupleLiteralKind::List => "Rewrite as a `tuple` literal",
+            TupleLiteralKind::List => "Rewrite as a tuple literal",
             TupleLiteralKind::Tuple => "Remove the outer call to `tuple()`",
             TupleLiteralKind::ListComp => "Rewrite as a generator",
         };
@@ -94,15 +97,15 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     ) else {
         return;
     };
-    if !checker.semantic().has_builtin_binding("tuple") {
-        return;
-    }
     let argument_kind = match argument {
         Expr::Tuple(_) => TupleLiteralKind::Tuple,
         Expr::List(_) => TupleLiteralKind::List,
         Expr::ListComp(_) if checker.settings.preview.is_enabled() => TupleLiteralKind::ListComp,
         _ => return,
     };
+    if !checker.semantic().has_builtin_binding("tuple") {
+        return;
+    }
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryLiteralWithinTupleCall {
