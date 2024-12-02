@@ -16,8 +16,7 @@ def f():
 
 ## Aliased to a different name
 
-If you alias `typing.Any` to another name, we still recognize that as a spelling
-of the Any type.
+If you alias `typing.Any` to another name, we still recognize that as a spelling of the Any type.
 
 ```py
 from typing import Any as RenamedAny
@@ -31,11 +30,11 @@ def f():
 
 ## Shadowed class
 
-If you define your own class named `Any`, using that in a type expression refers
-to your class, and isn't a spelling of the Any type.
+If you define your own class named `Any`, using that in a type expression refers to your class, and
+isn't a spelling of the Any type.
 
-> Note that the real name of the class shouldn't be `Any`, so that we can
-> distinguish it from the Any type in the assertion below.
+> Note that the real name of the class shouldn't be `Any`, so that we can distinguish it from the
+> Any type in the assertion below.
 
 ```py
 class LocalAny:
