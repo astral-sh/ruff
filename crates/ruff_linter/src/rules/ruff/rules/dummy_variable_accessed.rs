@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingKind, ScopeId, SemanticModel};
+use ruff_python_semantic::{Binding, BindingKind, ScopeId};
 use ruff_python_stdlib::{
     builtins::is_python_builtin, identifiers::is_identifier, keyword::is_keyword,
 };
@@ -49,7 +49,7 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 #[derive(ViolationMetadata)]
 pub(crate) struct DummyVariableAccessed {
     name: String,
-    fix_kind: Option<ShadowedKind>,
+    shadowed_kind: Option<ShadowedKind>,
 }
 
 impl Violation for DummyVariableAccessed {
@@ -61,8 +61,8 @@ impl Violation for DummyVariableAccessed {
     }
 
     fn fix_title(&self) -> Option<String> {
-        if let Some(fix_kind) = self.fix_kind {
-            return Some(match fix_kind {
+        if let Some(shadowed_kind) = self.shadowed_kind {
+            return Some(match shadowed_kind {
                 ShadowedKind::BuiltIn => {
                     "Prefer using trailing underscores to avoid shadowing a built-in".to_string()
                 }
@@ -114,20 +114,20 @@ pub(crate) fn dummy_variable_accessed(checker: &Checker, binding: &Binding) -> O
         return None;
     }
 
-    let possible_fix_kind = get_possible_fix_kind(name, checker, binding.scope);
+    let shadowed_kind = try_shadowed_kind(name, checker, binding.scope);
 
     let mut diagnostic = Diagnostic::new(
         DummyVariableAccessed {
             name: name.to_string(),
-            fix_kind: possible_fix_kind,
+            shadowed_kind,
         },
         binding.range(),
     );
 
     // If fix available
-    if let Some(fix_kind) = possible_fix_kind {
+    if let Some(shadowed_kind) = shadowed_kind {
         // Get the possible fix based on the scope
-        if let Some(fix) = get_possible_fix(name, fix_kind, binding.scope, semantic) {
+        if let Some(fix) = get_possible_fix(name, shadowed_kind, binding.scope, checker) {
             diagnostic.try_set_fix(|| {
                 Renamer::rename(name, &fix, scope, semantic, checker.stylist())
                     .map(|(edit, rest)| Fix::safe_edits(edit, rest))
@@ -156,7 +156,7 @@ fn get_possible_fix(
     name: &str,
     kind: ShadowedKind,
     scope_id: ScopeId,
-    semantic: &SemanticModel,
+    checker: &Checker,
 ) -> Option<String> {
     // Remove leading underscores for processing
     let trimmed_name = name.trim_start_matches('_');
@@ -169,8 +169,16 @@ fn get_possible_fix(
         ShadowedKind::None => trimmed_name.to_string(),
     };
 
+    // Check if the fix name is again dummy identifier
+    if checker.settings.dummy_variable_rgx.is_match(&fix_name) {
+        return None;
+    }
+
     // Ensure the fix name is not already taken in the scope or enclosing scopes
-    if !semantic.is_available_in_scope(&fix_name, scope_id) {
+    if !checker
+        .semantic()
+        .is_available_in_scope(&fix_name, scope_id)
+    {
         return None;
     }
 
@@ -179,7 +187,7 @@ fn get_possible_fix(
 }
 
 /// Determines the kind of shadowing or conflict for a given variable name.
-fn get_possible_fix_kind(name: &str, checker: &Checker, scope_id: ScopeId) -> Option<ShadowedKind> {
+fn try_shadowed_kind(name: &str, checker: &Checker, scope_id: ScopeId) -> Option<ShadowedKind> {
     // If the name starts with an underscore, we don't consider it
     if !name.starts_with('_') {
         return None;

@@ -1,0 +1,132 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF052.py:77:9: RUF052 [*] Local dummy variable `_var` is accessed
+   |
+75 | class Class_:
+76 |     def fun(self):
+77 |         _var = "method variable" # [RUF052]
+   |         ^^^^ RUF052
+78 |         return _var
+   |
+   = help: Remove leading underscores
+
+ℹ Safe fix
+74 74 | 
+75 75 | class Class_:
+76 76 |     def fun(self):
+77    |-        _var = "method variable" # [RUF052]
+78    |-        return _var
+   77 |+        var = "method variable" # [RUF052]
+   78 |+        return var
+79 79 | 
+80 80 | def fun(_var): # [RUF052]
+81 81 |     return _var
+
+RUF052.py:80:9: RUF052 [*] Local dummy variable `_var` is accessed
+   |
+78 |         return _var
+79 | 
+80 | def fun(_var): # [RUF052]
+   |         ^^^^ RUF052
+81 |     return _var
+   |
+   = help: Remove leading underscores
+
+ℹ Safe fix
+77 77 |         _var = "method variable" # [RUF052]
+78 78 |         return _var
+79 79 | 
+80    |-def fun(_var): # [RUF052]
+81    |-    return _var
+   80 |+def fun(var): # [RUF052]
+   81 |+    return var
+82 82 | 
+83 83 | def fun():
+84 84 |     _list = "built-in" # [RUF052]
+
+RUF052.py:84:5: RUF052 [*] Local dummy variable `_list` is accessed
+   |
+83 | def fun():
+84 |     _list = "built-in" # [RUF052]
+   |     ^^^^^ RUF052
+85 |     return _list
+   |
+   = help: Prefer using trailing underscores to avoid shadowing a built-in
+
+ℹ Safe fix
+81 81 |     return _var
+82 82 | 
+83 83 | def fun():
+84    |-    _list = "built-in" # [RUF052]
+85    |-    return _list
+   84 |+    list_ = "built-in" # [RUF052]
+   85 |+    return list_
+86 86 | 
+87 87 | x = "global"
+88 88 | 
+
+RUF052.py:91:5: RUF052 [*] Local dummy variable `_x` is accessed
+   |
+89 | def fun():
+90 |     global x
+91 |     _x = "shadows global" # [RUF052]
+   |     ^^ RUF052
+92 |     return _x
+   |
+   = help: Prefer using trailing underscores to avoid shadowing a variable
+
+ℹ Safe fix
+88 88 | 
+89 89 | def fun():
+90 90 |     global x
+91    |-    _x = "shadows global" # [RUF052]
+92    |-    return _x
+   91 |+    x_ = "shadows global" # [RUF052]
+   92 |+    return x_
+93 93 | 
+94 94 | def foo():
+95 95 |   x = "outer"
+
+RUF052.py:98:5: RUF052 [*] Local dummy variable `_x` is accessed
+    |
+ 96 |   def bar():
+ 97 |     nonlocal x
+ 98 |     _x = "shadows nonlocal" # [RUF052]
+    |     ^^ RUF052
+ 99 |     return _x
+100 |   bar()
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+ℹ Safe fix
+95  95  |   x = "outer"
+96  96  |   def bar():
+97  97  |     nonlocal x
+98      |-    _x = "shadows nonlocal" # [RUF052]
+99      |-    return _x
+    98  |+    x_ = "shadows nonlocal" # [RUF052]
+    99  |+    return x_
+100 100 |   bar()
+101 101 |   return x
+102 102 | 
+
+RUF052.py:105:5: RUF052 [*] Local dummy variable `_x` is accessed
+    |
+103 | def fun():
+104 |     x = "local"
+105 |     _x = "shadows local" # [RUF052]
+    |     ^^ RUF052
+106 |     return _x
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+ℹ Safe fix
+102 102 | 
+103 103 | def fun():
+104 104 |     x = "local"
+105     |-    _x = "shadows local" # [RUF052]
+106     |-    return _x
+    105 |+    x_ = "shadows local" # [RUF052]
+    106 |+    return x_
