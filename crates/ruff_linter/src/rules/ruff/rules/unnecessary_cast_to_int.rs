@@ -14,6 +14,11 @@ use ruff_text_size::TextRange;
 /// ## Known problems
 /// This rule is prone to false positives due to type inference limitations.
 ///
+/// It assumes that `round`, `math.ceil`, `math.floor`, `math.trunc`
+/// always return `int`, which might not be the case for objects
+/// with the corresponding dunder methods overridden.
+/// In such cases, the fix is marked as unsafe.
+///
 /// ## Example
 ///
 /// ```python
