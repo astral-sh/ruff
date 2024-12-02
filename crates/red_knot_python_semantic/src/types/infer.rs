@@ -1655,6 +1655,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value = assignment.value();
         let name = assignment.name();
 
+        // NOTE: typing.Any is _not_ currently defined as a _SpecialForm in the typeshed, so we
+        // can't detect it in the same was a typing.NoReturn and friends.  If the definition in the
+        // typeshed changes, this heuristic will need to change as well.
+        if let Some(vendored) = definition.file(self.db).path(self.db).as_vendored_path() {
+            if name.id == "Any" && vendored.as_str() == "stdlib/typing.pyi" {
+                let target_ty = Type::KnownInstance(KnownInstanceType::Any);
+                self.store_expression_type(name, target_ty);
+                self.add_binding(name.into(), definition, target_ty);
+                return;
+            }
+        }
+
         self.infer_standalone_expression(value);
 
         let value_ty = self.expression_ty(value);

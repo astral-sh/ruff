@@ -1956,7 +1956,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::Union => KnownClass::SpecialForm,
             Self::NoReturn => KnownClass::SpecialForm,
             Self::Never => KnownClass::SpecialForm,
-            Self::Any => KnownClass::SpecialForm,
+            // typing.Any is _not_ currently defined as a _SpecialForm in the typeshed.
+            Self::Any => KnownClass::Object,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
@@ -1976,7 +1977,8 @@ impl<'db> KnownInstanceType<'db> {
             return None;
         }
         match (module.name().as_str(), instance_name) {
-            ("typing" | "typing_extensions", "Any") => Some(Self::Any),
+            // NOTE: This method is currently only called for typing _SpecialForms.  typing.Any is
+            // not currently defined as a special form, so detecting it is handled elsewhere.
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
             ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
             ("typing" | "typing_extensions", "Union") => Some(Self::Union),
