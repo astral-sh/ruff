@@ -678,14 +678,43 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     }
 }
 
-/// Returns `true` if the expression is a single-element sequence (e.g., `(1,)`).
-fn is_single_element_sequence(expr: &Expr) -> bool {
-    match expr {
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.len() == 1
-        }
-        _ => false,
+/// Generate a vector of [`Edit`] to unpack single-element tuples or lists in `argvalues`.
+/// For example, the following code:
+///
+/// ```python
+/// pytest.mark.parametrize(..., argvalues=[(1,), (2,)])
+/// ```
+///
+/// will be transformed to:
+///
+/// ```python
+/// pytest.mark.parametrize(..., argvalues=[1, 2])
+/// ```
+fn argvalues_edits(checker: &Checker, argvalues: &Expr) -> Vec<Edit> {
+    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
+        argvalues
+    else {
+        return vec![];
+    };
+
+    let mut fixes = Vec::with_capacity(elts.len());
+    for value in elts {
+        let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
+            value
+        else {
+            return vec![];
+        };
+
+        let [elt] = elts.as_slice() else {
+            return vec![];
+        };
+
+        fixes.push(Edit::range_replacement(
+            checker.generator().expr(elt),
+            value.range(),
+        ));
     }
+    fixes
 }
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalues: &Expr) {
@@ -697,34 +726,10 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalue
         expr.range(),
     );
 
-    // Avoid suggesting a fix if both the `argnames` and `argvalues` are single-element sequences.
-    // Here's an example where the fix would break the test:
-    //
-    // ```python
-    // @pytest.mark.parametrize(("x",), [(1,), (2,)])
-    // def test_foo(x):  # `x` is an int
-    //     ...
-    //
-    // # The test above can't be fixed to:
-    //
-    // @pytest.mark.parametrize("x", [(1,), (2,)])
-    // def test_foo(x):  # `x` is a tuple, not an int
-    //     ...
-    // ```
-    if let Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) =
-        argvalues
-    {
-        if elts.iter().any(is_single_element_sequence) {
-            checker.diagnostics.push(diagnostic);
-            return;
-        }
-    }
-
-    let node = value.clone();
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        checker.generator().expr(&node),
-        expr.range(),
-    )));
+    diagnostic.set_fix(Fix::safe_edits(
+        Edit::range_replacement(checker.generator().expr(value), expr.range()),
+        argvalues_edits(checker, argvalues),
+    ));
     checker.diagnostics.push(diagnostic);
 }
 
