@@ -71,7 +71,7 @@ mod tests {
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
-    #[test_case(Rule::DummyVariableAccessed, Path::new("RUF052.py"))]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -452,8 +452,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DummyVariableAccessed, Path::new("RUF052.py"), r"^_+", 1)]
-    #[test_case(Rule::DummyVariableAccessed, Path::new("RUF052.py"), r"", 2)]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"^_+", 1)]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"", 2)]
     fn custom_regexp_preset(
         rule_code: Rule,
         path: &Path,

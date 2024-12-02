@@ -47,12 +47,12 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
-pub(crate) struct DummyVariableAccessed {
+pub(crate) struct UsedDummyVariable {
     name: String,
     shadowed_kind: Option<ShadowedKind>,
 }
 
-impl Violation for DummyVariableAccessed {
+impl Violation for UsedDummyVariable {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -80,7 +80,7 @@ impl Violation for DummyVariableAccessed {
 }
 
 /// RUF052
-pub(crate) fn dummy_variable_accessed(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     let name = binding.name(checker.source());
 
     // Ignore `_` and dunder variables
@@ -117,7 +117,7 @@ pub(crate) fn dummy_variable_accessed(checker: &Checker, binding: &Binding) -> O
     let shadowed_kind = try_shadowed_kind(name, checker, binding.scope);
 
     let mut diagnostic = Diagnostic::new(
-        DummyVariableAccessed {
+        UsedDummyVariable {
             name: name.to_string(),
             shadowed_kind,
         },
