@@ -37,6 +37,7 @@ class Everything:
     def method9(self):
         pass
 
+
 class Small:
     def __init__(self):
         pass
@@ -61,6 +62,7 @@ class Small:
 
     def method6(self):
         pass
+
 
 class SmallWithOverload:
     @overload
