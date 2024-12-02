@@ -57,37 +57,44 @@ impl Violation for Airflow3Removal {
     }
 }
 
-struct DeprecatedArgument(Vec<&'static str>, Option<&'static str>);
+fn diagnostic_for_argument(
+    arguments: &Arguments,
+    deprecated: &str,
+    replacement: Option<&str>,
+) -> Option<Diagnostic> {
+    let keyword = arguments.find_keyword(deprecated)?;
+    Some(Diagnostic::new(
+        Airflow3Removal {
+            deprecated: (*deprecated).to_string(),
+            replacement: match replacement {
+                Some(name) => Replacement::Name(name.to_owned()),
+                None => Replacement::None,
+            },
+        },
+        keyword
+            .arg
+            .as_ref()
+            .map_or_else(|| keyword.range(), Ranged::range),
+    ))
+}
 
 fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {
-    let deprecations = match qualname.segments() {
-        ["airflow", .., "DAG" | "dag"] => vec![DeprecatedArgument(
-            vec!["timetable", "schedule_interval"],
-            Some("schedule"),
-        )],
-        _ => {
-            return;
+    #[allow(clippy::single_match)]
+    match qualname.segments() {
+        ["airflow", .., "DAG" | "dag"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "schedule_interval",
+                Some("schedule"),
+            ));
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "timetable",
+                Some("schedule"),
+            ));
         }
+        _ => {}
     };
-    for deprecation in deprecations {
-        for arg in deprecation.0 {
-            if let Some(keyword) = arguments.find_keyword(arg) {
-                checker.diagnostics.push(Diagnostic::new(
-                    Airflow3Removal {
-                        deprecated: arg.to_string(),
-                        replacement: match deprecation.1 {
-                            Some(name) => Replacement::Name(name.to_owned()),
-                            None => Replacement::None,
-                        },
-                    },
-                    keyword
-                        .arg
-                        .as_ref()
-                        .map_or_else(|| keyword.range(), Ranged::range),
-                ));
-            };
-        }
-    }
 }
 
 fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
