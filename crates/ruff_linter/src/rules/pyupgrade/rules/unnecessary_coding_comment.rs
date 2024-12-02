@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_index::Indexer;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::Locator;
 
@@ -77,25 +77,16 @@ pub(crate) fn unnecessary_coding_comment(
         [Some(CodingComment::UTF8(ranges))]
         | [Some(CodingComment::UTF8(ranges)), None]
         | [None, Some(CodingComment::UTF8(ranges))] => {
-            report(diagnostics, &ranges.line_range, &ranges.self_range);
+            report(diagnostics, ranges.line_range, ranges.self_range);
         }
 
         [Some(CodingComment::UTF8(ranges_1)), Some(CodingComment::UTF8(ranges_2))] => {
-            report(diagnostics, &ranges_1.line_range, &ranges_1.self_range);
-            report(diagnostics, &ranges_2.line_range, &ranges_2.self_range);
+            report(diagnostics, ranges_1.line_range, ranges_1.self_range);
+            report(diagnostics, ranges_2.line_range, ranges_2.self_range);
         }
 
         _ => {}
     }
-}
-
-fn report(diagnostics: &mut Vec<Diagnostic>, line_range: &TextRange, comment_range: &TextRange) {
-    let edit = Edit::deletion(line_range.start(), line_range.end());
-    let fix = Fix::safe_edit(edit);
-
-    let diagnostic = Diagnostic::new(UTF8EncodingDeclaration, *comment_range);
-
-    diagnostics.push(diagnostic.with_fix(fix));
 }
 
 fn coding_comment(
@@ -148,4 +139,13 @@ fn coding_comment(
         "utf8" | "utf-8" => Some(CodingComment::UTF8(ranges)),
         _ => Some(CodingComment::Other),
     }
+}
+
+fn report(diagnostics: &mut Vec<Diagnostic>, line_range: TextRange, comment_range: TextRange) {
+    let edit = Edit::deletion(line_range.start(), line_range.end());
+    let fix = Fix::safe_edit(edit);
+
+    let diagnostic = Diagnostic::new(UTF8EncodingDeclaration, comment_range);
+
+    diagnostics.push(diagnostic.with_fix(fix));
 }
