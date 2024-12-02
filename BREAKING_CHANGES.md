@@ -192,7 +192,7 @@ flag or `unsafe-fixes` configuration option can be used to enable unsafe fixes.
 
 See the [docs](https://docs.astral.sh/ruff/configuration/#fix-safety) for details.
 
-### Remove formatter-conflicting rules from the default rule set  ([#7900](https://github.com/astral-sh/ruff/pull/7900))
+### Remove formatter-conflicting rules from the default rule set ([#7900](https://github.com/astral-sh/ruff/pull/7900))
 
 Previously, Ruff enabled all implemented rules in Pycodestyle (`E`) by default. Ruff now only includes the
 Pycodestyle prefixes `E4`, `E7`, and `E9` to exclude rules that conflict with automatic formatters. Consequently,
