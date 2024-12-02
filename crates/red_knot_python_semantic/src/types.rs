@@ -574,8 +574,11 @@ impl<'db> Type<'db> {
         Self::BytesLiteral(BytesLiteralType::new(db, bytes))
     }
 
-    pub fn tuple(db: &'db dyn Db, elements: &[Type<'db>]) -> Self {
-        Self::Tuple(TupleType::new(db, elements))
+    pub fn tuple<T: Into<Type<'db>>>(
+        db: &'db dyn Db,
+        elements: impl IntoIterator<Item = T>,
+    ) -> Self {
+        TupleType::from_elements(db, elements)
     }
 
     #[must_use]
@@ -3007,6 +3010,23 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> TupleType<'db> {
+    pub fn from_elements<T: Into<Type<'db>>>(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = T>,
+    ) -> Type<'db> {
+        let mut elements = vec![];
+
+        for ty in types {
+            let ty = ty.into();
+            if ty.is_never() {
+                return Type::Never;
+            }
+            elements.push(ty);
+        }
+
+        Type::Tuple(Self::new(db, elements.into_boxed_slice()))
+    }
+
     pub fn get(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
         self.elements(db).get(index).copied()
     }
@@ -3114,11 +3134,19 @@ pub(crate) mod tests {
                     builder.build()
                 }
                 Ty::Tuple(tys) => {
-                    let elements: Vec<Type> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
-                    Type::tuple(db, &elements)
+                    let elements = tys.into_iter().map(|ty| ty.into_type(db));
+                    Type::tuple(db, elements)
                 }
             }
         }
+    }
+
+    #[test_case(Ty::Tuple(vec![Ty::Never]))]
+    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::Never, Ty::BuiltinInstance("int")]))]
+    #[test_case(Ty::Tuple(vec![Ty::Tuple(vec![Ty::Never])]))]
+    fn tuple_containing_never_simplifies_to_never(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db), Type::Never);
     }
 
     #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
