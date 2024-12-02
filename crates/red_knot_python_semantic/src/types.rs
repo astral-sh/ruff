@@ -1977,8 +1977,7 @@ impl<'db> KnownInstanceType<'db> {
             return None;
         }
         match (module.name().as_str(), instance_name) {
-            // NOTE: This method is currently only called for typing _SpecialForms.  typing.Any is
-            // not currently defined as a special form, so detecting it is handled elsewhere.
+            ("typing" | "typing_extensions", "Any") => Some(Self::Any),
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
             ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
             ("typing" | "typing_extensions", "Union") => Some(Self::Union),
