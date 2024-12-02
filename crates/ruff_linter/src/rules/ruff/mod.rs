@@ -454,7 +454,12 @@ mod tests {
 
     #[test_case(Rule::DummyVariableAccessed, Path::new("RUF052.py"), r"^_+", 1)]
     #[test_case(Rule::DummyVariableAccessed, Path::new("RUF052.py"), r"", 2)]
-    fn custom_regexp_preset(rule_code: Rule, path: &Path, regex_pattern: &str, id: u8) -> Result<()> {
+    fn custom_regexp_preset(
+        rule_code: Rule,
+        path: &Path,
+        regex_pattern: &str,
+        id: u8,
+    ) -> Result<()> {
         // Compile the regex from the pattern string
         let regex = Regex::new(regex_pattern).unwrap();
 
