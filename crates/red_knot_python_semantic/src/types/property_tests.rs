@@ -130,85 +130,88 @@ fn get_cached_db() -> MutexGuard<'static, TestDb> {
     db.lock().unwrap()
 }
 
+/// A macro to define a property test for types.
+///
+/// The `$test_name` identifier specifies the name of the test function. The `$db` identifier
+/// is used to refer to the salsa database in the property to be tested. The actual property is
+/// specified using the syntax:
+///
+///     forall types t1, t2, ..., tn . <property>`
+///
+/// where `t1`, `t2`, ..., `tn` are identifiers that represent arbitrary types, and `<property>`
+/// is an expression using these identifiers.
+///
 macro_rules! type_property_test {
-    ($name:ident, $db:ident, ($($types:ident),+), $body:expr) => {
+    ($test_name:ident, $db:ident, forall types $($types:ident),+ . $property:expr) => {
         #[quickcheck_macros::quickcheck]
         #[ignore]
-        fn $name($($types: crate::types::tests::Ty),+) -> bool {
+        fn $test_name($($types: crate::types::tests::Ty),+) -> bool {
             let db_cached = super::get_cached_db();
             let $db = &*db_cached;
             $(let $types = $types.into_type($db);)+
 
-            $body
+            $property
         }
     };
     // A property test with a logical implication.
-    ($name:ident, $db:ident, ($($types:ident),+), $premise:expr => $conclusion:expr) => {
-        type_property_test!($name, $db, ($($types),+), !($premise) || ($conclusion));
-    };
-    // A property test with a single type argument
-    ($name:ident, $db:ident, $type:ident, $body:expr) => {
-        type_property_test!($name, $db, ($type), $body);
-    };
-    // Same, for the implication branch
-    ($name:ident, $db:ident, $type:ident, $premise:expr => $conclusion:expr) => {
-        type_property_test!($name, $db, ($type), $premise => $conclusion);
+    ($name:ident, $db:ident, forall types $($types:ident),+ . $premise:expr => $conclusion:expr) => {
+        type_property_test!($name, $db, forall types $($types),+ . !($premise) || ($conclusion));
     };
 }
 
 mod stable {
     // `T` is equivalent to itself.
-    type_property_test!(equivalent_to_is_reflexive, db, t, t.is_equivalent_to(db, t));
+    type_property_test!(
+        equivalent_to_is_reflexive, db,
+        forall types t. t.is_equivalent_to(db, t)
+    );
 
     // `T` is a subtype of itself.
-    type_property_test!(subtype_of_is_reflexive, db, t, t.is_subtype_of(db, t));
+    type_property_test!(
+        subtype_of_is_reflexive, db,
+        forall types t. t.is_subtype_of(db, t)
+    );
 
     // `S <: T` and `T <: U` implies that `S <: U`.
     type_property_test!(
-        subtype_of_is_transitive,
-        db,
-        (s, t, u),
-        s.is_subtype_of(db, t) && t.is_subtype_of(db, u) => s.is_subtype_of(db, u)
+        subtype_of_is_transitive, db,
+        forall types s, t, u. s.is_subtype_of(db, t) && t.is_subtype_of(db, u) => s.is_subtype_of(db, u)
     );
 
     // `T` is not disjoint from itself, unless `T` is `Never`.
     type_property_test!(
-        disjoint_from_is_irreflexive,
-        db,
-        t,
-        t.is_disjoint_from(db, t) => t.is_never()
+        disjoint_from_is_irreflexive, db,
+        forall types t. t.is_disjoint_from(db, t) => t.is_never()
     );
 
     // `S` is disjoint from `T` implies that `T` is disjoint from `S`.
     type_property_test!(
-        disjoint_from_is_symmetric,
-        db,
-        (s, t),
-        s.is_disjoint_from(db, t) == t.is_disjoint_from(db, s)
+        disjoint_from_is_symmetric, db,
+        forall types s, t. s.is_disjoint_from(db, t) == t.is_disjoint_from(db, s)
     );
 
     // `S <: T` implies that `S` is not disjoint from `T`, unless `S` is `Never`.
-    type_property_test!(subtype_of_implies_not_disjoint_from, db, (s, t),
-        s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.is_never()
+    type_property_test!(
+        subtype_of_implies_not_disjoint_from, db,
+        forall types s, t. s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.is_never()
     );
 
     // `T` can be assigned to itself.
-    type_property_test!(assignable_to_is_reflexive, db, t, t.is_assignable_to(db, t));
+    type_property_test!(
+        assignable_to_is_reflexive, db,
+        forall types t. t.is_assignable_to(db, t)
+    );
 
     // `S <: T` implies that `S` can be assigned to `T`.
     type_property_test!(
-        subtype_of_implies_assignable_to,
-        db,
-        (s, t),
-        s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
+        subtype_of_implies_assignable_to, db,
+        forall types s, t. s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
     );
 
     // If `T` is a singleton, it is also single-valued.
     type_property_test!(
-        singleton_implies_single_valued,
-        db,
-        t,
-        t.is_singleton(db) => t.is_single_valued(db)
+        singleton_implies_single_valued, db,
+        forall types t. t.is_singleton(db) => t.is_single_valued(db)
     );
 }
 
@@ -222,17 +225,13 @@ mod stable {
 mod flaky {
     // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
     type_property_test!(
-        subtype_of_is_antisymmetric,
-        db,
-        (s, t),
-        s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
+        subtype_of_is_antisymmetric, db,
+        forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
     );
 
     // Negating `T` twice is equivalent to `T`.
     type_property_test!(
-        double_negation_is_identity,
-        db,
-        t,
-        t.negate(db).negate(db).is_equivalent_to(db, t)
+        double_negation_is_identity, db,
+        forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
     );
 }
