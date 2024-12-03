@@ -722,9 +722,6 @@ impl<'db> Type<'db> {
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_subtype_of(db, right)
             }
-            (left, Type::KnownInstance(right)) => {
-                left.is_subtype_of(db, right.instance_fallback(db))
-            }
             (Type::Instance(left), Type::Instance(right)) => left.is_instance_of(db, right.class),
             // TODO
             _ => false,
@@ -3270,6 +3267,7 @@ pub(crate) mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(1)]})]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinClassLiteral("int"))]
+    #[test_case(Ty::TypingInstance("_SpecialForm"), Ty::TypingLiteral)]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
