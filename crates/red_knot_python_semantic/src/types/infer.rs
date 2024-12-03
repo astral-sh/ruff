@@ -1674,9 +1674,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             TargetKind::Name => value_ty,
         };
 
-        // NOTE: typing.Any is _not_ currently defined as a _SpecialForm in the typeshed, so we
-        // can't detect it in the same was a typing.NoReturn and friends.  If the definition in the
-        // typeshed changes, this heuristic will need to change as well.
         if let Some(known_instance) = file_to_module(self.db, definition.file(self.db))
             .as_ref()
             .and_then(|module| KnownInstanceType::try_from_module_and_symbol(module, &name.id))

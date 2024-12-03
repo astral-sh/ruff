@@ -1956,7 +1956,6 @@ impl<'db> KnownInstanceType<'db> {
             Self::Union => KnownClass::SpecialForm,
             Self::NoReturn => KnownClass::SpecialForm,
             Self::Never => KnownClass::SpecialForm,
-            // typing.Any is _not_ currently defined as a _SpecialForm in the typeshed.
             Self::Any => KnownClass::Object,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
