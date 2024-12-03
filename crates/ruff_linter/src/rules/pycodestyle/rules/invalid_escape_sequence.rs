@@ -87,33 +87,37 @@ pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: String
             }
             StringLikePart::FString(f_string) => {
                 let flags = AnyStringFlags::from(f_string.flags);
+                let mut escape_chars_state = EscapeCharsState::default();
                 for element in &f_string.elements {
                     match element {
                         FStringElement::Literal(literal) => {
-                            check(
-                                &mut checker.diagnostics,
+                            escape_chars_state.update(analyze_escape_chars(
                                 locator,
-                                f_string.start(),
                                 literal.range(),
                                 flags,
-                            );
+                            ));
                         }
                         FStringElement::Expression(expression) => {
                             let Some(format_spec) = expression.format_spec.as_ref() else {
                                 continue;
                             };
                             for literal in format_spec.elements.literals() {
-                                check(
-                                    &mut checker.diagnostics,
+                                escape_chars_state.update(analyze_escape_chars(
                                     locator,
-                                    f_string.start(),
                                     literal.range(),
                                     flags,
-                                );
+                                ));
                             }
                         }
                     }
                 }
+                check_from_escape_chars_state(
+                    &mut checker.diagnostics,
+                    locator,
+                    f_string.start(),
+                    flags,
+                    escape_chars_state,
+                );
             }
         }
     }
@@ -130,6 +134,29 @@ fn check(
     source_range: TextRange,
     flags: AnyStringFlags,
 ) {
+    let escape_chars_state = analyze_escape_chars(locator, source_range, flags);
+    check_from_escape_chars_state(diagnostics, locator, expr_start, flags, escape_chars_state);
+}
+
+#[derive(Default)]
+struct EscapeCharsState {
+    contains_valid_escape_sequence: bool,
+    invalid_escape_chars: Vec<InvalidEscapeChar>,
+}
+
+impl EscapeCharsState {
+    fn update(&mut self, other: Self) {
+        self.contains_valid_escape_sequence |= other.contains_valid_escape_sequence;
+        self.invalid_escape_chars.extend(other.invalid_escape_chars);
+    }
+}
+
+fn analyze_escape_chars(
+    locator: &Locator,
+    // Range in the source code to perform the analysis on.
+    source_range: TextRange,
+    flags: AnyStringFlags,
+) -> EscapeCharsState {
     let source = locator.slice(source_range);
     let mut contains_valid_escape_sequence = false;
     let mut invalid_escape_chars = Vec::new();
@@ -225,7 +252,26 @@ fn check(
             range,
         });
     }
+    EscapeCharsState {
+        contains_valid_escape_sequence,
+        invalid_escape_chars,
+    }
+}
 
+fn check_from_escape_chars_state(
+    diagnostics: &mut Vec<Diagnostic>,
+    locator: &Locator,
+    // Start position of the expression that contains the source range. This is used to generate
+    // the fix when the source range is part of the expression like in f-string which contains
+    // other f-string literal elements.
+    expr_start: TextSize,
+    flags: AnyStringFlags,
+    escape_chars_state: EscapeCharsState,
+) {
+    let EscapeCharsState {
+        contains_valid_escape_sequence,
+        invalid_escape_chars,
+    } = escape_chars_state;
     if contains_valid_escape_sequence {
         // Escape with backslash.
         for invalid_escape_char in &invalid_escape_chars {
