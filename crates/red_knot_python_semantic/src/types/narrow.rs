@@ -426,23 +426,17 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     },
                 )
             }
-            Type::ClassLiteral(..) => {
-                let is_valid_bool_invocation =
-                    expr_call.arguments.args.len() == 1 && expr_call.arguments.keywords.is_empty();
-
-                if is_valid_bool_invocation
-                    && callable_ty
-                        .into_class_literal()
-                        .is_some_and(|lit| lit.class.is_known(self.db, KnownClass::Bool))
-                {
-                    self.evaluate_expression_node_constraint(
-                        &expr_call.arguments.args[0],
-                        expression,
-                        is_positive,
-                    )
-                } else {
-                    None
-                }
+            // for the expression `bool(E)`, we further narrow the type based on `E`
+            Type::ClassLiteral(class_type)
+                if expr_call.arguments.args.len() == 1
+                    && expr_call.arguments.keywords.is_empty()
+                    && class_type.class.is_known(self.db, KnownClass::Bool) =>
+            {
+                self.evaluate_expression_node_constraint(
+                    &expr_call.arguments.args[0],
+                    expression,
+                    is_positive,
+                )
             }
             _ => None,
         }
