@@ -12,29 +12,12 @@ Parts of the testcases defined here were adapted from [the specification's examp
 It can be used anywhere a type is accepted:
 
 ```py
-from typing import (
-    Annotated,
-    ClassVar,
-    Final,
-    Literal,
-    LiteralString,
-    NotRequired,
-    Protocol,
-    ReadOnly,
-    Required,
-    TypedDict,
-    TypeVar,
-)
+from typing import LiteralString
 
-TA: TypeAlias = LiteralString
+x: LiteralString
 
-T1 = TypeVar("T1", bound=LiteralString)
-
-variable_annotation: LiteralString
-
-class Foo:
-    # fine: Second arguments and later must be ignored.
-    annotated: Annotated[int, Literal[LiteralString]]
+def f():
+    reveal_type(x)  # revealed: LiteralString
 ```
 
 ### Within `Literal`
