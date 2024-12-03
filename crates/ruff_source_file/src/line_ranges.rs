@@ -295,6 +295,40 @@ pub trait LineRanges {
     /// ## Panics
     /// If the start or end of `range` is out of bounds.
     fn full_lines_str(&self, range: TextRange) -> &str;
+
+    /// Returns the zero-based index of the line containing `offset`.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{Ranged, TextRange, TextSize};
+    /// # use ruff_source_file::LineRanges;
+    ///
+    /// let text = "First line\nsecond line\r\nthird line";
+    ///
+    /// assert_eq!(text.count_lines_until(TextSize::from(5)), 0);
+    /// assert_eq!(text.count_lines_until(TextSize::from(23)), 1);
+    /// assert_eq!(text.count_lines_until(TextSize::from(24)), 2);
+    /// ```
+    ///
+    /// ## Panics
+    /// If `offset` is out of bounds.
+    fn count_lines_until(&self, offset: TextSize) -> u32 {
+        let mut count = 0;
+        let mut last_line_end = TextSize::default();
+
+        loop {
+            last_line_end = self.full_line_end(last_line_end);
+
+            if last_line_end <= offset {
+                count += 1;
+            } else {
+                break;
+            }
+        }
+
+        count
+    }
 }
 
 impl LineRanges for str {

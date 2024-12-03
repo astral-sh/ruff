@@ -67,22 +67,18 @@ pub(crate) fn unnecessary_coding_comment(
 ) {
     // The coding comment must be on one of the first two lines. Since each comment spans at least
     // one line, we only need to check the first two comments at most.
-    let coding_comments = comment_ranges
+    let mut coding_comments = comment_ranges
         .iter()
         .take(2)
-        .map(|comment_range| coding_comment(locator, indexer, *comment_range))
-        .collect::<Vec<_>>();
+        .map(|comment_range| coding_comment(locator, indexer, *comment_range));
 
-    match &coding_comments[..] {
-        [Some(CodingComment::UTF8(ranges))]
-        | [Some(CodingComment::UTF8(ranges)), None]
+    let first = coding_comments.next().flatten();
+    let second = coding_comments.next().flatten();
+
+    match [first, second] {
+        [Some(CodingComment::UTF8(ranges)), None | Some(CodingComment::UTF8(..))]
         | [None, Some(CodingComment::UTF8(ranges))] => {
             report(diagnostics, ranges.line_range, ranges.self_range);
-        }
-
-        [Some(CodingComment::UTF8(ranges_1)), Some(CodingComment::UTF8(ranges_2))] => {
-            report(diagnostics, ranges_1.line_range, ranges_1.self_range);
-            report(diagnostics, ranges_2.line_range, ranges_2.self_range);
         }
 
         _ => {}
@@ -123,10 +119,9 @@ fn coding_comment(
     let part_of_interest = CODING_COMMENT_REGEX.captures(locator.slice(line_range))?;
     let coding_name = part_of_interest.name("name")?.as_str();
 
-    #[allow(deprecated)]
-    let index = locator.compute_line_index(line_range.start());
+    let line_index = locator.count_lines_until(line_range.start());
 
-    if index.to_zero_indexed() > 1 {
+    if line_index > 1 {
         return None;
     }
 
