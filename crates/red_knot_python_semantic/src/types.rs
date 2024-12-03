@@ -2658,7 +2658,7 @@ impl<'db> Class<'db> {
         self.is_subclass_of_base(db, other)
     }
 
-    fn is_subclass_of_base<C: Into<ClassBase<'db>>>(self, db: &'db dyn Db, other: C) -> bool {
+    fn is_subclass_of_base(self, db: &'db dyn Db, other: impl Into<ClassBase<'db>>) -> bool {
         self.iter_mro(db).contains(&other.into())
     }
 
