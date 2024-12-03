@@ -243,7 +243,7 @@ fn bindings_ty<'db>(
                 constraint_tys
                     .fold(
                         IntersectionBuilder::new(db).add_positive(binding_ty),
-                        IntersectionBuilder::add_positive,
+                        |builder, element| builder.add_positive(element.evaluate(db, binding_ty)),
                     )
                     .build()
             } else {
@@ -1671,6 +1671,129 @@ impl<'db> Type<'db> {
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
+        }
+    }
+
+    /// Implements the Falsy Intersection for a type within practical limitations.
+    /// The primary goal is to remove as much of the `AlwaysTruthy` set from the type as possible.
+    /// Note that (A & `Falsy`) = (A & ~`AlwaysTruthy`).
+    ///
+    /// The reason this function is named `exclude_always_truthy` is that it is not feasible to
+    /// implement (A & Falsy) directly. Instead of imperfectly extracting elements of the Falsy set
+    /// to create a subset of (A & Falsy), it is more appropriate to imperfectly remove `AlwaysTruthy`
+    /// elements to create a larger set that includes (A & Falsy).
+    ///
+    /// Common Pitfall:
+    /// A common misconception is to believe that the Falsy set can be determined solely
+    /// by `FalsyLiterals` (e.g., 0, False, "", b"", ...).
+    /// In reality, (A & Falsy) != (A & `FalsyLiterals`).
+    ///
+    /// One issue with this belief is that it does not account for subclasses.
+    /// Consider the following subclass of `int`:
+    ///
+    /// ```py
+    /// class SubclassInt(int):
+    ///     def __bool__(self) -> bool:
+    ///         return False
+    /// ```
+    ///
+    /// According to the Liskov Substitution Principle, instances of this subclass
+    /// can be assigned to the `int` type. Such an instance will successfully pass
+    /// `if not x`. Therefore, it is an element of (int & Falsy) but not an element of
+    /// (int & `FalsyLiterals`) = {0, False}.
+    ///
+    /// Similarly, this approach cannot handle mutable instances such as `list()`
+    /// or `set()`. For example, (list & `FalsyLiterals`) is just an empty set.
+    #[must_use]
+    pub fn exclude_always_truthy(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::Intersection(intersection) => {
+                // Case 1: Positives are not empty
+                // (A & ~B) & Falsy
+                // = (A & Falsy) & ~B
+                // ≈ A.exclude_always_truthy() & ~B
+                //
+                // Case 2: Positives are empty
+                // ~B & Falsy
+                // = ~(B | AlwaysTruthy)
+                // ≈ ~(B.include_always_truthy())
+                //
+                // Note: Calculating `(~B & Falsy)` = `~(B | AlwaysTruthy)` is extremely difficult.
+                // This set should include all elements where `bool(element)` is always True,
+                // regardless of the type of B. Examples include:
+                // { *(elements of B), True, 1, 2, ..., -1, -2, ..., *(instances of object), ... }.
+                //
+                // Attempting to represent this set via Union or Intersection
+                // could break type inference.
+                let mut builder = IntersectionBuilder::new(db);
+
+                // Theoretically, applying `intersection` to a single positive or to all positives
+                // should yield the same result. However, due to the limitations of the current type system,
+                // there is a possibility of losing information when applying it to only one positive.
+                // As a result, `exclude_always_truthy` is applied to all positives.
+                for element in intersection.positive(db) {
+                    builder = builder.add_positive(element.exclude_always_truthy(db));
+                }
+
+                for element in intersection.negative(db) {
+                    builder = builder.add_negative(*element);
+                }
+
+                debug_assert!(
+                    !intersection.positive(db).is_empty(),
+                    "negative-only-intersections can not use `exclude_always_truthy`"
+                );
+
+                builder.build()
+            }
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+
+                for element in union.elements(db) {
+                    builder = builder.add(element.exclude_always_truthy(db));
+                }
+
+                builder.build()
+            }
+            // Since `bool` is a @final class, there is no need to worry about subclasses.
+            Type::Instance(instance) if instance.class.is_known(db, KnownClass::Bool) => {
+                Type::BooleanLiteral(false)
+            }
+            _ => {
+                if let Truthiness::AlwaysTrue = self.bool(db) {
+                    Type::Never
+                } else {
+                    self
+                }
+            }
+        }
+    }
+
+    pub fn falsy_literals(db: &'db dyn Db) -> Type<'db> {
+        let elements = Box::from([
+            Type::none(db),
+            Type::BooleanLiteral(false),
+            Type::IntLiteral(0),
+            Type::string_literal(db, ""),
+            Type::bytes_literal(db, b""),
+            // TODO: tuple literal should be included
+            // Type::tuple(db, &[])
+        ]);
+        Type::Union(UnionType::new(db, elements))
+    }
+
+    /// Implements the Truthy Intersection for a type within practical limitations.
+    /// This is the counterpart to `exclude_always_truthy`, focusing on excluding values
+    /// that are always falsy from the given type.
+    #[must_use]
+    pub fn exclude_always_falsy(self, db: &'db dyn Db) -> Type<'db> {
+        if let Truthiness::AlwaysFalse = self.bool(db) {
+            Type::Never
+        } else {
+            IntersectionBuilder::new(db)
+                .add_positive(self)
+                .add_negative(Type::falsy_literals(db))
+                .build()
         }
     }
 }
