@@ -1,7 +1,8 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::{Arguments, Expr, ExprCall, ExprName, ExprNumberLiteral, Number};
+use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::TextRange;
 
@@ -12,18 +13,15 @@ use ruff_text_size::TextRange;
 /// Such a conversion is unnecessary.
 ///
 /// ## Known problems
-/// This rule is prone to false positives due to type inference limitations.
-///
-/// It assumes that `round`, `math.ceil`, `math.floor`, `math.trunc`
-/// always return `int`, which might not be the case for objects
-/// with the corresponding dunder methods overridden.
-/// In such cases, the fix is marked as unsafe.
+/// When values incorrectly override the `__round__`, `__ceil__`, `__floor__`,
+/// or `__trunc__` operators such that they don't return an integer,
+/// this rule may produce false positives.
 ///
 /// ## Example
 ///
 /// ```python
 /// int(len([]))
-/// int(round(foo, 0))
+/// int(round(foo, None))
 /// ```
 ///
 /// Use instead:
@@ -61,31 +59,28 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let (edit, applicability) = match qualified_name.segments() {
+    let edit = match qualified_name.segments() {
         // Always returns a strict instance of `int`
         ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
-        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => (
-            handle_other(checker, outer_range, inner_range),
-            Applicability::Safe,
-        ),
+        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"]
+        // Depends on `__ceil__`/`__floor__`/`__trunc__`
+        | ["math", "ceil" | "floor" | "trunc"] => {
+            replace_with_inner(checker, outer_range, inner_range)
+        }
 
         // Depends on `ndigits` and `number.__round__`
-        ["" | "builtins", "round"] => match handle_round(checker, outer_range, arguments) {
-            None => return,
-            Some(edit) => (edit, Applicability::Unsafe),
-        },
-
-        // Depends on `__ceil__`/`__floor__`/`__trunc__`
-        ["math", "ceil" | "floor" | "trunc"] => (
-            handle_other(checker, outer_range, inner_range),
-            Applicability::Unsafe,
-        ),
+        ["" | "builtins", "round"] => {
+            match replace_with_shortened_round_call(checker, outer_range, arguments) {
+                None => return,
+                Some(edit) => edit,
+            }
+        }
 
         _ => return,
     };
 
-    let diagnostic = Diagnostic::new(UnnecessaryCastToInt {}, call.range);
-    let fix = Fix::applicable_edit(edit, applicability);
+    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
+    let fix = Fix::safe_edit(edit);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
@@ -113,7 +108,14 @@ fn single_argument_to_int_call<'a>(
     Some(argument)
 }
 
-fn handle_round(checker: &Checker, outer_range: TextRange, arguments: &Arguments) -> Option<Edit> {
+/// Returns an [`Edit`] when the call is of any of the forms:
+/// * `round(integer)`, `round(integer, 0)`, `round(integer, None)`
+/// * `round(whatever)`, `round(integer, None)`
+fn replace_with_shortened_round_call(
+    checker: &Checker,
+    outer_range: TextRange,
+    arguments: &Arguments,
+) -> Option<Edit> {
     if arguments.len() > 2 {
         return None;
     }
@@ -121,16 +123,31 @@ fn handle_round(checker: &Checker, outer_range: TextRange, arguments: &Arguments
     let number = arguments.find_argument("number", 0)?;
     let ndigits = arguments.find_argument("ndigits", 1);
 
-    let number_expr = checker.locator().slice(number);
-    let new_content = match ndigits {
-        Some(Expr::NumberLiteral(ExprNumberLiteral { value, .. })) if is_literal_zero(value) => {
-            format!("round({number_expr})")
-        }
-        Some(Expr::NoneLiteral(_)) | None => format!("round({number_expr})"),
+    let number_is_int = match number {
+        Expr::Name(name) => is_int(checker.semantic(), name),
+        Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => matches!(value, Number::Int(..)),
+        _ => false,
+    };
+
+    match ndigits {
+        Some(Expr::NumberLiteral(ExprNumberLiteral { value, .. }))
+            if is_literal_zero(value) && number_is_int => {}
+        Some(Expr::NoneLiteral(_)) | None => {}
         _ => return None,
     };
 
+    let number_expr = checker.locator().slice(number);
+    let new_content = format!("round({number_expr})");
+
     Some(Edit::range_replacement(new_content, outer_range))
+}
+
+fn is_int(semantic: &SemanticModel, name: &ExprName) -> bool {
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    typing::is_int(binding, semantic)
 }
 
 fn is_literal_zero(value: &Number) -> bool {
@@ -141,7 +158,7 @@ fn is_literal_zero(value: &Number) -> bool {
     matches!(int.as_u8(), Some(0))
 }
 
-fn handle_other(checker: &Checker, outer_range: TextRange, inner_range: TextRange) -> Edit {
+fn replace_with_inner(checker: &Checker, outer_range: TextRange, inner_range: TextRange) -> Edit {
     let inner_expr = checker.locator().slice(inner_range);
 
     Edit::range_replacement(inner_expr.to_string(), outer_range)

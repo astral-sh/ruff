@@ -33,7 +33,6 @@ int(round(0, 0))
 int(round(0, None))
 
 int(round(0.1))
-int(round(0.1, 0))
 int(round(0.1, None))
 
 # Argument type is not checked
@@ -48,3 +47,4 @@ int(round(0, 3.14))
 int(round(0, non_literal))
 int(round(0, 0), base)
 int(round(0, 0, extra=keyword))
+int(round(0.1, 0))
