@@ -19,13 +19,13 @@ use crate::rules::ruff::rules::string_has_metacharacters;
 /// ## Example
 ///
 /// ```python
-/// foo = re.escape('bar')
+/// foo = re.escape("bar")
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
-/// foo = 'bar'
+/// foo = "bar"
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryReEscape;
@@ -67,17 +67,17 @@ pub(crate) fn unnecessary_re_escape(checker: &mut Checker, call: &ExprCall) {
         _ => return,
     };
 
-    let fix = replace_with_argument_fix(checker, call, parts_count, literal_range);
+    let fix = replace_with_argument_fix(checker, call, parts_count, *literal_range);
     let diagnostic = Diagnostic::new(UnnecessaryReEscape, call.range);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix))
+    checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
 fn replace_with_argument_fix(
     checker: &mut Checker,
     call: &ExprCall,
     parts_count: usize,
-    literal_range: &TextRange,
+    literal_range: TextRange,
 ) -> Fix {
     let literal_expr = checker.locator().slice(literal_range);
     let replacement = parenthesize_if_necessary(literal_expr, parts_count);
@@ -91,7 +91,7 @@ fn parenthesize_if_necessary(literal_expr: &str, parts_count: usize) -> String {
     if parts_count > 1 {
         format!("({literal_expr})")
     } else {
-        format!("{literal_expr}")
+        literal_expr.to_string()
     }
 }
 

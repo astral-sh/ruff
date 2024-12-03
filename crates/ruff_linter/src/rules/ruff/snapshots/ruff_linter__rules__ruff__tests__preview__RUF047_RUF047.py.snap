@@ -13,8 +13,8 @@ RUF047.py:5:1: RUF047 [*] Pattern does not need escaping
   = help: Remove `re.escape()` wrapper call
 
 ℹ Safe fix
-2 2 |
-3 3 |
+2 2 | 
+3 3 | 
 4 4 | ### Errors
 5   |-re.escape('normal')
   5 |+'normal'
@@ -34,7 +34,7 @@ RUF047.py:6:1: RUF047 [*] Pattern does not need escaping
   = help: Remove `re.escape()` wrapper call
 
 ℹ Safe fix
-3 3 |
+3 3 | 
 4 4 | ### Errors
 5 5 | re.escape('normal')
 6   |-re.escape("normal' 'double")
@@ -152,7 +152,7 @@ RUF047.py:13:1: RUF047 [*] Pattern does not need escaping
    13 |+r'aw'
 14 14 | re.escape(b'ytes')
 15 15 | re.escape(br'aw bytes')
-16 16 |
+16 16 | 
 
 RUF047.py:14:1: RUF047 [*] Pattern does not need escaping
    |
@@ -171,7 +171,7 @@ RUF047.py:14:1: RUF047 [*] Pattern does not need escaping
 14    |-re.escape(b'ytes')
    14 |+b'ytes'
 15 15 | re.escape(br'aw bytes')
-16 16 |
+16 16 | 
 17 17 | re.escape('co\n' r"cate" 'natio\u006E')
 
 RUF047.py:15:1: RUF047 [*] Pattern does not need escaping
@@ -180,7 +180,7 @@ RUF047.py:15:1: RUF047 [*] Pattern does not need escaping
 14 | re.escape(b'ytes')
 15 | re.escape(br'aw bytes')
    | ^^^^^^^^^^^^^^^^^^^^^^^ RUF047
-16 |
+16 | 
 17 | re.escape('co\n' r"cate" 'natio\u006E')
    |
    = help: Remove `re.escape()` wrapper call
@@ -191,14 +191,14 @@ RUF047.py:15:1: RUF047 [*] Pattern does not need escaping
 14 14 | re.escape(b'ytes')
 15    |-re.escape(br'aw bytes')
    15 |+br'aw bytes'
-16 16 |
+16 16 | 
 17 17 | re.escape('co\n' r"cate" 'natio\u006E')
 18 18 | re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
 
 RUF047.py:17:1: RUF047 [*] Pattern does not need escaping
    |
 15 | re.escape(br'aw bytes')
-16 |
+16 | 
 17 | re.escape('co\n' r"cate" 'natio\u006E')
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF047
 18 | re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
@@ -208,12 +208,12 @@ RUF047.py:17:1: RUF047 [*] Pattern does not need escaping
 ℹ Safe fix
 14 14 | re.escape(b'ytes')
 15 15 | re.escape(br'aw bytes')
-16 16 |
+16 16 | 
 17    |-re.escape('co\n' r"cate" 'natio\u006E')
    17 |+('co\n' r"cate" 'natio\u006E')
 18 18 | re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
-19 19 |
-20 20 |
+19 19 | 
+20 20 | 
 
 RUF047.py:18:1: RUF047 [*] Pattern does not need escaping
    |
@@ -225,10 +225,10 @@ RUF047.py:18:1: RUF047 [*] Pattern does not need escaping
 
 ℹ Safe fix
 15 15 | re.escape(br'aw bytes')
-16 16 |
+16 16 | 
 17 17 | re.escape('co\n' r"cate" 'natio\u006E')
 18    |-re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
    18 |+(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
-19 19 |
-20 20 |
+19 19 | 
+20 20 | 
 21 21 | ### No errors
