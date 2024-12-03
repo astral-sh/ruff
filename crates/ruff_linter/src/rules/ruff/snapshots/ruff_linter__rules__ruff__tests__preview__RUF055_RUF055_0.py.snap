@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF055_0.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
   |
@@ -112,6 +111,8 @@ RUF055_0.py:70:1: RUF055 [*] Plain string pattern passed to `re` function
 75 | |     s,  # string
 76 | | )
    | |_^ RUF055
+77 |   
+78 |   # A diagnostic should not be emitted for `sub` replacements with backreferences or
    |
    = help: Replace with `s.replace("abc", "")`
 
@@ -127,3 +128,100 @@ RUF055_0.py:70:1: RUF055 [*] Plain string pattern passed to `re` function
 75    |-    s,  # string
 76    |-)
    70 |+s.replace("abc", "")
+77 71 | 
+78 72 | # A diagnostic should not be emitted for `sub` replacements with backreferences or
+79 73 | # most other ASCII escapes
+
+RUF055_0.py:88:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+86 | # *not* `some_string.replace("a", "\\n")`.
+87 | # We currently emit diagnostics for some of these without fixing them.
+88 | re.sub(r"a", "\n", "a")
+   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+89 | re.sub(r"a", r"\n", "a")
+90 | re.sub(r"a", "\a", "a")
+   |
+   = help: Replace with `"a".replace("a", "\n")`
+
+ℹ Safe fix
+85 85 | # `re.sub(r"a", r"\n", some_string)` is fixed to `some_string.replace("a", "\n")`
+86 86 | # *not* `some_string.replace("a", "\\n")`.
+87 87 | # We currently emit diagnostics for some of these without fixing them.
+88    |-re.sub(r"a", "\n", "a")
+   88 |+"a".replace("a", "\n")
+89 89 | re.sub(r"a", r"\n", "a")
+90 90 | re.sub(r"a", "\a", "a")
+91 91 | re.sub(r"a", r"\a", "a")
+
+RUF055_0.py:89:1: RUF055 Plain string pattern passed to `re` function
+   |
+87 | # We currently emit diagnostics for some of these without fixing them.
+88 | re.sub(r"a", "\n", "a")
+89 | re.sub(r"a", r"\n", "a")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+90 | re.sub(r"a", "\a", "a")
+91 | re.sub(r"a", r"\a", "a")
+   |
+
+RUF055_0.py:90:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+88 | re.sub(r"a", "\n", "a")
+89 | re.sub(r"a", r"\n", "a")
+90 | re.sub(r"a", "\a", "a")
+   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+91 | re.sub(r"a", r"\a", "a")
+   |
+   = help: Replace with `"a".replace("a", "\x07")`
+
+ℹ Safe fix
+87 87 | # We currently emit diagnostics for some of these without fixing them.
+88 88 | re.sub(r"a", "\n", "a")
+89 89 | re.sub(r"a", r"\n", "a")
+90    |-re.sub(r"a", "\a", "a")
+   90 |+"a".replace("a", "\x07")
+91 91 | re.sub(r"a", r"\a", "a")
+92 92 | 
+93 93 | re.sub(r"a", "\?", "a")
+
+RUF055_0.py:91:1: RUF055 Plain string pattern passed to `re` function
+   |
+89 | re.sub(r"a", r"\n", "a")
+90 | re.sub(r"a", "\a", "a")
+91 | re.sub(r"a", r"\a", "a")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+92 | 
+93 | re.sub(r"a", "\?", "a")
+   |
+
+RUF055_0.py:93:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+91 | re.sub(r"a", r"\a", "a")
+92 | 
+93 | re.sub(r"a", "\?", "a")
+   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+94 | re.sub(r"a", r"\?", "a")
+   |
+   = help: Replace with `"a".replace("a", "\\?")`
+
+ℹ Safe fix
+90 90 | re.sub(r"a", "\a", "a")
+91 91 | re.sub(r"a", r"\a", "a")
+92 92 | 
+93    |-re.sub(r"a", "\?", "a")
+   93 |+"a".replace("a", "\\?")
+94 94 | re.sub(r"a", r"\?", "a")
+
+RUF055_0.py:94:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+93 | re.sub(r"a", "\?", "a")
+94 | re.sub(r"a", r"\?", "a")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `"a".replace("a", "\\?")`
+
+ℹ Safe fix
+91 91 | re.sub(r"a", r"\a", "a")
+92 92 | 
+93 93 | re.sub(r"a", "\?", "a")
+94    |-re.sub(r"a", r"\?", "a")
+   94 |+"a".replace("a", "\\?")

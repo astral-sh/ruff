@@ -74,3 +74,21 @@ re.sub(
     "",
     s,  # string
 )
+
+# A diagnostic should not be emitted for `sub` replacements with backreferences or
+# most other ASCII escapes
+re.sub(r"a", r"\g<0>\g<0>\g<0>", "a")
+re.sub(r"a", r"\1", "a")
+re.sub(r"a", r"\s", "a")
+
+# Escapes like \n are "processed":
+# `re.sub(r"a", r"\n", some_string)` is fixed to `some_string.replace("a", "\n")`
+# *not* `some_string.replace("a", "\\n")`.
+# We currently emit diagnostics for some of these without fixing them.
+re.sub(r"a", "\n", "a")
+re.sub(r"a", r"\n", "a")
+re.sub(r"a", "\a", "a")
+re.sub(r"a", r"\a", "a")
+
+re.sub(r"a", "\?", "a")
+re.sub(r"a", r"\?", "a")

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF055_1.py:9:1: RUF055 [*] Plain string pattern passed to `re` function
    |
@@ -29,8 +28,6 @@ RUF055_1.py:17:1: RUF055 [*] Plain string pattern passed to `re` function
 16 | repl = "new"
 17 | re.sub(r"abc", repl, haystack)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
-18 | 
-19 | # fixes should not be proposed for `sub` replacements with backreferences or
    |
    = help: Replace with `haystack.replace("abc", repl)`
 
@@ -40,21 +37,3 @@ RUF055_1.py:17:1: RUF055 [*] Plain string pattern passed to `re` function
 16 16 | repl = "new"
 17    |-re.sub(r"abc", repl, haystack)
    17 |+haystack.replace("abc", repl)
-18 18 | 
-19 19 | # fixes should not be proposed for `sub` replacements with backreferences or
-20 20 | # most other escapes
-
-RUF055_1.py:25:1: RUF055 [*] Plain string pattern passed to `re` function
-   |
-24 | # but escapes like \n should work
-25 | re.sub(r"a", "\n", "a")
-   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF055
-   |
-   = help: Replace with `"a".replace("a", "\n")`
-
-ℹ Safe fix
-22 22 | re.sub(r"a", r"\1", "a")
-23 23 | 
-24 24 | # but escapes like \n should work
-25    |-re.sub(r"a", "\n", "a")
-   25 |+"a".replace("a", "\n")

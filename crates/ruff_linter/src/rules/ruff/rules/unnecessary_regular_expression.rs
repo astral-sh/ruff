@@ -1,9 +1,9 @@
 use itertools::Itertools;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::ExprStringLiteral;
 use ruff_python_ast::{
-    Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier,
+    Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, ExprStringLiteral,
+    Identifier,
 };
 use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{Modules, SemanticModel};
@@ -56,17 +56,19 @@ use crate::checkers::ast::Checker;
 /// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryRegularExpression {
-    replacement: String,
+    replacement: Option<String>,
 }
 
-impl AlwaysFixableViolation for UnnecessaryRegularExpression {
+impl Violation for UnnecessaryRegularExpression {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Plain string pattern passed to `re` function".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        format!("Replace with `{}`", self.replacement)
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Replace with `{}`", self.replacement.as_ref()?))
     }
 }
 
@@ -113,33 +115,36 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
     // we can proceed with the str method replacement
     let new_expr = re_func.replacement();
 
-    let repl = checker.generator().expr(&new_expr);
-    let diagnostic = Diagnostic::new(
+    let repl = new_expr.map(|expr| checker.generator().expr(&expr));
+    let mut diagnostic = Diagnostic::new(
         UnnecessaryRegularExpression {
             replacement: repl.clone(),
         },
         call.range,
     );
 
-    let fix = Fix::applicable_edit(
-        Edit::range_replacement(repl, call.range),
-        if checker
-            .comment_ranges()
-            .has_comments(call, checker.source())
-        {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        },
-    );
+    if let Some(repl) = repl {
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(repl, call.range),
+            if checker
+                .comment_ranges()
+                .has_comments(call, checker.source())
+            {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
+    }
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.diagnostics.push(diagnostic);
 }
 
 /// The `re` functions supported by this rule.
 #[derive(Debug)]
 enum ReFuncKind<'a> {
-    Sub { repl: &'a Expr },
+    // Only `Some` if it's a fixable `re.sub()` call
+    Sub { repl: Option<&'a Expr> },
     Match,
     Search,
     Fullmatch,
@@ -155,7 +160,7 @@ struct ReFunc<'a> {
 
 impl<'a> ReFunc<'a> {
     fn from_call_expr(
-        semantic: &SemanticModel,
+        semantic: &'a SemanticModel,
         call: &'a ExprCall,
         func_name: &str,
     ) -> Option<Self> {
@@ -176,16 +181,32 @@ impl<'a> ReFunc<'a> {
             // version
             ("sub", 3) => {
                 let repl = call.arguments.find_argument("repl", 1)?;
-                // make sure repl can be resolved to a string literal without
-                // backslash escapes other than ascii control characters
                 let lit = resolve_string_literal(repl, semantic)?;
+                let mut fixable = true;
                 for (c, next) in lit.value.chars().tuple_windows() {
-                    if c == '\\' && !"abfnrtv".contains(next) {
-                        return None;
+                    // `\0` (or any other ASCII digit) and `\g` have special meaning in `repl` strings.
+                    // Meanwhile, nearly all other escapes of ASCII letters in a `repl` string causes
+                    // `re.PatternError` to be raised at runtime.
+                    //
+                    // If we see that the escaped character is an alphanumeric ASCII character,
+                    // we should only emit a diagnostic suggesting to replace the `re.sub()` call with
+                    // `str.replace`if we can detect that the escaped character is one that is both
+                    // valid in a `repl` string *and* does not have any special meaning in a REPL string.
+                    //
+                    // It's out of scope for this rule to change invalid `re.sub()` calls into something
+                    // that would not raise an exception at runtime. They should be left as-is.
+                    if c == '\\' && next.is_ascii_alphanumeric() {
+                        if "abfnrtv".contains(next) {
+                            fixable = false;
+                        } else {
+                            return None;
+                        }
                     }
                 }
                 Some(ReFunc {
-                    kind: ReFuncKind::Sub { repl },
+                    kind: ReFuncKind::Sub {
+                        repl: fixable.then_some(repl),
+                    },
                     pattern: call.arguments.find_argument("pattern", 0)?,
                     string: call.arguments.find_argument("string", 2)?,
                 })
@@ -209,20 +230,20 @@ impl<'a> ReFunc<'a> {
         }
     }
 
-    fn replacement(&self) -> Expr {
+    fn replacement(&self) -> Option<Expr> {
         match self.kind {
             // string.replace(pattern, repl)
-            ReFuncKind::Sub { repl } => {
-                self.method_expr("replace", vec![self.pattern.clone(), repl.clone()])
-            }
+            ReFuncKind::Sub { repl } => repl
+                .cloned()
+                .map(|repl| self.method_expr("replace", vec![self.pattern.clone(), repl])),
             // string.startswith(pattern)
-            ReFuncKind::Match => self.method_expr("startswith", vec![self.pattern.clone()]),
+            ReFuncKind::Match => Some(self.method_expr("startswith", vec![self.pattern.clone()])),
             // pattern in string
-            ReFuncKind::Search => self.compare_expr(CmpOp::In),
+            ReFuncKind::Search => Some(self.compare_expr(CmpOp::In)),
             // string == pattern
-            ReFuncKind::Fullmatch => self.compare_expr(CmpOp::Eq),
+            ReFuncKind::Fullmatch => Some(self.compare_expr(CmpOp::Eq)),
             // string.split(pattern)
-            ReFuncKind::Split => self.method_expr("split", vec![self.pattern.clone()]),
+            ReFuncKind::Split => Some(self.method_expr("split", vec![self.pattern.clone()])),
         }
     }
 
