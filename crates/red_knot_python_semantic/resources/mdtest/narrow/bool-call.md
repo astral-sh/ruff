@@ -22,11 +22,11 @@ if not bool():
 
 # invalid invocation, too many positional args
 reveal_type(x)  # revealed: Literal[1] | None
-if bool(x is not None, 5):
+if bool(x is not None, 5):  # TODO diagnostic
     reveal_type(x)  # revealed: Literal[1] | None
 
 # invalid invocation, too many kwargs
 reveal_type(x)  # revealed: Literal[1] | None
-if bool(x is not None, y=5):
+if bool(x is not None, y=5):  # TODO diagnostic
     reveal_type(x)  # revealed: Literal[1] | None
 ```

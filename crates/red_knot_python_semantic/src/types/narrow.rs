@@ -390,45 +390,43 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
-        match callable_ty
-            .into_function_literal()
-            .and_then(|f| f.known(self.db))
-            .and_then(KnownFunction::constraint_function)
-        {
-            Some(function) if expr_call.arguments.keywords.is_empty() => {
-                if let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
+        match callable_ty {
+            Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
+                let function = function_type
+                    .known(self.db)
+                    .and_then(KnownFunction::constraint_function)?;
+
+                let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
                     &*expr_call.arguments.args
-                {
-                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                else {
+                    return None;
+                };
 
-                    let class_info_ty =
-                        inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
+                let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-                    let to_constraint = match function {
-                        KnownConstraintFunction::IsInstance => {
-                            |class_literal: ClassLiteralType<'db>| {
-                                Type::instance(class_literal.class)
-                            }
+                let class_info_ty =
+                    inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
+
+                let to_constraint = match function {
+                    KnownConstraintFunction::IsInstance => {
+                        |class_literal: ClassLiteralType<'db>| Type::instance(class_literal.class)
+                    }
+                    KnownConstraintFunction::IsSubclass => {
+                        |class_literal: ClassLiteralType<'db>| {
+                            Type::subclass_of(class_literal.class)
                         }
-                        KnownConstraintFunction::IsSubclass => {
-                            |class_literal: ClassLiteralType<'db>| {
-                                Type::subclass_of(class_literal.class)
-                            }
-                        }
-                    };
+                    }
+                };
 
-                    generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
-                        |constraint| {
-                            let mut constraints = NarrowingConstraints::default();
-                            constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
-                            constraints
-                        },
-                    )
-                } else {
-                    None
-                }
+                generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
+                    |constraint| {
+                        let mut constraints = NarrowingConstraints::default();
+                        constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
+                        constraints
+                    },
+                )
             }
-            _ => {
+            Type::ClassLiteral(..) => {
                 let is_valid_bool_invocation =
                     expr_call.arguments.args.len() == 1 && expr_call.arguments.keywords.is_empty();
 
@@ -446,6 +444,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     None
                 }
             }
+            _ => None,
         }
     }
 
