@@ -1403,7 +1403,7 @@ impl<'db> Type<'db> {
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
 
-            Type::Todo(_) => CallOutcome::callable(todo_type!()),
+            Type::Todo(_) => CallOutcome::callable(todo_type!("call todo")),
 
             Type::Unknown => CallOutcome::callable(Type::Unknown),
 
@@ -1556,6 +1556,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
                 Type::Never
             }
+            Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             _ => todo_type!(),
         }
     }
@@ -1888,6 +1889,8 @@ impl<'db> KnownClass {
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
+    /// The symbol `typing.LiteralString` (which can also be found as `typing_extensions.LiteralString`)
+    LiteralString,
     /// The symbol `typing.Optional` (which can also be found as `typing_extensions.Optional`)
     Optional,
     /// The symbol `typing.Union` (which can also be found as `typing_extensions.Union`)
@@ -1907,6 +1910,7 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Literal => "Literal",
+            Self::LiteralString => "LiteralString",
             Self::Optional => "Optional",
             Self::Union => "Union",
             Self::TypeVar(_) => "TypeVar",
@@ -1920,6 +1924,7 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn bool(self) -> Truthiness {
         match self {
             Self::Literal
+            | Self::LiteralString
             | Self::Optional
             | Self::TypeVar(_)
             | Self::Union
@@ -1933,6 +1938,7 @@ impl<'db> KnownInstanceType<'db> {
     pub fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
             Self::Literal => "typing.Literal",
+            Self::LiteralString => "typing.LiteralString",
             Self::Optional => "typing.Optional",
             Self::Union => "typing.Union",
             Self::NoReturn => "typing.NoReturn",
@@ -1946,6 +1952,7 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn class(self) -> KnownClass {
         match self {
             Self::Literal => KnownClass::SpecialForm,
+            Self::LiteralString => KnownClass::SpecialForm,
             Self::Optional => KnownClass::SpecialForm,
             Self::Union => KnownClass::SpecialForm,
             Self::NoReturn => KnownClass::SpecialForm,
@@ -1970,6 +1977,7 @@ impl<'db> KnownInstanceType<'db> {
         }
         match (module.name().as_str(), instance_name) {
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
+            ("typing" | "typing_extensions", "LiteralString") => Some(Self::LiteralString),
             ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
             ("typing" | "typing_extensions", "Union") => Some(Self::Union),
             ("typing" | "typing_extensions", "NoReturn") => Some(Self::NoReturn),
