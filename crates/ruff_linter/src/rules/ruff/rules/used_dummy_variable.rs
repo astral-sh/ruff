@@ -10,16 +10,19 @@ use ruff_text_size::Ranged;
 use crate::{checkers::ast::Checker, renamer::Renamer};
 
 /// ## What it does
-/// Checks for accesses of local dummy variables, excluding `_` and dunder variables.
+/// Checks for "dummy variables" (variables that are named as if to indicate they are unused)
+/// that are in fact used.
 ///
 /// By default, "dummy variables" are any variables with names that start with leading
-/// underscores. However, this is customisable using the `dummy-variable-rgx` setting).
+/// underscores. However, this is customisable using the [`lint.dummy-variable-rgx`] setting).
+///
+/// Dunder variables are ignored by this rule, as are variables named `_`.
 ///
 /// ## Why is this bad?
 /// Marking a variable with a leading underscore conveys that it is intentionally unused within the function or method.
 /// When these variables are later referenced in the code, it causes confusion and potential misunderstandings about
-/// the code's intention. A variable marked as "unused" being subsequently used suggests oversight or unintentional use.
-/// This detracts from the clarity and maintainability of the codebase.
+/// the code's intention. If a variable marked as "unused" is subsequently used, it suggests that either the variable
+/// could be given a clearer name, or that the code is accidentally making use of the wrong variable.
 ///
 /// Sometimes leading underscores are used to avoid variables shadowing other variables, Python builtins, or Python
 /// keywords. However, [PEP 8] recommends to use trailing underscores for this rather than leading underscores.
@@ -39,11 +42,13 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// ```
 ///
 /// ## Fix availability
-/// An fix is only available for variables that start with leading underscores.
+/// The rule's fix is only available for variables that start with leading underscores.
+/// It will also only be available if the "obvious" new name for the variable
+/// would not shadow any other known variables already accessible from the scope
+/// in which the variable is defined.
 ///
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
-///
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
@@ -61,21 +66,18 @@ impl Violation for UsedDummyVariable {
     }
 
     fn fix_title(&self) -> Option<String> {
-        if let Some(shadowed_kind) = self.shadowed_kind {
-            return Some(match shadowed_kind {
-                ShadowedKind::BuiltIn => {
-                    "Prefer using trailing underscores to avoid shadowing a built-in".to_string()
-                }
-                ShadowedKind::Keyword => {
-                    "Prefer using trailing underscores to avoid shadowing a keyword".to_string()
-                }
-                ShadowedKind::Some => {
-                    "Prefer using trailing underscores to avoid shadowing a variable".to_string()
-                }
-                ShadowedKind::None => "Remove leading underscores".to_string(),
-            });
-        }
-        None
+        self.shadowed_kind.map(|kind| match kind {
+            ShadowedKind::BuiltIn => {
+                "Prefer using trailing underscores to avoid shadowing a built-in".to_string()
+            }
+            ShadowedKind::Keyword => {
+                "Prefer using trailing underscores to avoid shadowing a keyword".to_string()
+            }
+            ShadowedKind::Some => {
+                "Prefer using trailing underscores to avoid shadowing a variable".to_string()
+            }
+            ShadowedKind::None => "Remove leading underscores".to_string(),
+        })
     }
 }
 
