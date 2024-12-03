@@ -60,15 +60,11 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
     };
 
     let edit = match qualified_name.segments() {
-        // Always returns a strict instance of `int`
         ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
-        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"]
-        // Depends on `__ceil__`/`__floor__`/`__trunc__`
-        | ["math", "ceil" | "floor" | "trunc"] => {
+        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm" | "ceil" | "floor" | "trunc"] => {
             replace_with_inner(checker, outer_range, inner_range)
         }
 
-        // Depends on `ndigits` and `number.__round__`
         ["" | "builtins", "round"] => {
             match replace_with_shortened_round_call(checker, outer_range, arguments) {
                 None => return,
