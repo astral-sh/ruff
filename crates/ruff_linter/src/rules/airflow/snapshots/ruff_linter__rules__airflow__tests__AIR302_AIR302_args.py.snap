@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
 ---
-AIR302_args.py:6:39: AIR302 `schedule_interval` is removed in Airflow 3.0; use schedule instead
+AIR302_args.py:6:39: AIR302 `schedule_interval` is removed in Airflow 3.0; use `schedule` instead
   |
 4 | DAG(dag_id="class_schedule", schedule="@hourly")
 5 | 
@@ -11,7 +12,7 @@ AIR302_args.py:6:39: AIR302 `schedule_interval` is removed in Airflow 3.0; use s
 8 | DAG(dag_id="class_timetable", timetable=NullTimetable())
   |
 
-AIR302_args.py:8:31: AIR302 `timetable` is removed in Airflow 3.0; use schedule instead
+AIR302_args.py:8:31: AIR302 `timetable` is removed in Airflow 3.0; use `schedule` instead
   |
 6 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
 7 | 
@@ -19,7 +20,7 @@ AIR302_args.py:8:31: AIR302 `timetable` is removed in Airflow 3.0; use schedule 
   |                               ^^^^^^^^^ AIR302
   |
 
-AIR302_args.py:16:6: AIR302 `schedule_interval` is removed in Airflow 3.0; use schedule instead
+AIR302_args.py:16:6: AIR302 `schedule_interval` is removed in Airflow 3.0; use `schedule` instead
    |
 16 | @dag(schedule_interval="0 * * * *")
    |      ^^^^^^^^^^^^^^^^^ AIR302
@@ -27,7 +28,7 @@ AIR302_args.py:16:6: AIR302 `schedule_interval` is removed in Airflow 3.0; use s
 18 |     pass
    |
 
-AIR302_args.py:21:6: AIR302 `timetable` is removed in Airflow 3.0; use schedule instead
+AIR302_args.py:21:6: AIR302 `timetable` is removed in Airflow 3.0; use `schedule` instead
    |
 21 | @dag(timetable=NullTimetable())
    |      ^^^^^^^^^ AIR302
