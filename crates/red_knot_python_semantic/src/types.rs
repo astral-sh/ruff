@@ -40,6 +40,9 @@ mod signatures;
 mod string_annotation;
 mod unpacker;
 
+#[cfg(test)]
+mod property_tests;
+
 #[salsa::tracked(return_ref)]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
@@ -3083,8 +3086,8 @@ pub(crate) mod tests {
 
     /// A test representation of a type that can be transformed unambiguously into a real Type,
     /// given a db.
-    #[derive(Debug, Clone)]
-    enum Ty {
+    #[derive(Debug, Clone, PartialEq)]
+    pub(crate) enum Ty {
         Never,
         Unknown,
         None,
@@ -3108,7 +3111,7 @@ pub(crate) mod tests {
     }
 
     impl Ty {
-        fn into_type(self, db: &TestDb) -> Type<'_> {
+        pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
             match self {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::Unknown,
