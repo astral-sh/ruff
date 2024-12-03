@@ -1356,14 +1356,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            // If we instantiate a subclass of typing.Any, then we infer the result to be an
-            // instance of the Any type.
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_subclass_of_base(db, ClassBase::Any) =>
-            {
-                CallOutcome::callable(Type::Any)
-            }
-
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
                 CallOutcome::callable(match class.known(db) {
@@ -1525,14 +1517,6 @@ impl<'db> Type<'db> {
             todo @ Type::Todo(_) => *todo,
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
-            // We consider an instance of any subclass of typing.Any to be an instance of the Any
-            // type.
-            Type::ClassLiteral(ClassLiteralType { class })
-            | Type::SubclassOf(SubclassOfType { class })
-                if class.is_subclass_of_base(db, ClassBase::Any) =>
-            {
-                Type::Any
-            }
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
             Type::SubclassOf(SubclassOfType { class }) => Type::instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
