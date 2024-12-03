@@ -1342,7 +1342,7 @@ pub struct Flake8ImportConventionsOptions {
             "dask.dataframe" = "dd"
         "#
     )]
-    pub extend_aliases: Option<FxHashMap<String, String>>,
+    pub extend_aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to its banned import aliases.
     #[option(
@@ -1415,6 +1415,15 @@ impl<'de> Deserialize<'de> for Alias {
         D: Deserializer<'de>,
     {
         let name = String::deserialize(deserializer)?;
+        // Assignments to these names are SyntaxErrors
+        // see the note here:
+        // https://docs.python.org/3/library/constants.html#debug__
+        if matches!(&*name, "__debug__" | "True" | "False" | "None") {
+            return Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"an assignable Python identifier",
+            ));
+        }
         if is_identifier(&name) {
             Ok(Self(name))
         } else {
@@ -1436,7 +1445,11 @@ impl Flake8ImportConventionsOptions {
             None => flake8_import_conventions::settings::default_aliases(),
         };
         if let Some(extend_aliases) = self.extend_aliases {
-            aliases.extend(extend_aliases);
+            aliases.extend(
+                extend_aliases
+                    .into_iter()
+                    .map(|(module, alias)| (module.into_string(), alias.into_string())),
+            );
         }
 
         flake8_import_conventions::settings::Settings {
