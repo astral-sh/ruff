@@ -19,6 +19,7 @@ pub(crate) mod tests {
     use super::Db;
 
     #[salsa::db]
+    #[derive(Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         files: Files,

@@ -5,6 +5,7 @@ use crate::{
 };
 use ruff_python_parser::ParseError;
 use ruff_text_size::TextRange;
+use salsa::Accumulator as _;
 use std::borrow::Cow;
 
 pub trait Diagnostic: Send + Sync + std::fmt::Debug {
@@ -70,6 +71,47 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
         }
 
         write!(f, " {message}", message = self.diagnostic.message())
+    }
+}
+
+#[salsa::accumulator]
+pub struct CompileDiagnostic(std::sync::Arc<dyn Diagnostic>);
+
+impl CompileDiagnostic {
+    pub fn report<T>(db: &dyn Db, diagnostic: T)
+    where
+        T: Diagnostic + 'static,
+    {
+        Self(std::sync::Arc::new(diagnostic)).accumulate(db);
+    }
+
+    pub fn display<'a>(&'a self, db: &'a dyn Db) -> DisplayDiagnostic<'a> {
+        DisplayDiagnostic {
+            db,
+            diagnostic: &*self.0,
+        }
+    }
+}
+
+impl Diagnostic for CompileDiagnostic {
+    fn rule(&self) -> &str {
+        self.0.rule()
+    }
+
+    fn message(&self) -> Cow<str> {
+        self.0.message()
+    }
+
+    fn file(&self) -> File {
+        self.0.file()
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        self.0.range()
+    }
+
+    fn severity(&self) -> Severity {
+        self.0.severity()
     }
 }
 

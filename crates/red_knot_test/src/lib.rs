@@ -2,9 +2,8 @@ use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
+use ruff_db::diagnostic::{CompileDiagnostic, Diagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
-use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
@@ -102,24 +101,9 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
     let failures: Failures = test_files
         .into_iter()
         .filter_map(|test_file| {
-            let parsed = parsed_module(db, test_file.file);
-
-            let mut diagnostics: Vec<Box<_>> = parsed
-                .errors()
-                .iter()
-                .cloned()
-                .map(|error| {
-                    let diagnostic: Box<dyn Diagnostic> =
-                        Box::new(ParseDiagnostic::new(test_file.file, error));
-                    diagnostic
-                })
-                .collect();
-
-            let type_diagnostics = check_types(db, test_file.file);
-            diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
-                let diagnostic: Box<dyn Diagnostic> = Box::new((*diagnostic).clone());
-                diagnostic
-            }));
+            let mut diagnostics = check_types::accumulated::<CompileDiagnostic>(db, test_file.file);
+            // Filter out diagnostics that are not related to the current file.
+            diagnostics.retain(|diagnostic| diagnostic.file() == test_file.file);
 
             match matcher::match_file(db, test_file.file, diagnostics) {
                 Ok(()) => None,

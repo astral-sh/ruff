@@ -1,28 +1,39 @@
+use std::borrow::Cow;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use countme::Count;
 
-use ruff_notebook::Notebook;
-use ruff_python_ast::PySourceType;
-use ruff_source_file::LineIndex;
-
+use crate::diagnostic::{CompileDiagnostic, Diagnostic, Severity};
 use crate::files::{File, FilePath};
 use crate::Db;
+use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
+use ruff_source_file::LineIndex;
+use ruff_text_size::TextRange;
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
-    let mut read_error = None;
+    let mut has_read_error = false;
 
     let kind = if is_notebook(file.path(db)) {
         file.read_to_notebook(db)
             .unwrap_or_else(|error| {
                 tracing::debug!("Failed to read notebook '{path}': {error}");
 
-                read_error = Some(SourceTextError::FailedToReadNotebook(error.to_string()));
+                CompileDiagnostic::report(
+                    db,
+                    SourceTextDiagnostic {
+                        error: SourceTextError::FailedToReadNotebook(error),
+                        file,
+                    },
+                );
+
+                has_read_error = true;
+
                 Notebook::empty()
             })
             .into()
@@ -30,8 +41,16 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
         file.read_to_string(db)
             .unwrap_or_else(|error| {
                 tracing::debug!("Failed to read file '{path}': {error}");
+                CompileDiagnostic::report(
+                    db,
+                    SourceTextDiagnostic {
+                        error: SourceTextError::FailedToReadFile(error),
+                        file,
+                    },
+                );
 
-                read_error = Some(SourceTextError::FailedToReadFile(error.to_string()));
+                has_read_error = true;
+
                 String::new()
             })
             .into()
@@ -40,7 +59,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     SourceText {
         inner: Arc::new(SourceTextInner {
             kind,
-            read_error,
+            has_read_error,
             count: Count::new(),
         }),
     }
@@ -93,8 +112,8 @@ impl SourceText {
     }
 
     /// Returns `true` if there was an error when reading the content of the file.
-    pub fn read_error(&self) -> Option<&SourceTextError> {
-        self.inner.read_error.as_ref()
+    pub fn has_read_error(&self) -> bool {
+        self.inner.has_read_error
     }
 }
 
@@ -127,7 +146,7 @@ impl std::fmt::Debug for SourceText {
 struct SourceTextInner {
     count: Count<SourceText>,
     kind: SourceTextKind,
-    read_error: Option<SourceTextError>,
+    has_read_error: bool,
 }
 
 #[derive(Eq, PartialEq)]
@@ -148,12 +167,45 @@ impl From<Notebook> for SourceTextKind {
     }
 }
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
+#[derive(Debug)]
+pub(crate) struct SourceTextDiagnostic {
+    error: SourceTextError,
+    file: File,
+}
+
+impl Diagnostic for SourceTextDiagnostic {
+    fn rule(&self) -> &str {
+        "io-error"
+    }
+
+    fn message(&self) -> Cow<str> {
+        match &self.error {
+            SourceTextError::FailedToReadNotebook(notebook_error) => {
+                format!("Failed to read notebook: {notebook_error}").into()
+            }
+            SourceTextError::FailedToReadFile(error) => {
+                format!("Failed to read file: {error}").into()
+            }
+        }
+    }
+
+    fn file(&self) -> File {
+        self.file
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        None
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+}
+
+#[derive(Debug)]
 pub enum SourceTextError {
-    #[error("Failed to read notebook: {0}`")]
-    FailedToReadNotebook(String),
-    #[error("Failed to read file: {0}")]
-    FailedToReadFile(String),
+    FailedToReadNotebook(NotebookError),
+    FailedToReadFile(std::io::Error),
 }
 
 /// Computes the [`LineIndex`] for `file`.
