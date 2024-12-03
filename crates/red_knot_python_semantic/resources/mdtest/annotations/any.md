@@ -62,6 +62,8 @@ from typing import Any
 class Subclass(Any):
     pass
 
+reveal_type(Subclass.__mro__)  # revealed: tuple[Literal[Subclass], Any, Literal[object]]
+
 x: Subclass = 1      # error: [invalid-assignment]
 y: int = Subclass()  # error: [invalid-assignment]
 
