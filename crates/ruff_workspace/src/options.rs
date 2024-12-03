@@ -1415,10 +1415,10 @@ impl<'de> Deserialize<'de> for Alias {
         D: Deserializer<'de>,
     {
         let name = String::deserialize(deserializer)?;
-        // Assignments to these names are SyntaxErrors
+        // Assigning to "__debug__" is a SyntaxError
         // see the note here:
         // https://docs.python.org/3/library/constants.html#debug__
-        if matches!(&*name, "__debug__" | "True" | "False" | "None") {
+        if &*name == "__debug__" {
             return Err(de::Error::invalid_value(
                 de::Unexpected::Str(&name),
                 &"an assignable Python identifier",
