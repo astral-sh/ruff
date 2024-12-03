@@ -2004,6 +2004,42 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
 }
 
 #[test]
+fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.extend-aliases]
+"module.name" = "__debug__"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to parse [TMP]/ruff.toml
+          Cause: TOML parse error at line 2, column 2
+          |
+        2 | [lint.flake8-import-conventions.extend-aliases]
+          |  ^^^^
+        invalid value: string "__debug__", expected an assignable Python identifier
+        "###);});
+    Ok(())
+}
+
+#[test]
 fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
