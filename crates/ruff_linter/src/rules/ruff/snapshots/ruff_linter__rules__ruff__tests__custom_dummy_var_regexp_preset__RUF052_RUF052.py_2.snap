@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF052.py:21:9: RUF052 Local dummy variable `arg` is accessed
    |
@@ -38,12 +37,12 @@ RUF052.py:57:16: RUF052 Local dummy variable `arg` is accessed
 57 |     def method(arg):
    |                ^^^ RUF052
 58 |         _valid_unused_var = arg
-59 |         return 
+59 |         return
    |
 
 RUF052.py:61:9: RUF052 Local dummy variable `x` is accessed
    |
-59 |         return 
+59 |         return
 60 | 
 61 | def fun(x):
    |         ^ RUF052
@@ -117,5 +116,43 @@ RUF052.py:105:5: RUF052 Local dummy variable `_x` is accessed
 105 |     _x = "shadows local" # [RUF052]
     |     ^^ RUF052
 106 |     return _x
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+RUF052.py:113:5: RUF052 Local dummy variable `_GLOBAL_1` is accessed
+    |
+112 | def unfixables():
+113 |     _GLOBAL_1 = "foo"
+    |     ^^^^^^^^^ RUF052
+114 |     # unfixable because the rename would shadow a global variable
+115 |     print(_GLOBAL_1)  # [RUF052]
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+RUF052.py:121:5: RUF052 Local dummy variable `_local` is accessed
+    |
+120 |     # unfixable because the rename would shadow a local variable
+121 |     _local = "local3"  # [RUF052]
+    |     ^^^^^^ RUF052
+122 |     print(_local)
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+RUF052.py:125:9: RUF052 Local dummy variable `_GLOBAL_1` is accessed
+    |
+124 |     def nested():
+125 |         _GLOBAL_1 = "foo"
+    |         ^^^^^^^^^ RUF052
+126 |         # unfixable because the rename would shadow a global variable
+127 |         print(_GLOBAL_1)  # [RUF052]
+    |
+    = help: Prefer using trailing underscores to avoid shadowing a variable
+
+RUF052.py:130:9: RUF052 Local dummy variable `_local` is accessed
+    |
+129 |         # unfixable because the rename would shadow a variable from the outer function
+130 |         _local = "local4"
+    |         ^^^^^^ RUF052
+131 |         print(_local)
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
