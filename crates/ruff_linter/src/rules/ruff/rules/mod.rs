@@ -38,6 +38,7 @@ pub(crate) use unraw_re_pattern::*;
 pub(crate) use unsafe_markup_use::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
+pub(crate) use used_dummy_variable::*;
 pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
@@ -85,6 +86,7 @@ mod unraw_re_pattern;
 mod unsafe_markup_use;
 mod unused_async;
 mod unused_noqa;
+mod used_dummy_variable;
 mod useless_if_else;
 mod zip_instead_of_pairwise;
 
