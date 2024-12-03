@@ -46,3 +46,23 @@ def f():
 # to that but not to our locally defined class.
 y: Any = "not an Any"  # error: [invalid-assignment]
 ```
+
+## Subclass
+
+The spec allows you to define subclasses of `Any`, which must also resolve to the Any type.
+
+```py
+from typing import Any
+
+class Subclass(Any):
+    pass
+
+# Since Subclass is a subclass of Any, it is assignable to and from any other type, just like Any.
+x: Subclass = 1
+y: int = Subclass()
+
+def f() -> Subclass:
+    pass
+
+reveal_type(f())  # revealed: Any
+```
