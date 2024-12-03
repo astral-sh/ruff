@@ -352,7 +352,24 @@ fn convert_to_list_extend(
         None => String::new(),
     };
 
-    let for_iter_str = locator.slice(for_stmt.iter.range());
+    // if the loop target was an implicit tuple, add parentheses around it
+    // ```python
+    //  for i in a, b:
+    //      ...
+    // ```
+    // becomes
+    // [... for i in (a, b)]
+    let for_iter_str = if for_stmt
+        .iter
+        .as_ref()
+        .as_tuple_expr()
+        .is_some_and(|expr| !expr.parenthesized)
+    {
+        format!("({})", locator.slice(for_stmt.iter.range()))
+    } else {
+        locator.slice(for_stmt.iter.range()).to_string()
+    };
+
     let for_type = if for_stmt.is_async {
         "async for"
     } else {
@@ -367,8 +384,11 @@ fn convert_to_list_extend(
             .comment_ranges()
             .comments_in_range(range)
             .iter()
-            // Ignore comments inside of the append, since these are preserved
-            .filter(|comment| !to_append.range().contains_range(**comment))
+            // Ignore comments inside of the append or iterator, since these are preserved
+            .filter(|comment| {
+                !to_append.range().contains_range(**comment)
+                    && !for_stmt.iter.range().contains_range(**comment)
+            })
             .map(|range| locator.slice(range).trim_whitespace_start())
             .collect()
     };
@@ -384,6 +404,13 @@ fn convert_to_list_extend(
 
     match fix_type {
         ComprehensionType::Extend => {
+            let generator_str = if for_stmt.is_async {
+                // generators do not implement __iter__, so `async for` requires the generator to be a list
+                format!("[{generator_str}]")
+            } else {
+                generator_str
+            };
+
             let comprehension_body = format!("{variable_name}.extend({generator_str})");
 
             let indentation = if for_loop_inline_comments.is_empty() {
