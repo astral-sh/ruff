@@ -54,6 +54,3 @@ quickcheck_macros = { version = "1.0.0" }
 
 [lints]
 workspace = true
-
-[features]
-property_tests = []

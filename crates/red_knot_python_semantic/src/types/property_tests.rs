@@ -1,13 +1,14 @@
 //! This module contains quickcheck-based property tests for `Type`s.
 //!
-//! These tests are feature-gated and disabled by default. You can run them using:
+//! These tests are disabled by default, as they are non-deterministic and slow. You can
+//! run them explicitly using:
 //!
 //! ```sh
-//! cargo test -p red_knot_python_semantic --features property_tests types::property_tests
+//! cargo test -p red_knot_python_semantic -- --ignored types::property_tests::stable
 //! ```
 //!
-//! You can control the number of tests (default: 100) by setting the `QUICKCHECK_TESTS`
-//! variable. For example:
+//! The number of tests (default: 100) can be controlled by setting the `QUICKCHECK_TESTS`
+//! environment variable. For example:
 //!
 //! ```sh
 //! QUICKCHECK_TESTS=10000 cargo test …
@@ -19,19 +20,16 @@
 //!
 //! ```sh
 //! export QUICKCHECK_TESTS=100000
-//! while cargo test --release -p red_knot_python_semantic \
-//!   --features property_tests types::property_tests; do :; done
+//! while cargo test --release -p red_knot_python_semantic -- \
+//!   --ignored types::property_tests::stable; do :; done
 //! ```
 
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use super::tests::{setup_db, Ty};
-use super::Type;
 use crate::db::tests::TestDb;
 use crate::types::KnownClass;
-use crate::Db;
 use quickcheck::{Arbitrary, Gen};
-use quickcheck_macros::quickcheck;
 
 fn arbitrary_core_type(g: &mut Gen) -> Ty {
     // We could select a random integer here, but this would make it much less
@@ -125,27 +123,6 @@ impl Arbitrary for Ty {
     }
 }
 
-impl<'db> Type<'db> {
-    /// Checks if a type contains `Never` in its tree.
-    ///
-    /// This is currently needed since we currently don't propagate/simplify types containing
-    /// `Never`. For example, the type `tuple[int, Never]` is equivalent to `Never`. Similarly,
-    /// we simplify `Never` in unions, but we would not simplify `str | tuple[int, Never]`, so
-    /// we need to descent into unions and intersections as well.
-    fn contains_never(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::Never => true,
-            Type::Union(types) => types.elements(db).iter().any(|t| t.contains_never(db)),
-            Type::Tuple(types) => types.elements(db).iter().any(|t| t.contains_never(db)),
-            Type::Intersection(inner) => {
-                inner.positive(db).iter().any(|t| t.contains_never(db))
-                    || inner.negative(db).iter().any(|t| t.contains_never(db))
-            }
-            _ => false,
-        }
-    }
-}
-
 static CACHED_DB: OnceLock<Arc<Mutex<TestDb>>> = OnceLock::new();
 
 fn get_cached_db() -> MutexGuard<'static, TestDb> {
@@ -155,9 +132,10 @@ fn get_cached_db() -> MutexGuard<'static, TestDb> {
 
 macro_rules! type_property_test {
     ($name:ident, $db:ident, ($($types:ident),+), $body:expr) => {
-        #[quickcheck]
-        fn $name($($types: Ty),+) -> bool {
-            let db_cached = get_cached_db();
+        #[quickcheck_macros::quickcheck]
+        #[ignore]
+        fn $name($($types: crate::types::tests::Ty),+) -> bool {
+            let db_cached = super::get_cached_db();
             let $db = &*db_cached;
             $(let $types = $types.into_type($db);)+
 
@@ -178,72 +156,83 @@ macro_rules! type_property_test {
     };
 }
 
-// `T` is equivalent to itself.
-type_property_test!(equivalent_to_is_reflexive, db, t, t.is_equivalent_to(db, t));
+mod stable {
+    // `T` is equivalent to itself.
+    type_property_test!(equivalent_to_is_reflexive, db, t, t.is_equivalent_to(db, t));
 
-// `T` is a subtype of itself.
-type_property_test!(subtype_of_is_reflexive, db, t, t.is_subtype_of(db, t));
+    // `T` is a subtype of itself.
+    type_property_test!(subtype_of_is_reflexive, db, t, t.is_subtype_of(db, t));
 
-// `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
-type_property_test!(
-    subtype_of_is_antisymmetric,
-    db,
-    (s, t),
-    s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
-);
+    // `S <: T` and `T <: U` implies that `S <: U`.
+    type_property_test!(
+        subtype_of_is_transitive,
+        db,
+        (s, t, u),
+        s.is_subtype_of(db, t) && t.is_subtype_of(db, u) => s.is_subtype_of(db, u)
+    );
 
-// `S <: T` and `T <: U` implies that `S <: U`.
-type_property_test!(
-    subtype_of_is_transitive,
-    db,
-    (s, t, u),
-    s.is_subtype_of(db, t) && t.is_subtype_of(db, u) => s.is_subtype_of(db, u)
-);
+    // `T` is not disjoint from itself, unless `T` is `Never`.
+    type_property_test!(
+        disjoint_from_is_irreflexive,
+        db,
+        t,
+        t.is_disjoint_from(db, t) => t.is_never()
+    );
 
-// `T` is not disjoint from itself, unless `T` is `Never`.
-type_property_test!(
-    disjoint_from_is_irreflexive,
-    db,
-    t,
-    t.is_disjoint_from(db, t) => t.contains_never(db)
-);
+    // `S` is disjoint from `T` implies that `T` is disjoint from `S`.
+    type_property_test!(
+        disjoint_from_is_symmetric,
+        db,
+        (s, t),
+        s.is_disjoint_from(db, t) == t.is_disjoint_from(db, s)
+    );
 
-// `S` is disjoint from `T` implies that `T` is disjoint from `S`.
-type_property_test!(
-    disjoint_from_is_symmetric,
-    db,
-    (s, t),
-    s.is_disjoint_from(db, t) == t.is_disjoint_from(db, s)
-);
+    // `S <: T` implies that `S` is not disjoint from `T`, unless `S` is `Never`.
+    type_property_test!(subtype_of_implies_not_disjoint_from, db, (s, t),
+        s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.is_never()
+    );
 
-// `S <: T` implies that `S` is not disjoint from `T`, unless `S` is `Never`.
-type_property_test!(subtype_of_implies_not_disjoint_from, db, (s, t),
-    s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.contains_never(db)
-);
+    // `T` can be assigned to itself.
+    type_property_test!(assignable_to_is_reflexive, db, t, t.is_assignable_to(db, t));
 
-// `T` can be assigned to itself.
-type_property_test!(assignable_to_is_reflexive, db, t, t.is_assignable_to(db, t));
+    // `S <: T` implies that `S` can be assigned to `T`.
+    type_property_test!(
+        subtype_of_implies_assignable_to,
+        db,
+        (s, t),
+        s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
+    );
 
-// `S <: T` implies that `S` can be assigned to `T`.
-type_property_test!(
-    subtype_of_implies_assignable_to,
-    db,
-    (s, t),
-    s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
-);
+    // If `T` is a singleton, it is also single-valued.
+    type_property_test!(
+        singleton_implies_single_valued,
+        db,
+        t,
+        t.is_singleton(db) => t.is_single_valued(db)
+    );
+}
 
-// If `T` is a singleton, it is also single-valued.
-type_property_test!(
-    singleton_implies_single_valued,
-    db,
-    t,
-    t.is_singleton(db) => t.is_single_valued(db)
-);
+/// This module contains property tests that currently lead to many false positives.
+///
+/// The reason for this is our insufficient understanding of equivalence of types. For
+/// example, we currently consider `int | str` and `str | int` to be different types.
+/// Similar issues exist for intersection types. Once this is resolved, we can move these
+/// tests to the `stable` section. In the meantime, it can still be useful to run these
+/// tests (using [`types::property_tests::flaky`]), to see if there are any new obvious bugs.
+mod flaky {
+    // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
+    type_property_test!(
+        subtype_of_is_antisymmetric,
+        db,
+        (s, t),
+        s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
+    );
 
-// Negating `T` twice is equivalent to `T`.
-type_property_test!(
-    double_negation_is_identity,
-    db,
-    t,
-    t.negate(db).negate(db).is_equivalent_to(db, t)
-);
+    // Negating `T` twice is equivalent to `T`.
+    type_property_test!(
+        double_negation_is_identity,
+        db,
+        t,
+        t.negate(db).negate(db).is_equivalent_to(db, t)
+    );
+}

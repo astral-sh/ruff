@@ -41,7 +41,6 @@ mod string_annotation;
 mod unpacker;
 
 #[cfg(test)]
-#[cfg(feature = "property_tests")]
 mod property_tests;
 
 #[salsa::tracked(return_ref)]
