@@ -51,8 +51,8 @@ y: Any = "not an Any"  # error: [invalid-assignment]
 
 The spec allows you to define subclasses of `Any`, which must also resolve to the Any type.
 
-TODO: Handle assignments correctly.  `Subclass` has an unknown superclass, which might be `int`. The
-assignment to `x` should not be allowed, even when the unknown superclass is `int`.  The assignment
+TODO: Handle assignments correctly. `Subclass` has an unknown superclass, which might be `int`. The
+assignment to `x` should not be allowed, even when the unknown superclass is `int`. The assignment
 to `y` should be allowed, since `Subclass` might have `int` as a superclass, and is therefore
 assignable to `int`.
 
@@ -64,7 +64,7 @@ class Subclass(Any):
 
 reveal_type(Subclass.__mro__)  # revealed: tuple[Literal[Subclass], Any, Literal[object]]
 
-x: Subclass = 1      # error: [invalid-assignment]
+x: Subclass = 1  # error: [invalid-assignment]
 y: int = Subclass()  # error: [invalid-assignment]
 
 def f() -> Subclass:
