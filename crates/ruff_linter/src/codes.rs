@@ -983,6 +983,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "039") => (RuleGroup::Preview, rules::ruff::rules::UnrawRePattern),
         (Ruff, "040") => (RuleGroup::Preview, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
         (Ruff, "041") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryNestedLiteral),
+        (Ruff, "047") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryReEscape),
         (Ruff, "048") => (RuleGroup::Preview, rules::ruff::rules::MapIntVersionParsing),
         (Ruff, "055") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRegularExpression),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),

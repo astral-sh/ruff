@@ -2,6 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, 
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprCall, ExprCompare, ExprContext, Identifier,
+    StringLiteralValue,
 };
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::TextRange;
@@ -95,12 +96,8 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
         return;
     };
 
-    // For now, reject any regex metacharacters. Compare to the complete list
-    // from https://docs.python.org/3/howto/regex.html#matching-characters
-    let has_metacharacters = string_lit
-        .value
-        .to_str()
-        .contains(['.', '^', '$', '*', '+', '?', '{', '[', '\\', '|', '(']);
+    // For now, reject any regex metacharacters.
+    let has_metacharacters = string_has_metacharacters(&string_lit.value);
 
     if has_metacharacters {
         return;
@@ -131,6 +128,15 @@ pub(crate) fn unnecessary_regular_expression(checker: &mut Checker, call: &ExprC
     );
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
+}
+
+/// See also [`super::bytes_has_metacharacters`].
+pub(crate) fn string_has_metacharacters(value: &StringLiteralValue) -> bool {
+    // Compare to the complete list from
+    // https://docs.python.org/3/howto/regex.html#matching-characters
+    value
+        .to_str()
+        .contains(['.', '^', '$', '*', '+', '?', '{', '[', '\\', '|', '('])
 }
 
 /// The `re` functions supported by this rule.

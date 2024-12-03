@@ -1,0 +1,234 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF047.py:5:1: RUF047 [*] Pattern does not need escaping
+  |
+4 | ### Errors
+5 | re.escape('normal')
+  | ^^^^^^^^^^^^^^^^^^^ RUF047
+6 | re.escape("normal' 'double")
+7 | re.escape('''tri
+  |
+  = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+2 2 |
+3 3 |
+4 4 | ### Errors
+5   |-re.escape('normal')
+  5 |+'normal'
+6 6 | re.escape("normal' 'double")
+7 7 | re.escape('''tri
+8 8 | ple''')
+
+RUF047.py:6:1: RUF047 [*] Pattern does not need escaping
+  |
+4 | ### Errors
+5 | re.escape('normal')
+6 | re.escape("normal' 'double")
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF047
+7 | re.escape('''tri
+8 | ple''')
+  |
+  = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+3 3 |
+4 4 | ### Errors
+5 5 | re.escape('normal')
+6   |-re.escape("normal' 'double")
+  6 |+"normal' 'double"
+7 7 | re.escape('''tri
+8 8 | ple''')
+9 9 | re.escape("""triple \
+
+RUF047.py:7:1: RUF047 [*] Pattern does not need escaping
+   |
+ 5 |   re.escape('normal')
+ 6 |   re.escape("normal' 'double")
+ 7 | / re.escape('''tri
+ 8 | | ple''')
+   | |_______^ RUF047
+ 9 |   re.escape("""triple \
+10 |   double""")
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+4 4 | ### Errors
+5 5 | re.escape('normal')
+6 6 | re.escape("normal' 'double")
+7   |-re.escape('''tri
+8   |-ple''')
+  7 |+'''tri
+  8 |+ple'''
+9 9 | re.escape("""triple \
+10 10 | double""")
+11 11 | re.escape(u'normal')
+
+RUF047.py:9:1: RUF047 [*] Pattern does not need escaping
+   |
+ 7 |   re.escape('''tri
+ 8 |   ple''')
+ 9 | / re.escape("""triple \
+10 | | double""")
+   | |__________^ RUF047
+11 |   re.escape(u'normal')
+12 |   re.escape(u"normal double")
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+6  6  | re.escape("normal' 'double")
+7  7  | re.escape('''tri
+8  8  | ple''')
+9     |-re.escape("""triple \
+10    |-double""")
+   9  |+"""triple \
+   10 |+double"""
+11 11 | re.escape(u'normal')
+12 12 | re.escape(u"normal double")
+13 13 | re.escape(r'aw')
+
+RUF047.py:11:1: RUF047 [*] Pattern does not need escaping
+   |
+ 9 | re.escape("""triple \
+10 | double""")
+11 | re.escape(u'normal')
+   | ^^^^^^^^^^^^^^^^^^^^ RUF047
+12 | re.escape(u"normal double")
+13 | re.escape(r'aw')
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+8  8  | ple''')
+9  9  | re.escape("""triple \
+10 10 | double""")
+11    |-re.escape(u'normal')
+   11 |+u'normal'
+12 12 | re.escape(u"normal double")
+13 13 | re.escape(r'aw')
+14 14 | re.escape(b'ytes')
+
+RUF047.py:12:1: RUF047 [*] Pattern does not need escaping
+   |
+10 | double""")
+11 | re.escape(u'normal')
+12 | re.escape(u"normal double")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF047
+13 | re.escape(r'aw')
+14 | re.escape(b'ytes')
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+9  9  | re.escape("""triple \
+10 10 | double""")
+11 11 | re.escape(u'normal')
+12    |-re.escape(u"normal double")
+   12 |+u"normal double"
+13 13 | re.escape(r'aw')
+14 14 | re.escape(b'ytes')
+15 15 | re.escape(br'aw bytes')
+
+RUF047.py:13:1: RUF047 [*] Pattern does not need escaping
+   |
+11 | re.escape(u'normal')
+12 | re.escape(u"normal double")
+13 | re.escape(r'aw')
+   | ^^^^^^^^^^^^^^^^ RUF047
+14 | re.escape(b'ytes')
+15 | re.escape(br'aw bytes')
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+10 10 | double""")
+11 11 | re.escape(u'normal')
+12 12 | re.escape(u"normal double")
+13    |-re.escape(r'aw')
+   13 |+r'aw'
+14 14 | re.escape(b'ytes')
+15 15 | re.escape(br'aw bytes')
+16 16 |
+
+RUF047.py:14:1: RUF047 [*] Pattern does not need escaping
+   |
+12 | re.escape(u"normal double")
+13 | re.escape(r'aw')
+14 | re.escape(b'ytes')
+   | ^^^^^^^^^^^^^^^^^^ RUF047
+15 | re.escape(br'aw bytes')
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+11 11 | re.escape(u'normal')
+12 12 | re.escape(u"normal double")
+13 13 | re.escape(r'aw')
+14    |-re.escape(b'ytes')
+   14 |+b'ytes'
+15 15 | re.escape(br'aw bytes')
+16 16 |
+17 17 | re.escape('co\n' r"cate" 'natio\u006E')
+
+RUF047.py:15:1: RUF047 [*] Pattern does not need escaping
+   |
+13 | re.escape(r'aw')
+14 | re.escape(b'ytes')
+15 | re.escape(br'aw bytes')
+   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF047
+16 |
+17 | re.escape('co\n' r"cate" 'natio\u006E')
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+12 12 | re.escape(u"normal double")
+13 13 | re.escape(r'aw')
+14 14 | re.escape(b'ytes')
+15    |-re.escape(br'aw bytes')
+   15 |+br'aw bytes'
+16 16 |
+17 17 | re.escape('co\n' r"cate" 'natio\u006E')
+18 18 | re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
+
+RUF047.py:17:1: RUF047 [*] Pattern does not need escaping
+   |
+15 | re.escape(br'aw bytes')
+16 |
+17 | re.escape('co\n' r"cate" 'natio\u006E')
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF047
+18 | re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+14 14 | re.escape(b'ytes')
+15 15 | re.escape(br'aw bytes')
+16 16 |
+17    |-re.escape('co\n' r"cate" 'natio\u006E')
+   17 |+('co\n' r"cate" 'natio\u006E')
+18 18 | re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
+19 19 |
+20 20 |
+
+RUF047.py:18:1: RUF047 [*] Pattern does not need escaping
+   |
+17 | re.escape('co\n' r"cate" 'natio\u006E')
+18 | re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF047
+   |
+   = help: Remove `re.escape()` wrapper call
+
+ℹ Safe fix
+15 15 | re.escape(br'aw bytes')
+16 16 |
+17 17 | re.escape('co\n' r"cate" 'natio\u006E')
+18    |-re.escape(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
+   18 |+(br"ytes" b'''\x63\x6F\x6E\x63\x61\x74\x65\x6E\x61\x74\x69\x6F\x6E''')
+19 19 |
+20 20 |
+21 21 | ### No errors
