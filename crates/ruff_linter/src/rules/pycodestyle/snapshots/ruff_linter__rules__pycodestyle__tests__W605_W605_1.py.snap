@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 W605_1.py:4:11: W605 [*] Invalid escape sequence: `\.`
   |
@@ -243,6 +242,7 @@ W605_1.py:57:9: W605 [*] Invalid escape sequence: `\d`
    57 |+rf"{{}}+-\d"
 58 58 | f"\n{{}}+-\d+"
 59 59 | f"\n{{}}�+-\d+"
+60 60 | 
 
 W605_1.py:58:11: W605 [*] Invalid escape sequence: `\d`
    |
@@ -261,6 +261,8 @@ W605_1.py:58:11: W605 [*] Invalid escape sequence: `\d`
 58    |-f"\n{{}}+-\d+"
    58 |+f"\n{{}}+-\\d+"
 59 59 | f"\n{{}}�+-\d+"
+60 60 | 
+61 61 | # See https://github.com/astral-sh/ruff/issues/11491
 
 W605_1.py:59:12: W605 [*] Invalid escape sequence: `\d`
    |
@@ -268,6 +270,8 @@ W605_1.py:59:12: W605 [*] Invalid escape sequence: `\d`
 58 | f"\n{{}}+-\d+"
 59 | f"\n{{}}�+-\d+"
    |            ^^ W605
+60 | 
+61 | # See https://github.com/astral-sh/ruff/issues/11491
    |
    = help: Add backslash to escape sequence
 
@@ -277,3 +281,22 @@ W605_1.py:59:12: W605 [*] Invalid escape sequence: `\d`
 58 58 | f"\n{{}}+-\d+"
 59    |-f"\n{{}}�+-\d+"
    59 |+f"\n{{}}�+-\\d+"
+60 60 | 
+61 61 | # See https://github.com/astral-sh/ruff/issues/11491
+62 62 | total = 10
+
+W605_1.py:65:31: W605 [*] Invalid escape sequence: `\I`
+   |
+63 | ok = 7
+64 | incomplete = 3
+65 | s = f"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
+   |                               ^^ W605
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Safe fix
+62 62 | total = 10
+63 63 | ok = 7
+64 64 | incomplete = 3
+65    |-s = f"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
+   65 |+s = f"TOTAL: {total}\nOK: {ok}\\INCOMPLETE: {incomplete}\n"
