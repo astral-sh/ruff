@@ -4544,7 +4544,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
                     todo_type!()
                 } else {
-                    Type::tuple(self.db, &[single_element_ty])
+                    Type::tuple(self.db, [single_element_ty])
                 }
             }
         }
@@ -4644,6 +4644,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "invalid-type-parameter",
                     format_args!(
                         "Type `{}` expected no type parameter",
+                        known_instance.repr(self.db)
+                    ),
+                );
+                Type::Unknown
+            }
+            KnownInstanceType::LiteralString => {
+                self.diagnostics.add(
+                    subscript.into(),
+                    "invalid-type-parameter",
+                    format_args!(
+                        "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
                         known_instance.repr(self.db)
                     ),
                 );

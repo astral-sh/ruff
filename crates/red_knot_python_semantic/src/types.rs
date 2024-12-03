@@ -40,6 +40,9 @@ mod signatures;
 mod string_annotation;
 mod unpacker;
 
+#[cfg(test)]
+mod property_tests;
+
 #[salsa::tracked(return_ref)]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
@@ -574,8 +577,11 @@ impl<'db> Type<'db> {
         Self::BytesLiteral(BytesLiteralType::new(db, bytes))
     }
 
-    pub fn tuple(db: &'db dyn Db, elements: &[Type<'db>]) -> Self {
-        Self::Tuple(TupleType::new(db, elements))
+    pub fn tuple<T: Into<Type<'db>>>(
+        db: &'db dyn Db,
+        elements: impl IntoIterator<Item = T>,
+    ) -> Self {
+        TupleType::from_elements(db, elements)
     }
 
     #[must_use]
@@ -718,9 +724,6 @@ impl<'db> Type<'db> {
             }
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_subtype_of(db, right)
-            }
-            (left, Type::KnownInstance(right)) => {
-                left.is_subtype_of(db, right.instance_fallback(db))
             }
             (Type::Instance(left), Type::Instance(right)) => left.is_instance_of(db, right.class),
             // TODO
@@ -1403,7 +1406,7 @@ impl<'db> Type<'db> {
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
 
-            Type::Todo(_) => CallOutcome::callable(todo_type!()),
+            Type::Todo(_) => CallOutcome::callable(todo_type!("call todo")),
 
             Type::Unknown => CallOutcome::callable(Type::Unknown),
 
@@ -1556,6 +1559,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
                 Type::Never
             }
+            Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
             _ => todo_type!(),
         }
@@ -1889,6 +1893,8 @@ impl<'db> KnownClass {
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
+    /// The symbol `typing.LiteralString` (which can also be found as `typing_extensions.LiteralString`)
+    LiteralString,
     /// The symbol `typing.Optional` (which can also be found as `typing_extensions.Optional`)
     Optional,
     /// The symbol `typing.Union` (which can also be found as `typing_extensions.Union`)
@@ -1910,6 +1916,7 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Literal => "Literal",
+            Self::LiteralString => "LiteralString",
             Self::Optional => "Optional",
             Self::Union => "Union",
             Self::TypeVar(_) => "TypeVar",
@@ -1924,6 +1931,7 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn bool(self) -> Truthiness {
         match self {
             Self::Literal
+            | Self::LiteralString
             | Self::Optional
             | Self::TypeVar(_)
             | Self::Union
@@ -1938,6 +1946,7 @@ impl<'db> KnownInstanceType<'db> {
     pub fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
             Self::Literal => "typing.Literal",
+            Self::LiteralString => "typing.LiteralString",
             Self::Optional => "typing.Optional",
             Self::Union => "typing.Union",
             Self::NoReturn => "typing.NoReturn",
@@ -1952,6 +1961,7 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn class(self) -> KnownClass {
         match self {
             Self::Literal => KnownClass::SpecialForm,
+            Self::LiteralString => KnownClass::SpecialForm,
             Self::Optional => KnownClass::SpecialForm,
             Self::Union => KnownClass::SpecialForm,
             Self::NoReturn => KnownClass::SpecialForm,
@@ -1978,6 +1988,7 @@ impl<'db> KnownInstanceType<'db> {
         match (module.name().as_str(), instance_name) {
             ("typing", "Any") => Some(Self::Any),
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
+            ("typing" | "typing_extensions", "LiteralString") => Some(Self::LiteralString),
             ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
             ("typing" | "typing_extensions", "Union") => Some(Self::Union),
             ("typing" | "typing_extensions", "NoReturn") => Some(Self::NoReturn),
@@ -3019,6 +3030,23 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> TupleType<'db> {
+    pub fn from_elements<T: Into<Type<'db>>>(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = T>,
+    ) -> Type<'db> {
+        let mut elements = vec![];
+
+        for ty in types {
+            let ty = ty.into();
+            if ty.is_never() {
+                return Type::Never;
+            }
+            elements.push(ty);
+        }
+
+        Type::Tuple(Self::new(db, elements.into_boxed_slice()))
+    }
+
     pub fn get(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
         self.elements(db).get(index).copied()
     }
@@ -3070,8 +3098,8 @@ pub(crate) mod tests {
 
     /// A test representation of a type that can be transformed unambiguously into a real Type,
     /// given a db.
-    #[derive(Debug, Clone)]
-    enum Ty {
+    #[derive(Debug, Clone, PartialEq)]
+    pub(crate) enum Ty {
         Never,
         Unknown,
         None,
@@ -3095,7 +3123,7 @@ pub(crate) mod tests {
     }
 
     impl Ty {
-        fn into_type(self, db: &TestDb) -> Type<'_> {
+        pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
             match self {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::Unknown,
@@ -3126,11 +3154,19 @@ pub(crate) mod tests {
                     builder.build()
                 }
                 Ty::Tuple(tys) => {
-                    let elements: Vec<Type> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
-                    Type::tuple(db, &elements)
+                    let elements = tys.into_iter().map(|ty| ty.into_type(db));
+                    Type::tuple(db, elements)
                 }
             }
         }
+    }
+
+    #[test_case(Ty::Tuple(vec![Ty::Never]))]
+    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::Never, Ty::BuiltinInstance("int")]))]
+    #[test_case(Ty::Tuple(vec![Ty::Tuple(vec![Ty::Never])]))]
+    fn tuple_containing_never_simplifies_to_never(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db), Type::Never);
     }
 
     #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
@@ -3246,6 +3282,7 @@ pub(crate) mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(1)]})]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinClassLiteral("int"))]
+    #[test_case(Ty::TypingInstance("_SpecialForm"), Ty::TypingLiteral)]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));

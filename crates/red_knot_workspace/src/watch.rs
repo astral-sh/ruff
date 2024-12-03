@@ -81,6 +81,22 @@ impl ChangeEvent {
             _ => None,
         }
     }
+
+    pub const fn is_rescan(&self) -> bool {
+        matches!(self, ChangeEvent::Rescan)
+    }
+
+    pub const fn is_created(&self) -> bool {
+        matches!(self, ChangeEvent::Created { .. })
+    }
+
+    pub const fn is_changed(&self) -> bool {
+        matches!(self, ChangeEvent::Changed { .. })
+    }
+
+    pub const fn is_deleted(&self) -> bool {
+        matches!(self, ChangeEvent::Deleted { .. })
+    }
 }
 
 /// Classification of an event that creates a new path.
