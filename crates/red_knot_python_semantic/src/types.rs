@@ -302,13 +302,12 @@ fn declarations_ty<'db>(
     let declared_ty = if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db).add(first);
         for other in [second].into_iter().chain(all_types) {
-            // Make sure not to emit spurious errors relating to `Type::Todo`,
-            // since we only infer this type due to a limitation in our current model.
-            //
-            // `Unknown` is different here, since we might infer `Unknown`
+            // `Unknown` needs special handling, since we might infer `Unknown`
             // for one of these due to a variable being defined in one possible
             // control-flow branch but not another one.
-            if !first.is_equivalent_to(db, other) && !first.is_todo() && !other.is_todo() {
+            if !first.is_equivalent_to(db, other)
+                || ((first == Type::Unknown) != (other == Type::Unknown))
+            {
                 conflicting.push(other);
             }
             builder = builder.add(other);
@@ -600,10 +599,15 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is a [subtype of] type `target`.
     ///
+    /// This method returns `false` if either `self` or `other` is not fully static.
+    ///
     /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.is_equivalent_to(db, target) {
             return true;
+        }
+        if !self.is_fully_static(db) || !target.is_fully_static(db) {
+            return false;
         }
         match (self, target) {
             (Type::Unknown | Type::Any | Type::Todo(_), _) => false,
@@ -764,8 +768,16 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is equivalent to type `other`.
+    /// Return true if this type is [equivalent to] type `other`.
+    ///
+    /// This method returns `false` if either `self` or `other` is not fully static.
+    ///
+    /// [equivalent to]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        if !(self.is_fully_static(db) && other.is_fully_static(db)) {
+            return false;
+        }
+
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
 
@@ -776,7 +788,6 @@ impl<'db> Type<'db> {
         // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
         // we understand `sys.version_info` branches.
         self == other
-            || matches!((self, other), (Type::Todo(_), Type::Todo(_)))
             || matches!((self, other),
                 (
                     Type::Instance(InstanceType { class: self_class }),
@@ -788,6 +799,17 @@ impl<'db> Type<'db> {
                         && self_known == target_class.known(db)
                 }
             )
+    }
+
+    /// Returns true if both `self` and `other` are the same gradual form
+    /// (limited to `Any`, `Unknown`, or `Todo`).
+    pub(crate) fn is_same_gradual_form(self, other: Type<'db>) -> bool {
+        matches!(
+            (self, other),
+            (Type::Unknown, Type::Unknown)
+                | (Type::Any, Type::Any)
+                | (Type::Todo(_), Type::Todo(_))
+        )
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -993,6 +1015,48 @@ impl<'db> Type<'db> {
                     false
                 }
             }
+        }
+    }
+
+    /// Returns true if the type does not contain any gradual forms (as a sub-part).
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Any | Type::Unknown | Type::Todo(_) => false,
+            Type::Never
+            | Type::FunctionLiteral(..)
+            | Type::ModuleLiteral(..)
+            | Type::ClassLiteral(..)
+            | Type::SubclassOf(_)
+            | Type::Instance(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            | Type::KnownInstance(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|elem| elem.is_fully_static(db)),
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .all(|elem| elem.is_fully_static(db))
+                    && intersection
+                        .negative(db)
+                        .iter()
+                        .all(|elem| elem.is_fully_static(db))
+            }
+            Type::Tuple(tuple) => tuple
+                .elements(db)
+                .iter()
+                .all(|elem| elem.is_fully_static(db)),
+            // TODO: Once we support them, make sure that we return `false` for other types
+            // containing gradual forms such as `tuple[Any, ...]` or `Callable[..., str]`.
+            // Conversely, make sure to return `true` for homogeneous tuples such as
+            // `tuple[int, ...]`, once we add support for them.
         }
     }
 
@@ -3249,7 +3313,9 @@ pub(crate) mod tests {
     }
 
     #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::Unknown, Ty::Unknown)]
     #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
+    #[test_case(Ty::Any, Ty::Any)]
     #[test_case(Ty::Any, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::Unknown)]
     #[test_case(Ty::IntLiteral(1), Ty::Any)]
@@ -3355,6 +3421,18 @@ pub(crate) mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::Any, Ty::Any)]
+    #[test_case(Ty::Any, Ty::None)]
+    #[test_case(Ty::Unknown, Ty::Unknown)]
+    #[test_case(Ty::Todo, Ty::Todo)]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
+    fn is_not_equivalent_to(from: Ty, to: Ty) {
+        let db = setup_db();
+
+        assert!(!from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
     }
 
     #[test_case(Ty::Never, Ty::Never)]
@@ -3585,6 +3663,41 @@ pub(crate) mod tests {
         assert!(!from.into_type(&db).is_singleton(&db));
     }
 
+    #[test_case(Ty::Never)]
+    #[test_case(Ty::None)]
+    #[test_case(Ty::IntLiteral(1))]
+    #[test_case(Ty::BooleanLiteral(true))]
+    #[test_case(Ty::StringLiteral("abc"))]
+    #[test_case(Ty::LiteralString)]
+    #[test_case(Ty::BytesLiteral("abc"))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Str))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Object))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Type))]
+    #[test_case(Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::TypingLiteral)]
+    #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::None]))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::KnownClassInstance(KnownClass::Str)], neg: vec![Ty::LiteralString]})]
+    #[test_case(Ty::Tuple(vec![]))]
+    #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::KnownClassInstance(KnownClass::Object)]))]
+    fn is_fully_static(from: Ty) {
+        let db = setup_db();
+
+        assert!(from.into_type(&db).is_fully_static(&db));
+    }
+
+    #[test_case(Ty::Any)]
+    #[test_case(Ty::Unknown)]
+    #[test_case(Ty::Todo)]
+    #[test_case(Ty::Union(vec![Ty::Any, Ty::KnownClassInstance(KnownClass::Str)]))]
+    #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::Unknown]))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::Any], neg: vec![Ty::LiteralString]})]
+    #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::Any]))]
+    fn is_not_fully_static(from: Ty) {
+        let db = setup_db();
+
+        assert!(!from.into_type(&db).is_fully_static(&db));
+    }
+
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
     #[test_case(Ty::IntLiteral(-1))]
     #[test_case(Ty::StringLiteral("foo"))]
@@ -3758,19 +3871,6 @@ pub(crate) mod tests {
         let todo2 = todo_type!("2");
         let todo3 = todo_type!();
         let todo4 = todo_type!();
-
-        assert!(todo1.is_equivalent_to(&db, todo2));
-        assert!(todo3.is_equivalent_to(&db, todo4));
-        assert!(todo1.is_equivalent_to(&db, todo3));
-
-        assert!(todo1.is_subtype_of(&db, todo2));
-        assert!(todo2.is_subtype_of(&db, todo1));
-
-        assert!(todo3.is_subtype_of(&db, todo4));
-        assert!(todo4.is_subtype_of(&db, todo3));
-
-        assert!(todo1.is_subtype_of(&db, todo3));
-        assert!(todo3.is_subtype_of(&db, todo1));
 
         let int = KnownClass::Int.to_instance(&db);
 
