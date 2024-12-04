@@ -1440,7 +1440,7 @@ impl<'db> Type<'db> {
         }
 
         let usize_len = match self {
-            Type::BytesLiteral(bytes) => Some(bytes.len(db)),
+            Type::BytesLiteral(bytes) => Some(bytes.python_len(db)),
             Type::StringLiteral(string) => Some(string.python_len(db)),
             Type::Tuple(tuple) => Some(tuple.len(db)),
             _ => None,
@@ -3145,7 +3145,7 @@ pub struct BytesLiteralType<'db> {
 }
 
 impl<'db> BytesLiteralType<'db> {
-    pub fn len(&self, db: &'db dyn Db) -> usize {
+    pub fn python_len(&self, db: &'db dyn Db) -> usize {
         self.value(db).len()
     }
 }
