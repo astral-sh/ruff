@@ -52,7 +52,7 @@ fn empty_branch(checker: &mut Checker, range: TextRange, fix: Option<Fix>) {
     let mut diagnostic = Diagnostic::new(EmptyBranch { fixable }, range);
 
     diagnostic.try_set_optional_fix(|| Ok(fix));
-    checker.diagnostics.push(diagnostic)
+    checker.diagnostics.push(diagnostic);
 }
 
 /// RUF050: `if`-`elif`-`else`
@@ -235,7 +235,7 @@ pub(crate) fn empty_branch_try(checker: &mut Checker, stmt: &Stmt) {
 
 /// Whether `body` contains only `pass` or `...` statement.
 fn body_is_empty(body: &[Stmt]) -> bool {
-    if body.len() == 0 {
+    if body.is_empty() {
         return false;
     }
 
