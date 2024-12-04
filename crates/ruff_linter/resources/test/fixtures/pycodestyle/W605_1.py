@@ -63,3 +63,6 @@ total = 10
 ok = 7
 incomplete = 3
 s = f"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
+
+# Debug text (should trigger)
+t = f"{'\InHere'=}"
