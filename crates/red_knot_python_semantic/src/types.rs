@@ -1020,9 +1020,6 @@ impl<'db> Type<'db> {
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::ModuleLiteral(..)
-            | Type::ClassLiteral(..)
-            | Type::SubclassOf(_)
-            | Type::Instance(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
@@ -1030,6 +1027,24 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::KnownInstance(_) => true,
+            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::Instance(_) => {
+                // TODO: Ideally, we would iterate over the MRO of the class, check if all
+                // bases are fully static, and only return `true` if that is the case.
+                //
+                // This does not work yet, because we currently infer `Unknown` for some
+                // generic base classes that we don't understand yet. For example, `str`
+                // is defined as `class str(Sequence[str])` in typeshed and we currently
+                // compute its MRO as `(str, Unknown, object)`. This would make us think
+                // that `str` is a gradual type, which causes all sorts of downstream
+                // issues because it does not participate in equivalence/subtyping etc.
+                //
+                // Another problem is that we run into problems if we eagerly query the
+                // MRO of class literals here. I have not fully investigated this, but
+                // iterating over the MRO alone, without even acting on it, causes us to
+                // infer `Unknown` for many classes.
+
+                true
+            }
             Type::Union(union) => union
                 .elements(db)
                 .iter()
