@@ -238,7 +238,7 @@ RUF046.py:23:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 20 20 | 
 21 21 | ### Unsafe
 22 22 | 
@@ -257,7 +257,7 @@ RUF046.py:24:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 21 21 | ### Unsafe
 22 22 | 
 23 23 | int(math.ceil())
@@ -276,7 +276,7 @@ RUF046.py:25:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 22 22 | 
 23 23 | int(math.ceil())
 24 24 | int(math.floor())
@@ -296,7 +296,7 @@ RUF046.py:31:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 28 28 | ### `round()`
 29 29 | 
 30 30 | ## Errors
@@ -316,7 +316,7 @@ RUF046.py:32:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 29 29 | 
 30 30 | ## Errors
 31 31 | int(round(0))
@@ -337,7 +337,7 @@ RUF046.py:33:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 30 30 | ## Errors
 31 31 | int(round(0))
 32 32 | int(round(0, 0))
@@ -357,7 +357,7 @@ RUF046.py:35:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 32 32 | int(round(0, 0))
 33 33 | int(round(0, None))
 34 34 | 
@@ -377,7 +377,7 @@ RUF046.py:36:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 33 33 | int(round(0, None))
 34 34 | 
 35 35 | int(round(0.1))
@@ -398,7 +398,7 @@ RUF046.py:41:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 38 38 | # Argument type is not checked
 39 39 | foo = type("Foo", (), {"__round__": lambda self: 4.2})()
 40 40 | 
@@ -419,7 +419,7 @@ RUF046.py:43:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove `int()` wrapper call
 
-ℹ Safe fix
+ℹ Unsafe fix
 40 40 | 
 41 41 | int(round(foo))
 42 42 | int(round(foo, 0))

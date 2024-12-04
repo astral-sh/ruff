@@ -1,5 +1,5 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprName, ExprNumberLiteral, Number};
 use ruff_python_semantic::analyze::typing;
@@ -13,9 +13,12 @@ use ruff_text_size::TextRange;
 /// Such a conversion is unnecessary.
 ///
 /// ## Known problems
-/// When values incorrectly override the `__round__`, `__ceil__`, `__floor__`,
-/// or `__trunc__` operators such that they don't return an integer,
-/// this rule may produce false positives.
+/// This rule is prone to false positives due to type inference limitations.
+///
+/// It assumes that `round`, `math.ceil`, `math.floor`, `math.trunc`
+/// always return `int`, which might not be the case for objects
+/// with the corresponding dunder methods overridden.
+/// In such cases, the fix is marked as unsafe.
 ///
 /// ## Example
 ///
@@ -59,24 +62,33 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let edit = match qualified_name.segments() {
+    let (edit, applicability) = match qualified_name.segments() {
+        // Always returns a strict instance of `int`
         ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
-        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm" | "ceil" | "floor" | "trunc"] => {
-            replace_with_inner(checker, outer_range, inner_range)
-        }
+        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => (
+            replace_with_inner(checker, outer_range, inner_range),
+            Applicability::Safe,
+        ),
 
+        // Depends on `ndigits` and `number.__round__`
         ["" | "builtins", "round"] => {
             match replace_with_shortened_round_call(checker, outer_range, arguments) {
                 None => return,
-                Some(edit) => edit,
+                Some(edit) => (edit, Applicability::Unsafe),
             }
         }
+
+        // Depends on `__ceil__`/`__floor__`/`__trunc__`
+        ["math", "ceil" | "floor" | "trunc"] => (
+            replace_with_inner(checker, outer_range, inner_range),
+            Applicability::Unsafe,
+        ),
 
         _ => return,
     };
 
     let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
-    let fix = Fix::safe_edit(edit);
+    let fix = Fix::applicable_edit(edit, applicability);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
