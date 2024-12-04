@@ -93,7 +93,7 @@ impl Violation for PytestParametrizeNamesWrongType {
                 }
             }
         };
-        format!("Wrong type passed to first argument of `@pytest.mark.parametrize`; expected {expected_string}")
+        format!("Wrong type passed to first argument of `pytest.mark.parametrize`; expected {expected_string}")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -210,7 +210,7 @@ impl Violation for PytestParametrizeValuesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestParametrizeValuesWrongType { values, row } = self;
-        format!("Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}`")
+        format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -273,7 +273,7 @@ impl Violation for PytestDuplicateParametrizeTestCases {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestDuplicateParametrizeTestCases { index } = self;
-        format!("Duplicate of test case at index {index} in `@pytest_mark.parametrize`")
+        format!("Duplicate of test case at index {index} in `pytest.mark.parametrize`")
     }
 
     fn fix_title(&self) -> Option<String> {
