@@ -39,7 +39,7 @@ pub(crate) struct UnnecessaryCastToInt;
 impl AlwaysFixableViolation for UnnecessaryCastToInt {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Value being converted is already an integer".to_string()
+        "Value being casted is already an integer".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF046.py:7:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:7:1: RUF046 [*] Value being casted is already an integer
   |
 6 | # Arguments are not checked
 7 | int(id())
@@ -22,7 +22,7 @@ RUF046.py:7:1: RUF046 [*] Value being converted is already an integer
 9 9 | int(ord(foo))
 10 10 | int(hash(foo, bar))
 
-RUF046.py:8:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:8:1: RUF046 [*] Value being casted is already an integer
    |
  6 | # Arguments are not checked
  7 | int(id())
@@ -43,7 +43,7 @@ RUF046.py:8:1: RUF046 [*] Value being converted is already an integer
 10 10 | int(hash(foo, bar))
 11 11 | int(int(''))
 
-RUF046.py:9:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:9:1: RUF046 [*] Value being casted is already an integer
    |
  7 | int(id())
  8 | int(len([]))
@@ -64,7 +64,7 @@ RUF046.py:9:1: RUF046 [*] Value being converted is already an integer
 11 11 | int(int(''))
 12 12 | 
 
-RUF046.py:10:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:10:1: RUF046 [*] Value being casted is already an integer
    |
  8 | int(len([]))
  9 | int(ord(foo))
@@ -84,7 +84,7 @@ RUF046.py:10:1: RUF046 [*] Value being converted is already an integer
 12 12 | 
 13 13 | int(math.comb())
 
-RUF046.py:11:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:11:1: RUF046 [*] Value being casted is already an integer
    |
  9 | int(ord(foo))
 10 | int(hash(foo, bar))
@@ -105,7 +105,7 @@ RUF046.py:11:1: RUF046 [*] Value being converted is already an integer
 13 13 | int(math.comb())
 14 14 | int(math.factorial())
 
-RUF046.py:13:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:13:1: RUF046 [*] Value being casted is already an integer
    |
 11 | int(int(''))
 12 | 
@@ -126,7 +126,7 @@ RUF046.py:13:1: RUF046 [*] Value being converted is already an integer
 15 15 | int(math.gcd())
 16 16 | int(math.lcm())
 
-RUF046.py:14:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:14:1: RUF046 [*] Value being casted is already an integer
    |
 13 | int(math.comb())
 14 | int(math.factorial())
@@ -146,7 +146,7 @@ RUF046.py:14:1: RUF046 [*] Value being converted is already an integer
 16 16 | int(math.lcm())
 17 17 | int(math.isqrt())
 
-RUF046.py:15:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:15:1: RUF046 [*] Value being casted is already an integer
    |
 13 | int(math.comb())
 14 | int(math.factorial())
@@ -167,7 +167,7 @@ RUF046.py:15:1: RUF046 [*] Value being converted is already an integer
 17 17 | int(math.isqrt())
 18 18 | int(math.perm())
 
-RUF046.py:16:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:16:1: RUF046 [*] Value being casted is already an integer
    |
 14 | int(math.factorial())
 15 | int(math.gcd())
@@ -188,7 +188,7 @@ RUF046.py:16:1: RUF046 [*] Value being converted is already an integer
 18 18 | int(math.perm())
 19 19 | 
 
-RUF046.py:17:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:17:1: RUF046 [*] Value being casted is already an integer
    |
 15 | int(math.gcd())
 16 | int(math.lcm())
@@ -208,7 +208,7 @@ RUF046.py:17:1: RUF046 [*] Value being converted is already an integer
 19 19 | 
 20 20 | 
 
-RUF046.py:18:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:18:1: RUF046 [*] Value being casted is already an integer
    |
 16 | int(math.lcm())
 17 | int(math.isqrt())
@@ -227,7 +227,7 @@ RUF046.py:18:1: RUF046 [*] Value being converted is already an integer
 20 20 | 
 21 21 | ### Unsafe
 
-RUF046.py:23:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:23:1: RUF046 [*] Value being casted is already an integer
    |
 21 | ### Unsafe
 22 | 
@@ -248,7 +248,7 @@ RUF046.py:23:1: RUF046 [*] Value being converted is already an integer
 25 25 | int(math.trunc())
 26 26 | 
 
-RUF046.py:24:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:24:1: RUF046 [*] Value being casted is already an integer
    |
 23 | int(math.ceil())
 24 | int(math.floor())
@@ -267,7 +267,7 @@ RUF046.py:24:1: RUF046 [*] Value being converted is already an integer
 26 26 | 
 27 27 | 
 
-RUF046.py:25:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:25:1: RUF046 [*] Value being casted is already an integer
    |
 23 | int(math.ceil())
 24 | int(math.floor())
@@ -286,7 +286,7 @@ RUF046.py:25:1: RUF046 [*] Value being converted is already an integer
 27 27 | 
 28 28 | ### `round()`
 
-RUF046.py:31:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:31:1: RUF046 [*] Value being casted is already an integer
    |
 30 | ## Errors
 31 | int(round(0))
@@ -306,7 +306,7 @@ RUF046.py:31:1: RUF046 [*] Value being converted is already an integer
 33 33 | int(round(0, None))
 34 34 | 
 
-RUF046.py:32:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:32:1: RUF046 [*] Value being casted is already an integer
    |
 30 | ## Errors
 31 | int(round(0))
@@ -326,7 +326,7 @@ RUF046.py:32:1: RUF046 [*] Value being converted is already an integer
 34 34 | 
 35 35 | int(round(0.1))
 
-RUF046.py:33:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:33:1: RUF046 [*] Value being casted is already an integer
    |
 31 | int(round(0))
 32 | int(round(0, 0))
@@ -347,7 +347,7 @@ RUF046.py:33:1: RUF046 [*] Value being converted is already an integer
 35 35 | int(round(0.1))
 36 36 | int(round(0.1, None))
 
-RUF046.py:35:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:35:1: RUF046 [*] Value being casted is already an integer
    |
 33 | int(round(0, None))
 34 | 
@@ -367,7 +367,7 @@ RUF046.py:35:1: RUF046 [*] Value being converted is already an integer
 37 37 | 
 38 38 | # Argument type is not checked
 
-RUF046.py:36:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:36:1: RUF046 [*] Value being casted is already an integer
    |
 35 | int(round(0.1))
 36 | int(round(0.1, None))
@@ -387,7 +387,7 @@ RUF046.py:36:1: RUF046 [*] Value being converted is already an integer
 38 38 | # Argument type is not checked
 39 39 | foo = type("Foo", (), {"__round__": lambda self: 4.2})()
 
-RUF046.py:41:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:41:1: RUF046 [*] Value being casted is already an integer
    |
 39 | foo = type("Foo", (), {"__round__": lambda self: 4.2})()
 40 | 
@@ -408,7 +408,7 @@ RUF046.py:41:1: RUF046 [*] Value being converted is already an integer
 43 43 | int(round(foo, None))
 44 44 | 
 
-RUF046.py:43:1: RUF046 [*] Value being converted is already an integer
+RUF046.py:43:1: RUF046 [*] Value being casted is already an integer
    |
 41 | int(round(foo))
 42 | int(round(foo, 0))
