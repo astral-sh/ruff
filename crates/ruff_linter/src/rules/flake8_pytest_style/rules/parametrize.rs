@@ -717,6 +717,30 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalue
 
     diagnostic.set_fix(Fix::unsafe_edits(
         Edit::range_replacement(checker.generator().expr(value), expr.range()),
+        // If `argnames` and all items in `argvalues` are single-element sequences,
+        // they all should be unpacked. Here's an example:
+        //
+        // ```python
+        // @pytest.mark.parametrize(("x",), [(1,), (2,)])
+        // def test_foo(x):
+        //     assert isinstance(x, int)
+        // ```
+        //
+        // The code above should be transformed into:
+        //
+        // ```python
+        // @pytest.mark.parametrize("x", [1, 2])
+        // def test_foo(x):
+        //     assert isinstance(x, int)
+        // ```
+        //
+        // Only unpacking `argnames` would break the test:
+        //
+        // ```python
+        // @pytest.mark.parametrize("x", [(1,), (2,)])
+        // def test_foo(x):
+        //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
+        // ```
         unpack_single_element_items(checker, argvalues),
     ));
     checker.diagnostics.push(diagnostic);
