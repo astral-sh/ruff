@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
+---
+AIR303.py:10:1: AIR303 Import path `airflow.api.auth.backend.basic_auth` is moved into `fab` provider in Airflow 3.0;
+   |
+ 8 | from airflow.www.security import FabAirflowSecurityManagerOverride
+ 9 | 
+10 | basic_auth, kerberos_auth
+   | ^^^^^^^^^^ AIR303
+11 | auth_current_user
+12 | backend_kerberos_auth
+   |
+   = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth` instead.
+
+AIR303.py:10:13: AIR303 Import path `airflow.api.auth.backend.kerberos_auth` is moved into `fab` provider in Airflow 3.0;
+   |
+ 8 | from airflow.www.security import FabAirflowSecurityManagerOverride
+ 9 | 
+10 | basic_auth, kerberos_auth
+   |             ^^^^^^^^^^^^^ AIR303
+11 | auth_current_user
+12 | backend_kerberos_auth
+   |
+   = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
+
+AIR303.py:11:1: AIR303 Import path `airflow.api.auth.backend.basic_auth` is moved into `fab` provider in Airflow 3.0;
+   |
+10 | basic_auth, kerberos_auth
+11 | auth_current_user
+   | ^^^^^^^^^^^^^^^^^ AIR303
+12 | backend_kerberos_auth
+13 | fab_override
+   |
+   = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth` instead.
+
+AIR303.py:12:1: AIR303 Import path `airflow.auth_manager.api.auth.backend.kerberos_auth` is moved into `fab` provider in Airflow 3.0;
+   |
+10 | basic_auth, kerberos_auth
+11 | auth_current_user
+12 | backend_kerberos_auth
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR303
+13 | fab_override
+   |
+   = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
+
+AIR303.py:13:1: AIR303 Import path `airflow.auth.managers.fab.security_manager.override` is moved into `fab` provider in Airflow 3.0;
+   |
+11 | auth_current_user
+12 | backend_kerberos_auth
+13 | fab_override
+   | ^^^^^^^^^^^^ AIR303
+14 | 
+15 | FabAuthManager
+   |
+   = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.security_manager.override` instead.
+
+AIR303.py:15:1: AIR303 `airflow.auth.managers.fab.fab_auth_manager.FabAuthManager` is moved into `fab` provider in Airflow 3.0;
+   |
+13 | fab_override
+14 | 
+15 | FabAuthManager
+   | ^^^^^^^^^^^^^^ AIR303
+16 | FabAirflowSecurityManagerOverride
+   |
+   = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.FabAuthManager` instead.
+
+AIR303.py:16:1: AIR303 `airflow.www.security.FabAirflowSecurityManagerOverride` is moved into `fab` provider in Airflow 3.0;
+   |
+15 | FabAuthManager
+16 | FabAirflowSecurityManagerOverride
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR303
+   |
+   = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride` instead.

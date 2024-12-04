@@ -16,6 +16,7 @@ mod tests {
     #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR301.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_args.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_names.py"))]
+    #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR303.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
