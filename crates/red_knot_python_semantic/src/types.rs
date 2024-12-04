@@ -1020,9 +1020,6 @@ impl<'db> Type<'db> {
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::ModuleLiteral(..)
-            | Type::ClassLiteral(..)
-            | Type::SubclassOf(_)
-            | Type::Instance(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
@@ -1030,6 +1027,9 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::KnownInstance(_) => true,
+            Type::SubclassOf(subclass_of) => subclass_of.class.is_fully_static(db),
+            Type::ClassLiteral(class_literal) => class_literal.class.is_fully_static(db),
+            Type::Instance(instance) => instance.class.is_fully_static(db),
             Type::Union(union) => union
                 .elements(db)
                 .iter()
@@ -2650,6 +2650,27 @@ impl<'db> Class<'db> {
             .map(|ClassLiteralType { class }| class)
     }
 
+    /// Returns `true` if this class only contains fully-static entries in its MRO.
+    fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.known(db),
+            Some(
+                // TODO: probably not complete/correct:
+                KnownClass::Bool
+                    | KnownClass::Object
+                    | KnownClass::Bytes
+                    | KnownClass::Int
+                    | KnownClass::Float
+                    | KnownClass::Str
+                    | KnownClass::Set
+                    | KnownClass::List
+                    | KnownClass::Dict
+                    | KnownClass::Tuple
+                    | KnownClass::VersionInfo
+            )
+        ) || self.iter_mro(db).all(ClassBase::is_fully_static)
+    }
+
     #[salsa::tracked(return_ref)]
     fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let class_stmt = self.node(db);
@@ -3665,9 +3686,17 @@ pub(crate) mod tests {
     #[test_case(Ty::StringLiteral("abc"))]
     #[test_case(Ty::LiteralString)]
     #[test_case(Ty::BytesLiteral("abc"))]
-    #[test_case(Ty::KnownClassInstance(KnownClass::Str))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Bool))]
     #[test_case(Ty::KnownClassInstance(KnownClass::Object))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Bytes))]
     #[test_case(Ty::KnownClassInstance(KnownClass::Type))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Int))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Float))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Str))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::List))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Tuple))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Set))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Dict))]
     #[test_case(Ty::BuiltinClassLiteral("str"))]
     #[test_case(Ty::TypingLiteral)]
     #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::None]))]
@@ -3691,6 +3720,47 @@ pub(crate) mod tests {
         let db = setup_db();
 
         assert!(!from.into_type(&db).is_fully_static(&db));
+    }
+
+    #[test]
+    fn is_fully_static_for_classes() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            r#"
+            # TODO: change this to `from typing import Any` once we understand that
+            from unknown_module import UnknownClass
+
+            class FullyStaticBase: ...
+            class FullyStatic(FullyStaticBase): ...
+
+            fully_static_instance = FullyStatic()
+
+            class GradualBase(UnknownClass): ...
+            class Gradual(GradualBase): ...
+
+            gradual_instance = Gradual()
+            "#,
+        )?;
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py")?;
+
+        let fully_static_class = super::global_symbol(&db, module, "FullyStatic").expect_type();
+        assert!(fully_static_class.is_class_literal());
+        assert!(fully_static_class.is_fully_static(&db));
+
+        let fully_static_instance =
+            super::global_symbol(&db, module, "fully_static_instance").expect_type();
+        assert!(matches!(fully_static_instance, Type::Instance(_)));
+        assert!(fully_static_instance.is_fully_static(&db));
+
+        let gradual_class = super::global_symbol(&db, module, "Gradual").expect_type();
+        assert!(!gradual_class.is_fully_static(&db));
+
+        let gradual_instance = super::global_symbol(&db, module, "gradual_instance").expect_type();
+        assert!(matches!(gradual_instance, Type::Instance(_)));
+        assert!(!gradual_instance.is_fully_static(&db));
+
+        Ok(())
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]

@@ -390,6 +390,14 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    /// Returns `false` if the base is a non-fully-static type like `Any` or `Unknown`.
+    pub(crate) fn is_fully_static(self) -> bool {
+        match self {
+            Self::Class(_) => true,
+            Self::Any | Self::Unknown | Self::Todo => false,
+        }
+    }
+
     /// Iterate over the MRO of this base
     fn mro(
         self,
