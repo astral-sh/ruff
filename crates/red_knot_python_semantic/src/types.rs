@@ -3816,10 +3816,11 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn typing_vs_typeshed_no_default() -> anyhow::Result<()> {
+    fn typing_vs_typeshed_no_default() {
         let db = TestDbBuilder::new()
             .with_python_version(PythonVersion::PY313)
-            .build()?;
+            .build()
+            .unwrap();
 
         let typing_no_default = typing_symbol(&db, "NoDefault").expect_type();
         let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault").expect_type();
@@ -3829,8 +3830,6 @@ pub(crate) mod tests {
             typing_extensions_no_default.display(&db).to_string(),
             "NoDefault"
         );
-
-        Ok(())
     }
 
     #[test]
