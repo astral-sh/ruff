@@ -68,7 +68,7 @@ pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: String
         }
         let state = match part {
             StringLikePart::String(_) | StringLikePart::Bytes(_) => {
-                analyze_escape_chars(locator, part.range(), AnyStringFlags::from(part.flags()))
+                analyze_escape_chars(locator, part.range(), part.flags())
             }
             StringLikePart::FString(f_string) => {
                 let flags = AnyStringFlags::from(f_string.flags);
