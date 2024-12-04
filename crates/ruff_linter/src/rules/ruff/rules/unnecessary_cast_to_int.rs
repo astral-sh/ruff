@@ -39,7 +39,7 @@ pub(crate) struct UnnecessaryCastToInt;
 impl AlwaysFixableViolation for UnnecessaryCastToInt {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Value being casted is already an integer".to_string()
+        "Value being converted is already an integer".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -118,7 +118,7 @@ fn single_argument_to_int_call<'a>(
 
 /// Returns an [`Edit`] when the call is of any of the forms:
 /// * `round(integer)`, `round(integer, 0)`, `round(integer, None)`
-/// * `round(whatever)`, `round(integer, None)`
+/// * `round(whatever)`, `round(whatever, None)`
 fn replace_with_shortened_round_call(
     checker: &Checker,
     outer_range: TextRange,
