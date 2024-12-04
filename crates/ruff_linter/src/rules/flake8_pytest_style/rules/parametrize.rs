@@ -678,21 +678,10 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     }
 }
 
-/// Generate [`Edit`]s to unpack single-element tuples or lists in `argvalues`.
-/// For example, the following code:
-///
-/// ```python
-/// pytest.mark.parametrize(..., argvalues=[(1,), (2,)])
-/// ```
-///
-/// will be transformed to:
-///
-/// ```python
-/// pytest.mark.parametrize(..., argvalues=[1, 2])
-/// ```
-fn argvalues_edits(checker: &Checker, argvalues: &Expr) -> Vec<Edit> {
-    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
-        argvalues
+/// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
+/// For instance, `[(1,) (2,)]` will be transformed into `[1, 2]`.
+fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
+    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
     else {
         return vec![];
     };
@@ -728,7 +717,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalue
 
     diagnostic.set_fix(Fix::unsafe_edits(
         Edit::range_replacement(checker.generator().expr(value), expr.range()),
-        argvalues_edits(checker, argvalues),
+        unpack_single_element_items(checker, argvalues),
     ));
     checker.diagnostics.push(diagnostic);
 }
