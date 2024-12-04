@@ -133,6 +133,8 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         db.write_file(path, code).unwrap();
         let file = system_path_to_file(&*db, path).unwrap();
         check_types(&*db, file);
+        db.memory_file_system().remove_file(path).unwrap();
+        file.sync(&mut *db);
     }
 
     Corpus::Keep
