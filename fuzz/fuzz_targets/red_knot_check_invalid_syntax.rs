@@ -3,6 +3,8 @@
 
 #![no_main]
 
+use std::sync::{Mutex, OnceLock};
+
 use libfuzzer_sys::{fuzz_target, Corpus};
 
 use red_knot_python_semantic::types::check_types;
@@ -110,6 +112,8 @@ fn setup_db() -> TestDb {
     db
 }
 
+static TEST_DB: OnceLock<Mutex<TestDb>> = OnceLock::new();
+
 fn do_fuzz(case: &[u8]) -> Corpus {
     let Ok(code) = std::str::from_utf8(case) else {
         return Corpus::Reject;
@@ -120,10 +124,16 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         return Corpus::Reject;
     }
 
-    let mut db = setup_db();
-    db.write_file("/src/a.py", code).unwrap();
-    let file = system_path_to_file(&db, "/src/a.py").unwrap();
-    check_types(&db, file);
+    let mut db = TEST_DB
+        .get_or_init(|| Mutex::new(setup_db()))
+        .lock()
+        .unwrap();
+
+    for path in &["/src/a.py", "/src/a.pyi"] {
+        db.write_file(path, code).unwrap();
+        let file = system_path_to_file(&*db, path).unwrap();
+        check_types(&*db, file);
+    }
 
     Corpus::Keep
 }
