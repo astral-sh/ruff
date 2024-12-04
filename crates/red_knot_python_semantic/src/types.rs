@@ -302,12 +302,7 @@ fn declarations_ty<'db>(
     let declared_ty = if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db).add(first);
         for other in [second].into_iter().chain(all_types) {
-            // `Unknown` needs special handling, since we might infer `Unknown`
-            // for one of these due to a variable being defined in one possible
-            // control-flow branch but not another one.
-            if !first.is_equivalent_to(db, other)
-                || ((first == Type::Unknown) != (other == Type::Unknown))
-            {
+            if !first.is_equivalent_to(db, other) {
                 conflicting.push(other);
             }
             builder = builder.add(other);
