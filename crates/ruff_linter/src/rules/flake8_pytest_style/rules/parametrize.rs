@@ -678,7 +678,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     }
 }
 
-/// Generate a vector of [`Edit`] to unpack single-element tuples or lists in `argvalues`.
+/// Generate [`Edit`]s to unpack single-element tuples or lists in `argvalues`.
 /// For example, the following code:
 ///
 /// ```python
@@ -726,7 +726,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalue
         expr.range(),
     );
 
-    diagnostic.set_fix(Fix::safe_edits(
+    diagnostic.set_fix(Fix::unsafe_edits(
         Edit::range_replacement(checker.generator().expr(value), expr.range()),
         argvalues_edits(checker, argvalues),
     ));
