@@ -1,38 +1,157 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
 ---
-AIR302_names.py:4:1: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
-  |
-2 | from airflow.utils.dates import date_range, datetime_to_nano, days_ago
-3 | 
-4 | date_range
-  | ^^^^^^^^^^ AIR302
-5 | days_ago
-  |
-
-AIR302_names.py:5:1: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0; use datetime.timedelta() instead
-  |
-4 | date_range
-5 | days_ago
-  | ^^^^^^^^ AIR302
-6 | 
-7 | dates.date_range
-  |
-
-AIR302_names.py:7:7: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
-  |
-5 | days_ago
-6 | 
-7 | dates.date_range
-  |       ^^^^^^^^^^ AIR302
-8 | dates.days_ago
-  |
-
-AIR302_names.py:8:7: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0; use datetime.timedelta() instead
+AIR302_names.py:21:1: AIR302 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
    |
- 7 | dates.date_range
- 8 | dates.days_ago
+21 | TaskStateTrigger
+   | ^^^^^^^^^^^^^^^^ AIR302
+   |
+
+AIR302_names.py:24:1: AIR302 `airflow.www.auth.has_access` is removed in Airflow 3.0; use `airflow.www.auth.has_access_*` instead
+   |
+24 | has_access
+   | ^^^^^^^^^^ AIR302
+25 | requires_access
+   |
+
+AIR302_names.py:25:1: AIR302 `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0; use `airflow.api_connexion.security.requires_access_*` instead
+   |
+24 | has_access
+25 | requires_access
+   | ^^^^^^^^^^^^^^^ AIR302
+26 | 
+27 | AllowListValidator
+   |
+
+AIR302_names.py:27:1: AIR302 `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0; use `airflow.metrics.validators.PatternAllowListValidator` instead
+   |
+25 | requires_access
+26 | 
+27 | AllowListValidator
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+28 | BlockListValidator
+   |
+
+AIR302_names.py:28:1: AIR302 `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0; use `airflow.metrics.validators.PatternBlockListValidator` instead
+   |
+27 | AllowListValidator
+28 | BlockListValidator
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+29 | 
+30 | dates.date_range
+   |
+
+AIR302_names.py:30:7: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0; use `airflow.timetables.` instead
+   |
+28 | BlockListValidator
+29 | 
+30 | dates.date_range
+   |       ^^^^^^^^^^ AIR302
+31 | dates.days_ago
+   |
+
+AIR302_names.py:31:7: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0; use `pendulum.today('UTC').add(days=-N, ...)` instead
+   |
+30 | dates.date_range
+31 | dates.days_ago
    |       ^^^^^^^^ AIR302
- 9 | 
-10 | # This one was not deprecated.
+32 | 
+33 | date_range
+   |
+
+AIR302_names.py:33:1: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0; use `airflow.timetables.` instead
+   |
+31 | dates.days_ago
+32 | 
+33 | date_range
+   | ^^^^^^^^^^ AIR302
+34 | days_ago
+35 | parse_execution_date
+   |
+
+AIR302_names.py:34:1: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0; use `pendulum.today('UTC').add(days=-N, ...)` instead
+   |
+33 | date_range
+34 | days_ago
+   | ^^^^^^^^ AIR302
+35 | parse_execution_date
+36 | round_time
+   |
+
+AIR302_names.py:35:1: AIR302 `airflow.utils.dates.parse_execution_date` is removed in Airflow 3.0
+   |
+33 | date_range
+34 | days_ago
+35 | parse_execution_date
+   | ^^^^^^^^^^^^^^^^^^^^ AIR302
+36 | round_time
+37 | scale_time_units
+   |
+
+AIR302_names.py:36:1: AIR302 `airflow.utils.dates.round_time` is removed in Airflow 3.0
+   |
+34 | days_ago
+35 | parse_execution_date
+36 | round_time
+   | ^^^^^^^^^^ AIR302
+37 | scale_time_units
+38 | infer_time_unit
+   |
+
+AIR302_names.py:37:1: AIR302 `airflow.utils.dates.scale_time_units` is removed in Airflow 3.0
+   |
+35 | parse_execution_date
+36 | round_time
+37 | scale_time_units
+   | ^^^^^^^^^^^^^^^^ AIR302
+38 | infer_time_unit
+   |
+
+AIR302_names.py:38:1: AIR302 `airflow.utils.dates.infer_time_unit` is removed in Airflow 3.0
+   |
+36 | round_time
+37 | scale_time_units
+38 | infer_time_unit
+   | ^^^^^^^^^^^^^^^ AIR302
+   |
+
+AIR302_names.py:45:1: AIR302 `airflow.utils.file.TemporaryDirectory` is removed in Airflow 3.0
+   |
+43 | dates.datetime_to_nano
+44 | 
+45 | TemporaryDirectory
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+46 | mkdirs
+   |
+
+AIR302_names.py:46:1: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 3.0; use `pendulum.today('UTC').add(days=-N, ...)` instead
+   |
+45 | TemporaryDirectory
+46 | mkdirs
+   | ^^^^^^ AIR302
+47 | 
+48 | SHUTDOWN
+   |
+
+AIR302_names.py:48:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
+   |
+46 | mkdirs
+47 | 
+48 | SHUTDOWN
+   | ^^^^^^^^ AIR302
+49 | terminating_states
+   |
+
+AIR302_names.py:49:1: AIR302 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
+   |
+48 | SHUTDOWN
+49 | terminating_states
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+   |
+
+AIR302_names.py:52:1: AIR302 `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
+   |
+52 | test_cycle
+   | ^^^^^^^^^^ AIR302
    |
