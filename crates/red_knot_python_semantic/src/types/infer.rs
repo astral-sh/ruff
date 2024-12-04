@@ -1660,7 +1660,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.expression_ty(value);
         let name_ast_id = name.scoped_expression_id(self.db, self.scope());
 
-        let target_ty = match assignment.target() {
+        let mut target_ty = match assignment.target() {
             TargetKind::Sequence(unpack) => {
                 let unpacked = infer_unpack_types(self.db, unpack);
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
@@ -1673,6 +1673,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             TargetKind::Name => value_ty,
         };
+
+        if let Some(known_instance) = file_to_module(self.db, definition.file(self.db))
+            .as_ref()
+            .and_then(|module| KnownInstanceType::try_from_module_and_symbol(module, &name.id))
+        {
+            target_ty = Type::KnownInstance(known_instance);
+        }
 
         self.store_expression_type(name, target_ty);
         self.add_binding(name.into(), definition, target_ty);
@@ -4537,7 +4544,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
                     todo_type!()
                 } else {
-                    Type::tuple(self.db, &[single_element_ty])
+                    Type::tuple(self.db, [single_element_ty])
                 }
             }
         }
@@ -4642,6 +4649,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
+            KnownInstanceType::LiteralString => {
+                self.diagnostics.add(
+                    subscript.into(),
+                    "invalid-type-parameter",
+                    format_args!(
+                        "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
+                        known_instance.repr(self.db)
+                    ),
+                );
+                Type::Unknown
+            }
+            KnownInstanceType::Any => Type::Any,
         }
     }
 

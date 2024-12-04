@@ -21,6 +21,7 @@
 - \[`ruff`\] Auto-add `r` prefix when string has no backslashes for `unraw-re-pattern` (`RUF039`) ([#14536](https://github.com/astral-sh/ruff/pull/14536))
 - \[`ruff`\] Implement `invalid-assert-message-literal-argument` (`RUF040`) ([#14488](https://github.com/astral-sh/ruff/pull/14488))
 - \[`ruff`\] Implement `unnecessary-nested-literal` (`RUF041`) ([#14323](https://github.com/astral-sh/ruff/pull/14323))
+- \[`ruff`\] Implement `unnecessary-regular-expression` (`RUF055`) ([#14659](https://github.com/astral-sh/ruff/pull/14659))
 
 ### Rule changes
 
@@ -34,6 +35,8 @@
 
 - Avoid fixing code to `None | None` for `redundant-none-literal` (`PYI061`) and `never-union` (`RUF020`) ([#14583](https://github.com/astral-sh/ruff/pull/14583), [#14589](https://github.com/astral-sh/ruff/pull/14589))
 - \[`flake8-bugbear`\] Fix `mutable-contextvar-default` to resolve annotated function calls properly (`B039`) ([#14532](https://github.com/astral-sh/ruff/pull/14532))
+- \[`flake8-pyi`, `ruff`\] Fix traversal of nested literals and unions (`PYI016`, `PYI051`, `PYI055`, `PYI062`, `RUF041`) ([#14641](https://github.com/astral-sh/ruff/pull/14641))
+- \[`flake8-pyi`\] Avoid rewriting invalid type expressions in `unnecessary-type-union` (`PYI055`) ([#14660](https://github.com/astral-sh/ruff/pull/14660))
 - \[`flake8-type-checking`\] Avoid syntax errors and type checking problem for quoted annotations autofix (`TC003`, `TC006`) ([#14634](https://github.com/astral-sh/ruff/pull/14634))
 - \[`pylint`\] Do not wrap function calls in parentheses in the fix for unnecessary-dunder-call (`PLC2801`) ([#14601](https://github.com/astral-sh/ruff/pull/14601))
 - \[`ruff`\] Handle `attrs`'s `auto_attribs` correctly (`RUF009`) ([#14520](https://github.com/astral-sh/ruff/pull/14520))
@@ -254,7 +257,7 @@ The following fixes have been stabilized:
 ### Preview features
 
 - Fix `E221` and `E222` to flag missing or extra whitespace around `==` operator ([#13890](https://github.com/astral-sh/ruff/pull/13890))
-- Formatter: Alternate quotes for strings inside f-strings in preview  ([#13860](https://github.com/astral-sh/ruff/pull/13860))
+- Formatter: Alternate quotes for strings inside f-strings in preview ([#13860](https://github.com/astral-sh/ruff/pull/13860))
 - Formatter: Join implicit concatenated strings when they fit on a line ([#13663](https://github.com/astral-sh/ruff/pull/13663))
 - \[`pylint`\] Restrict `iteration-over-set` to only work on sets of literals (`PLC0208`) ([#13731](https://github.com/astral-sh/ruff/pull/13731))
 
@@ -1269,7 +1272,7 @@ To read more about this exciting milestone, check out our [blog post](https://as
 ### Preview features
 
 - \[`pycodestyle`\] Ignore end-of-line comments when determining blank line rules ([#11342](https://github.com/astral-sh/ruff/pull/11342))
-- \[`pylint`\] Detect `pathlib.Path.open` calls in `unspecified-encoding` (`PLW1514`)  ([#11288](https://github.com/astral-sh/ruff/pull/11288))
+- \[`pylint`\] Detect `pathlib.Path.open` calls in `unspecified-encoding` (`PLW1514`) ([#11288](https://github.com/astral-sh/ruff/pull/11288))
 - \[`flake8-pyi`\] Implement `PYI059` (`generic-not-last-base-class`) ([#11233](https://github.com/astral-sh/ruff/pull/11233))
 - \[`flake8-pyi`\] Implement `PYI062` (`duplicate-literal-member`) ([#11269](https://github.com/astral-sh/ruff/pull/11269))
 
@@ -1644,7 +1647,7 @@ To setup `ruff server` with your editor, refer to the [README.md](https://github
 - \[`pycodestyle`\] Do not ignore lines before the first logical line in blank lines rules. ([#10382](https://github.com/astral-sh/ruff/pull/10382))
 - \[`pycodestyle`\] Do not trigger `E225` and `E275` when the next token is a ')' ([#10315](https://github.com/astral-sh/ruff/pull/10315))
 - \[`pylint`\] Avoid false-positive slot non-assignment for `__dict__` (`PLE0237`) ([#10348](https://github.com/astral-sh/ruff/pull/10348))
-- Gate f-string struct size test for Rustc \< 1.76 ([#10371](https://github.com/astral-sh/ruff/pull/10371))
+- Gate f-string struct size test for Rustc < 1.76 ([#10371](https://github.com/astral-sh/ruff/pull/10371))
 
 ### Documentation
 

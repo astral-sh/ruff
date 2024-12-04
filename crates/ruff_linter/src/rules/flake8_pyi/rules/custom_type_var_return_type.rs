@@ -146,7 +146,7 @@ enum Method<'a> {
     Instance(InstanceMethod<'a>),
 }
 
-impl<'a> Method<'a> {
+impl Method<'_> {
     fn uses_custom_var(&self) -> bool {
         match self {
             Self::Class(class_method) => class_method.uses_custom_var(),
@@ -162,7 +162,7 @@ struct ClassMethod<'a> {
     type_params: Option<&'a TypeParams>,
 }
 
-impl<'a> ClassMethod<'a> {
+impl ClassMethod<'_> {
     /// Returns `true` if the class method is annotated with
     /// a custom `TypeVar` that is likely private.
     fn uses_custom_var(&self) -> bool {
@@ -203,7 +203,7 @@ struct InstanceMethod<'a> {
     type_params: Option<&'a TypeParams>,
 }
 
-impl<'a> InstanceMethod<'a> {
+impl InstanceMethod<'_> {
     /// Returns `true` if the instance method is annotated with
     /// a custom `TypeVar` that is likely private.
     fn uses_custom_var(&self) -> bool {

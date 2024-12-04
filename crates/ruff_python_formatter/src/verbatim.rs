@@ -787,7 +787,7 @@ impl<'a> LogicalLinesIter<'a> {
     }
 }
 
-impl<'a> Iterator for LogicalLinesIter<'a> {
+impl Iterator for LogicalLinesIter<'_> {
     type Item = FormatResult<LogicalLine>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -841,7 +841,7 @@ impl<'a> Iterator for LogicalLinesIter<'a> {
     }
 }
 
-impl<'a> FusedIterator for LogicalLinesIter<'a> {}
+impl FusedIterator for LogicalLinesIter<'_> {}
 
 /// A logical line or a comment (or form feed only) line
 struct LogicalLine {

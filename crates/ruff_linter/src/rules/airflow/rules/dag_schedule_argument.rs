@@ -73,8 +73,14 @@ pub(crate) fn dag_no_schedule_argument(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    // If there's a `schedule` keyword argument, we are good.
-    if arguments.find_keyword("schedule").is_some() {
+    // If there's a schedule keyword argument, we are good.
+    // This includes the canonical 'schedule', and the deprecated 'timetable'
+    // and 'schedule_interval'. Usages of deprecated schedule arguments are
+    // covered by AIR302.
+    if ["schedule", "schedule_interval", "timetable"]
+        .iter()
+        .any(|a| arguments.find_keyword(a).is_some())
+    {
         return;
     }
 

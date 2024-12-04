@@ -723,12 +723,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
-                    if self
-                        .semantic
-                        .match_typing_expr(&decorator.expression, "no_type_check")
-                    {
-                        self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
-                    }
                     self.visit_decorator(decorator);
                 }
 
@@ -971,10 +965,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 msg,
                 range: _,
             }) => {
+                let snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ASSERT_STATEMENT;
                 self.visit_boolean_test(test);
                 if let Some(expr) = msg {
                     self.visit_expr(expr);
                 }
+                self.semantic.flags = snapshot;
             }
             Stmt::With(ast::StmtWith {
                 items,
@@ -1894,9 +1891,6 @@ impl<'a> Checker<'a> {
 
     /// Visit an [`Expr`], and treat it as a type definition.
     fn visit_type_definition(&mut self, expr: &'a Expr) {
-        if self.semantic.in_no_type_check() {
-            return;
-        }
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -1953,6 +1947,9 @@ impl<'a> Checker<'a> {
 
         if self.semantic.in_exception_handler() {
             flags |= BindingFlags::IN_EXCEPT_HANDLER;
+        }
+        if self.semantic.in_assert_statement() {
+            flags |= BindingFlags::IN_ASSERT_STATEMENT;
         }
 
         // Create the `Binding`.

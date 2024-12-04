@@ -113,8 +113,10 @@ pub(crate) fn too_many_public_methods(
         .body
         .iter()
         .filter(|stmt| {
-            stmt.as_function_def_stmt()
-                .is_some_and(|node| matches!(visibility::method_visibility(node), Public))
+            stmt.as_function_def_stmt().is_some_and(|node| {
+                matches!(visibility::method_visibility(node), Public)
+                    && !visibility::is_overload(&node.decorator_list, checker.semantic())
+            })
         })
         .count();
 

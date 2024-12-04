@@ -374,10 +374,12 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::Literal
+                | KnownInstanceType::LiteralString
                 | KnownInstanceType::Union
                 | KnownInstanceType::NoReturn
                 | KnownInstanceType::Never
                 | KnownInstanceType::Optional => None,
+                KnownInstanceType::Any => Some(Self::Any),
             },
         }
     }
@@ -402,6 +404,12 @@ impl<'db> ClassBase<'db> {
             ClassBase::Todo => Either::Left([ClassBase::Todo, ClassBase::object(db)].into_iter()),
             ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
+    }
+}
+
+impl<'db> From<Class<'db>> for ClassBase<'db> {
+    fn from(value: Class<'db>) -> Self {
+        ClassBase::Class(value)
     }
 }
 

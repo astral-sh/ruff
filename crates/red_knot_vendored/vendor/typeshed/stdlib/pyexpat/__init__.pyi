@@ -2,7 +2,7 @@ from _typeshed import ReadableBuffer, SupportsRead
 from collections.abc import Callable
 from pyexpat import errors as errors, model as model
 from typing import Any, Final, final
-from typing_extensions import TypeAlias
+from typing_extensions import CapsuleType, TypeAlias
 from xml.parsers.expat import ExpatError as ExpatError
 
 EXPAT_VERSION: Final[str]  # undocumented
@@ -78,3 +78,5 @@ def ErrorString(code: int, /) -> str: ...
 def ParserCreate(
     encoding: str | None = None, namespace_separator: str | None = None, intern: dict[str, Any] | None = None
 ) -> XMLParserType: ...
+
+expat_CAPI: CapsuleType

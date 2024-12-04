@@ -8,11 +8,22 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 
 /// ## What it does
-/// Checks for an unquoted type expression in `typing.cast()` calls.
+/// Checks for unquoted type expressions in `typing.cast()` calls.
 ///
 /// ## Why is this bad?
-/// `typing.cast()` does not do anything at runtime, so the time spent
-/// on evaluating the type expression is wasted.
+/// This rule helps enforce a consistent style across your codebase.
+///
+/// It's often necessary to quote the first argument passed to `cast()`,
+/// as type expressions can involve forward references, or references
+/// to symbols which are only imported in `typing.TYPE_CHECKING` blocks.
+/// This can lead to a visual inconsistency across different `cast()` calls,
+/// where some type expressions are quoted but others are not. By enabling
+/// this rule, you ensure that all type expressions passed to `cast()` are
+/// quoted, enforcing stylistic consistency across all of your `cast()` calls.
+///
+/// In some cases where `cast()` is used in a hot loop, this rule may also
+/// help avoid overhead from repeatedly evaluating complex type expressions at
+/// runtime.
 ///
 /// ## Example
 /// ```python

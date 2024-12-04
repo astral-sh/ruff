@@ -442,7 +442,7 @@ impl<'a> Iterator for BestFittingVariantsIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for BestFittingVariantsIter<'a> {
+impl DoubleEndedIterator for BestFittingVariantsIter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let start_position = self.elements.iter().rposition(|element| {
             matches!(element, FormatElement::Tag(Tag::StartBestFittingEntry))

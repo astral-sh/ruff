@@ -232,3 +232,7 @@ def j():
         x = [1, 2, 3]
     if len(x): # [PLC1802] should be fine
         print(x)
+
+# regression tests for https://github.com/astral-sh/ruff/issues/14690
+bool(len(ascii(1)))
+bool(len(sorted("")))

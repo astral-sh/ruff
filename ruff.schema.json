@@ -1168,7 +1168,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/definitions/Alias"
           }
         }
       },
@@ -2797,6 +2797,7 @@
         "AIR3",
         "AIR30",
         "AIR301",
+        "AIR302",
         "ALL",
         "ANN",
         "ANN0",
@@ -3843,6 +3844,9 @@
         "RUF040",
         "RUF041",
         "RUF048",
+        "RUF05",
+        "RUF052",
+        "RUF055",
         "RUF1",
         "RUF10",
         "RUF100",

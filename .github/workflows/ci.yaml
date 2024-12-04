@@ -32,6 +32,8 @@ jobs:
       # Flag that is raised when any code is changed
       # This is superset of the linter and formatter
       code: ${{ steps.changed.outputs.code_any_changed }}
+      # Flag that is raised when any code that affects the fuzzer is changed
+      fuzz: ${{ steps.changed.outputs.fuzz_any_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,6 +80,11 @@ jobs:
               - scripts/*
               - python/**
               - .github/workflows/ci.yaml
+
+            fuzz:
+              - fuzz/Cargo.toml
+              - fuzz/Cargo.lock
+              - fuzz/fuzz_targets/**
 
             code:
               - "**/*"
@@ -288,7 +295,7 @@ jobs:
     name: "cargo fuzz build"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' || needs.determine_changes.outputs.fuzz == 'true' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -383,7 +390,7 @@ jobs:
           name: ruff
           path: target/debug
 
-      - uses: dawidd6/action-download-artifact@v6
+      - uses: dawidd6/action-download-artifact@v7
         name: Download baseline Ruff binary
         with:
           name: ruff
@@ -559,7 +566,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
       - uses: Swatinem/rust-cache@v2
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}

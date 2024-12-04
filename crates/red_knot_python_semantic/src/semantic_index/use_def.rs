@@ -400,7 +400,7 @@ pub(crate) struct ConstraintsIterator<'map, 'db> {
     constraint_ids: ConstraintIdIterator<'map>,
 }
 
-impl<'map, 'db> Iterator for ConstraintsIterator<'map, 'db> {
+impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
     type Item = Constraint<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -424,7 +424,7 @@ impl DeclarationsIterator<'_, '_> {
     }
 }
 
-impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
+impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
     type Item = Definition<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {

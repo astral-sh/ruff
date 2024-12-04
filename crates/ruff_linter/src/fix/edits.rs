@@ -292,7 +292,7 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
     {
         // Case 1: at least one regular parameter, so append after the last one.
         Edit::insertion(format!(", {parameter}"), last.end())
-    } else if parameters.args.first().is_some() {
+    } else if !parameters.args.is_empty() {
         // Case 2: no regular parameters, but at least one keyword parameter, so add before the
         // first.
         let pos = parameters.start();
@@ -316,7 +316,7 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
         } else {
             Edit::insertion(format!(", {parameter}"), slash.start())
         }
-    } else if parameters.kwonlyargs.first().is_some() {
+    } else if !parameters.kwonlyargs.is_empty() {
         // Case 3: no regular parameter, but a keyword-only parameter exist, so add parameter before that.
         // We need to backtrack to before the `*` separator.
         // We know there is no non-keyword-only params, so we can safely assume that the `*` separator is the first

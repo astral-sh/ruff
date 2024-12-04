@@ -64,3 +64,5 @@ class ModuleFinder:
     def any_missing(self) -> list[str]: ...  # undocumented
     def any_missing_maybe(self) -> tuple[list[str], list[str]]: ...  # undocumented
     def replace_paths_in_code(self, co: CodeType) -> CodeType: ...  # undocumented
+
+def test() -> ModuleFinder | None: ...  # undocumented

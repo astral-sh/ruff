@@ -984,6 +984,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "040") => (RuleGroup::Preview, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
         (Ruff, "041") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryNestedLiteral),
         (Ruff, "048") => (RuleGroup::Preview, rules::ruff::rules::MapIntVersionParsing),
+        (Ruff, "052") => (RuleGroup::Preview, rules::ruff::rules::UsedDummyVariable),
+        (Ruff, "055") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryRegularExpression),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
 
@@ -1039,6 +1041,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // airflow
         (Airflow, "001") => (RuleGroup::Stable, rules::airflow::rules::AirflowVariableNameTaskIdMismatch),
         (Airflow, "301") => (RuleGroup::Preview, rules::airflow::rules::AirflowDagNoScheduleArgument),
+        (Airflow, "302") => (RuleGroup::Preview, rules::airflow::rules::Airflow3Removal),
 
         // perflint
         (Perflint, "101") => (RuleGroup::Stable, rules::perflint::rules::UnnecessaryListCast),

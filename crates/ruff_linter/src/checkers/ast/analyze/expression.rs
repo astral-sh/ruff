@@ -220,6 +220,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::RegexFlagAlias) {
                         refurb::rules::regex_flag_alias(checker, expr);
                     }
+                    if checker.enabled(Rule::Airflow3Removal) {
+                        airflow::rules::removed_in_3(checker, expr);
+                    }
 
                     // Ex) List[...]
                     if checker.any_enabled(&[
@@ -379,6 +382,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ByteStringUsage) {
                 flake8_pyi::rules::bytestring_attribute(checker, expr);
+            }
+            if checker.enabled(Rule::Airflow3Removal) {
+                airflow::rules::removed_in_3(checker, expr);
             }
         }
         Expr::Call(
@@ -1081,6 +1087,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::AirflowDagNoScheduleArgument) {
                 airflow::rules::dag_no_schedule_argument(checker, expr);
             }
+            if checker.enabled(Rule::UnnecessaryRegularExpression) {
+                ruff::rules::unnecessary_regular_expression(checker, call);
+            }
+            if checker.enabled(Rule::Airflow3Removal) {
+                airflow::rules::removed_in_3(checker, expr);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
@@ -1643,11 +1655,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ParenthesizeChainedOperators) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
-            }
-        }
-        Expr::Named(..) => {
-            if checker.enabled(Rule::AssignmentInAssert) {
-                ruff::rules::assignment_in_assert(checker, expr);
             }
         }
         Expr::Lambda(lambda_expr) => {

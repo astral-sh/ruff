@@ -10,28 +10,14 @@ use crate::checkers::ast::Checker;
 
 use super::helpers;
 
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum DictKind {
-    Literal,
-    Comprehension,
-}
-
-impl fmt::Display for DictKind {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DictKind::Literal => fmt.write_str("literal"),
-            DictKind::Comprehension => fmt.write_str("comprehension"),
-        }
-    }
-}
-
 /// ## What it does
-/// Checks for `dict` calls that take unnecessary `dict` literals or `dict`
+/// Checks for `dict()` calls that take unnecessary dict literals or dict
 /// comprehensions as arguments.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to wrap a `dict` literal or comprehension within a `dict`
-/// call, since the literal or comprehension syntax already returns a `dict`.
+/// It's unnecessary to wrap a dict literal or comprehension within a `dict()`
+/// call, since the literal or comprehension syntax already returns a
+/// dictionary.
 ///
 /// ## Examples
 /// ```python
@@ -57,11 +43,11 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinDictCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryLiteralWithinDictCall { kind } = self;
-        format!("Unnecessary `dict` {kind} passed to `dict()` (remove the outer call to `dict()`)")
+        format!("Unnecessary dict {kind} passed to `dict()` (remove the outer call to `dict()`)")
     }
 
     fn fix_title(&self) -> String {
-        "Remove outer `dict` call".to_string()
+        "Remove outer `dict()` call".to_string()
     }
 }
 
@@ -75,14 +61,12 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &mut Checker, call: 
     else {
         return;
     };
+    let Some(argument_kind) = DictKind::try_from_expr(argument) else {
+        return;
+    };
     if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
-    let argument_kind = match argument {
-        Expr::DictComp(_) => DictKind::Comprehension,
-        Expr::Dict(_) => DictKind::Literal,
-        _ => return,
-    };
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryLiteralWithinDictCall {
@@ -103,4 +87,33 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &mut Checker, call: 
     });
 
     checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum DictKind {
+    Literal,
+    Comprehension,
+}
+
+impl DictKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Literal => "literal",
+            Self::Comprehension => "comprehension",
+        }
+    }
+
+    const fn try_from_expr(expr: &Expr) -> Option<Self> {
+        match expr {
+            Expr::Dict(_) => Some(Self::Literal),
+            Expr::DictComp(_) => Some(Self::Comprehension),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for DictKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
 }

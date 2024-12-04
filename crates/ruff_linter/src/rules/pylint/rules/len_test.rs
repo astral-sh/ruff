@@ -162,7 +162,7 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     // Match against specific built-in constructors that return sequences
-    return semantic.resolve_builtin_symbol(func).is_some_and(|func| {
+    semantic.resolve_builtin_symbol(func).is_some_and(|func| {
         matches!(
             func,
             "chr"
@@ -186,6 +186,8 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
                 | "hex"
                 | "memoryview"
                 | "oct"
+                | "ascii"
+                | "sorted"
         )
-    });
+    })
 }

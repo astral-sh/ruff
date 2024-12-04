@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -325,9 +325,15 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
-    /// in the current scope, or in any containing scope.
+    /// in the current scope currently being visited, or in any containing scope.
     pub fn is_available(&self, member: &str) -> bool {
-        self.lookup_symbol(member)
+        self.is_available_in_scope(member, self.scope_id)
+    }
+
+    /// Return `true` if `member` is an "available" symbol in a given scope, i.e.,
+    /// a symbol that has not been bound in that current scope, or in any containing scope.
+    pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
+        self.lookup_symbol_in_scope(member, scope_id, false)
             .map(|binding_id| &self.bindings[binding_id])
             .map_or(true, |binding| binding.kind.is_builtin())
     }
@@ -620,10 +626,22 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_load`], but
-    /// doesn't add any read references to the resolved symbol.
+    /// Lookup a symbol in the current scope.
     pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
-        if self.in_forward_reference() {
+        self.lookup_symbol_in_scope(symbol, self.scope_id, self.in_forward_reference())
+    }
+
+    /// Lookup a symbol in a certain scope
+    ///
+    /// This is a carbon copy of [`Self::resolve_load`], but
+    /// doesn't add any read references to the resolved symbol.
+    pub fn lookup_symbol_in_scope(
+        &self,
+        symbol: &str,
+        scope_id: ScopeId,
+        in_forward_reference: bool,
+    ) -> Option<BindingId> {
+        if in_forward_reference {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
                     return Some(binding_id);
@@ -633,7 +651,7 @@ impl<'a> SemanticModel<'a> {
 
         let mut seen_function = false;
         let mut class_variables_visible = true;
-        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+        for (index, scope_id) in self.scopes.ancestor_ids(scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
                 if seen_function && matches!(symbol, "__class__") {
@@ -1411,6 +1429,8 @@ impl<'a> SemanticModel<'a> {
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
             "attr" | "attrs" => self.seen.insert(Modules::ATTRS),
             "airflow" => self.seen.insert(Modules::AIRFLOW),
+            "hashlib" => self.seen.insert(Modules::HASHLIB),
+            "crypt" => self.seen.insert(Modules::CRYPT),
             _ => {}
         }
     }
@@ -1506,38 +1526,48 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in a nested union expression (e.g., the inner `Union` in
     /// `Union[Union[int, str], float]`).
     pub fn in_nested_union(&self) -> bool {
-        // Ex) `Union[Union[int, str], float]`
-        if self
-            .current_expression_grandparent()
-            .and_then(Expr::as_subscript_expr)
-            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Union"))
-        {
-            return true;
-        }
+        let mut parent_expressions = self.current_expressions().skip(1);
 
-        // Ex) `int | Union[str, float]`
-        if self.current_expression_parent().is_some_and(|parent| {
-            matches!(
-                parent,
-                Expr::BinOp(ast::ExprBinOp {
-                    op: Operator::BitOr,
-                    ..
-                })
-            )
-        }) {
-            return true;
+        match parent_expressions.next() {
+            // The parent expression is of the inner union is a single `typing.Union`.
+            // Ex) `Union[Union[a, b]]`
+            Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Union"),
+            // The parent expression is of the inner union is a tuple with two or more
+            // comma-separated elements and the parent of that tuple is a `typing.Union`.
+            // Ex) `Union[Union[a, b], Union[c, d]]`
+            Some(Expr::Tuple(_)) => parent_expressions
+                .next()
+                .and_then(Expr::as_subscript_expr)
+                .is_some_and(|grandparent| self.match_typing_expr(&grandparent.value, "Union")),
+            // The parent expression of the inner union is a PEP604-style union.
+            // Ex) `a | b | c` or `Union[a, b] | c`
+            // In contrast to `typing.Union`, PEP604-style unions are always binary operations, e.g.
+            // the expression `a | b | c` is represented by two binary unions: `(a | b) | c`.
+            Some(Expr::BinOp(bin_op)) => bin_op.op.is_bit_or(),
+            // Not a nested union otherwise.
+            _ => false,
         }
-
-        false
     }
 
     /// Return `true` if the model is in a nested literal expression (e.g., the inner `Literal` in
     /// `Literal[Literal[int, str], float]`).
     pub fn in_nested_literal(&self) -> bool {
-        // Ex) `Literal[Literal[int, str], float]`
-        self.current_expression_grandparent()
-            .and_then(Expr::as_subscript_expr)
-            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Literal"))
+        let mut parent_expressions = self.current_expressions().skip(1);
+
+        match parent_expressions.next() {
+            // The parent expression of the current `Literal` is a tuple, and the
+            // grandparent is a `Literal`.
+            // Ex) `Literal[Literal[str], Literal[int]]`
+            Some(Expr::Tuple(_)) => parent_expressions
+                .next()
+                .and_then(Expr::as_subscript_expr)
+                .is_some_and(|grandparent| self.match_typing_expr(&grandparent.value, "Literal")),
+            // The parent expression of the current `Literal` is also a `Literal`.
+            // Ex) `Literal[Literal[str]]`
+            Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Literal"),
+            // Not a nested literal otherwise
+            _ => false,
+        }
     }
 
     /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
@@ -1705,11 +1735,6 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::ANNOTATION)
     }
 
-    /// Return `true` if the model is in a `@no_type_check` context.
-    pub const fn in_no_type_check(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
-    }
-
     /// Return `true` if the model is in a typing-only type annotation.
     pub const fn in_typing_only_annotation(&self) -> bool {
         self.flags
@@ -1827,6 +1852,11 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
+    }
+
+    /// Return `true` if the model is in an `assert` statement.
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
     }
 
     /// Return `true` if the model is in an f-string.
@@ -2024,6 +2054,8 @@ bitflags! {
         const ATTRS = 1 << 25;
         const REGEX = 1 << 26;
         const AIRFLOW = 1 << 27;
+        const HASHLIB = 1 << 28;
+        const CRYPT = 1 << 29;
     }
 }
 
@@ -2384,22 +2416,6 @@ bitflags! {
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 25;
 
-        /// The model is in a [no_type_check] context.
-        ///
-        /// This is used to skip type checking when the `@no_type_check` decorator is found.
-        ///
-        /// For example (adapted from [#13824]):
-        /// ```python
-        /// from typing import no_type_check
-        ///
-        /// @no_type_check
-        /// def fn(arg: "A") -> "R":
-        ///     pass
-        /// ```
-        ///
-        /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
-        /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
-        const NO_TYPE_CHECK = 1 << 26;
         /// The model is in the value expression of a [PEP 613] explicit type alias.
         ///
         /// For example:
@@ -2421,6 +2437,14 @@ bitflags! {
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
         const DEFERRED_TYPE_ALIAS = 1 << 28;
+
+        /// The model is visiting an `assert` statement.
+        ///
+        /// For example, the model might be visiting `y` in
+        /// ```python
+        /// assert (y := x**2) > 42, y
+        /// ```
+        const ASSERT_STATEMENT = 1 << 29;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

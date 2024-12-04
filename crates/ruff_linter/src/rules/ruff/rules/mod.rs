@@ -33,10 +33,12 @@ pub(crate) use test_rules::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unnecessary_nested_literal::*;
+pub(crate) use unnecessary_regular_expression::*;
 pub(crate) use unraw_re_pattern::*;
 pub(crate) use unsafe_markup_use::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
+pub(crate) use used_dummy_variable::*;
 pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
@@ -79,10 +81,12 @@ pub(crate) mod test_rules;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unnecessary_nested_literal;
+mod unnecessary_regular_expression;
 mod unraw_re_pattern;
 mod unsafe_markup_use;
 mod unused_async;
 mod unused_noqa;
+mod used_dummy_variable;
 mod useless_if_else;
 mod zip_instead_of_pairwise;
 

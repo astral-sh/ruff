@@ -1,0 +1,1 @@
+aliases: dict[str, str]

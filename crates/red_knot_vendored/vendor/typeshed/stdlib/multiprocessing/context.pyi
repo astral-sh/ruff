@@ -1,7 +1,8 @@
 import ctypes
 import sys
+from _ctypes import _CData
 from collections.abc import Callable, Iterable, Sequence
-from ctypes import _CData, _SimpleCData, c_char
+from ctypes import _SimpleCData, c_char
 from logging import Logger, _Level as _LoggingLevel
 from multiprocessing import popen_fork, popen_forkserver, popen_spawn_posix, popen_spawn_win32, queues, synchronize
 from multiprocessing.managers import SyncManager

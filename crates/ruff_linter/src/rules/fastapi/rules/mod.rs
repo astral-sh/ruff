@@ -15,10 +15,10 @@ pub(crate) fn is_fastapi_route(
     function_def: &ast::StmtFunctionDef,
     semantic: &SemanticModel,
 ) -> bool {
-    return function_def
+    function_def
         .decorator_list
         .iter()
-        .any(|decorator| is_fastapi_route_decorator(decorator, semantic).is_some());
+        .any(|decorator| is_fastapi_route_decorator(decorator, semantic).is_some())
 }
 
 /// Returns `true` if the decorator is indicative of a FastAPI route.

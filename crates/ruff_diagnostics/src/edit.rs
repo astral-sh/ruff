@@ -62,6 +62,10 @@ impl Edit {
         self.content.as_deref()
     }
 
+    pub fn into_content(self) -> Option<Box<str>> {
+        self.content
+    }
+
     fn kind(&self) -> EditOperationKind {
         if self.content.is_none() {
             EditOperationKind::Deletion

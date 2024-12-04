@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF041.pyi:6:4: RUF041 [*] Unnecessary nested `Literal`
   |
@@ -216,26 +215,6 @@ RUF041.pyi:24:1: RUF041 [*] Unnecessary nested `Literal`
 26 26 | 
 27 27 | # OK
 
-RUF041.pyi:24:9: RUF041 [*] Unnecessary nested `Literal`
-   |
-22 | # nested literals, all equivalent to `Literal[1]`
-23 | Literal[Literal[1]]
-24 | Literal[Literal[Literal[1], Literal[1]]]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF041
-25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
-   |
-   = help: Replace with flattened `Literal`
-
-ℹ Safe fix
-21 21 | 
-22 22 | # nested literals, all equivalent to `Literal[1]`
-23 23 | Literal[Literal[1]]
-24    |-Literal[Literal[Literal[1], Literal[1]]]
-   24 |+Literal[Literal[1, 1]]
-25 25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
-26 26 | 
-27 27 | # OK
-
 RUF041.pyi:25:1: RUF041 [*] Unnecessary nested `Literal`
    |
 23 | Literal[Literal[1]]
@@ -253,27 +232,6 @@ RUF041.pyi:25:1: RUF041 [*] Unnecessary nested `Literal`
 24 24 | Literal[Literal[Literal[1], Literal[1]]]
 25    |-Literal[Literal[1], Literal[Literal[Literal[1]]]]
    25 |+Literal[1, 1]
-26 26 | 
-27 27 | # OK
-28 28 | x: Literal[True, False, True, False]
-
-RUF041.pyi:25:29: RUF041 [*] Unnecessary nested `Literal`
-   |
-23 | Literal[Literal[1]]
-24 | Literal[Literal[Literal[1], Literal[1]]]
-25 | Literal[Literal[1], Literal[Literal[Literal[1]]]]
-   |                             ^^^^^^^^^^^^^^^^^^^ RUF041
-26 | 
-27 | # OK
-   |
-   = help: Replace with flattened `Literal`
-
-ℹ Safe fix
-22 22 | # nested literals, all equivalent to `Literal[1]`
-23 23 | Literal[Literal[1]]
-24 24 | Literal[Literal[Literal[1], Literal[1]]]
-25    |-Literal[Literal[1], Literal[Literal[Literal[1]]]]
-   25 |+Literal[Literal[1], Literal[Literal[1]]]
 26 26 | 
 27 27 | # OK
 28 28 | x: Literal[True, False, True, False]

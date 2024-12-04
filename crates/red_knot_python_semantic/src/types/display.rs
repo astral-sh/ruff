@@ -289,7 +289,7 @@ struct DisplayMaybeNegatedType<'db> {
     negated: bool,
 }
 
-impl<'db> Display for DisplayMaybeNegatedType<'db> {
+impl Display for DisplayMaybeNegatedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if self.negated {
             f.write_str("~")?;
@@ -319,7 +319,7 @@ pub(crate) struct DisplayTypeArray<'b, 'db> {
     db: &'db dyn Db,
 }
 
-impl<'db> Display for DisplayTypeArray<'_, 'db> {
+impl Display for DisplayTypeArray<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.join(", ")
             .entries(self.types.iter().map(|ty| ty.display(self.db)))
