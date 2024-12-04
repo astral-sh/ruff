@@ -378,34 +378,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use super::{IntersectionBuilder, IntersectionType, Type, UnionType};
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
+
+    use crate::db::tests::{setup_db, TestDb};
     use crate::types::{global_symbol, todo_type, KnownClass, UnionBuilder};
-    use crate::ProgramSettings;
+
     use ruff_db::files::system_path_to_file;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithTestSystem;
     use test_case::test_case;
-
-    fn setup_db() -> TestDb {
-        let db = TestDb::new();
-
-        let src_root = SystemPathBuf::from("/src");
-        db.memory_file_system()
-            .create_directory_all(&src_root)
-            .unwrap();
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(src_root),
-            },
-        )
-        .expect("Valid search path settings");
-
-        db
-    }
 
     #[test]
     fn build_union() {

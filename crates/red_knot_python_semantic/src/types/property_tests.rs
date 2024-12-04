@@ -26,8 +26,8 @@
 
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
-use super::tests::{setup_db, Ty};
-use crate::db::tests::TestDb;
+use super::tests::Ty;
+use crate::db::tests::{setup_db, TestDb};
 use crate::types::KnownClass;
 use quickcheck::{Arbitrary, Gen};
 
