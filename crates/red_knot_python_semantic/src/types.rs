@@ -1417,8 +1417,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return the type of `len()` on a type if it is known ore precisely than `int`
-    /// and `None` otherwise.
+    /// Return the type of `len()` on a type if it is known more precisely than `int`,
+    /// or `None` otherwise.
     ///
     /// In the second case, the return type of `len()` in `typeshed` (`int`)
     /// is used as a fallback.
