@@ -66,28 +66,18 @@ pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: String
         if part.flags().is_raw_string() {
             continue;
         }
-        match part {
-            StringLikePart::String(string_literal) => {
-                check(
-                    &mut checker.diagnostics,
-                    locator,
-                    string_literal.start(),
-                    string_literal.range(),
-                    AnyStringFlags::from(string_literal.flags),
-                );
-            }
-            StringLikePart::Bytes(bytes_literal) => {
-                check(
-                    &mut checker.diagnostics,
-                    locator,
-                    bytes_literal.start(),
-                    bytes_literal.range(),
-                    AnyStringFlags::from(bytes_literal.flags),
-                );
+        let state = match part {
+            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+                analyze_escape_chars(locator, part.range(), AnyStringFlags::from(part.flags()))
             }
             StringLikePart::FString(f_string) => {
                 let flags = AnyStringFlags::from(f_string.flags);
                 let mut escape_chars_state = EscapeCharsState::default();
+                // Whether we suggest converting to a raw string or
+                // adding backslashes depends on the presence of valid
+                // escape characters in the entire f-string. Therefore,
+                // we must analyze escape characters in each f-string
+                // element before pushing a diagnostic and fix.
                 for element in &f_string.elements {
                     match element {
                         FStringElement::Literal(literal) => {
@@ -111,31 +101,17 @@ pub(crate) fn invalid_escape_sequence(checker: &mut Checker, string_like: String
                         }
                     }
                 }
-                check_from_escape_chars_state(
-                    &mut checker.diagnostics,
-                    locator,
-                    f_string.start(),
-                    flags,
-                    escape_chars_state,
-                );
+                escape_chars_state
             }
-        }
+        };
+        check(
+            &mut checker.diagnostics,
+            locator,
+            part.start(),
+            part.flags(),
+            state,
+        );
     }
-}
-
-fn check(
-    diagnostics: &mut Vec<Diagnostic>,
-    locator: &Locator,
-    // Start position of the expression that contains the source range. This is used to generate
-    // the fix when the source range is part of the expression like in f-string which contains
-    // other f-string literal elements.
-    expr_start: TextSize,
-    // Range in the source code to perform the check on.
-    source_range: TextRange,
-    flags: AnyStringFlags,
-) {
-    let escape_chars_state = analyze_escape_chars(locator, source_range, flags);
-    check_from_escape_chars_state(diagnostics, locator, expr_start, flags, escape_chars_state);
 }
 
 #[derive(Default)]
@@ -151,6 +127,8 @@ impl EscapeCharsState {
     }
 }
 
+/// Traverses string, collects invalid escape characters, and flags if a valid
+/// escape character is found.
 fn analyze_escape_chars(
     locator: &Locator,
     // Range in the source code to perform the analysis on.
@@ -258,7 +236,12 @@ fn analyze_escape_chars(
     }
 }
 
-fn check_from_escape_chars_state(
+/// Pushes a diagnostic and fix depending on escape characters seen so far.
+///
+/// If we have not seen any valid escape characters, we convert to
+/// a raw string. If we have seen valid escape characters,
+/// we manually add backslashes to each invalid escape character found.
+fn check(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     // Start position of the expression that contains the source range. This is used to generate
