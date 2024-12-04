@@ -189,8 +189,7 @@ impl<'db> Parameter<'db> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tests::TestDb;
-    use crate::test::setup_db;
+    use crate::db::tests::{setup_db, TestDb};
     use crate::types::{global_symbol, FunctionType};
     use ruff_db::system::DbWithTestSystem;
 

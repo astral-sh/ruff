@@ -25,7 +25,4 @@ pub mod types;
 mod unpack;
 mod util;
 
-#[cfg(test)]
-mod test;
-
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;

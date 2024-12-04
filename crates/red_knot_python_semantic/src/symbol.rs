@@ -90,7 +90,7 @@ impl<'db> Symbol<'db> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::setup_db;
+    use crate::db::tests::setup_db;
 
     #[test]
     fn test_symbol_or_fall_back_to() {

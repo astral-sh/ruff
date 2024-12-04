@@ -359,7 +359,7 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithTestSystem;
 
-    use crate::test::setup_db;
+    use crate::db::tests::setup_db;
     use crate::types::{global_symbol, SliceLiteralType, StringLiteralType, Type, UnionType};
 
     #[test]

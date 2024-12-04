@@ -3203,9 +3203,9 @@ static_assertions::assert_eq_size!(Type, [u8; 16]);
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::tests::TestDb;
+    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
     use crate::stdlib::typing_symbol;
-    use crate::test::setup_db;
+    use crate::PythonVersion;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
@@ -3816,8 +3816,10 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn typing_vs_typeshed_no_default() {
-        let db = setup_db();
+    fn typing_vs_typeshed_no_default() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY313)
+            .build()?;
 
         let typing_no_default = typing_symbol(&db, "NoDefault").expect_type();
         let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault").expect_type();
@@ -3827,6 +3829,8 @@ pub(crate) mod tests {
             typing_extensions_no_default.display(&db).to_string(),
             "NoDefault"
         );
+
+        Ok(())
     }
 
     #[test]

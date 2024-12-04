@@ -379,8 +379,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{IntersectionBuilder, IntersectionType, Type, UnionType};
 
-    use crate::db::tests::TestDb;
-    use crate::test::setup_db;
+    use crate::db::tests::{setup_db, TestDb};
     use crate::types::{global_symbol, todo_type, KnownClass, UnionBuilder};
 
     use ruff_db::files::system_path_to_file;
