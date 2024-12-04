@@ -296,7 +296,7 @@ pub trait LineRanges {
     /// If the start or end of `range` is out of bounds.
     fn full_lines_str(&self, range: TextRange) -> &str;
 
-    /// Returns the zero-based index of the line containing `offset`.
+    /// Returns the zero-based index of the line containing `range`'s start.
     ///
     /// ## Examples
     ///
@@ -309,6 +309,11 @@ pub trait LineRanges {
     /// assert_eq!(text.count_lines_until(TextSize::from(5)), 0);
     /// assert_eq!(text.count_lines_until(TextSize::from(23)), 1);
     /// assert_eq!(text.count_lines_until(TextSize::from(24)), 2);
+    /// assert_eq!(text.count_lines_until(TextSize::from(34)), 3);
+    ///
+    /// let text = "foo\n";
+    ///
+    /// assert_eq!(text.count_lines_until(TextSize::from(4)), 1);
     /// ```
     ///
     /// ## Panics
@@ -318,10 +323,11 @@ pub trait LineRanges {
         let mut last_line_end = TextSize::default();
 
         loop {
-            last_line_end = self.full_line_end(last_line_end);
+            let line_end = self.full_line_end(last_line_end);
 
-            if last_line_end <= offset {
+            if line_end <= offset && line_end != last_line_end {
                 count += 1;
+                last_line_end = line_end;
             } else {
                 break;
             }

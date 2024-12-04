@@ -65,22 +65,25 @@ pub(crate) fn unnecessary_coding_comment(
     indexer: &Indexer,
     comment_ranges: &CommentRanges,
 ) {
-    // The coding comment must be on one of the first two lines. Since each comment spans at least
-    // one line, we only need to check the first two comments at most.
+    // The coding comment must be on one of the first two lines.
+    // Since each comment spans at least one line,
+    // we only need to check the first two comments,
+    // plus a third to make sure it would not become a new coding comment.
     let mut coding_comments = comment_ranges
         .iter()
-        .take(2)
+        .take(3)
         .map(|comment_range| coding_comment(locator, indexer, *comment_range));
 
     let first = coding_comments.next().flatten();
     let second = coding_comments.next().flatten();
+    let third = coding_comments.next().flatten();
 
-    match [first, second] {
-        [Some(CodingComment::UTF8(ranges)), None | Some(CodingComment::UTF8(..))]
-        | [None, Some(CodingComment::UTF8(ranges))] => {
+    // Table: https://github.com/astral-sh/ruff/pull/14728#issuecomment-2518114454
+    match [first, second, third] {
+        [Some(CodingComment::UTF8(ranges)), None | Some(CodingComment::UTF8(..)), _]
+        | [None, Some(CodingComment::UTF8(ranges)), None | Some(CodingComment::UTF8(..))] => {
             report(diagnostics, ranges.line_range, ranges.self_range);
         }
-
         _ => {}
     }
 }
@@ -121,7 +124,14 @@ fn coding_comment(
 
     let line_index = locator.count_lines_until(line_range.start());
 
-    if line_index > 1 {
+    // Aside from the first two lines,
+    // we also need to check the third for overridden coding comments:
+    // ```
+    // #!/usr/bin/python
+    // # -*- coding: utf-8 -*-
+    // # -*- coding: ascii -*-
+    // ```
+    if line_index > 2 {
         return None;
     }
 
