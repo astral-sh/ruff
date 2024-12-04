@@ -12,15 +12,10 @@ use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 ///
 /// ## Why is this bad?
 /// `typing.cast()` does not do anything at runtime, so the time spent
-/// on evaluating the type expression is wasted.
-///
-/// In order to provide a consistent experience and keep this rule simple
-/// type expressions will be quoted, even if they're so simple, that their
-/// overhead becomes negligible (e.g. a single builtin name lookup like `str`).
-///
-/// This has the added benefit of making the type expression visually
-/// distinct from the value expression, making it easier to see at a glance
-/// where one ends and the other begins.
+/// on evaluating the potentially complex type expression is wasted.
+/// But it's also bad to be inconsistent, so this rule always quotes
+/// the type expression even if its contribution to import/evaluation
+/// time is negligible, as a matter of style.
 ///
 /// ## Example
 /// ```python
