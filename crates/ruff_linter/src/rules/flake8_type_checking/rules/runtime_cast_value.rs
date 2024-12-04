@@ -21,6 +21,10 @@ use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 /// this rule, you ensure that all type expressions passed to `cast()` are
 /// quoted, enforcing stylistic consistency across all of your `cast()` calls.
 ///
+/// In some cases where `cast()` is used in a hot loop, this rule may also
+/// help avoid overhead from repeatedly evaluating complex type expressions at
+/// runtime.
+///
 /// ## Example
 /// ```python
 /// from typing import cast
