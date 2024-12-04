@@ -2,50 +2,69 @@
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 snapshot_kind: text
 ---
-AIR302_args.py:6:39: AIR302 `schedule_interval` is removed in Airflow 3.0; use `schedule` instead
-  |
-4 | DAG(dag_id="class_schedule", schedule="@hourly")
-5 | 
-6 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
-  |                                       ^^^^^^^^^^^^^^^^^ AIR302
-7 | 
-8 | DAG(dag_id="class_timetable", timetable=NullTimetable())
-  |
-
-AIR302_args.py:8:31: AIR302 `timetable` is removed in Airflow 3.0; use `schedule` instead
-  |
-6 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
-7 | 
-8 | DAG(dag_id="class_timetable", timetable=NullTimetable())
-  |                               ^^^^^^^^^ AIR302
-  |
-
-AIR302_args.py:15:34: AIR302 `sla_miss_callback` is removed in Airflow 3.0
+AIR302_args.py:9:39: AIR302 `schedule_interval` is removed in Airflow 3.0; use `schedule` instead
    |
-15 | DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
+ 7 | DAG(dag_id="class_schedule", schedule="@hourly")
+ 8 | 
+ 9 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
+   |                                       ^^^^^^^^^^^^^^^^^ AIR302
+10 | 
+11 | DAG(dag_id="class_timetable", timetable=NullTimetable())
+   |
+
+AIR302_args.py:11:31: AIR302 `timetable` is removed in Airflow 3.0; use `schedule` instead
+   |
+ 9 | DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
+10 | 
+11 | DAG(dag_id="class_timetable", timetable=NullTimetable())
+   |                               ^^^^^^^^^ AIR302
+   |
+
+AIR302_args.py:18:34: AIR302 `sla_miss_callback` is removed in Airflow 3.0
+   |
+18 | DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
    |                                  ^^^^^^^^^^^^^^^^^ AIR302
    |
 
-AIR302_args.py:23:6: AIR302 `schedule_interval` is removed in Airflow 3.0; use `schedule` instead
+AIR302_args.py:26:6: AIR302 `schedule_interval` is removed in Airflow 3.0; use `schedule` instead
    |
-23 | @dag(schedule_interval="0 * * * *")
+26 | @dag(schedule_interval="0 * * * *")
    |      ^^^^^^^^^^^^^^^^^ AIR302
-24 | def decorator_schedule_interval():
-25 |     pass
+27 | def decorator_schedule_interval():
+28 |     pass
    |
 
-AIR302_args.py:28:6: AIR302 `timetable` is removed in Airflow 3.0; use `schedule` instead
+AIR302_args.py:31:6: AIR302 `timetable` is removed in Airflow 3.0; use `schedule` instead
    |
-28 | @dag(timetable=NullTimetable())
+31 | @dag(timetable=NullTimetable())
    |      ^^^^^^^^^ AIR302
-29 | def decorator_timetable():
-30 |     pass
+32 | def decorator_timetable():
+33 |     pass
    |
 
-AIR302_args.py:33:6: AIR302 `sla_miss_callback` is removed in Airflow 3.0
+AIR302_args.py:36:6: AIR302 `sla_miss_callback` is removed in Airflow 3.0
    |
-33 | @dag(sla_miss_callback=sla_callback)
+36 | @dag(sla_miss_callback=sla_callback)
    |      ^^^^^^^^^^^^^^^^^ AIR302
-34 | def decorator_sla_callback():
-35 |     pass
+37 | def decorator_sla_callback():
+38 |     pass
+   |
+
+AIR302_args.py:44:39: AIR302 `execution_date` is removed in Airflow 3.0; use `logical_date` instead
+   |
+42 | def decorator_trigger_dag_run_operator():
+43 |     trigger_dagrun_op1 = trigger_dagrun.TriggerDagRunOperator(
+44 |         task_id="trigger_dagrun_op1", execution_date="2024-12-04"
+   |                                       ^^^^^^^^^^^^^^ AIR302
+45 |     )
+46 |     trigger_dagrun_op2 = TriggerDagRunOperator(
+   |
+
+AIR302_args.py:47:39: AIR302 `execution_date` is removed in Airflow 3.0; use `logical_date` instead
+   |
+45 |     )
+46 |     trigger_dagrun_op2 = TriggerDagRunOperator(
+47 |         task_id="trigger_dagrun_op2", execution_date="2024-12-04"
+   |                                       ^^^^^^^^^^^^^^ AIR302
+48 |     )
    |

@@ -98,6 +98,13 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 None::<&str>,
             ));
         }
+        ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "execution_date",
+                Some("logical_date"),
+            ));
+        }
         _ => {}
     };
 }
