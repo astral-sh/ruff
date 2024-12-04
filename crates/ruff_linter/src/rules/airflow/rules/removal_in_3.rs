@@ -92,6 +92,11 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 "timetable",
                 Some("schedule"),
             ));
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "sla_miss_callback",
+                None::<&str>,
+            ));
         }
         _ => {}
     };

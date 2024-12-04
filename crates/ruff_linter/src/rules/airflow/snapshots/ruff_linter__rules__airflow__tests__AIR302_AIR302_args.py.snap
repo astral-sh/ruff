@@ -20,18 +20,32 @@ AIR302_args.py:8:31: AIR302 `timetable` is removed in Airflow 3.0; use `schedule
   |                               ^^^^^^^^^ AIR302
   |
 
-AIR302_args.py:16:6: AIR302 `schedule_interval` is removed in Airflow 3.0; use `schedule` instead
+AIR302_args.py:15:34: AIR302 `sla_miss_callback` is removed in Airflow 3.0
    |
-16 | @dag(schedule_interval="0 * * * *")
-   |      ^^^^^^^^^^^^^^^^^ AIR302
-17 | def decorator_schedule_interval():
-18 |     pass
+15 | DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
+   |                                  ^^^^^^^^^^^^^^^^^ AIR302
    |
 
-AIR302_args.py:21:6: AIR302 `timetable` is removed in Airflow 3.0; use `schedule` instead
+AIR302_args.py:23:6: AIR302 `schedule_interval` is removed in Airflow 3.0; use `schedule` instead
    |
-21 | @dag(timetable=NullTimetable())
+23 | @dag(schedule_interval="0 * * * *")
+   |      ^^^^^^^^^^^^^^^^^ AIR302
+24 | def decorator_schedule_interval():
+25 |     pass
+   |
+
+AIR302_args.py:28:6: AIR302 `timetable` is removed in Airflow 3.0; use `schedule` instead
+   |
+28 | @dag(timetable=NullTimetable())
    |      ^^^^^^^^^ AIR302
-22 | def decorator_timetable():
-23 |     pass
+29 | def decorator_timetable():
+30 |     pass
+   |
+
+AIR302_args.py:33:6: AIR302 `sla_miss_callback` is removed in Airflow 3.0
+   |
+33 | @dag(sla_miss_callback=sla_callback)
+   |      ^^^^^^^^^^^^^^^^^ AIR302
+34 | def decorator_sla_callback():
+35 |     pass
    |
