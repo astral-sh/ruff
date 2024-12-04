@@ -5054,6 +5054,7 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
+    use crate::test::setup_db;
     use crate::types::check_types;
     use crate::{HasTy, ProgramSettings, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
@@ -5062,26 +5063,6 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
 
     use super::*;
-
-    fn setup_db() -> TestDb {
-        let db = TestDb::new();
-
-        let src_root = SystemPathBuf::from("/src");
-        db.memory_file_system()
-            .create_directory_all(&src_root)
-            .unwrap();
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(src_root),
-            },
-        )
-        .expect("Valid search path settings");
-
-        db
-    }
 
     fn setup_db_with_custom_typeshed<'a>(
         typeshed: &str,
