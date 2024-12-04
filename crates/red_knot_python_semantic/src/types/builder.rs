@@ -378,7 +378,6 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::stdlib::typing_symbol;
     use crate::types::{global_symbol, todo_type, KnownClass, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::files::system_path_to_file;
@@ -626,59 +625,85 @@ mod tests {
 
     #[test]
     fn intersection_negation_distributes_over_union() {
-        let db = setup_db();
-        let st = typing_symbol(&db, "Sized").expect_type().to_instance(&db);
-        let ht = typing_symbol(&db, "Hashable")
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            r#"
+            class A: ...
+            class B: ...
+            "#,
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let a = global_symbol(&db, module, "A")
             .expect_type()
             .to_instance(&db);
-        // sh_t: Sized & Hashable
-        let sh_t = IntersectionBuilder::new(&db)
-            .add_positive(st)
-            .add_positive(ht)
+        let b = global_symbol(&db, module, "B")
+            .expect_type()
+            .to_instance(&db);
+
+        // intersection: A & B
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(a)
+            .add_positive(b)
             .build()
             .expect_intersection();
-        assert_eq!(sh_t.pos_vec(&db), &[st, ht]);
-        assert_eq!(sh_t.neg_vec(&db), &[]);
+        assert_eq!(intersection.pos_vec(&db), &[a, b]);
+        assert_eq!(intersection.neg_vec(&db), &[]);
 
-        // ~sh_t => ~Sized | ~Hashable
-        let not_s_h_t = IntersectionBuilder::new(&db)
-            .add_negative(Type::Intersection(sh_t))
+        // ~intersection => ~A | ~B
+        let negated_intersection = IntersectionBuilder::new(&db)
+            .add_negative(Type::Intersection(intersection))
             .build()
             .expect_union();
 
-        // should have as elements: (~Sized),(~Hashable)
-        let not_st = st.negate(&db);
-        let not_ht = ht.negate(&db);
-        assert_eq!(not_s_h_t.elements(&db), &[not_st, not_ht]);
+        // should have as elements ~A and ~B
+        let not_a = a.negate(&db);
+        let not_b = b.negate(&db);
+        assert_eq!(negated_intersection.elements(&db), &[not_a, not_b]);
     }
 
     #[test]
     fn mixed_intersection_negation_distributes_over_union() {
-        let db = setup_db();
-        let it = KnownClass::Int.to_instance(&db);
-        let st = typing_symbol(&db, "Sized").expect_type().to_instance(&db);
-        let ht = typing_symbol(&db, "Hashable")
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            r#"
+            class A: ...
+            class B: ...
+            "#,
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let a = global_symbol(&db, module, "A")
             .expect_type()
             .to_instance(&db);
-        // s_not_h_t: Sized & ~Hashable
-        let s_not_h_t = IntersectionBuilder::new(&db)
-            .add_positive(st)
-            .add_negative(ht)
+        let b = global_symbol(&db, module, "B")
+            .expect_type()
+            .to_instance(&db);
+        let int = KnownClass::Int.to_instance(&db);
+
+        // a_not_b: A & ~B
+        let a_not_b = IntersectionBuilder::new(&db)
+            .add_positive(a)
+            .add_negative(b)
             .build()
             .expect_intersection();
-        assert_eq!(s_not_h_t.pos_vec(&db), &[st]);
-        assert_eq!(s_not_h_t.neg_vec(&db), &[ht]);
+        assert_eq!(a_not_b.pos_vec(&db), &[a]);
+        assert_eq!(a_not_b.neg_vec(&db), &[b]);
 
-        // let's build int & ~(Sized & ~Hashable)
-        let tt = IntersectionBuilder::new(&db)
-            .add_positive(it)
-            .add_negative(Type::Intersection(s_not_h_t))
+        // let's build
+        //         int & ~(A & ~B)
+        //       = int & ~(A & ~B)
+        //       = int & (~A | B)
+        //       = (int & ~A) | (int & B)
+        let t = IntersectionBuilder::new(&db)
+            .add_positive(int)
+            .add_negative(Type::Intersection(a_not_b))
             .build();
-
-        // int & ~(Sized & ~Hashable)
-        // -> int & (~Sized | Hashable)
-        // -> (int & ~Sized) | (int & Hashable)
-        assert_eq!(tt.display(&db).to_string(), "int & ~Sized | int & Hashable");
+        assert_eq!(t.display(&db).to_string(), "int & ~A | int & B");
     }
 
     #[test]
