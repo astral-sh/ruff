@@ -697,7 +697,7 @@ fn argvalues_edits(checker: &Checker, argvalues: &Expr) -> Vec<Edit> {
         return vec![];
     };
 
-    let mut fixes = Vec::with_capacity(elts.len());
+    let mut edits = Vec::with_capacity(elts.len());
     for value in elts {
         let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
             value
@@ -709,12 +709,12 @@ fn argvalues_edits(checker: &Checker, argvalues: &Expr) -> Vec<Edit> {
             return vec![];
         };
 
-        fixes.push(Edit::range_replacement(
+        edits.push(Edit::range_replacement(
             checker.generator().expr(elt),
             value.range(),
         ));
     }
-    fixes
+    edits
 }
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalues: &Expr) {
