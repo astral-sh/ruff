@@ -1560,6 +1560,7 @@ impl<'db> Type<'db> {
                 Type::Never
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
+            Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
             _ => todo_type!(),
         }
     }
@@ -1902,6 +1903,8 @@ pub enum KnownInstanceType<'db> {
     NoReturn,
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
+    /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
+    Any,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
@@ -1919,6 +1922,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(_) => "TypeVar",
             Self::NoReturn => "NoReturn",
             Self::Never => "Never",
+            Self::Any => "Any",
             Self::TypeAliasType(_) => "TypeAliasType",
         }
     }
@@ -1933,6 +1937,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Union
             | Self::NoReturn
             | Self::Never
+            | Self::Any
             | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
         }
     }
@@ -1946,6 +1951,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Union => "typing.Union",
             Self::NoReturn => "typing.NoReturn",
             Self::Never => "typing.Never",
+            Self::Any => "typing.Any",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
         }
@@ -1960,6 +1966,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Union => KnownClass::SpecialForm,
             Self::NoReturn => KnownClass::SpecialForm,
             Self::Never => KnownClass::SpecialForm,
+            Self::Any => KnownClass::Object,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
@@ -1979,6 +1986,7 @@ impl<'db> KnownInstanceType<'db> {
             return None;
         }
         match (module.name().as_str(), instance_name) {
+            ("typing", "Any") => Some(Self::Any),
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
             ("typing" | "typing_extensions", "LiteralString") => Some(Self::LiteralString),
             ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
@@ -2647,7 +2655,11 @@ impl<'db> Class<'db> {
     pub fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.iter_mro(db).contains(&ClassBase::Class(other))
+        self.is_subclass_of_base(db, other)
+    }
+
+    fn is_subclass_of_base(self, db: &'db dyn Db, other: impl Into<ClassBase<'db>>) -> bool {
+        self.iter_mro(db).contains(&other.into())
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
