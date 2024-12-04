@@ -95,7 +95,8 @@ impl<'db> Unpacker<'db> {
                     // there would be a cost and it's not clear that it's worth it.
                     let value_ty = Type::tuple(
                         self.db,
-                        std::iter::repeat(Type::LiteralString).take(string_literal_ty.len(self.db)),
+                        std::iter::repeat(Type::LiteralString)
+                            .take(string_literal_ty.python_len(self.db)),
                     );
                     self.unpack(target, value_ty, scope);
                 }

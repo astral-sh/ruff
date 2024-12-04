@@ -1417,21 +1417,76 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return the type of `len()` on a type if it is known more precisely than `int`,
+    /// or `None` otherwise.
+    ///
+    /// In the second case, the return type of `len()` in `typeshed` (`int`)
+    /// is used as a fallback.
+    fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+            match ty {
+                // TODO: Emit diagnostic for non-integers and negative integers
+                Type::IntLiteral(value) => (value >= 0).then_some(ty),
+                Type::BooleanLiteral(value) => Some(Type::IntLiteral(value.into())),
+                Type::Union(union) => {
+                    let mut builder = UnionBuilder::new(db);
+                    for element in union.elements(db) {
+                        builder = builder.add(non_negative_int_literal(db, *element)?);
+                    }
+                    Some(builder.build())
+                }
+                _ => None,
+            }
+        }
+
+        let usize_len = match self {
+            Type::BytesLiteral(bytes) => Some(bytes.python_len(db)),
+            Type::StringLiteral(string) => Some(string.python_len(db)),
+            Type::Tuple(tuple) => Some(tuple.len(db)),
+            _ => None,
+        };
+
+        if let Some(usize_len) = usize_len {
+            return usize_len.try_into().ok().map(Type::IntLiteral);
+        }
+
+        let return_ty = match self.call_dunder(db, "__len__", &[*self]) {
+            // TODO: emit a diagnostic
+            CallDunderResult::MethodNotAvailable => return None,
+
+            CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
+                outcome.return_ty(db)?
+            }
+        };
+
+        non_negative_int_literal(db, return_ty)
+    }
+
     /// Return the outcome of calling an object of this type.
     #[must_use]
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
-            Type::FunctionLiteral(function_type) => {
-                if function_type.is_known(db, KnownFunction::RevealType) {
-                    CallOutcome::revealed(
-                        function_type.signature(db).return_ty,
-                        *arg_types.first().unwrap_or(&Type::Unknown),
-                    )
-                } else {
-                    CallOutcome::callable(function_type.signature(db).return_ty)
+            Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                Some(KnownFunction::RevealType) => CallOutcome::revealed(
+                    function_type.signature(db).return_ty,
+                    *arg_types.first().unwrap_or(&Type::Unknown),
+                ),
+
+                Some(KnownFunction::Len) => {
+                    let normal_return_ty = function_type.signature(db).return_ty;
+
+                    let [only_arg] = arg_types else {
+                        // TODO: Emit a diagnostic
+                        return CallOutcome::callable(normal_return_ty);
+                    };
+                    let len_ty = only_arg.len(db);
+
+                    CallOutcome::callable(len_ty.unwrap_or(normal_return_ty))
                 }
-            }
+
+                _ => CallOutcome::callable(function_type.signature(db).return_ty),
+            },
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
@@ -2597,13 +2652,15 @@ pub enum KnownFunction {
     ConstraintFunction(KnownConstraintFunction),
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
+    /// `builtins.len`
+    Len,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType => None,
+            Self::RevealType | Self::Len => None,
         }
     }
 
@@ -2620,6 +2677,7 @@ impl KnownFunction {
             "issubclass" if definition.is_builtin_definition(db) => Some(
                 KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
             ),
+            "len" if definition.is_builtin_definition(db) => Some(KnownFunction::Len),
             _ => None,
         }
     }
@@ -3074,8 +3132,9 @@ pub struct StringLiteralType<'db> {
 }
 
 impl<'db> StringLiteralType<'db> {
-    pub fn len(&self, db: &'db dyn Db) -> usize {
-        self.value(db).len()
+    /// The length of the string, as would be returned by Python's `len()`.
+    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).chars().count()
     }
 }
 
@@ -3083,6 +3142,12 @@ impl<'db> StringLiteralType<'db> {
 pub struct BytesLiteralType<'db> {
     #[return_ref]
     value: Box<[u8]>,
+}
+
+impl<'db> BytesLiteralType<'db> {
+    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).len()
+    }
 }
 
 #[salsa::interned]
