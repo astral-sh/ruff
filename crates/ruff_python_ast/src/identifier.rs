@@ -111,7 +111,7 @@ pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
 }
 
 /// Return the [`TextRange`] of the `else` token in a `For` or `While` statement.
-pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
+pub fn else_loop(stmt: &Stmt, source: &str) -> Option<TextRange> {
     let (Stmt::For(ast::StmtFor { body, orelse, .. })
     | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
     else {
@@ -121,6 +121,50 @@ pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
     if orelse.is_empty() {
         return None;
     }
+
+    IdentifierTokenizer::starts_at(
+        body.last().expect("Expected body to be non-empty").end(),
+        source,
+    )
+    .next()
+}
+
+/// Return the [`TextRange`] of the `else` token in a `Try` statement.
+pub fn else_try(stmt: &Stmt, source: &str) -> Option<TextRange> {
+    let Stmt::Try(stmt_try) = stmt else {
+        return None;
+    };
+
+    let handlers = &stmt_try.handlers;
+    let mut body = &stmt_try.body[..];
+
+    if let [.., ExceptHandler::ExceptHandler(last_handler)] = &handlers[..] {
+        body = &last_handler.body[..];
+    };
+
+    IdentifierTokenizer::starts_at(
+        body.last().expect("Expected body to be non-empty").end(),
+        source,
+    )
+    .next()
+}
+
+/// Return the [`TextRange`] of the `finally` token in a `Try` statement.
+pub fn finally(stmt: &Stmt, source: &str) -> Option<TextRange> {
+    let Stmt::Try(stmt_try) = stmt else {
+        return None;
+    };
+
+    let (handlers, orelse) = (&stmt_try.handlers, &stmt_try.orelse);
+    let mut body = &stmt_try.body[..];
+
+    if let [.., ExceptHandler::ExceptHandler(last_handler)] = &handlers[..] {
+        body = &last_handler.body[..];
+    };
+
+    if !orelse.is_empty() {
+        body = &orelse[..];
+    };
 
     IdentifierTokenizer::starts_at(
         body.last().expect("Expected body to be non-empty").end(),

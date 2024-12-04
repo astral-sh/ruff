@@ -1235,6 +1235,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::EmptyBranch) {
+                ruff::rules::empty_branch_if(checker, stmt);
+            }
         }
         Stmt::Assert(
             assert_stmt @ ast::StmtAssert {
@@ -1429,6 +1432,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     refurb::rules::for_loop_set_mutations(checker, for_stmt);
                 }
             }
+            if checker.enabled(Rule::EmptyBranch) {
+                ruff::rules::empty_branch_for(checker, stmt);
+            }
         }
         Stmt::Try(ast::StmtTry {
             body,
@@ -1502,6 +1508,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ErrorInsteadOfException) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
+            }
+            if checker.enabled(Rule::EmptyBranch) {
+                ruff::rules::empty_branch_try(checker, stmt);
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {

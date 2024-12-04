@@ -1,0 +1,76 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF050_for.py:9:1: RUF050 [*] Empty code branch
+   |
+ 8 |   # Unsafe fix: Remove statement
+ 9 | / for E in O:
+10 | |     ...
+   | |_______^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Unsafe fix
+6  6  | 
+7  7  | 
+8  8  | # Unsafe fix: Remove statement
+9     |-for E in O:
+10    |-    ...
+11 9  | 
+12 10 | 
+13 11 | # Unsafe fix: Remove statement
+
+RUF050_for.py:14:1: RUF050 [*] Empty code branch
+   |
+13 |   # Unsafe fix: Remove statement
+14 | / for E in E:
+15 | |     pass
+16 | | else:
+17 | |     ...
+   | |_______^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Unsafe fix
+11 11 | 
+12 12 | 
+13 13 | # Unsafe fix: Remove statement
+14    |-for E in E:
+15    |-    pass
+16    |-else:
+17    |-    ...
+18 14 | 
+19 15 | 
+20 16 | # No fix
+
+RUF050_for.py:21:1: RUF050 Empty code branch
+   |
+20 |   # No fix
+21 | / for E in N:
+22 | |     pass
+23 | | else:
+24 | |     print()
+   | |___________^ RUF050
+   |
+   = help: Refactor this branch
+
+RUF050_for.py:35:1: RUF050 [*] Empty code branch
+   |
+33 |   for N in E:
+34 |       print()
+35 | / else:
+36 | |     ...
+   | |_______^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+32 32 | # Safe fix: Remove `else` branch
+33 33 | for N in E:
+34 34 |     print()
+35    |-else:
+36    |-    ...
+37 35 | 
+38 36 | 
+39 37 | # No error
