@@ -12,7 +12,7 @@ use red_knot_workspace::watch;
 use red_knot_workspace::watch::WorkspaceWatcher;
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::CompileDiagnostic;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 use target_version::TargetVersion;
@@ -297,7 +297,7 @@ impl MainLoop {
         while let Ok(message) = self.receiver.recv() {
             match message {
                 MainLoopMessage::CheckWorkspace => {
-                    let db = db.snapshot();
+                    let db = db.clone();
                     let sender = self.sender.clone();
 
                     // Spawn a new task that checks the workspace. This needs to be done in a separate thread
@@ -380,7 +380,7 @@ impl MainLoopCancellationToken {
 enum MainLoopMessage {
     CheckWorkspace,
     CheckCompleted {
-        result: Vec<Box<dyn Diagnostic>>,
+        result: Vec<CompileDiagnostic>,
         revision: u64,
     },
     ApplyChanges(Vec<watch::ChangeEvent>),

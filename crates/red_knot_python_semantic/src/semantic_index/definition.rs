@@ -211,7 +211,6 @@ pub(crate) struct AssignmentDefinitionNodeRef<'a> {
     pub(crate) unpack: Option<Unpack<'a>>,
     pub(crate) value: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
-    pub(crate) first: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -282,12 +281,10 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 value,
                 name,
-                first,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 target: TargetKind::from(unpack),
                 value: AstNodeRef::new(parsed.clone(), value),
                 name: AstNodeRef::new(parsed, name),
-                first,
             }),
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
@@ -374,7 +371,6 @@ impl<'db> DefinitionNodeRef<'db> {
                 value: _,
                 unpack: _,
                 name,
-                first: _,
             }) => name.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
@@ -591,7 +587,6 @@ pub struct AssignmentDefinitionKind<'db> {
     target: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
     name: AstNodeRef<ast::ExprName>,
-    first: bool,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -605,10 +600,6 @@ impl<'db> AssignmentDefinitionKind<'db> {
 
     pub(crate) fn name(&self) -> &ast::ExprName {
         self.name.node()
-    }
-
-    pub(crate) fn is_first(&self) -> bool {
-        self.first
     }
 }
 

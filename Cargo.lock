@@ -2403,7 +2403,6 @@ dependencies = [
  "ruff_cache",
  "ruff_db",
  "ruff_python_ast",
- "ruff_text_size",
  "rustc-hash 2.1.0",
  "salsa",
  "serde",
@@ -2630,7 +2629,6 @@ dependencies = [
  "salsa",
  "serde",
  "tempfile",
- "thiserror 2.0.3",
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
@@ -3189,7 +3187,7 @@ checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=254c749b02cde2fd29852a7463a33e800b771758#254c749b02cde2fd29852a7463a33e800b771758"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e68679b3a9c2b5cfd8eab92de89edf4073b03601#e68679b3a9c2b5cfd8eab92de89edf4073b03601"
 dependencies = [
  "append-only-vec",
  "arc-swap",
@@ -3199,6 +3197,7 @@ dependencies = [
  "indexmap",
  "lazy_static",
  "parking_lot",
+ "rayon",
  "rustc-hash 2.1.0",
  "salsa-macro-rules",
  "salsa-macros",
@@ -3209,12 +3208,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=254c749b02cde2fd29852a7463a33e800b771758#254c749b02cde2fd29852a7463a33e800b771758"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e68679b3a9c2b5cfd8eab92de89edf4073b03601#e68679b3a9c2b5cfd8eab92de89edf4073b03601"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=254c749b02cde2fd29852a7463a33e800b771758#254c749b02cde2fd29852a7463a33e800b771758"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e68679b3a9c2b5cfd8eab92de89edf4073b03601#e68679b3a9c2b5cfd8eab92de89edf4073b03601"
 dependencies = [
  "heck",
  "proc-macro2",

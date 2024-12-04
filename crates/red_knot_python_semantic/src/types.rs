@@ -7,7 +7,6 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
@@ -25,7 +24,9 @@ use crate::stdlib::{
     builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
 };
 use crate::symbol::{Boundness, Symbol};
-use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
+use crate::types::diagnostic::{
+    report_not_iterable, report_not_iterable_possibly_unbound, report_type_diagnostic,
+};
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program};
@@ -43,21 +44,17 @@ mod unpacker;
 #[cfg(test)]
 mod property_tests;
 
-#[salsa::tracked(return_ref)]
-pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
+#[salsa::tracked]
+pub fn check_types(db: &dyn Db, file: File) {
     let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
 
     tracing::debug!("Checking file '{path}'", path = file.path(db));
 
     let index = semantic_index(db, file);
-    let mut diagnostics = TypeCheckDiagnostics::default();
 
     for scope_id in index.scope_ids() {
-        let result = infer_scope_types(db, scope_id);
-        diagnostics.extend(result.diagnostics());
+        let _ = infer_scope_types(db, scope_id);
     }
-
-    diagnostics
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
@@ -2268,19 +2265,21 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call, emitting default diagnostics if needed.
-    fn unwrap_with_diagnostic<'a>(
+    fn unwrap_with_diagnostic(
         &self,
         db: &'db dyn Db,
+        file: File,
         node: ast::AnyNodeRef,
-        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Type<'db> {
-        match self.return_ty_result(db, node, diagnostics) {
+        match self.return_ty_result(db, file, node) {
             Ok(return_ty) => return_ty,
             Err(NotCallableError::Type {
                 not_callable_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                report_type_diagnostic(
+                    db,
+                    file,
                     node,
                     "call-non-callable",
                     format_args!(
@@ -2295,7 +2294,9 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                report_type_diagnostic(
+                    db,
+                    file,
                     node,
                     "call-non-callable",
                     format_args!(
@@ -2311,7 +2312,9 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                report_type_diagnostic(
+                    db,
+                    file,
                     node,
                     "call-non-callable",
                     format_args!(
@@ -2326,7 +2329,9 @@ impl<'db> CallOutcome<'db> {
                 callable_ty: called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                report_type_diagnostic(
+                    db,
+                    file,
                     node,
                     "call-non-callable",
                     format_args!(
@@ -2340,11 +2345,11 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call as a result.
-    fn return_ty_result<'a>(
+    fn return_ty_result(
         &self,
         db: &'db dyn Db,
+        file: File,
         node: ast::AnyNodeRef,
-        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Result<Type<'db>, NotCallableError<'db>> {
         match self {
             Self::Callable { return_ty } => Ok(*return_ty),
@@ -2352,7 +2357,9 @@ impl<'db> CallOutcome<'db> {
                 return_ty,
                 revealed_ty,
             } => {
-                diagnostics.add(
+                report_type_diagnostic(
+                    db,
+                    file,
                     node,
                     "revealed-type",
                     format_args!("Revealed type is `{}`", revealed_ty.display(db)),
@@ -2391,10 +2398,10 @@ impl<'db> CallOutcome<'db> {
                                 *return_ty
                             } else {
                                 revealed = true;
-                                outcome.unwrap_with_diagnostic(db, node, diagnostics)
+                                outcome.unwrap_with_diagnostic(db, file, node)
                             }
                         }
-                        _ => outcome.unwrap_with_diagnostic(db, node, diagnostics),
+                        _ => outcome.unwrap_with_diagnostic(db, file, node),
                     };
                     union_builder = union_builder.add(return_ty);
                 }
@@ -2509,20 +2516,21 @@ enum IterationOutcome<'db> {
 impl<'db> IterationOutcome<'db> {
     fn unwrap_with_diagnostic(
         self,
+        db: &dyn Db,
+        file: File,
         iterable_node: ast::AnyNodeRef,
-        diagnostics: &mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Type<'db> {
         match self {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
-                diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
+                report_not_iterable(db, file, iterable_node, not_iterable_ty);
                 Type::Unknown
             }
             Self::PossiblyUnboundDunderIter {
                 iterable_ty,
                 element_ty,
             } => {
-                diagnostics.add_not_iterable_possibly_unbound(iterable_node, iterable_ty);
+                report_not_iterable_possibly_unbound(db, file, iterable_node, iterable_ty);
                 element_ty
             }
         }

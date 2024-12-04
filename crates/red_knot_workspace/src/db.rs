@@ -4,9 +4,9 @@ use std::sync::Arc;
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
 
-use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
+use crate::workspace::{Workspace, WorkspaceMetadata};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::CompileDiagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
@@ -20,6 +20,7 @@ pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
 }
 
 #[salsa::db]
+#[derive(Clone)]
 pub struct RootDatabase {
     workspace: Option<Workspace>,
     storage: salsa::Storage<RootDatabase>,
@@ -48,14 +49,14 @@ impl RootDatabase {
     }
 
     /// Checks all open files in the workspace and its dependencies.
-    pub fn check(&self) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
+    pub fn check(&self) -> Result<Vec<CompileDiagnostic>, Cancelled> {
         self.with_db(|db| db.workspace().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<CompileDiagnostic>, Cancelled> {
         let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
 
-        self.with_db(|db| check_file(db, file))
+        self.with_db(|db| db.workspace().check_file(self, file))
     }
 
     /// Returns a mutable reference to the system.
@@ -74,16 +75,6 @@ impl RootDatabase {
         F: FnOnce(&RootDatabase) -> T + std::panic::UnwindSafe,
     {
         Cancelled::catch(|| f(self))
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            workspace: self.workspace,
-            storage: self.storage.clone(),
-            files: self.files.snapshot(),
-            system: Arc::clone(&self.system),
-        }
     }
 }
 
@@ -172,6 +163,7 @@ pub(crate) mod tests {
     use crate::workspace::{Workspace, WorkspaceMetadata};
 
     #[salsa::db]
+    #[derive(Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,

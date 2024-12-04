@@ -5,6 +5,7 @@ use std::sync::Arc;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_parser::{parse_unchecked_source, Parsed};
 
+use crate::diagnostic::{CompileDiagnostic, ParseDiagnostic};
 use crate::files::{File, FilePath};
 use crate::source::source_text;
 use crate::Db;
@@ -37,7 +38,13 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
             .map_or(PySourceType::Python, PySourceType::from_extension),
     };
 
-    ParsedModule::new(parse_unchecked_source(&source, ty))
+    let parsed = parse_unchecked_source(&source, ty);
+
+    for error in parsed.errors() {
+        CompileDiagnostic::report(db, ParseDiagnostic::new(file, error.clone()));
+    }
+
+    ParsedModule::new(parsed)
 }
 
 /// Cheap cloneable wrapper around the parsed module.

@@ -48,7 +48,11 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
-use crate::types::diagnostic::{TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
+use crate::types::diagnostic::{
+    report_index_out_of_bounds, report_invalid_assignment, report_non_subscriptable,
+    report_possibly_unresolved_reference, report_slice_step_size_zero, report_type_diagnostic,
+    report_unresolved_module, report_unresolved_reference,
+};
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -216,9 +220,6 @@ pub(crate) struct TypeInference<'db> {
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
-
     /// The scope belong to this region.
     scope: ScopeId<'db>,
 }
@@ -230,7 +231,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
-            diagnostics: TypeCheckDiagnostics::default(),
+
             scope,
         }
     }
@@ -254,15 +255,10 @@ impl<'db> TypeInference<'db> {
         self.declarations[&definition]
     }
 
-    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
-    }
-
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.bindings.shrink_to_fit();
         self.declarations.shrink_to_fit();
-        self.diagnostics.shrink_to_fit();
         self.deferred.shrink_to_fit();
     }
 }
@@ -341,8 +337,6 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// expression could be deferred if the file has `from __future__ import annotations` import or
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
-
-    diagnostics: TypeCheckDiagnosticsBuilder<'db>,
 }
 
 impl<'db> TypeInferenceBuilder<'db> {
@@ -373,7 +367,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             file,
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
-            diagnostics: TypeCheckDiagnosticsBuilder::new(db, file),
         }
     }
 
@@ -386,7 +379,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             .extend(inference.declarations.iter());
         self.types.expressions.extend(inference.expressions.iter());
         self.types.deferred.extend(inference.deferred.iter());
-        self.diagnostics.extend(&inference.diagnostics);
     }
 
     fn scope(&self) -> ScopeId<'db> {
@@ -501,7 +493,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         for (class, class_node) in class_definitions {
             // (1) Check that the class does not have a cyclic definition
             if class.is_cyclically_defined(self.db) {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     class_node.into(),
                     "cyclic-class-def",
                     format_args!(
@@ -521,7 +515,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::DuplicateBases(duplicates) => {
                         let base_nodes = class_node.bases();
                         for (index, duplicate) in duplicates {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 (&base_nodes[*index]).into(),
                                 "duplicate-base",
                                 format_args!("Duplicate base class `{}`", duplicate.name(self.db)),
@@ -531,7 +527,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::InvalidBases(bases) => {
                         let base_nodes = class_node.bases();
                         for (index, base_ty) in bases {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 (&base_nodes[*index]).into(),
                                 "invalid-base",
                                 format_args!(
@@ -541,7 +539,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                         }
                     }
-                    MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
+                    MroErrorKind::UnresolvableMro { bases_list } => report_type_diagnostic(
+                        self.db,
+                        self.file,
                         class_node.into(),
                         "inconsistent-mro",
                         format_args!(
@@ -571,7 +571,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     } => {
                         let node = class_node.into();
                         if *candidate1_is_base_class {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 node,
                                 "conflicting-metaclass",
                                 format_args!(
@@ -586,7 +588,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 )
                             );
                         } else {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 node,
                                 "conflicting-metaclass",
                                 format_args!(
@@ -732,7 +736,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => return,
         };
 
-        self.diagnostics.add(
+        report_type_diagnostic(
+            self.db,
+            self.file,
             expr.into(),
             "division-by-zero",
             format_args!(
@@ -757,7 +763,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // TODO point out the conflicting declarations in the diagnostic?
                 let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
                 let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     node,
                     "conflicting-declarations",
                     format_args!(
@@ -769,8 +777,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
         );
         if !bound_ty.is_assignable_to(self.db, declared_ty) {
-            self.diagnostics
-                .add_invalid_assignment(node, declared_ty, bound_ty);
+            report_invalid_assignment(self.db, self.file, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
         };
@@ -787,7 +794,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = if inferred_ty.is_assignable_to(self.db, ty) {
             ty
         } else {
-            self.diagnostics.add(
+            report_type_diagnostic(
+                self.db,
+                self.file,
                 node,
                 "invalid-declaration",
                 format_args!(
@@ -813,8 +822,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let inferred_ty = if inferred_ty.is_assignable_to(self.db, declared_ty) {
             inferred_ty
         } else {
-            self.diagnostics
-                .add_invalid_assignment(node, declared_ty, inferred_ty);
+            report_invalid_assignment(self.db, self.file, node, declared_ty, inferred_ty);
             // if the assignment is invalid, fall back to assuming the annotation is correct
             declared_ty
         };
@@ -1297,7 +1305,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
             (Symbol::Unbound, Symbol::Unbound) => {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     context_expression.into(),
                     "invalid-context-manager",
                     format_args!(
@@ -1308,7 +1318,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Unknown
             }
             (Symbol::Unbound, _) => {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     context_expression.into(),
                     "invalid-context-manager",
                     format_args!(
@@ -1320,7 +1332,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             (Symbol::Type(enter_ty, enter_boundness), exit) => {
                 if enter_boundness == Boundness::PossiblyUnbound {
-                    self.diagnostics.add(
+                    report_type_diagnostic(
+                        self.db,
+                        self.file,
                         context_expression.into(),
                         "invalid-context-manager",
                         format_args!(
@@ -1332,9 +1346,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let target_ty = enter_ty
                     .call(self.db, &[context_expression_ty])
-                    .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
+                    .return_ty_result(self.db, self.file, context_expression.into(), )
                     .unwrap_or_else(|err| {
-                        self.diagnostics.add(
+                        report_type_diagnostic(
+                            self.db,
+                            self.file,
                             context_expression.into(),
                             "invalid-context-manager",
                             format_args!("
@@ -1346,7 +1362,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 match exit {
                     Symbol::Unbound => {
-                        self.diagnostics.add(
+                        report_type_diagnostic(
+                            self.db,
+                            self.file,
                             context_expression.into(),
                             "invalid-context-manager",
                             format_args!(
@@ -1359,7 +1377,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
 
                         if exit_boundness == Boundness::PossiblyUnbound {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 context_expression.into(),
                                 "invalid-context-manager",
                                 format_args!(
@@ -1379,14 +1399,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     Type::none(self.db),
                                 ],
                             )
-                            .return_ty_result(
-                                self.db,
-                                context_expression.into(),
-                                &mut self.diagnostics,
-                            )
+                            .return_ty_result(self.db, self.file, context_expression.into())
                             .is_err()
                         {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 context_expression.into(),
                                 "invalid-context-manager",
                                 format_args!(
@@ -1466,7 +1484,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
                 if elts.len() < 2 {
-                    self.diagnostics.add(
+                    report_type_diagnostic(
+                        self.db,
+                        self.file,
                         expr.into(),
                         "invalid-typevar-constraints",
                         format_args!("TypeVar must have at least two constrained types"),
@@ -1663,12 +1683,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         let mut target_ty = match assignment.target() {
             TargetKind::Sequence(unpack) => {
                 let unpacked = infer_unpack_types(self.db, unpack);
-                // Only copy the diagnostics if this is the first assignment to avoid duplicating the
-                // unpack assignments.
-                if assignment.is_first() {
-                    self.diagnostics.extend(unpacked.diagnostics());
-                }
-
                 unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
             }
             TargetKind::Name => value_ty,
@@ -1784,12 +1798,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let call = class_member.call(self.db, &[target_type, value_type]);
                     let augmented_return_ty = match call.return_ty_result(
                         self.db,
+                        self.file,
                         AnyNodeRef::StmtAugAssign(assignment),
-                        &mut self.diagnostics,
                     ) {
                         Ok(t) => t,
                         Err(e) => {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 assignment.into(),
                                 "unsupported-operator",
                                 format_args!(
@@ -1810,7 +1826,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             let binary_return_ty = self.infer_binary_expression_type(left_ty, right_ty, op)
                                 .unwrap_or_else(|| {
-                                    self.diagnostics.add(
+                                    report_type_diagnostic(
+                                        self.db,
+                                        self.file,
                                         assignment.into(),
                                         "unsupported-operator",
                                         format_args!(
@@ -1839,7 +1857,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_binary_expression_type(left_ty, right_ty, op)
             .unwrap_or_else(|| {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     assignment.into(),
                     "unsupported-operator",
                     format_args!(
@@ -1926,7 +1946,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             iterable_ty
                 .iterate(self.db)
-                .unwrap_with_diagnostic(iterable.into(), &mut self.diagnostics)
+                .unwrap_with_diagnostic(self.db, self.file, iterable.into())
         };
 
         self.store_expression_type(target, loop_var_value_ty);
@@ -1965,7 +1985,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Some(module) = self.module_ty_from_name(&module_name) {
                 module
             } else {
-                self.diagnostics.add_unresolved_module(alias, 0, Some(name));
+                report_unresolved_module(self.db, self.file, alias, 0, Some(name));
                 Type::Unknown
             }
         } else {
@@ -2093,7 +2113,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match module_ty.member(self.db, &ast::name::Name::new(&name.id)) {
                         Symbol::Type(ty, boundness) => {
                             if boundness == Boundness::PossiblyUnbound {
-                                self.diagnostics.add(
+                                report_type_diagnostic(
+                                    self.db,
+                                    self.file,
                                     AnyNodeRef::Alias(alias),
                                     "possibly-unbound-import",
                                     format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
@@ -2103,7 +2125,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ty
                         }
                         Symbol::Unbound => {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 AnyNodeRef::Alias(alias),
                                 "unresolved-import",
                                 format_args!("Module `{module_name}` has no member `{name}`",),
@@ -2112,8 +2136,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                 } else {
-                    self.diagnostics
-                        .add_unresolved_module(import_from, *level, module);
+                    report_unresolved_module(self.db, self.file, import_from, *level, module);
                     Type::Unknown
                 }
             }
@@ -2127,8 +2150,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                self.diagnostics
-                    .add_unresolved_module(import_from, *level, module);
+
+                report_unresolved_module(self.db, self.file, import_from, *level, module);
                 Type::Unknown
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
@@ -2137,8 +2160,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_import_from_module(*level, module),
                     self.file.path(self.db)
                 );
-                self.diagnostics
-                    .add_unresolved_module(import_from, *level, module);
+
+                report_unresolved_module(self.db, self.file, import_from, *level, module);
                 Type::Unknown
             }
         };
@@ -2603,7 +2626,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             iterable_ty
                 .iterate(self.db)
-                .unwrap_with_diagnostic(iterable.into(), &mut self.diagnostics)
+                .unwrap_with_diagnostic(self.db, self.file, iterable.into())
         };
 
         self.types.expressions.insert(
@@ -2704,7 +2727,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let function_type = self.infer_expression(func);
         function_type
             .call(self.db, arg_types.as_slice())
-            .unwrap_with_diagnostic(self.db, func.as_ref().into(), &mut self.diagnostics)
+            .unwrap_with_diagnostic(self.db, self.file, func.as_ref().into())
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -2715,9 +2738,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = starred;
 
         let iterable_ty = self.infer_expression(value);
-        iterable_ty
-            .iterate(self.db)
-            .unwrap_with_diagnostic(value.as_ref().into(), &mut self.diagnostics);
+        iterable_ty.iterate(self.db).unwrap_with_diagnostic(
+            self.db,
+            self.file,
+            value.as_ref().into(),
+        );
 
         // TODO
         todo_type!()
@@ -2736,9 +2761,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprYieldFrom { range: _, value } = yield_from;
 
         let iterable_ty = self.infer_expression(value);
-        iterable_ty
-            .iterate(self.db)
-            .unwrap_with_diagnostic(value.as_ref().into(), &mut self.diagnostics);
+        iterable_ty.iterate(self.db).unwrap_with_diagnostic(
+            self.db,
+            self.file,
+            value.as_ref().into(),
+        );
 
         // TODO get type from `ReturnType` of generator
         todo_type!()
@@ -2810,7 +2837,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             {
                 let mut builtins_symbol = builtins_symbol(self.db, name);
                 if builtins_symbol.is_unbound() && name == "reveal_type" {
-                    self.diagnostics.add(
+                    report_type_diagnostic(
+                        self.db,
+                        self.file,
                         name_node.into(),
                         "undefined-reveal",
                         format_args!(
@@ -2865,7 +2894,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             match self.lookup_name(name) {
                 Symbol::Type(looked_up_ty, looked_up_boundness) => {
                     if looked_up_boundness == Boundness::PossiblyUnbound {
-                        self.diagnostics.add_possibly_unresolved_reference(name);
+                        report_possibly_unresolved_reference(self.db, self.file, name);
                     }
 
                     bindings_ty
@@ -2874,9 +2903,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 Symbol::Unbound => {
                     if bindings_ty.is_some() {
-                        self.diagnostics.add_possibly_unresolved_reference(name);
+                        report_possibly_unresolved_reference(self.db, self.file, name);
                     } else {
-                        self.diagnostics.add_unresolved_reference(name);
+                        report_unresolved_reference(self.db, self.file, name);
                     }
                     bindings_ty.unwrap_or(Type::Unknown)
                 }
@@ -2907,7 +2936,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         match value_ty.member(self.db, &attr.id) {
             Symbol::Type(member_ty, boundness) => {
                 if boundness == Boundness::PossiblyUnbound {
-                    self.diagnostics.add(
+                    report_type_diagnostic(
+                        self.db,
+                        self.file,
                         attribute.into(),
                         "possibly-unbound-attribute",
                         format_args!(
@@ -2921,7 +2952,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 member_ty
             }
             Symbol::Unbound => {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     attribute.into(),
                     "unresolved-attribute",
                     format_args!(
@@ -2995,14 +3028,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 {
                     let call = class_member.call(self.db, &[operand_type]);
 
-                    match call.return_ty_result(
-                        self.db,
-                        AnyNodeRef::ExprUnaryOp(unary),
-                        &mut self.diagnostics,
-                    ) {
+                    match call.return_ty_result(self.db, self.file, AnyNodeRef::ExprUnaryOp(unary))
+                    {
                         Ok(t) => t,
                         Err(e) => {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 unary.into(),
                                 "unsupported-operator",
                                 format_args!(
@@ -3014,7 +3046,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                 } else {
-                    self.diagnostics.add(
+                    report_type_diagnostic(
+                        self.db,
+                        self.file,
                         unary.into(),
                         "unsupported-operator",
                         format_args!(
@@ -3055,7 +3089,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_binary_expression_type(left_ty, right_ty, *op)
             .unwrap_or_else(|| {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     binary.into(),
                     "unsupported-operator",
                     format_args!(
@@ -3365,7 +3401,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_binary_type_comparison(left_ty, *op, right_ty)
                         .unwrap_or_else(|error| {
                             // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 AnyNodeRef::ExprCompare(compare),
                                 "unsupported-operator",
                                 format_args!(
@@ -3911,7 +3949,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .copied()
                     .unwrap_or_else(|_| {
-                        self.diagnostics.add_index_out_of_bounds(
+                        report_index_out_of_bounds(
+                            self.db,
+                            self.file,
                             "tuple",
                             value_node.into(),
                             value_ty,
@@ -3930,7 +3970,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let new_elements: Vec<_> = new_elements.copied().collect();
                     Type::tuple(self.db, &new_elements)
                 } else {
-                    self.diagnostics.add_slice_step_size_zero(value_node.into());
+                    report_slice_step_size_zero(self.db, self.file, value_node.into());
                     Type::Unknown
                 }
             }
@@ -3944,7 +3984,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .map(|ch| Type::string_literal(self.db, &ch.to_string()))
                     .unwrap_or_else(|_| {
-                        self.diagnostics.add_index_out_of_bounds(
+                        report_index_out_of_bounds(
+                            self.db,
+                            self.file,
                             "string",
                             value_node.into(),
                             value_ty,
@@ -3964,7 +4006,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let literal: String = new_chars.collect();
                     Type::string_literal(self.db, &literal)
                 } else {
-                    self.diagnostics.add_slice_step_size_zero(value_node.into());
+                    report_slice_step_size_zero(self.db, self.file, value_node.into());
                     Type::Unknown
                 };
                 result
@@ -3979,7 +4021,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .map(|byte| Type::bytes_literal(self.db, &[*byte]))
                     .unwrap_or_else(|_| {
-                        self.diagnostics.add_index_out_of_bounds(
+                        report_index_out_of_bounds(
+                            self.db,
+                            self.file,
                             "bytes literal",
                             value_node.into(),
                             value_ty,
@@ -3998,7 +4042,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let new_bytes: Vec<u8> = new_bytes.copied().collect();
                     Type::bytes_literal(self.db, &new_bytes)
                 } else {
-                    self.diagnostics.add_slice_step_size_zero(value_node.into());
+                    report_slice_step_size_zero(self.db, self.file, value_node.into());
                     Type::Unknown
                 }
             }
@@ -4022,7 +4066,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Symbol::Unbound => {}
                     Symbol::Type(dunder_getitem_method, boundness) => {
                         if boundness == Boundness::PossiblyUnbound {
-                            self.diagnostics.add(
+                            report_type_diagnostic(
+                                self.db,
+                                self.file,
                                 value_node.into(),
                                 "call-possibly-unbound-method",
                                 format_args!(
@@ -4034,9 +4080,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         return dunder_getitem_method
                             .call(self.db, &[slice_ty])
-                            .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
+                            .return_ty_result(self.db, self.file, value_node.into())
                             .unwrap_or_else(|err| {
-                                self.diagnostics.add(
+                                report_type_diagnostic(
+                                    self.db,
+                                    self.file,
                                     value_node.into(),
                                     "call-non-callable",
                                     format_args!(
@@ -4066,7 +4114,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Symbol::Unbound => {}
                         Symbol::Type(ty, boundness) => {
                             if boundness == Boundness::PossiblyUnbound {
-                                self.diagnostics.add(
+                                report_type_diagnostic(
+                                    self.db,
+                                    self.file,
                                     value_node.into(),
                                     "call-possibly-unbound-method",
                                     format_args!(
@@ -4078,9 +4128,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             return ty
                                 .call(self.db, &[slice_ty])
-                                .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
+                                .return_ty_result(self.db, self.file, value_node.into())
                                 .unwrap_or_else(|err| {
-                                    self.diagnostics.add(
+                                    report_type_diagnostic(
+                                        self.db,
+                                        self.file,
                                         value_node.into(),
                                         "call-non-callable",
                                         format_args!(
@@ -4099,13 +4151,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return KnownClass::GenericAlias.to_instance(self.db);
                     }
 
-                    self.diagnostics.add_non_subscriptable(
+                    report_non_subscriptable(
+                        self.db,
+                        self.file,
                         value_node.into(),
                         value_ty,
                         "__class_getitem__",
                     );
                 } else {
-                    self.diagnostics.add_non_subscriptable(
+                    report_non_subscriptable(
+                        self.db,
+                        self.file,
                         value_node.into(),
                         value_ty,
                         "__getitem__",
@@ -4177,7 +4233,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     pub(super) fn finish(mut self) -> TypeInference<'db> {
         self.infer_region();
-        self.types.diagnostics = self.diagnostics.finish();
         self.types.shrink_to_fit();
         self.types
     }
@@ -4222,7 +4277,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
 
             ast::Expr::BytesLiteral(bytes) => {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     bytes.into(),
                     "annotation-byte-string",
                     format_args!("Type expressions cannot use bytes literal"),
@@ -4231,7 +4288,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             ast::Expr::FString(fstring) => {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     fstring.into(),
                     "annotation-f-string",
                     format_args!("Type expressions cannot use f-strings"),
@@ -4260,10 +4319,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     DeferredExpressionState::InStringAnnotation,
                 )
             }
-            Err(diagnostics) => {
-                self.diagnostics.extend(&diagnostics);
-                Type::Unknown
-            }
+            Err(()) => Type::Unknown,
         }
     }
 }
@@ -4483,10 +4539,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     DeferredExpressionState::InStringAnnotation,
                 )
             }
-            Err(diagnostics) => {
-                self.diagnostics.extend(&diagnostics);
-                Type::Unknown
-            }
+            Err(()) => Type::Unknown,
         }
     }
 
@@ -4603,7 +4656,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Ok(ty) => ty,
                 Err(nodes) => {
                     for node in nodes {
-                        self.diagnostics.add(
+                        report_type_diagnostic(
+                            self.db,
+                            self.file,
                             node.into(),
                             "invalid-literal-parameter",
                             format_args!(
@@ -4639,7 +4694,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("generic type alias")
             }
             KnownInstanceType::NoReturn | KnownInstanceType::Never => {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     subscript.into(),
                     "invalid-type-parameter",
                     format_args!(
@@ -4650,7 +4707,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Unknown
             }
             KnownInstanceType::LiteralString => {
-                self.diagnostics.add(
+                report_type_diagnostic(
+                    self.db,
+                    self.file,
                     subscript.into(),
                     "invalid-type-parameter",
                     format_args!(
@@ -5046,8 +5105,6 @@ fn perform_membership_test_comparison<'db>(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
-
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
@@ -5056,6 +5113,8 @@ mod tests {
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::check_types;
     use crate::{HasTy, ProgramSettings, SemanticModel};
+    use anyhow::Context;
+    use ruff_db::diagnostic::{CompileDiagnostic, Diagnostic};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -5157,20 +5216,16 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
-        let messages: Vec<&str> = diagnostics
+    fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
+        let file = system_path_to_file(db, filename).unwrap();
+
+        let diagnostics = check_types::accumulated::<CompileDiagnostic>(db, file);
+
+        let messages: Vec<_> = diagnostics
             .iter()
             .map(|diagnostic| diagnostic.message())
             .collect();
         assert_eq!(&messages, expected);
-    }
-
-    #[track_caller]
-    fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
-        let file = system_path_to_file(db, filename).unwrap();
-        let diagnostics = check_types(db, file);
-
-        assert_diagnostic_messages(diagnostics, expected);
     }
 
     #[test]
@@ -5957,7 +6012,15 @@ mod tests {
         assert!(z.is_unbound());
 
         // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
-        assert_file_diagnostics(&db, "src/a.py", &["Name `z` used when not defined"]);
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Expected an identifier, but found a keyword 'in' that cannot be used here",
+                "Expected 'in', found name",
+                "Name `z` used when not defined",
+            ],
+        );
 
         Ok(())
     }

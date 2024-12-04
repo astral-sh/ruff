@@ -5,10 +5,10 @@ use ruff_python_ast::{self as ast, ModExpression, StringFlags};
 use ruff_python_parser::{parse_expression_range, Parsed};
 use ruff_text_size::Ranged;
 
-use crate::types::diagnostic::{TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
+use crate::types::diagnostic::report_type_diagnostic;
 use crate::Db;
 
-type AnnotationParseResult = Result<Parsed<ModExpression>, TypeCheckDiagnostics>;
+type AnnotationParseResult = Result<Parsed<ModExpression>, ()>;
 
 /// Parses the given expression as a string annotation.
 pub(crate) fn parse_string_annotation(
@@ -20,12 +20,13 @@ pub(crate) fn parse_string_annotation(
 
     let source = source_text(db.upcast(), file);
     let node_text = &source[string_expr.range()];
-    let mut diagnostics = TypeCheckDiagnosticsBuilder::new(db, file);
 
     if let [string_literal] = string_expr.value.as_slice() {
         let prefix = string_literal.flags.prefix();
         if prefix.is_raw() {
-            diagnostics.add(
+            report_type_diagnostic(
+                db,
+                file,
                 string_literal.into(),
                 "annotation-raw-string",
                 format_args!("Type expressions cannot use raw string literal"),
@@ -49,7 +50,9 @@ pub(crate) fn parse_string_annotation(
             // ```
             match parse_expression_range(source.as_str(), range_excluding_quotes) {
                 Ok(parsed) => return Ok(parsed),
-                Err(parse_error) => diagnostics.add(
+                Err(parse_error) => report_type_diagnostic(
+                    db,
+                    file,
                     string_literal.into(),
                     "forward-annotation-syntax-error",
                     format_args!("Syntax error in forward annotation: {}", parse_error.error),
@@ -58,7 +61,9 @@ pub(crate) fn parse_string_annotation(
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the
             // case for annotations that contain escape sequences.
-            diagnostics.add(
+            report_type_diagnostic(
+                db,
+                file,
                 string_expr.into(),
                 "annotation-escape-character",
                 format_args!("Type expressions cannot contain escape characters"),
@@ -66,12 +71,14 @@ pub(crate) fn parse_string_annotation(
         }
     } else {
         // String is implicitly concatenated.
-        diagnostics.add(
+        report_type_diagnostic(
+            db,
+            file,
             string_expr.into(),
             "annotation-implicit-concat",
             format_args!("Type expressions cannot span multiple string literals"),
         );
     }
 
-    Err(diagnostics.finish())
+    Err(())
 }

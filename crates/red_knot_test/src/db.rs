@@ -7,6 +7,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 
 #[salsa::db]
+#[derive(Clone)]
 pub(crate) struct Db {
     workspace_root: SystemPathBuf,
     storage: salsa::Storage<Self>,

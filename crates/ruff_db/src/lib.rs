@@ -48,7 +48,7 @@ mod tests {
     ///
     /// Uses an in memory filesystem and it stubs out the vendored files by default.
     #[salsa::db]
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         files: Files,
