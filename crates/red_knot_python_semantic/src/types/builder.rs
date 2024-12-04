@@ -73,7 +73,8 @@ impl<'db> UnionBuilder<'db> {
                         // supertype of bool. Therefore, we are done.
                         break;
                     }
-                    if ty.is_subtype_of(self.db, *element) {
+
+                    if ty.is_same_gradual_form(*element) || ty.is_subtype_of(self.db, *element) {
                         return self;
                     } else if element.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
@@ -259,7 +260,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
             let mut to_remove = SmallVec::<[usize; 1]>::new();
             for (index, existing_positive) in self.positive.iter().enumerate() {
                 // S & T = S    if S <: T
-                if existing_positive.is_subtype_of(db, new_positive) {
+                if existing_positive.is_subtype_of(db, new_positive)
+                    || existing_positive.is_same_gradual_form(new_positive)
+                {
                     return;
                 }
                 // same rule, reverse order
@@ -497,6 +500,17 @@ mod tests {
     }
 
     #[test]
+    fn build_union_simplify_multiple_unknown() {
+        let db = setup_db();
+        let t0 = KnownClass::Str.to_instance(&db);
+        let t1 = Type::Unknown;
+
+        let u = UnionType::from_elements(&db, [t0, t1, t1]);
+
+        assert_eq!(u.expect_union().elements(&db), &[t0, t1]);
+    }
+
+    #[test]
     fn build_union_subsume_multiple() {
         let db = setup_db();
         let str_ty = KnownClass::Str.to_instance(&db);
@@ -601,6 +615,42 @@ mod tests {
             .add_negative(Type::Any)
             .build();
         assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_simplify_multiple_unknown() {
+        let db = setup_db();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unknown)
+            .add_positive(Type::Unknown)
+            .build();
+        assert_eq!(ty, Type::Unknown);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unknown)
+            .add_negative(Type::Unknown)
+            .build();
+        assert_eq!(ty, Type::Unknown);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::Unknown)
+            .add_negative(Type::Unknown)
+            .build();
+        assert_eq!(ty, Type::Unknown);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unknown)
+            .add_positive(Type::IntLiteral(0))
+            .add_negative(Type::Unknown)
+            .build();
+        assert_eq!(
+            ty,
+            IntersectionBuilder::new(&db)
+                .add_positive(Type::Unknown)
+                .add_positive(Type::IntLiteral(0))
+                .build()
+        );
     }
 
     #[test]

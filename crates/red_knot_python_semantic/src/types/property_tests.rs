@@ -213,6 +213,12 @@ mod stable {
         singleton_implies_single_valued, db,
         forall types t. t.is_singleton(db) => t.is_single_valued(db)
     );
+
+    // If `T` contains a gradual form, it should not participate in subtyping
+    type_property_test!(
+        non_fully_static_types_do_not_participate_in_subtyping, db,
+        forall types s, t. !s.is_fully_static(db) => !s.is_subtype_of(db, t) && !t.is_subtype_of(db, s)
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
