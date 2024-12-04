@@ -105,6 +105,27 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 Some("logical_date"),
             ));
         }
+        ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
+        }
+        ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
+        }
+        ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
+        }
         _ => {}
     };
 }
