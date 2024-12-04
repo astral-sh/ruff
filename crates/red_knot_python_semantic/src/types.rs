@@ -1340,14 +1340,15 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Resolves the length value of a type.
+    /// Return the type of `len()` on a type if it is known ore precisely than `int`
+    /// and `None` otherwise.
     ///
-    /// This is used to determine the value that would be returned
-    /// when `len(x)` is called on an object `x`.
+    /// In the second case, the return type of `len()` in `typeshed` (`int`)
+    /// is used as a fallback.
     fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             match ty {
-                // TODO: Emit diagnostic for negative integers
+                // TODO: Emit diagnostic for non-integers and negative integers
                 Type::IntLiteral(value) => (value >= 0).then_some(ty),
                 Type::BooleanLiteral(value) => Some(Type::IntLiteral(value.into())),
                 Type::Union(union) => {
@@ -1373,7 +1374,9 @@ impl<'db> Type<'db> {
         }
 
         let return_ty = match self.call_dunder(db, "__len__", &[*self]) {
+            // TODO: emit a diagnostic
             CallDunderResult::MethodNotAvailable => return None,
+
             CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
                 outcome.return_ty(db)?
             }
@@ -1397,8 +1400,7 @@ impl<'db> Type<'db> {
                     let normal_return_ty = function_type.signature(db).return_ty;
 
                     let [only_arg] = arg_types else {
-                        // TODO: Return a variant indicating wrong number of arguments
-                        // (we don't have that yet)
+                        // TODO: Emit a diagnostic
                         return CallOutcome::callable(normal_return_ty);
                     };
                     let len_ty = only_arg.len(db);

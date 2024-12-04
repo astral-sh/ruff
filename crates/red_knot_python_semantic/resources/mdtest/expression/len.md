@@ -47,8 +47,10 @@ reveal_type(len((1, 2)))  # revealed: Literal[2]
 # TODO: Handle constructor calls
 reveal_type(len(tuple()))  # revealed: int
 
-# TODO: Handle unpacks
+# TODO: Handle star unpacks; Should be: Literal[0]
 reveal_type(len((*[],)))  # revealed: Literal[1]
+
+# TODO: Handle star unpacks; Should be: Literal[1]
 reveal_type(  # revealed: Literal[2]
     len(
         (
@@ -57,7 +59,11 @@ reveal_type(  # revealed: Literal[2]
         )
     )
 )
+
+# TODO: Handle star unpacks; Should be: Literal[2]
 reveal_type(len((*[], 1, 2)))  # revealed: Literal[3]
+
+# TODO: Handle star unpacks; Should be: Literal[0]
 reveal_type(len((*[], *{})))  # revealed: Literal[2]
 ```
 
@@ -114,7 +120,11 @@ reveal_type(len(Zero()))  # revealed: Literal[0]
 reveal_type(len(ZeroOrOne()))  # revealed: Literal[0, 1]
 reveal_type(len(ZeroOrTrue()))  # revealed: Literal[0, 1]
 reveal_type(len(OneOrFalse()))  # revealed: Literal[0, 1]
+
+# TODO: Emit a diagnostic
 reveal_type(len(OneOrFoo()))  # revealed: int
+
+# TODO: Emit a diagnostic
 reveal_type(len(ZeroOrStr()))  # revealed: int
 ```
 
@@ -174,9 +184,9 @@ reveal_type(len(IntUnion()))  # revealed: Literal[2, 32]
 from typing import Literal
 
 class Negative:
-    # TODO: Emit a diagnostic
     def __len__(self) -> Literal[-1]: ...
 
+# TODO: Emit a diagnostic
 reveal_type(len(Negative()))  # revealed: int
 ```
 
@@ -186,13 +196,24 @@ reveal_type(len(Negative()))  # revealed: int
 from typing import Literal
 
 class SecondOptionalArgument:
-    # TODO: Emit a diagnostic
     def __len__(self, v: int = 0) -> Literal[0]: ...
 
 class SecondRequiredArgument:
-    # TODO: Emit a diagnostic
     def __len__(self, v: int) -> Literal[1]: ...
 
+# TODO: Emit a diagnostic
 reveal_type(len(SecondOptionalArgument()))  # revealed: Literal[0]
+
+# TODO: Emit a diagnostic
 reveal_type(len(SecondRequiredArgument()))  # revealed: Literal[1]
+```
+
+### No `__len__`
+
+```py
+class NoDunderLen:
+    pass
+
+# TODO: Emit a diagnostic
+reveal_type(len(NoDunderLen()))  # revealed: int
 ```
