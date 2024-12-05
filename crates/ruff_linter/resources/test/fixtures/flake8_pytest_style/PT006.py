@@ -91,3 +91,47 @@ def test_single_element_tuple(param):
 @pytest.mark.parametrize(("param",), [[1], [2]])
 def test_single_element_list(param):
     ...
+
+
+@pytest.mark.parametrize(("param",), [[1], [2]])
+def test_single_element_list(param):
+    ...
+
+
+# Unsafe fix
+@pytest.mark.parametrize(
+    (
+        # comment
+        "param",
+    ),
+    [[1], [2]],
+)
+def test_comment_in_argnames(param):
+    ...
+
+# Unsafe fix
+@pytest.mark.parametrize(
+    ("param",),
+    [
+        (
+            # comment
+            1,
+        ),
+        (2,),
+    ],
+)
+def test_comment_in_argvalues(param):
+    ...
+
+
+# Safe fix
+@pytest.mark.parametrize(
+    ("param",),
+    [
+        (1,),
+        # comment
+        (2,),
+    ],
+)
+def test_comment_between_argvalues_items(param):
+    ...
