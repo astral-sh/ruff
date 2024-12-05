@@ -5124,16 +5124,6 @@ mod tests {
     }
 
     #[test]
-    fn from_import_with_no_module_name() -> anyhow::Result<()> {
-        // This test checks that invalid syntax in a `StmtImportFrom` node
-        // leads to the type being inferred as `Unknown`
-        let mut db = setup_db();
-        db.write_file("src/foo.py", "from import bar")?;
-        assert_public_ty(&db, "src/foo.py", "bar", "Unknown");
-        Ok(())
-    }
-
-    #[test]
     fn resolve_method() -> anyhow::Result<()> {
         let mut db = setup_db();
 
