@@ -1093,6 +1093,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::removed_in_3(checker, expr);
             }
+            if checker.enabled(Rule::UnnecessaryCastToInt) {
+                ruff::rules::unnecessary_cast_to_int(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
