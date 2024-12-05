@@ -230,7 +230,7 @@ PT006.py:69:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 71 71 |     ...
 72 72 | 
 
-PT006.py:86:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:86:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    |
 86 | @pytest.mark.parametrize(("param",), [(1,), (2,)])
    |                          ^^^^^^^^^^ PT006
@@ -249,7 +249,7 @@ PT006.py:86:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 88 88 |     ...
 89 89 | 
 
-PT006.py:91:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:91:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    |
 91 | @pytest.mark.parametrize(("param",), [[1], [2]])
    |                          ^^^^^^^^^^ PT006
@@ -268,7 +268,7 @@ PT006.py:91:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 93 93 |     ...
 94 94 | 
 
-PT006.py:96:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:96:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    |
 96 | @pytest.mark.parametrize(("param",), [[1], [2]])
    |                          ^^^^^^^^^^ PT006
@@ -287,7 +287,7 @@ PT006.py:96:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 98 98 |     ...
 99 99 | 
 
-PT006.py:103:5: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:103:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
     |
 101 |   # Unsafe fix
 102 |   @pytest.mark.parametrize(
@@ -317,7 +317,7 @@ PT006.py:103:5: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 109 106 | def test_comment_in_argnames(param):
 110 107 |     ...
 
-PT006.py:114:5: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:114:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
     |
 112 | # Unsafe fix
 113 | @pytest.mark.parametrize(
@@ -346,7 +346,7 @@ PT006.py:114:5: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 122 119 | )
 123 120 | def test_comment_in_argvalues(param):
 
-PT006.py:129:5: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:129:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
     |
 127 | # Safe fix
 128 | @pytest.mark.parametrize(
