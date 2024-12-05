@@ -43,7 +43,7 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use std::collections::HashSet;
+use crate::semantic_index::use_def::ActiveConstraints;
 
 use super::bitset::{BitSet, BitSetIterator};
 use ruff_index::newtype_index;
@@ -72,7 +72,7 @@ type Declarations = BitSet<INLINE_DECLARATION_BLOCKS>;
 type DeclarationsIterator<'a> = BitSetIterator<'a, INLINE_DECLARATION_BLOCKS>;
 
 /// Can reference this * 64 total constraints inline; more will fall back to the heap.
-const INLINE_CONSTRAINT_BLOCKS: usize = 2;
+pub(crate) const INLINE_CONSTRAINT_BLOCKS: usize = 2;
 
 /// Can keep inline this many live bindings per symbol at a given time; more will go to heap.
 const INLINE_BINDINGS_PER_SYMBOL: usize = 4;
@@ -108,7 +108,7 @@ impl SymbolDeclarations {
     fn record_declaration(
         &mut self,
         declaration_id: ScopedDefinitionId,
-        active_constraints: &HashSet<ScopedConstraintId>,
+        active_constraints: &ActiveConstraints,
     ) {
         self.live_declarations = Declarations::with(declaration_id.into());
         self.may_be_undeclared = false;
@@ -117,8 +117,8 @@ impl SymbolDeclarations {
         self.constraints_active_at_declaration = Constraints::with_capacity(1);
         self.constraints_active_at_declaration
             .push(BitSet::default());
-        for active_constraint_id in active_constraints {
-            self.constraints_active_at_declaration[0].insert(active_constraint_id.as_u32());
+        for active_constraint_id in active_constraints.iter() {
+            self.constraints_active_at_declaration[0].insert(active_constraint_id);
         }
     }
 
@@ -181,7 +181,7 @@ impl SymbolBindings {
     pub(super) fn record_binding(
         &mut self,
         binding_id: ScopedDefinitionId,
-        active_constraints: &HashSet<ScopedConstraintId>,
+        active_constraints: &ActiveConstraints,
     ) {
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
@@ -190,8 +190,8 @@ impl SymbolBindings {
         self.constraints.push(BitSet::default());
         self.constraints_active_at_binding = Constraints::with_capacity(1);
         self.constraints_active_at_binding.push(BitSet::default());
-        for active_constraint_id in active_constraints {
-            self.constraints_active_at_binding[0].insert(active_constraint_id.as_u32());
+        for active_constraint_id in active_constraints.iter() {
+            self.constraints_active_at_binding[0].insert(active_constraint_id);
         }
         self.may_be_unbound = false;
     }
@@ -241,7 +241,7 @@ impl SymbolState {
     pub(super) fn record_binding(
         &mut self,
         binding_id: ScopedDefinitionId,
-        active_constraints: &HashSet<ScopedConstraintId>,
+        active_constraints: &ActiveConstraints,
     ) {
         self.bindings.record_binding(binding_id, active_constraints);
     }
@@ -260,7 +260,7 @@ impl SymbolState {
     pub(super) fn record_declaration(
         &mut self,
         declaration_id: ScopedDefinitionId,
-        active_constraints: &HashSet<ScopedConstraintId>,
+        active_constraints: &ActiveConstraints,
     ) {
         self.declarations
             .record_declaration(declaration_id, active_constraints);
