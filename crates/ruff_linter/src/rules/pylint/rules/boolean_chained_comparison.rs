@@ -112,9 +112,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
             let fix = match left_paren_count.cmp(&right_paren_count) {
                 std::cmp::Ordering::Less => {
                     let balance_parens_edit = Edit::insertion(
-                        std::iter::repeat('(')
-                            .take(right_paren_count - left_paren_count)
-                            .collect(),
+                        "(".repeat(right_paren_count - left_paren_count),
                         left_compare.start(),
                     );
                     Fix::safe_edits(edit, [balance_parens_edit])
@@ -122,7 +120,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
                 std::cmp::Ordering::Equal => Fix::safe_edit(edit),
                 std::cmp::Ordering::Greater => {
                     let balance_parens_edit = Edit::insertion(
-                        std::iter::repeat_n(')', left_paren_count - right_paren_count).collect(),
+                        ")".repeat(left_paren_count - right_paren_count),
                         right_compare.end(),
                     );
                     Fix::safe_edits(edit, [balance_parens_edit])
