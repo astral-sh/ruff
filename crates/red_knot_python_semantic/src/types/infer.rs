@@ -5273,23 +5273,6 @@ mod tests {
     }
 
     #[test]
-    fn ellipsis_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = ...
-            ",
-        )?;
-
-        // TODO: sys.version_info
-        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | ellipsis");
-
-        Ok(())
-    }
-
-    #[test]
     fn import_cycle() -> anyhow::Result<()> {
         let mut db = setup_db();
 
