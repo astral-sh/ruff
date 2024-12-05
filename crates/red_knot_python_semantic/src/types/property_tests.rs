@@ -26,8 +26,8 @@
 
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
-use super::tests::{setup_db, Ty};
-use crate::db::tests::TestDb;
+use super::tests::Ty;
+use crate::db::tests::{setup_db, TestDb};
 use crate::types::KnownClass;
 use quickcheck::{Arbitrary, Gen};
 
@@ -212,6 +212,12 @@ mod stable {
     type_property_test!(
         singleton_implies_single_valued, db,
         forall types t. t.is_singleton(db) => t.is_single_valued(db)
+    );
+
+    // If `T` contains a gradual form, it should not participate in subtyping
+    type_property_test!(
+        non_fully_static_types_do_not_participate_in_subtyping, db,
+        forall types s, t. !s.is_fully_static(db) => !s.is_subtype_of(db, t) && !t.is_subtype_of(db, s)
     );
 }
 

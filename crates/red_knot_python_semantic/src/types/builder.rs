@@ -73,7 +73,8 @@ impl<'db> UnionBuilder<'db> {
                         // supertype of bool. Therefore, we are done.
                         break;
                     }
-                    if ty.is_subtype_of(self.db, *element) {
+
+                    if ty.is_same_gradual_form(*element) || ty.is_subtype_of(self.db, *element) {
                         return self;
                     } else if element.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
@@ -259,7 +260,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
             let mut to_remove = SmallVec::<[usize; 1]>::new();
             for (index, existing_positive) in self.positive.iter().enumerate() {
                 // S & T = S    if S <: T
-                if existing_positive.is_subtype_of(db, new_positive) {
+                if existing_positive.is_subtype_of(db, new_positive)
+                    || existing_positive.is_same_gradual_form(new_positive)
+                {
                     return;
                 }
                 // same rule, reverse order
@@ -375,34 +378,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use super::{IntersectionBuilder, IntersectionType, Type, UnionType};
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
+
+    use crate::db::tests::{setup_db, TestDb};
     use crate::types::{global_symbol, todo_type, KnownClass, UnionBuilder};
-    use crate::ProgramSettings;
+
     use ruff_db::files::system_path_to_file;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithTestSystem;
     use test_case::test_case;
-
-    fn setup_db() -> TestDb {
-        let db = TestDb::new();
-
-        let src_root = SystemPathBuf::from("/src");
-        db.memory_file_system()
-            .create_directory_all(&src_root)
-            .unwrap();
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(src_root),
-            },
-        )
-        .expect("Valid search path settings");
-
-        db
-    }
 
     #[test]
     fn build_union() {
@@ -494,6 +476,17 @@ mod tests {
 
         assert_eq!(u0.expect_union().elements(&db), &[t0, t1]);
         assert_eq!(u1.expect_union().elements(&db), &[t1, t0]);
+    }
+
+    #[test]
+    fn build_union_simplify_multiple_unknown() {
+        let db = setup_db();
+        let t0 = KnownClass::Str.to_instance(&db);
+        let t1 = Type::Unknown;
+
+        let u = UnionType::from_elements(&db, [t0, t1, t1]);
+
+        assert_eq!(u.expect_union().elements(&db), &[t0, t1]);
     }
 
     #[test]
@@ -601,6 +594,42 @@ mod tests {
             .add_negative(Type::Any)
             .build();
         assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_simplify_multiple_unknown() {
+        let db = setup_db();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unknown)
+            .add_positive(Type::Unknown)
+            .build();
+        assert_eq!(ty, Type::Unknown);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unknown)
+            .add_negative(Type::Unknown)
+            .build();
+        assert_eq!(ty, Type::Unknown);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::Unknown)
+            .add_negative(Type::Unknown)
+            .build();
+        assert_eq!(ty, Type::Unknown);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unknown)
+            .add_positive(Type::IntLiteral(0))
+            .add_negative(Type::Unknown)
+            .build();
+        assert_eq!(
+            ty,
+            IntersectionBuilder::new(&db)
+                .add_positive(Type::Unknown)
+                .add_positive(Type::IntLiteral(0))
+                .build()
+        );
     }
 
     #[test]

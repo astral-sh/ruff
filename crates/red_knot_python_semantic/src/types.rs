@@ -28,7 +28,7 @@ use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 
 mod builder;
 mod diagnostic;
@@ -302,13 +302,7 @@ fn declarations_ty<'db>(
     let declared_ty = if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db).add(first);
         for other in [second].into_iter().chain(all_types) {
-            // Make sure not to emit spurious errors relating to `Type::Todo`,
-            // since we only infer this type due to a limitation in our current model.
-            //
-            // `Unknown` is different here, since we might infer `Unknown`
-            // for one of these due to a variable being defined in one possible
-            // control-flow branch but not another one.
-            if !first.is_equivalent_to(db, other) && !first.is_todo() && !other.is_todo() {
+            if !first.is_equivalent_to(db, other) {
                 conflicting.push(other);
             }
             builder = builder.add(other);
@@ -600,10 +594,15 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is a [subtype of] type `target`.
     ///
+    /// This method returns `false` if either `self` or `other` is not fully static.
+    ///
     /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.is_equivalent_to(db, target) {
             return true;
+        }
+        if !self.is_fully_static(db) || !target.is_fully_static(db) {
+            return false;
         }
         match (self, target) {
             (Type::Unknown | Type::Any | Type::Todo(_), _) => false,
@@ -764,8 +763,16 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is equivalent to type `other`.
+    /// Return true if this type is [equivalent to] type `other`.
+    ///
+    /// This method returns `false` if either `self` or `other` is not fully static.
+    ///
+    /// [equivalent to]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        if !(self.is_fully_static(db) && other.is_fully_static(db)) {
+            return false;
+        }
+
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
 
@@ -776,7 +783,6 @@ impl<'db> Type<'db> {
         // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
         // we understand `sys.version_info` branches.
         self == other
-            || matches!((self, other), (Type::Todo(_), Type::Todo(_)))
             || matches!((self, other),
                 (
                     Type::Instance(InstanceType { class: self_class }),
@@ -788,6 +794,17 @@ impl<'db> Type<'db> {
                         && self_known == target_class.known(db)
                 }
             )
+    }
+
+    /// Returns true if both `self` and `other` are the same gradual form
+    /// (limited to `Any`, `Unknown`, or `Todo`).
+    pub(crate) fn is_same_gradual_form(self, other: Type<'db>) -> bool {
+        matches!(
+            (self, other),
+            (Type::Unknown, Type::Unknown)
+                | (Type::Any, Type::Any)
+                | (Type::Todo(_), Type::Todo(_))
+        )
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -993,6 +1010,63 @@ impl<'db> Type<'db> {
                     false
                 }
             }
+        }
+    }
+
+    /// Returns true if the type does not contain any gradual forms (as a sub-part).
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Any | Type::Unknown | Type::Todo(_) => false,
+            Type::Never
+            | Type::FunctionLiteral(..)
+            | Type::ModuleLiteral(..)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            | Type::KnownInstance(_) => true,
+            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::Instance(_) => {
+                // TODO: Ideally, we would iterate over the MRO of the class, check if all
+                // bases are fully static, and only return `true` if that is the case.
+                //
+                // This does not work yet, because we currently infer `Unknown` for some
+                // generic base classes that we don't understand yet. For example, `str`
+                // is defined as `class str(Sequence[str])` in typeshed and we currently
+                // compute its MRO as `(str, Unknown, object)`. This would make us think
+                // that `str` is a gradual type, which causes all sorts of downstream
+                // issues because it does not participate in equivalence/subtyping etc.
+                //
+                // Another problem is that we run into problems if we eagerly query the
+                // MRO of class literals here. I have not fully investigated this, but
+                // iterating over the MRO alone, without even acting on it, causes us to
+                // infer `Unknown` for many classes.
+
+                true
+            }
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|elem| elem.is_fully_static(db)),
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .all(|elem| elem.is_fully_static(db))
+                    && intersection
+                        .negative(db)
+                        .iter()
+                        .all(|elem| elem.is_fully_static(db))
+            }
+            Type::Tuple(tuple) => tuple
+                .elements(db)
+                .iter()
+                .all(|elem| elem.is_fully_static(db)),
+            // TODO: Once we support them, make sure that we return `false` for other types
+            // containing gradual forms such as `tuple[Any, ...]` or `Callable[..., str]`.
+            // Conversely, make sure to return `true` for homogeneous tuples such as
+            // `tuple[int, ...]`, once we add support for them.
         }
     }
 
@@ -1343,21 +1417,76 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return the type of `len()` on a type if it is known more precisely than `int`,
+    /// or `None` otherwise.
+    ///
+    /// In the second case, the return type of `len()` in `typeshed` (`int`)
+    /// is used as a fallback.
+    fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+            match ty {
+                // TODO: Emit diagnostic for non-integers and negative integers
+                Type::IntLiteral(value) => (value >= 0).then_some(ty),
+                Type::BooleanLiteral(value) => Some(Type::IntLiteral(value.into())),
+                Type::Union(union) => {
+                    let mut builder = UnionBuilder::new(db);
+                    for element in union.elements(db) {
+                        builder = builder.add(non_negative_int_literal(db, *element)?);
+                    }
+                    Some(builder.build())
+                }
+                _ => None,
+            }
+        }
+
+        let usize_len = match self {
+            Type::BytesLiteral(bytes) => Some(bytes.python_len(db)),
+            Type::StringLiteral(string) => Some(string.python_len(db)),
+            Type::Tuple(tuple) => Some(tuple.len(db)),
+            _ => None,
+        };
+
+        if let Some(usize_len) = usize_len {
+            return usize_len.try_into().ok().map(Type::IntLiteral);
+        }
+
+        let return_ty = match self.call_dunder(db, "__len__", &[*self]) {
+            // TODO: emit a diagnostic
+            CallDunderResult::MethodNotAvailable => return None,
+
+            CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
+                outcome.return_ty(db)?
+            }
+        };
+
+        non_negative_int_literal(db, return_ty)
+    }
+
     /// Return the outcome of calling an object of this type.
     #[must_use]
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
-            Type::FunctionLiteral(function_type) => {
-                if function_type.is_known(db, KnownFunction::RevealType) {
-                    CallOutcome::revealed(
-                        function_type.signature(db).return_ty,
-                        *arg_types.first().unwrap_or(&Type::Unknown),
-                    )
-                } else {
-                    CallOutcome::callable(function_type.signature(db).return_ty)
+            Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                Some(KnownFunction::RevealType) => CallOutcome::revealed(
+                    function_type.signature(db).return_ty,
+                    *arg_types.first().unwrap_or(&Type::Unknown),
+                ),
+
+                Some(KnownFunction::Len) => {
+                    let normal_return_ty = function_type.signature(db).return_ty;
+
+                    let [only_arg] = arg_types else {
+                        // TODO: Emit a diagnostic
+                        return CallOutcome::callable(normal_return_ty);
+                    };
+                    let len_ty = only_arg.len(db);
+
+                    CallOutcome::callable(len_ty.unwrap_or(normal_return_ty))
                 }
-            }
+
+                _ => CallOutcome::callable(function_type.signature(db).return_ty),
+            },
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
@@ -1768,13 +1897,13 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        core_module_symbol(db, self.canonical_module(), self.as_str())
+        core_module_symbol(db, self.canonical_module(db), self.as_str())
             .ignore_possibly_unbound()
             .unwrap_or(Type::Unknown)
     }
 
     /// Return the module in which we should look up the definition for this class
-    pub(crate) const fn canonical_module(self) -> CoreStdlibModule {
+    pub(crate) fn canonical_module(self, db: &'db dyn Db) -> CoreStdlibModule {
         match self {
             Self::Bool
             | Self::Object
@@ -1792,10 +1921,18 @@ impl<'db> KnownClass {
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
             Self::NoneType => CoreStdlibModule::Typeshed,
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType => CoreStdlibModule::Typing,
-            // TODO when we understand sys.version_info, we will need an explicit fallback here,
-            // because typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
-            // singleton, but not for `typing._NoDefaultType`
-            Self::NoDefaultType => CoreStdlibModule::TypingExtensions,
+            Self::NoDefaultType => {
+                let python_version = Program::get(db).target_version(db);
+
+                // typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
+                // singleton, but not for `typing._NoDefaultType`. So we need to switch
+                // to `typing._NoDefaultType` for newer versions:
+                if python_version >= PythonVersion::PY313 {
+                    CoreStdlibModule::Typing
+                } else {
+                    CoreStdlibModule::TypingExtensions
+                }
+            }
         }
     }
 
@@ -1855,11 +1992,11 @@ impl<'db> KnownClass {
         };
 
         let module = file_to_module(db, file)?;
-        candidate.check_module(&module).then_some(candidate)
+        candidate.check_module(db, &module).then_some(candidate)
     }
 
     /// Return `true` if the module of `self` matches `module_name`
-    fn check_module(self, module: &Module) -> bool {
+    fn check_module(self, db: &'db dyn Db, module: &Module) -> bool {
         if !module.search_path().is_standard_library() {
             return false;
         }
@@ -1879,7 +2016,7 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::ModuleType
             | Self::VersionInfo
-            | Self::FunctionType => module.name() == self.canonical_module().as_str(),
+            | Self::FunctionType => module.name() == self.canonical_module(db).as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
                 matches!(module.name().as_str(), "typing" | "typing_extensions")
@@ -2523,13 +2660,15 @@ pub enum KnownFunction {
     ConstraintFunction(KnownConstraintFunction),
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
+    /// `builtins.len`
+    Len,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType => None,
+            Self::RevealType | Self::Len => None,
         }
     }
 
@@ -2546,6 +2685,7 @@ impl KnownFunction {
             "issubclass" if definition.is_builtin_definition(db) => Some(
                 KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
             ),
+            "len" if definition.is_builtin_definition(db) => Some(KnownFunction::Len),
             _ => None,
         }
     }
@@ -3000,8 +3140,9 @@ pub struct StringLiteralType<'db> {
 }
 
 impl<'db> StringLiteralType<'db> {
-    pub fn len(&self, db: &'db dyn Db) -> usize {
-        self.value(db).len()
+    /// The length of the string, as would be returned by Python's `len()`.
+    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).chars().count()
     }
 }
 
@@ -3009,6 +3150,12 @@ impl<'db> StringLiteralType<'db> {
 pub struct BytesLiteralType<'db> {
     #[return_ref]
     value: Box<[u8]>,
+}
+
+impl<'db> BytesLiteralType<'db> {
+    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).len()
+    }
 }
 
 #[salsa::interned]
@@ -3064,37 +3211,15 @@ static_assertions::assert_eq_size!(Type, [u8; 16]);
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
+    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
     use crate::stdlib::typing_symbol;
-    use crate::ProgramSettings;
+    use crate::PythonVersion;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast as ast;
     use test_case::test_case;
-
-    pub(crate) fn setup_db() -> TestDb {
-        let db = TestDb::new();
-
-        let src_root = SystemPathBuf::from("/src");
-        db.memory_file_system()
-            .create_directory_all(&src_root)
-            .unwrap();
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(src_root),
-            },
-        )
-        .expect("Valid search path settings");
-
-        db
-    }
 
     /// A test representation of a type that can be transformed unambiguously into a real Type,
     /// given a db.
@@ -3261,7 +3386,9 @@ pub(crate) mod tests {
     }
 
     #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::Unknown, Ty::Unknown)]
     #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
+    #[test_case(Ty::Any, Ty::Any)]
     #[test_case(Ty::Any, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::Unknown)]
     #[test_case(Ty::IntLiteral(1), Ty::Any)]
@@ -3367,6 +3494,18 @@ pub(crate) mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::Any, Ty::Any)]
+    #[test_case(Ty::Any, Ty::None)]
+    #[test_case(Ty::Unknown, Ty::Unknown)]
+    #[test_case(Ty::Todo, Ty::Todo)]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
+    fn is_not_equivalent_to(from: Ty, to: Ty) {
+        let db = setup_db();
+
+        assert!(!from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
     }
 
     #[test_case(Ty::Never, Ty::Never)]
@@ -3552,11 +3691,26 @@ pub(crate) mod tests {
     #[test_case(Ty::None)]
     #[test_case(Ty::BooleanLiteral(true))]
     #[test_case(Ty::BooleanLiteral(false))]
-    #[test_case(Ty::KnownClassInstance(KnownClass::NoDefaultType))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_singleton(&db));
+    }
+
+    /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
+    /// the fallback to `typing_extensions` is working correctly.
+    /// See [`KnownClass::canonical_module`] for more information.
+    #[test_case(PythonVersion::PY312)]
+    #[test_case(PythonVersion::PY313)]
+    fn no_default_type_is_singleton(python_version: PythonVersion) {
+        let db = TestDbBuilder::new()
+            .with_python_version(python_version)
+            .build()
+            .unwrap();
+
+        let no_default = Ty::KnownClassInstance(KnownClass::NoDefaultType).into_type(&db);
+
+        assert!(no_default.is_singleton(&db));
     }
 
     #[test_case(Ty::None)]
@@ -3595,6 +3749,41 @@ pub(crate) mod tests {
         let db = setup_db();
 
         assert!(!from.into_type(&db).is_singleton(&db));
+    }
+
+    #[test_case(Ty::Never)]
+    #[test_case(Ty::None)]
+    #[test_case(Ty::IntLiteral(1))]
+    #[test_case(Ty::BooleanLiteral(true))]
+    #[test_case(Ty::StringLiteral("abc"))]
+    #[test_case(Ty::LiteralString)]
+    #[test_case(Ty::BytesLiteral("abc"))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Str))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Object))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Type))]
+    #[test_case(Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::TypingLiteral)]
+    #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::None]))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::KnownClassInstance(KnownClass::Str)], neg: vec![Ty::LiteralString]})]
+    #[test_case(Ty::Tuple(vec![]))]
+    #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::KnownClassInstance(KnownClass::Object)]))]
+    fn is_fully_static(from: Ty) {
+        let db = setup_db();
+
+        assert!(from.into_type(&db).is_fully_static(&db));
+    }
+
+    #[test_case(Ty::Any)]
+    #[test_case(Ty::Unknown)]
+    #[test_case(Ty::Todo)]
+    #[test_case(Ty::Union(vec![Ty::Any, Ty::KnownClassInstance(KnownClass::Str)]))]
+    #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::Unknown]))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::Any], neg: vec![Ty::LiteralString]})]
+    #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::Any]))]
+    fn is_not_fully_static(from: Ty) {
+        let db = setup_db();
+
+        assert!(!from.into_type(&db).is_fully_static(&db));
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
@@ -3651,7 +3840,10 @@ pub(crate) mod tests {
 
     #[test]
     fn typing_vs_typeshed_no_default() {
-        let db = setup_db();
+        let db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY313)
+            .build()
+            .unwrap();
 
         let typing_no_default = typing_symbol(&db, "NoDefault").expect_type();
         let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault").expect_type();
@@ -3770,19 +3962,6 @@ pub(crate) mod tests {
         let todo2 = todo_type!("2");
         let todo3 = todo_type!();
         let todo4 = todo_type!();
-
-        assert!(todo1.is_equivalent_to(&db, todo2));
-        assert!(todo3.is_equivalent_to(&db, todo4));
-        assert!(todo1.is_equivalent_to(&db, todo3));
-
-        assert!(todo1.is_subtype_of(&db, todo2));
-        assert!(todo2.is_subtype_of(&db, todo1));
-
-        assert!(todo3.is_subtype_of(&db, todo4));
-        assert!(todo4.is_subtype_of(&db, todo3));
-
-        assert!(todo1.is_subtype_of(&db, todo3));
-        assert!(todo3.is_subtype_of(&db, todo1));
 
         let int = KnownClass::Int.to_instance(&db);
 
