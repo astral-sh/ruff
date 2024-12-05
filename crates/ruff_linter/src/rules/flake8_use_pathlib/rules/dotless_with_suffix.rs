@@ -43,7 +43,7 @@ impl AlwaysFixableViolation for DotlessWithSuffix {
     }
 }
 
-/// RUF049
+/// PTH901
 pub(crate) fn dotless_with_suffix(checker: &mut Checker, call: &ExprCall) {
     let (func, arguments) = (&call.func, &call.arguments);
 

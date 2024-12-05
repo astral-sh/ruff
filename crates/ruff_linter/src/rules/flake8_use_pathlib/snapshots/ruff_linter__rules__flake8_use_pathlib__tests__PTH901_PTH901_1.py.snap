@@ -2,12 +2,12 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF049_1.py:13:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:13:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 11 | def test_path(p: Path) -> None:
 12 |     ## Errors
 13 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 14 |     p.with_suffix(r"s")
 15 |     p.with_suffix(u'' "json")
    |
@@ -23,12 +23,12 @@ RUF049_1.py:13:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 15 15 |     p.with_suffix(u'' "json")
 16 16 |     p.with_suffix(suffix="js")
 
-RUF049_1.py:14:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:14:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 12 |     ## Errors
 13 |     p.with_suffix("py")
 14 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 15 |     p.with_suffix(u'' "json")
 16 |     p.with_suffix(suffix="js")
    |
@@ -44,12 +44,12 @@ RUF049_1.py:14:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 16 16 |     p.with_suffix(suffix="js")
 17 17 | 
 
-RUF049_1.py:15:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:15:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 13 |     p.with_suffix("py")
 14 |     p.with_suffix(r"s")
 15 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 16 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -64,12 +64,12 @@ RUF049_1.py:15:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 17 17 | 
 18 18 |     ## No errors
 
-RUF049_1.py:16:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:16:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 14 |     p.with_suffix(r"s")
 15 |     p.with_suffix(u'' "json")
 16 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 17 | 
 18 |     ## No errors
    |
@@ -85,12 +85,12 @@ RUF049_1.py:16:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 18 18 |     ## No errors
 19 19 |     p.with_suffix()
 
-RUF049_1.py:30:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:30:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 28 | def test_posix_path(p: PosixPath) -> None:
 29 |     ## Errors
 30 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 31 |     p.with_suffix(r"s")
 32 |     p.with_suffix(u'' "json")
    |
@@ -106,12 +106,12 @@ RUF049_1.py:30:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 32 32 |     p.with_suffix(u'' "json")
 33 33 |     p.with_suffix(suffix="js")
 
-RUF049_1.py:31:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:31:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 29 |     ## Errors
 30 |     p.with_suffix("py")
 31 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 32 |     p.with_suffix(u'' "json")
 33 |     p.with_suffix(suffix="js")
    |
@@ -127,12 +127,12 @@ RUF049_1.py:31:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 33 33 |     p.with_suffix(suffix="js")
 34 34 | 
 
-RUF049_1.py:32:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:32:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 30 |     p.with_suffix("py")
 31 |     p.with_suffix(r"s")
 32 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 33 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -147,12 +147,12 @@ RUF049_1.py:32:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 34 34 | 
 35 35 |     ## No errors
 
-RUF049_1.py:33:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:33:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 31 |     p.with_suffix(r"s")
 32 |     p.with_suffix(u'' "json")
 33 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 34 | 
 35 |     ## No errors
    |
@@ -168,12 +168,12 @@ RUF049_1.py:33:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 35 35 |     ## No errors
 36 36 |     p.with_suffix()
 
-RUF049_1.py:47:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:47:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 45 | def test_pure_path(p: PurePath) -> None:
 46 |     ## Errors
 47 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 48 |     p.with_suffix(r"s")
 49 |     p.with_suffix(u'' "json")
    |
@@ -189,12 +189,12 @@ RUF049_1.py:47:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 49 49 |     p.with_suffix(u'' "json")
 50 50 |     p.with_suffix(suffix="js")
 
-RUF049_1.py:48:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:48:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 46 |     ## Errors
 47 |     p.with_suffix("py")
 48 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 49 |     p.with_suffix(u'' "json")
 50 |     p.with_suffix(suffix="js")
    |
@@ -210,12 +210,12 @@ RUF049_1.py:48:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 50 50 |     p.with_suffix(suffix="js")
 51 51 | 
 
-RUF049_1.py:49:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:49:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 47 |     p.with_suffix("py")
 48 |     p.with_suffix(r"s")
 49 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 50 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -230,12 +230,12 @@ RUF049_1.py:49:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 51 51 | 
 52 52 |     ## No errors
 
-RUF049_1.py:50:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:50:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 48 |     p.with_suffix(r"s")
 49 |     p.with_suffix(u'' "json")
 50 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 51 | 
 52 |     ## No errors
    |
@@ -251,12 +251,12 @@ RUF049_1.py:50:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 52 52 |     ## No errors
 53 53 |     p.with_suffix()
 
-RUF049_1.py:64:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:64:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 62 | def test_pure_posix_path(p: PurePosixPath) -> None:
 63 |     ## Errors
 64 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 65 |     p.with_suffix(r"s")
 66 |     p.with_suffix(u'' "json")
    |
@@ -272,12 +272,12 @@ RUF049_1.py:64:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 66 66 |     p.with_suffix(u'' "json")
 67 67 |     p.with_suffix(suffix="js")
 
-RUF049_1.py:65:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:65:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 63 |     ## Errors
 64 |     p.with_suffix("py")
 65 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 66 |     p.with_suffix(u'' "json")
 67 |     p.with_suffix(suffix="js")
    |
@@ -293,12 +293,12 @@ RUF049_1.py:65:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 67 67 |     p.with_suffix(suffix="js")
 68 68 | 
 
-RUF049_1.py:66:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:66:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 64 |     p.with_suffix("py")
 65 |     p.with_suffix(r"s")
 66 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 67 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -313,12 +313,12 @@ RUF049_1.py:66:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 68 68 | 
 69 69 |     ## No errors
 
-RUF049_1.py:67:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:67:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 65 |     p.with_suffix(r"s")
 66 |     p.with_suffix(u'' "json")
 67 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 68 | 
 69 |     ## No errors
    |
@@ -334,12 +334,12 @@ RUF049_1.py:67:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 69 69 |     ## No errors
 70 70 |     p.with_suffix()
 
-RUF049_1.py:81:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:81:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 79 | def test_pure_windows_path(p: PureWindowsPath) -> None:
 80 |     ## Errors
 81 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 82 |     p.with_suffix(r"s")
 83 |     p.with_suffix(u'' "json")
    |
@@ -355,12 +355,12 @@ RUF049_1.py:81:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 83 83 |     p.with_suffix(u'' "json")
 84 84 |     p.with_suffix(suffix="js")
 
-RUF049_1.py:82:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:82:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 80 |     ## Errors
 81 |     p.with_suffix("py")
 82 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^ PTH901
 83 |     p.with_suffix(u'' "json")
 84 |     p.with_suffix(suffix="js")
    |
@@ -376,12 +376,12 @@ RUF049_1.py:82:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 84 84 |     p.with_suffix(suffix="js")
 85 85 | 
 
-RUF049_1.py:83:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:83:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 81 |     p.with_suffix("py")
 82 |     p.with_suffix(r"s")
 83 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 84 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -396,12 +396,12 @@ RUF049_1.py:83:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 85 85 | 
 86 86 |     ## No errors
 
-RUF049_1.py:84:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:84:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
 82 |     p.with_suffix(r"s")
 83 |     p.with_suffix(u'' "json")
 84 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 85 | 
 86 |     ## No errors
    |
@@ -417,12 +417,12 @@ RUF049_1.py:84:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 86 86 |     ## No errors
 87 87 |     p.with_suffix()
 
-RUF049_1.py:98:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:98:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
     |
  96 | def test_windows_path(p: WindowsPath) -> None:
  97 |     ## Errors
  98 |     p.with_suffix("py")
-    |     ^^^^^^^^^^^^^^^^^^^ RUF049
+    |     ^^^^^^^^^^^^^^^^^^^ PTH901
  99 |     p.with_suffix(r"s")
 100 |     p.with_suffix(u'' "json")
     |
@@ -438,12 +438,12 @@ RUF049_1.py:98:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 100 100 |     p.with_suffix(u'' "json")
 101 101 |     p.with_suffix(suffix="js")
 
-RUF049_1.py:99:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:99:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
     |
  97 |     ## Errors
  98 |     p.with_suffix("py")
  99 |     p.with_suffix(r"s")
-    |     ^^^^^^^^^^^^^^^^^^^ RUF049
+    |     ^^^^^^^^^^^^^^^^^^^ PTH901
 100 |     p.with_suffix(u'' "json")
 101 |     p.with_suffix(suffix="js")
     |
@@ -459,12 +459,12 @@ RUF049_1.py:99:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 101 101 |     p.with_suffix(suffix="js")
 102 102 | 
 
-RUF049_1.py:100:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:100:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
     |
  98 |     p.with_suffix("py")
  99 |     p.with_suffix(r"s")
 100 |     p.with_suffix(u'' "json")
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 101 |     p.with_suffix(suffix="js")
     |
     = help: Add a leading dot
@@ -479,12 +479,12 @@ RUF049_1.py:100:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
 102 102 | 
 103 103 |     ## No errors
 
-RUF049_1.py:101:5: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+PTH901_1.py:101:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
     |
  99 |     p.with_suffix(r"s")
 100 |     p.with_suffix(u'' "json")
 101 |     p.with_suffix(suffix="js")
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH901
 102 | 
 103 |     ## No errors
     |
