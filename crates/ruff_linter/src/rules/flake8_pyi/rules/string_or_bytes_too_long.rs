@@ -59,7 +59,10 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         return;
     }
 
-    if semantic.in_annotation() {
+    if semantic.in_type_definition()
+        | semantic.in_deferred_type_definition()
+        | semantic.in_typing_only_annotation()
+    {
         return;
     }
 
