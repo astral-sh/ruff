@@ -1919,7 +1919,7 @@ pub struct Flake8TypeCheckingOptions {
     /// to inconsistent style with `typing.cast` calls where sometimes the
     /// type expression is quoted or partially quoted and other times not,
     /// if you'd like to consistently quote type expressions, you should
-    /// instead consider enabling [`ruff_linter::registry::Rule::RuntimeCastValue`].
+    /// instead consider enabling [`runtime-cast-value`](/rules/runtime-cast-value/).
     #[option(
         default = "false",
         value_type = "bool",
@@ -1973,7 +1973,7 @@ pub struct Flake8TypeCheckingOptions {
     /// or uses type aliases in things like `isinstance` checks. So only
     /// use this if you're confident that it will cause no issues.
     ///
-    /// In most cases it should be safer to enable [`ruff_linter::registry::Rule::UnquotedTypeAlias`]
+    /// In most cases it should be safer to enable [`unquoted-type-alias`](/rules/unquoted-type-alias/)
     /// instead, or to switch to [PEP 695] type aliases, if you have the
     /// option to drop support for older Python versions.
     ///
