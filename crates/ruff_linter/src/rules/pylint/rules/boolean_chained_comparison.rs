@@ -76,7 +76,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
             are_compare_expr_simplifiable(left_compare, right_compare)
         })
         .filter_map(|(left_compare, right_compare)| {
-            let Expr::Name(left_compare_right) = left_compare.comparators.first()? else {
+            let Expr::Name(left_compare_right) = left_compare.comparators.last()? else {
                 return None;
             };
 
@@ -144,17 +144,15 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
 
 /// Checks whether two compare expressions are simplifiable
 fn are_compare_expr_simplifiable(left: &ExprCompare, right: &ExprCompare) -> bool {
-    let [left_operator] = &*left.ops else {
-        return false;
-    };
-
-    let [right_operator] = &*right.ops else {
-        return false;
-    };
-
-    matches!(
-        (left_operator, right_operator),
-        (CmpOp::Lt | CmpOp::LtE, CmpOp::Lt | CmpOp::LtE)
-            | (CmpOp::Gt | CmpOp::GtE, CmpOp::Gt | CmpOp::GtE)
-    )
+    left.ops
+        .iter()
+        .chain(right.ops.iter())
+        .tuple_windows::<(_, _)>()
+        .all(|(left_operator, right_operator)| {
+            matches!(
+                (left_operator, right_operator),
+                (CmpOp::Lt | CmpOp::LtE, CmpOp::Lt | CmpOp::LtE)
+                    | (CmpOp::Gt | CmpOp::GtE, CmpOp::Gt | CmpOp::GtE)
+            )
+        })
 }
