@@ -26,12 +26,9 @@ def True(for):
     # error: [invalid-syntax]
     pass
 
-# TODO: Why is there two diagnostics for the same error?
-
 # error: [invalid-syntax]
 # error: [invalid-syntax]
 # error: [invalid-syntax]
-# error: [unresolved-reference] "Name `pass` used when not defined"
 # error: [unresolved-reference] "Name `pass` used when not defined"
 for while in pass:
     pass
@@ -58,11 +55,9 @@ match while:
 ### Attribute expression
 
 ```py
-# TODO: Why is there two diagnostics for the same error?
 # TODO: Check when support for attribute expressions is added
 
 # error: [invalid-syntax]
-# error: [unresolved-reference] "Name `foo` used when not defined"
 # error: [unresolved-reference] "Name `foo` used when not defined"
 for x in foo.pass:
     pass
