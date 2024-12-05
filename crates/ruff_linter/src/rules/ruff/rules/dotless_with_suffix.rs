@@ -55,7 +55,7 @@ pub(crate) fn dotless_with_suffix(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    if matches!(string.value.chars().next(), Some('.')) {
+    if matches!(string.value.chars().next(), None | Some('.')) {
         return;
     }
 
