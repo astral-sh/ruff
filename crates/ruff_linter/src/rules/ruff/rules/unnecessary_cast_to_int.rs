@@ -13,12 +13,9 @@ use ruff_text_size::TextRange;
 /// Such a conversion is unnecessary.
 ///
 /// ## Known problems
-/// This rule is prone to false positives due to type inference limitations.
-///
-/// It assumes that `round`, `math.ceil`, `math.floor`, `math.trunc`
-/// always return `int`, which might not be the case for objects
-/// with the corresponding dunder methods overridden.
-/// In such cases, the fix is marked as unsafe.
+/// This rule may produce false positives for `round`, `math.ceil`, `math.floor`,
+/// and `math.trunc` calls when values override the `__round__`, `__ceil__`, `__floor__`,
+/// or `__trunc__` operators such that they don't return an integer.
 ///
 /// ## Example
 ///
@@ -33,6 +30,12 @@ use ruff_text_size::TextRange;
 /// len([])
 /// round(foo)
 /// ```
+///
+/// ## Fix safety
+/// The fix for `round`, `math.ceil`, `math.floor`, and `math.truncate` is unsafe
+/// because removing the `int` conversion can change the semantics for values
+/// overriding the `__round__`, `__ceil__`, `__floor__`, or `__trunc__` dunder methods
+/// such that they don't return an integer.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryCastToInt;
 
@@ -43,7 +46,7 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
     }
 
     fn fix_title(&self) -> String {
-        "Remove `int()` wrapper call".to_string()
+        "Remove unnecessary conversion to `int`".to_string()
     }
 }
 
