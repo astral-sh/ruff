@@ -65,35 +65,33 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let (edit, applicability) = match qualified_name.segments() {
+    let fix = match qualified_name.segments() {
         // Always returns a strict instance of `int`
         ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
-        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => (
-            replace_with_inner(checker, outer_range, inner_range),
-            Applicability::Safe,
-        ),
+        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => {
+            Fix::safe_edit(replace_with_inner(checker, outer_range, inner_range))
+        }
 
         // Depends on `ndigits` and `number.__round__`
         ["" | "builtins", "round"] => {
-            match replace_with_shortened_round_call(checker, outer_range, arguments) {
-                None => return,
-                Some(edit) => (edit, Applicability::Unsafe),
+            if let Some(fix) = replace_with_shortened_round_call(checker, outer_range, arguments) {
+                fix
+            } else {
+                return;
             }
         }
 
         // Depends on `__ceil__`/`__floor__`/`__trunc__`
-        ["math", "ceil" | "floor" | "trunc"] => (
-            replace_with_inner(checker, outer_range, inner_range),
-            Applicability::Unsafe,
-        ),
+        ["math", "ceil" | "floor" | "trunc"] => {
+            Fix::unsafe_edit(replace_with_inner(checker, outer_range, inner_range))
+        }
 
         _ => return,
     };
 
-    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
-    let fix = Fix::applicable_edit(edit, applicability);
-
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(UnnecessaryCastToInt, call.range).with_fix(fix));
 }
 
 fn single_argument_to_int_call<'a>(
@@ -126,7 +124,7 @@ fn replace_with_shortened_round_call(
     checker: &Checker,
     outer_range: TextRange,
     arguments: &Arguments,
-) -> Option<Edit> {
+) -> Option<Fix> {
     if arguments.len() > 2 {
         return None;
     }
@@ -150,7 +148,16 @@ fn replace_with_shortened_round_call(
     let number_expr = checker.locator().slice(number);
     let new_content = format!("round({number_expr})");
 
-    Some(Edit::range_replacement(new_content, outer_range))
+    let applicability = if number_is_int {
+        Applicability::Safe
+    } else {
+        Applicability::Unsafe
+    };
+
+    Some(Fix::applicable_edit(
+        Edit::range_replacement(new_content, outer_range),
+        applicability,
+    ))
 }
 
 fn is_int(semantic: &SemanticModel, name: &ExprName) -> bool {
