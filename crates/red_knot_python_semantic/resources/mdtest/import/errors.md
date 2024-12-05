@@ -67,15 +67,23 @@ reveal_type(bar)  # revealed: Unknown
 ## Import cycle
 
 ```py path=a.py
-class A: pass
+class A:
+    pass
+
 reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[object]]
 import b
-class C(b.B): pass
+
+class C(b.B):
+    pass
+
 reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Literal[A], Literal[object]]
 ```
 
 ```py path=b.py
 from a import A
-class B(A): pass
+
+class B(A):
+    pass
+
 reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[A], Literal[object]]
 ```

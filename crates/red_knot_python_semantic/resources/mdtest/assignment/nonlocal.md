@@ -26,6 +26,7 @@ def f():
 ```py
 def f():
     x = 1
+
     class C:
         x = 2
         def g():

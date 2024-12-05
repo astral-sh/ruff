@@ -65,6 +65,7 @@ An unbound function local that has definitions in the scope does not fall back t
 
 ```py
 x = 1
+
 def f():
     y = x  # error: [unresolved-reference]
     x = 2
