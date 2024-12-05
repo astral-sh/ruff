@@ -119,10 +119,12 @@ c = int(input())
 if a > b and b < c:
     pass
 
-
-# Unfixable due to parentheses.
+# fixes will balance parentheses
 (a < b) and b < c
 a < b and (b < c)
 ((a < b) and b < c)
 (a < b) and (b < c)
 (((a < b))) and (b < c)
+
+(a<b) and b<c and ((c<d))
+
