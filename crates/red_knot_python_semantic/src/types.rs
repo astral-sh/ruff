@@ -28,7 +28,7 @@ use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 
 mod builder;
 mod diagnostic;
@@ -1927,7 +1927,7 @@ impl<'db> KnownClass {
                 // typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
                 // singleton, but not for `typing._NoDefaultType`. So we need to switch
                 // to `typing._NoDefaultType` for newer versions:
-                if python_version.major >= 3 && python_version.minor >= 13 {
+                if python_version >= PythonVersion::PY313 {
                     CoreStdlibModule::Typing
                 } else {
                     CoreStdlibModule::TypingExtensions
