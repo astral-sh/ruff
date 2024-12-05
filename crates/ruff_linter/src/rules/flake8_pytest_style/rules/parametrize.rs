@@ -699,6 +699,10 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> (Vec<Edit>, bo
             return (vec![], false);
         };
 
+        if matches!(elt, Expr::Starred(_)) {
+            return (vec![], false);
+        }
+
         has_comments |= checker
             .comment_ranges()
             .has_comments(&value, checker.source());
