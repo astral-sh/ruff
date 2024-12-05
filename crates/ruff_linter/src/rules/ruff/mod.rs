@@ -413,6 +413,8 @@ mod tests {
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
+    #[test_case(Rule::DotlessWithSuffix, Path::new("RUF049.py"))]
+    #[test_case(Rule::DotlessWithSuffix, Path::new("RUF049_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

@@ -1,0 +1,493 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF049.py:21:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+20 | ### Errors
+21 | path.with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^ RUF049
+22 | path.with_suffix(r"s")
+23 | path.with_suffix(u'' "json")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+18 18 | 
+19 19 | 
+20 20 | ### Errors
+21    |-path.with_suffix("py")
+   21 |+path.with_suffix(".py")
+22 22 | path.with_suffix(r"s")
+23 23 | path.with_suffix(u'' "json")
+24 24 | path.with_suffix(suffix="")
+
+RUF049.py:22:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+20 | ### Errors
+21 | path.with_suffix("py")
+22 | path.with_suffix(r"s")
+   | ^^^^^^^^^^^^^^^^^^^^^^ RUF049
+23 | path.with_suffix(u'' "json")
+24 | path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+19 19 | 
+20 20 | ### Errors
+21 21 | path.with_suffix("py")
+22    |-path.with_suffix(r"s")
+   22 |+path.with_suffix(r".s")
+23 23 | path.with_suffix(u'' "json")
+24 24 | path.with_suffix(suffix="")
+25 25 | 
+
+RUF049.py:23:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+21 | path.with_suffix("py")
+22 | path.with_suffix(r"s")
+23 | path.with_suffix(u'' "json")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+24 | path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+20 20 | ### Errors
+21 21 | path.with_suffix("py")
+22 22 | path.with_suffix(r"s")
+23    |-path.with_suffix(u'' "json")
+   23 |+path.with_suffix(u'.' "json")
+24 24 | path.with_suffix(suffix="")
+25 25 | 
+26 26 | posix_path.with_suffix("py")
+
+RUF049.py:24:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+22 | path.with_suffix(r"s")
+23 | path.with_suffix(u'' "json")
+24 | path.with_suffix(suffix="")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+25 | 
+26 | posix_path.with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+21 21 | path.with_suffix("py")
+22 22 | path.with_suffix(r"s")
+23 23 | path.with_suffix(u'' "json")
+24    |-path.with_suffix(suffix="")
+   24 |+path.with_suffix(suffix=".")
+25 25 | 
+26 26 | posix_path.with_suffix("py")
+27 27 | posix_path.with_suffix(r"s")
+
+RUF049.py:26:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+24 | path.with_suffix(suffix="")
+25 | 
+26 | posix_path.with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+27 | posix_path.with_suffix(r"s")
+28 | posix_path.with_suffix(u'' "json")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+23 23 | path.with_suffix(u'' "json")
+24 24 | path.with_suffix(suffix="")
+25 25 | 
+26    |-posix_path.with_suffix("py")
+   26 |+posix_path.with_suffix(".py")
+27 27 | posix_path.with_suffix(r"s")
+28 28 | posix_path.with_suffix(u'' "json")
+29 29 | posix_path.with_suffix(suffix="")
+
+RUF049.py:27:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+26 | posix_path.with_suffix("py")
+27 | posix_path.with_suffix(r"s")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+28 | posix_path.with_suffix(u'' "json")
+29 | posix_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+24 24 | path.with_suffix(suffix="")
+25 25 | 
+26 26 | posix_path.with_suffix("py")
+27    |-posix_path.with_suffix(r"s")
+   27 |+posix_path.with_suffix(r".s")
+28 28 | posix_path.with_suffix(u'' "json")
+29 29 | posix_path.with_suffix(suffix="")
+30 30 | 
+
+RUF049.py:28:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+26 | posix_path.with_suffix("py")
+27 | posix_path.with_suffix(r"s")
+28 | posix_path.with_suffix(u'' "json")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+29 | posix_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+25 25 | 
+26 26 | posix_path.with_suffix("py")
+27 27 | posix_path.with_suffix(r"s")
+28    |-posix_path.with_suffix(u'' "json")
+   28 |+posix_path.with_suffix(u'.' "json")
+29 29 | posix_path.with_suffix(suffix="")
+30 30 | 
+31 31 | pure_path.with_suffix("py")
+
+RUF049.py:29:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+27 | posix_path.with_suffix(r"s")
+28 | posix_path.with_suffix(u'' "json")
+29 | posix_path.with_suffix(suffix="")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+30 | 
+31 | pure_path.with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+26 26 | posix_path.with_suffix("py")
+27 27 | posix_path.with_suffix(r"s")
+28 28 | posix_path.with_suffix(u'' "json")
+29    |-posix_path.with_suffix(suffix="")
+   29 |+posix_path.with_suffix(suffix=".")
+30 30 | 
+31 31 | pure_path.with_suffix("py")
+32 32 | pure_path.with_suffix(r"s")
+
+RUF049.py:31:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+29 | posix_path.with_suffix(suffix="")
+30 | 
+31 | pure_path.with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+32 | pure_path.with_suffix(r"s")
+33 | pure_path.with_suffix(u'' "json")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+28 28 | posix_path.with_suffix(u'' "json")
+29 29 | posix_path.with_suffix(suffix="")
+30 30 | 
+31    |-pure_path.with_suffix("py")
+   31 |+pure_path.with_suffix(".py")
+32 32 | pure_path.with_suffix(r"s")
+33 33 | pure_path.with_suffix(u'' "json")
+34 34 | pure_path.with_suffix(suffix="")
+
+RUF049.py:32:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+31 | pure_path.with_suffix("py")
+32 | pure_path.with_suffix(r"s")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+33 | pure_path.with_suffix(u'' "json")
+34 | pure_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+29 29 | posix_path.with_suffix(suffix="")
+30 30 | 
+31 31 | pure_path.with_suffix("py")
+32    |-pure_path.with_suffix(r"s")
+   32 |+pure_path.with_suffix(r".s")
+33 33 | pure_path.with_suffix(u'' "json")
+34 34 | pure_path.with_suffix(suffix="")
+35 35 | 
+
+RUF049.py:33:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+31 | pure_path.with_suffix("py")
+32 | pure_path.with_suffix(r"s")
+33 | pure_path.with_suffix(u'' "json")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+34 | pure_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+30 30 | 
+31 31 | pure_path.with_suffix("py")
+32 32 | pure_path.with_suffix(r"s")
+33    |-pure_path.with_suffix(u'' "json")
+   33 |+pure_path.with_suffix(u'.' "json")
+34 34 | pure_path.with_suffix(suffix="")
+35 35 | 
+36 36 | pure_posix_path.with_suffix("py")
+
+RUF049.py:34:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+32 | pure_path.with_suffix(r"s")
+33 | pure_path.with_suffix(u'' "json")
+34 | pure_path.with_suffix(suffix="")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+35 | 
+36 | pure_posix_path.with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+31 31 | pure_path.with_suffix("py")
+32 32 | pure_path.with_suffix(r"s")
+33 33 | pure_path.with_suffix(u'' "json")
+34    |-pure_path.with_suffix(suffix="")
+   34 |+pure_path.with_suffix(suffix=".")
+35 35 | 
+36 36 | pure_posix_path.with_suffix("py")
+37 37 | pure_posix_path.with_suffix(r"s")
+
+RUF049.py:36:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+34 | pure_path.with_suffix(suffix="")
+35 | 
+36 | pure_posix_path.with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+37 | pure_posix_path.with_suffix(r"s")
+38 | pure_posix_path.with_suffix(u'' "json")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+33 33 | pure_path.with_suffix(u'' "json")
+34 34 | pure_path.with_suffix(suffix="")
+35 35 | 
+36    |-pure_posix_path.with_suffix("py")
+   36 |+pure_posix_path.with_suffix(".py")
+37 37 | pure_posix_path.with_suffix(r"s")
+38 38 | pure_posix_path.with_suffix(u'' "json")
+39 39 | pure_posix_path.with_suffix(suffix="")
+
+RUF049.py:37:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+36 | pure_posix_path.with_suffix("py")
+37 | pure_posix_path.with_suffix(r"s")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+38 | pure_posix_path.with_suffix(u'' "json")
+39 | pure_posix_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+34 34 | pure_path.with_suffix(suffix="")
+35 35 | 
+36 36 | pure_posix_path.with_suffix("py")
+37    |-pure_posix_path.with_suffix(r"s")
+   37 |+pure_posix_path.with_suffix(r".s")
+38 38 | pure_posix_path.with_suffix(u'' "json")
+39 39 | pure_posix_path.with_suffix(suffix="")
+40 40 | 
+
+RUF049.py:38:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+36 | pure_posix_path.with_suffix("py")
+37 | pure_posix_path.with_suffix(r"s")
+38 | pure_posix_path.with_suffix(u'' "json")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+39 | pure_posix_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+35 35 | 
+36 36 | pure_posix_path.with_suffix("py")
+37 37 | pure_posix_path.with_suffix(r"s")
+38    |-pure_posix_path.with_suffix(u'' "json")
+   38 |+pure_posix_path.with_suffix(u'.' "json")
+39 39 | pure_posix_path.with_suffix(suffix="")
+40 40 | 
+41 41 | pure_windows_path.with_suffix("py")
+
+RUF049.py:39:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+37 | pure_posix_path.with_suffix(r"s")
+38 | pure_posix_path.with_suffix(u'' "json")
+39 | pure_posix_path.with_suffix(suffix="")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+40 | 
+41 | pure_windows_path.with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+36 36 | pure_posix_path.with_suffix("py")
+37 37 | pure_posix_path.with_suffix(r"s")
+38 38 | pure_posix_path.with_suffix(u'' "json")
+39    |-pure_posix_path.with_suffix(suffix="")
+   39 |+pure_posix_path.with_suffix(suffix=".")
+40 40 | 
+41 41 | pure_windows_path.with_suffix("py")
+42 42 | pure_windows_path.with_suffix(r"s")
+
+RUF049.py:41:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+39 | pure_posix_path.with_suffix(suffix="")
+40 | 
+41 | pure_windows_path.with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+42 | pure_windows_path.with_suffix(r"s")
+43 | pure_windows_path.with_suffix(u'' "json")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+38 38 | pure_posix_path.with_suffix(u'' "json")
+39 39 | pure_posix_path.with_suffix(suffix="")
+40 40 | 
+41    |-pure_windows_path.with_suffix("py")
+   41 |+pure_windows_path.with_suffix(".py")
+42 42 | pure_windows_path.with_suffix(r"s")
+43 43 | pure_windows_path.with_suffix(u'' "json")
+44 44 | pure_windows_path.with_suffix(suffix="")
+
+RUF049.py:42:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+41 | pure_windows_path.with_suffix("py")
+42 | pure_windows_path.with_suffix(r"s")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+43 | pure_windows_path.with_suffix(u'' "json")
+44 | pure_windows_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+39 39 | pure_posix_path.with_suffix(suffix="")
+40 40 | 
+41 41 | pure_windows_path.with_suffix("py")
+42    |-pure_windows_path.with_suffix(r"s")
+   42 |+pure_windows_path.with_suffix(r".s")
+43 43 | pure_windows_path.with_suffix(u'' "json")
+44 44 | pure_windows_path.with_suffix(suffix="")
+45 45 | 
+
+RUF049.py:43:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+41 | pure_windows_path.with_suffix("py")
+42 | pure_windows_path.with_suffix(r"s")
+43 | pure_windows_path.with_suffix(u'' "json")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+44 | pure_windows_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+40 40 | 
+41 41 | pure_windows_path.with_suffix("py")
+42 42 | pure_windows_path.with_suffix(r"s")
+43    |-pure_windows_path.with_suffix(u'' "json")
+   43 |+pure_windows_path.with_suffix(u'.' "json")
+44 44 | pure_windows_path.with_suffix(suffix="")
+45 45 | 
+46 46 | windows_path.with_suffix("py")
+
+RUF049.py:44:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+42 | pure_windows_path.with_suffix(r"s")
+43 | pure_windows_path.with_suffix(u'' "json")
+44 | pure_windows_path.with_suffix(suffix="")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+45 | 
+46 | windows_path.with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+41 41 | pure_windows_path.with_suffix("py")
+42 42 | pure_windows_path.with_suffix(r"s")
+43 43 | pure_windows_path.with_suffix(u'' "json")
+44    |-pure_windows_path.with_suffix(suffix="")
+   44 |+pure_windows_path.with_suffix(suffix=".")
+45 45 | 
+46 46 | windows_path.with_suffix("py")
+47 47 | windows_path.with_suffix(r"s")
+
+RUF049.py:46:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+44 | pure_windows_path.with_suffix(suffix="")
+45 | 
+46 | windows_path.with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+47 | windows_path.with_suffix(r"s")
+48 | windows_path.with_suffix(u'' "json")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+43 43 | pure_windows_path.with_suffix(u'' "json")
+44 44 | pure_windows_path.with_suffix(suffix="")
+45 45 | 
+46    |-windows_path.with_suffix("py")
+   46 |+windows_path.with_suffix(".py")
+47 47 | windows_path.with_suffix(r"s")
+48 48 | windows_path.with_suffix(u'' "json")
+49 49 | windows_path.with_suffix(suffix="")
+
+RUF049.py:47:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+46 | windows_path.with_suffix("py")
+47 | windows_path.with_suffix(r"s")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+48 | windows_path.with_suffix(u'' "json")
+49 | windows_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+44 44 | pure_windows_path.with_suffix(suffix="")
+45 45 | 
+46 46 | windows_path.with_suffix("py")
+47    |-windows_path.with_suffix(r"s")
+   47 |+windows_path.with_suffix(r".s")
+48 48 | windows_path.with_suffix(u'' "json")
+49 49 | windows_path.with_suffix(suffix="")
+50 50 | 
+
+RUF049.py:48:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+46 | windows_path.with_suffix("py")
+47 | windows_path.with_suffix(r"s")
+48 | windows_path.with_suffix(u'' "json")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+49 | windows_path.with_suffix(suffix="")
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+45 45 | 
+46 46 | windows_path.with_suffix("py")
+47 47 | windows_path.with_suffix(r"s")
+48    |-windows_path.with_suffix(u'' "json")
+   48 |+windows_path.with_suffix(u'.' "json")
+49 49 | windows_path.with_suffix(suffix="")
+50 50 | 
+51 51 | 
+
+RUF049.py:49:1: RUF049 [*] Dotless suffix passed to `.with_suffix()`
+   |
+47 | windows_path.with_suffix(r"s")
+48 | windows_path.with_suffix(u'' "json")
+49 | windows_path.with_suffix(suffix="")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF049
+   |
+   = help: Add a leading dot
+
+ℹ Safe fix
+46 46 | windows_path.with_suffix("py")
+47 47 | windows_path.with_suffix(r"s")
+48 48 | windows_path.with_suffix(u'' "json")
+49    |-windows_path.with_suffix(suffix="")
+   49 |+windows_path.with_suffix(suffix=".")
+50 50 | 
+51 51 | 
+52 52 | ### No errors
