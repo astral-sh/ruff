@@ -9,7 +9,7 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{AnyParameterRef, BoolOp, Expr};
+use ruff_python_ast::{BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -479,21 +479,32 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
     }
 
-    fn declare_parameter(&mut self, parameter: AnyParameterRef<'db>) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+    fn declare_parameters(&mut self, parameters: &'db ast::Parameters) {
+        for parameter in parameters.iter_non_variadic_params() {
+            self.declare_parameter(parameter);
+        }
+        if let Some(vararg) = parameters.vararg.as_ref() {
+            let symbol = self.add_symbol(vararg.name.id().clone());
+            self.add_definition(symbol, DefinitionNodeRef::VariadicParameter(vararg));
+        }
+        if let Some(kwarg) = parameters.kwarg.as_ref() {
+            let symbol = self.add_symbol(kwarg.name.id().clone());
+            self.add_definition(symbol, DefinitionNodeRef::VariadicKeywordParameter(kwarg));
+        }
+    }
+
+    fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
+        let symbol = self.add_symbol(parameter.parameter.name.id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
-        if let AnyParameterRef::NonVariadic(with_default) = parameter {
-            // Insert a mapping from the parameter to the same definition.
-            // This ensures that calling `HasTy::ty` on the inner parameter returns
-            // a valid type (and doesn't panic)
-            let existing_definition = self.definitions_by_node.insert(
-                DefinitionNodeRef::from(AnyParameterRef::Variadic(&with_default.parameter)).key(),
-                definition,
-            );
-            debug_assert_eq!(existing_definition, None);
-        }
+        // Insert a mapping from the inner Parameter node to the same definition.
+        // This ensures that calling `HasTy::ty` on the inner parameter returns
+        // a valid type (and doesn't panic)
+        let existing_definition = self
+            .definitions_by_node
+            .insert((&parameter.parameter).into(), definition);
+        debug_assert_eq!(existing_definition, None);
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
@@ -556,34 +567,40 @@ where
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
-                for decorator in &function_def.decorator_list {
+                let ast::StmtFunctionDef {
+                    decorator_list,
+                    parameters,
+                    type_params,
+                    name,
+                    returns,
+                    body,
+                    is_async: _,
+                    range: _,
+                } = function_def;
+                for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
 
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
-                    function_def.type_params.as_deref(),
+                    type_params.as_deref(),
                     |builder| {
-                        builder.visit_parameters(&function_def.parameters);
-                        if let Some(expr) = &function_def.returns {
-                            builder.visit_annotation(expr);
+                        builder.visit_parameters(parameters);
+                        if let Some(returns) = returns {
+                            builder.visit_annotation(returns);
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        // Add symbols and definitions for the parameters to the function scope.
-                        for parameter in &*function_def.parameters {
-                            builder.declare_parameter(parameter);
-                        }
+                        builder.declare_parameters(parameters);
 
-                        builder.visit_body(&function_def.body);
+                        builder.visit_body(body);
                         builder.pop_scope()
                     },
                 );
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
-                for default in function_def
-                    .parameters
+                for default in parameters
                     .iter_non_variadic_params()
                     .filter_map(|param| param.default.as_deref())
                 {
@@ -592,7 +609,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(function_def.name.id.clone());
+                let symbol = self.add_symbol(name.id.clone());
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
@@ -1179,10 +1196,8 @@ where
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
 
                 // Add symbols and definitions for the parameters to the lambda scope.
-                if let Some(parameters) = &lambda.parameters {
-                    for parameter in parameters {
-                        self.declare_parameter(parameter);
-                    }
+                if let Some(parameters) = lambda.parameters.as_ref() {
+                    self.declare_parameters(parameters);
                 }
 
                 self.visit_expr(lambda.body.as_ref());

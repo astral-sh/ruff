@@ -63,6 +63,7 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
+use super::definition_expression_ty;
 use super::string_annotation::parse_string_annotation;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -654,8 +655,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
-            DefinitionKind::Parameter(parameter) => {
-                self.infer_parameter_definition(parameter, definition);
+            DefinitionKind::VariadicParameter(parameter) => {
+                self.infer_variadic_parameter_definition(parameter, definition);
+            }
+            DefinitionKind::VariadicKeywordParameter(parameter) => {
+                self.infer_variadic_keyword_parameter_definition(parameter, definition);
             }
             DefinitionKind::ParameterWithDefault(parameter_with_default) => {
                 self.infer_parameter_with_default_definition(parameter_with_default, definition);
@@ -1038,28 +1042,74 @@ impl<'db> TypeInferenceBuilder<'db> {
         parameter_with_default: &ast::ParameterWithDefault,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): Infer types from annotation or default expression
-        // TODO check that default is assignable to parameter type
-        self.infer_parameter_definition(&parameter_with_default.parameter, definition);
+        let ast::ParameterWithDefault {
+            parameter,
+            default,
+            range: _,
+        } = parameter_with_default;
+        let opt_default_ty = default
+            .as_ref()
+            .map(|default| definition_expression_ty(self.db, definition, default));
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let declared_ty = definition_expression_ty(self.db, definition, annotation);
+            let inferred_ty = if let Some(default_ty) = opt_default_ty {
+                UnionType::from_elements(self.db, [declared_ty, default_ty])
+            } else {
+                declared_ty
+            };
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                declared_ty,
+                inferred_ty,
+            );
+        } else {
+            let ty = if let Some(default_ty) = opt_default_ty {
+                UnionType::from_elements(self.db, [Type::Unknown, default_ty])
+            } else {
+                Type::Unknown
+            };
+            self.add_binding(parameter.into(), definition, ty);
+        }
     }
 
-    fn infer_parameter_definition(
+    fn infer_variadic_parameter_definition(
         &mut self,
         parameter: &ast::Parameter,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): Annotation expression is resolved at the enclosing scope, infer the
-        // parameter type from there
-        let annotated_ty = todo_type!("function parameter type");
-        if parameter.annotation.is_some() {
-            self.add_declaration_with_binding(
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let _annotated_ty = definition_expression_ty(self.db, definition, annotation);
+            // TODO tuple[annotated_ty, ...]
+            let ty = KnownClass::Tuple.to_instance(self.db);
+            self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
+        } else {
+            self.add_binding(
                 parameter.into(),
                 definition,
-                annotated_ty,
-                annotated_ty,
+                // TODO tuple of Unknown
+                KnownClass::Tuple.to_instance(self.db),
             );
+        }
+    }
+
+    fn infer_variadic_keyword_parameter_definition(
+        &mut self,
+        parameter: &ast::Parameter,
+        definition: Definition<'db>,
+    ) {
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let _annotated_ty = definition_expression_ty(self.db, definition, annotation);
+            // TODO dict[str, annotated_ty]
+            let ty = KnownClass::Dict.to_instance(self.db);
+            self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
         } else {
-            self.add_binding(parameter.into(), definition, annotated_ty);
+            self.add_binding(
+                parameter.into(),
+                definition,
+                // TODO dict[str, Unknown]
+                KnownClass::Dict.to_instance(self.db),
+            );
         }
     }
 
@@ -1435,10 +1485,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal()
-                            .map_or(todo_type!(), |ClassLiteralType { class }| {
-                                Type::instance(class)
-                            })
+                        ty.into_class_literal().map_or(
+                            todo_type!("exception type"),
+                            |ClassLiteralType { class }| Type::instance(class),
+                        )
                     }),
                 ),
                 _ => todo_type!("exception type"),
@@ -2719,7 +2769,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(value.as_ref().into(), &mut self.diagnostics);
 
         // TODO
-        todo_type!()
+        todo_type!("starred expression")
     }
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
