@@ -13,7 +13,7 @@ PTH901_1.py:13:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 10 10 | 
 11 11 | def test_path(p: Path) -> None:
 12 12 |     ## Errors
@@ -34,7 +34,7 @@ PTH901_1.py:14:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 11 11 | def test_path(p: Path) -> None:
 12 12 |     ## Errors
 13 13 |     p.with_suffix("py")
@@ -54,7 +54,7 @@ PTH901_1.py:15:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 12 12 |     ## Errors
 13 13 |     p.with_suffix("py")
 14 14 |     p.with_suffix(r"s")
@@ -75,7 +75,7 @@ PTH901_1.py:16:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 13 13 |     p.with_suffix("py")
 14 14 |     p.with_suffix(r"s")
 15 15 |     p.with_suffix(u'' "json")
@@ -96,7 +96,7 @@ PTH901_1.py:30:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 27 27 | 
 28 28 | def test_posix_path(p: PosixPath) -> None:
 29 29 |     ## Errors
@@ -117,7 +117,7 @@ PTH901_1.py:31:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 28 28 | def test_posix_path(p: PosixPath) -> None:
 29 29 |     ## Errors
 30 30 |     p.with_suffix("py")
@@ -137,7 +137,7 @@ PTH901_1.py:32:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 29 29 |     ## Errors
 30 30 |     p.with_suffix("py")
 31 31 |     p.with_suffix(r"s")
@@ -158,7 +158,7 @@ PTH901_1.py:33:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 30 30 |     p.with_suffix("py")
 31 31 |     p.with_suffix(r"s")
 32 32 |     p.with_suffix(u'' "json")
@@ -179,7 +179,7 @@ PTH901_1.py:47:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 44 44 | 
 45 45 | def test_pure_path(p: PurePath) -> None:
 46 46 |     ## Errors
@@ -200,7 +200,7 @@ PTH901_1.py:48:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 45 45 | def test_pure_path(p: PurePath) -> None:
 46 46 |     ## Errors
 47 47 |     p.with_suffix("py")
@@ -220,7 +220,7 @@ PTH901_1.py:49:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 46 46 |     ## Errors
 47 47 |     p.with_suffix("py")
 48 48 |     p.with_suffix(r"s")
@@ -241,7 +241,7 @@ PTH901_1.py:50:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 47 47 |     p.with_suffix("py")
 48 48 |     p.with_suffix(r"s")
 49 49 |     p.with_suffix(u'' "json")
@@ -262,7 +262,7 @@ PTH901_1.py:64:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 61 61 | 
 62 62 | def test_pure_posix_path(p: PurePosixPath) -> None:
 63 63 |     ## Errors
@@ -283,7 +283,7 @@ PTH901_1.py:65:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 62 62 | def test_pure_posix_path(p: PurePosixPath) -> None:
 63 63 |     ## Errors
 64 64 |     p.with_suffix("py")
@@ -303,7 +303,7 @@ PTH901_1.py:66:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 63 63 |     ## Errors
 64 64 |     p.with_suffix("py")
 65 65 |     p.with_suffix(r"s")
@@ -324,7 +324,7 @@ PTH901_1.py:67:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 64 64 |     p.with_suffix("py")
 65 65 |     p.with_suffix(r"s")
 66 66 |     p.with_suffix(u'' "json")
@@ -345,7 +345,7 @@ PTH901_1.py:81:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 78 78 | 
 79 79 | def test_pure_windows_path(p: PureWindowsPath) -> None:
 80 80 |     ## Errors
@@ -366,7 +366,7 @@ PTH901_1.py:82:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 79 79 | def test_pure_windows_path(p: PureWindowsPath) -> None:
 80 80 |     ## Errors
 81 81 |     p.with_suffix("py")
@@ -386,7 +386,7 @@ PTH901_1.py:83:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 80 80 |     ## Errors
 81 81 |     p.with_suffix("py")
 82 82 |     p.with_suffix(r"s")
@@ -407,7 +407,7 @@ PTH901_1.py:84:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
    |
    = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 81 81 |     p.with_suffix("py")
 82 82 |     p.with_suffix(r"s")
 83 83 |     p.with_suffix(u'' "json")
@@ -428,7 +428,7 @@ PTH901_1.py:98:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
     |
     = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 95 95 | 
 96 96 | def test_windows_path(p: WindowsPath) -> None:
 97 97 |     ## Errors
@@ -449,7 +449,7 @@ PTH901_1.py:99:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
     |
     = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 96  96  | def test_windows_path(p: WindowsPath) -> None:
 97  97  |     ## Errors
 98  98  |     p.with_suffix("py")
@@ -469,7 +469,7 @@ PTH901_1.py:100:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
     |
     = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 97  97  |     ## Errors
 98  98  |     p.with_suffix("py")
 99  99  |     p.with_suffix(r"s")
@@ -490,7 +490,7 @@ PTH901_1.py:101:5: PTH901 [*] Dotless suffix passed to `.with_suffix()`
     |
     = help: Add a leading dot
 
-ℹ Safe fix
+ℹ Unsafe fix
 98  98  |     p.with_suffix("py")
 99  99  |     p.with_suffix(r"s")
 100 100 |     p.with_suffix(u'' "json")
