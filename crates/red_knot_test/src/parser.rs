@@ -395,7 +395,7 @@ impl<'s> Parser<'s> {
         }
 
         let config = MarkdownTestConfig::from_str(code)?;
-        let target_version = config.tool.knot.environment.target_version;
+        let target_version = config.environment.target_version;
 
         let parts = target_version
             .split('.')

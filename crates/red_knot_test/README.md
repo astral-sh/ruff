@@ -289,7 +289,7 @@ a TOML code block:
 
 ````markdown
 ```toml
-[tool.knot]
+[lint.rules]
 warn-on-any = true
 ```
 
@@ -320,11 +320,11 @@ variable.
 
 ### Configuring search paths and kinds
 
-The red-knot TOML configuration format hasn't been designed yet, and we may want to implement
+The red-knot TOML configuration format hasn't been finalized, and we may want to implement
 support in the test framework for configuring search paths before it is designed. If so, we can
-define some configuration options for now under the `[tool.knot.tests]` namespace. In the future,
-perhaps some of these can be replaced by real red-knot configuration options; some or all may also
-be kept long-term as test-specific options.
+define some configuration options for now under the `[tests]` namespace. In the future, perhaps
+some of these can be replaced by real red-knot configuration options; some or all may also be
+kept long-term as test-specific options.
 
 Some configuration options we will want to provide:
 
@@ -342,13 +342,13 @@ non-default value using the `workspace-root` config.
 
 ### Specifying a custom typeshed
 
-Some tests will need to override the default typeshed with custom files. The `[tool.knot.tests]`
-configuration option `typeshed-root` should be usable for this:
+Some tests will need to override the default typeshed with custom files. The `[environment]`
+configuration option `typeshed-path` can be used to do this:
 
 ````markdown
 ```toml
-[tool.knot.tests]
-typeshed-root = "/typeshed"
+[environment]
+typeshed-path = "/typeshed"
 ```
 
 This file is importable as part of our custom typeshed, because it is within `/typeshed`, which we

@@ -1,10 +1,9 @@
-//! Ad-hoc implementation of a simplified TOML-deserializable Red Knot configuration, to
-//! be able to control some configuration options from Markdown files. Eventually, this
-//! should be replaced by the actual Red Knot config parsing. For now, this supports the
-//! following TOML structure:
+//! TOML-deserializable Red Knot configuration, similar to `knot.toml`, to be able to
+//! control some configuration options from Markdown files. For now, this supports the
+//! following limited structure:
 //!
 //! ```toml
-//! [tool.knot.environment]
+//! [environment]
 //! target-version = "3.10"
 //! ```
 
@@ -13,23 +12,13 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub(crate) struct MarkdownTestConfig {
-    pub(crate) tool: Tool,
+    pub(crate) environment: Environment,
 }
 
 impl MarkdownTestConfig {
     pub(crate) fn from_str(s: &str) -> anyhow::Result<Self> {
         toml::from_str(s).context("Error while parsing Markdown TOML config")
     }
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Tool {
-    pub(crate) knot: Knot,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Knot {
-    pub(crate) environment: Environment,
 }
 
 #[derive(Deserialize)]

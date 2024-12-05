@@ -4,7 +4,7 @@ This test makes sure that we correctly parse the `target-version` configuration 
 `sys_version_info.md` for the actual tests for `sys.version_info`.
 
 ```toml
-[tool.knot.environment]
+[environment]
 target-version = "3.13"
 ```
 

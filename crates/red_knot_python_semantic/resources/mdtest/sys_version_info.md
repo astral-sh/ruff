@@ -1,7 +1,7 @@
 # `sys.version_info`
 
 ```toml
-[tool.knot.environment]
+[environment]
 target-version = "3.9"
 ```
 
