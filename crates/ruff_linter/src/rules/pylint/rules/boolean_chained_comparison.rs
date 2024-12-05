@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    parenthesize::parenthesized_range, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
+    parenthesize::parentheses_iterator, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -88,33 +88,45 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
                 return None;
             }
 
-            let left_has_paren = parenthesized_range(
+            let left_paren_count = parentheses_iterator(
                 left_compare.into(),
-                expr_bool_op.into(),
+                Some(expr_bool_op.into()),
                 comment_ranges,
                 locator.contents(),
             )
-            .is_some();
+            .count();
 
-            let right_has_paren = parenthesized_range(
+            let right_paren_count = parentheses_iterator(
                 right_compare.into(),
-                expr_bool_op.into(),
+                Some(expr_bool_op.into()),
                 comment_ranges,
                 locator.contents(),
             )
-            .is_some();
+            .count();
 
-            // Do not offer a fix if there are any parentheses
-            // TODO: We can support a fix here, we just need to be careful to balance the
-            // parentheses which requires a more sophisticated edit
-            let fix = if left_has_paren || right_has_paren {
-                None
-            } else {
-                let edit = Edit::range_replacement(
-                    left_compare_right.id().to_string(),
-                    TextRange::new(left_compare_right.start(), right_compare_left.end()),
-                );
-                Some(Fix::safe_edit(edit))
+            // Create the edit that removes the comparison operator
+            let edit = Edit::range_replacement(
+                left_compare_right.id().to_string(),
+                TextRange::new(left_compare_right.start(), right_compare_left.end()),
+            );
+
+            // Balance left and right parentheses
+            let fix = match left_paren_count.cmp(&right_paren_count) {
+                std::cmp::Ordering::Less => {
+                    let balance_parens_edit = Edit::insertion(
+                        std::iter::repeat_n('(', right_paren_count - left_paren_count).collect(),
+                        left_compare.start(),
+                    );
+                    Fix::safe_edits(edit, [balance_parens_edit])
+                }
+                std::cmp::Ordering::Equal => Fix::safe_edit(edit),
+                std::cmp::Ordering::Greater => {
+                    let balance_parens_edit = Edit::insertion(
+                        std::iter::repeat_n(')', left_paren_count - right_paren_count).collect(),
+                        right_compare.end(),
+                    );
+                    Fix::safe_edits(edit, [balance_parens_edit])
+                }
             };
 
             let mut diagnostic = Diagnostic::new(
@@ -122,9 +134,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
                 TextRange::new(left_compare.start(), right_compare.end()),
             );
 
-            if let Some(fix) = fix {
-                diagnostic.set_fix(fix);
-            }
+            diagnostic.set_fix(fix);
 
             Some(diagnostic)
         });
