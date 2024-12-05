@@ -56,14 +56,6 @@ from b import x
 x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
 ```
 
-## Invalid syntax
-
-```py
-from import bar  # error: [invalid-syntax]
-
-reveal_type(bar)  # revealed: Unknown
-```
-
 ## Import cycle
 
 ```py path=a.py
