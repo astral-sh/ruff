@@ -1,10 +1,10 @@
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, ExprStringLiteral, StringFlags};
+use ruff_python_ast::{Expr, ExprAttribute, ExprCall, ExprStringLiteral, StringFlags};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
-
-use crate::checkers::ast::Checker;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `Path.with_suffix()` calls where
@@ -51,17 +51,23 @@ pub(crate) fn dotless_with_suffix(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(string) = single_string_literal_argument(arguments) else {
+    if arguments.len() > 1 {
+        return;
+    }
+
+    let Some(Expr::StringLiteral(string)) = arguments.find_argument("suffix", 0) else {
         return;
     };
 
-    if matches!(string.value.chars().next(), None | Some('.')) {
+    let string_value = string.value.to_str();
+
+    if string_value.is_empty() || string_value.starts_with('.') {
         return;
     }
 
     let diagnostic = Diagnostic::new(DotlessWithSuffix, call.range);
     let Some(fix) = add_leading_dot_fix(string) else {
-        return;
+        unreachable!("Expected to always be able to fix this rule");
     };
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
@@ -86,32 +92,13 @@ fn is_path_with_suffix_call(semantic: &SemanticModel, func: &Expr) -> bool {
     typing::is_pathlib_path(binding, semantic)
 }
 
-fn single_string_literal_argument(arguments: &Arguments) -> Option<&ExprStringLiteral> {
-    if arguments.len() > 1 {
-        return None;
-    }
-
-    match arguments.find_argument("suffix", 0)? {
-        Expr::StringLiteral(string) => Some(string),
-        _ => None,
-    }
-}
-
 fn add_leading_dot_fix(string: &ExprStringLiteral) -> Option<Fix> {
     let first_part = string.value.iter().next()?;
 
-    // |r"foo"
-    let before_prefix = first_part.range.start();
-
-    // r|"foo"
-    let prefix_length = first_part.flags.prefix().as_str().len();
-    let after_prefix = before_prefix.checked_add(u32::try_from(prefix_length).ok()?.into())?;
-
-    // r"|foo"
-    let quote_length = first_part.flags.quote_str().len();
-    let after_leading_quote = after_prefix.checked_add(u32::try_from(quote_length).ok()?.into())?;
+    let opener_length = first_part.flags.opener_len();
+    let after_leading_quote = first_part.start().checked_add(opener_length)?;
 
     let edit = Edit::insertion(".".to_string(), after_leading_quote);
 
-    Some(Fix::safe_edit(edit))
+    Some(Fix::unsafe_edit(edit))
 }
