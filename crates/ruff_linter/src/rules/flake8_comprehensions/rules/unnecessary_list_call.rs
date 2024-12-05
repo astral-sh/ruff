@@ -11,10 +11,10 @@ use crate::rules::flake8_comprehensions::fixes;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary `list` calls around list comprehensions.
+/// Checks for unnecessary `list()` calls around list comprehensions.
 ///
 /// ## Why is this bad?
-/// It is redundant to use a `list` call around a list comprehension.
+/// It is redundant to use a `list()` call around a list comprehension.
 ///
 /// ## Examples
 /// ```python
@@ -35,11 +35,11 @@ pub(crate) struct UnnecessaryListCall;
 impl AlwaysFixableViolation for UnnecessaryListCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Unnecessary `list` call (remove the outer call to `list()`)".to_string()
+        "Unnecessary `list()` call (remove the outer call to `list()`)".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Remove outer `list` call".to_string()
+        "Remove outer `list()` call".to_string()
     }
 }
 
@@ -53,10 +53,10 @@ pub(crate) fn unnecessary_list_call(
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };
-    if !checker.semantic().has_builtin_binding("list") {
+    if !argument.is_list_comp_expr() {
         return;
     }
-    if !argument.is_list_comp_expr() {
+    if !checker.semantic().has_builtin_binding("list") {
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());

@@ -6,14 +6,11 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`.
+/// the lower-level API offered by `os.path`.
 ///
 /// When possible, using `Path` object methods such as `Path.stat()` can
-/// improve readability over the `os` module's counterparts (e.g.,
+/// improve readability over the `os.path` module's counterparts (e.g.,
 /// `os.path.getmtime()`).
-///
-/// Note that `os` functions may be preferable if performance is a concern,
-/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -28,6 +25,11 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 ///
 /// Path(__file__).stat().st_mtime
 /// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
 ///
 /// ## References
 /// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)

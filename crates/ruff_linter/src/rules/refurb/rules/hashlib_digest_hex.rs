@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -27,11 +28,6 @@ use crate::checkers::ast::Checker;
 /// hashed = sha512(b"some data").hexdigest()
 /// ```
 ///
-/// ## Fix safety
-/// This rule's fix is marked as unsafe, as the target of the `.digest()` call
-/// could be a user-defined class that implements a `.hex()` method, rather
-/// than a hashlib hash object.
-///
 /// ## References
 /// - [Python documentation: `hashlib`](https://docs.python.org/3/library/hashlib.html)
 #[derive(ViolationMetadata)]
@@ -52,6 +48,10 @@ impl Violation for HashlibDigestHex {
 
 /// FURB181
 pub(crate) fn hashlib_digest_hex(checker: &mut Checker, call: &ExprCall) {
+    if !checker.semantic().seen_module(Modules::HASHLIB) {
+        return;
+    }
+
     if !call.arguments.is_empty() {
         return;
     }
@@ -105,14 +105,13 @@ pub(crate) fn hashlib_digest_hex(checker: &mut Checker, call: &ExprCall) {
                         | "sha3_512"
                         | "shake_128"
                         | "shake_256"
-                        | "_Hash"
                 ]
             )
         })
     {
         let mut diagnostic = Diagnostic::new(HashlibDigestHex, call.range());
         if arguments.is_empty() {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 ".hexdigest".to_string(),
                 TextRange::new(value.end(), call.func.end()),
             )));

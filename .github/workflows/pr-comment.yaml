@@ -17,7 +17,7 @@ jobs:
   comment:
     runs-on: ubuntu-latest
     steps:
-      - uses: dawidd6/action-download-artifact@v6
+      - uses: dawidd6/action-download-artifact@v7
         name: Download pull request number
         with:
           name: pr-number
@@ -33,7 +33,7 @@ jobs:
             echo "pr-number=$(<pr-number)" >> $GITHUB_OUTPUT
           fi
 
-      - uses: dawidd6/action-download-artifact@v6
+      - uses: dawidd6/action-download-artifact@v7
         name: "Download ecosystem results"
         id: download-ecosystem-result
         if: steps.pr-number.outputs.pr-number

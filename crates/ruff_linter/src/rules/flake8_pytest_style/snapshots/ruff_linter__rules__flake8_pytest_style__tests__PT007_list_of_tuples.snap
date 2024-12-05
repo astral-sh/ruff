@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 snapshot_kind: text
 ---
-PT007.py:4:35: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:4:35: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
   |
 4 | @pytest.mark.parametrize("param", (1, 2))
   |                                   ^^^^^^ PT007
@@ -21,7 +21,7 @@ PT007.py:4:35: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 6 6 |     ...
 7 7 | 
 
-PT007.py:11:5: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:11:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
  9 |   @pytest.mark.parametrize(
 10 |       ("param1", "param2"),
@@ -50,7 +50,7 @@ PT007.py:11:5: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 16 16 | def test_tuple_of_tuples(param1, param2):
 17 17 |     ...
 
-PT007.py:22:5: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:22:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
 20 |   @pytest.mark.parametrize(
 21 |       ("param1", "param2"),
@@ -79,7 +79,7 @@ PT007.py:22:5: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 27 27 | def test_tuple_of_lists(param1, param2):
 28 28 |     ...
 
-PT007.py:23:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:23:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
 21 |     ("param1", "param2"),
 22 |     (
@@ -100,7 +100,7 @@ PT007.py:23:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 25 25 |     ),
 26 26 | )
 
-PT007.py:24:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:24:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
 22 |     (
 23 |         [1, 2],
@@ -121,7 +121,7 @@ PT007.py:24:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 26 26 | )
 27 27 | def test_tuple_of_lists(param1, param2):
 
-PT007.py:50:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:50:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
 48 |     ("param1", "param2"),
 49 |     [
@@ -142,7 +142,7 @@ PT007.py:50:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 52 52 |     ],
 53 53 | )
 
-PT007.py:51:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:51:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
 49 |     [
 50 |         [1, 2],
@@ -163,7 +163,7 @@ PT007.py:51:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 53 53 | )
 54 54 | def test_list_of_lists(param1, param2):
 
-PT007.py:61:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:61:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
 59 |     "param1,param2",
 60 |     [
@@ -184,7 +184,7 @@ PT007.py:61:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 63 63 |     ],
 64 64 | )
 
-PT007.py:62:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:62:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
 60 |     [
 61 |         [1, 2],
@@ -205,7 +205,7 @@ PT007.py:62:9: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expecte
 64 64 | )
 65 65 | def test_csv_name_list_of_lists(param1, param2):
 
-PT007.py:81:38: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:81:38: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
    |
 80 | @pytest.mark.parametrize("a", [1, 2])
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))

@@ -325,9 +325,15 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
-    /// in the current scope, or in any containing scope.
+    /// in the current scope currently being visited, or in any containing scope.
     pub fn is_available(&self, member: &str) -> bool {
-        self.lookup_symbol(member)
+        self.is_available_in_scope(member, self.scope_id)
+    }
+
+    /// Return `true` if `member` is an "available" symbol in a given scope, i.e.,
+    /// a symbol that has not been bound in that current scope, or in any containing scope.
+    pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
+        self.lookup_symbol_in_scope(member, scope_id, false)
             .map(|binding_id| &self.bindings[binding_id])
             .map_or(true, |binding| binding.kind.is_builtin())
     }
@@ -620,10 +626,22 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_load`], but
-    /// doesn't add any read references to the resolved symbol.
+    /// Lookup a symbol in the current scope.
     pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
-        if self.in_forward_reference() {
+        self.lookup_symbol_in_scope(symbol, self.scope_id, self.in_forward_reference())
+    }
+
+    /// Lookup a symbol in a certain scope
+    ///
+    /// This is a carbon copy of [`Self::resolve_load`], but
+    /// doesn't add any read references to the resolved symbol.
+    pub fn lookup_symbol_in_scope(
+        &self,
+        symbol: &str,
+        scope_id: ScopeId,
+        in_forward_reference: bool,
+    ) -> Option<BindingId> {
+        if in_forward_reference {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
                     return Some(binding_id);
@@ -633,7 +651,7 @@ impl<'a> SemanticModel<'a> {
 
         let mut seen_function = false;
         let mut class_variables_visible = true;
-        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+        for (index, scope_id) in self.scopes.ancestor_ids(scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
                 if seen_function && matches!(symbol, "__class__") {
@@ -1411,6 +1429,8 @@ impl<'a> SemanticModel<'a> {
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
             "attr" | "attrs" => self.seen.insert(Modules::ATTRS),
             "airflow" => self.seen.insert(Modules::AIRFLOW),
+            "hashlib" => self.seen.insert(Modules::HASHLIB),
+            "crypt" => self.seen.insert(Modules::CRYPT),
             _ => {}
         }
     }
@@ -1713,11 +1733,6 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in a type annotation.
     pub const fn in_annotation(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::ANNOTATION)
-    }
-
-    /// Return `true` if the model is in a `@no_type_check` context.
-    pub const fn in_no_type_check(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
     }
 
     /// Return `true` if the model is in a typing-only type annotation.
@@ -2039,6 +2054,8 @@ bitflags! {
         const ATTRS = 1 << 25;
         const REGEX = 1 << 26;
         const AIRFLOW = 1 << 27;
+        const HASHLIB = 1 << 28;
+        const CRYPT = 1 << 29;
     }
 }
 
@@ -2399,22 +2416,6 @@ bitflags! {
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 25;
 
-        /// The model is in a [no_type_check] context.
-        ///
-        /// This is used to skip type checking when the `@no_type_check` decorator is found.
-        ///
-        /// For example (adapted from [#13824]):
-        /// ```python
-        /// from typing import no_type_check
-        ///
-        /// @no_type_check
-        /// def fn(arg: "A") -> "R":
-        ///     pass
-        /// ```
-        ///
-        /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
-        /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
-        const NO_TYPE_CHECK = 1 << 26;
         /// The model is in the value expression of a [PEP 613] explicit type alias.
         ///
         /// For example:

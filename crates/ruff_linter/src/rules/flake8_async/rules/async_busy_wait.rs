@@ -35,8 +35,8 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// ## References
 /// - [`asyncio` events](https://docs.python.org/3/library/asyncio-sync.html#asyncio.Event)
-/// - [`anyio` events](https://trio.readthedocs.io/en/latest/reference-core.html#trio.Event)
-/// - [`trio` events](https://anyio.readthedocs.io/en/latest/api.html#anyio.Event)
+/// - [`anyio` events](https://anyio.readthedocs.io/en/latest/api.html#anyio.Event)
+/// - [`trio` events](https://trio.readthedocs.io/en/latest/reference-core.html#trio.Event)
 #[derive(ViolationMetadata)]
 pub(crate) struct AsyncBusyWait {
     module: AsyncModule,

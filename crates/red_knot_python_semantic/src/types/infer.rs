@@ -1660,7 +1660,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.expression_ty(value);
         let name_ast_id = name.scoped_expression_id(self.db, self.scope());
 
-        let target_ty = match assignment.target() {
+        let mut target_ty = match assignment.target() {
             TargetKind::Sequence(unpack) => {
                 let unpacked = infer_unpack_types(self.db, unpack);
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
@@ -1673,6 +1673,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             TargetKind::Name => value_ty,
         };
+
+        if let Some(known_instance) = file_to_module(self.db, definition.file(self.db))
+            .as_ref()
+            .and_then(|module| KnownInstanceType::try_from_module_and_symbol(module, &name.id))
+        {
+            target_ty = Type::KnownInstance(known_instance);
+        }
 
         self.store_expression_type(name, target_ty);
         self.add_binding(name.into(), definition, target_ty);
@@ -1893,12 +1900,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        self.infer_standalone_expression(iter);
-
         // TODO more complex assignment targets
         if let ast::Expr::Name(name) = &**target {
             self.infer_definition(name);
         } else {
+            self.infer_standalone_expression(iter);
             self.infer_expression(target);
         }
         self.infer_body(body);
@@ -4537,7 +4543,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
                     todo_type!()
                 } else {
-                    Type::tuple(self.db, &[single_element_ty])
+                    Type::tuple(self.db, [single_element_ty])
                 }
             }
         }
@@ -4642,6 +4648,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
+            KnownInstanceType::LiteralString => {
+                self.diagnostics.add(
+                    subscript.into(),
+                    "invalid-type-parameter",
+                    format_args!(
+                        "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
+                        known_instance.repr(self.db)
+                    ),
+                );
+                Type::Unknown
+            }
+            KnownInstanceType::Any => Type::Any,
         }
     }
 
@@ -5027,67 +5045,18 @@ fn perform_membership_test_comparison<'db>(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
-
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
+    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::check_types;
-    use crate::{HasTy, ProgramSettings, SemanticModel};
+    use crate::{HasTy, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
 
     use super::*;
-
-    fn setup_db() -> TestDb {
-        let db = TestDb::new();
-
-        let src_root = SystemPathBuf::from("/src");
-        db.memory_file_system()
-            .create_directory_all(&src_root)
-            .unwrap();
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(src_root),
-            },
-        )
-        .expect("Valid search path settings");
-
-        db
-    }
-
-    fn setup_db_with_custom_typeshed<'a>(
-        typeshed: &str,
-        files: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> anyhow::Result<TestDb> {
-        let mut db = TestDb::new();
-        let src_root = SystemPathBuf::from("/src");
-
-        db.write_files(files)
-            .context("Failed to write test files")?;
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    custom_typeshed: Some(SystemPathBuf::from(typeshed)),
-                    ..SearchPathSettings::new(src_root)
-                },
-            },
-        )
-        .context("Failed to create Program")?;
-
-        Ok(db)
-    }
 
     #[track_caller]
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
@@ -5483,17 +5452,15 @@ mod tests {
 
     #[test]
     fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
-        let db = setup_db_with_custom_typeshed(
-            "/typeshed",
-            [
-                ("/src/a.py", "c = copyright"),
-                (
-                    "/typeshed/stdlib/builtins.pyi",
-                    "def copyright() -> None: ...",
-                ),
-                ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
-            ],
-        )?;
+        let db = TestDbBuilder::new()
+            .with_custom_typeshed("/typeshed")
+            .with_file("/src/a.py", "c = copyright")
+            .with_file(
+                "/typeshed/stdlib/builtins.pyi",
+                "def copyright() -> None: ...",
+            )
+            .with_file("/typeshed/stdlib/VERSIONS", "builtins: 3.8-")
+            .build()?;
 
         assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
 
@@ -5502,14 +5469,12 @@ mod tests {
 
     #[test]
     fn unknown_builtin_later_defined() -> anyhow::Result<()> {
-        let db = setup_db_with_custom_typeshed(
-            "/typeshed",
-            [
-                ("/src/a.py", "x = foo"),
-                ("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1"),
-                ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
-            ],
-        )?;
+        let db = TestDbBuilder::new()
+            .with_custom_typeshed("/typeshed")
+            .with_file("/src/a.py", "x = foo")
+            .with_file("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1")
+            .with_file("/typeshed/stdlib/VERSIONS", "builtins: 3.8-")
+            .build()?;
 
         assert_public_ty(&db, "/src/a.py", "x", "Unknown");
 
