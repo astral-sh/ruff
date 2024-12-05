@@ -221,8 +221,6 @@
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
-use std::collections::HashSet;
-
 use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
@@ -230,6 +228,8 @@ use self::symbol_state::{
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::semantic_index::use_def::bitset::BitSet;
+use crate::semantic_index::use_def::symbol_state::INLINE_CONSTRAINT_BLOCKS;
 use crate::symbol::Boundness;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
@@ -562,8 +562,10 @@ pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 }
 
+type ActiveConstraints = BitSet<INLINE_CONSTRAINT_BLOCKS>;
+
 #[derive(Clone, Debug)]
-pub(super) struct ActiveConstraintsSnapshot(HashSet<ScopedConstraintId>);
+pub(super) struct ActiveConstraintsSnapshot(ActiveConstraints);
 
 #[derive(Debug, Default)]
 pub(super) struct UseDefMapBuilder<'db> {
@@ -573,7 +575,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Constraint`].
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
-    active_constraints: HashSet<ScopedConstraintId>,
+    active_constraints: ActiveConstraints,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -606,7 +608,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for state in &mut self.symbol_states {
             state.record_constraint(constraint_id);
         }
-        self.active_constraints.insert(constraint_id);
+        self.active_constraints.insert(constraint_id.as_u32());
     }
 
     pub(super) fn record_declaration(
