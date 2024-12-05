@@ -1280,7 +1280,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     Some(typing::Callable::Cast) => {
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
-                            self.visit_type_definition(arg);
+                            self.visit_cast_type_expression(arg);
 
                             if self.enabled(Rule::RuntimeCastValue) {
                                 flake8_type_checking::rules::runtime_cast_value(self, arg);
@@ -1886,6 +1886,15 @@ impl<'a> Checker<'a> {
         self.visit
             .type_param_definitions
             .push((expr, self.semantic.snapshot()));
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a the type expression
+    /// of a `typing.cast` call.
+    fn visit_cast_type_expression(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::CAST_TYPE_EXPRESSION;
+        self.visit_type_definition(expr);
         self.semantic.flags = snapshot;
     }
 

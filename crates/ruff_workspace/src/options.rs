@@ -1878,6 +1878,118 @@ pub struct Flake8TypeCheckingOptions {
         "#
     )]
     pub quote_annotations: Option<bool>,
+
+    /// Whether to add quotes around the type expression of a `typing.cast`
+    /// call, if doing so would allow the corresponding import to be moved
+    /// into a type-checking block.
+    ///
+    /// For example, in the following, Python requires that `Sequence` be
+    /// available at runtime, despite the fact that it's only used in a `cast`
+    /// which doesn't do anything at runtime.
+    ///
+    /// ```python
+    /// from collections.abc import Sequence
+    /// from typing import cast
+    ///
+    /// cast(Sequence[float], [1, 2, 3])
+    /// ```
+    ///
+    /// In other words, moving `from collections.abc import Sequence` into an
+    /// `if TYPE_CHECKING:` block above would cause a runtime error, as the
+    /// type would no longer be available at runtime.
+    ///
+    /// By default, Ruff will respect such runtime semantics and avoid moving
+    /// the import to prevent such runtime errors.
+    ///
+    /// Setting `quote-cast-type-expressions` to `true` will instruct Ruff to
+    /// add quotes around the type expression (e.g., `"Sequence[float]"`),
+    /// which in turn enables Ruff to move the import into an
+    /// `if TYPE_CHECKING:` block, like so:
+    ///
+    /// ```python
+    /// from typing import TYPE_CHECKING, cast
+    ///
+    /// if TYPE_CHECKING:
+    ///     from collections.abc import Sequence
+    ///
+    /// cast("Sequence[float]", [1, 2, 3])
+    /// ```
+    ///
+    /// Note that this setting should always be safe to enable, but can lead
+    /// to inconsistent style with `typing.cast` calls where sometimes the
+    /// type expression is quoted or partially quoted and other times not,
+    /// if you'd like to consistently quote type expressions, you should
+    /// instead consider enabling [`RuntimeCastValue`].
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Add quotes around the type expression of a `typing.cast`,
+            # if doing so would allow an import to be moved into a
+            # type-checking block.
+            quote-cast-type-expressions = true
+        "#
+    )]
+    pub quote_cast_type_expressions: Option<bool>,
+
+    /// Whether to add quotes around the value expression of a [PEP 613]
+    /// type alias, if doing so would allow the corresponding import to be
+    /// moved into a type-checking block.
+    ///
+    /// For example, in the following, Python requires that `Sequence` be
+    /// available at runtime, despite the fact that it's only used in a
+    /// `TypeAlias`, which may never end up being used at runtime.
+    ///
+    /// ```python
+    /// from collections.abc import Sequence
+    /// from typing import TypeAlias
+    ///
+    /// IntSeq: TypeAlias = Sequence[int]
+    /// ```
+    ///
+    /// In other words, moving `from collections.abc import Sequence` into an
+    /// `if TYPE_CHECKING:` block above would cause a runtime error, as the
+    /// type would no longer be available at runtime.
+    ///
+    /// By default, Ruff will respect such runtime semantics and avoid moving
+    /// the import to prevent such runtime errors.
+    ///
+    /// Setting `quote-annotated-type-value` to `true` will instruct Ruff to
+    /// add quotes around the value expression (e.g., `"Sequence[int]"`),
+    /// which in turn enables Ruff to move the import into an
+    /// `if TYPE_CHECKING:` block, like so:
+    ///
+    /// ```python
+    /// from typing import TYPE_CHECKING, TypeAlias
+    ///
+    /// if TYPE_CHECKING:
+    ///     from collections.abc import Sequence
+    ///
+    /// IntSeq: TypeAlias = "Sequence[int]"
+    /// ```
+    ///
+    /// Note that this setting can be quite dangerous and can cause problems
+    /// in a code base that uses a runtime type library like Pydantic,
+    /// or uses type aliases in things like `isinstance` checks. So only
+    /// use this if you're confident that it will cause no issues.
+    ///
+    /// In most cases it should be safer to enable [`UnquotedTypeAlias`]
+    /// instead, or to switch to [PEP 695] type aliases, if you have the
+    /// option to drop support for older Python versions.
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Add quotes around the value expression of a type alias,
+            # if doing so would allow an import to be moved into a
+            # type-checking block.
+            quote-annotated-type-alias-value = true
+        "#
+    )]
+    pub quote_annotated_type_alias_values: Option<bool>,
 }
 
 impl Flake8TypeCheckingOptions {
@@ -1890,6 +2002,10 @@ impl Flake8TypeCheckingOptions {
             runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
             runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
             quote_annotations: self.quote_annotations.unwrap_or_default(),
+            quote_cast_type_expressions: self.quote_cast_type_expressions.unwrap_or_default(),
+            quote_annotated_type_alias_values: self
+                .quote_annotated_type_alias_values
+                .unwrap_or_default(),
         }
     }
 }

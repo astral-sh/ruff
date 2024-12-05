@@ -17,14 +17,48 @@ use crate::Locator;
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
 /// context (with quoting enabled).
-pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
+pub(crate) fn is_typing_reference(
+    semantic: &SemanticModel,
+    reference: &ResolvedReference,
+    settings: &Settings,
+) -> bool {
     reference.in_type_checking_block()
         // if we're not in a type checking block, we necessarily need to be within a
         // type definition to be considered a typing reference
         || (reference.in_type_definition()
             && (reference.in_typing_only_annotation()
                 || reference.in_string_type_definition()
-                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
+                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())
+                || (settings.quote_cast_type_expressions && reference.in_cast_type_expression())
+                || (settings.quote_annotated_type_alias_values && reference.in_annotated_type_alias_value() && !parent_type_alias_has_runtime_references(semantic, reference))))
+}
+
+/// Find the [`Binding`] defined by the [PEP 613] type alias from a [`Reference`]
+/// originating from its value expression and check whether or not the binding has
+/// any runtime references
+///
+/// [PEP 613]: https://peps.python.org/pep-0613/
+pub(crate) fn parent_type_alias_has_runtime_references(
+    semantic: &SemanticModel,
+    reference: &ResolvedReference,
+) -> bool {
+    let Some(expression_id) = reference.expression_id() else {
+        return false;
+    };
+    let statement = semantic.statement(expression_id);
+    let scope = &semantic.scopes[reference.scope_id()];
+    for (_, binding_id) in scope.bindings() {
+        let binding = semantic.binding(binding_id);
+        let Some(binding_statement) = binding.statement(semantic) else {
+            continue;
+        };
+        if statement == binding_statement {
+            return binding
+                .references()
+                .any(|reference_id| semantic.reference(reference_id).in_runtime_context());
+        }
+    }
+    false
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
@@ -41,7 +75,7 @@ pub(crate) fn is_valid_runtime_import(
             && binding
                 .references()
                 .map(|reference_id| semantic.reference(reference_id))
-                .any(|reference| !is_typing_reference(reference, settings))
+                .any(|reference| !is_typing_reference(semantic, reference, settings))
     } else {
         false
     }
