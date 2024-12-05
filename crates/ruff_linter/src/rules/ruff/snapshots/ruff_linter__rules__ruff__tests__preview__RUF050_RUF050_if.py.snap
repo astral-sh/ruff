@@ -1,0 +1,400 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF050_if.py:9:1: RUF050 [*] Empty code branch
+   |
+ 8 |   # Unsafe fix: Remove statement
+ 9 | / if EOO:
+10 | |     pass
+   | |________^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Unsafe fix
+6  6  | 
+7  7  | 
+8  8  | # Unsafe fix: Remove statement
+9     |-if EOO:
+10    |-    pass
+11 9  | 
+12 10 | 
+13 11 | # Unsafe fix: Remove statement
+
+RUF050_if.py:14:1: RUF050 [*] Empty code branch
+   |
+13 |   # Unsafe fix: Remove statement
+14 | / if EOE:
+15 | |     ...
+16 | | else:
+17 | |     pass
+   | |________^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Unsafe fix
+11 11 | 
+12 12 | 
+13 13 | # Unsafe fix: Remove statement
+14    |-if EOE:
+15    |-    ...
+16    |-else:
+17    |-    pass
+18 14 | 
+19 15 | 
+20 16 | # No fix
+
+RUF050_if.py:21:1: RUF050 Empty code branch
+   |
+20 |   # No fix
+21 | / if EON:
+22 | |     ...
+   | |_______^ RUF050
+23 |   else:
+24 |       print()
+   |
+   = help: Refactor this branch
+
+RUF050_if.py:28:1: RUF050 [*] Empty code branch
+   |
+27 |   # Unsafe fix: Remove statement
+28 | / if EEO:
+29 | |     pass
+30 | | elif _:
+31 | |     ...
+   | |_______^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Unsafe fix
+25 25 | 
+26 26 | 
+27 27 | # Unsafe fix: Remove statement
+28    |-if EEO:
+29    |-    pass
+30    |-elif _:
+31    |-    ...
+32 28 | 
+33 29 | 
+34 30 | # Unsafe fix: Remove statement
+
+RUF050_if.py:35:1: RUF050 [*] Empty code branch
+   |
+34 |   # Unsafe fix: Remove statement
+35 | / if EEE:
+36 | |     pass
+37 | | elif _:
+38 | |     ...
+39 | | else:
+40 | |     pass
+   | |________^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Unsafe fix
+32 32 | 
+33 33 | 
+34 34 | # Unsafe fix: Remove statement
+35    |-if EEE:
+36    |-    pass
+37    |-elif _:
+38    |-    ...
+39    |-else:
+40    |-    pass
+41 35 | 
+42 36 | 
+43 37 | # No fix
+
+RUF050_if.py:45:1: RUF050 Empty code branch
+   |
+43 |   # No fix
+44 |   # Display-only fix: Remove `elif` branch
+45 | / if EEN:
+46 | |     pass
+   | |________^ RUF050
+47 |   elif _:
+48 |       ...
+   |
+   = help: Refactor this branch
+
+RUF050_if.py:47:1: RUF050 Empty code branch
+   |
+45 |   if EEN:
+46 |       pass
+47 | / elif _:
+48 | |     ...
+   | |_______^ RUF050
+49 |   else:
+50 |       print()
+   |
+   = help: Remove branch
+
+ℹ Display-only fix
+44 44 | # Display-only fix: Remove `elif` branch
+45 45 | if EEN:
+46 46 |     pass
+47    |-elif _:
+48    |-    ...
+49 47 | else:
+50 48 |     print()
+51 49 | 
+
+RUF050_if.py:54:1: RUF050 Empty code branch
+   |
+53 |   # No fix
+54 | / if ENO:
+55 | |     pass
+   | |________^ RUF050
+56 |   elif _:
+57 |       print()
+   |
+   = help: Refactor this branch
+
+RUF050_if.py:62:1: RUF050 Empty code branch
+   |
+60 |   # No fix
+61 |   # Safe fix: Remove `else` branch
+62 | / if ENE:
+63 | |     ...
+   | |_______^ RUF050
+64 |   elif _:
+65 |       print()
+   |
+   = help: Refactor this branch
+
+RUF050_if.py:66:1: RUF050 [*] Empty code branch
+   |
+64 |   elif _:
+65 |       print()
+66 | / else:
+67 | |     pass
+   | |________^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+63 63 |     ...
+64 64 | elif _:
+65 65 |     print()
+66    |-else:
+67    |-    pass
+68 66 | 
+69 67 | 
+70 68 | # No fix
+
+RUF050_if.py:71:1: RUF050 Empty code branch
+   |
+70 |   # No fix
+71 | / if ENN:
+72 | |     ...
+   | |_______^ RUF050
+73 |   elif _:
+74 |       print()
+   |
+   = help: Refactor this branch
+
+RUF050_if.py:87:1: RUF050 [*] Empty code branch
+   |
+85 |   if NOE:
+86 |       print()
+87 | / else:
+88 | |     pass
+   | |________^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+84 84 | # Safe fix: Remove `else` branch
+85 85 | if NOE:
+86 86 |     print()
+87    |-else:
+88    |-    pass
+89 87 | 
+90 88 | 
+91 89 | # No error
+
+RUF050_if.py:101:1: RUF050 [*] Empty code branch
+    |
+ 99 |   if NEO:
+100 |       print()
+101 | / elif _:
+102 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Unsafe fix
+98  98  | # Unsafe fix: Remove `elif` branch
+99  99  | if NEO:
+100 100 |     print()
+101     |-elif _:
+102     |-    ...
+103 101 | 
+104 102 | 
+105 103 | # Display-only fix: Remove `elif` branch
+
+RUF050_if.py:109:1: RUF050 Empty code branch
+    |
+107 |   if NEE:
+108 |       print()
+109 | / elif _:
+110 | |     pass
+    | |________^ RUF050
+111 |   else:
+112 |       ...
+    |
+    = help: Remove branch
+
+ℹ Display-only fix
+106 106 | # Safe fix: Remove `else` branch
+107 107 | if NEE:
+108 108 |     print()
+109     |-elif _:
+110     |-    pass
+111 109 | else:
+112 110 |     ...
+113 111 | 
+
+RUF050_if.py:111:1: RUF050 [*] Empty code branch
+    |
+109 |   elif _:
+110 |       pass
+111 | / else:
+112 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+108 108 |     print()
+109 109 | elif _:
+110 110 |     pass
+111     |-else:
+112     |-    ...
+113 111 | 
+114 112 | 
+115 113 | # Display-only fix: Remove `elif` branch
+
+RUF050_if.py:118:1: RUF050 Empty code branch
+    |
+116 |   if NEN:
+117 |       print()
+118 | / elif _:
+119 | |     pass
+    | |________^ RUF050
+120 |   else:
+121 |       print()
+    |
+    = help: Remove branch
+
+ℹ Display-only fix
+115 115 | # Display-only fix: Remove `elif` branch
+116 116 | if NEN:
+117 117 |     print()
+118     |-elif _:
+119     |-    pass
+120 118 | else:
+121 119 |     print()
+122 120 | 
+
+RUF050_if.py:136:1: RUF050 [*] Empty code branch
+    |
+134 |   elif _:
+135 |       print()
+136 | / else:
+137 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+133 133 |     print()
+134 134 | elif _:
+135 135 |     print()
+136     |-else:
+137     |-    ...
+138 136 | 
+139 137 | 
+140 138 | # No error
+
+RUF050_if.py:156:1: RUF050 Empty code branch
+    |
+154 |   if NEE_:
+155 |       print()
+156 | / elif _:
+157 | |     pass
+    | |________^ RUF050
+158 |   elif _:
+159 |       ...
+    |
+    = help: Remove branch
+
+ℹ Display-only fix
+154 154 | if NEE_:
+155 155 |     print()
+156 156 | elif _:
+157     |-    pass
+158     |-elif _:
+159 157 |     ...
+160 158 | 
+161 159 | 
+
+RUF050_if.py:158:1: RUF050 [*] Empty code branch
+    |
+156 |   elif _:
+157 |       pass
+158 | / elif _:
+159 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Unsafe fix
+155 155 |     print()
+156 156 | elif _:
+157 157 |     pass
+158     |-elif _:
+159     |-    ...
+160 158 | 
+161 159 | 
+162 160 | # Unsafe fix: Remove `elif` branch
+
+RUF050_if.py:166:1: RUF050 [*] Empty code branch
+    |
+164 |       print()
+165 |   # Lorem ipsum
+166 | / elif _:
+167 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Unsafe fix
+162 162 | # Unsafe fix: Remove `elif` branch
+163 163 | if NEO_:
+164 164 |     print()
+165     |-# Lorem ipsum
+166     |-elif _:
+167     |-    ...
+168 165 | 
+169 166 | 
+170 167 | # Unsafe fix: Remove `else` branch
+
+RUF050_if.py:173:1: RUF050 [*] Empty code branch
+    |
+171 |   if NOE_:
+172 |       print()
+173 | / else:
+174 | |     # Lorem ipsum
+175 | |     pass
+    | |________^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Unsafe fix
+170 170 | # Unsafe fix: Remove `else` branch
+171 171 | if NOE_:
+172 172 |     print()
+173     |-else:
+174     |-    # Lorem ipsum
+175     |-    pass

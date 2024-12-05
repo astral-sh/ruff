@@ -1,0 +1,665 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF050_try.py:9:1: RUF050 [*] Empty code branch
+   |
+ 8 |   # Safe fix: Remove statement
+ 9 | / try:
+10 | |     pass
+11 | | except:
+12 | |     ...
+   | |_______^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+6  6  | 
+7  7  | 
+8  8  | # Safe fix: Remove statement
+9     |-try:
+10    |-    pass
+11    |-except:
+12    |-    ...
+13 9  | 
+14 10 | 
+15 11 | # Safe fix: Remove statement
+
+RUF050_try.py:16:1: RUF050 [*] Empty code branch
+   |
+15 |   # Safe fix: Remove statement
+16 | / try:
+17 | |     pass
+18 | | except:
+19 | |     ...
+20 | | finally:
+21 | |     pass
+   | |________^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+13 13 | 
+14 14 | 
+15 15 | # Safe fix: Remove statement
+16    |-try:
+17    |-    pass
+18    |-except:
+19    |-    ...
+20    |-finally:
+21    |-    pass
+22 16 | 
+23 17 | 
+24 18 | # No fix
+
+RUF050_try.py:25:1: RUF050 Empty code branch
+   |
+24 |   # No fix
+25 | / try:
+26 | |     ...
+   | |_______^ RUF050
+27 |   except:
+28 |       pass
+   |
+   = help: Refactor this branch
+
+RUF050_try.py:34:1: RUF050 [*] Empty code branch
+   |
+33 |   # Safe fix: Remove statement
+34 | / try:
+35 | |     ...
+36 | | except:
+37 | |     pass
+38 | | else:
+39 | |     ...
+   | |_______^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+31 31 | 
+32 32 | 
+33 33 | # Safe fix: Remove statement
+34    |-try:
+35    |-    ...
+36    |-except:
+37    |-    pass
+38    |-else:
+39    |-    ...
+40 34 | 
+41 35 | 
+42 36 | # Safe fix: Remove statement
+
+RUF050_try.py:43:1: RUF050 [*] Empty code branch
+   |
+42 |   # Safe fix: Remove statement
+43 | / try:
+44 | |     pass
+45 | | except:
+46 | |     ...
+47 | | else:
+48 | |     pass
+49 | | finally:
+50 | |     ...
+   | |_______^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+40 40 | 
+41 41 | 
+42 42 | # Safe fix: Remove statement
+43    |-try:
+44    |-    pass
+45    |-except:
+46    |-    ...
+47    |-else:
+48    |-    pass
+49    |-finally:
+50    |-    ...
+51 43 | 
+52 44 | 
+53 45 | # No fix
+
+RUF050_try.py:55:1: RUF050 Empty code branch
+   |
+53 |   # No fix
+54 |   # Safe fix: Remove `else` branch
+55 | / try:
+56 | |     pass
+   | |________^ RUF050
+57 |   except:
+58 |       ...
+   |
+   = help: Refactor this branch
+
+RUF050_try.py:59:1: RUF050 [*] Empty code branch
+   |
+57 |   except:
+58 |       ...
+59 | / else:
+60 | |     pass
+   | |________^ RUF050
+61 |   finally:
+62 |       print()
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+56 56 |     pass
+57 57 | except:
+58 58 |     ...
+59    |-else:
+60    |-    pass
+61 59 | finally:
+62 60 |     print()
+63 61 | 
+
+RUF050_try.py:66:1: RUF050 Empty code branch
+   |
+65 |   # No fix
+66 | / try:
+67 | |     ...
+   | |_______^ RUF050
+68 |   except:
+69 |       pass
+   |
+   = help: Refactor this branch
+
+RUF050_try.py:76:1: RUF050 Empty code branch
+   |
+74 |   # No fix
+75 |   # Safe fix: Remove `finally` branch
+76 | / try:
+77 | |     ...
+   | |_______^ RUF050
+78 |   except:
+79 |       pass
+   |
+   = help: Refactor this branch
+
+RUF050_try.py:82:1: RUF050 [*] Empty code branch
+   |
+80 |   else:
+81 |       print()
+82 | / finally:
+83 | |     ...
+   | |_______^ RUF050
+   |
+   = help: Remove branch
+
+ℹ Safe fix
+79 79 |     pass
+80 80 | else:
+81 81 |     print()
+82    |-finally:
+83    |-    ...
+84 82 | 
+85 83 | 
+86 84 | # No fix
+
+RUF050_try.py:87:1: RUF050 Empty code branch
+   |
+86 |   # No fix
+87 | / try:
+88 | |     pass
+   | |________^ RUF050
+89 |   except:
+90 |       ...
+   |
+   = help: Refactor this branch
+
+RUF050_try.py:98:1: RUF050 [*] Empty code branch
+    |
+ 97 |   # Safe fix: Remove statement
+ 98 | / try:
+ 99 | |     pass
+100 | | except:
+101 | |     print()
+    | |___________^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+95  95  | 
+96  96  | 
+97  97  | # Safe fix: Remove statement
+98      |-try:
+99      |-    pass
+100     |-except:
+101     |-    print()
+102 98  | 
+103 99  | 
+104 100 | # Safe fix: Remove statement
+
+RUF050_try.py:105:1: RUF050 [*] Empty code branch
+    |
+104 |   # Safe fix: Remove statement
+105 | / try:
+106 | |     ...
+107 | | except:
+108 | |     print()
+109 | | finally:
+110 | |     pass
+    | |________^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+102 102 | 
+103 103 | 
+104 104 | # Safe fix: Remove statement
+105     |-try:
+106     |-    ...
+107     |-except:
+108     |-    print()
+109     |-finally:
+110     |-    pass
+111 105 | 
+112 106 | 
+113 107 | # No fix
+
+RUF050_try.py:114:1: RUF050 Empty code branch
+    |
+113 |   # No fix
+114 | / try:
+115 | |     ...
+    | |_______^ RUF050
+116 |   except:
+117 |       print()
+    |
+    = help: Refactor this branch
+
+RUF050_try.py:123:1: RUF050 [*] Empty code branch
+    |
+122 |   # Safe fix: Remove statement
+123 | / try:
+124 | |     pass
+125 | | except:
+126 | |     print()
+127 | | else:
+128 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+120 120 | 
+121 121 | 
+122 122 | # Safe fix: Remove statement
+123     |-try:
+124     |-    pass
+125     |-except:
+126     |-    print()
+127     |-else:
+128     |-    ...
+129 123 | 
+130 124 | 
+131 125 | # Safe fix: Remove statement
+
+RUF050_try.py:132:1: RUF050 [*] Empty code branch
+    |
+131 |   # Safe fix: Remove statement
+132 | / try:
+133 | |     pass
+134 | | except:
+135 | |     print()
+136 | | else:
+137 | |     ...
+138 | | finally:
+139 | |     pass
+    | |________^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+129 129 | 
+130 130 | 
+131 131 | # Safe fix: Remove statement
+132     |-try:
+133     |-    pass
+134     |-except:
+135     |-    print()
+136     |-else:
+137     |-    ...
+138     |-finally:
+139     |-    pass
+140 132 | 
+141 133 | 
+142 134 | # No fix
+
+RUF050_try.py:144:1: RUF050 Empty code branch
+    |
+142 |   # No fix
+143 |   # Safe fix: Remove `else` branch
+144 | / try:
+145 | |     ...
+    | |_______^ RUF050
+146 |   except:
+147 |       print()
+    |
+    = help: Refactor this branch
+
+RUF050_try.py:148:1: RUF050 [*] Empty code branch
+    |
+146 |   except:
+147 |       print()
+148 | / else:
+149 | |     pass
+    | |________^ RUF050
+150 |   finally:
+151 |       print()
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+145 145 |     ...
+146 146 | except:
+147 147 |     print()
+148     |-else:
+149     |-    pass
+150 148 | finally:
+151 149 |     print()
+152 150 | 
+
+RUF050_try.py:155:1: RUF050 Empty code branch
+    |
+154 |   # No fix
+155 | / try:
+156 | |     ...
+    | |_______^ RUF050
+157 |   except:
+158 |       print()
+    |
+    = help: Refactor this branch
+
+RUF050_try.py:165:1: RUF050 Empty code branch
+    |
+163 |   # No fix
+164 |   # Safe fix: Remove `finally` branch
+165 | / try:
+166 | |     pass
+    | |________^ RUF050
+167 |   except:
+168 |       print()
+    |
+    = help: Refactor this branch
+
+RUF050_try.py:171:1: RUF050 [*] Empty code branch
+    |
+169 |   else:
+170 |       print()
+171 | / finally:
+172 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+168 168 |     print()
+169 169 | else:
+170 170 |     print()
+171     |-finally:
+172     |-    ...
+173 171 | 
+174 172 | 
+175 173 | # No fix
+
+RUF050_try.py:176:1: RUF050 Empty code branch
+    |
+175 |   # No fix
+176 | / try:
+177 | |     pass
+    | |________^ RUF050
+178 |   except:
+179 |       print()
+    |
+    = help: Refactor this branch
+
+RUF050_try.py:198:1: RUF050 [*] Empty code branch
+    |
+196 |   except:
+197 |       pass
+198 | / finally:
+199 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+195 195 |     print()
+196 196 | except:
+197 197 |     pass
+198     |-finally:
+199     |-    ...
+200 198 | 
+201 199 | 
+202 200 | # No error
+
+RUF050_try.py:216:1: RUF050 [*] Empty code branch
+    |
+214 |   except:
+215 |       ...
+216 | / else:
+217 | |     pass
+    | |________^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+213 213 |     print()
+214 214 | except:
+215 215 |     ...
+216     |-else:
+217     |-    pass
+218 216 | 
+219 217 | 
+220 218 | # Safe fix: Remove `else` branch
+
+RUF050_try.py:226:1: RUF050 [*] Empty code branch
+    |
+224 |   except:
+225 |       ...
+226 | / else:
+227 | |     pass
+    | |________^ RUF050
+228 |   finally:
+229 |       ...
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+223 223 |     print()
+224 224 | except:
+225 225 |     ...
+226     |-else:
+227     |-    pass
+228 226 | finally:
+229 227 |     ...
+230 228 | 
+
+RUF050_try.py:228:1: RUF050 [*] Empty code branch
+    |
+226 |   else:
+227 |       pass
+228 | / finally:
+229 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+225 225 |     ...
+226 226 | else:
+227 227 |     pass
+228     |-finally:
+229     |-    ...
+230 228 | 
+231 229 | 
+232 230 | # Safe fix: Remove `else` branch
+
+RUF050_try.py:237:1: RUF050 [*] Empty code branch
+    |
+235 |   except:
+236 |       pass
+237 | / else:
+238 | |     ...
+    | |_______^ RUF050
+239 |   finally:
+240 |       print()
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+234 234 |     print()
+235 235 | except:
+236 236 |     pass
+237     |-else:
+238     |-    ...
+239 237 | finally:
+240 238 |     print()
+241 239 | 
+
+RUF050_try.py:259:1: RUF050 [*] Empty code branch
+    |
+257 |   else:
+258 |       print()
+259 | / finally:
+260 | |     pass
+    | |________^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+256 256 |     ...
+257 257 | else:
+258 258 |     print()
+259     |-finally:
+260     |-    pass
+261 259 | 
+262 260 | 
+263 261 | # No error
+
+RUF050_try.py:286:1: RUF050 [*] Empty code branch
+    |
+284 |   except:
+285 |       print()
+286 | / finally:
+287 | |     pass
+    | |________^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+283 283 |     print()
+284 284 | except:
+285 285 |     print()
+286     |-finally:
+287     |-    pass
+288 286 | 
+289 287 | 
+290 288 | # No error
+
+RUF050_try.py:304:1: RUF050 [*] Empty code branch
+    |
+302 |   except:
+303 |       print()
+304 | / else:
+305 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+301 301 |     print()
+302 302 | except:
+303 303 |     print()
+304     |-else:
+305     |-    ...
+306 304 | 
+307 305 | 
+308 306 | # Safe fix: Remove `else` branch
+
+RUF050_try.py:314:1: RUF050 [*] Empty code branch
+    |
+312 |   except:
+313 |       print()
+314 | / else:
+315 | |     pass
+    | |________^ RUF050
+316 |   finally:
+317 |       ...
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+311 311 |     print()
+312 312 | except:
+313 313 |     print()
+314     |-else:
+315     |-    pass
+316 314 | finally:
+317 315 |     ...
+318 316 | 
+
+RUF050_try.py:316:1: RUF050 [*] Empty code branch
+    |
+314 |   else:
+315 |       pass
+316 | / finally:
+317 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+313 313 |     print()
+314 314 | else:
+315 315 |     pass
+316     |-finally:
+317     |-    ...
+318 316 | 
+319 317 | 
+320 318 | # Safe fix: Remove `else` branch
+
+RUF050_try.py:325:1: RUF050 [*] Empty code branch
+    |
+323 |   except:
+324 |       print()
+325 | / else:
+326 | |     pass
+    | |________^ RUF050
+327 |   finally:
+328 |       print()
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+322 322 |     print()
+323 323 | except:
+324 324 |     print()
+325     |-else:
+326     |-    pass
+327 325 | finally:
+328 326 |     print()
+329 327 | 
+
+RUF050_try.py:347:1: RUF050 [*] Empty code branch
+    |
+345 |   else:
+346 |       print()
+347 | / finally:
+348 | |     ...
+    | |_______^ RUF050
+    |
+    = help: Remove branch
+
+ℹ Safe fix
+344 344 |     print()
+345 345 | else:
+346 346 |     print()
+347     |-finally:
+348     |-    ...
+349 347 | 
+350 348 | 
+351 349 | # No error
