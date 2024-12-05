@@ -48,9 +48,10 @@ An unbound function local that has definitions in the scope does not fall back t
 x = 1
 
 def f():
-    y = x  # error: [unresolved-reference]
+    # error: [unresolved-reference]
+    # revealed: Unknown
+    reveal_type(x)
     x = 2
-    reveal_type(y)  # revealed: Unknown
-    reveal_type(x)  # revealed: Literal[2]
+    # revealed: Literal[2]
+    reveal_type(x)
 ```
-
