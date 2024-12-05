@@ -128,3 +128,5 @@ a < b and (b < c)
 
 (a<b) and b<c and ((c<d))
 
+# should error and fix
+a<b<c and c<d
