@@ -144,6 +144,7 @@ struct DiagnosticWithLine<T> {
 mod tests {
     use crate::db::Db;
     use crate::diagnostic::Diagnostic;
+    use red_knot_python_semantic::PythonVersion;
     use ruff_db::diagnostic::Severity;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::source::line_index;
@@ -154,7 +155,7 @@ mod tests {
 
     #[test]
     fn sort_and_group() {
-        let mut db = Db::setup(SystemPathBuf::from("/src"));
+        let mut db = Db::setup(SystemPathBuf::from("/src"), PythonVersion::default());
         db.write_file("/src/test.py", "one\ntwo\n").unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let lines = line_index(&db, file);

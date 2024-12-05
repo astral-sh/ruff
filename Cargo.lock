@@ -2358,7 +2358,9 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash 2.1.0",
  "salsa",
+ "serde",
  "smallvec",
+ "toml",
 ]
 
 [[package]]

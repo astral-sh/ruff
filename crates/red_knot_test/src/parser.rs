@@ -1,12 +1,16 @@
 use std::sync::LazyLock;
 
+use anyhow::{bail, Context};
 use memchr::memchr2;
+use red_knot_python_semantic::PythonVersion;
 use regex::{Captures, Match, Regex};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{TextLen, TextSize};
+
+use crate::config::MarkdownTestConfig;
 
 /// Parse the Markdown `source` as a test suite with given `title`.
 pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
@@ -24,6 +28,9 @@ pub(crate) struct MarkdownTestSuite<'s> {
 
     /// Test files embedded within the Markdown file.
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
+
+    /// Target Python version for the whole test suite.
+    pub(crate) target_version: PythonVersion,
 }
 
 impl<'s> MarkdownTestSuite<'s> {
@@ -201,6 +208,9 @@ struct Parser<'s> {
 
     /// Names of embedded files in current active section.
     current_section_files: Option<FxHashSet<&'s str>>,
+
+    /// Python version specified in the TOML configuration block, if any.
+    target_version: Option<PythonVersion>,
 }
 
 impl<'s> Parser<'s> {
@@ -218,6 +228,7 @@ impl<'s> Parser<'s> {
             source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
+            target_version: None,
         }
     }
 
@@ -233,6 +244,7 @@ impl<'s> Parser<'s> {
         MarkdownTestSuite {
             sections: self.sections,
             files: self.files,
+            target_version: self.target_version.unwrap_or_default(),
         }
     }
 
@@ -333,16 +345,24 @@ impl<'s> Parser<'s> {
 
         let path = config.get("path").copied().unwrap_or("test.py");
 
+        // CODE_RE can't match without matches for 'lang' and 'code'.
+        let lang = captures
+            .name("lang")
+            .as_ref()
+            .map(Match::as_str)
+            .unwrap_or_default();
+        let code = captures.name("code").unwrap().into();
+
+        if lang == "toml" {
+            return self.parse_config(code);
+        }
+
         self.files.push(EmbeddedFile {
             path,
             section: parent,
-            lang: captures
-                .name("lang")
-                .as_ref()
-                .map(Match::as_str)
-                .unwrap_or_default(),
-            // CODE_RE can't match without matches for 'lang' and 'code'.
-            code: captures.name("code").unwrap().into(),
+            lang,
+
+            code,
 
             md_offset: self.offset(),
         });
@@ -365,6 +385,31 @@ impl<'s> Parser<'s> {
         } else {
             self.current_section_files = Some(FxHashSet::from_iter([path]));
         }
+
+        Ok(())
+    }
+
+    fn parse_config(&mut self, code: &str) -> anyhow::Result<()> {
+        if self.target_version.is_some() {
+            bail!("Multiple TOML configuration blocks in the same file are not yet supported.");
+        }
+
+        let config = MarkdownTestConfig::from_str(code)?;
+        let target_version = config.tool.knot.environment.target_version;
+
+        let parts = target_version
+            .split('.')
+            .map(str::parse)
+            .collect::<Result<Vec<_>, _>>()
+            .context(format!(
+                "Invalid 'target-version' component: '{target_version}'"
+            ))?;
+
+        if parts.len() != 2 {
+            bail!("Invalid 'target-version': expected MAJOR.MINOR, got '{target_version}'.",);
+        }
+
+        self.target_version = Some(PythonVersion::from((parts[0], parts[1])));
 
         Ok(())
     }

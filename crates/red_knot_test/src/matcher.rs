@@ -323,6 +323,7 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
+    use red_knot_python_semantic::PythonVersion;
     use ruff_db::diagnostic::{Diagnostic, Severity};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -393,7 +394,7 @@ mod tests {
     ) -> Result<(), FailuresByLine> {
         colored::control::set_override(false);
 
-        let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"));
+        let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"), PythonVersion::default());
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 

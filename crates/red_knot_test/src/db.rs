@@ -16,7 +16,7 @@ pub(crate) struct Db {
 }
 
 impl Db {
-    pub(crate) fn setup(workspace_root: SystemPathBuf) -> Self {
+    pub(crate) fn setup(workspace_root: SystemPathBuf, target_version: PythonVersion) -> Self {
         let db = Self {
             workspace_root,
             storage: salsa::Storage::default(),
@@ -32,7 +32,7 @@ impl Db {
         Program::from_settings(
             &db,
             &ProgramSettings {
-                target_version: PythonVersion::default(),
+                target_version,
                 search_paths: SearchPathSettings::new(db.workspace_root.clone()),
             },
         )

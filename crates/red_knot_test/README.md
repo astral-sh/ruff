@@ -306,6 +306,9 @@ section, in which case it applies to all nested tests within that grouping secti
 at multiple level are allowed and merged, with the most-nested (closest to the test) taking
 precedence.
 
+For now, we only support a very limited version of this feature where a single TOML block is allowed
+per test file. See `crates/red_knot_test/src/config.rs` for details.
+
 ### Running just a single test from a suite
 
 Having each test in a suite always run as a distinct Rust test would require writing our own test

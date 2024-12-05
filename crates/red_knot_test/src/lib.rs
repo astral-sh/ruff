@@ -10,6 +10,7 @@ use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
 
 mod assertion;
+mod config;
 mod db;
 mod diagnostic;
 mod matcher;
@@ -26,11 +27,11 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
     let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
-            panic!("Error parsing `{path}`: {err}")
+            panic!("Error parsing `{path}`: {err:?}")
         }
     };
 
-    let mut db = db::Db::setup(SystemPathBuf::from("/src"));
+    let mut db = db::Db::setup(SystemPathBuf::from("/src"), suite.target_version);
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
