@@ -5272,41 +5272,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn import_cycle() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            class A: pass
-            import b
-            class C(b.B): pass
-            ",
-        )?;
-        db.write_dedented(
-            "src/b.py",
-            "
-            from a import A
-            class B(A): pass
-            ",
-        )?;
-
-        let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let c_ty = global_symbol(&db, a, "C").expect_type();
-        let c_class = c_ty.expect_class_literal().class;
-        let mut c_mro = c_class.iter_mro(&db);
-        let b_ty = c_mro.nth(1).unwrap();
-        let b_class = b_ty.expect_class_base();
-        assert_eq!(b_class.name(&db), "B");
-        let mut b_mro = b_class.iter_mro(&db);
-        let a_ty = b_mro.nth(1).unwrap();
-        let a_class = a_ty.expect_class_base();
-        assert_eq!(a_class.name(&db), "A");
-
-        Ok(())
-    }
-
     /// An unbound function local that has definitions in the scope does not fall back to globals.
     #[test]
     fn unbound_function_local() -> anyhow::Result<()> {
