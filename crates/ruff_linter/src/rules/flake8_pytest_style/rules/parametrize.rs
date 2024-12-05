@@ -702,10 +702,6 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
             return vec![];
         }
 
-        has_comments |= checker
-            .comment_ranges()
-            .has_comments(&value, checker.source());
-
         edits.push(Edit::range_replacement(
             checker.generator().expr(elt),
             value.range(),
