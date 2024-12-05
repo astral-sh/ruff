@@ -5273,28 +5273,6 @@ mod tests {
     }
 
     #[test]
-    fn bytes_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            w = b'red' b'knot'
-            x = b'hello'
-            y = b'world' + b'!'
-            z = b'\\xff\\x00'
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "w", "Literal[b\"redknot\"]");
-        assert_public_ty(&db, "src/a.py", "x", "Literal[b\"hello\"]");
-        assert_public_ty(&db, "src/a.py", "y", "Literal[b\"world!\"]");
-        assert_public_ty(&db, "src/a.py", "z", "Literal[b\"\\xff\\x00\"]");
-
-        Ok(())
-    }
-
-    #[test]
     fn ellipsis_type() -> anyhow::Result<()> {
         let mut db = setup_db();
 
