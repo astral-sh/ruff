@@ -1900,12 +1900,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        self.infer_standalone_expression(iter);
-
         // TODO more complex assignment targets
         if let ast::Expr::Name(name) = &**target {
             self.infer_definition(name);
         } else {
+            self.infer_standalone_expression(iter);
             self.infer_expression(target);
         }
         self.infer_body(body);
