@@ -5272,38 +5272,6 @@ mod tests {
         Ok(())
     }
 
-    /// An unbound function local that has definitions in the scope does not fall back to globals.
-    #[test]
-    fn unbound_function_local() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = 1
-            def f():
-                y = x
-                x = 2
-            ",
-        )?;
-
-        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let index = semantic_index(&db, file);
-        let function_scope = index
-            .child_scopes(FileScopeId::global())
-            .next()
-            .unwrap()
-            .0
-            .to_scope_id(&db, file);
-        let y_ty = symbol(&db, function_scope, "y").expect_type();
-        let x_ty = symbol(&db, function_scope, "x").expect_type();
-
-        assert_eq!(y_ty.display(&db).to_string(), "Unknown");
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
-
-        Ok(())
-    }
-
     /// A name reference to a never-defined symbol in a function is implicitly a global lookup.
     #[test]
     fn implicit_global_in_function() -> anyhow::Result<()> {

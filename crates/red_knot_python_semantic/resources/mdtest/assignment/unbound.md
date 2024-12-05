@@ -58,3 +58,16 @@ class C:
 
 reveal_type(C.y)  # revealed: Literal[1] | Literal["abc"]
 ```
+
+## Unbound function local
+
+An unbound function local that has definitions in the scope does not fall back to globals.
+
+```py
+x = 1
+def f():
+    y = x  # error: [unresolved-reference]
+    x = 2
+    reveal_type(y)  # revealed: Unknown
+    reveal_type(x)  # revealed: Literal[2]
+```
