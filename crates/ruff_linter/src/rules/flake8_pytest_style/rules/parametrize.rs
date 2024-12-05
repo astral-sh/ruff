@@ -680,27 +680,26 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
 
 /// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
 /// For instance, `[(1,) (2,)]` will be transformed into `[1, 2]`.
-fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> (Vec<Edit>, bool) {
+fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
     else {
-        return (vec![], false);
+        return vec![];
     };
 
     let mut edits = Vec::with_capacity(elts.len());
-    let mut has_comments = false;
     for value in elts {
         let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
             value
         else {
-            return (vec![], false);
+            return vec![];
         };
 
         let [elt] = elts.as_slice() else {
-            return (vec![], false);
+            return vec![];
         };
 
         if matches!(elt, Expr::Starred(_)) {
-            return (vec![], false);
+            return vec![];
         }
 
         has_comments |= checker
@@ -712,7 +711,7 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> (Vec<Edit>, bo
             value.range(),
         ));
     }
-    (edits, has_comments)
+    edits
 }
 
 fn handle_single_name(checker: &mut Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
@@ -747,20 +746,18 @@ fn handle_single_name(checker: &mut Checker, argnames: &Expr, value: &Expr, argv
     // def test_foo(x):
     //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
     // ```
-    let (argvalues_edits, has_comments) = unpack_single_element_items(checker, argvalues);
+    let argvalues_edits = unpack_single_element_items(checker, argvalues);
     let argnames_edit = Edit::range_replacement(checker.generator().expr(value), argnames.range());
-
-    // Use `unsafe_edits if the nodes to be replaced have comments.
-    let edits = if checker
-        .comment_ranges()
-        .has_comments(argnames, checker.source())
-        || has_comments
+    let fix = if checker.comment_ranges().intersects(argnames_edit.range())
+        || argvalues_edits
+            .iter()
+            .any(|edit| checker.comment_ranges().intersects(edit.range()))
     {
         Fix::unsafe_edits(argnames_edit, argvalues_edits)
     } else {
         Fix::safe_edits(argnames_edit, argvalues_edits)
     };
-    diagnostic.set_fix(edits);
+    diagnostic.set_fix(fix);
     checker.diagnostics.push(diagnostic);
 }
 
