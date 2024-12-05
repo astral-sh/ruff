@@ -706,43 +706,57 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
     edits
 }
 
-fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr, argvalues: &Expr) {
+fn handle_single_name(checker: &mut Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
     let mut diagnostic = Diagnostic::new(
         PytestParametrizeNamesWrongType {
             single_argument: true,
             expected: types::ParametrizeNameType::Csv,
         },
-        expr.range(),
+        argnames.range(),
     );
-
-    diagnostic.set_fix(Fix::unsafe_edits(
-        Edit::range_replacement(checker.generator().expr(value), expr.range()),
-        // If `argnames` and all items in `argvalues` are single-element sequences,
-        // they all should be unpacked. Here's an example:
-        //
-        // ```python
-        // @pytest.mark.parametrize(("x",), [(1,), (2,)])
-        // def test_foo(x):
-        //     assert isinstance(x, int)
-        // ```
-        //
-        // The code above should be transformed into:
-        //
-        // ```python
-        // @pytest.mark.parametrize("x", [1, 2])
-        // def test_foo(x):
-        //     assert isinstance(x, int)
-        // ```
-        //
-        // Only unpacking `argnames` would break the test:
-        //
-        // ```python
-        // @pytest.mark.parametrize("x", [(1,), (2,)])
-        // def test_foo(x):
-        //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
-        // ```
-        unpack_single_element_items(checker, argvalues),
-    ));
+    // If `argnames` and all items in `argvalues` are single-element sequences,
+    // they all should be unpacked. Here's an example:
+    //
+    // ```python
+    // @pytest.mark.parametrize(("x",), [(1,), (2,)])
+    // def test_foo(x):
+    //     assert isinstance(x, int)
+    // ```
+    //
+    // The code above should be transformed into:
+    //
+    // ```python
+    // @pytest.mark.parametrize("x", [1, 2])
+    // def test_foo(x):
+    //     assert isinstance(x, int)
+    // ```
+    //
+    // Only unpacking `argnames` would break the test:
+    //
+    // ```python
+    // @pytest.mark.parametrize("x", [(1,), (2,)])
+    // def test_foo(x):
+    //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
+    // ```
+    let argvalues_edits = unpack_single_element_items(checker, argvalues);
+    let edits = if checker
+        .comment_ranges()
+        .has_comments(argnames, checker.source())
+        || checker
+            .comment_ranges()
+            .has_comments(argvalues, checker.source())
+    {
+        Fix::unsafe_edits(
+            Edit::range_replacement(checker.generator().expr(value), argnames.range()),
+            argvalues_edits,
+        )
+    } else {
+        Fix::safe_edits(
+            Edit::range_replacement(checker.generator().expr(value), argnames.range()),
+            argvalues_edits,
+        )
+    };
+    diagnostic.set_fix(edits);
     checker.diagnostics.push(diagnostic);
 }
 

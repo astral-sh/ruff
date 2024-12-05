@@ -68,7 +68,7 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string for the first argument
 
-ℹ Unsafe fix
+ℹ Safe fix
 26 26 |     ...
 27 27 | 
 28 28 | 
@@ -106,7 +106,7 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string for the first argument
 
-ℹ Unsafe fix
+ℹ Safe fix
 36 36 |     ...
 37 37 | 
 38 38 | 
@@ -239,7 +239,7 @@ PT006.py:86:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string for the first argument
 
-ℹ Unsafe fix
+ℹ Safe fix
 83 83 |     ...
 84 84 | 
 85 85 | 
@@ -258,7 +258,7 @@ PT006.py:91:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
    |
    = help: Use a string for the first argument
 
-ℹ Unsafe fix
+ℹ Safe fix
 88 88 |     ...
 89 89 | 
 90 90 | 
