@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     parenthesize::parentheses_iterator, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
@@ -36,16 +36,14 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 pub(crate) struct BooleanChainedComparison;
 
-impl Violation for BooleanChainedComparison {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for BooleanChainedComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Contains chained boolean comparison that can be simplified".to_string()
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Use a single compare expression".to_string())
+    fn fix_title(&self) -> String {
+        "Use a single compare expression".to_string()
     }
 }
 
