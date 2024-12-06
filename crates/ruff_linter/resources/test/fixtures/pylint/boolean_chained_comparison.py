@@ -144,3 +144,5 @@ a < ( # sneaky comment
     <c
     and ((c<d))
 )
+
+a < (b) and (((b)) < c)
