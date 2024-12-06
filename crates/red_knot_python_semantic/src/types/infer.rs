@@ -4560,7 +4560,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     todo_type!("unsupported type[X] special form")
                 }
             }
-            // TODO: attributes, unions, subscripts, etc.
+            // TODO: unions, subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);
                 todo_type!("unsupported type[X] special form")
