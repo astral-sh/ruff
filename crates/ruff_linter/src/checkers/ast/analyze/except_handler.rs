@@ -8,7 +8,7 @@ use crate::rules::{
 };
 
 /// Run lint rules over an [`ExceptHandler`] syntax node.
-pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Checker) {
+pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Checker, is_star: bool) {
     match except_handler {
         ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_,
@@ -60,7 +60,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Check
                 );
             }
             if checker.enabled(Rule::ExceptWithEmptyTuple) {
-                flake8_bugbear::rules::except_with_empty_tuple(checker, except_handler);
+                flake8_bugbear::rules::except_with_empty_tuple(checker, except_handler, is_star);
             }
             if checker.enabled(Rule::ExceptWithNonExceptionClasses) {
                 flake8_bugbear::rules::except_with_non_exception_classes(checker, except_handler);

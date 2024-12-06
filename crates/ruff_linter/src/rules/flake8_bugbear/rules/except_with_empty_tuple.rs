@@ -34,18 +34,27 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
-pub(crate) struct ExceptWithEmptyTuple;
+pub(crate) struct ExceptWithEmptyTuple {
+    is_star: bool,
+}
 
 impl Violation for ExceptWithEmptyTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `except ():` with an empty tuple does not catch anything; add exceptions to handle"
-            .to_string()
+        if self.is_star {
+            "Using `except* ():` with an empty tuple does not catch anything; add exceptions to handle".to_string()
+        } else {
+            "Using `except ():` with an empty tuple does not catch anything; add exceptions to handle".to_string()
+        }
     }
 }
 
 /// B029
-pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &ExceptHandler) {
+pub(crate) fn except_with_empty_tuple(
+    checker: &mut Checker,
+    except_handler: &ExceptHandler,
+    is_star: bool,
+) {
     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
         except_handler;
     let Some(type_) = type_ else {
@@ -56,7 +65,7 @@ pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &Ex
     };
     if elts.is_empty() {
         checker.diagnostics.push(Diagnostic::new(
-            ExceptWithEmptyTuple,
+            ExceptWithEmptyTuple { is_star },
             except_handler.range(),
         ));
     }

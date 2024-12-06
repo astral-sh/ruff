@@ -53,7 +53,7 @@ impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
         visitor::walk_expr(self, expr);
     }
 
-    fn visit_except_handler(&mut self, _except_handler: &'b ExceptHandler) {
+    fn visit_except_handler(&mut self, _except_handler: &'b ExceptHandler, _is_star: bool) {
         // Don't recurse into exception handlers, since we'll re-run the visitor on any such
         // handlers.
     }

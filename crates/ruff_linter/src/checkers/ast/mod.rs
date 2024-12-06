@@ -892,6 +892,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     handlers,
                     orelse,
                     finalbody,
+                    is_star,
                     ..
                 },
             ) => {
@@ -908,7 +909,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 for except_handler in handlers {
                     self.semantic.push_branch();
-                    self.visit_except_handler(except_handler);
+                    self.visit_except_handler(except_handler, *is_star);
                     self.semantic.pop_branch();
                 }
 
@@ -1564,7 +1565,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.pop_node();
     }
 
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler, is_star: bool) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
@@ -1609,7 +1610,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 4: Analysis
-        analyze::except_handler(except_handler, self);
+        analyze::except_handler(except_handler, self, is_star);
 
         self.semantic.flags = flags_snapshot;
     }
