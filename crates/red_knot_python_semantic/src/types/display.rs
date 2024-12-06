@@ -6,6 +6,7 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
+use crate::types::mro::ClassBase;
 use crate::types::{
     ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
     SubclassOfType, Type, UnionType,
@@ -83,8 +84,15 @@ impl Display for DisplayRepresentation<'_> {
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),
-            Type::SubclassOf(SubclassOfType { class }) => {
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => {
+                // Only show the bare class name here; ClassBase::display would render this as
+                // type[<class 'Foo'>] instead of type[Foo].
                 write!(f, "type[{}]", class.name(self.db))
+            }
+            Type::SubclassOf(SubclassOfType { base }) => {
+                write!(f, "type[{}]", base.display(self.db))
             }
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
