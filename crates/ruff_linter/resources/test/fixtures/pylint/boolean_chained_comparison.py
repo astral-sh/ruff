@@ -130,3 +130,17 @@ a < b and (b < c)
 
 # should error and fix
 a<b<c and c<d
+
+# more involved examples (all should error and fix)
+a < ( # sneaky comment
+	b
+  # more comments 
+) and b < c
+
+(
+    a
+    <b
+    # hmmm...
+    <c
+    and ((c<d))
+)
