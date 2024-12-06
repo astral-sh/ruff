@@ -14,6 +14,7 @@ from airflow.utils.dates import (
     scale_time_units,
 )
 from airflow.utils.file import TemporaryDirectory, mkdirs
+from airflow.utils.helpers import chain, cross_downstream
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.dag_cycle_tester import test_cycle
 
@@ -45,8 +46,10 @@ dates.datetime_to_nano
 TemporaryDirectory
 mkdirs
 
+chain
+cross_downstream
+
 SHUTDOWN
 terminating_states
-
 
 test_cycle

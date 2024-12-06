@@ -158,6 +158,15 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name("pendulum.today('UTC').add(days=-N, ...)".to_string()),
                 )),
+                // airflow.utils.helpers
+                ["airflow", "utils", "helpers", "chain"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.models.baseoperator.chain".to_string()),
+                )),
+                ["airflow", "utils", "helpers", "cross_downstream"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.models.baseoperator.cross_downstream".to_string()),
+                )),
                 // airflow.utils.state
                 ["airflow", "utils", "state", "SHUTDOWN"] => {
                     Some((qualname.to_string(), Replacement::None))
