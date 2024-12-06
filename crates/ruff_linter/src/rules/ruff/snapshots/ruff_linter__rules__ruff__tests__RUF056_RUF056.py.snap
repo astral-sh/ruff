@@ -1,0 +1,81 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF056.py:2:1: RUF056 [*] f-string consisting only of a single replacement field
+  |
+1 | # These should trigger the rule, including fix suggestions
+2 | f"{a}"
+  | ^^^^^^ RUF056
+3 | f"{a!a}"
+4 | f"{a!r}"
+  |
+  = help: Remove f-string or replace it with a call of the str function
+
+ℹ Unsafe fix
+1 1 | # These should trigger the rule, including fix suggestions
+2   |-f"{a}"
+  2 |+str(a)
+3 3 | f"{a!a}"
+4 4 | f"{a!r}"
+5 5 | f"{a!s}"
+
+RUF056.py:3:1: RUF056 [*] f-string consisting only of a single replacement field
+  |
+1 | # These should trigger the rule, including fix suggestions
+2 | f"{a}"
+3 | f"{a!a}"
+  | ^^^^^^^^ RUF056
+4 | f"{a!r}"
+5 | f"{a!s}"
+  |
+  = help: Remove f-string or replace it with a call of the ascii function
+
+ℹ Unsafe fix
+1 1 | # These should trigger the rule, including fix suggestions
+2 2 | f"{a}"
+3   |-f"{a!a}"
+  3 |+ascii(a)
+4 4 | f"{a!r}"
+5 5 | f"{a!s}"
+6 6 | 
+
+RUF056.py:4:1: RUF056 [*] f-string consisting only of a single replacement field
+  |
+2 | f"{a}"
+3 | f"{a!a}"
+4 | f"{a!r}"
+  | ^^^^^^^^ RUF056
+5 | f"{a!s}"
+  |
+  = help: Remove f-string or replace it with a call of the repr function
+
+ℹ Unsafe fix
+1 1 | # These should trigger the rule, including fix suggestions
+2 2 | f"{a}"
+3 3 | f"{a!a}"
+4   |-f"{a!r}"
+  4 |+repr(a)
+5 5 | f"{a!s}"
+6 6 | 
+7 7 | # These should not trigger the rule, because they have format specifications
+
+RUF056.py:5:1: RUF056 [*] f-string consisting only of a single replacement field
+  |
+3 | f"{a!a}"
+4 | f"{a!r}"
+5 | f"{a!s}"
+  | ^^^^^^^^ RUF056
+6 | 
+7 | # These should not trigger the rule, because they have format specifications
+  |
+  = help: Remove f-string or replace it with a call of the str function
+
+ℹ Unsafe fix
+2 2 | f"{a}"
+3 3 | f"{a!a}"
+4 4 | f"{a!r}"
+5   |-f"{a!s}"
+  5 |+str(a)
+6 6 | 
+7 7 | # These should not trigger the rule, because they have format specifications
+8 8 | f"{a:.3}"

@@ -1165,6 +1165,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
             }
+            if checker.enabled(Rule::UnnecessaryFString) {
+                ruff::rules::unnecessary_fstring(checker, f_string_expr);
+            }
         }
         Expr::BinOp(ast::ExprBinOp {
             left,
