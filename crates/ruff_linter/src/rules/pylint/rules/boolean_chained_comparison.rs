@@ -62,11 +62,11 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
     let locator = checker.locator();
     let comment_ranges = checker.comment_ranges();
 
-    // retrieve all compare statements from expression
+    // retrieve all compare expressions from boolean expression
     let compare_expressions = expr_bool_op
         .values
         .iter()
-        .map(|stmt| stmt.as_compare_expr().unwrap());
+        .map(|expr| expr.as_compare_expr().unwrap());
 
     let diagnostics = compare_expressions
         .tuple_windows()
