@@ -9,7 +9,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze;
-use ruff_python_semantic::analyze::class::is_generic;
+use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -259,7 +259,7 @@ fn replace_with_self_fix(
         others.push(edit);
     }
 
-    let applicability = if is_generic(class_def, checker.semantic()) {
+    let applicability = if might_be_generic(class_def, checker.semantic()) {
         Applicability::DisplayOnly
     } else {
         Applicability::Unsafe

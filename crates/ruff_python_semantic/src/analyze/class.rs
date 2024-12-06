@@ -172,13 +172,14 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
     }
 }
 
-/// Returns true if a class is generic.
+/// Returns true if a class might generic.
 ///
-/// A class is generic if at least one of its direct bases is subscripted with a `TypeVar`-like,
+/// A class is considered generic if at least one of its direct bases
+/// is subscripted with a `TypeVar`-like,
 /// or if it is defined using PEP 695 syntax.
 ///
 /// This should only be used in stub context to avoid false positives and negatives.
-pub fn is_generic(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+pub fn might_be_generic(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     if class_def.type_params.is_some() {
         return true;
     }
@@ -188,31 +189,37 @@ pub fn is_generic(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bo
             return false;
         };
 
-        match slice.as_ref() {
-            Expr::Name(name) => is_old_style_typevar_like(name, semantic),
+        let Expr::Tuple(ExprTuple { elts, .. }) = slice.as_ref() else {
+            return expr_might_be_typevar_like(slice, semantic);
+        };
 
-            Expr::Tuple(ExprTuple { elts, .. }) => elts.iter().any(|elt| match elt {
-                Expr::Name(name) => is_old_style_typevar_like(name, semantic),
-
-                Expr::Starred(ExprStarred { value, .. }) => match value.as_ref() {
-                    Expr::Name(name) => is_old_style_typevar_like(name, semantic),
-                    _ => false,
-                },
-
-                _ => false,
-            }),
-
-            Expr::Starred(ExprStarred { value, .. }) => match value.as_ref() {
-                Expr::Name(name) => is_old_style_typevar_like(name, semantic),
-                _ => false,
-            },
-
-            _ => false,
-        }
+        elts.iter()
+            .any(|elt| expr_might_be_typevar_like(elt, semantic))
     })
 }
 
-fn is_old_style_typevar_like(name: &ExprName, semantic: &SemanticModel) -> bool {
+fn expr_might_be_typevar_like(expr: &Expr, semantic: &SemanticModel) -> bool {
+    is_known_typevar(expr, semantic) || expr_might_be_old_style_typevar_like(expr, semantic)
+}
+
+fn is_known_typevar(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.match_typing_expr(expr, "AnyStr")
+}
+
+fn expr_might_be_old_style_typevar_like(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::Name(name) => might_be_old_style_typevar_like(name, semantic),
+
+        Expr::Starred(ExprStarred { value, .. }) => match value.as_ref() {
+            Expr::Name(name) => might_be_old_style_typevar_like(name, semantic),
+            _ => false,
+        },
+
+        _ => false,
+    }
+}
+
+fn might_be_old_style_typevar_like(name: &ExprName, semantic: &SemanticModel) -> bool {
     let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
         return false;
     };
