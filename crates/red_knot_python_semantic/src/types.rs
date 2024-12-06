@@ -225,7 +225,10 @@ fn definition_expression_ty<'db>(
     }
 }
 
-/// Infer the type of an expression from an arbitrary scope.
+/// Get the type of an expression from an arbitrary scope.
+///
+/// Can cause query cycles if used carelessly; caller must be sure that type inference isn't
+/// currently in progress for the expression's scope.
 fn expression_ty<'db>(db: &'db dyn Db, file: File, expression: &ast::Expr) -> Type<'db> {
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);

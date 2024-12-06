@@ -1037,6 +1037,34 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
+    /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
+    /// in the function body scope.
+    ///
+    /// The declared type is the annotated type, if any, or `Unknown`.
+    ///
+    /// The inferred type is the annotated type, unioned with the type of the default value, if
+    /// any. If both types are fully static, this union is a no-op (it should simplify to just the
+    /// annotated type.) But in a case like `f(x=None)` with no annotated type, we want to infer
+    /// the type `Unknown | None` for `x`, not just `Unknown`, so that we can error on usage of `x`
+    /// that would not be valid for `None`.
+    ///
+    /// If the default-value type is not assignable to the declared (annotated) type, we ignore the
+    /// default-value type and just infer the annotated type. This allows an explicit annotation to
+    /// override a wrong inferred type. We should also emit a diagnostic, but that can't happen
+    /// here, because we aren't in the right scope; we need to emit the diagnostic on the
+    /// default-value node, which is in the outer scope, not the function-body scope.
+    ///
+    /// In general, parameter definitions are odd in that they define a symbol in the function-body
+    /// scope, so the Definition belongs to the function body scope, but the expressions
+    /// (annotation and default value) both belong to outer scopes. (The default value always
+    /// belongs to the outer scope in which the function is defined, the annotation belongs either
+    /// to the outer scope, or maybe to an intervening type-params scope, if it's a generic
+    /// function.) So we don't use `self.infer_expression` or store any expression types here, we
+    /// just use `expression_ty` to get the types of the expressions from their respective scopes.
+    ///
+    /// It is safe (non-cycle-causing) to use `expression_ty` here, because an outer scope can't
+    /// depend on a definition from an inner scope, so we shouldn't be in-process of inferring the
+    /// outer scope here.
     fn infer_parameter_definition(
         &mut self,
         parameter_with_default: &ast::ParameterWithDefault,
@@ -1047,12 +1075,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
             range: _,
         } = parameter_with_default;
-        let opt_default_ty = default
+        let default_ty = default
             .as_ref()
             .map(|default| expression_ty(self.db, self.file, default));
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = expression_ty(self.db, self.file, annotation);
-            let inferred_ty = if let Some(default_ty) = opt_default_ty {
+            let inferred_ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db, [declared_ty, default_ty])
             } else {
                 declared_ty
@@ -1064,7 +1092,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 inferred_ty,
             );
         } else {
-            let ty = if let Some(default_ty) = opt_default_ty {
+            let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db, [Type::Unknown, default_ty])
             } else {
                 Type::Unknown
@@ -1073,6 +1101,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    /// Set initial declared/inferred types for a `*args` variadic positional parameter.
+    ///
+    /// The annotated type is implicitly wrapped in a homogeneous tuple.
+    ///
+    /// See `infer_parameter_definition` doc comment for some relevant observations about scopes.
     fn infer_variadic_positional_parameter_definition(
         &mut self,
         parameter: &ast::Parameter,
@@ -1093,6 +1126,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    /// Set initial declared/inferred types for a `*args` variadic positional parameter.
+    ///
+    /// The annotated type is implicitly wrapped in a string-keyed dictionary.
+    ///
+    /// See `infer_parameter_definition` doc comment for some relevant observations about scopes.
     fn infer_variadic_keyword_parameter_definition(
         &mut self,
         parameter: &ast::Parameter,
