@@ -299,8 +299,8 @@ pub(super) enum MroErrorKind<'db> {
 /// This is much more limited than the [`Type`] enum:
 /// all types that would be invalid to have as a class base are
 /// transformed into [`ClassBase::Unknown`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum ClassBase<'db> {
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
+pub enum ClassBase<'db> {
     Any,
     Unknown,
     Todo,
@@ -308,7 +308,7 @@ pub(super) enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+    pub fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             base: ClassBase<'db>,
             db: &'db dyn Db,
@@ -326,6 +326,22 @@ impl<'db> ClassBase<'db> {
         }
 
         Display { base: self, db }
+    }
+
+    pub fn is_subtype_of(self, db: &'db dyn Db, target: ClassBase<'db>) -> bool {
+        match (self, target) {
+            (ClassBase::Any | ClassBase::Todo | ClassBase::Unknown, _) => false,
+            (_, ClassBase::Any | ClassBase::Todo | ClassBase::Unknown) => false,
+            (ClassBase::Class(class), ClassBase::Class(target)) => class.is_subclass_of(db, target),
+        }
+    }
+
+    pub fn is_assignable_to(self, db: &'db dyn Db, target: ClassBase<'db>) -> bool {
+        match (self, target) {
+            (ClassBase::Any | ClassBase::Todo | ClassBase::Unknown, _) => true,
+            (_, ClassBase::Any | ClassBase::Todo | ClassBase::Unknown) => true,
+            _ => self.is_subtype_of(db, target),
+        }
     }
 
     /// Return a `ClassBase` representing the class `builtins.object`

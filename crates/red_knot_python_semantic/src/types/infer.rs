@@ -49,7 +49,7 @@ use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
-use crate::types::mro::MroErrorKind;
+use crate::types::mro::{ClassBase, MroErrorKind};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
@@ -4657,10 +4657,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         match slice {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
-                if let Some(ClassLiteralType { class }) = name_ty.into_class_literal() {
-                    Type::subclass_of(class)
-                } else {
-                    todo_type!("unsupported type[X] special form")
+                match name_ty {
+                    Type::ClassLiteral(ClassLiteralType { class }) => Type::subclass_of(class),
+                    Type::KnownInstance(KnownInstanceType::Any) => {
+                        Type::subclass_of_base(ClassBase::Any)
+                    }
+                    _ => todo_type!("unsupported type[X] special form"),
                 }
             }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {

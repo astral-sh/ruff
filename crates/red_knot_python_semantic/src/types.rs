@@ -572,7 +572,11 @@ impl<'db> Type<'db> {
     }
 
     pub const fn subclass_of(class: Class<'db>) -> Self {
-        Self::SubclassOf(SubclassOfType { class })
+        Self::subclass_of_base(ClassBase::Class(class))
+    }
+
+    pub const fn subclass_of_base(base: ClassBase<'db>) -> Self {
+        Self::SubclassOf(SubclassOfType { base })
     }
 
     pub fn string_literal(db: &'db dyn Db, string: &str) -> Self {
@@ -667,13 +671,15 @@ impl<'db> Type<'db> {
                 true
             }
             (Type::ClassLiteral(self_class), Type::SubclassOf(target_class)) => {
-                self_class.class.is_subclass_of(db, target_class.class)
+                self_class.class.is_subclass_of_base(db, target_class.base)
             }
             (Type::SubclassOf(self_class), Type::SubclassOf(target_class)) => {
-                self_class.class.is_subclass_of(db, target_class.class)
+                self_class.base.is_subtype_of(db, target_class.base)
             }
             (
-                Type::SubclassOf(SubclassOfType { class: self_class }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
                 Type::Instance(InstanceType {
                     class: target_class,
                 }),
@@ -872,7 +878,7 @@ impl<'db> Type<'db> {
 
             (Type::SubclassOf(type_class), Type::ClassLiteral(class_literal))
             | (Type::ClassLiteral(class_literal), Type::SubclassOf(type_class)) => {
-                !class_literal.class.is_subclass_of(db, type_class.class)
+                !class_literal.class.is_subclass_of_base(db, type_class.base)
             }
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
             (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
@@ -1662,7 +1668,10 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
-            Type::SubclassOf(SubclassOfType { class }) => Type::instance(*class),
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => Type::instance(*class),
+            Type::SubclassOf(_) => Type::Any,
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => todo_type!(),
@@ -1750,9 +1759,7 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            Type::Instance(InstanceType { class }) => {
-                Type::SubclassOf(SubclassOfType { class: *class })
-            }
+            Type::Instance(InstanceType { class }) => Type::subclass_of(*class),
             Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
@@ -1763,7 +1770,9 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
-            Type::SubclassOf(SubclassOfType { class }) => Type::subclass_of(
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => Type::subclass_of(
                 class
                     .try_metaclass(db)
                     .ok()
@@ -1771,10 +1780,9 @@ impl<'db> Type<'db> {
                     .unwrap_or_else(|| KnownClass::Type.to_class_literal(db).expect_class_literal())
                     .class,
             ),
+            Type::SubclassOf(_) => Type::Any,
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
-            // TODO: `type[Any]`?
             Type::Any => Type::Any,
-            // TODO: `type[Unknown]`?
             Type::Unknown => Type::Unknown,
             // TODO intersections
             Type::Intersection(_) => todo_type!(),
@@ -3033,12 +3041,12 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
 /// A type that represents `type[C]`, i.e. the class literal `C` and class literals that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
-    class: Class<'db>,
+    base: ClassBase<'db>,
 }
 
 impl<'db> SubclassOfType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        self.class.class_member(db, name)
+        Type::from(self.base).member(db, name)
     }
 }
 
