@@ -875,6 +875,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+        // Parameters are odd: they are Definitions in the function body scope, but have no
+        // constituent nodes that are part of the function body. In order to get diagnostics
+        // merged/emitted for them, we need to explicitly infer their definitions here.
+        for parameter in &function.parameters {
+            self.infer_definition(parameter);
+        }
         self.infer_body(&function.body);
     }
 
@@ -1049,18 +1055,16 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// that would not be valid for `None`.
     ///
     /// If the default-value type is not assignable to the declared (annotated) type, we ignore the
-    /// default-value type and just infer the annotated type. This allows an explicit annotation to
-    /// override a wrong inferred type. We should also emit a diagnostic, but that can't happen
-    /// here, because we aren't in the right scope; we need to emit the diagnostic on the
-    /// default-value node, which is in the outer scope, not the function-body scope.
+    /// default-value type and just infer the annotated type; this is the same way we handle
+    /// assignments, and allows an explicit annotation to override a bad inference.
     ///
-    /// In general, parameter definitions are odd in that they define a symbol in the function-body
-    /// scope, so the Definition belongs to the function body scope, but the expressions
-    /// (annotation and default value) both belong to outer scopes. (The default value always
-    /// belongs to the outer scope in which the function is defined, the annotation belongs either
-    /// to the outer scope, or maybe to an intervening type-params scope, if it's a generic
-    /// function.) So we don't use `self.infer_expression` or store any expression types here, we
-    /// just use `expression_ty` to get the types of the expressions from their respective scopes.
+    /// Parameter definitions are odd in that they define a symbol in the function-body scope, so
+    /// the Definition belongs to the function body scope, but the expressions (annotation and
+    /// default value) both belong to outer scopes. (The default value always belongs to the outer
+    /// scope in which the function is defined, the annotation belongs either to the outer scope,
+    /// or maybe to an intervening type-params scope, if it's a generic function.) So we don't use
+    /// `self.infer_expression` or store any expression types here, we just use `expression_ty` to
+    /// get the types of the expressions from their respective scopes.
     ///
     /// It is safe (non-cycle-causing) to use `expression_ty` here, because an outer scope can't
     /// depend on a definition from an inner scope, so we shouldn't be in-process of inferring the
@@ -1081,7 +1085,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = expression_ty(self.db, self.file, annotation);
             let inferred_ty = if let Some(default_ty) = default_ty {
-                UnionType::from_elements(self.db, [declared_ty, default_ty])
+                if default_ty.is_assignable_to(self.db, declared_ty) {
+                    UnionType::from_elements(self.db, [declared_ty, default_ty])
+                } else {
+                    self.diagnostics.add(
+                        parameter_with_default.into(),
+                        "invalid-parameter-default",
+                        format_args!(
+                            "Default value of type `{}` is not assignable to annotated parameter type `{}`",
+                            default_ty.display(self.db), declared_ty.display(self.db))
+                    );
+                    declared_ty
+                }
             } else {
                 declared_ty
             };

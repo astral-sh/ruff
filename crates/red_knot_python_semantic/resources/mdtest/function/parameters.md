@@ -56,3 +56,20 @@ from typing import Any
 def f(x: Any = 1):
     reveal_type(x)  # revealed: Any | Literal[1]
 ```
+
+## Default value type must be assignable to annotated type
+
+The default value type must be assignable to the annotated type. If not, we emit a diagnostic, and
+fall back to inferring the annotated type, ignoring the default value type.
+
+```py
+# error: [invalid-parameter-default]
+def f(x: int = "foo"):
+    reveal_type(x)  # revealed: int
+
+# The check is assignable-to, not subtype-of, so this is fine:
+from typing import Any
+
+def g(x: Any = "foo"):
+    reveal_type(x)  # revealed: Any | Literal["foo"]
+```
