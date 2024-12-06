@@ -13,6 +13,7 @@ from airflow.configuration import (
 )
 from airflow.metrics.validators import AllowListValidator
 from airflow.metrics.validators import BlockListValidator
+from airflow.secrets.local_filesystem import get_connection, load_connections
 from airflow.utils import dates
 from airflow.utils.dates import (
     date_range,
@@ -54,6 +55,9 @@ datetime_to_nano
 dates.datetime_to_nano
 
 get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+
+get_connection, load_connections
+
 TemporaryDirectory
 mkdirs
 

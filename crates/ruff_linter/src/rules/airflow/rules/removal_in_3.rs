@@ -162,6 +162,19 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         "airflow.metrics.validators.PatternBlockListValidator".to_string(),
                     ),
                 )),
+                // airflow.secrets
+                ["airflow", "secrets", "local_filesystem", "load_connections"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.secrets.local_filesystem.load_connections_dict".to_string(),
+                    ),
+                )),
+                ["airflow", "secrets", "local_filesystem", "get_connection"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.secrets.local_filesystem.load_connections_dict".to_string(),
+                    ),
+                )),
                 // airflow.utils.dates
                 ["airflow", "utils", "dates", "date_range"] => Some((
                     qualname.to_string(),
