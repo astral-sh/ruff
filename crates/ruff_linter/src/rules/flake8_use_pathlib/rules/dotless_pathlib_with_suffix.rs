@@ -30,9 +30,9 @@ use ruff_text_size::Ranged;
 /// path.with_suffix(".py")
 /// ```
 #[derive(ViolationMetadata)]
-pub(crate) struct DotlessWithSuffix;
+pub(crate) struct DotlessPathlibWithSuffix;
 
-impl AlwaysFixableViolation for DotlessWithSuffix {
+impl AlwaysFixableViolation for DotlessPathlibWithSuffix {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Dotless suffix passed to `.with_suffix()`".to_string()
@@ -43,8 +43,8 @@ impl AlwaysFixableViolation for DotlessWithSuffix {
     }
 }
 
-/// PTH901
-pub(crate) fn dotless_with_suffix(checker: &mut Checker, call: &ExprCall) {
+/// PTH210
+pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ExprCall) {
     let (func, arguments) = (&call.func, &call.arguments);
 
     if !is_path_with_suffix_call(checker.semantic(), func) {
@@ -65,7 +65,7 @@ pub(crate) fn dotless_with_suffix(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let diagnostic = Diagnostic::new(DotlessWithSuffix, call.range);
+    let diagnostic = Diagnostic::new(DotlessPathlibWithSuffix, call.range);
     let Some(fix) = add_leading_dot_fix(string) else {
         unreachable!("Expected to always be able to fix this rule");
     };
