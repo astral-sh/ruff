@@ -1,5 +1,12 @@
 # Type aliases
 
+Type aliases are only available in Python 3.12 and later:
+
+```toml
+[environment]
+target-version = "3.12"
+```
+
 ## Basic
 
 ```py

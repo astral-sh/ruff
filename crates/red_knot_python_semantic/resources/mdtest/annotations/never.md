@@ -47,7 +47,9 @@ def f():
 
 ## `typing.Never`
 
-`typing.Never` is only available in Python 3.11 and later:
+`typing.Never` is only available in Python 3.11 and later.
+
+### Python 3.11
 
 ```toml
 [environment]
@@ -57,8 +59,20 @@ target-version = "3.11"
 ```py
 from typing import Never
 
-x: Never
+reveal_type(Never)  # revealed: typing.Never
+```
 
-def f():
-    reveal_type(x)  # revealed: Never
+### Python 3.10
+
+```toml
+[environment]
+target-version = "3.10"
+```
+
+```py
+# TODO: should raise a diagnostic
+from typing import Never
+
+# TODO: this should be Unknown
+reveal_type(Never)  # revealed: Never
 ```
