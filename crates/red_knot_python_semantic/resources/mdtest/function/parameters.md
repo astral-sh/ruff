@@ -1,7 +1,7 @@
 # Function parameter types
 
-Within a function scope, the declared type of each parameter is its annotated type (or Unknown if not
-annotated). The initial inferred type is the union of the declared type with the type of the
+Within a function scope, the declared type of each parameter is its annotated type (or Unknown if
+not annotated). The initial inferred type is the union of the declared type with the type of the
 default value expression (if any). If both are fully static types, this union should simplify to the
 annotated type (since the default value type must be assignable to the annotated type, and for fully
 static types this means subtype-of, which simplifies in unions). But if the annotated type is

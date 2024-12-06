@@ -618,10 +618,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                         .expect("symbol exists"),
                 )
                 .unwrap();
-            assert!(matches!(
-                binding.kind(&db),
-                DefinitionKind::ParameterWithDefault(_)
-            ));
+            assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
             .first_public_binding(
@@ -632,7 +629,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
-            DefinitionKind::VariadicParameter(_)
+            DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
             .first_public_binding(
@@ -674,10 +671,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
                 .unwrap();
-            assert!(matches!(
-                binding.kind(&db),
-                DefinitionKind::ParameterWithDefault(_)
-            ));
+            assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
             .first_public_binding(
@@ -688,7 +682,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
-            DefinitionKind::VariadicParameter(_)
+            DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
             .first_public_binding(

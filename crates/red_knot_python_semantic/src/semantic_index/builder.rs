@@ -485,7 +485,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
             let symbol = self.add_symbol(vararg.name.id().clone());
-            self.add_definition(symbol, DefinitionNodeRef::VariadicParameter(vararg));
+            self.add_definition(
+                symbol,
+                DefinitionNodeRef::VariadicPositionalParameter(vararg),
+            );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
             let symbol = self.add_symbol(kwarg.name.id().clone());

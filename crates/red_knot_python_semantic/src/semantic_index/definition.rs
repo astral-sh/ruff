@@ -89,9 +89,9 @@ pub(crate) enum DefinitionNodeRef<'a> {
     AnnotatedAssignment(&'a ast::StmtAnnAssign),
     AugmentedAssignment(&'a ast::StmtAugAssign),
     Comprehension(ComprehensionDefinitionNodeRef<'a>),
-    VariadicParameter(&'a ast::Parameter),
+    VariadicPositionalParameter(&'a ast::Parameter),
     VariadicKeywordParameter(&'a ast::Parameter),
-    ParameterWithDefault(&'a ast::ParameterWithDefault),
+    Parameter(&'a ast::ParameterWithDefault),
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'a>),
@@ -192,7 +192,7 @@ impl<'a> From<ComprehensionDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
 
 impl<'a> From<&'a ast::ParameterWithDefault> for DefinitionNodeRef<'a> {
     fn from(node: &'a ast::ParameterWithDefault) -> Self {
-        Self::ParameterWithDefault(node)
+        Self::Parameter(node)
     }
 }
 
@@ -317,14 +317,14 @@ impl<'db> DefinitionNodeRef<'db> {
                 first,
                 is_async,
             }),
-            DefinitionNodeRef::VariadicParameter(parameter) => {
-                DefinitionKind::VariadicParameter(AstNodeRef::new(parsed, parameter))
+            DefinitionNodeRef::VariadicPositionalParameter(parameter) => {
+                DefinitionKind::VariadicPositionalParameter(AstNodeRef::new(parsed, parameter))
             }
             DefinitionNodeRef::VariadicKeywordParameter(parameter) => {
                 DefinitionKind::VariadicKeywordParameter(AstNodeRef::new(parsed, parameter))
             }
-            DefinitionNodeRef::ParameterWithDefault(parameter) => {
-                DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
+            DefinitionNodeRef::Parameter(parameter) => {
+                DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
             }
             DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
                 node,
@@ -387,9 +387,9 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_async: _,
             }) => target.into(),
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => target.into(),
-            Self::VariadicParameter(node) => node.into(),
+            Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
-            Self::ParameterWithDefault(node) => node.into(),
+            Self::Parameter(node) => node.into(),
             Self::WithItem(WithItemDefinitionNodeRef {
                 node: _,
                 target,
@@ -454,9 +454,9 @@ pub enum DefinitionKind<'db> {
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
     For(ForStmtDefinitionKind),
     Comprehension(ComprehensionDefinitionKind),
-    VariadicParameter(AstNodeRef<ast::Parameter>),
+    VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
     VariadicKeywordParameter(AstNodeRef<ast::Parameter>),
-    ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
+    Parameter(AstNodeRef<ast::ParameterWithDefault>),
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
     ExceptHandler(ExceptHandlerDefinitionKind),
@@ -478,7 +478,7 @@ impl DefinitionKind<'_> {
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
             // a parameter always binds a value, but is only a declaration if annotated
-            DefinitionKind::VariadicParameter(parameter)
+            DefinitionKind::VariadicPositionalParameter(parameter)
             | DefinitionKind::VariadicKeywordParameter(parameter) => {
                 if parameter.annotation.is_some() {
                     DefinitionCategory::DeclarationAndBinding
@@ -487,7 +487,7 @@ impl DefinitionKind<'_> {
                 }
             }
             // presence of a default is irrelevant, same logic as for a no-default parameter
-            DefinitionKind::ParameterWithDefault(parameter_with_default) => {
+            DefinitionKind::Parameter(parameter_with_default) => {
                 if parameter_with_default.parameter.annotation.is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
