@@ -84,7 +84,8 @@ pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
     };
 
     let diagnostic = Diagnostic::new(DotlessPathlibWithSuffix, call.range);
-    let fix = add_leading_dot_fix(first_part);
+    let after_leading_quote = string.start() + first_part.flags.opener_len();
+    let fix = Fix::unsafe_edit(Edit::insertion(".".to_string(), after_leading_quote));
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
@@ -105,14 +106,4 @@ fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool 
     };
 
     typing::is_pathlib_path(binding, semantic)
-}
-
-fn add_leading_dot_fix(string: &ast::StringLiteral) -> Fix {
-    let opener_length = string.flags.opener_len();
-    let after_leading_quote = string
-        .start()
-        .checked_add(opener_length)
-        .expect("Stepping past a string's opener should still be a valid offset");
-    let edit = Edit::insertion(".".to_string(), after_leading_quote);
-    Fix::unsafe_edit(edit)
 }
