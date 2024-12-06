@@ -10,6 +10,7 @@ from airflow.configuration import (
     as_dict,
     set,
 )
+from airflow.contrib.aws_athena_hook import AWSAthenaHook
 from airflow.metrics.validators import AllowListValidator
 from airflow.metrics.validators import BlockListValidator
 from airflow.secrets.local_filesystem import get_connection, load_connections
@@ -31,6 +32,7 @@ from airflow.www.auth import has_access
 from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
 
 
+AWSAthenaHook
 TaskStateTrigger
 
 requires_access

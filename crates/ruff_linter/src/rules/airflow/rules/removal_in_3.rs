@@ -106,10 +106,6 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "triggers", "external_task", "TaskStateTrigger"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
-                ["airflow", "www", "auth", "has_access"] => Some((
-                    qualname.to_string(),
-                    Replacement::Name("airflow.www.auth.has_access_*".to_string()),
-                )),
                 ["airflow", "api_connexion", "security", "requires_access"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
@@ -149,6 +145,8 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name("airflow.configuration.conf.set".to_string()),
                 )),
+                // airflow.contrib.*
+                ["airflow", "contrib", ..] => Some((qualname.to_string(), Replacement::None)),
                 // airflow.metrics.validators
                 ["airflow", "metrics", "validators", "AllowListValidator"] => Some((
                     qualname.to_string(),
@@ -228,6 +226,10 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     Some((qualname.to_string(), Replacement::None))
                 }
                 // airflow.www
+                ["airflow", "www", "auth", "has_access"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.www.auth.has_access_*".to_string()),
+                )),
                 ["airflow", "www", "utils", "get_sensitive_variables_fields"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
