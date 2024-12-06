@@ -411,6 +411,8 @@ boolean_chained_comparison.py:132:1: PLR1716 [*] Contains chained boolean compar
 131 | # should error and fix
 132 | a<b<c and c<d
     | ^^^^^^^^^^^^^ PLR1716
+133 | 
+134 | # more involved examples (all should error and fix)
     |
     = help: Use a single compare expression
 
@@ -420,3 +422,56 @@ boolean_chained_comparison.py:132:1: PLR1716 [*] Contains chained boolean compar
 131 131 | # should error and fix
 132     |-a<b<c and c<d
     132 |+a<b<c<d
+133 133 | 
+134 134 | # more involved examples (all should error and fix)
+135 135 | a < ( # sneaky comment
+
+boolean_chained_comparison.py:135:1: PLR1716 [*] Contains chained boolean comparison that can be simplified
+    |
+134 |   # more involved examples (all should error and fix)
+135 | / a < ( # sneaky comment
+136 | |     b
+137 | |   # more comments 
+138 | | ) and b < c
+    | |___________^ PLR1716
+139 |   
+140 |   (
+    |
+    = help: Use a single compare expression
+
+ℹ Safe fix
+135 135 | a < ( # sneaky comment
+136 136 | 	b
+137 137 |   # more comments 
+138     |-) and b < c
+    138 |+) < c
+139 139 | 
+140 140 | (
+141 141 |     a
+
+boolean_chained_comparison.py:141:5: PLR1716 [*] Contains chained boolean comparison that can be simplified
+    |
+140 |   (
+141 |       a
+    |  _____^
+142 | |     <b
+143 | |     # hmmm...
+144 | |     <c
+145 | |     and ((c<d))
+    | |_____________^ PLR1716
+146 |   )
+    |
+    = help: Use a single compare expression
+
+ℹ Safe fix
+138 138 | ) and b < c
+139 139 | 
+140 140 | (
+141     |-    a
+    141 |+    ((a
+142 142 |     <b
+143 143 |     # hmmm...
+144     |-    <c
+145     |-    and ((c<d))
+    144 |+    <c<d))
+146 145 | )
