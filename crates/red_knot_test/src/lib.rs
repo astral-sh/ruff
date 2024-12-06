@@ -2,12 +2,14 @@ use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::Program;
 use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
+use salsa::Setter;
 
 mod assertion;
 mod config;
@@ -31,7 +33,7 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
         }
     };
 
-    let mut db = db::Db::setup(SystemPathBuf::from("/src"), suite.target_version);
+    let mut db = db::Db::setup(SystemPathBuf::from("/src"));
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
@@ -39,6 +41,10 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
         if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
             continue;
         }
+
+        Program::get(&db)
+            .set_target_version(&mut db)
+            .to(test.target_version());
 
         // Remove all files so that the db is in a "fresh" state.
         db.memory_file_system().remove_all();

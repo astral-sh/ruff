@@ -28,9 +28,6 @@ pub(crate) struct MarkdownTestSuite<'s> {
 
     /// Test files embedded within the Markdown file.
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
-
-    /// Target Python version for the whole test suite.
-    pub(crate) target_version: PythonVersion,
 }
 
 impl<'s> MarkdownTestSuite<'s> {
@@ -75,6 +72,10 @@ impl<'m, 's> MarkdownTest<'m, 's> {
 
     pub(crate) fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {
         self.files.iter()
+    }
+
+    pub(crate) fn target_version(&self) -> PythonVersion {
+        self.section.target_version
     }
 }
 
@@ -124,6 +125,8 @@ struct Section<'s> {
     title: &'s str,
     level: u8,
     parent_id: Option<SectionId>,
+    target_version: PythonVersion,
+    has_config_block: bool,
 }
 
 #[newtype_index]
@@ -208,9 +211,6 @@ struct Parser<'s> {
 
     /// Names of embedded files in current active section.
     current_section_files: Option<FxHashSet<&'s str>>,
-
-    /// Python version specified in the TOML configuration block, if any.
-    target_version: Option<PythonVersion>,
 }
 
 impl<'s> Parser<'s> {
@@ -220,6 +220,8 @@ impl<'s> Parser<'s> {
             title,
             level: 0,
             parent_id: None,
+            target_version: PythonVersion::default(),
+            has_config_block: false,
         });
         Self {
             sections,
@@ -228,7 +230,6 @@ impl<'s> Parser<'s> {
             source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
-            target_version: None,
         }
     }
 
@@ -244,7 +245,6 @@ impl<'s> Parser<'s> {
         MarkdownTestSuite {
             sections: self.sections,
             files: self.files,
-            target_version: self.target_version.unwrap_or_default(),
         }
     }
 
@@ -303,6 +303,8 @@ impl<'s> Parser<'s> {
             title,
             level: header_level.try_into()?,
             parent_id: Some(parent),
+            target_version: self.sections[parent].target_version,
+            has_config_block: false,
         };
 
         if self.current_section_files.is_some() {
@@ -390,8 +392,10 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_config(&mut self, code: &str) -> anyhow::Result<()> {
-        if self.target_version.is_some() {
-            bail!("Multiple TOML configuration blocks in the same file are not yet supported.");
+        let current_section = &mut self.sections[self.stack.parent()];
+
+        if current_section.has_config_block {
+            bail!("Multiple TOML configuration blocks in the same section are not allowed.");
         }
 
         let config = MarkdownTestConfig::from_str(code)?;
@@ -409,7 +413,8 @@ impl<'s> Parser<'s> {
             bail!("Invalid 'target-version': expected MAJOR.MINOR, got '{target_version}'.",);
         }
 
-        self.target_version = Some(PythonVersion::from((parts[0], parts[1])));
+        current_section.target_version = PythonVersion::from((parts[0], parts[1]));
+        current_section.has_config_block = true;
 
         Ok(())
     }
