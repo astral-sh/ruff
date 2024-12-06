@@ -164,6 +164,68 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "operators", "subdag", ..] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
+                ["airflow.sensors.external_task.ExternalTaskSensorLink"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.external_task.ExternalDagLin".to_string()),
+                )),
+                ["airflow", "operators", "bash_operator", "BashOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.bash.BashOperator".to_string()),
+                )),
+                ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.branch.BaseBranchOperator".to_string()),
+                )),
+                ["airflow", "operators", " dummy", "EmptyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                )),
+                ["airflow", "operators", "dummy", "DummyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                )),
+                ["airflow", "operators", "dummy_operator", "EmptyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                )),
+                ["airflow", "operators", "dummy_operator", "DummyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                )),
+                ["airflow", "operators", "email_operator", "EmailOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.email.EmailOperator".to_string()),
+                )),
+                ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.base.BaseSensorOperator".to_string()),
+                )),
+                ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.date_time.DateTimeSensor".to_string()),
+                )),
+                ["airflow", "sensors", "external_task_sensor", "ExternalTaskMarker"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.sensors.external_task.ExternalTaskMarker".to_string(),
+                    ),
+                )),
+                ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.sensors.external_task.ExternalTaskSensor".to_string(),
+                    ),
+                )),
+                ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensorLink"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.sensors.external_task.ExternalTaskSensorLink".to_string(),
+                    ),
+                )),
+                ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor".to_string()),
+                )),
                 // airflow.secrets
                 ["airflow", "secrets", "local_filesystem", "load_connections"] => Some((
                     qualname.to_string(),

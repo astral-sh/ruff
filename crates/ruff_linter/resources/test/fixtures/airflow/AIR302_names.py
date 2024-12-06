@@ -14,6 +14,20 @@ from airflow.contrib.aws_athena_hook import AWSAthenaHook
 from airflow.metrics.validators import AllowListValidator
 from airflow.metrics.validators import BlockListValidator
 from airflow.operators.subdag import SubDagOperator
+from airflow.sensors.external_task import ExternalTaskSensorLink
+from airflow.operators.bash_operator import BashOperator
+from airflow.operators.branch_operator import BaseBranchOperator
+from airflow.operators.dummy import EmptyOperator, DummyOperator
+from airflow.operators import dummy_operator
+from airflow.operators.email_operator import EmailOperator
+from airflow.sensors.base_sensor_operator import BaseSensorOperator
+from airflow.sensors.date_time_sensor import DateTimeSensor
+from airflow.sensors.external_task_sensor import (
+    ExternalTaskMarker,
+    ExternalTaskSensor,
+    ExternalTaskSensorLink,
+)
+from airflow.sensors.time_delta_sensor import TimeDeltaSensor
 from airflow.secrets.local_filesystem import get_connection, load_connections
 from airflow.utils import dates
 from airflow.utils.dates import (
@@ -61,6 +75,19 @@ dates.datetime_to_nano
 get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 
 get_connection, load_connections
+
+
+ExternalTaskSensorLink
+BashOperator
+BaseBranchOperator
+EmptyOperator, DummyOperator
+dummy_operator.EmptyOperator
+dummy_operator.DummyOperator
+EmailOperator
+BaseSensorOperator
+DateTimeSensor
+(ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
+TimeDeltaSensor
 
 TemporaryDirectory
 mkdirs
