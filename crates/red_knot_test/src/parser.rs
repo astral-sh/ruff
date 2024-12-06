@@ -184,7 +184,7 @@ impl SectionStack {
         popped
     }
 
-    fn parent(&mut self) -> SectionId {
+    fn top(&mut self) -> SectionId {
         *self
             .0
             .last()
@@ -297,7 +297,7 @@ impl<'s> Parser<'s> {
 
         self.pop_sections_to_level(header_level);
 
-        let parent = self.stack.parent();
+        let parent = self.stack.top();
 
         let section = Section {
             title,
@@ -325,7 +325,7 @@ impl<'s> Parser<'s> {
 
     fn parse_code_block(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
         // We never pop the implicit root section.
-        let parent = self.stack.parent();
+        let section = self.stack.top();
 
         let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
 
@@ -361,7 +361,7 @@ impl<'s> Parser<'s> {
 
         self.files.push(EmbeddedFile {
             path,
-            section: parent,
+            section,
             lang,
 
             code,
@@ -376,12 +376,12 @@ impl<'s> Parser<'s> {
                         "Test `{}` has duplicate files named `{path}`. \
                                 (This is the default filename; \
                                  consider giving some files an explicit name with `path=...`.)",
-                        self.sections[parent].title
+                        self.sections[section].title
                     ));
                 }
                 return Err(anyhow::anyhow!(
                     "Test `{}` has duplicate files named `{path}`.",
-                    self.sections[parent].title
+                    self.sections[section].title
                 ));
             };
         } else {
@@ -392,7 +392,7 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_config(&mut self, code: &str) -> anyhow::Result<()> {
-        let current_section = &mut self.sections[self.stack.parent()];
+        let current_section = &mut self.sections[self.stack.top()];
 
         if current_section.has_config_block {
             bail!("Multiple TOML configuration blocks in the same section are not allowed.");
@@ -420,7 +420,7 @@ impl<'s> Parser<'s> {
     }
 
     fn pop_sections_to_level(&mut self, level: usize) {
-        while level <= self.sections[self.stack.parent()].level.into() {
+        while level <= self.sections[self.stack.top()].level.into() {
             self.stack.pop();
             // We would have errored before pushing a child section if there were files, so we know
             // no parent section can have files.
