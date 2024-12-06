@@ -112,6 +112,35 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         "airflow.api_connexion.security.requires_access_*".to_string(),
                     ),
                 )),
+                // airflow.PY\d{1,2}
+                ["airflow", "PY36"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY37"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY38"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY39"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY310"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY311"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY312"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
                 // airflow.configuration
                 ["airflow", "configuration", "get"] => Some((
                     qualname.to_string(),

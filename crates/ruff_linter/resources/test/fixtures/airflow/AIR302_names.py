@@ -1,3 +1,4 @@
+from airflow import PY36, PY37, PY38, PY39, PY310, PY311, PY312
 from airflow.triggers.external_task import TaskStateTrigger
 from airflow.api_connexion.security import requires_access
 from airflow.configuration import (
@@ -47,6 +48,7 @@ from airflow.utils.trigger_rule import TriggerRule
 from airflow.www.auth import has_access
 from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
 
+PY36, PY37, PY38, PY39, PY310, PY311, PY312
 
 AWSAthenaHook
 TaskStateTrigger
