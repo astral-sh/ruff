@@ -43,6 +43,7 @@ from airflow.utils.file import TemporaryDirectory, mkdirs
 from airflow.utils.helpers import chain, cross_downstream
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.dag_cycle_tester import test_cycle
+from airflow.utils.trigger_rule import TriggerRule
 from airflow.www.auth import has_access
 from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
 
@@ -97,6 +98,9 @@ cross_downstream
 
 SHUTDOWN
 terminating_states
+
+TriggerRule.DUMMY
+TriggerRule.NONE_FAILED_OR_SKIPPED
 
 test_cycle
 

@@ -268,6 +268,7 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name("pendulum.today('UTC').add(days=-N, ...)".to_string()),
                 )),
+
                 // airflow.utils.helpers
                 ["airflow", "utils", "helpers", "chain"] => Some((
                     qualname.to_string(),
@@ -282,6 +283,13 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     Some((qualname.to_string(), Replacement::None))
                 }
                 ["airflow", "utils", "state", "terminating_states"] => {
+                    Some((qualname.to_string(), Replacement::None))
+                }
+                // airflow.utils.trigger_rule
+                ["airflow", "utils", "trigger_rule", "TriggerRule", "DUMMY"] => {
+                    Some((qualname.to_string(), Replacement::None))
+                }
+                ["airflow", "utils", "trigger_rule", "TriggerRule", "NONE_FAILED_OR_SKIPPED"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
                 // airflow.uilts
