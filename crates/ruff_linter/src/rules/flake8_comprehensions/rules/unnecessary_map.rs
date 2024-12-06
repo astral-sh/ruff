@@ -3,6 +3,7 @@ use std::fmt;
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Stmt};
@@ -106,7 +107,7 @@ pub(crate) fn unnecessary_map(
 
             // For example, (x+1 for x in (c:=a)) is invalid syntax
             // so we can't suggest it.
-            if iterable.is_named_expr() {
+            if any_over_expr(iterable, &|expr| expr.is_named_expr()) {
                 return;
             }
 

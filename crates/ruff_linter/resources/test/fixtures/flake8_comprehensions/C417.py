@@ -54,3 +54,6 @@ map(lambda x: x, (x, y, z))
 a = [1, 2, 3]
 b = map(lambda x: x, c := a)
 print(c)
+
+# Check nested as well
+[x for x in map(lambda x:x, c:=a)]
