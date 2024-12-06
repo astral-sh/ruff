@@ -129,3 +129,19 @@ def unfixables():
         # unfixable because the rename would shadow a variable from the outer function
         _local = "local4"
         print(_local)
+
+def special_calls():
+    from typing import TypeVar, ParamSpec, NamedTuple
+    from enum import Enum
+    from collections import namedtuple
+
+    _P = ParamSpec("_P")
+    _T = TypeVar(name="_T", covariant=True, bound=int|str)
+    _NT = NamedTuple("_NT", [("foo", int)])
+    _E = Enum("_E", ["a", "b", "c"])
+    _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+    _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+    _DynamicClass = type("_DynamicClass", (), {})
+    _NotADynamicClass = type("_NotADynamicClass")
+
+    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)

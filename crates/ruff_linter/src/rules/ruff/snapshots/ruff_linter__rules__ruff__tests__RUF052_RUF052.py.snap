@@ -148,3 +148,196 @@ RUF052.py:130:9: RUF052 Local dummy variable `_local` is accessed
 131 |         print(_local)
     |
     = help: Prefer using trailing underscores to avoid shadowing a variable
+
+RUF052.py:138:5: RUF052 [*] Local dummy variable `_P` is accessed
+    |
+136 |     from collections import namedtuple
+137 | 
+138 |     _P = ParamSpec("_P")
+    |     ^^ RUF052
+139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+140 |     _NT = NamedTuple("_NT", [("foo", int)])
+    |
+    = help: Remove leading underscores
+
+ℹ Safe fix
+135 135 |     from enum import Enum
+136 136 |     from collections import namedtuple
+137 137 | 
+138     |-    _P = ParamSpec("_P")
+    138 |+    P = ParamSpec("P")
+139 139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+140 140 |     _NT = NamedTuple("_NT", [("foo", int)])
+141 141 |     _E = Enum("_E", ["a", "b", "c"])
+--------------------------------------------------------------------------------
+144 144 |     _DynamicClass = type("_DynamicClass", (), {})
+145 145 |     _NotADynamicClass = type("_NotADynamicClass")
+146 146 | 
+147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    147 |+    print(_T, P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+
+RUF052.py:139:5: RUF052 [*] Local dummy variable `_T` is accessed
+    |
+138 |     _P = ParamSpec("_P")
+139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+    |     ^^ RUF052
+140 |     _NT = NamedTuple("_NT", [("foo", int)])
+141 |     _E = Enum("_E", ["a", "b", "c"])
+    |
+    = help: Remove leading underscores
+
+ℹ Safe fix
+136 136 |     from collections import namedtuple
+137 137 | 
+138 138 |     _P = ParamSpec("_P")
+139     |-    _T = TypeVar(name="_T", covariant=True, bound=int|str)
+    139 |+    T = TypeVar(name="T", covariant=True, bound=int|str)
+140 140 |     _NT = NamedTuple("_NT", [("foo", int)])
+141 141 |     _E = Enum("_E", ["a", "b", "c"])
+142 142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+--------------------------------------------------------------------------------
+144 144 |     _DynamicClass = type("_DynamicClass", (), {})
+145 145 |     _NotADynamicClass = type("_NotADynamicClass")
+146 146 | 
+147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    147 |+    print(T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+
+RUF052.py:140:5: RUF052 [*] Local dummy variable `_NT` is accessed
+    |
+138 |     _P = ParamSpec("_P")
+139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+140 |     _NT = NamedTuple("_NT", [("foo", int)])
+    |     ^^^ RUF052
+141 |     _E = Enum("_E", ["a", "b", "c"])
+142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+    |
+    = help: Remove leading underscores
+
+ℹ Safe fix
+137 137 | 
+138 138 |     _P = ParamSpec("_P")
+139 139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+140     |-    _NT = NamedTuple("_NT", [("foo", int)])
+    140 |+    NT = NamedTuple("NT", [("foo", int)])
+141 141 |     _E = Enum("_E", ["a", "b", "c"])
+142 142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+143 143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+144 144 |     _DynamicClass = type("_DynamicClass", (), {})
+145 145 |     _NotADynamicClass = type("_NotADynamicClass")
+146 146 | 
+147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    147 |+    print(_T, _P, NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+
+RUF052.py:141:5: RUF052 [*] Local dummy variable `_E` is accessed
+    |
+139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+140 |     _NT = NamedTuple("_NT", [("foo", int)])
+141 |     _E = Enum("_E", ["a", "b", "c"])
+    |     ^^ RUF052
+142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+    |
+    = help: Remove leading underscores
+
+ℹ Safe fix
+138 138 |     _P = ParamSpec("_P")
+139 139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+140 140 |     _NT = NamedTuple("_NT", [("foo", int)])
+141     |-    _E = Enum("_E", ["a", "b", "c"])
+    141 |+    E = Enum("E", ["a", "b", "c"])
+142 142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+143 143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+144 144 |     _DynamicClass = type("_DynamicClass", (), {})
+145 145 |     _NotADynamicClass = type("_NotADynamicClass")
+146 146 | 
+147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    147 |+    print(_T, _P, _NT, E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+
+RUF052.py:142:5: RUF052 [*] Local dummy variable `_NT2` is accessed
+    |
+140 |     _NT = NamedTuple("_NT", [("foo", int)])
+141 |     _E = Enum("_E", ["a", "b", "c"])
+142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+    |     ^^^^ RUF052
+143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+144 |     _DynamicClass = type("_DynamicClass", (), {})
+    |
+    = help: Remove leading underscores
+
+ℹ Safe fix
+139 139 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+140 140 |     _NT = NamedTuple("_NT", [("foo", int)])
+141 141 |     _E = Enum("_E", ["a", "b", "c"])
+142     |-    _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+    142 |+    NT2 = namedtuple("NT2", ['x', 'y', 'z'])
+143 143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+144 144 |     _DynamicClass = type("_DynamicClass", (), {})
+145 145 |     _NotADynamicClass = type("_NotADynamicClass")
+146 146 | 
+147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    147 |+    print(_T, _P, _NT, _E, NT2, _NT3, _DynamicClass, _NotADynamicClass)
+
+RUF052.py:143:5: RUF052 [*] Local dummy variable `_NT3` is accessed
+    |
+141 |     _E = Enum("_E", ["a", "b", "c"])
+142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+    |     ^^^^ RUF052
+144 |     _DynamicClass = type("_DynamicClass", (), {})
+145 |     _NotADynamicClass = type("_NotADynamicClass")
+    |
+    = help: Remove leading underscores
+
+ℹ Safe fix
+140 140 |     _NT = NamedTuple("_NT", [("foo", int)])
+141 141 |     _E = Enum("_E", ["a", "b", "c"])
+142 142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+143     |-    _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+    143 |+    NT3 = namedtuple(typename="NT3", field_names=['x', 'y', 'z'])
+144 144 |     _DynamicClass = type("_DynamicClass", (), {})
+145 145 |     _NotADynamicClass = type("_NotADynamicClass")
+146 146 | 
+147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    147 |+    print(_T, _P, _NT, _E, _NT2, NT3, _DynamicClass, _NotADynamicClass)
+
+RUF052.py:144:5: RUF052 [*] Local dummy variable `_DynamicClass` is accessed
+    |
+142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+144 |     _DynamicClass = type("_DynamicClass", (), {})
+    |     ^^^^^^^^^^^^^ RUF052
+145 |     _NotADynamicClass = type("_NotADynamicClass")
+    |
+    = help: Remove leading underscores
+
+ℹ Safe fix
+141 141 |     _E = Enum("_E", ["a", "b", "c"])
+142 142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+143 143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+144     |-    _DynamicClass = type("_DynamicClass", (), {})
+    144 |+    DynamicClass = type("DynamicClass", (), {})
+145 145 |     _NotADynamicClass = type("_NotADynamicClass")
+146 146 | 
+147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    147 |+    print(_T, _P, _NT, _E, _NT2, _NT3, DynamicClass, _NotADynamicClass)
+
+RUF052.py:145:5: RUF052 [*] Local dummy variable `_NotADynamicClass` is accessed
+    |
+143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+144 |     _DynamicClass = type("_DynamicClass", (), {})
+145 |     _NotADynamicClass = type("_NotADynamicClass")
+    |     ^^^^^^^^^^^^^^^^^ RUF052
+146 | 
+147 |     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    |
+    = help: Remove leading underscores
+
+ℹ Safe fix
+142 142 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+143 143 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+144 144 |     _DynamicClass = type("_DynamicClass", (), {})
+145     |-    _NotADynamicClass = type("_NotADynamicClass")
+    145 |+    NotADynamicClass = type("_NotADynamicClass")
+146 146 | 
+147     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+    147 |+    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, NotADynamicClass)
