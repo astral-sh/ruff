@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingKind, ScopeId};
+use ruff_python_semantic::{Binding, ScopeId};
 use ruff_python_stdlib::{
     builtins::is_python_builtin, identifiers::is_identifier, keyword::is_keyword,
 };
@@ -93,13 +93,27 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding) -> Optio
     if binding.is_unused() {
         return None;
     }
-    // Only variables defined via function arguments or assignments.
-    if !matches!(
-        binding.kind,
-        BindingKind::Argument | BindingKind::Assignment
-    ) {
+
+    // We only emit the lint on variables defined via assignments.
+    //
+    // ## Why not also emit the lint on function parameters?
+    //
+    // There isn't universal agreement that leading underscores indicate "unused" parameters
+    // in Python (many people use them for "private" parameters), so this would be a lot more
+    // controversial than emitting the lint on assignments. Even if it's decided that it's
+    // desirable to emit a lint on function parameters with "dummy variable" names, it would
+    // possibly have to be a separate rule or we'd have to put it behind a configuration flag,
+    // as there's much less community consensus about the issue.
+    // See <https://github.com/astral-sh/ruff/issues/14796>.
+    //
+    // Moreover, autofixing the diagnostic for function parameters is much more troublesome than
+    // autofixing the diagnostic for assignments. See:
+    // - <https://github.com/astral-sh/ruff/issues/14790>
+    // - <https://github.com/astral-sh/ruff/issues/14799>
+    if !binding.kind.is_assignment() {
         return None;
     }
+
     // This excludes `global` and `nonlocal` variables.
     if binding.is_global() || binding.is_nonlocal() {
         return None;
