@@ -63,7 +63,11 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Check
                 flake8_bugbear::rules::except_with_empty_tuple(checker, except_handler, is_star);
             }
             if checker.enabled(Rule::ExceptWithNonExceptionClasses) {
-                flake8_bugbear::rules::except_with_non_exception_classes(checker, except_handler);
+                flake8_bugbear::rules::except_with_non_exception_classes(
+                    checker,
+                    except_handler,
+                    is_star,
+                );
             }
             if checker.enabled(Rule::BinaryOpException) {
                 pylint::rules::binary_op_exception(checker, except_handler);
