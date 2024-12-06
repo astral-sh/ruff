@@ -1,15 +1,18 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
+use ruff_python_ast::{
+    self as ast, Decorator, Expr, ExprSubscript, Parameters, Stmt, StmtFunctionDef,
+};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze;
+use ruff_python_semantic::analyze::class::is_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for methods that are annotated with a fixed return type which
@@ -188,8 +191,30 @@ fn add_diagnostic(
     class_def: &ast::StmtClassDef,
     method_name: &str,
 ) {
-    /// Return an [`Edit`] that imports `typing.Self` from `typing` or `typing_extensions`.
-    fn import_self(checker: &Checker, range: TextRange) -> Option<Edit> {
+    let mut diagnostic = Diagnostic::new(
+        NonSelfReturnType {
+            class_name: class_def.name.to_string(),
+            method_name: method_name.to_string(),
+        },
+        stmt.identifier(),
+    );
+
+    if let Some(fix) = replace_with_self_fix(checker, stmt, returns, class_def) {
+        diagnostic.set_fix(fix);
+    }
+
+    checker.diagnostics.push(diagnostic);
+}
+
+fn replace_with_self_fix(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    returns: &Expr,
+    class_def: &ast::StmtClassDef,
+) -> Option<Fix> {
+    let semantic = checker.semantic();
+
+    let import_self = || -> Option<Edit> {
         let target_version = checker.settings.target_version.as_tuple();
         let source_module = if target_version >= (3, 11) {
             "typing"
@@ -201,30 +226,63 @@ fn add_diagnostic(
         let request = ImportRequest::import_from(source_module, "Self");
 
         let (edit, ..) = importer
-            .get_or_import_symbol(&request, range.start(), semantic)
+            .get_or_import_symbol(&request, returns.start(), semantic)
             .ok()?;
 
         Some(edit)
+    };
+
+    let remove_first_argument_type_hint = || -> Option<Edit> {
+        let Stmt::FunctionDef(StmtFunctionDef { parameters, .. }) = stmt else {
+            return None;
+        };
+
+        let first = parameters.iter().next()?;
+        let annotation = first.annotation()?;
+
+        if !is_class_reference(semantic, annotation, &class_def.name) {
+            return None;
+        }
+
+        Some(Edit::deletion(first.name().end(), annotation.end()))
+    };
+
+    let replace_return_type_with_self =
+        || -> Edit { Edit::range_replacement("Self".to_string(), returns.range()) };
+
+    let import_self = import_self()?;
+    let mut others = Vec::with_capacity(2);
+
+    others.push(replace_return_type_with_self());
+
+    if let Some(edit) = remove_first_argument_type_hint() {
+        others.push(edit);
     }
 
-    /// Generate a [`Fix`] that replaces the return type with `Self`.
-    fn replace_with_self(checker: &mut Checker, range: TextRange) -> Option<Fix> {
-        let import_self = import_self(checker, range)?;
-        let replace_with_self = Edit::range_replacement("Self".to_string(), range);
-        Some(Fix::unsafe_edits(import_self, [replace_with_self]))
+    let applicability = if is_generic(class_def, checker.semantic()) {
+        Applicability::DisplayOnly
+    } else {
+        Applicability::Unsafe
+    };
+
+    Some(Fix::applicable_edits(import_self, others, applicability))
+}
+
+/// Return true if `annotation` is either `ClassName` or `type[ClassName]`
+fn is_class_reference(semantic: &SemanticModel, annotation: &Expr, expected: &str) -> bool {
+    if is_name(annotation, expected) {
+        return true;
     }
 
-    let mut diagnostic = Diagnostic::new(
-        NonSelfReturnType {
-            class_name: class_def.name.to_string(),
-            method_name: method_name.to_string(),
-        },
-        stmt.identifier(),
-    );
-    if let Some(fix) = replace_with_self(checker, returns.range()) {
-        diagnostic.set_fix(fix);
+    let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation else {
+        return false;
+    };
+
+    if !semantic.match_builtin_expr(value, "type") && !semantic.match_typing_expr(value, "Type") {
+        return false;
     }
-    checker.diagnostics.push(diagnostic);
+
+    is_name(slice, expected)
 }
 
 /// Returns `true` if the method is an in-place binary operator.

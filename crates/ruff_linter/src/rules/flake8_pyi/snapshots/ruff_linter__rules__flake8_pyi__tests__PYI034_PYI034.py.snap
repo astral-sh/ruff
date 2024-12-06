@@ -217,3 +217,214 @@ PYI034.py:203:9: PYI034 [*] `__aiter__` methods in classes like `SubclassOfBadAs
 204 204 |         ...
 205 205 | 
 206 206 | class AsyncIteratorReturningAsyncIterable:
+
+PYI034.py:327:9: PYI034 [*] `__new__` methods in classes like `NonGeneric1` usually return `self` at runtime
+    |
+326 | class NonGeneric1(tuple):
+327 |     def __new__(cls: type[NonGeneric1], *args, **kwargs) -> NonGeneric1: ...
+    |         ^^^^^^^ PYI034
+328 |     def __enter__(self: NonGeneric1) -> NonGeneric1: ...
+    |
+    = help: Use `Self` as return type
+
+ℹ Unsafe fix
+324 324 | 
+325 325 | 
+326 326 | class NonGeneric1(tuple):
+327     |-    def __new__(cls: type[NonGeneric1], *args, **kwargs) -> NonGeneric1: ...
+    327 |+    def __new__(cls, *args, **kwargs) -> Self: ...
+328 328 |     def __enter__(self: NonGeneric1) -> NonGeneric1: ...
+329 329 | 
+330 330 | class NonGeneric2(tuple):
+
+PYI034.py:328:9: PYI034 [*] `__enter__` methods in classes like `NonGeneric1` usually return `self` at runtime
+    |
+326 | class NonGeneric1(tuple):
+327 |     def __new__(cls: type[NonGeneric1], *args, **kwargs) -> NonGeneric1: ...
+328 |     def __enter__(self: NonGeneric1) -> NonGeneric1: ...
+    |         ^^^^^^^^^ PYI034
+329 | 
+330 | class NonGeneric2(tuple):
+    |
+    = help: Use `Self` as return type
+
+ℹ Unsafe fix
+325 325 | 
+326 326 | class NonGeneric1(tuple):
+327 327 |     def __new__(cls: type[NonGeneric1], *args, **kwargs) -> NonGeneric1: ...
+328     |-    def __enter__(self: NonGeneric1) -> NonGeneric1: ...
+    328 |+    def __enter__(self) -> Self: ...
+329 329 | 
+330 330 | class NonGeneric2(tuple):
+331 331 |     def __new__(cls: Type[NonGeneric2]) -> NonGeneric2: ...
+
+PYI034.py:331:9: PYI034 [*] `__new__` methods in classes like `NonGeneric2` usually return `self` at runtime
+    |
+330 | class NonGeneric2(tuple):
+331 |     def __new__(cls: Type[NonGeneric2]) -> NonGeneric2: ...
+    |         ^^^^^^^ PYI034
+332 | 
+333 | class Generic1[T](list):
+    |
+    = help: Use `Self` as return type
+
+ℹ Unsafe fix
+328 328 |     def __enter__(self: NonGeneric1) -> NonGeneric1: ...
+329 329 | 
+330 330 | class NonGeneric2(tuple):
+331     |-    def __new__(cls: Type[NonGeneric2]) -> NonGeneric2: ...
+    331 |+    def __new__(cls) -> Self: ...
+332 332 | 
+333 333 | class Generic1[T](list):
+334 334 |     def __new__(cls: type[Generic1]) -> Generic1: ...
+
+PYI034.py:334:9: PYI034 `__new__` methods in classes like `Generic1` usually return `self` at runtime
+    |
+333 | class Generic1[T](list):
+334 |     def __new__(cls: type[Generic1]) -> Generic1: ...
+    |         ^^^^^^^ PYI034
+335 |     def __enter__(self: Generic1) -> Generic1: ...
+    |
+    = help: Use `Self` as return type
+
+ℹ Display-only fix
+331 331 |     def __new__(cls: Type[NonGeneric2]) -> NonGeneric2: ...
+332 332 | 
+333 333 | class Generic1[T](list):
+334     |-    def __new__(cls: type[Generic1]) -> Generic1: ...
+    334 |+    def __new__(cls) -> Self: ...
+335 335 |     def __enter__(self: Generic1) -> Generic1: ...
+336 336 | 
+337 337 | 
+
+PYI034.py:335:9: PYI034 `__enter__` methods in classes like `Generic1` usually return `self` at runtime
+    |
+333 | class Generic1[T](list):
+334 |     def __new__(cls: type[Generic1]) -> Generic1: ...
+335 |     def __enter__(self: Generic1) -> Generic1: ...
+    |         ^^^^^^^^^ PYI034
+    |
+    = help: Use `Self` as return type
+
+ℹ Display-only fix
+332 332 | 
+333 333 | class Generic1[T](list):
+334 334 |     def __new__(cls: type[Generic1]) -> Generic1: ...
+335     |-    def __enter__(self: Generic1) -> Generic1: ...
+    335 |+    def __enter__(self) -> Self: ...
+336 336 | 
+337 337 | 
+338 338 | ### Correctness of typevar-likes are not verified.
+
+PYI034.py:345:9: PYI034 `__new__` methods in classes like `Generic2` usually return `self` at runtime
+    |
+344 | class Generic2(Generic[T]):
+345 |     def __new__(cls: type[Generic2]) -> Generic2: ...
+    |         ^^^^^^^ PYI034
+346 |     def __enter__(self: Generic2) -> Generic2: ...
+    |
+    = help: Use `Self` as return type
+
+ℹ Display-only fix
+342 342 | Ts = TypeVarTuple('foo')
+343 343 | 
+344 344 | class Generic2(Generic[T]):
+345     |-    def __new__(cls: type[Generic2]) -> Generic2: ...
+    345 |+    def __new__(cls) -> Self: ...
+346 346 |     def __enter__(self: Generic2) -> Generic2: ...
+347 347 | 
+348 348 | class Generic3(tuple[*Ts]):
+
+PYI034.py:346:9: PYI034 `__enter__` methods in classes like `Generic2` usually return `self` at runtime
+    |
+344 | class Generic2(Generic[T]):
+345 |     def __new__(cls: type[Generic2]) -> Generic2: ...
+346 |     def __enter__(self: Generic2) -> Generic2: ...
+    |         ^^^^^^^^^ PYI034
+347 | 
+348 | class Generic3(tuple[*Ts]):
+    |
+    = help: Use `Self` as return type
+
+ℹ Display-only fix
+343 343 | 
+344 344 | class Generic2(Generic[T]):
+345 345 |     def __new__(cls: type[Generic2]) -> Generic2: ...
+346     |-    def __enter__(self: Generic2) -> Generic2: ...
+    346 |+    def __enter__(self) -> Self: ...
+347 347 | 
+348 348 | class Generic3(tuple[*Ts]):
+349 349 |     def __new__(cls: type[Generic3]) -> Generic3: ...
+
+PYI034.py:349:9: PYI034 `__new__` methods in classes like `Generic3` usually return `self` at runtime
+    |
+348 | class Generic3(tuple[*Ts]):
+349 |     def __new__(cls: type[Generic3]) -> Generic3: ...
+    |         ^^^^^^^ PYI034
+350 |     def __enter__(self: Generic3) -> Generic3: ...
+    |
+    = help: Use `Self` as return type
+
+ℹ Display-only fix
+346 346 |     def __enter__(self: Generic2) -> Generic2: ...
+347 347 | 
+348 348 | class Generic3(tuple[*Ts]):
+349     |-    def __new__(cls: type[Generic3]) -> Generic3: ...
+    349 |+    def __new__(cls) -> Self: ...
+350 350 |     def __enter__(self: Generic3) -> Generic3: ...
+351 351 | 
+352 352 | class Generic4(collections.abc.Callable[P, ...]):
+
+PYI034.py:350:9: PYI034 `__enter__` methods in classes like `Generic3` usually return `self` at runtime
+    |
+348 | class Generic3(tuple[*Ts]):
+349 |     def __new__(cls: type[Generic3]) -> Generic3: ...
+350 |     def __enter__(self: Generic3) -> Generic3: ...
+    |         ^^^^^^^^^ PYI034
+351 | 
+352 | class Generic4(collections.abc.Callable[P, ...]):
+    |
+    = help: Use `Self` as return type
+
+ℹ Display-only fix
+347 347 | 
+348 348 | class Generic3(tuple[*Ts]):
+349 349 |     def __new__(cls: type[Generic3]) -> Generic3: ...
+350     |-    def __enter__(self: Generic3) -> Generic3: ...
+    350 |+    def __enter__(self) -> Self: ...
+351 351 | 
+352 352 | class Generic4(collections.abc.Callable[P, ...]):
+353 353 |     def __new__(cls: type[Generic4]) -> Generic4: ...
+
+PYI034.py:353:9: PYI034 `__new__` methods in classes like `Generic4` usually return `self` at runtime
+    |
+352 | class Generic4(collections.abc.Callable[P, ...]):
+353 |     def __new__(cls: type[Generic4]) -> Generic4: ...
+    |         ^^^^^^^ PYI034
+354 |     def __enter__(self: Generic4) -> Generic4: ...
+    |
+    = help: Use `Self` as return type
+
+ℹ Display-only fix
+350 350 |     def __enter__(self: Generic3) -> Generic3: ...
+351 351 | 
+352 352 | class Generic4(collections.abc.Callable[P, ...]):
+353     |-    def __new__(cls: type[Generic4]) -> Generic4: ...
+    353 |+    def __new__(cls) -> Self: ...
+354 354 |     def __enter__(self: Generic4) -> Generic4: ...
+
+PYI034.py:354:9: PYI034 `__enter__` methods in classes like `Generic4` usually return `self` at runtime
+    |
+352 | class Generic4(collections.abc.Callable[P, ...]):
+353 |     def __new__(cls: type[Generic4]) -> Generic4: ...
+354 |     def __enter__(self: Generic4) -> Generic4: ...
+    |         ^^^^^^^^^ PYI034
+    |
+    = help: Use `Self` as return type
+
+ℹ Display-only fix
+351 351 | 
+352 352 | class Generic4(collections.abc.Callable[P, ...]):
+353 353 |     def __new__(cls: type[Generic4]) -> Generic4: ...
+354     |-    def __enter__(self: Generic4) -> Generic4: ...
+    354 |+    def __enter__(self) -> Self: ...

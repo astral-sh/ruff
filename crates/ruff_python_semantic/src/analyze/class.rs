@@ -1,10 +1,11 @@
 use rustc_hash::FxHashSet;
 
+use crate::analyze::typing;
 use crate::{BindingId, SemanticModel};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple};
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
 pub fn any_qualified_base_class(
@@ -169,4 +170,52 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
         (true, false) => IsMetaclass::Yes,
         (false, _) => IsMetaclass::No,
     }
+}
+
+/// Returns true if a class is generic.
+///
+/// A class is generic if at least one of its direct bases is subscripted with a `TypeVar`-like,
+/// or if it is defined using PEP 695 syntax.
+///
+/// This should only be used in stub context to avoid false positives and negatives.
+pub fn is_generic(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    if class_def.type_params.is_some() {
+        return true;
+    }
+
+    class_def.bases().iter().any(|base| {
+        let Expr::Subscript(ExprSubscript { slice, .. }) = base else {
+            return false;
+        };
+
+        match slice.as_ref() {
+            Expr::Name(name) => is_old_style_typevar_like(name, semantic),
+
+            Expr::Tuple(ExprTuple { elts, .. }) => elts.iter().any(|elt| match elt {
+                Expr::Name(name) => is_old_style_typevar_like(name, semantic),
+
+                Expr::Starred(ExprStarred { value, .. }) => match value.as_ref() {
+                    Expr::Name(name) => is_old_style_typevar_like(name, semantic),
+                    _ => false,
+                },
+
+                _ => false,
+            }),
+
+            Expr::Starred(ExprStarred { value, .. }) => match value.as_ref() {
+                Expr::Name(name) => is_old_style_typevar_like(name, semantic),
+                _ => false,
+            },
+
+            _ => false,
+        }
+    })
+}
+
+fn is_old_style_typevar_like(name: &ExprName, semantic: &SemanticModel) -> bool {
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    typing::is_type_var_like(binding, semantic)
 }
