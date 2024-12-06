@@ -2,7 +2,8 @@ use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    parenthesize::parentheses_iterator, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
+    parenthesize::{parentheses_iterator, parenthesized_range},
+    BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -103,9 +104,29 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
             .count();
 
             // Create the edit that removes the comparison operator
+
+            // In `a<(b) and ((b))<c`, we need to handle the
+            // parentheses when specifying the fix range.
+            let left_compare_right_range = parenthesized_range(
+                left_compare_right.into(),
+                left_compare.into(),
+                comment_ranges,
+                locator.contents(),
+            )
+            .unwrap_or(left_compare_right.range());
+            let right_compare_left_range = parenthesized_range(
+                right_compare_left.into(),
+                right_compare.into(),
+                comment_ranges,
+                locator.contents(),
+            )
+            .unwrap_or(right_compare_left.range());
             let edit = Edit::range_replacement(
-                left_compare_right.id().to_string(),
-                TextRange::new(left_compare_right.start(), right_compare_left.end()),
+                locator.slice(left_compare_right_range).to_string(),
+                TextRange::new(
+                    left_compare_right_range.start(),
+                    right_compare_left_range.end(),
+                ),
             );
 
             // Balance left and right parentheses
