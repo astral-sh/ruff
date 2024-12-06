@@ -4552,18 +4552,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Given the slice of a `type[]` annotation, return the type that the annotation represents
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
         match slice {
-            ast::Expr::Name(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
                 if let Some(ClassLiteralType { class }) = name_ty.into_class_literal() {
                     Type::subclass_of(class)
                 } else {
-                    todo_type!()
+                    todo_type!("unsupported type[X] special form")
                 }
             }
             // TODO: attributes, unions, subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);
-                todo_type!()
+                todo_type!("unsupported type[X] special form")
             }
         }
     }
