@@ -96,6 +96,39 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 "timetable",
                 Some("schedule"),
             ));
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "sla_miss_callback",
+                None::<&str>,
+            ));
+        }
+        ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "execution_date",
+                Some("logical_date"),
+            ));
+        }
+        ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
+        }
+        ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
+        }
+        ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
         }
         _ => {}
     };
