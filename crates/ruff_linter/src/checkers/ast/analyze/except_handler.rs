@@ -31,6 +31,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Check
                     checker,
                     name.as_deref(),
                     body,
+                    is_star,
                 );
             }
             if checker.enabled(Rule::BlindExcept) {
