@@ -16,7 +16,13 @@ use ruff_text_size::Ranged;
 ///
 /// ## Known problems
 /// This rule is prone to false positives and negatives
-/// due to type inference limitations.
+/// due to type inference limitations, as it will only detect
+/// paths that are either instantiated (`p = Path(...)`)
+/// or annotated (`def f(p: Path)`) as such.
+///
+/// ## Fix safety
+/// The fix is marked as unsafe, since it changes runtime behaviour
+/// (`.with_suffix()` call no longer raises an exception).
 ///
 /// ## Examples
 ///
