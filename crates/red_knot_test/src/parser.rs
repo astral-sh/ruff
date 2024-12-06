@@ -126,7 +126,6 @@ struct Section<'s> {
     level: u8,
     parent_id: Option<SectionId>,
     target_version: PythonVersion,
-    has_config_block: bool,
 }
 
 #[newtype_index]
@@ -211,6 +210,9 @@ struct Parser<'s> {
 
     /// Names of embedded files in current active section.
     current_section_files: Option<FxHashSet<&'s str>>,
+
+    /// Whether or not the current section has a config block.
+    current_section_has_config: bool,
 }
 
 impl<'s> Parser<'s> {
@@ -221,7 +223,6 @@ impl<'s> Parser<'s> {
             level: 0,
             parent_id: None,
             target_version: PythonVersion::default(),
-            has_config_block: false,
         });
         Self {
             sections,
@@ -230,6 +231,7 @@ impl<'s> Parser<'s> {
             source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
+            current_section_has_config: false,
         }
     }
 
@@ -304,7 +306,6 @@ impl<'s> Parser<'s> {
             level: header_level.try_into()?,
             parent_id: Some(parent),
             target_version: self.sections[parent].target_version,
-            has_config_block: false,
         };
 
         if self.current_section_files.is_some() {
@@ -319,6 +320,7 @@ impl<'s> Parser<'s> {
         self.stack.push(section_id);
 
         self.current_section_files = None;
+        self.current_section_has_config = false;
 
         Ok(())
     }
@@ -392,9 +394,7 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_config(&mut self, code: &str) -> anyhow::Result<()> {
-        let current_section = &mut self.sections[self.stack.top()];
-
-        if current_section.has_config_block {
+        if self.current_section_has_config {
             bail!("Multiple TOML configuration blocks in the same section are not allowed.");
         }
 
@@ -413,8 +413,10 @@ impl<'s> Parser<'s> {
             bail!("Invalid 'target-version': expected MAJOR.MINOR, got '{target_version}'.",);
         }
 
+        let current_section = &mut self.sections[self.stack.top()];
         current_section.target_version = PythonVersion::from((parts[0], parts[1]));
-        current_section.has_config_block = true;
+
+        self.current_section_has_config = true;
 
         Ok(())
     }
