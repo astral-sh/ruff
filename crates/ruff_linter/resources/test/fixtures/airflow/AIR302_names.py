@@ -1,5 +1,4 @@
 from airflow.triggers.external_task import TaskStateTrigger
-from airflow.www.auth import has_access
 from airflow.api_connexion.security import requires_access
 from airflow.configuration import (
     get,
@@ -28,12 +27,12 @@ from airflow.utils.file import TemporaryDirectory, mkdirs
 from airflow.utils.helpers import chain, cross_downstream
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.dag_cycle_tester import test_cycle
+from airflow.www.auth import has_access
+from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
 
 
 TaskStateTrigger
 
-
-has_access
 requires_access
 
 AllowListValidator
@@ -68,3 +67,6 @@ SHUTDOWN
 terminating_states
 
 test_cycle
+
+has_access
+get_sensitive_variables_fields, should_hide_value_for_key

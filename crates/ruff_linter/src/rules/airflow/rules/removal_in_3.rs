@@ -227,6 +227,20 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "utils", "decorators", "apply_defaults"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
+                // airflow.www
+                ["airflow", "www", "utils", "get_sensitive_variables_fields"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.utils.log.secrets_masker.get_sensitive_variables_fields"
+                            .to_string(),
+                    ),
+                )),
+                ["airflow", "www", "utils", "should_hide_value_for_key"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.utils.log.secrets_masker.should_hide_value_for_key".to_string(),
+                    ),
+                )),
                 _ => None,
             });
     if let Some((deprecated, replacement)) = result {
