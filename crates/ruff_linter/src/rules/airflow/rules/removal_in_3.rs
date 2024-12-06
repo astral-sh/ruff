@@ -116,6 +116,39 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         "airflow.api_connexion.security.requires_access_*".to_string(),
                     ),
                 )),
+                // airflow.configuration
+                ["airflow", "configuration", "get"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.get".to_string()),
+                )),
+                ["airflow", "configuration", "getboolean"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.getboolean".to_string()),
+                )),
+                ["airflow", "configuration", "getfloat"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.getfloat".to_string()),
+                )),
+                ["airflow", "configuration", "getint"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.getint".to_string()),
+                )),
+                ["airflow", "configuration", "has_option"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.has_option".to_string()),
+                )),
+                ["airflow", "configuration", "remove_option"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.remove_option".to_string()),
+                )),
+                ["airflow", "configuration", "as_dict"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.as_dict".to_string()),
+                )),
+                ["airflow", "configuration", "set"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.set".to_string()),
+                )),
                 // airflow.metrics.validators
                 ["airflow", "metrics", "validators", "AllowListValidator"] => Some((
                     qualname.to_string(),
