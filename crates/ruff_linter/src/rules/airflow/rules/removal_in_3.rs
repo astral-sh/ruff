@@ -160,6 +160,10 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         "airflow.metrics.validators.PatternBlockListValidator".to_string(),
                     ),
                 )),
+                // airflow.operators
+                ["airflow", "operators", "subdag", ..] => {
+                    Some((qualname.to_string(), Replacement::None))
+                }
                 // airflow.secrets
                 ["airflow", "secrets", "local_filesystem", "load_connections"] => Some((
                     qualname.to_string(),

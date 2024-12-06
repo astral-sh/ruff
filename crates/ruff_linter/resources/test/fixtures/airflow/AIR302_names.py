@@ -13,6 +13,7 @@ from airflow.configuration import (
 from airflow.contrib.aws_athena_hook import AWSAthenaHook
 from airflow.metrics.validators import AllowListValidator
 from airflow.metrics.validators import BlockListValidator
+from airflow.operators.subdag import SubDagOperator
 from airflow.secrets.local_filesystem import get_connection, load_connections
 from airflow.utils import dates
 from airflow.utils.dates import (
@@ -39,6 +40,8 @@ requires_access
 
 AllowListValidator
 BlockListValidator
+
+SubDagOperator
 
 dates.date_range
 dates.days_ago
