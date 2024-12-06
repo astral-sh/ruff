@@ -92,9 +92,10 @@ impl Violation for ManualListComprehension {
 
 /// PERF401
 pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::StmtFor) {
-    let Expr::Name(ast::ExprName { id, .. }) = &*for_stmt.target else {
+    let Expr::Name(loop_target_name) = &*for_stmt.target else {
         return;
     };
+    let id = &loop_target_name.id;
 
     let (stmt, if_test) = match &*for_stmt.body {
         // ```python
@@ -234,15 +235,29 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     // ```
     let for_loop_target = checker
         .semantic()
-        .lookup_symbol(id.as_str())
+        .lookup_symbol(id)
         .map(|id| checker.semantic().binding(id))
         .expect("for loop target must exist");
     // TODO: this currently does not properly find usages outside the for loop; figure out why
     if for_loop_target
         .references()
         .map(|id| checker.semantic().reference(id))
+        .inspect(|reference| {
+            // println!("{}", checker.locator().slice(reference.range()));
+            let binding_string = checker
+                .locator()
+                .slice(for_loop_target.statement(checker.semantic()).unwrap());
+            dbg!(binding_string);
+            println!(
+                "{}",
+                checker
+                    .locator()
+                    .slice(checker.locator().full_lines_range(reference.range()))
+            );
+        })
         .any(|reference| !for_stmt.range.contains_range(reference.range()))
     {
+        println!("found reference outside of loop");
         return;
     }
 
