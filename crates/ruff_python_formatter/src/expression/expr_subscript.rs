@@ -8,7 +8,6 @@ use crate::expression::parentheses::{
 };
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
-use crate::preview::is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled;
 
 #[derive(Default)]
 pub struct FormatExprSubscript {
@@ -108,13 +107,14 @@ impl NeedsParentheses for ExprSubscript {
                             if function.returns.as_deref().is_some_and(|returns| {
                                 AnyNodeRef::ptr_eq(returns.into(), self.into())
                             }) {
-                                if is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(context) &&
-                                    function.parameters.is_empty() && !context.comments().has(&*function.parameters) {
+                                if function.parameters.is_empty()
+                                    && !context.comments().has(&*function.parameters)
+                                {
                                     // Apply the `optional_parentheses` layout when the subscript
                                     // is in a return type position of a function without parameters.
                                     // This ensures the subscript is parenthesized if it has a very
                                     // long name that goes over the line length limit.
-                                    return OptionalParentheses::Multiline
+                                    return OptionalParentheses::Multiline;
                                 }
 
                                 // Don't use the best fitting layout for return type annotation because it results in the

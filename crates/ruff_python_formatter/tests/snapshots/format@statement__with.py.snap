@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/with.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -444,7 +443,9 @@ with (
 with a:  # should remove brackets
     pass
 
-with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c:
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) as c:
     pass
 
 
@@ -609,7 +610,9 @@ with (  # outer comment
     pass
 
 # Breaking of with items.
-with test as (  # bar  # foo
+with (
+    test  # bar
+) as (  # foo
     # test
     foo
 ):
@@ -621,7 +624,9 @@ with test as (
 ):
     pass
 
-with test as (  # bar  # foo  # baz
+with (
+    test  # bar
+) as (  # foo  # baz
     # test
     foo
 ):
@@ -674,7 +679,9 @@ with (
 ) as b:
     pass
 
-with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b:
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) as b:
     pass
 
 with (
@@ -717,15 +724,19 @@ if True:
         pass
 
 if True:
-    with anyio.CancelScope(
-        shield=True
-    ) if get_running_loop() else contextlib.nullcontext():
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ):
         pass
 
 if True:
-    with anyio.CancelScope(
-        shield=True
-    ) if get_running_loop() else contextlib.nullcontext() as c:
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ) as c:
         pass
 
 with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(
@@ -739,16 +750,22 @@ with open(
 ):
     pass
 
-with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+):
     pass
 
-with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b:
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) as b:
     pass
 
 if True:
-    with anyio.CancelScope(
-        shield=True
-    ) if get_running_loop() else contextlib.nullcontext() as b:
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ) as b:
         pass
 
 
@@ -800,103 +817,7 @@ with (
 ```diff
 --- Stable
 +++ Preview
-@@ -49,7 +49,9 @@
- with a:  # should remove brackets
-     pass
- 
--with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c:
-+with (
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-+) as c:
-     pass
- 
- 
-@@ -214,7 +216,9 @@
-     pass
- 
- # Breaking of with items.
--with test as (  # bar  # foo
-+with (
-+    test  # bar
-+) as (  # foo
-     # test
-     foo
- ):
-@@ -226,7 +230,9 @@
- ):
-     pass
- 
--with test as (  # bar  # foo  # baz
-+with (
-+    test  # bar
-+) as (  # foo  # baz
-     # test
-     foo
- ):
-@@ -279,7 +285,9 @@
- ) as b:
-     pass
- 
--with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b:
-+with (
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-+) as b:
-     pass
- 
- with (
-@@ -322,15 +330,19 @@
-         pass
- 
- if True:
--    with anyio.CancelScope(
--        shield=True
--    ) if get_running_loop() else contextlib.nullcontext():
-+    with (
-+        anyio.CancelScope(shield=True)
-+        if get_running_loop()
-+        else contextlib.nullcontext()
-+    ):
-         pass
- 
- if True:
--    with anyio.CancelScope(
--        shield=True
--    ) if get_running_loop() else contextlib.nullcontext() as c:
-+    with (
-+        anyio.CancelScope(shield=True)
-+        if get_running_loop()
-+        else contextlib.nullcontext()
-+    ) as c:
-         pass
- 
- with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(
-@@ -344,57 +356,57 @@
- ):
-     pass
- 
--with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
-+with (
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-+):
-     pass
- 
--with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b:
-+with (
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-+) as b:
-     pass
- 
- if True:
--    with anyio.CancelScope(
--        shield=True
--    ) if get_running_loop() else contextlib.nullcontext() as b:
-+    with (
-+        anyio.CancelScope(shield=True)
-+        if get_running_loop()
-+        else contextlib.nullcontext()
-+    ) as b:
-         pass
- 
+@@ -377,42 +377,36 @@
  
  # Regression test for https://github.com/astral-sh/ruff/issues/14001
  with (
