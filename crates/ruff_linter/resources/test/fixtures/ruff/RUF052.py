@@ -77,7 +77,7 @@ class Class_:
         _var = "method variable" # [RUF052]
         return _var
 
-def fun(_var): # [RUF052]
+def fun(_var): # parameters are ignored
     return _var
 
 def fun():
