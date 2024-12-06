@@ -99,10 +99,16 @@ pub(crate) fn unnecessary_map(
             // Only flag, e.g., `map(lambda x: x + 1, iterable)`.
             let [Expr::Lambda(ast::ExprLambda {
                 parameters, body, ..
-            }), _] = args
+            }), iterable] = args
             else {
                 return;
             };
+
+            // For example, (x+1 for x in (c:=a)) is invalid syntax
+            // so we can't suggest it.
+            if iterable.is_named_expr() {
+                return;
+            }
 
             if parameters.as_ref().is_some_and(|parameters| {
                 late_binding(parameters, body)
