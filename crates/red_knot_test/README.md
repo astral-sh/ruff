@@ -225,6 +225,22 @@ A header-demarcated section must either be a test or a grouping header; it canno
 a header section can either contain embedded files (making it a test), or it can contain more
 deeply-nested headers (headers with more `#`), but it cannot contain both.
 
+## Configuration
+
+The test framework supports a TOML-based configuration format, which is a subset of the full red-knot
+configuration format. This configuration can be specified in fenced code blocks with `toml` as the
+language tag:
+
+````markdown
+```toml
+[environment]
+target-version = "3.10"
+```
+````
+
+This configuration will apply to all tests in the same section, and all nested sections within that
+section. Nested sections can override configurations from their parent sections.
+
 ## Documentation of tests
 
 Arbitrary Markdown syntax (including of course normal prose paragraphs) is permitted (and ignored by
@@ -281,33 +297,6 @@ Of course, red-knot is only run directly on `py` and `pyi` files, and assertion 
 possible in these files.
 
 A fenced code block with no language will always be an error.
-
-### Configuration
-
-We will add the ability to specify non-default red-knot configurations to use in tests, by including
-a TOML code block:
-
-````markdown
-```toml
-[lint.rules]
-warn-on-any = true
-```
-
-```py
-from typing import Any
-
-def f(x: Any):  # error: [use-of-any]
-    pass
-```
-````
-
-It should be possible to include a TOML code block in a single test (as shown), or in a grouping
-section, in which case it applies to all nested tests within that grouping section. Configurations
-at multiple level are allowed and merged, with the most-nested (closest to the test) taking
-precedence.
-
-For now, we only support a very limited version of this feature where a single TOML block is allowed
-per test file. See `crates/red_knot_test/src/config.rs` for details.
 
 ### Running just a single test from a suite
 
