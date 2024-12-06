@@ -178,7 +178,9 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
 /// is subscripted with a `TypeVar`-like,
 /// or if it is defined using PEP 695 syntax.
 ///
-/// This should only be used in stub context to avoid false positives and negatives.
+/// Therefore, a class *might* be generic if it uses PEP-695 syntax
+/// or at least one of its direct bases is a subscript expression that
+/// is subscripted with an object that *might* be a `TypeVar`-like.
 pub fn might_be_generic(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     if class_def.type_params.is_some() {
         return true;
@@ -208,9 +210,11 @@ fn is_known_typevar(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 fn expr_might_be_old_style_typevar_like(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
+        Expr::Attribute(..) => true,
         Expr::Name(name) => might_be_old_style_typevar_like(name, semantic),
 
         Expr::Starred(ExprStarred { value, .. }) => match value.as_ref() {
+            Expr::Attribute(..) => true,
             Expr::Name(name) => might_be_old_style_typevar_like(name, semantic),
             _ => false,
         },

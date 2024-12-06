@@ -412,6 +412,8 @@ PYI034.py:353:9: PYI034 `__new__` methods in classes like `Generic4` usually ret
 353     |-    def __new__(cls: type[Generic4]) -> Generic4: ...
     353 |+    def __new__(cls) -> Self: ...
 354 354 |     def __enter__(self: Generic4) -> Generic4: ...
+355 355 | 
+356 356 | from some_module import PotentialTypeVar
 
 PYI034.py:354:9: PYI034 `__enter__` methods in classes like `Generic4` usually return `self` at runtime
     |
@@ -419,6 +421,8 @@ PYI034.py:354:9: PYI034 `__enter__` methods in classes like `Generic4` usually r
 353 |     def __new__(cls: type[Generic4]) -> Generic4: ...
 354 |     def __enter__(self: Generic4) -> Generic4: ...
     |         ^^^^^^^^^ PYI034
+355 | 
+356 | from some_module import PotentialTypeVar
     |
     = help: Use `Self` as return type
 
@@ -428,3 +432,41 @@ PYI034.py:354:9: PYI034 `__enter__` methods in classes like `Generic4` usually r
 353 353 |     def __new__(cls: type[Generic4]) -> Generic4: ...
 354     |-    def __enter__(self: Generic4) -> Generic4: ...
     354 |+    def __enter__(self) -> Self: ...
+355 355 | 
+356 356 | from some_module import PotentialTypeVar
+357 357 | 
+
+PYI034.py:359:9: PYI034 [*] `__new__` methods in classes like `Generic5` usually return `self` at runtime
+    |
+358 | class Generic5(list[PotentialTypeVar]):
+359 |     def __new__(cls: type[Generic5]) -> Generic5: ...
+    |         ^^^^^^^ PYI034
+360 |     def __enter__(self: Generic5) -> Generic5: ...
+    |
+    = help: Use `Self` as return type
+
+ℹ Unsafe fix
+356 356 | from some_module import PotentialTypeVar
+357 357 | 
+358 358 | class Generic5(list[PotentialTypeVar]):
+359     |-    def __new__(cls: type[Generic5]) -> Generic5: ...
+    359 |+    def __new__(cls) -> Self: ...
+360 360 |     def __enter__(self: Generic5) -> Generic5: ...
+361 361 | 
+
+PYI034.py:360:9: PYI034 [*] `__enter__` methods in classes like `Generic5` usually return `self` at runtime
+    |
+358 | class Generic5(list[PotentialTypeVar]):
+359 |     def __new__(cls: type[Generic5]) -> Generic5: ...
+360 |     def __enter__(self: Generic5) -> Generic5: ...
+    |         ^^^^^^^^^ PYI034
+    |
+    = help: Use `Self` as return type
+
+ℹ Unsafe fix
+357 357 | 
+358 358 | class Generic5(list[PotentialTypeVar]):
+359 359 |     def __new__(cls: type[Generic5]) -> Generic5: ...
+360     |-    def __enter__(self: Generic5) -> Generic5: ...
+    360 |+    def __enter__(self) -> Self: ...
+361 361 |
