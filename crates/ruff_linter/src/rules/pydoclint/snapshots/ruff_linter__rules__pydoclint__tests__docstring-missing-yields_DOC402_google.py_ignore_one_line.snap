@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC402_google.py:9:5: DOC402 `yield` is not documented in docstring
+  |
+7 |         num (int): A number
+8 |     """
+9 |     yield 'test'
+  |     ^^^^^^^^^^^^ DOC402
+  |
+  = help: Add a "Yields" section to the docstring
+
+DOC402_google.py:50:9: DOC402 `yield` is not documented in docstring
+   |
+48 |             num (int): A number
+49 |         """
+50 |         yield 'test'
+   |         ^^^^^^^^^^^^ DOC402
+   |
+   = help: Add a "Yields" section to the docstring
