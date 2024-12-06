@@ -1080,14 +1080,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         if let Some(annotation) = parameter.annotation.as_ref() {
             let _annotated_ty = definition_expression_ty(self.db, definition, annotation);
-            // TODO tuple[annotated_ty, ...]
+            // TODO `tuple[annotated_ty, ...]`
             let ty = KnownClass::Tuple.to_instance(self.db);
             self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
         } else {
             self.add_binding(
                 parameter.into(),
                 definition,
-                // TODO tuple of Unknown
+                // TODO `tuple[Unknown, ...]`
                 KnownClass::Tuple.to_instance(self.db),
             );
         }
@@ -1100,14 +1100,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         if let Some(annotation) = parameter.annotation.as_ref() {
             let _annotated_ty = definition_expression_ty(self.db, definition, annotation);
-            // TODO dict[str, annotated_ty]
+            // TODO `dict[str, annotated_ty]`
             let ty = KnownClass::Dict.to_instance(self.db);
             self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
         } else {
             self.add_binding(
                 parameter.into(),
                 definition,
-                // TODO dict[str, Unknown]
+                // TODO `dict[str, Unknown]`
                 KnownClass::Dict.to_instance(self.db),
             );
         }

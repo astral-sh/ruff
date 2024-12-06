@@ -1,7 +1,7 @@
 # Function parameter types
 
-Within a function scope, the declared type of each parameter is its annotated type (or Unknown if no
-annotation). The initial inferred type is the union of the declared type with the type of the
+Within a function scope, the declared type of each parameter is its annotated type (or Unknown if not
+annotated). The initial inferred type is the union of the declared type with the type of the
 default value expression (if any). If both are fully static types, this union should simplify to the
 annotated type (since the default value type must be assignable to the annotated type, and for fully
 static types this means subtype-of, which simplifies in unions). But if the annotated type is
@@ -16,7 +16,7 @@ a dictionary from strings to its annotated type.
 ```py
 from typing import Literal
 
-def f(a, b: int, c=1, d: int = 2, /, e=3, f: Literal[4] = 4, *args: object, g=5, h: Literal[6] = 6, **kwargs: str) -> bytes:
+def f(a, b: int, c=1, d: int = 2, /, e=3, f: Literal[4] = 4, *args: object, g=5, h: Literal[6] = 6, **kwargs: str):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: int
     reveal_type(c)  # revealed: Unknown | Literal[1]
