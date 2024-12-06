@@ -144,16 +144,14 @@ def f():
 
 def f():
     # make sure that `tmp` is not deleted
-    tmp = 1
-    result = []  # commment should be protected
+    tmp = 1; result = []  # commment should be protected
     for i in range(10):
         result.append(i + 1)  # PERF401
 
 
 def f():
     # make sure that `tmp` is not deleted
-    result = []
-    tmp = 1  # commment should be protected
+    result = []; tmp = 1  # commment should be protected
     for i in range(10):
         result.append(i + 1)  # PERF401
 

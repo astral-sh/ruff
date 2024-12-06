@@ -6,11 +6,11 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_parser::{parse, Mode, TokenKind};
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
-use ruff_python_trivia::PythonWhitespace;
+use ruff_python_trivia::{is_python_whitespace, PythonWhitespace};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
-
+use ruff_text_size::{Ranged, TextRange, TextSize};
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a list comprehension.
 ///
@@ -346,6 +346,7 @@ fn convert_to_list_extend(
     to_append: &Expr,
     checker: &Checker,
 ) -> Result<Fix> {
+    let semantic = checker.semantic();
     let locator = checker.locator();
     let if_str = match if_test {
         Some(test) => format!(" if {}", locator.slice(test.range())),
@@ -397,10 +398,11 @@ fn convert_to_list_extend(
     let for_loop_inline_comments: Vec<&str> = comment_strings_in_range(for_stmt.range);
 
     let newline = checker.stylist().line_ending().as_str();
-    let indent_range = TextRange::new(
+
+    let indent = locator.slice(TextRange::new(
         locator.line_start(for_stmt.range.start()),
         for_stmt.range.start(),
-    );
+    ));
 
     match fix_type {
         ComprehensionType::Extend => {
@@ -416,7 +418,7 @@ fn convert_to_list_extend(
             let indentation = if for_loop_inline_comments.is_empty() {
                 String::new()
             } else {
-                format!("{newline}{}", locator.slice(indent_range))
+                format!("{newline}{indent}")
             };
             let text_to_replace = format!(
                 "{}{indentation}{comprehension_body}",
@@ -429,32 +431,66 @@ fn convert_to_list_extend(
         }
         ComprehensionType::ListComprehension => {
             let binding_stmt_range = binding
-                .statement(checker.semantic())
+                .statement(semantic)
                 .and_then(|stmt| match stmt {
                     ast::Stmt::AnnAssign(assign) => Some(assign.range),
                     ast::Stmt::Assign(assign) => Some(assign.range),
                     _ => None,
                 })
-                .map(|range| locator.full_lines_range(range))
+                // .map(|range| locator.full_lines_range(range))
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
+            let binding_is_multiple_exprs = {
+                let binding_text = locator
+                    .slice(locator.full_lines_range(binding_stmt_range))
+                    .trim_whitespace_start();
+                let tokens = parse(binding_text, Mode::Module).map_err(|err| {
+                    anyhow!(
+                        "Failed to tokenize binding statement: {err} {}",
+                        binding_text
+                    )
+                })?;
+                tokens
+                    .tokens()
+                    .iter()
+                    .any(|token| matches!(token.kind(), TokenKind::Semi))
+            };
+            // If there are multiple binding statements in one line, we don't want to accidentally delete them
+            // Instead, we just delete the binding statement and leave any comments where they are
+            let binding_stmt_range = if binding_is_multiple_exprs {
+                let end_of_line = locator.slice(TextRange::new(
+                    binding_stmt_range.end(),
+                    locator.full_line_end(binding_stmt_range.end()),
+                ));
+                let first_safe: u32 = end_of_line
+                    .chars()
+                    .position(|c| !is_python_whitespace(c) && c != ';')
+                    .expect("end of line must always include a newline, since for loop is after binding")
+                    .try_into()
+                    .expect("semicolon/whitespace should be at most a few characters");
+                binding_stmt_range.add_end(TextSize::new(first_safe))
+            } else {
+                locator.full_lines_range(binding_stmt_range)
+            };
 
             let annotations = match binding
-                .statement(checker.semantic())
+                .statement(semantic)
                 .and_then(|stmt| stmt.as_ann_assign_stmt())
             {
                 Some(assign) => format!(": {}", locator.slice(assign.annotation.range())),
                 None => String::new(),
             };
 
-            let mut comments_to_move = comment_strings_in_range(binding_stmt_range);
-            comments_to_move.extend(for_loop_inline_comments);
+            let mut comments_to_move = for_loop_inline_comments;
+            if !binding_is_multiple_exprs {
+                comments_to_move.extend(comment_strings_in_range(binding_stmt_range));
+            }
 
             let indentation = if comments_to_move.is_empty() {
                 String::new()
             } else {
-                format!("{newline}{}", locator.slice(indent_range))
+                format!("{newline}{indent}")
             };
             let leading_comments = format!("{}{indentation}", comments_to_move.join(&indentation));
 
