@@ -665,6 +665,10 @@ _ = (
 # Regression test for https://github.com/astral-sh/ruff/issues/14487
 f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
 
+# Regression test for https://github.com/astral-sh/ruff/issues/14778
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ""}"
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ""}"
+
 # Quotes reuse
 f"{'a'}"
 

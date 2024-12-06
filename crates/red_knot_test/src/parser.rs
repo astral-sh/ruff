@@ -1,12 +1,16 @@
 use std::sync::LazyLock;
 
+use anyhow::{bail, Context};
 use memchr::memchr2;
+use red_knot_python_semantic::PythonVersion;
 use regex::{Captures, Match, Regex};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{TextLen, TextSize};
+
+use crate::config::MarkdownTestConfig;
 
 /// Parse the Markdown `source` as a test suite with given `title`.
 pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
@@ -69,6 +73,10 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     pub(crate) fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {
         self.files.iter()
     }
+
+    pub(crate) fn target_version(&self) -> PythonVersion {
+        self.section.target_version
+    }
 }
 
 /// Iterator yielding all [`MarkdownTest`]s in a [`MarkdownTestSuite`].
@@ -117,6 +125,7 @@ struct Section<'s> {
     title: &'s str,
     level: u8,
     parent_id: Option<SectionId>,
+    target_version: PythonVersion,
 }
 
 #[newtype_index]
@@ -174,7 +183,7 @@ impl SectionStack {
         popped
     }
 
-    fn parent(&mut self) -> SectionId {
+    fn top(&mut self) -> SectionId {
         *self
             .0
             .last()
@@ -201,6 +210,9 @@ struct Parser<'s> {
 
     /// Names of embedded files in current active section.
     current_section_files: Option<FxHashSet<&'s str>>,
+
+    /// Whether or not the current section has a config block.
+    current_section_has_config: bool,
 }
 
 impl<'s> Parser<'s> {
@@ -210,6 +222,7 @@ impl<'s> Parser<'s> {
             title,
             level: 0,
             parent_id: None,
+            target_version: PythonVersion::default(),
         });
         Self {
             sections,
@@ -218,6 +231,7 @@ impl<'s> Parser<'s> {
             source_len: source.text_len(),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
+            current_section_has_config: false,
         }
     }
 
@@ -285,12 +299,13 @@ impl<'s> Parser<'s> {
 
         self.pop_sections_to_level(header_level);
 
-        let parent = self.stack.parent();
+        let parent = self.stack.top();
 
         let section = Section {
             title,
             level: header_level.try_into()?,
             parent_id: Some(parent),
+            target_version: self.sections[parent].target_version,
         };
 
         if self.current_section_files.is_some() {
@@ -305,13 +320,14 @@ impl<'s> Parser<'s> {
         self.stack.push(section_id);
 
         self.current_section_files = None;
+        self.current_section_has_config = false;
 
         Ok(())
     }
 
     fn parse_code_block(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
         // We never pop the implicit root section.
-        let parent = self.stack.parent();
+        let section = self.stack.top();
 
         let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
 
@@ -333,16 +349,24 @@ impl<'s> Parser<'s> {
 
         let path = config.get("path").copied().unwrap_or("test.py");
 
+        // CODE_RE can't match without matches for 'lang' and 'code'.
+        let lang = captures
+            .name("lang")
+            .as_ref()
+            .map(Match::as_str)
+            .unwrap_or_default();
+        let code = captures.name("code").unwrap().into();
+
+        if lang == "toml" {
+            return self.parse_config(code);
+        }
+
         self.files.push(EmbeddedFile {
             path,
-            section: parent,
-            lang: captures
-                .name("lang")
-                .as_ref()
-                .map(Match::as_str)
-                .unwrap_or_default(),
-            // CODE_RE can't match without matches for 'lang' and 'code'.
-            code: captures.name("code").unwrap().into(),
+            section,
+            lang,
+
+            code,
 
             md_offset: self.offset(),
         });
@@ -354,12 +378,12 @@ impl<'s> Parser<'s> {
                         "Test `{}` has duplicate files named `{path}`. \
                                 (This is the default filename; \
                                  consider giving some files an explicit name with `path=...`.)",
-                        self.sections[parent].title
+                        self.sections[section].title
                     ));
                 }
                 return Err(anyhow::anyhow!(
                     "Test `{}` has duplicate files named `{path}`.",
-                    self.sections[parent].title
+                    self.sections[section].title
                 ));
             };
         } else {
@@ -369,8 +393,36 @@ impl<'s> Parser<'s> {
         Ok(())
     }
 
+    fn parse_config(&mut self, code: &str) -> anyhow::Result<()> {
+        if self.current_section_has_config {
+            bail!("Multiple TOML configuration blocks in the same section are not allowed.");
+        }
+
+        let config = MarkdownTestConfig::from_str(code)?;
+        let target_version = config.environment.target_version;
+
+        let parts = target_version
+            .split('.')
+            .map(str::parse)
+            .collect::<Result<Vec<_>, _>>()
+            .context(format!(
+                "Invalid 'target-version' component: '{target_version}'"
+            ))?;
+
+        if parts.len() != 2 {
+            bail!("Invalid 'target-version': expected MAJOR.MINOR, got '{target_version}'.",);
+        }
+
+        let current_section = &mut self.sections[self.stack.top()];
+        current_section.target_version = PythonVersion::from((parts[0], parts[1]));
+
+        self.current_section_has_config = true;
+
+        Ok(())
+    }
+
     fn pop_sections_to_level(&mut self, level: usize) {
-        while level <= self.sections[self.stack.parent()].level.into() {
+        while level <= self.sections[self.stack.top()].level.into() {
             self.stack.pop();
             // We would have errored before pushing a child section if there were files, so we know
             // no parent section can have files.

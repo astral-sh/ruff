@@ -328,15 +328,6 @@ impl<'db> ClassBase<'db> {
         Display { base: self, db }
     }
 
-    #[cfg(test)]
-    #[track_caller]
-    pub(super) fn expect_class_base(self) -> Class<'db> {
-        match self {
-            ClassBase::Class(class) => class,
-            _ => panic!("Expected a `ClassBase::Class()` variant"),
-        }
-    }
-
     /// Return a `ClassBase` representing the class `builtins.object`
     fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
