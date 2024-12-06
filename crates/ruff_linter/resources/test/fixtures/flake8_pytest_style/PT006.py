@@ -135,3 +135,24 @@ def test_comment_in_argvalues(param):
 )
 def test_comment_between_argvalues_items(param):
     ...
+
+
+# A fix should be suggested for `argnames`, but not for `argvalues`.
+@pytest.mark.parametrize(
+    ("param",),
+    [
+        (1,),
+        (2, 3),
+    ],
+)
+def test_invalid_argvalues(param):
+    """
+    pytest throws the following error for this test:
+    ------------------------------------------------
+    a.py::test_comment_between_argvalues_items: in "parametrize" the number of names (1):
+        ('param',)
+    must be equal to the number of values (2):
+        (2, 3)
+    ------------------------------------------------
+    """
+    ...

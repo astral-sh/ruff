@@ -410,3 +410,24 @@ PT006.py:129:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 134 134 |     ],
 135 135 | )
 136 136 | def test_comment_between_argvalues_items(param):
+
+PT006.py:142:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+    |
+140 | # A fix should be suggested for `argnames`, but not for `argvalues`.
+141 | @pytest.mark.parametrize(
+142 |     ("param",),
+    |     ^^^^^^^^^^ PT006
+143 |     [
+144 |         (1,),
+    |
+    = help: Use a string for the first argument
+
+ℹ Safe fix
+139 139 | 
+140 140 | # A fix should be suggested for `argnames`, but not for `argvalues`.
+141 141 | @pytest.mark.parametrize(
+142     |-    ("param",),
+    142 |+    "param",
+143 143 |     [
+144 144 |         (1,),
+145 145 |         (2, 3),
