@@ -49,12 +49,11 @@ impl Violation for DuplicateTryBlockException {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DuplicateTryBlockException { name, is_star } = self;
-        let star = if *is_star {
-            "*".to_string()
+        if *is_star {
+            format!("try-except* block with duplicate exception `{name}`")
         } else {
-            String::new()
-        };
-        format!("try-except{star} block with duplicate exception `{name}`")
+            format!("try-except block with duplicate exception `{name}`")
+        }
     }
 }
 
