@@ -40,6 +40,7 @@ from airflow.utils.dates import (
     round_time,
     scale_time_units,
 )
+from airflow.utils.decorators import apply_defaults
 from airflow.utils.file import TemporaryDirectory, mkdirs
 from airflow.utils.helpers import chain, cross_downstream
 from airflow.utils.state import SHUTDOWN, terminating_states
@@ -91,6 +92,8 @@ BaseSensorOperator
 DateTimeSensor
 (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
 TimeDeltaSensor
+
+apply_defaults
 
 TemporaryDirectory
 mkdirs

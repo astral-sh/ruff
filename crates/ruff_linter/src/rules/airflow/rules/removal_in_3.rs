@@ -10,6 +10,7 @@ use crate::checkers::ast::Checker;
 enum Replacement {
     None,
     Name(String),
+    Message(String),
 }
 
 /// ## What it does
@@ -52,6 +53,9 @@ impl Violation for Airflow3Removal {
             Replacement::None => format!("`{deprecated}` is removed in Airflow 3.0"),
             Replacement::Name(name) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; use `{name}` instead")
+            }
+            Replacement::Message(message) => {
+                format!("`{deprecated}` is removed in Airflow 3.0; {message}")
             }
         }
     }
@@ -325,9 +329,13 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "utils", "dag_cycle_tester", "test_cycle"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
-                ["airflow", "utils", "decorators", "apply_defaults"] => {
-                    Some((qualname.to_string(), Replacement::None))
-                }
+                ["airflow", "utils", "decorators", "apply_defaults"] => Some((
+                    qualname.to_string(),
+                    Replacement::Message(
+                        "`apply_defaults` is now unconditionally done and can be safely removed."
+                            .to_string(),
+                    ),
+                )),
                 // airflow.www
                 ["airflow", "www", "auth", "has_access"] => Some((
                     qualname.to_string(),
