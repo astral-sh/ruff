@@ -42,13 +42,19 @@ use crate::registry::Rule;
 #[derive(ViolationMetadata)]
 pub(crate) struct DuplicateTryBlockException {
     name: String,
+    is_star: bool,
 }
 
 impl Violation for DuplicateTryBlockException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateTryBlockException { name } = self;
-        format!("try-except block with duplicate exception `{name}`")
+        let DuplicateTryBlockException { name, is_star } = self;
+        let star = if *is_star {
+            "*".to_string()
+        } else {
+            String::new()
+        };
+        format!("try-except{star} block with duplicate exception `{name}`")
     }
 }
 
@@ -170,7 +176,11 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 /// B025
-pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn duplicate_exceptions(
+    checker: &mut Checker,
+    handlers: &[ExceptHandler],
+    is_star: bool,
+) {
     let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut duplicates: FxHashMap<UnqualifiedName, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
@@ -210,6 +220,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
                 checker.diagnostics.push(Diagnostic::new(
                     DuplicateTryBlockException {
                         name: name.segments().join("."),
+                        is_star,
                     },
                     expr.range(),
                 ));

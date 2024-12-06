@@ -1435,6 +1435,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             handlers,
             orelse,
             finalbody,
+            is_star,
             ..
         }) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
@@ -1459,7 +1460,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::DuplicateHandlerException,
                 Rule::DuplicateTryBlockException,
             ]) {
-                flake8_bugbear::rules::duplicate_exceptions(checker, handlers);
+                flake8_bugbear::rules::duplicate_exceptions(checker, handlers, *is_star);
             }
             if checker.enabled(Rule::RedundantTupleInExceptionHandler) {
                 flake8_bugbear::rules::redundant_tuple_in_exception_handler(checker, handlers);
