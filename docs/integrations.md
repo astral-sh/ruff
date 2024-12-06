@@ -46,13 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v1
+      - uses: astral-sh/ruff-action@v2
 ```
 
 Alternatively, you can include `ruff-action` as a step in any other workflow file:
 
 ```yaml
-      - uses: astral-sh/ruff-action@v1
+      - uses: astral-sh/ruff-action@v2
 ```
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
@@ -61,12 +61,12 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 - `args`: The command-line arguments to pass to Ruff (default: `"check"`).
 - `src`: The source paths to pass to Ruff (default: `[".", "src"]`).
 
-For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
+For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
 ```yaml
-- uses: astral-sh/ruff-action@v1
+- uses: astral-sh/ruff-action@v2
   with:
-    version: 0.0.259
+    version: 0.8.0
     args: check --select B
     src: "./src"
 ```
