@@ -475,3 +475,21 @@ boolean_chained_comparison.py:141:5: PLR1716 [*] Contains chained boolean compar
 145     |-    and ((c<d))
     144 |+    <c<d))
 146 145 | )
+147 146 | 
+148 147 | a < (b) and (((b)) < c)
+
+boolean_chained_comparison.py:148:1: PLR1716 [*] Contains chained boolean comparison that can be simplified
+    |
+146 | )
+147 | 
+148 | a < (b) and (((b)) < c)
+    | ^^^^^^^^^^^^^^^^^^^^^^ PLR1716
+    |
+    = help: Use a single compare expression
+
+ℹ Safe fix
+145 145 |     and ((c<d))
+146 146 | )
+147 147 | 
+148     |-a < (b) and (((b)) < c)
+    148 |+(a < (b) < c)
