@@ -307,28 +307,6 @@ PERF401.py:169:9: PERF401 [*] Use `list.extend` to create a transformed list
 171 170 | 
 172 171 | def f():
 
-PERF401.py:182:9: PERF401 [*] Use a list comprehension to create a transformed list
-    |
-180 |     result = []
-181 |     for val in range(5):
-182 |         result.append(val * 2)  # Ok
-    |         ^^^^^^^^^^^^^^^^^^^^^^ PERF401
-183 |     print(val)
-    |
-    = help: Replace for loop with list comprehension
-
-ℹ Unsafe fix
-177 177 | 
-178 178 | 
-179 179 | def f():
-180     |-    result = []
-181     |-    for val in range(5):
-182     |-        result.append(val * 2)  # Ok
-    180 |+    result = [val * 2 for val in range(5)]  # Ok
-183 181 |     print(val)
-184 182 | 
-185 183 | 
-
 PERF401.py:195:13: PERF401 [*] Use a list comprehension to create a transformed list
     |
 193 |       ):  # Comment 3

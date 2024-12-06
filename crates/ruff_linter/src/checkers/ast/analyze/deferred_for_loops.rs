@@ -14,7 +14,6 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
             let Stmt::For(stmt_for) = checker.semantic.current_statement() else {
                 unreachable!("Expected Stmt::For");
             };
-
             if checker.enabled(Rule::UnusedLoopControlVariable) {
                 flake8_bugbear::rules::unused_loop_control_variable(checker, stmt_for);
             }
@@ -35,6 +34,9 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
             }
             if checker.enabled(Rule::DictIndexMissingItems) {
                 pylint::rules::dict_index_missing_items(checker, stmt_for);
+            }
+            if checker.enabled(Rule::ManualListComprehension) {
+                perflint::rules::manual_list_comprehension(checker, stmt_for);
             }
         }
     }

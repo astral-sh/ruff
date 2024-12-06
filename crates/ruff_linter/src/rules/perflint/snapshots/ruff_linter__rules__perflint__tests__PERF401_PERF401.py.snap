@@ -127,16 +127,6 @@ PERF401.py:169:9: PERF401 Use `list.extend` to create a transformed list
     |
     = help: Replace for loop with list.extend
 
-PERF401.py:182:9: PERF401 Use a list comprehension to create a transformed list
-    |
-180 |     result = []
-181 |     for val in range(5):
-182 |         result.append(val * 2)  # Ok
-    |         ^^^^^^^^^^^^^^^^^^^^^^ PERF401
-183 |     print(val)
-    |
-    = help: Replace for loop with list comprehension
-
 PERF401.py:195:13: PERF401 Use a list comprehension to create a transformed list
     |
 193 |       ):  # Comment 3
