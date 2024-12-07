@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
-snapshot_kind: text
 ---
 PERF401.py:6:13: PERF401 Use a list comprehension to create a transformed list
   |
@@ -50,7 +49,7 @@ PERF401.py:95:9: PERF401 Use `list.extend` to create a transformed list
 PERF401.py:104:17: PERF401 Use `list.extend` to create a transformed list
     |
 102 |             # single-line comment 2 should be protected
-103 |             if i % 2: # single-line comment 3 should be protected 
+103 |             if i % 2: # single-line comment 3 should be protected
 104 |                 result.append(i) # PERF401
     |                 ^^^^^^^^^^^^^^^^ PERF401
     |
@@ -59,7 +58,7 @@ PERF401.py:104:17: PERF401 Use `list.extend` to create a transformed list
 PERF401.py:112:13: PERF401 Use a list comprehension to create a transformed list
     |
 110 |         # single-line comment 2 should be protected
-111 |         if i % 2: # single-line comment 3 should be protected 
+111 |         if i % 2: # single-line comment 3 should be protected
 112 |             result.append(i) # PERF401
     |             ^^^^^^^^^^^^^^^^ PERF401
     |
@@ -71,5 +70,32 @@ PERF401.py:127:13: PERF401 Use a list comprehension to create a transformed list
 126 |         for value in param:
 127 |             new_layers.append(value * 3)
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+PERF401.py:134:13: PERF401 Use `list.extend` with an async comprehension to create a transformed list
+    |
+132 |     async for msg in channel.history():
+133 |         if msg.id == 123:
+134 |             msgs.append(msg)
+    |             ^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+PERF401.py:143:13: PERF401 Use `list.extend` with an async comprehension to create a transformed list
+    |
+141 |     ):  # ccc
+142 |         if msg.id == 123:  # ddd
+143 |             msgs.append(msg)  # eee
+    |             ^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+PERF401.py:152:13: PERF401 Use an async list comprehension to create a transformed list
+    |
+150 |     ):  # ddd
+151 |         if msg.id == 123:  # eee
+152 |             msgs.append(msg)  # fff
+    |             ^^^^^^^^^^^^^^^^ PERF401
     |
     = help: Replace for loop with list comprehension
