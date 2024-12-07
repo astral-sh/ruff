@@ -56,4 +56,4 @@ b = map(lambda x: x, c := a)
 print(c)
 
 # Check nested as well
-[x for x in map(lambda x:x, c:=a)]
+map(lambda x:x, [c:=a])
