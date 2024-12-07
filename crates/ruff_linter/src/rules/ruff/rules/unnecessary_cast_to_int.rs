@@ -1,4 +1,6 @@
 use crate::checkers::ast::Checker;
+use crate::rules::ruff::rules::is_literal_zero;
+use crate::rules::ruff::rules::unnecessary_round_ndigits::round_number_and_ndigits;
 use crate::Locator;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -290,25 +292,6 @@ fn round_call_strictly_returns_int(
 
         _ => IsStrictlyInt::Maybe,
     }
-}
-
-fn round_number_and_ndigits(arguments: &Arguments) -> Option<(&Expr, Option<&Expr>)> {
-    if arguments.len() > 2 {
-        return None;
-    }
-
-    let number = arguments.find_argument("number", 0)?;
-    let ndigits = arguments.find_argument("ndigits", 1);
-
-    Some((number, ndigits))
-}
-
-fn is_literal_zero(value: &Number) -> bool {
-    let Number::Int(int) = value else {
-        return false;
-    };
-
-    matches!(int.as_u8(), Some(0))
 }
 
 fn replace_with_inner(locator: &Locator, outer_range: TextRange, inner_range: TextRange) -> Edit {
