@@ -10,7 +10,7 @@ B028.py:8:1: B028 [*] No explicit `stacklevel` keyword argument found
  9 | warnings.warn(DeprecationWarning("test"), source=None)
 10 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
    |
-   = help: Provide a `stacklevel` of at least 2.
+   = help: Set `stacklevel=2`
 
 ℹ Unsafe fix
 5 5 | B028 - on lines 8 and 9
@@ -30,7 +30,7 @@ B028.py:9:1: B028 [*] No explicit `stacklevel` keyword argument found
 10 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
 11 | warnings.warn(DeprecationWarning("test"), stacklevel=1)
    |
-   = help: Provide a `stacklevel` of at least 2.
+   = help: Set `stacklevel=2`
 
 ℹ Unsafe fix
 6  6  | """
@@ -52,7 +52,7 @@ B028.py:13:1: B028 [*] No explicit `stacklevel` keyword argument found
 14 |         DeprecationWarning("test"),
 15 |         # some comments here
    |
-   = help: Provide a `stacklevel` of at least 2.
+   = help: Set `stacklevel=2`
 
 ℹ Unsafe fix
 13 13 | warnings.warn(
