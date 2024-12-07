@@ -4663,7 +4663,28 @@ impl<'db> TypeInferenceBuilder<'db> {
                     todo_type!("unsupported type[X] special form")
                 }
             }
-            // TODO: unions, subscripts, etc.
+            ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                let union_ty = UnionType::from_elements(
+                    self.db,
+                    [
+                        self.infer_subclass_of_type_expression(&binary.left),
+                        self.infer_subclass_of_type_expression(&binary.right),
+                    ],
+                );
+                self.store_expression_type(slice, union_ty);
+
+                union_ty
+            }
+            ast::Expr::Tuple(_) => {
+                self.infer_type_expression(slice);
+                self.diagnostics.add(
+                    slice.into(),
+                    "invalid-type-parameter",
+                    format_args!("type[...] must have exactly one type argument"),
+                );
+                Type::Unknown
+            }
+            // TODO: subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);
                 todo_type!("unsupported type[X] special form")
