@@ -111,7 +111,7 @@ reveal_type(get_user())
 class A: ...
 class B: ...
 
-# error: [invalid-type-parameter]
+# error: [invalid-type-form]
 def get_user() -> type[A, B]:
     return A
 ```

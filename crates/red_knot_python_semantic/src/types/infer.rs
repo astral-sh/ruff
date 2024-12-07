@@ -4679,7 +4679,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(slice);
                 self.diagnostics.add(
                     slice.into(),
-                    "invalid-type-parameter",
+                    "invalid-type-form",
                     format_args!("type[...] must have exactly one type argument"),
                 );
                 Type::Unknown
