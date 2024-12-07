@@ -1,0 +1,61 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+assertion_line: 312
+snapshot_kind: text
+---
+PT006_and_PT007.py:3:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+  |
+1 | import pytest
+2 | 
+3 | @pytest.mark.parametrize(("param",), [[1], [2]])
+  |                          ^^^^^^^^^^ PT006
+4 | def test_PT006_and_PT007_do_not_conflict(param):
+5 |     ...
+  |
+  = help: Use a string for the first argument
+
+ℹ Safe fix
+1 1 | import pytest
+2 2 | 
+3   |-@pytest.mark.parametrize(("param",), [[1], [2]])
+  3 |+@pytest.mark.parametrize("param", [1, 2])
+4 4 | def test_PT006_and_PT007_do_not_conflict(param):
+5 5 |     ...
+
+PT006_and_PT007.py:3:39: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+  |
+1 | import pytest
+2 | 
+3 | @pytest.mark.parametrize(("param",), [[1], [2]])
+  |                                       ^^^ PT007
+4 | def test_PT006_and_PT007_do_not_conflict(param):
+5 |     ...
+  |
+  = help: Use `list` of `tuple` for parameter values
+
+ℹ Unsafe fix
+1 1 | import pytest
+2 2 | 
+3   |-@pytest.mark.parametrize(("param",), [[1], [2]])
+  3 |+@pytest.mark.parametrize(("param",), [(1,), [2]])
+4 4 | def test_PT006_and_PT007_do_not_conflict(param):
+5 5 |     ...
+
+PT006_and_PT007.py:3:44: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+  |
+1 | import pytest
+2 | 
+3 | @pytest.mark.parametrize(("param",), [[1], [2]])
+  |                                            ^^^ PT007
+4 | def test_PT006_and_PT007_do_not_conflict(param):
+5 |     ...
+  |
+  = help: Use `list` of `tuple` for parameter values
+
+ℹ Unsafe fix
+1 1 | import pytest
+2 2 | 
+3   |-@pytest.mark.parametrize(("param",), [[1], [2]])
+  3 |+@pytest.mark.parametrize(("param",), [[1], (2,)])
+4 4 | def test_PT006_and_PT007_do_not_conflict(param):
+5 5 |     ...
