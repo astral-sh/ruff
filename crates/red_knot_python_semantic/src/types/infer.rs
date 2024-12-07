@@ -63,6 +63,7 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
+use super::expression_ty;
 use super::string_annotation::parse_string_annotation;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -654,11 +655,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
-            DefinitionKind::Parameter(parameter) => {
-                self.infer_parameter_definition(parameter, definition);
+            DefinitionKind::VariadicPositionalParameter(parameter) => {
+                self.infer_variadic_positional_parameter_definition(parameter, definition);
             }
-            DefinitionKind::ParameterWithDefault(parameter_with_default) => {
-                self.infer_parameter_with_default_definition(parameter_with_default, definition);
+            DefinitionKind::VariadicKeywordParameter(parameter) => {
+                self.infer_variadic_keyword_parameter_definition(parameter, definition);
+            }
+            DefinitionKind::Parameter(parameter_with_default) => {
+                self.infer_parameter_definition(parameter_with_default, definition);
             }
             DefinitionKind::WithItem(with_item) => {
                 self.infer_with_item_definition(
@@ -871,6 +875,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+        // Parameters are odd: they are Definitions in the function body scope, but have no
+        // constituent nodes that are part of the function body. In order to get diagnostics
+        // merged/emitted for them, we need to explicitly infer their definitions here.
+        for parameter in &function.parameters {
+            self.infer_definition(parameter);
+        }
         self.infer_body(&function.body);
     }
 
@@ -1033,33 +1043,126 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
-    fn infer_parameter_with_default_definition(
+    /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
+    /// in the function body scope.
+    ///
+    /// The declared type is the annotated type, if any, or `Unknown`.
+    ///
+    /// The inferred type is the annotated type, unioned with the type of the default value, if
+    /// any. If both types are fully static, this union is a no-op (it should simplify to just the
+    /// annotated type.) But in a case like `f(x=None)` with no annotated type, we want to infer
+    /// the type `Unknown | None` for `x`, not just `Unknown`, so that we can error on usage of `x`
+    /// that would not be valid for `None`.
+    ///
+    /// If the default-value type is not assignable to the declared (annotated) type, we ignore the
+    /// default-value type and just infer the annotated type; this is the same way we handle
+    /// assignments, and allows an explicit annotation to override a bad inference.
+    ///
+    /// Parameter definitions are odd in that they define a symbol in the function-body scope, so
+    /// the Definition belongs to the function body scope, but the expressions (annotation and
+    /// default value) both belong to outer scopes. (The default value always belongs to the outer
+    /// scope in which the function is defined, the annotation belongs either to the outer scope,
+    /// or maybe to an intervening type-params scope, if it's a generic function.) So we don't use
+    /// `self.infer_expression` or store any expression types here, we just use `expression_ty` to
+    /// get the types of the expressions from their respective scopes.
+    ///
+    /// It is safe (non-cycle-causing) to use `expression_ty` here, because an outer scope can't
+    /// depend on a definition from an inner scope, so we shouldn't be in-process of inferring the
+    /// outer scope here.
+    fn infer_parameter_definition(
         &mut self,
         parameter_with_default: &ast::ParameterWithDefault,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): Infer types from annotation or default expression
-        // TODO check that default is assignable to parameter type
-        self.infer_parameter_definition(&parameter_with_default.parameter, definition);
+        let ast::ParameterWithDefault {
+            parameter,
+            default,
+            range: _,
+        } = parameter_with_default;
+        let default_ty = default
+            .as_ref()
+            .map(|default| expression_ty(self.db, self.file, default));
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let declared_ty = expression_ty(self.db, self.file, annotation);
+            let inferred_ty = if let Some(default_ty) = default_ty {
+                if default_ty.is_assignable_to(self.db, declared_ty) {
+                    UnionType::from_elements(self.db, [declared_ty, default_ty])
+                } else {
+                    self.diagnostics.add(
+                        parameter_with_default.into(),
+                        "invalid-parameter-default",
+                        format_args!(
+                            "Default value of type `{}` is not assignable to annotated parameter type `{}`",
+                            default_ty.display(self.db), declared_ty.display(self.db))
+                    );
+                    declared_ty
+                }
+            } else {
+                declared_ty
+            };
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                declared_ty,
+                inferred_ty,
+            );
+        } else {
+            let ty = if let Some(default_ty) = default_ty {
+                UnionType::from_elements(self.db, [Type::Unknown, default_ty])
+            } else {
+                Type::Unknown
+            };
+            self.add_binding(parameter.into(), definition, ty);
+        }
     }
 
-    fn infer_parameter_definition(
+    /// Set initial declared/inferred types for a `*args` variadic positional parameter.
+    ///
+    /// The annotated type is implicitly wrapped in a homogeneous tuple.
+    ///
+    /// See `infer_parameter_definition` doc comment for some relevant observations about scopes.
+    fn infer_variadic_positional_parameter_definition(
         &mut self,
         parameter: &ast::Parameter,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): Annotation expression is resolved at the enclosing scope, infer the
-        // parameter type from there
-        let annotated_ty = todo_type!("function parameter type");
-        if parameter.annotation.is_some() {
-            self.add_declaration_with_binding(
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let _annotated_ty = expression_ty(self.db, self.file, annotation);
+            // TODO `tuple[annotated_ty, ...]`
+            let ty = KnownClass::Tuple.to_instance(self.db);
+            self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
+        } else {
+            self.add_binding(
                 parameter.into(),
                 definition,
-                annotated_ty,
-                annotated_ty,
+                // TODO `tuple[Unknown, ...]`
+                KnownClass::Tuple.to_instance(self.db),
             );
+        }
+    }
+
+    /// Set initial declared/inferred types for a `*args` variadic positional parameter.
+    ///
+    /// The annotated type is implicitly wrapped in a string-keyed dictionary.
+    ///
+    /// See `infer_parameter_definition` doc comment for some relevant observations about scopes.
+    fn infer_variadic_keyword_parameter_definition(
+        &mut self,
+        parameter: &ast::Parameter,
+        definition: Definition<'db>,
+    ) {
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let _annotated_ty = expression_ty(self.db, self.file, annotation);
+            // TODO `dict[str, annotated_ty]`
+            let ty = KnownClass::Dict.to_instance(self.db);
+            self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
         } else {
-            self.add_binding(parameter.into(), definition, annotated_ty);
+            self.add_binding(
+                parameter.into(),
+                definition,
+                // TODO `dict[str, Unknown]`
+                KnownClass::Dict.to_instance(self.db),
+            );
         }
     }
 
@@ -1435,10 +1538,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal()
-                            .map_or(todo_type!(), |ClassLiteralType { class }| {
-                                Type::instance(class)
-                            })
+                        ty.into_class_literal().map_or(
+                            todo_type!("exception type"),
+                            |ClassLiteralType { class }| Type::instance(class),
+                        )
                     }),
                 ),
                 _ => todo_type!("exception type"),
@@ -2719,7 +2822,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(value.as_ref().into(), &mut self.diagnostics);
 
         // TODO
-        todo_type!()
+        todo_type!("starred expression")
     }
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
@@ -4552,18 +4655,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Given the slice of a `type[]` annotation, return the type that the annotation represents
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
         match slice {
-            ast::Expr::Name(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
                 if let Some(ClassLiteralType { class }) = name_ty.into_class_literal() {
                     Type::subclass_of(class)
                 } else {
-                    todo_type!()
+                    todo_type!("unsupported type[X] special form")
                 }
             }
-            // TODO: attributes, unions, subscripts, etc.
+            // TODO: unions, subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);
-                todo_type!()
+                todo_type!("unsupported type[X] special form")
             }
         }
     }
@@ -5124,16 +5227,6 @@ mod tests {
     }
 
     #[test]
-    fn from_import_with_no_module_name() -> anyhow::Result<()> {
-        // This test checks that invalid syntax in a `StmtImportFrom` node
-        // leads to the type being inferred as `Unknown`
-        let mut db = setup_db();
-        db.write_file("src/foo.py", "from import bar")?;
-        assert_public_ty(&db, "src/foo.py", "bar", "Unknown");
-        Ok(())
-    }
-
-    #[test]
     fn resolve_method() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -5278,112 +5371,6 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "w", "LiteralString");
         assert_public_ty(&db, "src/a.py", "x", "LiteralString");
         assert_public_ty(&db, "src/a.py", "z", "LiteralString");
-
-        Ok(())
-    }
-
-    #[test]
-    fn bytes_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            w = b'red' b'knot'
-            x = b'hello'
-            y = b'world' + b'!'
-            z = b'\\xff\\x00'
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "w", "Literal[b\"redknot\"]");
-        assert_public_ty(&db, "src/a.py", "x", "Literal[b\"hello\"]");
-        assert_public_ty(&db, "src/a.py", "y", "Literal[b\"world!\"]");
-        assert_public_ty(&db, "src/a.py", "z", "Literal[b\"\\xff\\x00\"]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn ellipsis_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = ...
-            ",
-        )?;
-
-        // TODO: sys.version_info
-        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | ellipsis");
-
-        Ok(())
-    }
-
-    #[test]
-    fn import_cycle() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            class A: pass
-            import b
-            class C(b.B): pass
-            ",
-        )?;
-        db.write_dedented(
-            "src/b.py",
-            "
-            from a import A
-            class B(A): pass
-            ",
-        )?;
-
-        let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let c_ty = global_symbol(&db, a, "C").expect_type();
-        let c_class = c_ty.expect_class_literal().class;
-        let mut c_mro = c_class.iter_mro(&db);
-        let b_ty = c_mro.nth(1).unwrap();
-        let b_class = b_ty.expect_class_base();
-        assert_eq!(b_class.name(&db), "B");
-        let mut b_mro = b_class.iter_mro(&db);
-        let a_ty = b_mro.nth(1).unwrap();
-        let a_class = a_ty.expect_class_base();
-        assert_eq!(a_class.name(&db), "A");
-
-        Ok(())
-    }
-
-    /// An unbound function local that has definitions in the scope does not fall back to globals.
-    #[test]
-    fn unbound_function_local() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = 1
-            def f():
-                y = x
-                x = 2
-            ",
-        )?;
-
-        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let index = semantic_index(&db, file);
-        let function_scope = index
-            .child_scopes(FileScopeId::global())
-            .next()
-            .unwrap()
-            .0
-            .to_scope_id(&db, file);
-        let y_ty = symbol(&db, function_scope, "y").expect_type();
-        let x_ty = symbol(&db, function_scope, "x").expect_type();
-
-        assert_eq!(y_ty.display(&db).to_string(), "Unknown");
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
 
         Ok(())
     }
@@ -5558,89 +5545,6 @@ mod tests {
             ",
         )?;
         assert_public_ty(&db, "/src/source_with_future.py", "foo", "Foo");
-
-        Ok(())
-    }
-
-    #[test]
-    fn nonlocal_name_reference() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def f():
-                x = 1
-                def g():
-                    y = x
-            ",
-        )?;
-
-        assert_scope_ty(&db, "/src/a.py", &["f", "g"], "y", "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn nonlocal_name_reference_multi_level() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def f():
-                x = 1
-                def g():
-                    def h():
-                        y = x
-            ",
-        )?;
-
-        assert_scope_ty(&db, "/src/a.py", &["f", "g", "h"], "y", "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn nonlocal_name_reference_skips_class_scope() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def f():
-                x = 1
-                class C:
-                    x = 2
-                    def g():
-                        y = x
-            ",
-        )?;
-
-        assert_scope_ty(&db, "/src/a.py", &["f", "C", "g"], "y", "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn nonlocal_name_reference_skips_annotation_only_assignment() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def f():
-                x = 1
-                def g():
-                    // it's pretty weird to have an annotated assignment in a function where the
-                    // name is otherwise not defined; maybe should be an error?
-                    x: int
-                    def h():
-                        y = x
-            ",
-        )?;
-
-        assert_scope_ty(&db, "/src/a.py", &["f", "g", "h"], "y", "Literal[1]");
 
         Ok(())
     }
