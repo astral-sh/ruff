@@ -28,6 +28,12 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// warnings.warn("This is a warning", stacklevel=2)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because it changes
+/// the behavior of the code. Moreover, the fix will assign
+/// a stacklevel of 2, while the user may wish to assign a
+/// higher stacklevel to address the diagnostic.
+///
 /// ## References
 /// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
 #[derive(ViolationMetadata)]
