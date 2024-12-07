@@ -71,7 +71,6 @@ pub(crate) fn raise_without_from_inside_except(
     checker: &mut Checker,
     name: Option<&str>,
     body: &[Stmt],
-    is_star: bool,
 ) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
@@ -100,6 +99,12 @@ pub(crate) fn raise_without_from_inside_except(
                         continue;
                     }
                 }
+
+                let is_star = checker
+                    .semantic()
+                    .current_statement()
+                    .as_try_stmt()
+                    .is_some_and(|try_stmt| try_stmt.is_star);
 
                 checker.diagnostics.push(Diagnostic::new(
                     RaiseWithoutFromInsideExcept { is_star },

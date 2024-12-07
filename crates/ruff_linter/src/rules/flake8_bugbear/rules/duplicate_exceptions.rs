@@ -175,11 +175,7 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 /// B025
-pub(crate) fn duplicate_exceptions(
-    checker: &mut Checker,
-    handlers: &[ExceptHandler],
-    is_star: bool,
-) {
+pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
     let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut duplicates: FxHashMap<UnqualifiedName, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
@@ -213,6 +209,11 @@ pub(crate) fn duplicate_exceptions(
         }
     }
 
+    let is_star = checker
+        .semantic()
+        .current_statement()
+        .as_try_stmt()
+        .is_some_and(|try_stmt| try_stmt.is_star);
     if checker.enabled(Rule::DuplicateTryBlockException) {
         for (name, exprs) in duplicates {
             for expr in exprs {

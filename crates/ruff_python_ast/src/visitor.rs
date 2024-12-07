@@ -51,7 +51,7 @@ pub trait Visitor<'a> {
     fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
         walk_comprehension(self, comprehension);
     }
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler, _is_star: bool) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
         walk_except_handler(self, except_handler);
     }
     fn visit_arguments(&mut self, arguments: &'a Arguments) {
@@ -286,12 +286,12 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             handlers,
             orelse,
             finalbody,
-            is_star,
+            is_star: _,
             range: _,
         }) => {
             visitor.visit_body(body);
             for except_handler in handlers {
-                visitor.visit_except_handler(except_handler, *is_star);
+                visitor.visit_except_handler(except_handler);
             }
             visitor.visit_body(orelse);
             visitor.visit_body(finalbody);

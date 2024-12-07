@@ -247,7 +247,7 @@ impl Visitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_except_handler(&mut self, except_handler: &ExceptHandler, _is_star: bool) {
+    fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
         self.enter_node(except_handler);
         walk_except_handler(self, except_handler);
         self.exit_node();
