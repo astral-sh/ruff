@@ -87,3 +87,31 @@ reveal_type(f())  # revealed: @Todo(unsupported type[X] special form)
 ```py path=a/b.py
 class C: ...
 ```
+
+## Union of classes
+
+```py
+class BasicUser: ...
+class ProUser: ...
+
+class A:
+    class B:
+        class C: ...
+
+def get_user() -> type[BasicUser | ProUser | A.B.C]:
+    return BasicUser
+
+# revealed: type[BasicUser] | type[ProUser] | type[C]
+reveal_type(get_user())
+```
+
+## Illegal parameters
+
+```py
+class A: ...
+class B: ...
+
+# error: [invalid-type-form]
+def get_user() -> type[A, B]:
+    return A
+```
