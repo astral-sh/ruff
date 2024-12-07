@@ -8,14 +8,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::settings::types::IdentifierPattern;
     use crate::settings::types::PreviewMode;
-    use crate::source_kind::SourceKind;
-    use crate::test::{test_contents, test_path};
+    use crate::test::test_path;
     use crate::{assert_messages, settings};
 
     use super::settings::Settings;
@@ -299,15 +297,7 @@ mod tests {
     /// edits `argvalues` for `pytest.mark.parametrize`.
     #[test]
     fn test_pytest_style_pt006_and_pt007() -> Result<()> {
-        let contents = r#"
-        import pytest
-
-        @pytest.mark.parametrize(("params",), [[1], [2]])
-        def test_foo(argnames):
-            ...
-        "#;
-        let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
+        let diagnostics = test_path(
             Path::new("flake8_pytest_style")
                 .join(Path::new("PT006_and_PT007.py"))
                 .as_path(),
@@ -318,7 +308,7 @@ mod tests {
                     Rule::PytestParametrizeValuesWrongType,
                 ])
             },
-        );
+        )?;
         assert_messages!("PT006_and_PT007", diagnostics);
         Ok(())
     }
