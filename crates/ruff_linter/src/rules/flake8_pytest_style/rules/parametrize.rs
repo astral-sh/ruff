@@ -678,38 +678,6 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     }
 }
 
-/// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
-/// For instance, `[(1,) (2,)]` will be transformed into `[1, 2]`.
-fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
-    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
-    else {
-        return vec![];
-    };
-
-    let mut edits = Vec::with_capacity(elts.len());
-    for value in elts {
-        let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
-            value
-        else {
-            return vec![];
-        };
-
-        let [elt] = elts.as_slice() else {
-            return vec![];
-        };
-
-        if matches!(elt, Expr::Starred(_)) {
-            return vec![];
-        }
-
-        edits.push(Edit::range_replacement(
-            checker.generator().expr(elt),
-            value.range(),
-        ));
-    }
-    edits
-}
-
 fn handle_single_name(checker: &mut Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
     let mut diagnostic = Diagnostic::new(
         PytestParametrizeNamesWrongType {
@@ -755,6 +723,38 @@ fn handle_single_name(checker: &mut Checker, argnames: &Expr, value: &Expr, argv
     };
     diagnostic.set_fix(fix);
     checker.diagnostics.push(diagnostic);
+}
+
+/// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
+/// For instance, `[(1,) (2,)]` will be transformed into `[1, 2]`.
+fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
+    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
+    else {
+        return vec![];
+    };
+
+    let mut edits = Vec::with_capacity(elts.len());
+    for value in elts {
+        let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
+            value
+        else {
+            return vec![];
+        };
+
+        let [elt] = elts.as_slice() else {
+            return vec![];
+        };
+
+        if matches!(elt, Expr::Starred(_)) {
+            return vec![];
+        }
+
+        edits.push(Edit::range_replacement(
+            checker.generator().expr(elt),
+            value.range(),
+        ));
+    }
+    edits
 }
 
 fn handle_value_rows(
