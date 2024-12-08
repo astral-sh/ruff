@@ -57,3 +57,12 @@ value = f"{rf"\{1}"}"
 f"{{}}+-\d"
 f"\n{{}}+-\d+"
 f"\n{{}}�+-\d+"
+
+# See https://github.com/astral-sh/ruff/issues/11491
+total = 10
+ok = 7
+incomplete = 3
+s = f"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
+
+# Debug text (should trigger)
+t = f"{'\InHere'=}"

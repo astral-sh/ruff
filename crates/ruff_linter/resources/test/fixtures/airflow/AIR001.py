@@ -1,4 +1,6 @@
 from airflow.operators import PythonOperator
+from airflow.providers.airbyte.operators.airbyte import AirbyteTriggerSyncOperator
+from airflow.providers.amazon.aws.operators.appflow import AppflowFlowRunOperator
 
 
 def my_callable():
@@ -6,11 +8,15 @@ def my_callable():
 
 
 my_task = PythonOperator(task_id="my_task", callable=my_callable)
-my_task_2 = PythonOperator(callable=my_callable, task_id="my_task_2")
+incorrect_name = PythonOperator(task_id="my_task")  # AIR001
 
-incorrect_name = PythonOperator(task_id="my_task")
-incorrect_name_2 = PythonOperator(callable=my_callable, task_id="my_task_2")
+my_task = AirbyteTriggerSyncOperator(task_id="my_task", callable=my_callable)
+incorrect_name = AirbyteTriggerSyncOperator(task_id="my_task")  # AIR001
 
-from my_module import MyClass
+my_task = AppflowFlowRunOperator(task_id="my_task", callable=my_callable)
+incorrect_name = AppflowFlowRunOperator(task_id="my_task")  # AIR001
 
-incorrect_name = MyClass(task_id="my_task")
+# Consider only from the `airflow.operators` (or providers operators) module
+from airflow import MyOperator
+
+incorrect_name = MyOperator(task_id="my_task")

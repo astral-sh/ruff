@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 snapshot_kind: text
 ---
-PT006.py:9:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:9:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
  9 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^ PT006
@@ -21,7 +21,7 @@ PT006.py:9:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.pa
 11 11 |     ...
 12 12 | 
 
-PT006.py:14:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:14:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 14 | @pytest.mark.parametrize("   param1,   ,    param2   , ", [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
@@ -40,7 +40,7 @@ PT006.py:14:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 16 16 |     ...
 17 17 | 
 
-PT006.py:19:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:19:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 19 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^ PT006
@@ -59,7 +59,7 @@ PT006.py:19:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 21 21 |     ...
 22 22 | 
 
-PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    |
 29 | @pytest.mark.parametrize(("param1",), [1, 2, 3])
    |                          ^^^^^^^^^^^ PT006
@@ -78,7 +78,7 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 31 31 |     ...
 32 32 | 
 
-PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 34 | @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^^^^^^ PT006
@@ -97,7 +97,7 @@ PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 36 36 |     ...
 37 37 | 
 
-PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    |
 39 | @pytest.mark.parametrize(["param1"], [1, 2, 3])
    |                          ^^^^^^^^^^ PT006
@@ -116,7 +116,7 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 41 41 |     ...
 42 42 | 
 
-PT006.py:44:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:44:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 44 | @pytest.mark.parametrize([some_expr, another_expr], [1, 2, 3])
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
@@ -135,7 +135,7 @@ PT006.py:44:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 46 46 |     ...
 47 47 | 
 
-PT006.py:49:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:49:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 49 | @pytest.mark.parametrize([some_expr, "param2"], [1, 2, 3])
    |                          ^^^^^^^^^^^^^^^^^^^^^ PT006
@@ -154,7 +154,7 @@ PT006.py:49:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 51 51 |     ...
 52 52 | 
 
-PT006.py:54:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:54:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 54 | @pytest.mark.parametrize(("param1, " "param2, " "param3"), [(1, 2, 3), (4, 5, 6)])
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
@@ -173,7 +173,7 @@ PT006.py:54:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 56 56 |     ...
 57 57 | 
 
-PT006.py:59:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:59:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 59 | @pytest.mark.parametrize("param1, " "param2, " "param3", [(1, 2, 3), (4, 5, 6)])
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
@@ -192,7 +192,7 @@ PT006.py:59:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 61 61 |     ...
 62 62 | 
 
-PT006.py:64:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:64:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 64 | @pytest.mark.parametrize((("param1, " "param2, " "param3")), [(1, 2, 3), (4, 5, 6)])
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
@@ -211,7 +211,7 @@ PT006.py:64:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 66 66 |     ...
 67 67 | 
 
-PT006.py:69:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `tuple`
+PT006.py:69:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
    |
 69 | @pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^^^ PT006

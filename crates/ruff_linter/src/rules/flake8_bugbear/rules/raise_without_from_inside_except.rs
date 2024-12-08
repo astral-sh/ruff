@@ -47,14 +47,22 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[derive(ViolationMetadata)]
-pub(crate) struct RaiseWithoutFromInsideExcept;
+pub(crate) struct RaiseWithoutFromInsideExcept {
+    is_star: bool,
+}
 
 impl Violation for RaiseWithoutFromInsideExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... \
-             from None` to distinguish them from errors in exception handling"
-            .to_string()
+        if self.is_star {
+            "Within an `except*` clause, raise exceptions with `raise ... from err` or `raise ... \
+                 from None` to distinguish them from errors in exception handling"
+                .to_string()
+        } else {
+            "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... \
+                 from None` to distinguish them from errors in exception handling"
+                .to_string()
+        }
     }
 }
 
@@ -92,9 +100,16 @@ pub(crate) fn raise_without_from_inside_except(
                     }
                 }
 
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(RaiseWithoutFromInsideExcept, range));
+                let is_star = checker
+                    .semantic()
+                    .current_statement()
+                    .as_try_stmt()
+                    .is_some_and(|try_stmt| try_stmt.is_star);
+
+                checker.diagnostics.push(Diagnostic::new(
+                    RaiseWithoutFromInsideExcept { is_star },
+                    range,
+                ));
             }
         }
     }

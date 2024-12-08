@@ -1093,6 +1093,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::removed_in_3(checker, expr);
             }
+            if checker.enabled(Rule::UnnecessaryCastToInt) {
+                ruff::rules::unnecessary_cast_to_int(checker, call);
+            }
+            if checker.enabled(Rule::DotlessPathlibWithSuffix) {
+                flake8_use_pathlib::rules::dotless_pathlib_with_suffix(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[

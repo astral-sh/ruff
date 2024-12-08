@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/fstring.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -670,6 +671,10 @@ _ = (
 
 # Regression test for https://github.com/astral-sh/ruff/issues/14487
 f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14778
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ""}"
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ""}"
 
 # Quotes reuse
 f"{'a'}"
@@ -1441,6 +1446,10 @@ _ = (
 # Regression test for https://github.com/astral-sh/ruff/issues/14487
 f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
 
+# Regression test for https://github.com/astral-sh/ruff/issues/14778
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' if True else ''}"
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' if True else ''}"
+
 # Quotes reuse
 f"{'a'}"
 
@@ -2162,6 +2171,10 @@ _ = (
 
 # Regression test for https://github.com/astral-sh/ruff/issues/14487
 f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14778
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ""}"
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ""}"
 
 # Quotes reuse
 f"{'a'}"
@@ -2993,7 +3006,7 @@ f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.
  )
  
  # Indentation
-@@ -632,29 +680,29 @@
+@@ -632,37 +680,37 @@
          if indent2:
              foo = f"""hello world
  hello {
@@ -3041,7 +3054,17 @@ f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.
  )
  
  # Regression test for https://github.com/astral-sh/ruff/issues/14487
-@@ -678,18 +726,18 @@
+ f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
+ 
+ # Regression test for https://github.com/astral-sh/ruff/issues/14778
+-f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ""}"
+-f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ""}"
++f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' if True else ''}"
++f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' if True else ''}"
+ 
+ # Quotes reuse
+ f"{'a'}"
+@@ -682,18 +730,18 @@
  f'{1: hy "user"}'
  f'{1:hy "user"}'
  f'{1: abcd "{1}" }'

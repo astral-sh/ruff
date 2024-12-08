@@ -294,8 +294,15 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
         let mut constraints = NarrowingConstraints::default();
+
+        let mut last_rhs_ty: Option<Type> = None;
+
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
+            let lhs_ty = last_rhs_ty.unwrap_or_else(|| {
+                inference.expression_ty(left.scoped_expression_id(self.db, scope))
+            });
             let rhs_ty = inference.expression_ty(right.scoped_expression_id(self.db, scope));
+            last_rhs_ty = Some(rhs_ty);
 
             match left {
                 ast::Expr::Name(ast::ExprName {
@@ -329,6 +336,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                                     .build();
                                 constraints.insert(symbol, ty);
                             }
+                        }
+                        ast::CmpOp::Eq if lhs_ty.is_literal_string() => {
+                            constraints.insert(symbol, rhs_ty);
                         }
                         _ => {
                             // TODO other comparison types
@@ -388,46 +398,58 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
+        let callable_ty =
+            inference.expression_ty(expr_call.func.scoped_expression_id(self.db, scope));
+
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
-        match inference
-            .expression_ty(expr_call.func.scoped_expression_id(self.db, scope))
-            .into_function_literal()
-            .and_then(|f| f.known(self.db))
-            .and_then(KnownFunction::constraint_function)
-        {
-            Some(function) if expr_call.arguments.keywords.is_empty() => {
-                if let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
+        match callable_ty {
+            Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
+                let function = function_type
+                    .known(self.db)
+                    .and_then(KnownFunction::constraint_function)?;
+
+                let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
                     &*expr_call.arguments.args
-                {
-                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                else {
+                    return None;
+                };
 
-                    let class_info_ty =
-                        inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
+                let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-                    let to_constraint = match function {
-                        KnownConstraintFunction::IsInstance => {
-                            |class_literal: ClassLiteralType<'db>| {
-                                Type::instance(class_literal.class)
-                            }
+                let class_info_ty =
+                    inference.expression_ty(class_info.scoped_expression_id(self.db, scope));
+
+                let to_constraint = match function {
+                    KnownConstraintFunction::IsInstance => {
+                        |class_literal: ClassLiteralType<'db>| Type::instance(class_literal.class)
+                    }
+                    KnownConstraintFunction::IsSubclass => {
+                        |class_literal: ClassLiteralType<'db>| {
+                            Type::subclass_of(class_literal.class)
                         }
-                        KnownConstraintFunction::IsSubclass => {
-                            |class_literal: ClassLiteralType<'db>| {
-                                Type::subclass_of(class_literal.class)
-                            }
-                        }
-                    };
+                    }
+                };
 
-                    generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
-                        |constraint| {
-                            let mut constraints = NarrowingConstraints::default();
-                            constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
-                            constraints
-                        },
-                    )
-                } else {
-                    None
-                }
+                generate_classinfo_constraint(self.db, &class_info_ty, to_constraint).map(
+                    |constraint| {
+                        let mut constraints = NarrowingConstraints::default();
+                        constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
+                        constraints
+                    },
+                )
+            }
+            // for the expression `bool(E)`, we further narrow the type based on `E`
+            Type::ClassLiteral(class_type)
+                if expr_call.arguments.args.len() == 1
+                    && expr_call.arguments.keywords.is_empty()
+                    && class_type.class.is_known(self.db, KnownClass::Bool) =>
+            {
+                self.evaluate_expression_node_constraint(
+                    &expr_call.arguments.args[0],
+                    expression,
+                    is_positive,
+                )
             }
             _ => None,
         }
