@@ -103,8 +103,6 @@ target-version = "3.10"
 ```
 
 ```py
-# TODO: this error should ideally go away once we understand `sys.version_info` branches.
-# error: [possibly-unbound-import] "Member `NoneType` of module `types` is possibly unbound"
 from types import NoneType
 
 def _(flag: bool):
