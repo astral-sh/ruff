@@ -49,4 +49,5 @@ invalid_envvar_default.py:14:17: PLW1508 Invalid type for environment variable d
 14 | os.getenv("AA", 1 if Z else "BAR")  # [invalid-envvar-default]
    |                 ^^^^^^^^^^^^^^^^^ PLW1508
 15 | os.environ.get("TEST", 12)  # [invalid-envvar-default]
+16 | os.environ.get("TEST", "AA" * 12)
    |
