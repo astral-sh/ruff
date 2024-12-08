@@ -225,12 +225,15 @@ use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
-use crate::semantic_index::ast_ids::ScopedUseId;
+use crate::db;
+use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedUseId};
+use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::bitset::BitSet;
 use crate::semantic_index::use_def::symbol_state::INLINE_CONSTRAINT_BLOCKS;
 use crate::symbol::Boundness;
+use crate::types::{infer_expression_types, KnownClass};
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -381,12 +384,72 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    pub(crate) fn use_boundness(&self, use_id: ScopedUseId) -> Boundness {
-        if self.bindings_by_use[use_id].may_be_unbound() {
-            Boundness::PossiblyUnbound
-        } else {
-            Boundness::Bound
+    fn compute_boundness(
+        &self,
+        db: &dyn crate::db::Db,
+        bindings: &SymbolBindings,
+    ) -> Option<Boundness> {
+        let bindings_iter = self.bindings_iterator(bindings);
+
+        let mut definitely_bound = false;
+        let mut definitely_unbound = true;
+        for binding in bindings_iter {
+            let test_expr_tys = || {
+                binding.constraints_active_at_binding.clone().map(|c| {
+                    let ty = if let ConstraintNode::Expression(test_expr) = c.node {
+                        let inference = infer_expression_types(db, test_expr);
+                        let scope = test_expr.scope(db);
+                        inference
+                            .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope))
+                    } else {
+                        // TODO: handle other constraint nodes
+                        KnownClass::Bool.to_instance(db)
+                    };
+
+                    (c, ty)
+                })
+            };
+
+            let is_any_always_false = test_expr_tys().any(|(c, test_expr_ty)| {
+                if c.is_positive {
+                    test_expr_ty.bool(db).is_always_false()
+                } else {
+                    test_expr_ty.bool(db).is_always_true()
+                }
+            });
+            if !is_any_always_false {
+                definitely_unbound = false;
+            }
+
+            let are_all_always_true = test_expr_tys().all(|(c, test_expr_ty)| {
+                if c.is_positive {
+                    test_expr_ty.bool(db).is_always_true()
+                } else {
+                    test_expr_ty.bool(db).is_always_false()
+                }
+            });
+            if are_all_always_true {
+                definitely_bound = true;
+            }
         }
+
+        if definitely_unbound {
+            None
+        } else {
+            if definitely_bound || !bindings.may_be_unbound() {
+                Some(Boundness::Bound)
+            } else {
+                Some(Boundness::PossiblyUnbound)
+            }
+        }
+    }
+
+    pub(crate) fn use_boundness(
+        &self,
+        db: &dyn crate::db::Db,
+        use_id: ScopedUseId,
+    ) -> Option<Boundness> {
+        self.compute_boundness(db, &self.bindings_by_use[use_id])
     }
 
     pub(crate) fn public_bindings(
@@ -396,12 +459,12 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
     }
 
-    pub(crate) fn public_boundness(&self, symbol: ScopedSymbolId) -> Boundness {
-        if self.public_symbols[symbol].may_be_unbound() {
-            Boundness::PossiblyUnbound
-        } else {
-            Boundness::Bound
-        }
+    pub(crate) fn public_boundness(
+        &self,
+        db: &dyn crate::db::Db,
+        symbol: ScopedSymbolId,
+    ) -> Option<Boundness> {
+        self.compute_boundness(db, &self.public_symbols[symbol].bindings())
     }
 
     pub(crate) fn bindings_at_declaration(

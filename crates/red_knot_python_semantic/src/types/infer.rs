@@ -2995,24 +2995,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_id_by_name(id) {
                 (
                     bindings_ty(self.db, use_def.public_bindings(symbol)),
-                    use_def.public_boundness(symbol),
+                    use_def.public_boundness(self.db, symbol),
                 )
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
                     "Expected the symbol table to create a symbol for every Name node"
                 );
-                (None, Boundness::PossiblyUnbound)
+                (None, Some(Boundness::PossiblyUnbound))
             }
         } else {
             let use_id = name.scoped_use_id(self.db, self.scope());
             (
                 bindings_ty(self.db, use_def.bindings_at_use(use_id)),
-                use_def.use_boundness(use_id),
+                use_def.use_boundness(self.db, use_id),
             )
         };
-
-        if boundness == Boundness::PossiblyUnbound {
+        if boundness == Some(Boundness::PossiblyUnbound) || boundness == None {
             match self.lookup_name(name) {
                 Symbol::Type(looked_up_ty, looked_up_boundness) => {
                     if looked_up_boundness == Boundness::PossiblyUnbound {
@@ -3025,14 +3024,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 Symbol::Unbound => {
                     if bindings_ty.is_some() {
-                        self.diagnostics.add_possibly_unresolved_reference(name);
+                        if boundness == Some(Boundness::PossiblyUnbound) {
+                            self.diagnostics.add_possibly_unresolved_reference(name);
+                        } else {
+                            self.diagnostics.add_unresolved_reference(name);
+                        }
                     } else {
                         self.diagnostics.add_unresolved_reference(name);
                     }
                     bindings_ty.unwrap_or(Type::Unknown)
                 }
             }
-        } else {
+        } else
+        /*if boundness == Some(Boundness::Bound) */
+        {
             bindings_ty.unwrap_or(Type::Unknown)
         }
     }

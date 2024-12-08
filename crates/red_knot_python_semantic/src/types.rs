@@ -78,7 +78,13 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
         let undeclared_ty = if declarations.may_be_undeclared() {
             Some(
                 bindings_ty(db, use_def.public_bindings(symbol))
-                    .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
+                    .map(|bindings_ty| {
+                        if let Some(boundness) = use_def.public_boundness(db, symbol) {
+                            Symbol::Type(bindings_ty, boundness)
+                        } else {
+                            Symbol::Unbound
+                        }
+                    })
                     .unwrap_or(Symbol::Unbound),
             )
         } else {
@@ -114,7 +120,13 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
         }
     } else {
         bindings_ty(db, use_def.public_bindings(symbol))
-            .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
+            .map(|bindings_ty| {
+                if let Some(boundness) = use_def.public_boundness(db, symbol) {
+                    Symbol::Type(bindings_ty, boundness)
+                } else {
+                    Symbol::Unbound
+                }
+            })
             .unwrap_or(Symbol::Unbound)
     }
 }
@@ -1539,7 +1551,7 @@ impl<'db> Type<'db> {
     ///
     /// This is used to determine the value that would be returned
     /// when `bool(x)` is called on an object `x`.
-    fn bool(&self, db: &'db dyn Db) -> Truthiness {
+    pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
             Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
@@ -2624,11 +2636,11 @@ impl Truthiness {
         matches!(self, Truthiness::Ambiguous)
     }
 
-    const fn is_always_false(self) -> bool {
+    pub(crate) const fn is_always_false(self) -> bool {
         matches!(self, Truthiness::AlwaysFalse)
     }
 
-    const fn is_always_true(self) -> bool {
+    pub(crate) const fn is_always_true(self) -> bool {
         matches!(self, Truthiness::AlwaysTrue)
     }
 

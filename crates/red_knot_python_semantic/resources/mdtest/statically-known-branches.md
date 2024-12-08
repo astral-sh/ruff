@@ -292,3 +292,112 @@ class C:
 
 reveal_type(C.x)  # revealed: int
 ```
+
+## (Un)boundness
+
+### Unbound, `if False`
+
+```py
+if False:
+    x = 1
+
+# error: [unresolved-reference]
+x
+```
+
+### Unbound, `if True … else`
+
+```py
+if True:
+    pass
+else:
+    x = 1
+
+# error: [unresolved-reference]
+x
+```
+
+### Bound, `if True`
+
+```py
+if True:
+    x = 1
+
+# x is always bound, no error
+x
+```
+
+### Bound, `if False … else`
+
+```py
+if False:
+    pass
+else:
+    x = 1
+
+# x is always bound, no error
+x
+```
+
+### Nested
+
+```py
+if False:
+    if True:
+        x = 1
+
+if True:
+    if False:
+        y = 1
+
+if False:
+    if False:
+        z = 1
+
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+(x, y, z)
+```
+
+### Multiple nested conditions
+
+```py
+if True:
+    if False:
+        x = 1
+    if True:
+        x = 2
+
+# x is always bound, no error
+x
+
+if True:
+    if False:
+        y = 1
+    if True:
+        y = 2
+
+# y is always bound, no error
+y
+
+if False:
+    if False:
+        z = 1
+    if False:
+        z = 2
+
+# error: [unresolved-reference]
+z
+```
+
+### Public boundness
+
+```py
+if True:
+    x = 1
+
+def f():
+    # x is always bound, no error
+    x
+```
