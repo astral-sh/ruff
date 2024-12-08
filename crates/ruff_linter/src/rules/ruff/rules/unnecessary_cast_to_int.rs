@@ -163,7 +163,7 @@ fn replace_with_round(
         Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
             Number::Int(..) => Rounded::LiteralInt,
             Number::Float(..) => Rounded::LiteralFloat,
-            _ => Rounded::Other,
+            Number::Complex { .. } => Rounded::Other,
         },
 
         _ => Rounded::Other,
