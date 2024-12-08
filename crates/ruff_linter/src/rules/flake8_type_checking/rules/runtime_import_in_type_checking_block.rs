@@ -12,7 +12,9 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
-use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annotation};
+use crate::rules::flake8_type_checking::helpers::{
+    filter_contained, parent_type_alias_has_runtime_references, quote_annotation,
+};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 
 /// ## What it does
@@ -136,6 +138,14 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 parent_range: binding.parent_range(checker.semantic()),
             };
 
+            // TODO: We should consider giving TC007 precedence, when it is
+            //       enabled in order to better match what the original plugin
+            //       does, i.e. if all runtime uses occur in annotated type aliases
+            //       values, then TC004 could be avoided by fixing TC007 instead
+            //       this is less broad than `quote-annotated-type-alias-values`
+            //       so should generally be safer. We would need to be careful
+            //       with ignored TC007 violations however, since that is a
+            //       signal that the user actually wants TC004 to trigger.
             if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.start())
                 || import.parent_range.is_some_and(|parent_range| {
                     checker.rule_is_ignored(
@@ -151,18 +161,23 @@ pub(crate) fn runtime_import_in_type_checking_block(
             } else {
                 // Determine whether the member should be fixed by moving the import out of the
                 // type-checking block, or by quoting its references.
-                // TODO: We should check `reference.in_annotated_type_alias()`
-                //       as well to match the behavior of the flake8 plugin
-                //       although maybe the best way forward is to add an
-                //       additional setting to configure whether quoting
-                //       or moving the import is preferred for type aliases
-                //       since some people will consistently use their
-                //       type aliases at runtimes, while others won't, so
-                //       the best solution is unclear.
-                if checker.settings.flake8_type_checking.quote_annotations
+                let settings = &checker.settings.flake8_type_checking;
+                if (settings.quote_annotations
+                    || settings.quote_cast_type_expressions
+                    || settings.quote_annotated_type_alias_values)
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
-                        reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
+                        reference.in_typing_context()
+                            || (settings.quote_annotations
+                                && reference.in_runtime_evaluated_annotation())
+                            || (settings.quote_cast_type_expressions
+                                && reference.in_cast_type_expression())
+                            || (settings.quote_annotated_type_alias_values
+                                && reference.in_annotated_type_alias_value()
+                                && !parent_type_alias_has_runtime_references(
+                                    checker.semantic(),
+                                    reference,
+                                ))
                     })
                 {
                     actions
