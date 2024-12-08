@@ -1512,40 +1512,56 @@ impl<'db> TypeInferenceBuilder<'db> {
         except_handler_definition: &ExceptHandlerDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let node_ty = except_handler_definition
-            .handled_exceptions()
-            .map(|ty| self.infer_expression(ty))
-            // If there is no handled exception, it's invalid syntax;
-            // a diagnostic will have already been emitted
-            .unwrap_or(Type::Unknown);
+        let node = except_handler_definition.handled_exceptions();
+
+        // If there is no handled exception, it's invalid syntax;
+        // a diagnostic will have already been emitted
+        let node_ty = node.map_or(Type::Unknown, |ty| self.infer_expression(ty));
+
+        // If it's an `except*` handler, this won't actually be the type of the bound symbol;
+        // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
+        let symbol_ty = if let Type::Tuple(tuple) = node_ty {
+            let type_base_exception = KnownClass::BaseException
+                .to_subclass_of(self.db)
+                .unwrap_or(Type::Unknown);
+            let mut builder = UnionBuilder::new(self.db);
+            for element in tuple.elements(self.db).iter().copied() {
+                builder = builder.add(if element.is_assignable_to(self.db, type_base_exception) {
+                    element.to_instance(self.db)
+                } else {
+                    if let Some(node) = node {
+                        self.diagnostics
+                            .add_invalid_exception(self.db, node, element);
+                    }
+                    Type::Unknown
+                });
+            }
+            builder.build()
+        } else if node_ty.is_subtype_of(self.db, KnownClass::Tuple.to_instance(self.db)) {
+            todo_type!("Homogeneous tuple in exception handler")
+        } else {
+            let type_base_exception = KnownClass::BaseException
+                .to_subclass_of(self.db)
+                .unwrap_or(Type::Unknown);
+            if node_ty.is_assignable_to(self.db, type_base_exception) {
+                node_ty.to_instance(self.db)
+            } else {
+                if let Some(node) = node {
+                    self.diagnostics
+                        .add_invalid_exception(self.db, node, node_ty);
+                }
+                Type::Unknown
+            }
+        };
 
         let symbol_ty = if except_handler_definition.is_star() {
-            // TODO should be generic --Alex
+            // TODO: we should infer `ExceptionGroup` if `node_ty` is a subtype of `tuple[type[Exception], ...]`
+            // (needs support for homogeneous tuples).
             //
-            // TODO should infer `ExceptionGroup` if all caught exceptions
-            // are subclasses of `Exception` --Alex
-            builtins_symbol(self.db, "BaseExceptionGroup")
-                .ignore_possibly_unbound()
-                .unwrap_or(Type::Unknown)
-                .to_instance(self.db)
+            // TODO: should be generic with `symbol_ty` as the generic parameter
+            KnownClass::BaseExceptionGroup.to_instance(self.db)
         } else {
-            // TODO: anything that's a consistent subtype of
-            // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
-            // anything else is invalid and should lead to a diagnostic being reported --Alex
-            match node_ty {
-                Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(class),
-                Type::Tuple(tuple) => UnionType::from_elements(
-                    self.db,
-                    tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal().map_or(
-                            todo_type!("exception type"),
-                            |ClassLiteralType { class }| Type::instance(class),
-                        )
-                    }),
-                ),
-                _ => todo_type!("exception type"),
-            }
+            symbol_ty
         };
 
         self.add_binding(
