@@ -1,6 +1,6 @@
 use ast::{Expr, StmtAugAssign};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::Operator;
@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// If the right-hand side of an assignment statement consists of a binary
 /// operation in which one operand is the same as the assignment target,
-/// it can be rewritten as an augmented assignment. For example, `x = x + 1
+/// it can be rewritten as an augmented assignment. For example, `x = x + 1`
 /// can be rewritten as `x += 1`.
 ///
 /// When performing such an operation, an augmented assignment is more concise
@@ -68,8 +68,8 @@ use crate::checkers::ast::Checker;
 /// foo += [2]
 /// assert (foo, bar) == ([1, 2], [1, 2])
 /// ```
-#[violation]
-pub struct NonAugmentedAssignment {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonAugmentedAssignment {
     operator: AugmentedOperator,
 }
 

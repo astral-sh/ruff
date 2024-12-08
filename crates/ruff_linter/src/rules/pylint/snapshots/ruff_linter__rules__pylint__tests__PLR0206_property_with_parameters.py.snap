@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 property_with_parameters.py:7:9: PLR0206 Cannot have defined parameters for properties
   |

@@ -28,6 +28,7 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{fix_file, FixResult};
 use crate::message::Message;
 use crate::noqa::add_noqa;
+use crate::package::PackageRoot;
 use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
@@ -60,7 +61,7 @@ pub struct FixerResult<'a> {
 #[allow(clippy::too_many_arguments)]
 pub fn check_path(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -323,7 +324,7 @@ const MAX_ITERATIONS: usize = 100;
 /// Add any missing `# noqa` pragmas to the source code at the given `Path`.
 pub fn add_noqa_to_path(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     source_kind: &SourceKind,
     source_type: PySourceType,
     settings: &LinterSettings,
@@ -380,7 +381,7 @@ pub fn add_noqa_to_path(
 /// code.
 pub fn lint_only(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     settings: &LinterSettings,
     noqa: flags::Noqa,
     source_kind: &SourceKind,
@@ -467,7 +468,7 @@ fn diagnostics_to_messages(
 #[allow(clippy::too_many_arguments)]
 pub fn lint_fix<'a>(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     noqa: flags::Noqa,
     unsafe_fixes: UnsafeFixes,
     settings: &LinterSettings,

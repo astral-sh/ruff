@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/mccabe/mod.rs
+snapshot_kind: text
 ---
 C901.py:2:5: C901 `trivial` is too complex (1 > 0)
   |
@@ -196,5 +197,3 @@ C901.py:135:17: C901 `exception` is too complex (1 > 0)
     |                 ^^^^^^^^^ C901
 136 |                 pass
     |
-
-

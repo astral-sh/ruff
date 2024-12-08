@@ -12,6 +12,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::settings::types::IdentifierPattern;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -44,18 +45,6 @@ mod tests {
         Path::new("PT003.py"),
         Settings::default(),
         "PT003"
-    )]
-    #[test_case(
-        Rule::PytestMissingFixtureNameUnderscore,
-        Path::new("PT004.py"),
-        Settings::default(),
-        "PT004"
-    )]
-    #[test_case(
-        Rule::PytestIncorrectFixtureNameUnderscore,
-        Path::new("PT005.py"),
-        Settings::default(),
-        "PT005"
     )]
     #[test_case(
         Rule::PytestParametrizeNamesWrongType,
@@ -301,6 +290,24 @@ mod tests {
             },
         )?;
         assert_messages!(name, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::PytestParametrizeNamesWrongType, Path::new("PT006.py"))]
+    fn test_pytest_style_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_pytest_style").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

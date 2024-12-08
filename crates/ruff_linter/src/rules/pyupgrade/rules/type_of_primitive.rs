@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -30,8 +30,8 @@ use super::super::types::Primitive;
 /// ## References
 /// - [Python documentation: `type()`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Built-in types](https://docs.python.org/3/library/stdtypes.html)
-#[violation]
-pub struct TypeOfPrimitive {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeOfPrimitive {
     primitive: Primitive,
 }
 

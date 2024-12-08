@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -22,13 +22,13 @@ use crate::Locator;
 /// ```python
 /// spam(1)\n
 /// ```
-#[violation]
-pub struct MissingNewlineAtEndOfFile;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingNewlineAtEndOfFile;
 
 impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No newline at end of file")
+        "No newline at end of file".to_string()
     }
 
     fn fix_title(&self) -> String {

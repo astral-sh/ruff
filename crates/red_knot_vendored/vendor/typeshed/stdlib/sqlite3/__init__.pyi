@@ -63,7 +63,7 @@ from sqlite3.dbapi2 import (
     version_info as version_info,
 )
 from types import TracebackType
-from typing import Any, Literal, Protocol, SupportsIndex, TypeVar, final, overload
+from typing import Any, Literal, Protocol, SupportsIndex, TypeVar, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 if sys.version_info >= (3, 12):
@@ -446,7 +446,9 @@ class Row(Sequence[Any]):
     def __lt__(self, value: object, /) -> bool: ...
     def __ne__(self, value: object, /) -> bool: ...
 
+# This class is not exposed. It calls itself sqlite3.Statement.
 @final
+@type_check_only
 class _Statement: ...
 
 if sys.version_info >= (3, 11):

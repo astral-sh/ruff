@@ -70,8 +70,10 @@ if sys.platform != "win32":
         LOCK_RW: int
         LOCK_WRITE: int
 
-    # These are highly problematic, they might be present or not, depends on the specific OS.
     if sys.platform == "linux":
+        # Constants for the POSIX STREAMS interface. Present in glibc until 2.29 (released February 2019).
+        # Never implemented on BSD, and considered "obsolescent" starting in POSIX 2008.
+        # Probably still used on Solaris.
         I_ATMARK: int
         I_CANPUT: int
         I_CKBAND: int

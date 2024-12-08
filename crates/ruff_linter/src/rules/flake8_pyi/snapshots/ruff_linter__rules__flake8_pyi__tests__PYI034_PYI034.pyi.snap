@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
-PYI034.pyi:20:9: PYI034 `__new__` methods in classes like `Bad` usually return `self` at runtime
+PYI034.pyi:20:9: PYI034 [*] `__new__` methods in classes like `Bad` usually return `self` at runtime
    |
 18 |     object
 19 | ):  # Y040 Do not inherit from "object" explicitly, as it is redundant in Python 3
@@ -10,9 +11,19 @@ PYI034.pyi:20:9: PYI034 `__new__` methods in classes like `Bad` usually return `
 21 |         cls, *args: Any, **kwargs: Any
 22 |     ) -> Bad: ...  # Y034 "__new__" methods usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__new__", e.g. "def __new__(cls, *args: Any, **kwargs: Any) -> Self: ..."
    |
-   = help: Consider using `typing_extensions.Self` as return type
+   = help: Use `Self` as return type
 
-PYI034.pyi:35:9: PYI034 `__enter__` methods in classes like `Bad` usually return `self` at runtime
+ℹ Unsafe fix
+19 19 | ):  # Y040 Do not inherit from "object" explicitly, as it is redundant in Python 3
+20 20 |     def __new__(
+21 21 |         cls, *args: Any, **kwargs: Any
+22    |-    ) -> Bad: ...  # Y034 "__new__" methods usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__new__", e.g. "def __new__(cls, *args: Any, **kwargs: Any) -> Self: ..."
+   22 |+    ) -> Self: ...  # Y034 "__new__" methods usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__new__", e.g. "def __new__(cls, *args: Any, **kwargs: Any) -> Self: ..."
+23 23 |     def __repr__(
+24 24 |         self,
+25 25 |     ) -> str: ...  # Y029 Defining __repr__ or __str__ in a stub is almost always redundant
+
+PYI034.pyi:35:9: PYI034 [*] `__enter__` methods in classes like `Bad` usually return `self` at runtime
    |
 33 |         self, other: typing.Any
 34 |     ) -> typing.Any: ...  # Y032 Prefer "object" to "Any" for the second parameter in "__ne__" methods
@@ -21,9 +32,19 @@ PYI034.pyi:35:9: PYI034 `__enter__` methods in classes like `Bad` usually return
 36 |         self,
 37 |     ) -> Bad: ...  # Y034 "__enter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__enter__", e.g. "def __enter__(self) -> Self: ..."
    |
-   = help: Consider using `typing_extensions.Self` as return type
+   = help: Use `Self` as return type
 
-PYI034.pyi:38:15: PYI034 `__aenter__` methods in classes like `Bad` usually return `self` at runtime
+ℹ Unsafe fix
+34 34 |     ) -> typing.Any: ...  # Y032 Prefer "object" to "Any" for the second parameter in "__ne__" methods
+35 35 |     def __enter__(
+36 36 |         self,
+37    |-    ) -> Bad: ...  # Y034 "__enter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__enter__", e.g. "def __enter__(self) -> Self: ..."
+   37 |+    ) -> Self: ...  # Y034 "__enter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__enter__", e.g. "def __enter__(self) -> Self: ..."
+38 38 |     async def __aenter__(
+39 39 |         self,
+40 40 |     ) -> Bad: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
+
+PYI034.pyi:38:15: PYI034 [*] `__aenter__` methods in classes like `Bad` usually return `self` at runtime
    |
 36 |         self,
 37 |     ) -> Bad: ...  # Y034 "__enter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__enter__", e.g. "def __enter__(self) -> Self: ..."
@@ -32,9 +53,19 @@ PYI034.pyi:38:15: PYI034 `__aenter__` methods in classes like `Bad` usually retu
 39 |         self,
 40 |     ) -> Bad: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
    |
-   = help: Consider using `typing_extensions.Self` as return type
+   = help: Use `Self` as return type
 
-PYI034.pyi:41:9: PYI034 `__iadd__` methods in classes like `Bad` usually return `self` at runtime
+ℹ Unsafe fix
+37 37 |     ) -> Bad: ...  # Y034 "__enter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__enter__", e.g. "def __enter__(self) -> Self: ..."
+38 38 |     async def __aenter__(
+39 39 |         self,
+40    |-    ) -> Bad: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
+   40 |+    ) -> Self: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
+41 41 |     def __iadd__(
+42 42 |         self, other: Bad
+43 43 |     ) -> Bad: ...  # Y034 "__iadd__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__iadd__", e.g. "def __iadd__(self, other: Bad) -> Self: ..."
+
+PYI034.pyi:41:9: PYI034 [*] `__iadd__` methods in classes like `Bad` usually return `self` at runtime
    |
 39 |         self,
 40 |     ) -> Bad: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
@@ -43,9 +74,19 @@ PYI034.pyi:41:9: PYI034 `__iadd__` methods in classes like `Bad` usually return 
 42 |         self, other: Bad
 43 |     ) -> Bad: ...  # Y034 "__iadd__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__iadd__", e.g. "def __iadd__(self, other: Bad) -> Self: ..."
    |
-   = help: Consider using `typing_extensions.Self` as return type
+   = help: Use `Self` as return type
 
-PYI034.pyi:104:9: PYI034 `__iter__` methods in classes like `BadIterator1` usually return `self` at runtime
+ℹ Unsafe fix
+40 40 |     ) -> Bad: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
+41 41 |     def __iadd__(
+42 42 |         self, other: Bad
+43    |-    ) -> Bad: ...  # Y034 "__iadd__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__iadd__", e.g. "def __iadd__(self, other: Bad) -> Self: ..."
+   43 |+    ) -> Self: ...  # Y034 "__iadd__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__iadd__", e.g. "def __iadd__(self, other: Bad) -> Self: ..."
+44 44 | 
+45 45 | class AlsoBad(
+46 46 |     int, builtins.object
+
+PYI034.pyi:104:9: PYI034 [*] `__iter__` methods in classes like `BadIterator1` usually return `self` at runtime
     |
 103 | class BadIterator1(Iterator[int]):
 104 |     def __iter__(
@@ -53,9 +94,21 @@ PYI034.pyi:104:9: PYI034 `__iter__` methods in classes like `BadIterator1` usual
 105 |         self,
 106 |     ) -> Iterator[
     |
-    = help: Consider using `typing_extensions.Self` as return type
+    = help: Use `Self` as return type
 
-PYI034.pyi:113:9: PYI034 `__iter__` methods in classes like `BadIterator2` usually return `self` at runtime
+ℹ Unsafe fix
+103 103 | class BadIterator1(Iterator[int]):
+104 104 |     def __iter__(
+105 105 |         self,
+106     |-    ) -> Iterator[
+107     |-        int
+108     |-    ]: ...  # Y034 "__iter__" methods in classes like "BadIterator1" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator1.__iter__", e.g. "def __iter__(self) -> Self: ..."
+    106 |+    ) -> Self: ...  # Y034 "__iter__" methods in classes like "BadIterator1" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator1.__iter__", e.g. "def __iter__(self) -> Self: ..."
+109 107 | 
+110 108 | class BadIterator2(
+111 109 |     typing.Iterator[int]
+
+PYI034.pyi:113:9: PYI034 [*] `__iter__` methods in classes like `BadIterator2` usually return `self` at runtime
     |
 111 |     typing.Iterator[int]
 112 | ):  # Y022 Use "collections.abc.Iterator[T]" instead of "typing.Iterator[T]" (PEP 585 syntax)
@@ -64,9 +117,21 @@ PYI034.pyi:113:9: PYI034 `__iter__` methods in classes like `BadIterator2` usual
 114 |         self,
 115 |     ) -> Iterator[
     |
-    = help: Consider using `typing_extensions.Self` as return type
+    = help: Use `Self` as return type
 
-PYI034.pyi:122:9: PYI034 `__iter__` methods in classes like `BadIterator3` usually return `self` at runtime
+ℹ Unsafe fix
+112 112 | ):  # Y022 Use "collections.abc.Iterator[T]" instead of "typing.Iterator[T]" (PEP 585 syntax)
+113 113 |     def __iter__(
+114 114 |         self,
+115     |-    ) -> Iterator[
+116     |-        int
+117     |-    ]: ...  # Y034 "__iter__" methods in classes like "BadIterator2" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator2.__iter__", e.g. "def __iter__(self) -> Self: ..."
+    115 |+    ) -> Self: ...  # Y034 "__iter__" methods in classes like "BadIterator2" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator2.__iter__", e.g. "def __iter__(self) -> Self: ..."
+118 116 | 
+119 117 | class BadIterator3(
+120 118 |     typing.Iterator[int]
+
+PYI034.pyi:122:9: PYI034 [*] `__iter__` methods in classes like `BadIterator3` usually return `self` at runtime
     |
 120 |     typing.Iterator[int]
 121 | ):  # Y022 Use "collections.abc.Iterator[T]" instead of "typing.Iterator[T]" (PEP 585 syntax)
@@ -75,9 +140,21 @@ PYI034.pyi:122:9: PYI034 `__iter__` methods in classes like `BadIterator3` usual
 123 |         self,
 124 |     ) -> collections.abc.Iterator[
     |
-    = help: Consider using `typing_extensions.Self` as return type
+    = help: Use `Self` as return type
 
-PYI034.pyi:130:9: PYI034 `__iter__` methods in classes like `BadIterator4` usually return `self` at runtime
+ℹ Unsafe fix
+121 121 | ):  # Y022 Use "collections.abc.Iterator[T]" instead of "typing.Iterator[T]" (PEP 585 syntax)
+122 122 |     def __iter__(
+123 123 |         self,
+124     |-    ) -> collections.abc.Iterator[
+125     |-        int
+126     |-    ]: ...  # Y034 "__iter__" methods in classes like "BadIterator3" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator3.__iter__", e.g. "def __iter__(self) -> Self: ..."
+    124 |+    ) -> Self: ...  # Y034 "__iter__" methods in classes like "BadIterator3" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator3.__iter__", e.g. "def __iter__(self) -> Self: ..."
+127 125 | 
+128 126 | class BadIterator4(Iterator[int]):
+129 127 |     # Note: *Iterable*, not *Iterator*, returned!
+
+PYI034.pyi:130:9: PYI034 [*] `__iter__` methods in classes like `BadIterator4` usually return `self` at runtime
     |
 128 | class BadIterator4(Iterator[int]):
 129 |     # Note: *Iterable*, not *Iterator*, returned!
@@ -86,9 +163,21 @@ PYI034.pyi:130:9: PYI034 `__iter__` methods in classes like `BadIterator4` usual
 131 |         self,
 132 |     ) -> Iterable[
     |
-    = help: Consider using `typing_extensions.Self` as return type
+    = help: Use `Self` as return type
 
-PYI034.pyi:144:9: PYI034 `__aiter__` methods in classes like `BadAsyncIterator` usually return `self` at runtime
+ℹ Unsafe fix
+129 129 |     # Note: *Iterable*, not *Iterator*, returned!
+130 130 |     def __iter__(
+131 131 |         self,
+132     |-    ) -> Iterable[
+133     |-        int
+134     |-    ]: ...  # Y034 "__iter__" methods in classes like "BadIterator4" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator4.__iter__", e.g. "def __iter__(self) -> Self: ..."
+    132 |+    ) -> Self: ...  # Y034 "__iter__" methods in classes like "BadIterator4" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator4.__iter__", e.g. "def __iter__(self) -> Self: ..."
+135 133 | 
+136 134 | class IteratorReturningIterable:
+137 135 |     def __iter__(
+
+PYI034.pyi:144:9: PYI034 [*] `__aiter__` methods in classes like `BadAsyncIterator` usually return `self` at runtime
     |
 143 | class BadAsyncIterator(collections.abc.AsyncIterator[str]):
 144 |     def __aiter__(
@@ -96,6 +185,16 @@ PYI034.pyi:144:9: PYI034 `__aiter__` methods in classes like `BadAsyncIterator` 
 145 |         self,
 146 |     ) -> typing.AsyncIterator[
     |
-    = help: Consider using `typing_extensions.Self` as return type
+    = help: Use `Self` as return type
 
-
+ℹ Unsafe fix
+143 143 | class BadAsyncIterator(collections.abc.AsyncIterator[str]):
+144 144 |     def __aiter__(
+145 145 |         self,
+146     |-    ) -> typing.AsyncIterator[
+147     |-        str
+148     |-    ]: ...  # Y034 "__aiter__" methods in classes like "BadAsyncIterator" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadAsyncIterator.__aiter__", e.g. "def __aiter__(self) -> Self: ..."  # Y022 Use "collections.abc.AsyncIterator[T]" instead of "typing.AsyncIterator[T]" (PEP 585 syntax)
+    146 |+    ) -> Self: ...  # Y034 "__aiter__" methods in classes like "BadAsyncIterator" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadAsyncIterator.__aiter__", e.g. "def __aiter__(self) -> Self: ..."  # Y022 Use "collections.abc.AsyncIterator[T]" instead of "typing.AsyncIterator[T]" (PEP 585 syntax)
+149 147 | 
+150 148 | class AsyncIteratorReturningAsyncIterable:
+151 149 |     def __aiter__(

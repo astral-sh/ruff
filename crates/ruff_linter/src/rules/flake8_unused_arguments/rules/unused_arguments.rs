@@ -4,7 +4,7 @@ use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, St
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -19,6 +19,10 @@ use crate::registry::Rule;
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// def foo(bar, baz):
@@ -30,8 +34,11 @@ use crate::registry::Rule;
 /// def foo(bar):
 ///     return bar * 2
 /// ```
-#[violation]
-pub struct UnusedFunctionArgument {
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedFunctionArgument {
     name: String,
 }
 
@@ -50,6 +57,10 @@ impl Violation for UnusedFunctionArgument {
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -63,8 +74,11 @@ impl Violation for UnusedFunctionArgument {
 ///     def foo(self, arg1):
 ///         print(arg1)
 /// ```
-#[violation]
-pub struct UnusedMethodArgument {
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedMethodArgument {
     name: String,
 }
 
@@ -83,6 +97,10 @@ impl Violation for UnusedMethodArgument {
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -98,8 +116,11 @@ impl Violation for UnusedMethodArgument {
 ///     def foo(cls, arg1):
 ///         print(arg1)
 /// ```
-#[violation]
-pub struct UnusedClassMethodArgument {
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedClassMethodArgument {
     name: String,
 }
 
@@ -118,6 +139,10 @@ impl Violation for UnusedClassMethodArgument {
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// class Class:
@@ -133,8 +158,11 @@ impl Violation for UnusedClassMethodArgument {
 ///     def foo(arg1):
 ///         print(arg1)
 /// ```
-#[violation]
-pub struct UnusedStaticMethodArgument {
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedStaticMethodArgument {
     name: String,
 }
 
@@ -154,6 +182,10 @@ impl Violation for UnusedStaticMethodArgument {
 /// An argument that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`lint.dummy-variable-rgx`] pattern.
+///
 /// ## Example
 /// ```python
 /// my_list = [1, 2, 3, 4, 5]
@@ -165,8 +197,11 @@ impl Violation for UnusedStaticMethodArgument {
 /// my_list = [1, 2, 3, 4, 5]
 /// squares = map(lambda x: x**2, my_list)
 /// ```
-#[violation]
-pub struct UnusedLambdaArgument {
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedLambdaArgument {
     name: String,
 }
 

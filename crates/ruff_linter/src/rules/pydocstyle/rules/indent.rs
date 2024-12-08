@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_source_file::{Line, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextSize};
@@ -10,6 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
 
+#[allow(clippy::tabs_in_doc_comments)]
 /// ## What it does
 /// Checks for docstrings that are indented with tabs.
 ///
@@ -50,13 +51,13 @@ use crate::registry::Rule;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct IndentWithSpaces;
+#[derive(ViolationMetadata)]
+pub(crate) struct IndentWithSpaces;
 
 impl Violation for IndentWithSpaces {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring should be indented with spaces, not tabs")
+        "Docstring should be indented with spaces, not tabs".to_string()
     }
 }
 
@@ -98,13 +99,13 @@ impl Violation for IndentWithSpaces {
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct UnderIndentation;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnderIndentation;
 
 impl AlwaysFixableViolation for UnderIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring is under-indented")
+        "Docstring is under-indented".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -150,13 +151,13 @@ impl AlwaysFixableViolation for UnderIndentation {
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct OverIndentation;
+#[derive(ViolationMetadata)]
+pub(crate) struct OverIndentation;
 
 impl AlwaysFixableViolation for OverIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Docstring is over-indented")
+        "Docstring is over-indented".to_string()
     }
 
     fn fix_title(&self) -> String {

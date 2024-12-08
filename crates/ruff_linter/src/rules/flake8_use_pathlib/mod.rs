@@ -63,6 +63,9 @@ mod tests {
     #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]
     #[test_case(Rule::OsSepSplit, Path::new("PTH206.py"))]
     #[test_case(Rule::Glob, Path::new("PTH207.py"))]
+    #[test_case(Rule::OsListdir, Path::new("PTH208.py"))]
+    #[test_case(Rule::DotlessPathlibWithSuffix, Path::new("PTH210.py"))]
+    #[test_case(Rule::DotlessPathlibWithSuffix, Path::new("PTH210_1.py"))]
     fn rules_pypath(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

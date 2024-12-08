@@ -2,7 +2,7 @@ use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
@@ -55,13 +55,13 @@ use crate::Locator;
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html
 /// [fastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
-#[violation]
-pub struct MissingFStringSyntax;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingFStringSyntax;
 
 impl AlwaysFixableViolation for MissingFStringSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r"Possible f-string without an `f` prefix")
+        r"Possible f-string without an `f` prefix".to_string()
     }
 
     fn fix_title(&self) -> String {

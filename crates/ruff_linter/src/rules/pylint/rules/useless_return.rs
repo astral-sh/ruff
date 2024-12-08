@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -28,17 +28,17 @@ use crate::fix;
 /// def f():
 ///     print(5)
 /// ```
-#[violation]
-pub struct UselessReturn;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessReturn;
 
 impl AlwaysFixableViolation for UselessReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Useless `return` statement at end of function")
+        "Useless `return` statement at end of function".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove useless `return` statement")
+        "Remove useless `return` statement".to_string()
     }
 }
 

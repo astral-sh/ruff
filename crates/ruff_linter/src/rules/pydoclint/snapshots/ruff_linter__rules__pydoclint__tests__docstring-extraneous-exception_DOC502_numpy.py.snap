@@ -1,48 +1,97 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+snapshot_kind: text
 ---
-DOC502_numpy.py:22:1: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+DOC502_numpy.py:7:5: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
    |
-20 |           Speed as distance divided by time.
-21 |   
-22 | /     Raises
+ 5 |   # DOC502
+ 6 |   def calculate_speed(distance: float, time: float) -> float:
+ 7 |       """
+   |  _____^
+ 8 | |     Calculate speed as distance divided by time.
+ 9 | | 
+10 | |     Parameters
+11 | |     ----------
+12 | |     distance : float
+13 | |         Distance traveled.
+14 | |     time : float
+15 | |         Time spent traveling.
+16 | | 
+17 | |     Returns
+18 | |     -------
+19 | |     float
+20 | |         Speed as distance divided by time.
+21 | | 
+22 | |     Raises
 23 | |     ------
 24 | |     FasterThanLightError
 25 | |         If speed is greater than the speed of light.
 26 | |     """
-   | |____^ DOC502
+   | |_______^ DOC502
 27 |       return distance / time
    |
    = help: Remove `FasterThanLightError` from the docstring
 
-DOC502_numpy.py:47:1: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+DOC502_numpy.py:32:5: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
    |
-45 |           Speed as distance divided by time.
-46 |   
-47 | /     Raises
+30 |   # DOC502
+31 |   def calculate_speed(distance: float, time: float) -> float:
+32 |       """
+   |  _____^
+33 | |     Calculate speed as distance divided by time.
+34 | | 
+35 | |     Parameters
+36 | |     ----------
+37 | |     distance : float
+38 | |         Distance traveled.
+39 | |     time : float
+40 | |         Time spent traveling.
+41 | | 
+42 | |     Returns
+43 | |     -------
+44 | |     float
+45 | |         Speed as distance divided by time.
+46 | | 
+47 | |     Raises
 48 | |     ------
 49 | |     FasterThanLightError
 50 | |         If speed is greater than the speed of light.
 51 | |     DivisionByZero
 52 | |         If attempting to divide by zero.
 53 | |     """
-   | |____^ DOC502
+   | |_______^ DOC502
 54 |       return distance / time
    |
    = help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
 
-DOC502_numpy.py:74:1: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+DOC502_numpy.py:59:5: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
    |
-72 |           Speed as distance divided by time.
-73 |   
-74 | /     Raises
+57 |   # DOC502
+58 |   def calculate_speed(distance: float, time: float) -> float:
+59 |       """
+   |  _____^
+60 | |     Calculate speed as distance divided by time.
+61 | | 
+62 | |     Parameters
+63 | |     ----------
+64 | |     distance : float
+65 | |         Distance traveled.
+66 | |     time : float
+67 | |         Time spent traveling.
+68 | | 
+69 | |     Returns
+70 | |     -------
+71 | |     float
+72 | |         Speed as distance divided by time.
+73 | | 
+74 | |     Raises
 75 | |     ------
 76 | |     FasterThanLightError
 77 | |         If speed is greater than the speed of light.
 78 | |     DivisionByZero
 79 | |         If attempting to divide by zero.
 80 | |     """
-   | |____^ DOC502
+   | |_______^ DOC502
 81 |       try:
 82 |           return distance / time
    |

@@ -682,7 +682,7 @@
       ]
     },
     "src": {
-      "description": "The directories to consider when resolving first- vs. third-party imports.\n\nWhen omitted, the `src` directory will typically default to including both:\n\n1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"). 2. The `\"src\"` subdirectory of the project root.\n\nThese defaults ensure that uv supports both flat layouts and `src` layouts out-of-the-box. (If a configuration file is explicitly provided (e.g., via the `--config` command-line flag), the current working directory will be considered the project root.)\n\nAs an example, consider an alternative project structure, like:\n\n```text my_project ├── pyproject.toml └── lib └── my_package ├── __init__.py ├── foo.py └── bar.py ```\n\nIn this case, the `./lib` directory should be included in the `src` option (e.g., `src = [\"lib\"]`), such that when resolving imports, `my_package.foo` is considered first-party.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all packages in that directory. User home directory and environment variables will also be expanded.",
+      "description": "The directories to consider when resolving first- vs. third-party imports.\n\nWhen omitted, the `src` directory will typically default to including both:\n\n1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"). 2. The `\"src\"` subdirectory of the project root.\n\nThese defaults ensure that Ruff supports both flat layouts and `src` layouts out-of-the-box. (If a configuration file is explicitly provided (e.g., via the `--config` command-line flag), the current working directory will be considered the project root.)\n\nAs an example, consider an alternative project structure, like:\n\n```text my_project ├── pyproject.toml └── lib └── my_package ├── __init__.py ├── foo.py └── bar.py ```\n\nIn this case, the `./lib` directory should be included in the `src` option (e.g., `src = [\"lib\"]`), such that when resolving imports, `my_package.foo` is considered first-party.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all packages in that directory. User home directory and environment variables will also be expanded.",
       "type": [
         "array",
         "null"
@@ -745,6 +745,9 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "Alias": {
+      "type": "string"
+    },
     "AnalyzeOptions": {
       "description": "Configures Ruff's `analyze` command.",
       "type": "object",
@@ -948,7 +951,7 @@
           ]
         },
         "hardcoded-tmp-directory": {
-          "description": "A list of directories to consider temporary.",
+          "description": "A list of directories to consider temporary (see `S108`).",
           "type": [
             "array",
             "null"
@@ -958,7 +961,7 @@
           }
         },
         "hardcoded-tmp-directory-extend": {
-          "description": "A list of directories to consider temporary, in addition to those specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory).",
+          "description": "A list of directories to consider temporary, in addition to those specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory) (see `S108`).",
           "type": [
             "array",
             "null"
@@ -1134,7 +1137,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/definitions/Alias"
           }
         },
         "banned-aliases": {
@@ -1165,7 +1168,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "string"
+            "$ref": "#/definitions/Alias"
           }
         }
       },
@@ -1700,7 +1703,7 @@
           ]
         },
         "lines-after-imports": {
-          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
+          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
           "type": [
             "integer",
             "null"
@@ -2755,6 +2758,16 @@
     "RuffOptions": {
       "type": "object",
       "properties": {
+        "extend-markup-names": {
+          "description": "A list of additional callable names that behave like [`markupsafe.Markup`].\n\nExpects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than `literal`).\n\n[markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "parenthesize-tuple-in-subscript": {
           "description": "Whether to prefer accessing items keyed by tuples with parentheses around the tuple (see `RUF031`).",
           "type": [
@@ -2781,6 +2794,10 @@
         "AIR0",
         "AIR00",
         "AIR001",
+        "AIR3",
+        "AIR30",
+        "AIR301",
+        "AIR302",
         "ALL",
         "ANN",
         "ANN0",
@@ -2788,10 +2805,6 @@
         "ANN001",
         "ANN002",
         "ANN003",
-        "ANN1",
-        "ANN10",
-        "ANN101",
-        "ANN102",
         "ANN2",
         "ANN20",
         "ANN201",
@@ -3013,6 +3026,9 @@
         "DTZ01",
         "DTZ011",
         "DTZ012",
+        "DTZ9",
+        "DTZ90",
+        "DTZ901",
         "E",
         "E1",
         "E10",
@@ -3099,8 +3115,6 @@
         "E9",
         "E90",
         "E902",
-        "E99",
-        "E999",
         "EM",
         "EM1",
         "EM10",
@@ -3253,6 +3267,7 @@
         "FURB181",
         "FURB187",
         "FURB188",
+        "FURB189",
         "FURB19",
         "FURB192",
         "G",
@@ -3305,6 +3320,8 @@
         "LOG002",
         "LOG007",
         "LOG009",
+        "LOG01",
+        "LOG015",
         "N",
         "N8",
         "N80",
@@ -3409,6 +3426,9 @@
         "PLC0414",
         "PLC0415",
         "PLC1",
+        "PLC18",
+        "PLC180",
+        "PLC1802",
         "PLC19",
         "PLC190",
         "PLC1901",
@@ -3600,6 +3620,7 @@
         "PLW15",
         "PLW150",
         "PLW1501",
+        "PLW1507",
         "PLW1508",
         "PLW1509",
         "PLW151",
@@ -3628,8 +3649,6 @@
         "PT001",
         "PT002",
         "PT003",
-        "PT004",
-        "PT005",
         "PT006",
         "PT007",
         "PT008",
@@ -3693,6 +3712,9 @@
         "PTH205",
         "PTH206",
         "PTH207",
+        "PTH208",
+        "PTH21",
+        "PTH210",
         "PYI",
         "PYI0",
         "PYI00",
@@ -3752,6 +3774,7 @@
         "PYI058",
         "PYI059",
         "PYI06",
+        "PYI061",
         "PYI062",
         "PYI063",
         "PYI064",
@@ -3815,6 +3838,18 @@
         "RUF032",
         "RUF033",
         "RUF034",
+        "RUF035",
+        "RUF036",
+        "RUF038",
+        "RUF039",
+        "RUF04",
+        "RUF040",
+        "RUF041",
+        "RUF046",
+        "RUF048",
+        "RUF05",
+        "RUF052",
+        "RUF055",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -3976,16 +4011,19 @@
         "T20",
         "T201",
         "T203",
-        "TCH",
-        "TCH0",
-        "TCH00",
-        "TCH001",
-        "TCH002",
-        "TCH003",
-        "TCH004",
-        "TCH005",
-        "TCH01",
-        "TCH010",
+        "TC",
+        "TC0",
+        "TC00",
+        "TC001",
+        "TC002",
+        "TC003",
+        "TC004",
+        "TC005",
+        "TC006",
+        "TC007",
+        "TC008",
+        "TC01",
+        "TC010",
         "TD",
         "TD0",
         "TD00",
@@ -4049,7 +4087,6 @@
         "UP024",
         "UP025",
         "UP026",
-        "UP027",
         "UP028",
         "UP029",
         "UP03",

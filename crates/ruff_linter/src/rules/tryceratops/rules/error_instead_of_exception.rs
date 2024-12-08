@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_python_semantic::analyze::logging::exc_info;
@@ -51,19 +51,19 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 ///
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
-#[violation]
-pub struct ErrorInsteadOfException;
+#[derive(ViolationMetadata)]
+pub(crate) struct ErrorInsteadOfException;
 
 impl Violation for ErrorInsteadOfException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `logging.exception` instead of `logging.error`")
+        "Use `logging.exception` instead of `logging.error`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `exception`"))
+        Some("Replace with `exception`".to_string())
     }
 }
 

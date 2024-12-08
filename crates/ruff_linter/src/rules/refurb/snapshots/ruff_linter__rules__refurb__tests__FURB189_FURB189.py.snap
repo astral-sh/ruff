@@ -1,0 +1,78 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
+---
+FURB189.py:17:9: FURB189 [*] Subclassing `dict` can be error prone, use `collections.UserDict` instead
+   |
+16 | # positives
+17 | class D(dict):
+   |         ^^^^ FURB189
+18 |     pass
+   |
+   = help: Replace with `collections.UserDict`
+
+ℹ Unsafe fix
+1  1  | # setup
+2  2  | from enum import Enum, EnumMeta
+3     |-from collections import UserList as UL
+   3  |+from collections import UserList as UL, UserDict
+4  4  | 
+5  5  | class SetOnceMappingMixin:
+6  6  |     __slots__ = ()
+--------------------------------------------------------------------------------
+14 14 |     pass
+15 15 | 
+16 16 | # positives
+17    |-class D(dict):
+   17 |+class D(UserDict):
+18 18 |     pass
+19 19 | 
+20 20 | class L(list):
+
+FURB189.py:20:9: FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` instead
+   |
+18 |     pass
+19 | 
+20 | class L(list):
+   |         ^^^^ FURB189
+21 |     pass
+   |
+   = help: Replace with `collections.UserList`
+
+ℹ Unsafe fix
+17 17 | class D(dict):
+18 18 |     pass
+19 19 | 
+20    |-class L(list):
+   20 |+class L(UL):
+21 21 |     pass
+22 22 | 
+23 23 | class S(str):
+
+FURB189.py:23:9: FURB189 [*] Subclassing `str` can be error prone, use `collections.UserString` instead
+   |
+21 |     pass
+22 | 
+23 | class S(str):
+   |         ^^^ FURB189
+24 |     pass
+   |
+   = help: Replace with `collections.UserString`
+
+ℹ Unsafe fix
+1  1  | # setup
+2  2  | from enum import Enum, EnumMeta
+3     |-from collections import UserList as UL
+   3  |+from collections import UserList as UL, UserString
+4  4  | 
+5  5  | class SetOnceMappingMixin:
+6  6  |     __slots__ = ()
+--------------------------------------------------------------------------------
+20 20 | class L(list):
+21 21 |     pass
+22 22 | 
+23    |-class S(str):
+   23 |+class S(UserString):
+24 24 |     pass
+25 25 | 
+26 26 | # currently not detected

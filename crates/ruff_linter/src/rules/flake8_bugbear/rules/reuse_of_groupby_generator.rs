@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Comprehension, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_text_size::Ranged;
 
@@ -33,13 +33,13 @@ use crate::checkers::ast::Checker;
 ///     for _ in range(5):
 ///         do_something_with_the_group(values)
 /// ```
-#[violation]
-pub struct ReuseOfGroupbyGenerator;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReuseOfGroupbyGenerator;
 
 impl Violation for ReuseOfGroupbyGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage")
+        "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage".to_string()
     }
 }
 

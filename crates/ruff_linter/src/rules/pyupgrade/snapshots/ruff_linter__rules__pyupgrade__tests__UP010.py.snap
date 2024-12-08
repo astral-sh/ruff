@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP010.py:1:1: UP010 [*] Unnecessary `__future__` imports `generators`, `nested_scopes` for target Python version
   |
@@ -181,5 +182,3 @@ UP010.py:14:5: UP010 [*] Unnecessary `__future__` import `generators` for target
 13 13 |     from __future__ import generator_stop
 14    |-    from __future__ import invalid_module, generators
    14 |+    from __future__ import invalid_module
-
-

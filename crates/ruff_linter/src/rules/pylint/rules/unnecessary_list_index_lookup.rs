@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Int, Number, StmtFor};
 use ruff_python_semantic::SemanticModel;
@@ -31,17 +31,17 @@ use crate::rules::pylint::helpers::SequenceIndexVisitor;
 /// for index, letter in enumerate(letters):
 ///     print(letter)
 /// ```
-#[violation]
-pub struct UnnecessaryListIndexLookup;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryListIndexLookup;
 
 impl AlwaysFixableViolation for UnnecessaryListIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("List index lookup in `enumerate()` loop")
+        "List index lookup in `enumerate()` loop".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Use the loop variable directly")
+        "Use the loop variable directly".to_string()
     }
 }
 

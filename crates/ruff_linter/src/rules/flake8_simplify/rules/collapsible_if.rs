@@ -5,7 +5,7 @@ use libcst_native::ParenthesizedNode;
 use log::error;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, whitespace, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
@@ -46,15 +46,15 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
-#[violation]
-pub struct CollapsibleIf;
+#[derive(ViolationMetadata)]
+pub(crate) struct CollapsibleIf;
 
 impl Violation for CollapsibleIf {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a single `if` statement instead of nested `if` statements")
+        "Use a single `if` statement instead of nested `if` statements".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

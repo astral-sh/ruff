@@ -9,7 +9,7 @@ use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -61,11 +61,11 @@ const BLANK_LINES_NESTED_LEVEL: u32 = 1;
 /// them. That's why this rule is not enabled in typing stub files.
 ///
 /// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
+/// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
 /// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
-#[violation]
-pub struct BlankLineBetweenMethods;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLineBetweenMethods;
 
 impl AlwaysFixableViolation for BlankLineBetweenMethods {
     #[derive_message_formats]
@@ -114,11 +114,11 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// - `lint.isort.lines-after-imports`
 ///
 /// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
+/// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E302.html)
 /// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
-#[violation]
-pub struct BlankLinesTopLevel {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLinesTopLevel {
     actual_blank_lines: u32,
     expected_blank_lines: u32,
 }
@@ -181,11 +181,11 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// - `lint.isort.lines-between-types`
 ///
 /// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
+/// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
 /// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
-#[violation]
-pub struct TooManyBlankLines {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyBlankLines {
     actual_blank_lines: u32,
 }
 
@@ -228,10 +228,10 @@ impl AlwaysFixableViolation for TooManyBlankLines {
 /// ```
 ///
 /// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
+/// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E304.html)
-#[violation]
-pub struct BlankLineAfterDecorator {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLineAfterDecorator {
     actual_blank_lines: u32,
 }
 
@@ -278,11 +278,11 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// them. That's why this rule is not enabled in typing stub files.
 ///
 /// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
+/// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E305.html)
 /// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
-#[violation]
-pub struct BlankLinesAfterFunctionOrClass {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLinesAfterFunctionOrClass {
     actual_blank_lines: u32,
 }
 
@@ -332,16 +332,16 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// them. That's why this rule is not enabled in typing stub files.
 ///
 /// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
+/// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
 /// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
-#[violation]
-pub struct BlankLinesBeforeNestedDefinition;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLinesBeforeNestedDefinition;
 
 impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected 1 blank line before a nested definition, found 0")
+        "Expected 1 blank line before a nested definition, found 0".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -420,7 +420,7 @@ impl<'a> LinePreprocessor<'a> {
     }
 }
 
-impl<'a> Iterator for LinePreprocessor<'a> {
+impl Iterator for LinePreprocessor<'_> {
     type Item = LogicalLineInfo;
 
     fn next(&mut self) -> Option<LogicalLineInfo> {

@@ -9,7 +9,7 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{AnyParameterRef, BoolOp, Expr};
+use ruff_python_ast::{BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -25,27 +25,42 @@ use crate::semantic_index::symbol::{
 };
 use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
+use crate::unpack::Unpack;
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use super::definition::{
-    AssignmentKind, DefinitionCategory, ExceptHandlerDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
 };
 
 mod except_handlers;
+
+/// Are we in a state where a `break` statement is allowed?
+#[derive(Clone, Copy, Debug)]
+enum LoopState {
+    InLoop,
+    NotInLoop,
+}
+
+impl LoopState {
+    fn is_inside(self) -> bool {
+        matches!(self, LoopState::InLoop)
+    }
+}
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
     file: File,
     module: &'db ParsedModule,
-    scope_stack: Vec<FileScopeId>,
+    scope_stack: Vec<(FileScopeId, LoopState)>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
     current_assignments: Vec<CurrentAssignment<'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
+
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
     /// Per-scope contexts regarding nested `try`/`except` statements
@@ -101,7 +116,22 @@ impl<'db> SemanticIndexBuilder<'db> {
         *self
             .scope_stack
             .last()
+            .map(|(scope, _)| scope)
             .expect("Always to have a root scope")
+    }
+
+    fn loop_state(&self) -> LoopState {
+        self.scope_stack
+            .last()
+            .expect("Always to have a root scope")
+            .1
+    }
+
+    fn set_inside_loop(&mut self, state: LoopState) {
+        self.scope_stack
+            .last_mut()
+            .expect("Always to have a root scope")
+            .1 = state;
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
@@ -112,38 +142,33 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
+        #[allow(unsafe_code)]
         let scope = Scope {
             parent,
-            kind: node.scope_kind(),
+            // SAFETY: `node` is guaranteed to be a child of `self.module`
+            node: unsafe { node.to_kind(self.module.clone()) },
             descendents: children_start..children_start,
         };
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
-        self.symbol_tables.push(SymbolTableBuilder::new());
-        self.use_def_maps.push(UseDefMapBuilder::new());
-        let ast_id_scope = self.ast_ids.push(AstIdsBuilder::new());
+        self.symbol_tables.push(SymbolTableBuilder::default());
+        self.use_def_maps.push(UseDefMapBuilder::default());
+        let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
-        #[allow(unsafe_code)]
-        // SAFETY: `node` is guaranteed to be a child of `self.module`
-        let scope_id = ScopeId::new(
-            self.db,
-            self.file,
-            file_scope_id,
-            unsafe { node.to_kind(self.module.clone()) },
-            countme::Count::default(),
-        );
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
 
         self.scope_ids_by_scope.push(scope_id);
-        self.scopes_by_node.insert(node.node_key(), file_scope_id);
+        let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
+        debug_assert_eq!(previous, None);
 
         debug_assert_eq!(ast_id_scope, file_scope_id);
 
-        self.scope_stack.push(file_scope_id);
+        self.scope_stack.push((file_scope_id, LoopState::NotInLoop));
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
-        let id = self.scope_stack.pop().expect("Root scope to be present");
+        let (id, _) = self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
@@ -203,10 +228,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_symbol_table().mark_symbol_used(id);
     }
 
-    fn add_definition<'a>(
+    fn add_definition(
         &mut self,
         symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'a>>,
+        definition_node: impl Into<DefinitionNodeRef<'db>>,
     ) -> Definition<'db> {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
@@ -285,8 +310,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         debug_assert!(popped_assignment.is_some());
     }
 
-    fn current_assignment(&self) -> Option<&CurrentAssignment<'db>> {
-        self.current_assignments.last()
+    fn current_assignment(&self) -> Option<CurrentAssignment<'db>> {
+        self.current_assignments.last().copied()
+    }
+
+    fn current_assignment_mut(&mut self) -> Option<&mut CurrentAssignment<'db>> {
+        self.current_assignments.last_mut()
     }
 
     fn add_pattern_constraint(
@@ -373,6 +402,11 @@ impl<'db> SemanticIndexBuilder<'db> {
                 if let Some(default) = default {
                     self.visit_expr(default);
                 }
+                match type_param {
+                    ast::TypeParam::TypeVar(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::ParamSpec(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::TypeVarTuple(node) => self.add_definition(symbol, node),
+                };
             }
         }
 
@@ -445,21 +479,35 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
     }
 
-    fn declare_parameter(&mut self, parameter: AnyParameterRef) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+    fn declare_parameters(&mut self, parameters: &'db ast::Parameters) {
+        for parameter in parameters.iter_non_variadic_params() {
+            self.declare_parameter(parameter);
+        }
+        if let Some(vararg) = parameters.vararg.as_ref() {
+            let symbol = self.add_symbol(vararg.name.id().clone());
+            self.add_definition(
+                symbol,
+                DefinitionNodeRef::VariadicPositionalParameter(vararg),
+            );
+        }
+        if let Some(kwarg) = parameters.kwarg.as_ref() {
+            let symbol = self.add_symbol(kwarg.name.id().clone());
+            self.add_definition(symbol, DefinitionNodeRef::VariadicKeywordParameter(kwarg));
+        }
+    }
+
+    fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
+        let symbol = self.add_symbol(parameter.parameter.name.id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
-        if let AnyParameterRef::NonVariadic(with_default) = parameter {
-            // Insert a mapping from the parameter to the same definition.
-            // This ensures that calling `HasTy::ty` on the inner parameter returns
-            // a valid type (and doesn't panic)
-            let existing_definition = self.definitions_by_node.insert(
-                DefinitionNodeRef::from(AnyParameterRef::Variadic(&with_default.parameter)).key(),
-                definition,
-            );
-            debug_assert_eq!(existing_definition, None);
-        }
+        // Insert a mapping from the inner Parameter node to the same definition.
+        // This ensures that calling `HasTy::ty` on the inner parameter returns
+        // a valid type (and doesn't panic)
+        let existing_definition = self
+            .definitions_by_node
+            .insert((&parameter.parameter).into(), definition);
+        debug_assert_eq!(existing_definition, None);
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
@@ -522,34 +570,40 @@ where
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
-                for decorator in &function_def.decorator_list {
+                let ast::StmtFunctionDef {
+                    decorator_list,
+                    parameters,
+                    type_params,
+                    name,
+                    returns,
+                    body,
+                    is_async: _,
+                    range: _,
+                } = function_def;
+                for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
 
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
-                    function_def.type_params.as_deref(),
+                    type_params.as_deref(),
                     |builder| {
-                        builder.visit_parameters(&function_def.parameters);
-                        if let Some(expr) = &function_def.returns {
-                            builder.visit_annotation(expr);
+                        builder.visit_parameters(parameters);
+                        if let Some(returns) = returns {
+                            builder.visit_annotation(returns);
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        // Add symbols and definitions for the parameters to the function scope.
-                        for parameter in &*function_def.parameters {
-                            builder.declare_parameter(parameter);
-                        }
+                        builder.declare_parameters(parameters);
 
-                        builder.visit_body(&function_def.body);
+                        builder.visit_body(body);
                         builder.pop_scope()
                     },
                 );
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
-                for default in function_def
-                    .parameters
+                for default in parameters
                     .iter_non_variadic_params()
                     .filter_map(|param| param.default.as_deref())
                 {
@@ -558,7 +612,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(function_def.name.id.clone());
+                let symbol = self.add_symbol(name.id.clone());
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
@@ -580,6 +634,27 @@ where
                         builder.push_scope(NodeWithScopeRef::Class(class));
                         builder.visit_body(&class.body);
 
+                        builder.pop_scope()
+                    },
+                );
+            }
+            ast::Stmt::TypeAlias(type_alias) => {
+                let symbol = self.add_symbol(
+                    type_alias
+                        .name
+                        .as_name_expr()
+                        .map(|name| name.id.clone())
+                        .unwrap_or("<unknown>".into()),
+                );
+                self.add_definition(symbol, type_alias);
+                self.visit_expr(&type_alias.name);
+
+                self.with_type_params(
+                    NodeWithScopeRef::TypeAliasTypeParameters(type_alias),
+                    type_alias.type_params.as_ref(),
+                    |builder| {
+                        builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
+                        builder.visit_expr(&type_alias.value);
                         builder.pop_scope()
                     },
                 );
@@ -619,24 +694,48 @@ where
             }
             ast::Stmt::Assign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
+
                 self.visit_expr(&node.value);
-                self.add_standalone_expression(&node.value);
-                for (target_index, target) in node.targets.iter().enumerate() {
-                    let kind = match target {
-                        ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(AssignmentKind::Sequence),
-                        ast::Expr::Name(_) => Some(AssignmentKind::Name),
+                let value = self.add_standalone_expression(&node.value);
+
+                for target in &node.targets {
+                    // We only handle assignments to names and unpackings here, other targets like
+                    // attribute and subscript are handled separately as they don't create a new
+                    // definition.
+                    let current_assignment = match target {
+                        ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                            Some(CurrentAssignment::Assign {
+                                node,
+                                first: true,
+                                unpack: Some(Unpack::new(
+                                    self.db,
+                                    self.file,
+                                    self.current_scope(),
+                                    #[allow(unsafe_code)]
+                                    unsafe {
+                                        AstNodeRef::new(self.module.clone(), target)
+                                    },
+                                    value,
+                                    countme::Count::default(),
+                                )),
+                            })
+                        }
+                        ast::Expr::Name(_) => Some(CurrentAssignment::Assign {
+                            node,
+                            unpack: None,
+                            first: false,
+                        }),
                         _ => None,
                     };
-                    if let Some(kind) = kind {
-                        self.push_assignment(CurrentAssignment::Assign {
-                            assignment: node,
-                            target_index,
-                            kind,
-                        });
+
+                    if let Some(current_assignment) = current_assignment {
+                        self.push_assignment(current_assignment);
                     }
+
                     self.visit_expr(target);
-                    if kind.is_some() {
-                        // only need to pop in the case where we pushed something
+
+                    if current_assignment.is_some() {
+                        // Only need to pop in the case where we pushed something
                         self.pop_assignment();
                     }
                 }
@@ -647,9 +746,18 @@ where
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                 }
-                self.push_assignment(node.into());
-                self.visit_expr(&node.target);
-                self.pop_assignment();
+
+                // See https://docs.python.org/3/library/ast.html#ast.AnnAssign
+                if matches!(
+                    *node.target,
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
+                ) {
+                    self.push_assignment(node.into());
+                    self.visit_expr(&node.target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(&node.target);
+                }
             }
             ast::Stmt::AugAssign(
                 aug_assign @ ast::StmtAugAssign {
@@ -661,9 +769,18 @@ where
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(value);
-                self.push_assignment(aug_assign.into());
-                self.visit_expr(target);
-                self.pop_assignment();
+
+                // See https://docs.python.org/3/library/ast.html#ast.AugAssign
+                if matches!(
+                    **target,
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
+                ) {
+                    self.push_assignment(aug_assign.into());
+                    self.visit_expr(target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(target);
+                }
             }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
@@ -672,7 +789,22 @@ where
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
-                for clause in &node.elif_else_clauses {
+                let elif_else_clauses = node
+                    .elif_else_clauses
+                    .iter()
+                    .map(|clause| (clause.test.as_ref(), clause.body.as_slice()));
+                let has_else = node
+                    .elif_else_clauses
+                    .last()
+                    .is_some_and(|clause| clause.test.is_none());
+                let elif_else_clauses = elif_else_clauses.chain(if has_else {
+                    // if there's an `else` clause already, we don't need to add another
+                    None
+                } else {
+                    // if there's no `else` branch, we should add a no-op `else` branch
+                    Some((None, Default::default()))
+                });
+                for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
@@ -682,23 +814,14 @@ where
                     for constraint in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
-                    if let Some(elif_test) = &clause.test {
+                    if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         constraints.push(self.record_expression_constraint(elif_test));
                     }
-                    self.visit_body(&clause.body);
+                    self.visit_body(clause_body);
                 }
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
-                }
-                let has_else = node
-                    .elif_else_clauses
-                    .last()
-                    .is_some_and(|clause| clause.test.is_none());
-                if !has_else {
-                    // if there's no else clause, then it's possible we took none of the branches,
-                    // and the pre_if state can reach here
-                    self.flow_merge(pre_if);
                 }
             }
             ast::Stmt::While(ast::StmtWhile {
@@ -716,7 +839,10 @@ where
 
                 // TODO: definitions created inside the body should be fully visible
                 // to other statements/expressions inside the body --Alex/Carl
+                let outer_loop_state = self.loop_state();
+                self.set_inside_loop(LoopState::InLoop);
                 self.visit_body(body);
+                self.set_inside_loop(outer_loop_state);
 
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
@@ -755,7 +881,9 @@ where
                 self.visit_body(body);
             }
             ast::Stmt::Break(_) => {
-                self.loop_break_states.push(self.flow_snapshot());
+                if self.loop_state().is_inside() {
+                    self.loop_break_states.push(self.flow_snapshot());
+                }
             }
 
             ast::Stmt::For(
@@ -782,7 +910,10 @@ where
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
                 // are fully visible to other statements/expressions inside the body --Alex/Carl
+                let outer_loop_state = self.loop_state();
+                self.set_inside_loop(LoopState::InLoop);
                 self.visit_body(body);
+                self.set_inside_loop(outer_loop_state);
 
                 let break_states =
                     std::mem::replace(&mut self.loop_break_states, saved_break_states);
@@ -970,19 +1101,19 @@ where
                 }
 
                 if is_definition {
-                    match self.current_assignment().copied() {
+                    match self.current_assignment() {
                         Some(CurrentAssignment::Assign {
-                            assignment,
-                            target_index,
-                            kind,
+                            node,
+                            first,
+                            unpack,
                         }) => {
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
-                                    assignment,
-                                    target_index,
+                                    unpack,
+                                    value: &node.value,
                                     name: name_node,
-                                    kind,
+                                    first,
                                 },
                             );
                         }
@@ -1033,14 +1164,25 @@ where
                     }
                 }
 
+                if let Some(CurrentAssignment::Assign { first, .. }) = self.current_assignment_mut()
+                {
+                    *first = false;
+                }
+
                 walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
-                self.push_assignment(node.into());
-                self.visit_expr(&node.target);
-                self.pop_assignment();
+
+                // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
+                if node.target.is_name_expr() {
+                    self.push_assignment(node.into());
+                    self.visit_expr(&node.target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(&node.target);
+                }
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
@@ -1057,10 +1199,8 @@ where
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
 
                 // Add symbols and definitions for the parameters to the lambda scope.
-                if let Some(parameters) = &lambda.parameters {
-                    for parameter in parameters {
-                        self.declare_parameter(parameter);
-                    }
+                if let Some(parameters) = lambda.parameters.as_ref() {
+                    self.declare_parameters(parameters);
                 }
 
                 self.visit_expr(lambda.body.as_ref());
@@ -1074,9 +1214,12 @@ where
                 // later checking)
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
+                let constraint = self.record_expression_constraint(test);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
+
+                self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
             }
@@ -1229,9 +1372,9 @@ where
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CurrentAssignment<'a> {
     Assign {
-        assignment: &'a ast::StmtAssign,
-        target_index: usize,
-        kind: AssignmentKind,
+        node: &'a ast::StmtAssign,
+        first: bool,
+        unpack: Option<Unpack<'a>>,
     },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),

@@ -96,7 +96,7 @@ impl Int {
         }
     }
 
-    /// Return the [`Int`] as an u64, if it can be represented as that data type.
+    /// Return the [`Int`] as an usize, if it can be represented as that data type.
     pub fn as_usize(&self) -> Option<usize> {
         match &self.0 {
             Number::Small(small) => usize::try_from(*small).ok(),

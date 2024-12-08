@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F402.py:5:5: F402 Import `os` from line 1 shadowed by loop variable
   |
@@ -16,5 +17,3 @@ F402.py:8:5: F402 Import `path` from line 2 shadowed by loop variable
   |     ^^^^ F402
 9 |     pass
   |
-
-

@@ -2,6 +2,7 @@
 //! filesystem.
 
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -18,6 +19,7 @@ use path_slash::PathExt;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::fs;
+use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
 
 use crate::configuration::Configuration;
@@ -147,8 +149,8 @@ impl<'a> Resolver<'a> {
     fn add(&mut self, path: &Path, settings: Settings) {
         self.settings.push(settings);
 
-        // normalize the path to use `/` separators and escape the '{' and '}' characters,
-        // which matchit uses for routing parameters
+        // Normalize the path to use `/` separators and escape the '{' and '}' characters,
+        // which matchit uses for routing parameters.
         let path = path.to_slash_lossy().replace('{', "{{").replace('}', "}}");
 
         match self
@@ -181,7 +183,10 @@ impl<'a> Resolver<'a> {
     }
 
     /// Return a mapping from Python package to its package root.
-    pub fn package_roots(&'a self, files: &[&'a Path]) -> FxHashMap<&'a Path, Option<&'a Path>> {
+    pub fn package_roots(
+        &'a self,
+        files: &[&'a Path],
+    ) -> FxHashMap<&'a Path, Option<PackageRoot<'a>>> {
         // Pre-populate the module cache, since the list of files could (but isn't
         // required to) contain some `__init__.py` files.
         let mut package_cache: FxHashMap<&Path, bool> = FxHashMap::default();
@@ -200,7 +205,7 @@ impl<'a> Resolver<'a> {
             .any(|settings| !settings.linter.namespace_packages.is_empty());
 
         // Search for the package root for each file.
-        let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
+        let mut package_roots: FxHashMap<&Path, Option<PackageRoot<'_>>> = FxHashMap::default();
         for file in files {
             if let Some(package) = file.parent() {
                 package_roots.entry(package).or_insert_with(|| {
@@ -210,7 +215,38 @@ impl<'a> Resolver<'a> {
                         &[]
                     };
                     detect_package_root_with_cache(package, namespace_packages, &mut package_cache)
+                        .map(|path| PackageRoot::Root { path })
                 });
+            }
+        }
+
+        // Discard any nested roots.
+        //
+        // For example, if `./foo/__init__.py` is a root, and then `./foo/bar` is empty, and
+        // `./foo/bar/baz/__init__.py` was detected as a root, we should only consider
+        // `./foo/__init__.py`.
+        let mut non_roots = FxHashSet::default();
+        let mut router: Router<&Path> = Router::new();
+        for root in package_roots
+            .values()
+            .flatten()
+            .copied()
+            .map(PackageRoot::path)
+            .collect::<BTreeSet<_>>()
+        {
+            // Normalize the path to use `/` separators and escape the '{' and '}' characters,
+            // which matchit uses for routing parameters.
+            let path = root.to_slash_lossy().replace('{', "{{").replace('}', "}}");
+            if let Ok(matched) = router.at_mut(&path) {
+                debug!(
+                    "Ignoring nested package root: {} (under {})",
+                    root.display(),
+                    matched.value.display()
+                );
+                package_roots.insert(root, Some(PackageRoot::nested(root)));
+                non_roots.insert(root);
+            } else {
+                let _ = router.insert(format!("{path}/{{*filepath}}"), root);
             }
         }
 

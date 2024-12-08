@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B017.py:23:14: B017 `assertRaises(Exception)` should be considered evil
    |

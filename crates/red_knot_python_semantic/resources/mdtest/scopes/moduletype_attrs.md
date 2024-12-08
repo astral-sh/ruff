@@ -17,8 +17,7 @@ reveal_type(__doc__)  # revealed: str | None
 # (needs support for `*` imports)
 reveal_type(__spec__)  # revealed: Unknown | None
 
-# TODO: generics
-reveal_type(__path__)  # revealed: @Todo
+reveal_type(__path__)  # revealed: @Todo(generics)
 
 class X:
     reveal_type(__name__)  # revealed: str
@@ -58,15 +57,13 @@ reveal_type(typing.__name__)  # revealed: str
 reveal_type(typing.__init__)  # revealed: Literal[__init__]
 
 # These come from `builtins.object`, not `types.ModuleType`:
-# TODO: we don't currently understand `types.ModuleType` as inheriting from `object`;
-# these should not reveal `Unknown`:
-reveal_type(typing.__eq__)  # revealed: Unknown
-reveal_type(typing.__class__)  # revealed: Unknown
-reveal_type(typing.__module__)  # revealed: Unknown
+reveal_type(typing.__eq__)  # revealed: Literal[__eq__]
+
+reveal_type(typing.__class__)  # revealed: Literal[type]
 
 # TODO: needs support for attribute access on instances, properties and generics;
 # should be `dict[str, Any]`
-reveal_type(typing.__dict__)  # revealed: @Todo
+reveal_type(typing.__dict__)  # revealed: @Todo(instance attributes)
 ```
 
 Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType` to help out with
@@ -76,6 +73,7 @@ we're dealing with:
 ```py path=__getattr__.py
 import typing
 
+# error: [unresolved-attribute]
 reveal_type(typing.__getattr__)  # revealed: Unknown
 ```
 
@@ -97,8 +95,8 @@ from foo import __dict__ as foo_dict
 
 # TODO: needs support for attribute access on instances, properties, and generics;
 # should be `dict[str, Any]` for both of these:
-reveal_type(foo.__dict__)  # revealed: @Todo
-reveal_type(foo_dict)  # revealed: @Todo
+reveal_type(foo.__dict__)  # revealed: @Todo(instance attributes)
+reveal_type(foo_dict)  # revealed: @Todo(instance attributes)
 ```
 
 ## Conditionally global or `ModuleType` attribute

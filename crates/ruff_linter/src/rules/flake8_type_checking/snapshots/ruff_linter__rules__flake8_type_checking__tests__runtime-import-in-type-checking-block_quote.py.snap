@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-quote.py:57:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
+quote.py:57:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
    |
 56 |     if TYPE_CHECKING:
 57 |         from pandas import DataFrame
-   |                            ^^^^^^^^^ TCH004
+   |                            ^^^^^^^^^ TC004
 58 | 
 59 |     def func(value: DataFrame):
    |
@@ -25,3 +25,27 @@ quote.py:57:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking b
 58 59 | 
 59 60 |     def func(value: DataFrame):
 60 61 |         ...
+
+quote.py:110:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
+    |
+109 |     if TYPE_CHECKING:
+110 |         from pandas import DataFrame
+    |                            ^^^^^^^^^ TC004
+111 | 
+112 |     x: TypeAlias = DataFrame | None
+    |
+    = help: Move out of type-checking block
+
+ℹ Unsafe fix
+    1   |+from pandas import DataFrame
+1   2   | def f():
+2   3   |     from pandas import DataFrame
+3   4   | 
+--------------------------------------------------------------------------------
+107 108 |     from typing import TypeAlias, TYPE_CHECKING
+108 109 | 
+109 110 |     if TYPE_CHECKING:
+110     |-        from pandas import DataFrame
+    111 |+        pass
+111 112 | 
+112 113 |     x: TypeAlias = DataFrame | None

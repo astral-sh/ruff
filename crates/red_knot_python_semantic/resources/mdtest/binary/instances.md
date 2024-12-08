@@ -202,11 +202,7 @@ reveal_type(A() + B())  # revealed: MyString
 # N.B. Still a subtype of `A`, even though `A` does not appear directly in the class's `__bases__`
 class C(B): ...
 
-# TODO: we currently only understand direct subclasses as subtypes of the superclass.
-# We need to iterate through the full MRO rather than just the class's bases;
-# if we do, we'll understand `C` as a subtype of `A`, and correctly understand this as being
-# `MyString` rather than `str`
-reveal_type(A() + C())  # revealed: str
+reveal_type(A() + C())  # revealed: MyString
 ```
 
 ## Reflected precedence 2
@@ -321,7 +317,7 @@ reveal_type(1 + A())  # revealed: int
 reveal_type(A() + "foo")  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
 # TODO overloads
-reveal_type("foo" + A())  # revealed: @Todo
+reveal_type("foo" + A())  # revealed: @Todo(return type)
 
 reveal_type(A() + b"foo")  # revealed: A
 # TODO should be `A` since `bytes.__add__` doesn't support `A` instances
@@ -329,7 +325,7 @@ reveal_type(b"foo" + A())  # revealed: bytes
 
 reveal_type(A() + ())  # revealed: A
 # TODO this should be `A`, since `tuple.__add__` doesn't support `A` instances
-reveal_type(() + A())  # revealed: @Todo
+reveal_type(() + A())  # revealed: @Todo(return type)
 
 literal_string_instance = "foo" * 1_000_000_000
 # the test is not testing what it's meant to be testing if this isn't a `LiteralString`:
@@ -338,7 +334,7 @@ reveal_type(literal_string_instance)  # revealed: LiteralString
 reveal_type(A() + literal_string_instance)  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
 # TODO overloads
-reveal_type(literal_string_instance + A())  # revealed: @Todo
+reveal_type(literal_string_instance + A())  # revealed: @Todo(return type)
 ```
 
 ## Operations involving instances of classes inheriting from `Any`

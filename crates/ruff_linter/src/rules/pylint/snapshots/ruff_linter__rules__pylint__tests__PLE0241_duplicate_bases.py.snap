@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 duplicate_bases.py:13:13: PLE0241 [*] Duplicate base `A` for class `F1`
    |

@@ -221,7 +221,7 @@ where
     }
 }
 
-impl<'ast, 'buf, B> Deref for WithNodeLevel<'ast, 'buf, B>
+impl<'ast, B> Deref for WithNodeLevel<'ast, '_, B>
 where
     B: Buffer<Context = PyFormatContext<'ast>>,
 {
@@ -232,7 +232,7 @@ where
     }
 }
 
-impl<'ast, 'buf, B> DerefMut for WithNodeLevel<'ast, 'buf, B>
+impl<'ast, B> DerefMut for WithNodeLevel<'ast, '_, B>
 where
     B: Buffer<Context = PyFormatContext<'ast>>,
 {

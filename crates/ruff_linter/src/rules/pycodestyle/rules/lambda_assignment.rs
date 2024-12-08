@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     self as ast, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Stmt,
 };
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
-#[violation]
-pub struct LambdaAssignment {
+#[derive(ViolationMetadata)]
+pub(crate) struct LambdaAssignment {
     name: String,
 }
 
@@ -44,7 +44,7 @@ impl Violation for LambdaAssignment {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not assign a `lambda` expression, use a `def`")
+        "Do not assign a `lambda` expression, use a `def`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

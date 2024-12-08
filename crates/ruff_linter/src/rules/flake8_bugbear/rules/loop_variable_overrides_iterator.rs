@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::Ranged;
@@ -36,8 +36,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `for` statement](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
-#[violation]
-pub struct LoopVariableOverridesIterator {
+#[derive(ViolationMetadata)]
+pub(crate) struct LoopVariableOverridesIterator {
     name: String,
 }
 

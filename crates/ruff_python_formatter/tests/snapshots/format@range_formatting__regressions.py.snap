@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/regressions.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -166,6 +167,3 @@ def test_start ():
 def new_function_inserted_after_test_start():
     print("This should get formatted")
 ```
-
-
-

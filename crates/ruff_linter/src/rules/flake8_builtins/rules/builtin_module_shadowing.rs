@@ -1,12 +1,13 @@
 use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
 
+use crate::package::PackageRoot;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
@@ -23,8 +24,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-allowed-modules`
-#[violation]
-pub struct BuiltinModuleShadowing {
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinModuleShadowing {
     name: String,
 }
 
@@ -39,7 +40,7 @@ impl Violation for BuiltinModuleShadowing {
 /// A005
 pub(crate) fn builtin_module_shadowing(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     allowed_modules: &[String],
     target_version: PythonVersion,
 ) -> Option<Diagnostic> {
@@ -47,25 +48,35 @@ pub(crate) fn builtin_module_shadowing(
         return None;
     }
 
-    if let Some(package) = package {
-        let module_name = if is_module_file(path) {
-            package.file_name().unwrap().to_string_lossy()
-        } else {
-            path.file_stem().unwrap().to_string_lossy()
-        };
+    let package = package?;
 
-        if is_known_standard_library(target_version.minor(), &module_name)
-            && allowed_modules
-                .iter()
-                .all(|allowed_module| allowed_module != &module_name)
-        {
-            return Some(Diagnostic::new(
-                BuiltinModuleShadowing {
-                    name: module_name.to_string(),
-                },
-                TextRange::default(),
-            ));
-        }
+    let module_name = if is_module_file(path) {
+        package.path().file_name().unwrap().to_string_lossy()
+    } else {
+        path.file_stem().unwrap().to_string_lossy()
+    };
+
+    if !is_known_standard_library(target_version.minor(), &module_name) {
+        return None;
     }
-    None
+
+    // Shadowing private stdlib modules is okay.
+    // https://github.com/astral-sh/ruff/issues/12949
+    if module_name.starts_with('_') && !module_name.starts_with("__") {
+        return None;
+    }
+
+    if allowed_modules
+        .iter()
+        .any(|allowed_module| allowed_module == &module_name)
+    {
+        return None;
+    }
+
+    Some(Diagnostic::new(
+        BuiltinModuleShadowing {
+            name: module_name.to_string(),
+        },
+        TextRange::default(),
+    ))
 }

@@ -1,8 +1,8 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{CmpOp, Expr, ExprCompare, ExprStringLiteral};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
 
 /// ## What it does
@@ -27,15 +27,15 @@ use ruff_text_size::TextRange;
 ///
 /// ## References
 /// - [Python documentation: String constants](https://docs.python.org/3/library/string.html#string-constants)
-#[violation]
-pub struct HardcodedStringCharset {
+#[derive(ViolationMetadata)]
+pub(crate) struct HardcodedStringCharset {
     name: &'static str,
 }
 
 impl AlwaysFixableViolation for HardcodedStringCharset {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of hardcoded string charset")
+        "Use of hardcoded string charset".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -44,6 +44,14 @@ impl AlwaysFixableViolation for HardcodedStringCharset {
     }
 }
 
+/// FURB156
+pub(crate) fn hardcoded_string_charset_literal(checker: &mut Checker, expr: &ExprStringLiteral) {
+    if let Some(charset) = check_charset_exact(expr.value.to_str().as_bytes()) {
+        push_diagnostic(checker, expr.range, charset);
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct NamedCharset {
     name: &'static str,
     bytes: &'static [u8],
@@ -51,7 +59,7 @@ struct NamedCharset {
 }
 
 /// Represents the set of ascii characters in form of a bitset.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct AsciiCharSet(u128);
 
 impl AsciiCharSet {
@@ -108,14 +116,6 @@ const KNOWN_NAMED_CHARSETS: [NamedCharset; 9] = [
     NamedCharset::new("whitespace", b" \t\n\r\x0b\x0c"),
 ];
 
-fn check_charset_as_set(bytes: &[u8]) -> Option<&NamedCharset> {
-    let ascii_char_set = AsciiCharSet::from_bytes(bytes)?;
-
-    KNOWN_NAMED_CHARSETS
-        .iter()
-        .find(|&charset| charset.ascii_char_set == ascii_char_set)
-}
-
 fn check_charset_exact(bytes: &[u8]) -> Option<&NamedCharset> {
     KNOWN_NAMED_CHARSETS
         .iter()
@@ -137,35 +137,4 @@ fn push_diagnostic(checker: &mut Checker, range: TextRange, charset: &NamedChars
         ))
     });
     checker.diagnostics.push(diagnostic);
-}
-
-/// FURB156
-pub(crate) fn hardcoded_string_charset_comparison(checker: &mut Checker, compare: &ExprCompare) {
-    let (
-        [CmpOp::In | CmpOp::NotIn],
-        [Expr::StringLiteral(string_literal @ ExprStringLiteral { value, .. })],
-    ) = (compare.ops.as_ref(), compare.comparators.as_ref())
-    else {
-        return;
-    };
-
-    let bytes = value.to_str().as_bytes();
-
-    let Some(charset) = check_charset_as_set(bytes) else {
-        return;
-    };
-
-    // In this case the diagnostic will be emitted via string_literal check.
-    if charset.bytes == bytes {
-        return;
-    }
-
-    push_diagnostic(checker, string_literal.range, charset);
-}
-
-/// FURB156
-pub(crate) fn hardcoded_string_charset_literal(checker: &mut Checker, expr: &ExprStringLiteral) {
-    if let Some(charset) = check_charset_exact(expr.value.to_str().as_bytes()) {
-        push_diagnostic(checker, expr.range, charset);
-    }
 }

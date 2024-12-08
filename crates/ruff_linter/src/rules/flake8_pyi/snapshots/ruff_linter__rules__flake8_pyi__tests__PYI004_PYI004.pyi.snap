@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI004.pyi:4:4: PYI004 Version comparison must use only major and minor version
   |
@@ -38,5 +39,3 @@ PYI004.pyi:7:4: PYI004 Version comparison must use only major and minor version
 8 | 
 9 | if sys.version_info[0] == 2: ...
   |
-
-

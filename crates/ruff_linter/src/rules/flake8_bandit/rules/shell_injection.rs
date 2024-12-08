@@ -1,7 +1,7 @@
 //! Checks relating to shell injection.
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -36,8 +36,8 @@ use crate::{
 /// ## References
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
-#[violation]
-pub struct SubprocessPopenWithShellEqualsTrue {
+#[derive(ViolationMetadata)]
+pub(crate) struct SubprocessPopenWithShellEqualsTrue {
     safety: Safety,
     is_exact: bool,
 }
@@ -46,14 +46,10 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         match (self.safety, self.is_exact) {
-            (Safety::SeemsSafe, true) => format!(
-                "`subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`"
-            ),
-            (Safety::Unknown, true) => format!("`subprocess` call with `shell=True` identified, security issue"),
-            (Safety::SeemsSafe, false) => format!(
-                "`subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`"
-            ),
-            (Safety::Unknown, false) => format!("`subprocess` call with truthy `shell` identified, security issue"),
+            (Safety::SeemsSafe, true) => "`subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
+            (Safety::Unknown, true) => "`subprocess` call with `shell=True` identified, security issue".to_string(),
+            (Safety::SeemsSafe, false) => "`subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
+            (Safety::Unknown, false) => "`subprocess` call with truthy `shell` identified, security issue".to_string(),
         }
     }
 }
@@ -82,13 +78,13 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
 ///
 /// [#4045]: https://github.com/astral-sh/ruff/issues/4045
-#[violation]
-pub struct SubprocessWithoutShellEqualsTrue;
+#[derive(ViolationMetadata)]
+pub(crate) struct SubprocessWithoutShellEqualsTrue;
 
 impl Violation for SubprocessWithoutShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`subprocess` call: check for execution of untrusted input")
+        "`subprocess` call: check for execution of untrusted input".to_string()
     }
 }
 
@@ -120,8 +116,8 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 ///
 /// ## References
 /// - [Python documentation: Security Considerations](https://docs.python.org/3/library/subprocess.html#security-considerations)
-#[violation]
-pub struct CallWithShellEqualsTrue {
+#[derive(ViolationMetadata)]
+pub(crate) struct CallWithShellEqualsTrue {
     is_exact: bool,
 }
 
@@ -129,9 +125,9 @@ impl Violation for CallWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.is_exact {
-            format!("Function call with `shell=True` parameter identified, security issue")
+            "Function call with `shell=True` parameter identified, security issue".to_string()
         } else {
-            format!("Function call with truthy `shell` parameter identified, security issue")
+            "Function call with truthy `shell` parameter identified, security issue".to_string()
         }
     }
 }
@@ -172,8 +168,8 @@ impl Violation for CallWithShellEqualsTrue {
 ///
 /// ## References
 /// - [Python documentation: `subprocess`](https://docs.python.org/3/library/subprocess.html)
-#[violation]
-pub struct StartProcessWithAShell {
+#[derive(ViolationMetadata)]
+pub(crate) struct StartProcessWithAShell {
     safety: Safety,
 }
 
@@ -181,8 +177,8 @@ impl Violation for StartProcessWithAShell {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.safety {
-            Safety::SeemsSafe => format!("Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`"),
-            Safety::Unknown => format!("Starting a process with a shell, possible injection detected"),
+            Safety::SeemsSafe => "Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
+            Safety::Unknown => "Starting a process with a shell, possible injection detected".to_string(),
         }
     }
 }
@@ -213,13 +209,13 @@ impl Violation for StartProcessWithAShell {
 /// ```
 ///
 /// [start-process-with-a-shell]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell/#start-process-with-a-shell-s605
-#[violation]
-pub struct StartProcessWithNoShell;
+#[derive(ViolationMetadata)]
+pub(crate) struct StartProcessWithNoShell;
 
 impl Violation for StartProcessWithNoShell {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Starting a process without a shell")
+        "Starting a process without a shell".to_string()
     }
 }
 
@@ -248,13 +244,13 @@ impl Violation for StartProcessWithNoShell {
 /// ## References
 /// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
 /// - [Common Weakness Enumeration: CWE-426](https://cwe.mitre.org/data/definitions/426.html)
-#[violation]
-pub struct StartProcessWithPartialPath;
+#[derive(ViolationMetadata)]
+pub(crate) struct StartProcessWithPartialPath;
 
 impl Violation for StartProcessWithPartialPath {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Starting a process with a partial executable path")
+        "Starting a process with a partial executable path".to_string()
     }
 }
 
@@ -281,13 +277,13 @@ impl Violation for StartProcessWithPartialPath {
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
-#[violation]
-pub struct UnixCommandWildcardInjection;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnixCommandWildcardInjection;
 
 impl Violation for UnixCommandWildcardInjection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible wildcard injection in call due to `*` usage")
+        "Possible wildcard injection in call due to `*` usage".to_string()
     }
 }
 
@@ -315,7 +311,8 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 Some(ShellKeyword {
-                    truthiness: Truthiness::False | Truthiness::Falsey | Truthiness::Unknown,
+                    truthiness:
+                        Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
                 }) => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
+snapshot_kind: text
 ---
 PERF101.py:7:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
   |

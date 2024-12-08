@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 bidirectional_unicode.py:2:1: PLE2502 Contains control characters that can permit obfuscated code
   |
@@ -39,5 +40,3 @@ bidirectional_unicode.py:14:1: PLE2502 Contains control characters that can perm
 16 |       bank[account] -= amount
 17 |       return
    |
-
-

@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use imperative::Mood;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
@@ -43,13 +43,15 @@ static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 ///
 /// ## Options
 /// - `lint.pydocstyle.convention`
+/// - `lint.pydocstyle.property-decorators`
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct NonImperativeMood {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonImperativeMood {
     first_line: String,
 }
 

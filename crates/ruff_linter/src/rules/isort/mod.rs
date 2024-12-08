@@ -1,6 +1,6 @@
 //! Rules from [isort](https://pypi.org/project/isort/).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use annotate::annotate_imports;
 use block::{Block, Trailer};
@@ -18,6 +18,7 @@ use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, ImportBlock, TrailingComma};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
+use crate::package::PackageRoot;
 use crate::settings::types::PythonVersion;
 use crate::Locator;
 
@@ -71,7 +72,7 @@ pub(crate) fn format_imports(
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     target_version: PythonVersion,
     settings: &Settings,
@@ -155,7 +156,7 @@ fn format_import_block(
     indentation_width: LineWidthBuilder,
     stylist: &Stylist,
     src: &[PathBuf],
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     target_version: PythonVersion,
     settings: &Settings,
 ) -> String {
@@ -848,6 +849,57 @@ mod tests {
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("this_this_from.py"))]
+    fn required_importfrom_with_useless_alias(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "required_importfrom_with_useless_alias_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([NameImport::ImportFrom(
+                        MemberNameImport::alias(
+                            "module".to_string(),
+                            "this".to_string(),
+                            "this".to_string(),
+                        ),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::UselessImportAlias])
+            },
+        )?;
+
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("this_this.py"))]
+    fn required_import_with_useless_alias(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "required_import_with_useless_alias_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([NameImport::Import(
+                        ModuleNameImport::alias("this".to_string(), "this".to_string()),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::UselessImportAlias])
             },
         )?;
         assert_messages!(snapshot, diagnostics);

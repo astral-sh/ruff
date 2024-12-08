@@ -1,14 +1,15 @@
+use crate::types::{ClassLiteralType, Type};
+use crate::Db;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::types::Type;
-use crate::Db;
-
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TypeCheckDiagnostic {
     // TODO: Don't use string keys for rules
     pub(super) rule: String,
@@ -31,6 +32,28 @@ impl TypeCheckDiagnostic {
     }
 }
 
+impl Diagnostic for TypeCheckDiagnostic {
+    fn rule(&self) -> &str {
+        TypeCheckDiagnostic::rule(self)
+    }
+
+    fn message(&self) -> Cow<str> {
+        TypeCheckDiagnostic::message(self).into()
+    }
+
+    fn file(&self) -> File {
+        TypeCheckDiagnostic::file(self)
+    }
+
+    fn range(&self) -> Option<TextRange> {
+        Some(Ranged::range(self))
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+}
+
 impl Ranged for TypeCheckDiagnostic {
     fn range(&self) -> TextRange {
         self.range
@@ -50,10 +73,6 @@ pub struct TypeCheckDiagnostics {
 }
 
 impl TypeCheckDiagnostics {
-    pub fn new() -> Self {
-        Self { inner: Vec::new() }
-    }
-
     pub(super) fn push(&mut self, diagnostic: TypeCheckDiagnostic) {
         self.inner.push(Arc::new(diagnostic));
     }
@@ -125,7 +144,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         Self {
             db,
             file,
-            diagnostics: TypeCheckDiagnostics::new(),
+            diagnostics: TypeCheckDiagnostics::default(),
         }
     }
 
@@ -137,6 +156,23 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
             format_args!(
                 "Object of type `{}` is not iterable",
                 not_iterable_ty.display(self.db)
+            ),
+        );
+    }
+
+    /// Emit a diagnostic declaring that the object represented by `node` is not iterable
+    /// because its `__iter__` method is possibly unbound.
+    pub(super) fn add_not_iterable_possibly_unbound(
+        &mut self,
+        node: AnyNodeRef,
+        element_ty: Type<'db>,
+    ) {
+        self.add(
+            node,
+            "not-iterable",
+            format_args!(
+                "Object of type `{}` is not iterable because its `__iter__` method is possibly unbound",
+                element_ty.display(self.db)
             ),
         );
     }
@@ -209,7 +245,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         assigned_ty: Type<'db>,
     ) {
         match declared_ty {
-            Type::ClassLiteral(class) => {
+            Type::ClassLiteral(ClassLiteralType { class }) => {
                 self.add(node, "invalid-assignment", format_args!(
                         "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                         class.name(self.db)));

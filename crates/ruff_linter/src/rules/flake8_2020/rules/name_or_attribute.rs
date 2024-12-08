@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -35,13 +35,13 @@ use crate::checkers::ast::Checker;
 /// - [PyPI: `six`](https://pypi.org/project/six/)
 /// - [Six documentation: `six.PY2`](https://six.readthedocs.io/#six.PY2)
 /// - [Six documentation: `six.PY3`](https://six.readthedocs.io/#six.PY3)
-#[violation]
-pub struct SixPY3;
+#[derive(ViolationMetadata)]
+pub(crate) struct SixPY3;
 
 impl Violation for SixPY3 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`six.PY3` referenced (python4), use `not six.PY2`")
+        "`six.PY3` referenced (python4), use `not six.PY2`".to_string()
     }
 }
 

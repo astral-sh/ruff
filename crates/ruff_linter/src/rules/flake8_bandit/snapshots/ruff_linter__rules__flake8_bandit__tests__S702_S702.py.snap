@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S702.py:6:1: S702 Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks
   |
@@ -24,5 +25,3 @@ S702.py:9:1: S702 Mako templates allow HTML and JavaScript rendering by default 
 9 | template.Template("hern")
   | ^^^^^^^^^^^^^^^^^ S702
   |
-
-

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
@@ -47,8 +47,8 @@ use super::helpers::{self, DatetimeModuleAntipattern};
 ///
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
-#[violation]
-pub struct CallDatetimeFromtimestamp(DatetimeModuleAntipattern);
+#[derive(ViolationMetadata)]
+pub(crate) struct CallDatetimeFromtimestamp(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeFromtimestamp {
     #[derive_message_formats]
@@ -56,10 +56,10 @@ impl Violation for CallDatetimeFromtimestamp {
         let CallDatetimeFromtimestamp(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("`datetime.datetime.fromtimestamp()` called without a `tz` argument")
+                "`datetime.datetime.fromtimestamp()` called without a `tz` argument".to_string()
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("`tz=None` passed to `datetime.datetime.fromtimestamp()`")
+                "`tz=None` passed to `datetime.datetime.fromtimestamp()`".to_string()
             }
         }
     }

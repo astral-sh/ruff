@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
+snapshot_kind: text
 ---
 LOG002.py:11:11: LOG002 [*] Use `__name__` with `logging.getLogger()`
    |
@@ -78,5 +79,3 @@ LOG002.py:15:16: LOG002 [*] Use `__name__` with `logging.getLogger()`
 16 16 | 
 17 17 | 
 18 18 | # Override `logging.getLogger`
-
-

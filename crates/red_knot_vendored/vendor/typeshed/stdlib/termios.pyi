@@ -10,58 +10,38 @@ _AttrReturn: TypeAlias = list[Any]
 
 if sys.platform != "win32":
     B0: int
-    B1000000: int
     B110: int
     B115200: int
-    B1152000: int
     B1200: int
     B134: int
     B150: int
-    B1500000: int
     B1800: int
     B19200: int
     B200: int
-    B2000000: int
     B230400: int
     B2400: int
-    B2500000: int
     B300: int
-    B3000000: int
-    B3500000: int
     B38400: int
-    B4000000: int
-    B460800: int
     B4800: int
     B50: int
-    B500000: int
     B57600: int
-    B576000: int
     B600: int
     B75: int
-    B921600: int
     B9600: int
     BRKINT: int
     BS0: int
     BS1: int
     BSDLY: int
-    CBAUD: int
-    CBAUDEX: int
-    CDEL: int
     CDSUSP: int
     CEOF: int
     CEOL: int
-    CEOL2: int
     CEOT: int
     CERASE: int
-    CESC: int
     CFLUSH: int
-    CIBAUD: int
     CINTR: int
     CKILL: int
     CLNEXT: int
     CLOCAL: int
-    CNUL: int
-    COMMON: int
     CQUIT: int
     CR0: int
     CR1: int
@@ -80,7 +60,6 @@ if sys.platform != "win32":
     CSTOP: int
     CSTOPB: int
     CSUSP: int
-    CSWTCH: int
     CWERASE: int
     ECHO: int
     ECHOCTL: int
@@ -101,7 +80,6 @@ if sys.platform != "win32":
     FIONREAD: int
     FLUSHO: int
     HUPCL: int
-    IBSHIFT: int
     ICANON: int
     ICRNL: int
     IEXTEN: int
@@ -109,33 +87,21 @@ if sys.platform != "win32":
     IGNCR: int
     IGNPAR: int
     IMAXBEL: int
-    INIT_C_CC: int
     INLCR: int
     INPCK: int
-    IOCSIZE_MASK: int
-    IOCSIZE_SHIFT: int
     ISIG: int
     ISTRIP: int
-    IUCLC: int
     IXANY: int
     IXOFF: int
     IXON: int
-    N_MOUSE: int
-    N_PPP: int
-    N_SLIP: int
-    N_STRIP: int
-    N_TTY: int
-    NCC: int
     NCCS: int
     NL0: int
     NL1: int
     NLDLY: int
     NOFLSH: int
-    NSWTCH: int
     OCRNL: int
     OFDEL: int
     OFILL: int
-    OLCUC: int
     ONLCR: int
     ONLRET: int
     ONOCR: int
@@ -149,9 +115,6 @@ if sys.platform != "win32":
     TAB2: int
     TAB3: int
     TABDLY: int
-    TCFLSH: int
-    TCGETA: int
-    TCGETS: int
     TCIFLUSH: int
     TCIOFF: int
     TCIOFLUSH: int
@@ -162,28 +125,11 @@ if sys.platform != "win32":
     TCSADRAIN: int
     TCSAFLUSH: int
     TCSANOW: int
-    TCSASOFT: int
-    TCSBRK: int
-    TCSBRKP: int
-    TCSETA: int
-    TCSETAF: int
-    TCSETAW: int
-    TCSETS: int
-    TCSETSF: int
-    TCSETSW: int
-    TCXONC: int
     TIOCCONS: int
     TIOCEXCL: int
     TIOCGETD: int
-    TIOCGICOUNT: int
-    TIOCGLCKTRMIOS: int
     TIOCGPGRP: int
-    TIOCGSERIAL: int
-    TIOCGSIZE: int
-    TIOCGSOFTCAR: int
     TIOCGWINSZ: int
-    TIOCINQ: int
-    TIOCLINUX: int
     TIOCM_CAR: int
     TIOCM_CD: int
     TIOCM_CTS: int
@@ -198,7 +144,6 @@ if sys.platform != "win32":
     TIOCMBIC: int
     TIOCMBIS: int
     TIOCMGET: int
-    TIOCMIWAIT: int
     TIOCMSET: int
     TIOCNOTTY: int
     TIOCNXCL: int
@@ -212,23 +157,10 @@ if sys.platform != "win32":
     TIOCPKT_STOP: int
     TIOCPKT: int
     TIOCSCTTY: int
-    TIOCSER_TEMT: int
-    TIOCSERCONFIG: int
-    TIOCSERGETLSR: int
-    TIOCSERGETMULTI: int
-    TIOCSERGSTRUCT: int
-    TIOCSERGWILD: int
-    TIOCSERSETMULTI: int
-    TIOCSERSWILD: int
     TIOCSETD: int
-    TIOCSLCKTRMIOS: int
     TIOCSPGRP: int
-    TIOCSSERIAL: int
-    TIOCSSIZE: int
-    TIOCSSOFTCAR: int
     TIOCSTI: int
     TIOCSWINSZ: int
-    TIOCTTYGSTRUCT: int
     TOSTOP: int
     VDISCARD: int
     VEOF: int
@@ -244,15 +176,119 @@ if sys.platform != "win32":
     VSTART: int
     VSTOP: int
     VSUSP: int
-    VSWTC: int
-    VSWTCH: int
     VT0: int
     VT1: int
     VTDLY: int
     VTIME: int
     VWERASE: int
-    XCASE: int
-    XTABS: int
+
+    if sys.version_info >= (3, 13):
+        EXTPROC: int
+        IUTF8: int
+
+    if sys.platform == "darwin" and sys.version_info >= (3, 13):
+        ALTWERASE: int
+        B14400: int
+        B28800: int
+        B7200: int
+        B76800: int
+        CCAR_OFLOW: int
+        CCTS_OFLOW: int
+        CDSR_OFLOW: int
+        CDTR_IFLOW: int
+        CIGNORE: int
+        CRTS_IFLOW: int
+        MDMBUF: int
+        NL2: int
+        NL3: int
+        NOKERNINFO: int
+        ONOEOT: int
+        OXTABS: int
+        VDSUSP: int
+        VSTATUS: int
+
+    if sys.platform == "darwin" and sys.version_info >= (3, 11):
+        TIOCGSIZE: int
+        TIOCSSIZE: int
+
+    if sys.platform == "linux":
+        B1152000: int
+        B576000: int
+        CBAUD: int
+        CBAUDEX: int
+        CIBAUD: int
+        IOCSIZE_MASK: int
+        IOCSIZE_SHIFT: int
+        IUCLC: int
+        N_MOUSE: int
+        N_PPP: int
+        N_SLIP: int
+        N_STRIP: int
+        N_TTY: int
+        NCC: int
+        OLCUC: int
+        TCFLSH: int
+        TCGETA: int
+        TCGETS: int
+        TCSBRK: int
+        TCSBRKP: int
+        TCSETA: int
+        TCSETAF: int
+        TCSETAW: int
+        TCSETS: int
+        TCSETSF: int
+        TCSETSW: int
+        TCXONC: int
+        TIOCGICOUNT: int
+        TIOCGLCKTRMIOS: int
+        TIOCGSERIAL: int
+        TIOCGSOFTCAR: int
+        TIOCINQ: int
+        TIOCLINUX: int
+        TIOCMIWAIT: int
+        TIOCTTYGSTRUCT: int
+        TIOCSER_TEMT: int
+        TIOCSERCONFIG: int
+        TIOCSERGETLSR: int
+        TIOCSERGETMULTI: int
+        TIOCSERGSTRUCT: int
+        TIOCSERGWILD: int
+        TIOCSERSETMULTI: int
+        TIOCSERSWILD: int
+        TIOCSLCKTRMIOS: int
+        TIOCSSERIAL: int
+        TIOCSSOFTCAR: int
+        VSWTC: int
+        VSWTCH: int
+        XCASE: int
+        XTABS: int
+
+    if sys.platform != "darwin":
+        B1000000: int
+        B1500000: int
+        B2000000: int
+        B2500000: int
+        B3000000: int
+        B3500000: int
+        B4000000: int
+        B460800: int
+        B500000: int
+        B921600: int
+
+    if sys.platform != "linux":
+        TCSASOFT: int
+
+    if sys.platform != "darwin" and sys.platform != "linux":
+        # not available on FreeBSD either.
+        CDEL: int
+        CEOL2: int
+        CESC: int
+        CNUL: int
+        COMMON: int
+        CSWTCH: int
+        IBSHIFT: int
+        INIT_C_CC: int
+        NSWTCH: int
 
     def tcgetattr(fd: FileDescriptorLike, /) -> _AttrReturn: ...
     def tcsetattr(fd: FileDescriptorLike, when: int, attributes: _Attr, /) -> None: ...

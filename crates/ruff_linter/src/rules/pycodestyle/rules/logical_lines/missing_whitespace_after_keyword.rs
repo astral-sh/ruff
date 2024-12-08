@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
@@ -26,17 +26,17 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 ///
 /// ## References
 /// - [Python documentation: Keywords](https://docs.python.org/3/reference/lexical_analysis.html#keywords)
-#[violation]
-pub struct MissingWhitespaceAfterKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAfterKeyword;
 
 impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace after keyword")
+        "Missing whitespace after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Added missing whitespace after keyword")
+        "Added missing whitespace after keyword".to_string()
     }
 }
 

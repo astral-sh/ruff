@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{CmpOp, Expr};
 use ruff_text_size::Ranged;
 
@@ -30,19 +30,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
-#[violation]
-pub struct ComparisonWithItself {
+#[derive(ViolationMetadata)]
+pub(crate) struct ComparisonWithItself {
     actual: SourceCodeSnippet,
 }
 
 impl Violation for ComparisonWithItself {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ComparisonWithItself { actual } = self;
-        if let Some(actual) = actual.full_display() {
+        if let Some(actual) = self.actual.full_display() {
             format!("Name compared with itself, consider replacing `{actual}`")
         } else {
-            format!("Name compared with itself")
+            "Name compared with itself".to_string()
         }
     }
 }

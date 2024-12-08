@@ -47,7 +47,7 @@ jobs:
         working-directory: playground
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@v3.9.0
+        uses: cloudflare/wrangler-action@v3.13.0
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}

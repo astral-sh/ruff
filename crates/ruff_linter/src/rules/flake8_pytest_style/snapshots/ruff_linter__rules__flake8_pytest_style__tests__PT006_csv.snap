@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
-PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected a string of comma-separated values
+PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
    |
 24 | @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^^^^^^ PT006
@@ -20,7 +21,7 @@ PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 26 26 |     ...
 27 27 | 
 
-PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    |
 29 | @pytest.mark.parametrize(("param1",), [1, 2, 3])
    |                          ^^^^^^^^^^^ PT006
@@ -39,7 +40,7 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 31 31 |     ...
 32 32 | 
 
-PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected a string of comma-separated values
+PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
    |
 34 | @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^^^^^^ PT006
@@ -58,7 +59,7 @@ PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 36 36 |     ...
 37 37 | 
 
-PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`
+PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    |
 39 | @pytest.mark.parametrize(["param1"], [1, 2, 3])
    |                          ^^^^^^^^^^ PT006
@@ -77,7 +78,7 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `@pytest.mark.p
 41 41 |     ...
 42 42 | 
 
-PT006.py:44:26: PT006 Wrong type passed to first argument of `@pytest.mark.parametrize`; expected a string of comma-separated values
+PT006.py:44:26: PT006 Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
    |
 44 | @pytest.mark.parametrize([some_expr, another_expr], [1, 2, 3])
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
@@ -86,7 +87,7 @@ PT006.py:44:26: PT006 Wrong type passed to first argument of `@pytest.mark.param
    |
    = help: Use a string of comma-separated values for the first argument
 
-PT006.py:49:26: PT006 Wrong type passed to first argument of `@pytest.mark.parametrize`; expected a string of comma-separated values
+PT006.py:49:26: PT006 Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
    |
 49 | @pytest.mark.parametrize([some_expr, "param2"], [1, 2, 3])
    |                          ^^^^^^^^^^^^^^^^^^^^^ PT006

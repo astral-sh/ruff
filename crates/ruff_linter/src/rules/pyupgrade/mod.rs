@@ -83,7 +83,6 @@ mod tests {
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010.py"))]
-    #[test_case(Rule::UnpackedListComprehension, Path::new("UP027.py"))]
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"))]
     #[test_case(Rule::UselessObjectInheritance, Path::new("UP004.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"))]
@@ -97,19 +96,6 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
-    fn preview(rule_code: Rule, path: &Path) -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade").join(path),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(diagnostics);
         Ok(())
     }
 

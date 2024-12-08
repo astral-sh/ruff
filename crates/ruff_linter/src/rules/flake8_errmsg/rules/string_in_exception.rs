@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::whitespace;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_codegen::Stylist;
@@ -47,15 +47,15 @@ use crate::Locator;
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-#[violation]
-pub struct RawStringInException;
+#[derive(ViolationMetadata)]
+pub(crate) struct RawStringInException;
 
 impl Violation for RawStringInException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Exception must not use a string literal, assign to variable first")
+        "Exception must not use a string literal, assign to variable first".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -102,15 +102,15 @@ impl Violation for RawStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-#[violation]
-pub struct FStringInException;
+#[derive(ViolationMetadata)]
+pub(crate) struct FStringInException;
 
 impl Violation for FStringInException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Exception must not use an f-string literal, assign to variable first")
+        "Exception must not use an f-string literal, assign to variable first".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -158,15 +158,15 @@ impl Violation for FStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-#[violation]
-pub struct DotFormatInException;
+#[derive(ViolationMetadata)]
+pub(crate) struct DotFormatInException;
 
 impl Violation for DotFormatInException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Exception must not use a `.format()` string directly, assign to variable first")
+        "Exception must not use a `.format()` string directly, assign to variable first".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

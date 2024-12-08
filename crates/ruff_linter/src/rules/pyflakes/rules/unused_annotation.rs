@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Scope;
 use ruff_text_size::Ranged;
 
@@ -19,9 +19,9 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 484](https://peps.python.org/pep-0484/)
-#[violation]
-pub struct UnusedAnnotation {
+/// - [PEP 484 – Type Hints](https://peps.python.org/pep-0484/)
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedAnnotation {
     name: String,
 }
 

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 non_ascii_module_import.py:1:29: PLC2403 Module alias `łos` contains a non-ASCII character
   |

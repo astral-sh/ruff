@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -35,17 +35,17 @@ use crate::checkers::ast::Checker;
 ///     name: str
 ///     age: int
 /// ```
-#[violation]
-pub struct CollectionsNamedTuple;
+#[derive(ViolationMetadata)]
+pub(crate) struct CollectionsNamedTuple;
 
 impl Violation for CollectionsNamedTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `typing.NamedTuple` instead of `collections.namedtuple`")
+        "Use `typing.NamedTuple` instead of `collections.namedtuple`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `typing.NamedTuple`"))
+        Some("Replace with `typing.NamedTuple`".to_string())
     }
 }
 

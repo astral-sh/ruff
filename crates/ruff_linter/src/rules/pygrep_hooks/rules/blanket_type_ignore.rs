@@ -5,7 +5,7 @@ use memchr::memchr_iter;
 use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextSize;
 
@@ -40,13 +40,13 @@ use crate::Locator;
 /// [tool.mypy]
 /// enable_error_code = ["ignore-without-code"]
 /// ```
-#[violation]
-pub struct BlanketTypeIgnore;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlanketTypeIgnore;
 
 impl Violation for BlanketTypeIgnore {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use specific rule codes when ignoring type issues")
+        "Use specific rule codes when ignoring type issues".to_string()
     }
 }
 

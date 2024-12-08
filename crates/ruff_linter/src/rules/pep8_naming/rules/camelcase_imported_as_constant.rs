@@ -1,7 +1,7 @@
 use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
@@ -30,9 +30,23 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// from example import MyClassName
 /// ```
 ///
+/// ## Note
+/// Identifiers consisting of a single uppercase character are ambiguous under
+/// the rules of [PEP 8], which specifies `CamelCase` for classes and
+/// `ALL_CAPS_SNAKE_CASE` for constants. Without a second character, it is not
+/// possible to reliably guess whether the identifier is intended to be part
+/// of a `CamelCase` string for a class or an `ALL_CAPS_SNAKE_CASE` string for
+/// a constant, since both conventions will produce the same output when given
+/// a single input character. Therefore, this lint rule does not apply to cases
+/// where the alias for the imported identifier consists of a single uppercase
+/// character.
+///
+/// A common example of a single uppercase character being used for a class
+/// name can be found in Django's `django.db.models.Q` class.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/
-#[violation]
-pub struct CamelcaseImportedAsConstant {
+#[derive(ViolationMetadata)]
+pub(crate) struct CamelcaseImportedAsConstant {
     name: String,
     asname: String,
 }
@@ -53,6 +67,9 @@ pub(crate) fn camelcase_imported_as_constant(
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
+    // Single-character names are ambiguous. It could be a class or a constant.
+    asname.chars().nth(1)?;
+
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
         && str::is_cased_uppercase(asname)

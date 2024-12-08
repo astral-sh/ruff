@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{Arguments, Expr, Int};
@@ -57,8 +57,8 @@ use crate::fix::edits::pad;
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 /// - [Python documentation: `len`](https://docs.python.org/3/library/functions.html#len)
-#[violation]
-pub struct UnnecessaryEnumerate {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryEnumerate {
     subset: EnumerateSubset,
 }
 
@@ -67,23 +67,22 @@ impl Violation for UnnecessaryEnumerate {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryEnumerate { subset } = self;
-        match subset {
+        match self.subset {
             EnumerateSubset::Indices => {
-                format!("`enumerate` value is unused, use `for x in range(len(y))` instead")
+                "`enumerate` value is unused, use `for x in range(len(y))` instead".to_string()
             }
             EnumerateSubset::Values => {
-                format!("`enumerate` index is unused, use `for x in y` instead")
+                "`enumerate` index is unused, use `for x in y` instead".to_string()
             }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnnecessaryEnumerate { subset } = self;
-        match subset {
-            EnumerateSubset::Indices => Some("Replace with `range(len(...))`".to_string()),
-            EnumerateSubset::Values => Some("Remove `enumerate`".to_string()),
-        }
+        let title = match self.subset {
+            EnumerateSubset::Indices => "Replace with `range(len(...))`",
+            EnumerateSubset::Values => "Remove `enumerate`",
+        };
+        Some(title.to_string())
     }
 }
 

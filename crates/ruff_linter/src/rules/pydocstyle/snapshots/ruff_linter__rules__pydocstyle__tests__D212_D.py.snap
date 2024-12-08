@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:129:5: D212 [*] Multi-line docstring summary should start at the first line
     |
@@ -71,5 +72,3 @@ D.py:624:5: D212 [*] Multi-line docstring summary should start at the first line
 627 625 | 
 628 626 | 
 629 627 | @expect('D404: First word of the docstring should not be "This"')
-
-

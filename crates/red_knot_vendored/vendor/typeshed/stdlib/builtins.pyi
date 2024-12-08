@@ -107,7 +107,7 @@ class object:
     @property
     def __class__(self) -> type[Self]: ...
     @__class__.setter
-    def __class__(self, type: type[object], /) -> None: ...
+    def __class__(self, type: type[Self], /) -> None: ...
     def __init__(self) -> None: ...
     def __new__(cls) -> Self: ...
     # N.B. `object.__setattr__` and `object.__delattr__` are heavily special-cased by type checkers.
@@ -1284,9 +1284,7 @@ class property:
 
 @final
 class _NotImplementedType(Any):
-    # A little weird, but typing the __call__ as NotImplemented makes the error message
-    # for NotImplemented() much better
-    __call__: NotImplemented  # type: ignore[valid-type]  # pyright: ignore[reportInvalidTypeForm]
+    __call__: None
 
 NotImplemented: _NotImplementedType
 
@@ -1917,7 +1915,7 @@ class StopIteration(Exception):
 
 class OSError(Exception):
     errno: int | None
-    strerror: str
+    strerror: str | None
     # filename, filename2 are actually str | bytes | None
     filename: Any
     filename2: Any
@@ -1965,13 +1963,32 @@ class StopAsyncIteration(Exception):
 
 class SyntaxError(Exception):
     msg: str
+    filename: str | None
     lineno: int | None
     offset: int | None
     text: str | None
-    filename: str | None
+    # Errors are displayed differently if this attribute exists on the exception.
+    # The value is always None.
+    print_file_and_line: None
     if sys.version_info >= (3, 10):
         end_lineno: int | None
         end_offset: int | None
+
+    @overload
+    def __init__(self) -> None: ...
+    @overload
+    def __init__(self, msg: object, /) -> None: ...
+    # Second argument is the tuple (filename, lineno, offset, text)
+    @overload
+    def __init__(self, msg: str, info: tuple[str | None, int | None, int | None, str | None], /) -> None: ...
+    if sys.version_info >= (3, 10):
+        # end_lineno and end_offset must both be provided if one is.
+        @overload
+        def __init__(
+            self, msg: str, info: tuple[str | None, int | None, int | None, str | None, int | None, int | None], /
+        ) -> None: ...
+    # If you provide more than two arguments, it still creates the SyntaxError, but
+    # the arguments from the info tuple are not parsed. This form is omitted.
 
 class SystemError(Exception): ...
 class TypeError(Exception): ...

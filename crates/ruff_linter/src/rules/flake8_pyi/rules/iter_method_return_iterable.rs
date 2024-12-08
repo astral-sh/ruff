@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_text_size::Ranged;
 
@@ -68,19 +68,19 @@ use crate::checkers::ast::Checker;
 /// class Klass:
 ///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
-#[violation]
-pub struct IterMethodReturnIterable {
+#[derive(ViolationMetadata)]
+pub(crate) struct IterMethodReturnIterable {
     is_async: bool,
 }
 
 impl Violation for IterMethodReturnIterable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IterMethodReturnIterable { is_async } = self;
-        if *is_async {
-            format!("`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`")
+        if self.is_async {
+            "`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`"
+                .to_string()
         } else {
-            format!("`__iter__` methods should return an `Iterator`, not an `Iterable`")
+            "`__iter__` methods should return an `Iterator`, not an `Iterable`".to_string()
         }
     }
 }

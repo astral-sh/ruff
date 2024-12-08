@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_index::Indexer;
 use ruff_python_parser::TokenKind;
 use ruff_source_file::LineRanges;
@@ -29,13 +29,13 @@ use super::LogicalLine;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
-#[violation]
-pub struct RedundantBackslash;
+#[derive(ViolationMetadata)]
+pub(crate) struct RedundantBackslash;
 
 impl AlwaysFixableViolation for RedundantBackslash {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Redundant backslash")
+        "Redundant backslash".to_string()
     }
 
     fn fix_title(&self) -> String {

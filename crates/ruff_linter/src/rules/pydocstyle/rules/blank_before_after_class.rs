@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::{indentation_at_offset, PythonWhitespace};
 use ruff_source_file::{Line, LineRanges, UniversalNewlineIterator};
 use ruff_text_size::Ranged;
@@ -42,13 +42,13 @@ use crate::registry::Rule;
 /// - `lint.pydocstyle.convention`
 ///
 /// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
-#[violation]
-pub struct OneBlankLineBeforeClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct OneBlankLineBeforeClass;
 
 impl AlwaysFixableViolation for OneBlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("1 blank line required before class docstring")
+        "1 blank line required before class docstring".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -94,13 +94,13 @@ impl AlwaysFixableViolation for OneBlankLineBeforeClass {
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct OneBlankLineAfterClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct OneBlankLineAfterClass;
 
 impl AlwaysFixableViolation for OneBlankLineAfterClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("1 blank line required after class docstring")
+        "1 blank line required after class docstring".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -141,13 +141,13 @@ impl AlwaysFixableViolation for OneBlankLineAfterClass {
 /// - `lint.pydocstyle.convention`
 ///
 /// [D203]: https://docs.astral.sh/ruff/rules/one-blank-line-before-class
-#[violation]
-pub struct BlankLineBeforeClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLineBeforeClass;
 
 impl AlwaysFixableViolation for BlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No blank lines allowed before class docstring")
+        "No blank lines allowed before class docstring".to_string()
     }
 
     fn fix_title(&self) -> String {

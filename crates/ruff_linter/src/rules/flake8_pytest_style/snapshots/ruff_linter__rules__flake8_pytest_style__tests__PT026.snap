@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT026.py:19:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    |
@@ -37,5 +38,3 @@ PT026.py:24:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    24 |+
 25 25 | def test_error_no_parens():
 26 26 |     pass
-
-

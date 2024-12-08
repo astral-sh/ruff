@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
@@ -14,13 +14,13 @@ use crate::checkers::ast::Checker;
 ///
 /// At the module level, all names are global by default, so the `global`
 /// keyword is redundant.
-#[violation]
-pub struct GlobalAtModuleLevel;
+#[derive(ViolationMetadata)]
+pub(crate) struct GlobalAtModuleLevel;
 
 impl Violation for GlobalAtModuleLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`global` at module level is redundant")
+        "`global` at module level is redundant".to_string()
     }
 }
 

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::is_io_base_expr;
@@ -31,13 +31,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `io.IOBase.readlines`](https://docs.python.org/3/library/io.html#io.IOBase.readlines)
-#[violation]
+#[derive(ViolationMetadata)]
 pub(crate) struct ReadlinesInFor;
 
 impl AlwaysFixableViolation for ReadlinesInFor {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Instead of calling `readlines()`, iterate over file object directly")
+        "Instead of calling `readlines()`, iterate over file object directly".to_string()
     }
 
     fn fix_title(&self) -> String {

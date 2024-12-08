@@ -46,13 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v1
+      - uses: astral-sh/ruff-action@v2
 ```
 
 Alternatively, you can include `ruff-action` as a step in any other workflow file:
 
 ```yaml
-      - uses: astral-sh/ruff-action@v1
+      - uses: astral-sh/ruff-action@v2
 ```
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
@@ -61,12 +61,12 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 - `args`: The command-line arguments to pass to Ruff (default: `"check"`).
 - `src`: The source paths to pass to Ruff (default: `[".", "src"]`).
 
-For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
+For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
 ```yaml
-- uses: astral-sh/ruff-action@v1
+- uses: astral-sh/ruff-action@v2
   with:
-    version: 0.0.259
+    version: 0.8.0
     args: check --select B
     src: "./src"
 ```
@@ -80,13 +80,13 @@ You can add the following configuration to `.gitlab-ci.yml` to run a `ruff forma
   stage: build
   interruptible: true
   image:
-    name: ghcr.io/astral-sh/ruff:0.7.2-alpine
+    name: ghcr.io/astral-sh/ruff:0.8.2-alpine
   before_script:
     - cd $CI_PROJECT_DIR
     - ruff --version
 
 Ruff Check:
-  extends: .base_ruff  
+  extends: .base_ruff
   script:
     - ruff check --output-format=gitlab > code-quality-report.json
   artifacts:
@@ -106,7 +106,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.7.2
+  rev: v0.8.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -119,7 +119,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.7.2
+  rev: v0.8.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -133,7 +133,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.7.2
+  rev: v0.8.2
   hooks:
     # Run the linter.
     - id: ruff

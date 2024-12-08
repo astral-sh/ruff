@@ -4,7 +4,7 @@ use smallvec::SmallVec;
 
 use ast::{StmtClassDef, StmtFunctionDef};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, helpers::comment_indentation_after, AnyNodeRef};
 use ruff_python_trivia::{indentation_at_offset, SuppressionKind};
 use ruff_text_size::{Ranged, TextLen, TextRange};
@@ -49,8 +49,8 @@ use super::suppression_comment_visitor::{
 ///     # fmt: on
 ///     # yapf: enable
 /// ```
-#[violation]
-pub struct InvalidFormatterSuppressionComment {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidFormatterSuppressionComment {
     reason: IgnoredReason,
 }
 
@@ -64,7 +64,7 @@ impl AlwaysFixableViolation for InvalidFormatterSuppressionComment {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove this comment")
+        "Remove this comment".to_string()
     }
 }
 
@@ -203,7 +203,7 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
     }
 }
 
-impl<'src, 'loc> CaptureSuppressionComment<'src> for UselessSuppressionComments<'src, 'loc> {
+impl<'src> CaptureSuppressionComment<'src> for UselessSuppressionComments<'src, '_> {
     fn capture(&mut self, comment: SuppressionCommentData<'src>) {
         match self.check_suppression_comment(&comment) {
             Ok(()) => {}
@@ -278,6 +278,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::StmtIpyEscapeCommand(_)
         | AnyNodeRef::ExceptHandlerExceptHandler(_)
         | AnyNodeRef::MatchCase(_)
+        | AnyNodeRef::Decorator(_)
         | AnyNodeRef::ElifElseClause(_) => true,
 
         AnyNodeRef::ExprBoolOp(_)
@@ -333,7 +334,6 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::Keyword(_)
         | AnyNodeRef::Alias(_)
         | AnyNodeRef::WithItem(_)
-        | AnyNodeRef::Decorator(_)
         | AnyNodeRef::TypeParams(_)
         | AnyNodeRef::TypeParamTypeVar(_)
         | AnyNodeRef::TypeParamTypeVarTuple(_)

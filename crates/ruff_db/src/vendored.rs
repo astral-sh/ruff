@@ -270,7 +270,7 @@ impl VendoredZipArchive {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct NormalizedVendoredPath<'a>(Cow<'a, str>);
 
-impl<'a> NormalizedVendoredPath<'a> {
+impl NormalizedVendoredPath<'_> {
     fn with_trailing_slash(self) -> Self {
         debug_assert!(!self.0.ends_with('/'));
         let mut data = self.0.into_owned();
@@ -418,7 +418,7 @@ pub(crate) mod tests {
 
     #[test]
     fn filesystem_debug_implementation_alternate() {
-        assert_snapshot!(format!("{:#?}", mock_typeshed()), @r###"
+        assert_snapshot!(format!("{:#?}", mock_typeshed()), @r#"
         VendoredFileSystem {
             inner_mutex_poisoned: false,
             paths: [
@@ -454,7 +454,7 @@ pub(crate) mod tests {
                 },
             },
         }
-        "###);
+        "#);
     }
 
     fn test_directory(dirname: &str) {

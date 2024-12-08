@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -34,13 +34,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `__bytes__` method](https://docs.python.org/3/reference/datamodel.html#object.__bytes__)
-#[violation]
-pub struct InvalidBytesReturnType;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidBytesReturnType;
 
 impl Violation for InvalidBytesReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__bytes__` does not return `bytes`")
+        "`__bytes__` does not return `bytes`".to_string()
     }
 }
 

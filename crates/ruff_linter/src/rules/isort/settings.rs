@@ -13,7 +13,7 @@ use crate::display_settings;
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
 use ruff_macros::CacheKey;
-use ruff_python_semantic::NameImport;
+use ruff_python_semantic::{Alias, MemberNameImport, ModuleNameImport, NameImport};
 
 use super::categorize::ImportSection;
 
@@ -73,6 +73,29 @@ pub struct Settings {
     pub from_first: bool,
     pub length_sort: bool,
     pub length_sort_straight: bool,
+}
+
+impl Settings {
+    pub fn requires_module_import(&self, name: String, as_name: Option<String>) -> bool {
+        self.required_imports
+            .contains(&NameImport::Import(ModuleNameImport {
+                name: Alias { name, as_name },
+            }))
+    }
+    pub fn requires_member_import(
+        &self,
+        module: Option<String>,
+        name: String,
+        as_name: Option<String>,
+        level: u32,
+    ) -> bool {
+        self.required_imports
+            .contains(&NameImport::ImportFrom(MemberNameImport {
+                module,
+                name: Alias { name, as_name },
+                level,
+            }))
+    }
 }
 
 impl Default for Settings {

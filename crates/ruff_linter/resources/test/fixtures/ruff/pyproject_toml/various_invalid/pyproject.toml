@@ -1,0 +1,37 @@
+[build-system]
+requires = [ "maturin>=0.14", "numpy", "wheel", "patchelf",]
+build-backend = "maturin"
+
+[project]
+name = "..."
+license-files = [ "license.txt",]
+requires-python = ">=3.8"
+requires-dist = [ "maturin>=0.14", "...",]
+dependencies = [ "packaging", "...",]
+zip-safe = false
+version = "..."
+readme = "..."
+description = "..."
+classifiers = [ "...",]
+[[project.authors]]
+name = "..."
+email = "..."
+
+[project.urls]
+homepage = "..."
+documentation = "..."
+repository = "..."
+
+[project.optional-dependencies]
+test = [ "coverage", "...",]
+docs = [ "sphinx", "sphinx-rtd-theme",]
+devel = []
+
+[tool.maturin]
+include = [ "...",]
+bindings = "pyo3"
+compatibility = "manylinux2014"
+
+[tool.pytest.ini_options]
+testpaths = [ "...",]
+addopts = "--color=yes --tb=native --cov-report term --cov-report html:docs/dist_coverage --cov=aisdb --doctest-modules --envfile .env"

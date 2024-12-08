@@ -1,1 +1,3 @@
 INHERIT: mkdocs.generated.yml
+watch:
+  - mkdocs.generated.yml

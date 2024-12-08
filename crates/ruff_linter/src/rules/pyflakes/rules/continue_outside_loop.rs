@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -19,13 +19,13 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Python documentation: `continue`](https://docs.python.org/3/reference/simple_stmts.html#the-continue-statement)
-#[violation]
-pub struct ContinueOutsideLoop;
+#[derive(ViolationMetadata)]
+pub(crate) struct ContinueOutsideLoop;
 
 impl Violation for ContinueOutsideLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`continue` not properly in loop")
+        "`continue` not properly in loop".to_string()
     }
 }
 

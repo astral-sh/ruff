@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
 ---
 PT024.py:14:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
@@ -73,5 +74,3 @@ PT024.py:33:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 33    |-@pytest.mark.asyncio
 34 33 | async def my_fixture():  # Error after no parens
 35 34 |     return 0
-
-

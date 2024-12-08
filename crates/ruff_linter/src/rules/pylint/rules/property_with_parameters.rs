@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{identifier::Identifier, Decorator, Parameters, Stmt};
 use ruff_python_semantic::analyze::visibility::is_property;
 
@@ -34,13 +34,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `property`](https://docs.python.org/3/library/functions.html#property)
-#[violation]
-pub struct PropertyWithParameters;
+#[derive(ViolationMetadata)]
+pub(crate) struct PropertyWithParameters;
 
 impl Violation for PropertyWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Cannot have defined parameters for properties")
+        "Cannot have defined parameters for properties".to_string()
     }
 }
 

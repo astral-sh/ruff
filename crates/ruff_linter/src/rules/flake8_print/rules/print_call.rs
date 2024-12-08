@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -32,15 +32,15 @@ use crate::registry::AsRule;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may remove `print` statements
 /// that are used beyond debugging purposes.
-#[violation]
-pub struct Print;
+#[derive(ViolationMetadata)]
+pub(crate) struct Print;
 
 impl Violation for Print {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`print` found")
+        "`print` found".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -79,15 +79,15 @@ impl Violation for Print {
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may remove `pprint` statements
 /// that are used beyond debugging purposes.
-#[violation]
-pub struct PPrint;
+#[derive(ViolationMetadata)]
+pub(crate) struct PPrint;
 
 impl Violation for PPrint {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pprint` found")
+        "`pprint` found".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

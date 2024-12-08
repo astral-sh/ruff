@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Alias;
 
 use crate::checkers::ast::Checker;
@@ -16,10 +16,33 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// Builtins can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
 ///
+/// ## Example
+/// ```python
+/// from rich import print
+///
+/// print("Some message")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from rich import print as rich_print
+///
+/// rich_print("Some message")
+/// ```
+///
+/// or:
+/// ```python
+/// import rich
+///
+/// rich.print("Some message")
+/// ```
+///
 /// ## Options
 /// - `lint.flake8-builtins.builtins-ignorelist`
-#[violation]
-pub struct BuiltinImportShadowing {
+/// - `target-version`
+///
+#[derive(ViolationMetadata)]
+pub(crate) struct BuiltinImportShadowing {
     name: String,
 }
 

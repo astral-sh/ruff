@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::TextRange;
@@ -29,19 +29,19 @@ use super::super::detection::comment_contains_code;
 /// - `lint.task-tags`
 ///
 /// [#4845]: https://github.com/astral-sh/ruff/issues/4845
-#[violation]
-pub struct CommentedOutCode;
+#[derive(ViolationMetadata)]
+pub(crate) struct CommentedOutCode;
 
 impl Violation for CommentedOutCode {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Found commented-out code")
+        "Found commented-out code".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove commented-out code"))
+        Some("Remove commented-out code".to_string())
     }
 }
 

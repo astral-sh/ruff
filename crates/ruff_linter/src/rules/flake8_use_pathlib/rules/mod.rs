@@ -1,3 +1,4 @@
+pub(crate) use dotless_pathlib_with_suffix::*;
 pub(crate) use glob_rule::*;
 pub(crate) use os_path_getatime::*;
 pub(crate) use os_path_getctime::*;
@@ -7,6 +8,7 @@ pub(crate) use os_sep_split::*;
 pub(crate) use path_constructor_current_directory::*;
 pub(crate) use replaceable_by_pathlib::*;
 
+mod dotless_pathlib_with_suffix;
 mod glob_rule;
 mod os_path_getatime;
 mod os_path_getctime;

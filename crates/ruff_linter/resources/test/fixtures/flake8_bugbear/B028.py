@@ -9,3 +9,9 @@ warnings.warn(DeprecationWarning("test"))
 warnings.warn(DeprecationWarning("test"), source=None)
 warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
 warnings.warn(DeprecationWarning("test"), stacklevel=1)
+
+warnings.warn(
+        DeprecationWarning("test"),
+        # some comments here
+        source = None # no trailing comma
+    )

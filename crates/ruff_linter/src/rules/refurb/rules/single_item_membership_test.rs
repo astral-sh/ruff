@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprStringLiteral};
 use ruff_text_size::Ranged;
@@ -28,8 +28,8 @@ use crate::fix::edits::pad;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
-#[violation]
-pub struct SingleItemMembershipTest {
+#[derive(ViolationMetadata)]
+pub(crate) struct SingleItemMembershipTest {
     membership_test: MembershipTest,
 }
 
@@ -38,7 +38,7 @@ impl Violation for SingleItemMembershipTest {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Membership test against single-item container")
+        "Membership test against single-item container".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

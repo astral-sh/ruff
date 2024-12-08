@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, FixAvailability};
 use ruff_diagnostics::{Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextSize};
@@ -65,8 +65,8 @@ use crate::rules::flake8_comprehensions::fixes;
 /// rewriting some comprehensions.
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct UnnecessaryComprehensionInCall {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryComprehensionInCall {
     comprehension_kind: ComprehensionKind,
 }
 
@@ -76,8 +76,8 @@ impl Violation for UnnecessaryComprehensionInCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.comprehension_kind {
-            ComprehensionKind::List => format!("Unnecessary list comprehension"),
-            ComprehensionKind::Set => format!("Unnecessary set comprehension"),
+            ComprehensionKind::List => "Unnecessary list comprehension".to_string(),
+            ComprehensionKind::Set => "Unnecessary set comprehension".to_string(),
         }
     }
 

@@ -58,3 +58,13 @@ x = {
 t={"x":"test123", "x":("test123")}
 
 t={"x":("test123"), "x":"test123"}
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/12772
+x = {
+    1: "abc",
+    1: "def",
+    True: "ghi",
+    0: "foo",
+    0: "bar",
+    False: "baz",
+}

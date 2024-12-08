@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -27,14 +27,14 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
-#[violation]
-pub struct QuotedAnnotationInStub;
+/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
+#[derive(ViolationMetadata)]
+pub(crate) struct QuotedAnnotationInStub;
 
 impl AlwaysFixableViolation for QuotedAnnotationInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Quoted annotations should not be included in stubs")
+        "Quoted annotations should not be included in stubs".to_string()
     }
 
     fn fix_title(&self) -> String {

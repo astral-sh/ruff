@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -36,8 +36,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
-#[violation]
-pub struct CollectionLiteralConcatenation {
+#[derive(ViolationMetadata)]
+pub(crate) struct CollectionLiteralConcatenation {
     expression: SourceCodeSnippet,
 }
 
@@ -46,21 +46,19 @@ impl Violation for CollectionLiteralConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CollectionLiteralConcatenation { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!("Consider `{expression}` instead of concatenation")
         } else {
-            format!("Consider iterable unpacking instead of concatenation")
+            "Consider iterable unpacking instead of concatenation".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let CollectionLiteralConcatenation { expression } = self;
-        if let Some(expression) = expression.full_display() {
-            Some(format!("Replace with `{expression}`"))
-        } else {
-            Some(format!("Replace with iterable unpacking"))
-        }
+        let title = match self.expression.full_display() {
+            Some(expression) => format!("Replace with `{expression}`"),
+            None => "Replace with iterable unpacking".to_string(),
+        };
+        Some(title)
     }
 }
 

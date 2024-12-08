@@ -139,7 +139,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-    `#[violation]` to see examples.
+    `#[derive(ViolationMetadata)]` to see examples.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
@@ -863,7 +863,7 @@ each configuration file.
 
 The package root is used to determine a file's "module path". Consider, again, `baz.py`. In that
 case, `./my_project/src/foo` was identified as the package root, so the module path for `baz.py`
-would resolve to  `foo.bar.baz` — as computed by taking the relative path from the package root
+would resolve to `foo.bar.baz` — as computed by taking the relative path from the package root
 (inclusive of the root itself). The module path can be thought of as "the path you would use to
 import the module" (e.g., `import foo.bar.baz`).
 

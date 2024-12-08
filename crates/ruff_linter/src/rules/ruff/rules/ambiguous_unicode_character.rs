@@ -3,7 +3,7 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -46,8 +46,8 @@ use crate::Locator;
 /// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct AmbiguousUnicodeCharacterString {
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousUnicodeCharacterString {
     confusable: char,
     representant: char,
 }
@@ -99,8 +99,8 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct AmbiguousUnicodeCharacterDocstring {
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
     representant: char,
 }
@@ -152,8 +152,8 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct AmbiguousUnicodeCharacterComment {
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousUnicodeCharacterComment {
     confusable: char,
     representant: char,
 }
@@ -302,9 +302,9 @@ bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct WordFlags: u8 {
         /// The word contains at least one ASCII character (like `B`).
-        const ASCII = 0b0000_0001;
+        const ASCII = 1 << 0;
         /// The word contains at least one unambiguous unicode character (like `β`).
-        const UNAMBIGUOUS_UNICODE = 0b0000_0010;
+        const UNAMBIGUOUS_UNICODE = 1 << 1;
     }
 }
 

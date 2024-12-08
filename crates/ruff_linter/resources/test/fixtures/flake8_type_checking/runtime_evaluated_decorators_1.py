@@ -9,10 +9,10 @@ from attrs import frozen
 import numpy
 
 if TYPE_CHECKING:
-    import datetime  # TCH004
-    from array import array  # TCH004
+    import datetime  # TC004
+    from array import array  # TC004
 
-    import pandas  # TCH004
+    import pandas  # TC004
     import pyproj
 
 

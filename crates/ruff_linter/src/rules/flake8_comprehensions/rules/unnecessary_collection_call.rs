@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -9,7 +9,7 @@ use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::rules::flake8_comprehensions::settings::Settings;
 
 /// ## What it does
-/// Checks for unnecessary `dict`, `list` or `tuple` calls that can be
+/// Checks for unnecessary `dict()`, `list()` or `tuple()` calls that can be
 /// rewritten as empty literals.
 ///
 /// ## Why is this bad?
@@ -39,16 +39,16 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 ///
 /// ## Options
 /// - `lint.flake8-comprehensions.allow-dict-calls-with-keyword-arguments`
-#[violation]
-pub struct UnnecessaryCollectionCall {
-    obj_type: String,
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryCollectionCall {
+    kind: Collection,
 }
 
 impl AlwaysFixableViolation for UnnecessaryCollectionCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryCollectionCall { obj_type } = self;
-        format!("Unnecessary `{obj_type}` call (rewrite as a literal)")
+        let UnnecessaryCollectionCall { kind } = self;
+        format!("Unnecessary `{kind}()` call (rewrite as a literal)")
     }
 
     fn fix_title(&self) -> String {
@@ -88,12 +88,8 @@ pub(crate) fn unnecessary_collection_call(
         _ => return,
     };
 
-    let mut diagnostic = Diagnostic::new(
-        UnnecessaryCollectionCall {
-            obj_type: builtin.to_string(),
-        },
-        call.range(),
-    );
+    let mut diagnostic =
+        Diagnostic::new(UnnecessaryCollectionCall { kind: collection }, call.range());
 
     // Convert `dict()` to `{}`.
     if call.arguments.keywords.is_empty() {
@@ -136,8 +132,25 @@ pub(crate) fn unnecessary_collection_call(
     checker.diagnostics.push(diagnostic);
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Collection {
     Tuple,
     List,
     Dict,
+}
+
+impl Collection {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Dict => "dict",
+            Self::List => "list",
+            Self::Tuple => "tuple",
+        }
+    }
+}
+
+impl std::fmt::Display for Collection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }

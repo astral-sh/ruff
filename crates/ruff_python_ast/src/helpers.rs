@@ -12,8 +12,8 @@ use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, CmpOp, ExceptHandler, Expr, FStringElement, MatchCase, Operator,
-    Pattern, Stmt, TypeParam,
+    self as ast, Arguments, CmpOp, DictItem, ExceptHandler, Expr, FStringElement, MatchCase,
+    Operator, Pattern, Stmt, TypeParam,
 };
 use crate::{AnyNodeRef, ExprContext};
 
@@ -1118,6 +1118,8 @@ pub enum Truthiness {
     Falsey,
     /// The expression evaluates to a `True`-like value (e.g., `1`, `"foo"`).
     Truthy,
+    /// The expression evaluates to `None`.
+    None,
     /// The expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
     Unknown,
 }
@@ -1173,7 +1175,7 @@ impl Truthiness {
                     Self::False
                 }
             }
-            Expr::NoneLiteral(_) => Self::Falsey,
+            Expr::NoneLiteral(_) => Self::None,
             Expr::EllipsisLiteral(_) => Self::Truthy,
             Expr::FString(f_string) => {
                 if is_empty_f_string(f_string) {
@@ -1188,14 +1190,32 @@ impl Truthiness {
             | Expr::Set(ast::ExprSet { elts, .. })
             | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 if elts.is_empty() {
-                    Self::Falsey
+                    return Self::Falsey;
+                }
+
+                if elts.iter().all(Expr::is_starred_expr) {
+                    // [*foo] / [*foo, *bar]
+                    Self::Unknown
                 } else {
                     Self::Truthy
                 }
             }
             Expr::Dict(dict) => {
                 if dict.is_empty() {
-                    Self::Falsey
+                    return Self::Falsey;
+                }
+
+                if dict.items.iter().all(|item| {
+                    matches!(
+                        item,
+                        DictItem {
+                            key: None,
+                            value: Expr::Name(..)
+                        }
+                    )
+                }) {
+                    // {**foo} / {**foo, **bar}
+                    Self::Unknown
                 } else {
                     Self::Truthy
                 }
@@ -1229,6 +1249,7 @@ impl Truthiness {
         match self {
             Self::True | Self::Truthy => Some(true),
             Self::False | Self::Falsey => Some(false),
+            Self::None => Some(false),
             Self::Unknown => None,
         }
     }

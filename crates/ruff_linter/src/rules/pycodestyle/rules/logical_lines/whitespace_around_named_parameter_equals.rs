@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -31,17 +31,17 @@ use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLi
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
-#[violation]
-pub struct UnexpectedSpacesAroundKeywordParameterEquals;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnexpectedSpacesAroundKeywordParameterEquals;
 
 impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unexpected spaces around keyword / parameter equals")
+        "Unexpected spaces around keyword / parameter equals".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove whitespace")
+        "Remove whitespace".to_string()
     }
 }
 
@@ -70,17 +70,17 @@ impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
-#[violation]
-pub struct MissingWhitespaceAroundParameterEquals;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundParameterEquals;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around parameter equals")
+        "Missing whitespace around parameter equals".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 

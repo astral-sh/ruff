@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_const_false;
 
 use crate::checkers::ast::Checker;
@@ -34,13 +34,14 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
-#[violation]
-pub struct AssertFalse;
+#[derive(ViolationMetadata)]
+pub(crate) struct AssertFalse;
 
 impl AlwaysFixableViolation for AssertFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`")
+        "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
+            .to_string()
     }
 
     fn fix_title(&self) -> String {

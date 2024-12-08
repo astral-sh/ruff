@@ -6,7 +6,7 @@ use ruff_source_file::LineIndex;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
-use crate::semantic_index::ast_ids::HasScopedAstId;
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::semantic_index;
 use crate::types::{binding_ty, infer_scope_types, Type};
 use crate::Db;
@@ -54,7 +54,7 @@ impl HasTy for ast::ExpressionRef<'_> {
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        let expression_id = self.scoped_ast_id(model.db, scope);
+        let expression_id = self.scoped_expression_id(model.db, scope);
         infer_scope_types(model.db, scope).expression_ty(expression_id)
     }
 }
@@ -166,31 +166,15 @@ impl_binding_has_ty!(ast::ParameterWithDefault);
 mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
-    use crate::{HasTy, ProgramSettings, SemanticModel};
-
-    fn setup_db<'a>(files: impl IntoIterator<Item = (&'a str, &'a str)>) -> anyhow::Result<TestDb> {
-        let mut db = TestDb::new();
-        db.write_files(files)?;
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(SystemPathBuf::from("/src")),
-            },
-        )?;
-
-        Ok(db)
-    }
+    use crate::db::tests::TestDbBuilder;
+    use crate::{HasTy, SemanticModel};
 
     #[test]
     fn function_ty() -> anyhow::Result<()> {
-        let db = setup_db([("/src/foo.py", "def test(): pass")])?;
+        let db = TestDbBuilder::new()
+            .with_file("/src/foo.py", "def test(): pass")
+            .build()?;
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
@@ -207,7 +191,9 @@ mod tests {
 
     #[test]
     fn class_ty() -> anyhow::Result<()> {
-        let db = setup_db([("/src/foo.py", "class Test: pass")])?;
+        let db = TestDbBuilder::new()
+            .with_file("/src/foo.py", "class Test: pass")
+            .build()?;
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
@@ -224,10 +210,10 @@ mod tests {
 
     #[test]
     fn alias_ty() -> anyhow::Result<()> {
-        let db = setup_db([
-            ("/src/foo.py", "class Test: pass"),
-            ("/src/bar.py", "from foo import Test"),
-        ])?;
+        let db = TestDbBuilder::new()
+            .with_file("/src/foo.py", "class Test: pass")
+            .with_file("/src/bar.py", "from foo import Test")
+            .build()?;
 
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 

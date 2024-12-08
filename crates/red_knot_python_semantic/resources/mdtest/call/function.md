@@ -16,7 +16,16 @@ async def get_int_async() -> int:
     return 42
 
 # TODO: we don't yet support `types.CoroutineType`, should be generic `Coroutine[Any, Any, int]`
-reveal_type(get_int_async())  # revealed: @Todo
+reveal_type(get_int_async())  # revealed: @Todo(generic types.CoroutineType)
+```
+
+## Generic
+
+```py
+def get_int[T]() -> int:
+    return 42
+
+reveal_type(get_int())  # revealed: int
 ```
 
 ## Decorated
@@ -35,7 +44,7 @@ def bar() -> str:
     return "bar"
 
 # TODO: should reveal `int`, as the decorator replaces `bar` with `foo`
-reveal_type(bar())  # revealed: @Todo
+reveal_type(bar())  # revealed: @Todo(return type)
 ```
 
 ## Invalid callable
@@ -43,4 +52,17 @@ reveal_type(bar())  # revealed: @Todo
 ```py
 nonsense = 123
 x = nonsense()  # error: "Object of type `Literal[123]` is not callable"
+```
+
+## Potentially unbound function
+
+```py
+def flag() -> bool: ...
+
+if flag():
+    def foo() -> int:
+        return 42
+
+# error: [possibly-unresolved-reference]
+reveal_type(foo())  # revealed: int
 ```

@@ -2,7 +2,7 @@ use anyhow::Result;
 use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::AstNode;
 use ruff_python_ast::{self as ast, Arguments, Expr};
@@ -52,17 +52,17 @@ use crate::importer::ImportRequest;
 /// - [_How do I make a flat list out of a list of lists?_](https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists/953097#953097)
 ///
 /// [microbenchmarks]: https://github.com/astral-sh/ruff/issues/5073#issuecomment-1591836349
-#[violation]
-pub struct QuadraticListSummation;
+#[derive(ViolationMetadata)]
+pub(crate) struct QuadraticListSummation;
 
 impl AlwaysFixableViolation for QuadraticListSummation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid quadratic list summation")
+        "Avoid quadratic list summation".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `functools.reduce`")
+        "Replace with `functools.reduce`".to_string()
     }
 }
 

@@ -68,7 +68,7 @@ impl Session {
             let system = LSPSystem::new(index.clone());
 
             // TODO(dhruvmanila): Get the values from the client settings
-            let metadata = WorkspaceMetadata::from_path(system_path, &system, None)?;
+            let metadata = WorkspaceMetadata::discover(system_path, &system, None)?;
             // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
             workspaces.insert(path, RootDatabase::new(metadata, system)?);
         }

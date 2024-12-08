@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
@@ -36,14 +36,14 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `yield` statement](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
-/// - [PEP 380](https://peps.python.org/pep-0380/)
-#[violation]
-pub struct YieldInForLoop;
+/// - [PEP 380 – Syntax for Delegating to a Subgenerator](https://peps.python.org/pep-0380/)
+#[derive(ViolationMetadata)]
+pub(crate) struct YieldInForLoop;
 
 impl AlwaysFixableViolation for YieldInForLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace `yield` over `for` loop with `yield from`")
+        "Replace `yield` over `for` loop with `yield from`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -149,7 +149,7 @@ fn is_same_expr(left: &Expr, right: &Expr) -> bool {
 
 /// Collect all named variables in an expression consisting solely of tuples and
 /// names.
-fn collect_names<'a>(expr: &'a Expr) -> Box<dyn Iterator<Item = &ast::ExprName> + 'a> {
+fn collect_names<'a>(expr: &'a Expr) -> Box<dyn Iterator<Item = &'a ast::ExprName> + 'a> {
     Box::new(
         expr.as_name_expr().into_iter().chain(
             expr.as_tuple_expr()

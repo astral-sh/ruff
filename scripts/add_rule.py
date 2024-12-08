@@ -93,7 +93,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
         fp.write(
             f"""\
 use ruff_diagnostics::Violation;
-use ruff_macros::{{derive_message_formats, violation}};
+use ruff_macros::{{derive_message_formats, ViolationMetadata}};
 
 use crate::checkers::ast::Checker;
 
@@ -108,8 +108,8 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// ```
-#[violation]
-pub struct {name};
+#[derive(ViolationMetadata)]
+pub(crate) struct {name};
 
 impl Violation for {name} {{
     #[derive_message_formats]

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_diagnostics::{Applicability, Edit};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
@@ -37,10 +37,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
-#[violation]
-pub struct InDictKeys {
+#[derive(ViolationMetadata)]
+pub(crate) struct InDictKeys {
     operator: String,
 }
 
@@ -52,8 +50,7 @@ impl AlwaysFixableViolation for InDictKeys {
     }
 
     fn fix_title(&self) -> String {
-        let InDictKeys { operator: _ } = self;
-        format!("Remove `.keys()`")
+        "Remove `.keys()`".to_string()
     }
 }
 

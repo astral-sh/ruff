@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -45,13 +45,13 @@ use crate::fix::edits::add_argument;
 ///
 /// ## References
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
-#[violation]
-pub struct SubprocessRunWithoutCheck;
+#[derive(ViolationMetadata)]
+pub(crate) struct SubprocessRunWithoutCheck;
 
 impl AlwaysFixableViolation for SubprocessRunWithoutCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`subprocess.run` without explicit `check` argument")
+        "`subprocess.run` without explicit `check` argument".to_string()
     }
 
     fn fix_title(&self) -> String {

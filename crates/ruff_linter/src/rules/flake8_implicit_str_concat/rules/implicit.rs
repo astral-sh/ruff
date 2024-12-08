@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
@@ -34,15 +34,30 @@ use crate::Locator;
 /// ```python
 /// z = "The quick brown fox."
 /// ```
-#[violation]
-pub struct SingleLineImplicitStringConcatenation;
+///
+/// # Formatter compatibility
+/// Use of this rule alongside the [formatter] must be handled with care.
+/// Currently, the [formatter] can introduce new single-line implicitly
+/// concatenated strings, therefore we suggest rerunning the linter and
+/// [formatter] in the following order:
+/// 1. Run the linter with this rule (`ISC001`) disabled
+/// 2. Run the [formatter]
+/// 3. Rerun the linter with this rule (`ISC001`) enabled
+///
+/// This is one of very few cases where the [formatter] can produce code that
+/// contains lint violations. It is a known issue that should be resolved by the
+/// new 2025 style guide.
+///
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
+#[derive(ViolationMetadata)]
+pub(crate) struct SingleLineImplicitStringConcatenation;
 
 impl Violation for SingleLineImplicitStringConcatenation {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals on one line")
+        "Implicitly concatenated string literals on one line".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -81,14 +96,29 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// ## Options
 /// - `lint.flake8-implicit-str-concat.allow-multiline`
 ///
+/// # Formatter compatibility
+/// Use of this rule alongside the [formatter] must be handled with care.
+/// Currently, the [formatter] can introduce new multi-line implicitly
+/// concatenated strings, therefore we suggest rerunning the linter and
+/// [formatter] in the following order:
+///
+/// 1. Run the linter with this rule (`ISC002`) disabled
+/// 2. Run the [formatter]
+/// 3. Rerun the linter with this rule (`ISC002`) enabled
+///
+/// This is one of very few cases where the [formatter] can produce code that
+/// contains lint violations. It is a known issue that should be resolved by the
+/// new 2025 style guide.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
-#[violation]
-pub struct MultiLineImplicitStringConcatenation;
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
+#[derive(ViolationMetadata)]
+pub(crate) struct MultiLineImplicitStringConcatenation;
 
 impl Violation for MultiLineImplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over multiple lines")
+        "Implicitly concatenated string literals over multiple lines".to_string()
     }
 }
 

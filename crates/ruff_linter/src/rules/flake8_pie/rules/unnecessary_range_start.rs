@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysFixableViolation, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -27,17 +27,17 @@ use crate::fix::edits::{remove_argument, Parentheses};
 ///
 /// ## References
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
-#[violation]
-pub struct UnnecessaryRangeStart;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryRangeStart;
 
 impl AlwaysFixableViolation for UnnecessaryRangeStart {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary `start` argument in `range`")
+        "Unnecessary `start` argument in `range`".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove `start` argument")
+        "Remove `start` argument".to_string()
     }
 }
 

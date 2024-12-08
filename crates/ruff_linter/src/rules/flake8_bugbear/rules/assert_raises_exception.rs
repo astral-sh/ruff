@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, WithItem};
 use ruff_text_size::Ranged;
 
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// self.assertRaises(SomeSpecificException, foo)
 /// ```
-#[violation]
-pub struct AssertRaisesException {
+#[derive(ViolationMetadata)]
+pub(crate) struct AssertRaisesException {
     assertion: AssertionKind,
     exception: ExceptionKind,
 }

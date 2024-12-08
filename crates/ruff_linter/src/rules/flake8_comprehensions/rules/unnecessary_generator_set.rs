@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::ExprGenerator;
@@ -11,8 +11,8 @@ use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary generators that can be rewritten as `set`
-/// comprehensions (or with `set` directly).
+/// Checks for unnecessary generators that can be rewritten as set
+/// comprehensions (or with `set()` directly).
 ///
 /// ## Why is this bad?
 /// It is unnecessary to use `set` around a generator expression, since
@@ -38,8 +38,8 @@ use super::helpers;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-#[violation]
-pub struct UnnecessaryGeneratorSet {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryGeneratorSet {
     short_circuit: bool,
 }
 
@@ -47,9 +47,9 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.short_circuit {
-            format!("Unnecessary generator (rewrite using `set()`)")
+            "Unnecessary generator (rewrite using `set()`)".to_string()
         } else {
-            format!("Unnecessary generator (rewrite as a `set` comprehension)")
+            "Unnecessary generator (rewrite as a set comprehension)".to_string()
         }
     }
 
@@ -57,7 +57,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
         if self.short_circuit {
             "Rewrite using `set()`".to_string()
         } else {
-            "Rewrite as a `set` comprehension".to_string()
+            "Rewrite as a set comprehension".to_string()
         }
     }
 }
@@ -72,16 +72,16 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
     ) else {
         return;
     };
-    if !checker.semantic().has_builtin_binding("set") {
-        return;
-    }
 
-    let Some(ExprGenerator {
+    let ast::Expr::Generator(ExprGenerator {
         elt, generators, ..
-    }) = argument.as_generator_expr()
+    }) = argument
     else {
         return;
     };
+    if !checker.semantic().has_builtin_binding("set") {
+        return;
+    }
 
     // Short-circuit: given `set(x for x in y)`, generate `set(y)` (in lieu of `{x for x in y}`).
     if let [generator] = generators.as_slice() {
@@ -105,13 +105,13 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
     }
 
     // Convert `set(f(x) for x in y)` to `{f(x) for x in y}`.
-    let mut diagnostic = Diagnostic::new(
+    let diagnostic = Diagnostic::new(
         UnnecessaryGeneratorSet {
             short_circuit: false,
         },
         call.range(),
     );
-    diagnostic.set_fix({
+    let fix = {
         // Replace `set(` with `}`.
         let call_start = Edit::replacement(
             pad_start("{", call.range(), checker.locator(), checker.semantic()),
@@ -127,7 +127,6 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
         );
 
         Fix::unsafe_edits(call_start, [call_end])
-    });
-
-    checker.diagnostics.push(diagnostic);
+    };
+    checker.diagnostics.push(diagnostic.with_fix(fix));
 }

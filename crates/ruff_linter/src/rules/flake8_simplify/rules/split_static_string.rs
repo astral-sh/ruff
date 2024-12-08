@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     Expr, ExprCall, ExprContext, ExprList, ExprStringLiteral, ExprUnaryOp, StringLiteral,
     StringLiteralFlags, StringLiteralValue, UnaryOp,
@@ -42,15 +42,15 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
 /// ```
-#[violation]
-pub struct SplitStaticString;
+#[derive(ViolationMetadata)]
+pub(crate) struct SplitStaticString;
 
 impl Violation for SplitStaticString {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Consider using a list literal instead of `str.split`")
+        "Consider using a list literal instead of `str.split`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

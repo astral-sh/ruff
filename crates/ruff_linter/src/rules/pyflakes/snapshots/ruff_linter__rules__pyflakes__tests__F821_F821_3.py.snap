@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_3.py:11:10: F821 Undefined name `key`
    |
@@ -20,5 +21,3 @@ F821_3.py:11:17: F821 Undefined name `value`
 12 | 
 13 | # OK
    |
-
-

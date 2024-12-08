@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// This is not a regular diagnostic; instead, it's raised when a file cannot be read
@@ -23,13 +23,15 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## References
 /// - [UNIX Permissions introduction](https://mason.gmu.edu/~montecin/UNIXpermiss.htm)
 /// - [Command Line Basics: Symbolic Links](https://www.digitalocean.com/community/tutorials/workflow-symbolic-links)
-#[violation]
+#[derive(ViolationMetadata)]
 pub struct IOError {
     pub message: String,
 }
 
 /// E902
 impl Violation for IOError {
+    // The format message is used by the `derive_message_formats` macro.
+    #![allow(clippy::useless_format)]
     #[derive_message_formats]
     fn message(&self) -> String {
         let IOError { message } = self;
@@ -37,8 +39,8 @@ impl Violation for IOError {
     }
 }
 
-/// ## Deprecated
-/// This rule has been deprecated and will be removed in a future release. Syntax errors will
+/// ## Removed
+/// This rule has been removed. Syntax errors will
 /// always be shown regardless of whether this rule is selected or not.
 ///
 /// ## What it does
@@ -60,15 +62,17 @@ impl Violation for IOError {
 ///
 /// ## References
 /// - [Python documentation: Syntax Errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
-#[violation]
-pub struct SyntaxError {
-    pub message: String,
-}
+#[derive(ViolationMetadata)]
+#[deprecated(note = "E999 has been removed")]
+pub(crate) struct SyntaxError;
 
+#[allow(deprecated)]
 impl Violation for SyntaxError {
-    #[derive_message_formats]
     fn message(&self) -> String {
-        let SyntaxError { message } = self;
-        format!("SyntaxError: {message}")
+        unreachable!("E999 has been removed")
+    }
+
+    fn message_formats() -> &'static [&'static str] {
+        &["SyntaxError"]
     }
 }

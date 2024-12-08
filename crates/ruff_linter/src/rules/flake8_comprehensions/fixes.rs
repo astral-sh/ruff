@@ -295,7 +295,7 @@ pub(crate) fn fix_unnecessary_collection_call(
 
 /// Re-formats the given expression for use within a formatted string.
 ///
-/// For example, when converting a `dict` call to a dictionary literal within
+/// For example, when converting a `dict()` call to a dictionary literal within
 /// a formatted string, we might naively generate the following code:
 ///
 /// ```python
@@ -977,6 +977,14 @@ pub(crate) fn fix_unnecessary_comprehension_in_call(
         }
         _ => whitespace_after_arg,
     };
+
+    // Remove trailing comma, if any.
+    //
+    // This relies on the fact that
+    // there is only one argument,
+    // which is already checked beforehand
+    // by both of this function's callers.
+    call.args[0].comma = None;
 
     Ok(Fix::unsafe_edit(Edit::range_replacement(
         tree.codegen_stylist(stylist),

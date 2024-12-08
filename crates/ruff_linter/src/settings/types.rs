@@ -42,10 +42,10 @@ use crate::{display_settings, fs};
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
+    Py38,
     // Make sure to also change the default for `ruff_python_formatter::PythonVersion`
     // when changing the default here.
     #[default]
-    Py38,
     Py39,
     Py310,
     Py311,
@@ -66,6 +66,10 @@ impl PythonVersion {
     /// Return the latest supported Python version.
     pub const fn latest() -> Self {
         Self::Py313
+    }
+
+    pub const fn minimal_supported() -> Self {
+        Self::Py37
     }
 
     pub const fn as_tuple(&self) -> (u8, u8) {

@@ -93,3 +93,53 @@ op_itemgetter = lambda x: x[1,          :]
 
 # Without a slice, trivia is retained
 op_itemgetter = lambda x: x[1,          2]
+
+
+# All methods in classes are ignored, even those defined using lambdas:
+class Foo:
+    def x(self, other):
+        return self == other
+
+class Bar:
+    y = lambda self, other: self == other
+
+from typing import Callable
+class Baz:
+    z: Callable = lambda self, other: self == other
+
+
+# Lambdas wrapped in function calls could also still be method definitions!
+# To avoid false positives, we shouldn't flag any of these either:
+from typing import final, override, no_type_check
+
+
+class Foo:
+    a = final(lambda self, other: self == other)
+    b = override(lambda self, other: self == other)
+    c = no_type_check(lambda self, other: self == other)
+    d = final(override(no_type_check(lambda self, other: self == other)))
+
+
+# lambdas used in decorators do not constitute method definitions,
+# so these *should* be flagged:
+class TheLambdasHereAreNotMethods:
+    @pytest.mark.parametrize(
+        "slicer, expected",
+        [
+            (lambda x: x[-2:], "foo"),
+            (lambda x: x[-5:-3], "bar"),
+        ],
+    )
+    def test_inlet_asset_alias_extra_slice(self, slicer, expected):
+        assert slice("whatever") == expected
+
+
+class NotAMethodButHardToDetect:
+    # In an ideal world, perhaps we'd emit a diagnostic here,
+    # since this `lambda` is clearly not a method definition,
+    # and *could* be safely replaced with an `operator` function.
+    # Practically speaking, however, it's hard to see how we'd accurately determine
+    # that the `lambda` is *not* a method definition
+    # without risking false positives elsewhere or introducing complex heuristics
+    # that users would find surprising and confusing
+    FOO = sorted([x for x in BAR], key=lambda x: x.baz)

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_semantic::Definition;
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlineIterator};
@@ -48,15 +48,23 @@ use crate::registry::Rule;
 ///     """
 /// ```
 ///
+/// ## Options
+/// - `lint.pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
 /// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
 /// [PEP 257]: https://peps.python.org/pep-0257
-#[violation]
-pub struct MultiLineSummaryFirstLine;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultiLineSummaryFirstLine;
 
 impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multi-line docstring summary should start at the first line")
+        "Multi-line docstring summary should start at the first line".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -103,15 +111,23 @@ impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
 ///     """
 /// ```
 ///
+/// ## Options
+/// - `lint.pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
 /// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
 /// [PEP 257]: https://peps.python.org/pep-0257
-#[violation]
-pub struct MultiLineSummarySecondLine;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultiLineSummarySecondLine;
 
 impl AlwaysFixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multi-line docstring summary should start at the second line")
+        "Multi-line docstring summary should start at the second line".to_string()
     }
 
     fn fix_title(&self) -> String {

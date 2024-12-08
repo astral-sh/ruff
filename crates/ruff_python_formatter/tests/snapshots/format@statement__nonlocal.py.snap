@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/nonlocal.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -46,6 +47,3 @@ def f():
 def f():
     nonlocal analyze_featuremap_layer, analyze_featuremapcompression_layer, analyze_latencies_post, analyze_motions_layer, analyze_size_model  # end-of-line comment
 ```
-
-
-

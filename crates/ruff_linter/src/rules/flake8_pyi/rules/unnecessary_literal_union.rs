@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::typing::traverse_union;
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
-#[violation]
-pub struct UnnecessaryLiteralUnion {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryLiteralUnion {
     members: Vec<String>,
 }
 
@@ -47,7 +47,7 @@ impl Violation for UnnecessaryLiteralUnion {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with a single `Literal`",))
+        Some("Replace with a single `Literal`".to_string())
     }
 }
 

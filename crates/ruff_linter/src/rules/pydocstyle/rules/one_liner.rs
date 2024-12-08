@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::Ranged;
@@ -32,15 +32,15 @@ use crate::docstrings::Docstring;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct FitsOnOneLine;
+#[derive(ViolationMetadata)]
+pub(crate) struct FitsOnOneLine;
 
 impl Violation for FitsOnOneLine {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("One-line docstring should fit on one line")
+        "One-line docstring should fit on one line".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

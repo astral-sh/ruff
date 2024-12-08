@@ -12,7 +12,7 @@ pub fn any_qualified_base_class(
     semantic: &SemanticModel,
     func: &dyn Fn(QualifiedName) -> bool,
 ) -> bool {
-    any_base_class(class_def, semantic, &|expr| {
+    any_base_class(class_def, semantic, &mut |expr| {
         semantic
             .resolve_qualified_name(map_subscript(expr))
             .is_some_and(func)
@@ -23,12 +23,12 @@ pub fn any_qualified_base_class(
 pub fn any_base_class(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: &dyn Fn(&Expr) -> bool,
+    func: &mut dyn FnMut(&Expr) -> bool,
 ) -> bool {
     fn inner(
         class_def: &ast::StmtClassDef,
         semantic: &SemanticModel,
-        func: &dyn Fn(&Expr) -> bool,
+        func: &mut dyn FnMut(&Expr) -> bool,
         seen: &mut FxHashSet<BindingId>,
     ) -> bool {
         class_def.bases().iter().any(|expr| {
@@ -121,12 +121,30 @@ pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -
     })
 }
 
-/// Returns `true` if the given class is a metaclass.
-pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    any_base_class(class_def, semantic, &|expr| match expr {
+/// Whether or not a class is a metaclass. Constructed by [`is_metaclass`].
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum IsMetaclass {
+    Yes,
+    No,
+    Maybe,
+}
+
+impl From<IsMetaclass> for bool {
+    fn from(value: IsMetaclass) -> Self {
+        matches!(value, IsMetaclass::Yes)
+    }
+}
+
+/// Returns `IsMetaclass::Yes` if the given class is definitely a metaclass,
+/// `IsMetaclass::No` if it's definitely *not* a metaclass, and
+/// `IsMetaclass::Maybe` otherwise.
+pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
+    let mut maybe = false;
+    let is_base_class = any_base_class(class_def, semantic, &mut |expr| match expr {
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
+            maybe = true;
             // Ex) `class Foo(type(Protocol)): ...`
             arguments.len() == 1 && semantic.match_builtin_expr(func.as_ref(), "type")
         }
@@ -144,5 +162,11 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
                         | ["enum", "EnumMeta" | "EnumType"]
                 )
             }),
-    })
+    });
+
+    match (is_base_class, maybe) {
+        (true, true) => IsMetaclass::Maybe,
+        (true, false) => IsMetaclass::Yes,
+        (false, _) => IsMetaclass::No,
+    }
 }

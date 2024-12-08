@@ -1,7 +1,7 @@
 use ruff_python_ast as ast;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -31,22 +31,22 @@ use crate::fix;
 /// ```
 ///
 /// ## References
-/// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct EmptyTypeCheckingBlock;
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+#[derive(ViolationMetadata)]
+pub(crate) struct EmptyTypeCheckingBlock;
 
 impl AlwaysFixableViolation for EmptyTypeCheckingBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Found empty type-checking block")
+        "Found empty type-checking block".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Delete empty type-checking block")
+        "Delete empty type-checking block".to_string()
     }
 }
 
-/// TCH005
+/// TC005
 pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtIf) {
     if !typing::is_type_checking_block(stmt, checker.semantic()) {
         return;

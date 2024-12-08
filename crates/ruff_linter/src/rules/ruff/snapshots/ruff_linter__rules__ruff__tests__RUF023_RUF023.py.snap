@@ -204,7 +204,7 @@ RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
    |
    = help: Apply a natural sort to `Klass3.__slots__`
 
-ℹ Safe fix
+ℹ Unsafe fix
 31 31 | 
 32 32 | class Klass3:
 33 33 |     __slots__ = (
@@ -239,7 +239,7 @@ RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
    |
    = help: Apply a natural sort to `Klass3.__slots__`
 
-ℹ Safe fix
+ℹ Unsafe fix
 38 38 |         "a0"
 39 39 |     )
 40 40 |     __slots__ = [
@@ -274,7 +274,7 @@ RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
    |
    = help: Apply a natural sort to `Klass4.__slots__`
 
-ℹ Safe fix
+ℹ Unsafe fix
 51 51 | 
 52 52 | class Klass4:
 53 53 |     # comment0
@@ -315,7 +315,7 @@ RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
    |
    = help: Apply a natural sort to `Klass4.__slots__`
 
-ℹ Safe fix
+ℹ Unsafe fix
 62 62 |     # comment7
 63 63 | 
 64 64 |     __slots__ = [  # comment0
@@ -376,7 +376,7 @@ RUF023.py:75:17: RUF023 [*] `PurePath.__slots__` is not sorted
     |
     = help: Apply a natural sort to `PurePath.__slots__`
 
-ℹ Safe fix
+ℹ Unsafe fix
 73  73  | # from cpython/Lib/pathlib/__init__.py
 74  74  | class PurePath:
 75  75  |     __slots__ = (
@@ -459,7 +459,7 @@ RUF023.py:113:17: RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
     |
     = help: Apply a natural sort to `ArgumentDescriptor.__slots__`
 
-ℹ Safe fix
+ℹ Unsafe fix
 111 111 | # From cpython/Lib/pickletools.py
 112 112 | class ArgumentDescriptor(object):
 113 113 |     __slots__ = (
@@ -648,7 +648,7 @@ RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
     |
     = help: Apply a natural sort to `BezierBuilder4.__slots__`
 
-ℹ Safe fix
+ℹ Unsafe fix
 179 179 | 
 180 180 | class BezierBuilder4:
 181 181 |     __slots__ = (

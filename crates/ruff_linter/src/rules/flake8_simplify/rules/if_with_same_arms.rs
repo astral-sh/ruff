@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
@@ -35,15 +35,15 @@ use crate::Locator;
 /// if x == 1 or x == 2:
 ///     print("Hello")
 /// ```
-#[violation]
-pub struct IfWithSameArms;
+#[derive(ViolationMetadata)]
+pub(crate) struct IfWithSameArms;
 
 impl Violation for IfWithSameArms {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Combine `if` branches using logical `or` operator")
+        "Combine `if` branches using logical `or` operator".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

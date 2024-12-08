@@ -8,7 +8,7 @@ use libcst_native::{
 };
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
@@ -58,15 +58,15 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something
 ///     assert not something_else
 /// ```
-#[violation]
-pub struct PytestCompositeAssertion;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assertion should be broken down into multiple parts")
+        "Assertion should be broken down into multiple parts".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -105,8 +105,8 @@ impl Violation for PytestCompositeAssertion {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[violation]
-pub struct PytestAssertInExcept {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestAssertInExcept {
     name: String,
 }
 
@@ -146,13 +146,13 @@ impl Violation for PytestAssertInExcept {
 ///
 /// References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
-#[violation]
-pub struct PytestAssertAlwaysFalse;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestAssertAlwaysFalse;
 
 impl Violation for PytestAssertAlwaysFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Assertion always fails, replace with `pytest.fail()`")
+        "Assertion always fails, replace with `pytest.fail()`".to_string()
     }
 }
 
@@ -186,8 +186,8 @@ impl Violation for PytestAssertAlwaysFalse {
 /// ## References
 /// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 
-#[violation]
-pub struct PytestUnittestAssertion {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUnittestAssertion {
     assertion: String,
 }
 
@@ -343,8 +343,8 @@ pub(crate) fn unittest_assertion(
 ///
 /// ## References
 /// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
-#[violation]
-pub struct PytestUnittestRaisesAssertion {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestUnittestRaisesAssertion {
     assertion: String,
 }
 
@@ -493,7 +493,7 @@ fn to_pytest_raises_args<'a>(
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
-    if matches!(truthiness, Truthiness::False | Truthiness::Falsey) {
+    if truthiness.into_bool() == Some(false) {
         checker
             .diagnostics
             .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));

@@ -235,3 +235,15 @@ if typing.TYPE_CHECKING:
     def contains_meaningful_ellipsis() -> list[int]:
         """Allow this in a TYPE_CHECKING block."""
         ...
+
+# https://github.com/astral-sh/ruff/issues/12616
+class PotentialDocstring1:
+    pass
+    """
+    Lorem ipsum dolor sit amet.
+    """
+
+
+class PotentialDocstring2:
+    ...
+    'Lorem ipsum dolor sit amet.'

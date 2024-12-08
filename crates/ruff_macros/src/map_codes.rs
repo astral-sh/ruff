@@ -420,8 +420,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         rule_fixable_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
         );
-        rule_explanation_match_arms
-            .extend(quote! {#(#attrs)* Self::#name => #path::explanation(),});
+        rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
 
         // Enable conversion from `DiagnosticKind` to `Rule`.
         from_impls_for_diagnostic_kind
@@ -457,6 +456,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             /// Returns the documentation for this rule.
             pub fn explanation(&self) -> Option<&'static str> {
+                use ruff_diagnostics::ViolationMetadata;
                 match self { #rule_explanation_match_arms }
             }
 
@@ -465,6 +465,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_fixable_match_arms }
             }
         }
+
 
         impl AsRule for ruff_diagnostics::DiagnosticKind {
             fn rule(&self) -> Rule {

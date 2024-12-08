@@ -53,7 +53,7 @@ impl NeedsParentheses for ExprStringLiteral {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if StringLike::String(self).is_multiline(context.source()) {
+        } else if StringLike::String(self).is_multiline(context) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

@@ -27,7 +27,7 @@ from _ssl import (
 )
 from _typeshed import ReadableBuffer, StrOrBytesPath, WriteableBuffer
 from collections.abc import Callable, Iterable
-from typing import Any, Literal, NamedTuple, TypedDict, overload
+from typing import Any, Literal, NamedTuple, TypedDict, overload, type_check_only
 from typing_extensions import Never, Self, TypeAlias
 
 if sys.version_info >= (3, 13):
@@ -309,6 +309,8 @@ ALERT_DESCRIPTION_UNSUPPORTED_CERTIFICATE: AlertDescription
 ALERT_DESCRIPTION_UNSUPPORTED_EXTENSION: AlertDescription
 ALERT_DESCRIPTION_USER_CANCELLED: AlertDescription
 
+# This class is not exposed. It calls itself ssl._ASN1Object.
+@type_check_only
 class _ASN1ObjectBase(NamedTuple):
     nid: int
     shortname: str

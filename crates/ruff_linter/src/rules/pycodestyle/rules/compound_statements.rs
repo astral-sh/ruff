@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_index::Indexer;
@@ -27,13 +27,13 @@ use crate::Locator;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
-#[violation]
-pub struct MultipleStatementsOnOneLineColon;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleStatementsOnOneLineColon;
 
 impl Violation for MultipleStatementsOnOneLineColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple statements on one line (colon)")
+        "Multiple statements on one line (colon)".to_string()
     }
 }
 
@@ -57,13 +57,13 @@ impl Violation for MultipleStatementsOnOneLineColon {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
-#[violation]
-pub struct MultipleStatementsOnOneLineSemicolon;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleStatementsOnOneLineSemicolon;
 
 impl Violation for MultipleStatementsOnOneLineSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple statements on one line (semicolon)")
+        "Multiple statements on one line (semicolon)".to_string()
     }
 }
 
@@ -82,17 +82,17 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 /// ```python
 /// do_four()
 /// ```
-#[violation]
-pub struct UselessSemicolon;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessSemicolon;
 
 impl AlwaysFixableViolation for UselessSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Statement ends with an unnecessary semicolon")
+        "Statement ends with an unnecessary semicolon".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary semicolon")
+        "Remove unnecessary semicolon".to_string()
     }
 }
 

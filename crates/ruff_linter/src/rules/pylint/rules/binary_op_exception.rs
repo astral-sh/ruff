@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -46,18 +46,19 @@ impl From<&ast::BoolOp> for BoolOp {
 /// except (A, B):
 ///     pass
 /// ```
-#[violation]
-pub struct BinaryOpException {
+#[derive(ViolationMetadata)]
+pub(crate) struct BinaryOpException {
     op: BoolOp,
 }
 
 impl Violation for BinaryOpException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BinaryOpException { op } = self;
-        match op {
-            BoolOp::And => format!("Exception to catch is the result of a binary `and` operation"),
-            BoolOp::Or => format!("Exception to catch is the result of a binary `or` operation"),
+        match self.op {
+            BoolOp::And => {
+                "Exception to catch is the result of a binary `and` operation".to_string()
+            }
+            BoolOp::Or => "Exception to catch is the result of a binary `or` operation".to_string(),
         }
     }
 }

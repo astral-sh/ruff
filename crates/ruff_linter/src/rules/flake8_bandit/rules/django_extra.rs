@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_text_size::Ranged;
 
@@ -33,13 +33,13 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Django documentation: SQL injection protection](https://docs.djangoproject.com/en/dev/topics/security/#sql-injection-protection)
 /// - [Common Weakness Enumeration: CWE-89](https://cwe.mitre.org/data/definitions/89.html)
-#[violation]
-pub struct DjangoExtra;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoExtra;
 
 impl Violation for DjangoExtra {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of Django `extra` can lead to SQL injection vulnerabilities")
+        "Use of Django `extra` can lead to SQL injection vulnerabilities".to_string()
     }
 }
 

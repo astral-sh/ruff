@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtIf};
@@ -35,13 +35,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `TypeError`](https://docs.python.org/3/library/exceptions.html#TypeError)
-#[violation]
-pub struct TypeCheckWithoutTypeError;
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeCheckWithoutTypeError;
 
 impl Violation for TypeCheckWithoutTypeError {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `TypeError` exception for invalid type")
+        "Prefer `TypeError` exception for invalid type".to_string()
     }
 }
 

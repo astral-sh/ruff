@@ -1,36 +1,51 @@
+use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::Program;
+use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
-use std::path::Path;
+use salsa::Setter;
 
 mod assertion;
+mod config;
 mod db;
 mod diagnostic;
 mod matcher;
 mod parser;
 
+const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &Path, title: &str) {
+pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str) {
     let source = std::fs::read_to_string(path).unwrap();
-    let suite = match test_parser::parse(title, &source) {
+    let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
-            panic!("Error parsing `{}`: {err}", path.to_str().unwrap())
+            panic!("Error parsing `{path}`: {err:?}")
         }
     };
 
     let mut db = db::Db::setup(SystemPathBuf::from("/src"));
 
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
+        if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
+            continue;
+        }
+
+        Program::get(&db)
+            .set_target_version(&mut db)
+            .to(test.target_version());
+
         // Remove all files so that the db is in a "fresh" state.
         db.memory_file_system().remove_all();
         Files::sync_all(&mut db);
@@ -48,11 +63,20 @@ pub fn run(path: &Path, title: &str) {
                     for failure in failures {
                         let absolute_line_number =
                             backtick_line.checked_add(relative_line_number).unwrap();
-                        let line_info = format!("{title}:{absolute_line_number}").cyan();
-                        println!("    {line_info} {failure}");
+                        let line_info = format!("{long_title}:{absolute_line_number}").cyan();
+                        println!("  {line_info} {failure}");
                     }
                 }
             }
+
+            println!(
+                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}=\"{}\"",
+                test.name()
+            );
+            println!(
+                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
+                test.name()
+            );
         }
     }
 
@@ -87,16 +111,24 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
         .filter_map(|test_file| {
             let parsed = parsed_module(db, test_file.file);
 
-            // TODO allow testing against code with syntax errors
-            assert!(
-                parsed.errors().is_empty(),
-                "Python syntax errors in {}, {}: {:?}",
-                test.name(),
-                test_file.file.path(db),
-                parsed.errors()
-            );
+            let mut diagnostics: Vec<Box<_>> = parsed
+                .errors()
+                .iter()
+                .cloned()
+                .map(|error| {
+                    let diagnostic: Box<dyn Diagnostic> =
+                        Box::new(ParseDiagnostic::new(test_file.file, error));
+                    diagnostic
+                })
+                .collect();
 
-            match matcher::match_file(db, test_file.file, check_types(db, test_file.file)) {
+            let type_diagnostics = check_types(db, test_file.file);
+            diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
+                let diagnostic: Box<dyn Diagnostic> = Box::new((*diagnostic).clone());
+                diagnostic
+            }));
+
+            match matcher::match_file(db, test_file.file, diagnostics) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offset: test_file.backtick_offset,

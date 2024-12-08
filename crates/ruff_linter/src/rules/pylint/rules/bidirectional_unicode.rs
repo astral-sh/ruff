@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::Line;
 
 const BIDI_UNICODE: [char; 10] = [
@@ -13,7 +13,7 @@ const BIDI_UNICODE: [char; 10] = [
     '\u{2068}', //{FIRST STRONG ISOLATE}
     '\u{2069}', //{POP DIRECTIONAL ISOLATE}
     // The following was part of PEP 672:
-    // https://www.python.org/dev/peps/pep-0672/
+    // https://peps.python.org/pep-0672/
     // so the list above might not be complete
     '\u{200F}', //{RIGHT-TO-LEFT MARK}
                 // We don't use
@@ -40,14 +40,14 @@ const BIDI_UNICODE: [char; 10] = [
 /// ```
 ///
 /// ## References
-/// - [PEP 672](https://peps.python.org/pep-0672/#bidirectional-text)
-#[violation]
-pub struct BidirectionalUnicode;
+/// - [PEP 672: Bidirectional Text](https://peps.python.org/pep-0672/#bidirectional-text)
+#[derive(ViolationMetadata)]
+pub(crate) struct BidirectionalUnicode;
 
 impl Violation for BidirectionalUnicode {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Contains control characters that can permit obfuscated code")
+        "Contains control characters that can permit obfuscated code".to_string()
     }
 }
 

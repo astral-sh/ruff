@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB164.py:7:5: FURB164 [*] Verbose method `from_float` in `Fraction` construction
   |

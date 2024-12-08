@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -31,13 +31,13 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
-#[violation]
-pub struct ShebangNotFirstLine;
+#[derive(ViolationMetadata)]
+pub(crate) struct ShebangNotFirstLine;
 
 impl Violation for ShebangNotFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Shebang should be at the beginning of the file")
+        "Shebang should be at the beginning of the file".to_string()
     }
 }
 

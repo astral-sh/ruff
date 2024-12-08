@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
@@ -45,13 +45,13 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[violation]
-pub struct PytestRaisesWithMultipleStatements;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestRaisesWithMultipleStatements;
 
 impl Violation for PytestRaisesWithMultipleStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pytest.raises()` block should contain a single simple statement")
+        "`pytest.raises()` block should contain a single simple statement".to_string()
     }
 }
 
@@ -96,8 +96,8 @@ impl Violation for PytestRaisesWithMultipleStatements {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[violation]
-pub struct PytestRaisesTooBroad {
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestRaisesTooBroad {
     exception: String,
 }
 
@@ -141,13 +141,13 @@ impl Violation for PytestRaisesTooBroad {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[violation]
-pub struct PytestRaisesWithoutException;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestRaisesWithoutException;
 
 impl Violation for PytestRaisesWithoutException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("set the expected exception in `pytest.raises()`")
+        "set the expected exception in `pytest.raises()`".to_string()
     }
 }
 
@@ -177,13 +177,12 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            let match_keyword = call.arguments.find_keyword("match");
-            if let Some(exception) = call.arguments.args.first() {
-                if let Some(match_keyword) = match_keyword {
-                    if is_empty_or_null_string(&match_keyword.value) {
-                        exception_needs_match(checker, exception);
-                    }
-                } else {
+            if let Some(exception) = call.arguments.find_argument("expected_exception", 0) {
+                if call
+                    .arguments
+                    .find_keyword("match")
+                    .map_or(true, |k| is_empty_or_null_string(&k.value))
+                {
                     exception_needs_match(checker, exception);
                 }
             }

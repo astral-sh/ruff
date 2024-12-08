@@ -1,14 +1,14 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for assignments to the variable `df`.
 ///
 /// ## Why is this bad?
-/// Although `df` is a common variable name for a Pandas DataFrame, it's not a
+/// Although `df` is a common variable name for a Pandas `DataFrame`, it's not a
 /// great variable name for production code, as it's non-descriptive and
 /// prone to name conflicts.
 ///
@@ -27,13 +27,13 @@ use ruff_text_size::Ranged;
 ///
 /// animals = pd.read_csv("animals.csv")
 /// ```
-#[violation]
-pub struct PandasDfVariableName;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasDfVariableName;
 
 impl Violation for PandasDfVariableName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid using the generic variable name `df` for DataFrames")
+        "Avoid using the generic variable name `df` for DataFrames".to_string()
     }
 }
 

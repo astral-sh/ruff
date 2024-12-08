@@ -16,6 +16,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
 use ruff_linter::message::{Message, SyntaxErrorMessage};
+use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
@@ -180,7 +181,7 @@ impl AddAssign for FixMap {
 /// Lint the source code at the given `Path`.
 pub(crate) fn lint_path(
     path: &Path,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
@@ -373,7 +374,7 @@ pub(crate) fn lint_path(
 /// stdin.
 pub(crate) fn lint_stdin(
     path: Option<&Path>,
-    package: Option<&Path>,
+    package: Option<PackageRoot<'_>>,
     contents: String,
     settings: &Settings,
     noqa: flags::Noqa,

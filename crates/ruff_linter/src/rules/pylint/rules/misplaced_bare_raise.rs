@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -40,13 +40,13 @@ use crate::rules::pylint::helpers::in_dunder_method;
 ///     if obj is None:
 ///         raise ValueError("`obj` cannot be `None`")
 /// ```
-#[violation]
-pub struct MisplacedBareRaise;
+#[derive(ViolationMetadata)]
+pub(crate) struct MisplacedBareRaise;
 
 impl Violation for MisplacedBareRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Bare `raise` statement is not inside an exception handler")
+        "Bare `raise` statement is not inside an exception handler".to_string()
     }
 }
 

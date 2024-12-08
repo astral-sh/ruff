@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -38,14 +38,14 @@ use ruff_text_size::Ranged;
 ///
 /// ## References
 /// - [Python documentation: `unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
-/// - [`pytest-mock`](https://pypi.org/project/pytest-mock/)
-#[violation]
-pub struct PytestPatchWithLambda;
+/// - [PyPI: `pytest-mock`](https://pypi.org/project/pytest-mock/)
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestPatchWithLambda;
 
 impl Violation for PytestPatchWithLambda {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `return_value=` instead of patching with `lambda`")
+        "Use `return_value=` instead of patching with `lambda`".to_string()
     }
 }
 

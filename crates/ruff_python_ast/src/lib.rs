@@ -9,7 +9,6 @@ pub use nodes::*;
 pub mod comparable;
 pub mod docstrings;
 mod expression;
-pub mod hashable;
 pub mod helpers;
 pub mod identifier;
 mod int;

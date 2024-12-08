@@ -1,7 +1,7 @@
 use flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 use flake8_quotes::settings::Quote;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::{walk_f_string, Visitor};
 use ruff_python_ast::{self as ast, AnyStringFlags, StringFlags, StringLike};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -35,13 +35,13 @@ use crate::Locator;
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct AvoidableEscapedQuote;
+#[derive(ViolationMetadata)]
+pub(crate) struct AvoidableEscapedQuote;
 
 impl AlwaysFixableViolation for AvoidableEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Change outer quotes to avoid escaping inner quotes")
+        "Change outer quotes to avoid escaping inner quotes".to_string()
     }
 
     fn fix_title(&self) -> String {

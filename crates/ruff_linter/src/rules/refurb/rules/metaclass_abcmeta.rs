@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -34,17 +34,17 @@ use crate::importer::ImportRequest;
 /// ## References
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
 /// - [Python documentation: `abc.ABCMeta`](https://docs.python.org/3/library/abc.html#abc.ABCMeta)
-#[violation]
-pub struct MetaClassABCMeta;
+#[derive(ViolationMetadata)]
+pub(crate) struct MetaClassABCMeta;
 
 impl AlwaysFixableViolation for MetaClassABCMeta {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `metaclass=abc.ABCMeta` to define abstract base class")
+        "Use of `metaclass=abc.ABCMeta` to define abstract base class".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `abc.ABC`")
+        "Replace with `abc.ABC`".to_string()
     }
 }
 

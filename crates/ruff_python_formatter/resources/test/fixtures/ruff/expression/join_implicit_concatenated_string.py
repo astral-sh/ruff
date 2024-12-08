@@ -319,3 +319,31 @@ assert False, "Implicit concatenated stringuses {} layout on {} format"[
 assert False, +"Implicit concatenated string" "uses {} layout on {} format".format(
     "Multiline", "first"
 )
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/13935
+
+"a" f'{1=: "abcd \'\'}'
+f'{1=: "abcd \'\'}' "a"
+f'{1=: "abcd \'\'}' f"{1=: 'abcd \"\"}"
+
+# These strings contains escaped newline characters and should be joined, they are
+# not multiline strings.
+f"aaaaaaaaaaaaaaaa \
+        bbbbbbbbbbb" "cccccccccccccc \
+               ddddddddddddddddddd"
+b"aaaaaaaaaaaaaaaa \
+        bbbbbbbbbbb" b"cccccccccccccc \
+               ddddddddddddddddddd"
+f"aaaaaaaaaaaaaaaa \
+        bbbbbbbbbbb" "cccccccccccccc \
+               ddddddddddddddddddd"  # comment 1
+(f"aaaaaaaaaaaaaaaa \
+        bbbbbbbbbbb" "cccccccccccccc \
+               ddddddddddddddddddd")  # comment 2
+(
+    f"aaaaaaaaaaaaaaaa \
+            bbbbbbbbbbb" # comment 3
+    "cccccccccccccc \
+            ddddddddddddddddddd"  # comment 4
+)

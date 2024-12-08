@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -30,21 +30,20 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Unary arithmetic and bitwise operations](https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations)
 /// - [Python documentation: Augmented assignment statements](https://docs.python.org/3/reference/simple_stmts.html#augmented-assignment-statements)
-#[violation]
-pub struct UnaryPrefixIncrementDecrement {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnaryPrefixIncrementDecrement {
     operator: UnaryPrefixOperatorType,
 }
 
 impl Violation for UnaryPrefixIncrementDecrement {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnaryPrefixIncrementDecrement { operator } = self;
-        match operator {
+        match self.operator {
             UnaryPrefixOperatorType::Increment => {
-                format!("Python does not support the unary prefix increment operator (`++`)")
+                "Python does not support the unary prefix increment operator (`++`)".to_string()
             }
             UnaryPrefixOperatorType::Decrement => {
-                format!("Python does not support the unary prefix decrement operator (`--`)")
+                "Python does not support the unary prefix decrement operator (`--`)".to_string()
             }
         }
     }

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 super_without_brackets.py:10:26: PLW0245 [*] `super` call is missing parentheses
    |
@@ -19,6 +20,4 @@ super_without_brackets.py:10:26: PLW0245 [*] `super` call is missing parentheses
    10 |+        original_speak = super().speak()  # PLW0245
 11 11 |         return f"{original_speak} But as a dog, it barks!"
 12 12 | 
-13 13 | 
-
-
+13 13 |

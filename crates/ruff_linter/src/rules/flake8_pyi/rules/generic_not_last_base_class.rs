@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
@@ -47,15 +47,15 @@ use crate::fix::edits::{add_argument, remove_argument, Parentheses};
 /// - [`typing.Generic` documentation](https://docs.python.org/3/library/typing.html#typing.Generic)
 ///
 /// [1]: https://github.com/python/cpython/issues/106102
-#[violation]
-pub struct GenericNotLastBaseClass;
+#[derive(ViolationMetadata)]
+pub(crate) struct GenericNotLastBaseClass;
 
 impl Violation for GenericNotLastBaseClass {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`Generic[]` should always be the last base class")
+        "`Generic[]` should always be the last base class".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

@@ -125,6 +125,7 @@ impl<'db> SemanticIndex<'db> {
     ///
     /// Use the Salsa cached [`symbol_table()`] query if you only need the
     /// symbol table for a single scope.
+    #[track_caller]
     pub(super) fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
         self.symbol_tables[scope_id].clone()
     }
@@ -133,15 +134,18 @@ impl<'db> SemanticIndex<'db> {
     ///
     /// Use the Salsa cached [`use_def_map()`] query if you only need the
     /// use-def map for a single scope.
+    #[track_caller]
     pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> Arc<UseDefMap> {
         self.use_def_maps[scope_id].clone()
     }
 
+    #[track_caller]
     pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
         &self.ast_ids[scope_id]
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
+    #[track_caller]
     pub(crate) fn expression_scope_id(
         &self,
         expression: impl Into<ExpressionNodeKey>,
@@ -151,11 +155,13 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
+    #[track_caller]
     pub(crate) fn expression_scope(&self, expression: impl Into<ExpressionNodeKey>) -> &Scope {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
     /// Returns the [`Scope`] with the given id.
+    #[track_caller]
     pub(crate) fn scope(&self, id: FileScopeId) -> &Scope {
         &self.scopes[id]
     }
@@ -172,6 +178,7 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the parent scope of `scope_id`.
     #[allow(unused)]
+    #[track_caller]
     pub(crate) fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope> {
         Some(&self.scopes[self.parent_scope_id(scope_id)?])
     }
@@ -195,6 +202,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns the [`Definition`] salsa ingredient for `definition_key`.
+    #[track_caller]
     pub(crate) fn definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
@@ -206,6 +214,7 @@ impl<'db> SemanticIndex<'db> {
     /// Panics if we have no expression ingredient for that node. We can only call this method for
     /// standalone-inferable expressions, which we call `add_standalone_expression` for in
     /// [`SemanticIndexBuilder`].
+    #[track_caller]
     pub(crate) fn expression(
         &self,
         expression_key: impl Into<ExpressionNodeKey>,
@@ -213,8 +222,18 @@ impl<'db> SemanticIndex<'db> {
         self.expressions_by_node[&expression_key.into()]
     }
 
+    pub(crate) fn try_expression(
+        &self,
+        expression_key: impl Into<ExpressionNodeKey>,
+    ) -> Option<Expression<'db>> {
+        self.expressions_by_node
+            .get(&expression_key.into())
+            .copied()
+    }
+
     /// Returns the id of the scope that `node` creates. This is different from [`Definition::scope`] which
     /// returns the scope in which that definition is defined in.
+    #[track_caller]
     pub(crate) fn node_scope(&self, node: NodeWithScopeRef) -> FileScopeId {
         self.scopes_by_node[&node.node_key()]
     }
@@ -587,7 +606,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let function_table = index.symbol_table(function_scope_id);
         assert_eq!(
             names(&function_table),
-            vec!["a", "b", "c", "args", "d", "kwargs"],
+            vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
         let use_def = index.use_def_map(function_scope_id);
@@ -599,21 +618,30 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                         .expect("symbol exists"),
                 )
                 .unwrap();
-            assert!(matches!(
-                binding.kind(&db),
-                DefinitionKind::ParameterWithDefault(_)
-            ));
-        }
-        for name in ["args", "kwargs"] {
-            let binding = use_def
-                .first_public_binding(
-                    function_table
-                        .symbol_id_by_name(name)
-                        .expect("symbol exists"),
-                )
-                .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
+        let args_binding = use_def
+            .first_public_binding(
+                function_table
+                    .symbol_id_by_name("args")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            args_binding.kind(&db),
+            DefinitionKind::VariadicPositionalParameter(_)
+        ));
+        let kwargs_binding = use_def
+            .first_public_binding(
+                function_table
+                    .symbol_id_by_name("kwargs")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            kwargs_binding.kind(&db),
+            DefinitionKind::VariadicKeywordParameter(_)
+        ));
     }
 
     #[test]
@@ -635,7 +663,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let lambda_table = index.symbol_table(lambda_scope_id);
         assert_eq!(
             names(&lambda_table),
-            vec!["a", "b", "c", "args", "d", "kwargs"],
+            vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
         let use_def = index.use_def_map(lambda_scope_id);
@@ -643,17 +671,30 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
                 .unwrap();
-            assert!(matches!(
-                binding.kind(&db),
-                DefinitionKind::ParameterWithDefault(_)
-            ));
-        }
-        for name in ["args", "kwargs"] {
-            let binding = use_def
-                .first_public_binding(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
-                .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
+        let args_binding = use_def
+            .first_public_binding(
+                lambda_table
+                    .symbol_id_by_name("args")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            args_binding.kind(&db),
+            DefinitionKind::VariadicPositionalParameter(_)
+        ));
+        let kwargs_binding = use_def
+            .first_public_binding(
+                lambda_table
+                    .symbol_id_by_name("kwargs")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            kwargs_binding.kind(&db),
+            DefinitionKind::VariadicKeywordParameter(_)
+        ));
     }
 
     /// Test case to validate that the comprehension scope is correctly identified and that the target

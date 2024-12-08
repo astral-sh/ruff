@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -325,9 +325,15 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
-    /// in the current scope, or in any containing scope.
+    /// in the current scope currently being visited, or in any containing scope.
     pub fn is_available(&self, member: &str) -> bool {
-        self.lookup_symbol(member)
+        self.is_available_in_scope(member, self.scope_id)
+    }
+
+    /// Return `true` if `member` is an "available" symbol in a given scope, i.e.,
+    /// a symbol that has not been bound in that current scope, or in any containing scope.
+    pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
+        self.lookup_symbol_in_scope(member, scope_id, false)
             .map(|binding_id| &self.bindings[binding_id])
             .map_or(true, |binding| binding.kind.is_builtin())
     }
@@ -620,10 +626,22 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_load`], but
-    /// doesn't add any read references to the resolved symbol.
+    /// Lookup a symbol in the current scope.
     pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
-        if self.in_forward_reference() {
+        self.lookup_symbol_in_scope(symbol, self.scope_id, self.in_forward_reference())
+    }
+
+    /// Lookup a symbol in a certain scope
+    ///
+    /// This is a carbon copy of [`Self::resolve_load`], but
+    /// doesn't add any read references to the resolved symbol.
+    pub fn lookup_symbol_in_scope(
+        &self,
+        symbol: &str,
+        scope_id: ScopeId,
+        in_forward_reference: bool,
+    ) -> Option<BindingId> {
+        if in_forward_reference {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
                     return Some(binding_id);
@@ -633,7 +651,7 @@ impl<'a> SemanticModel<'a> {
 
         let mut seen_function = false;
         let mut class_variables_visible = true;
-        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+        for (index, scope_id) in self.scopes.ancestor_ids(scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
                 if seen_function && matches!(symbol, "__class__") {
@@ -645,6 +663,7 @@ impl<'a> SemanticModel<'a> {
             }
 
             class_variables_visible = scope.kind.is_type() && index == 0;
+            seen_function |= scope.kind.is_function();
 
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
@@ -661,8 +680,128 @@ impl<'a> SemanticModel<'a> {
                     return None;
                 }
             }
+        }
 
+        None
+    }
+
+    /// Simulates a runtime load of a given [`ast::ExprName`].
+    ///
+    /// This should not be run until after all the bindings have been visited.
+    ///
+    /// The main purpose of this method and what makes this different
+    /// from methods like [`SemanticModel::lookup_symbol`] and
+    /// [`SemanticModel::resolve_name`] is that it may be used
+    /// to perform speculative name lookups.
+    ///
+    /// In most cases a load can be accurately modeled simply by calling
+    /// [`SemanticModel::resolve_name`] at the right time during semantic
+    /// analysis, however for speculative lookups this is not the case,
+    /// since we're aiming to change the semantic meaning of our load.
+    /// E.g. we want to check what would happen if we changed a forward
+    /// reference to an immediate load or vice versa.
+    ///
+    /// Use caution when utilizing this method, since it was primarily designed
+    /// to work for speculative lookups from within type definitions, which
+    /// happen to share some nice properties, where attaching each binding
+    /// to a range in the source code and ordering those bindings based on
+    /// that range is a good enough approximation of which bindings are
+    /// available at runtime for which reference.
+    ///
+    /// References from within an [`ast::Comprehension`] can produce incorrect
+    /// results when referring to a [`BindingKind::NamedExprAssignment`].
+    pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
+        let symbol = name.id.as_str();
+        let range = name.range;
+        let mut seen_function = false;
+        let mut class_variables_visible = true;
+        let mut source_order_sensitive_lookup = true;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+
+            // Only once we leave a function scope and its enclosing type scope should
+            // we stop doing source-order lookups. We could e.g. have nested classes
+            // where we lookup symbols from the innermost class scope, which can only see
+            // things from the outer class(es) that have been defined before the inner
+            // class. Source-order lookups take advantage of the fact that most of the
+            // bindings are created sequentially in source order, so if we want to
+            // determine whether or not a given reference can refer to another binding
+            // we can look at their text ranges to check whether or not the binding
+            // could actually be referred to. This is not as robust as back-tracking
+            // the AST, since that can properly take care of the few out-of order
+            // corner-cases, but back-tracking the AST from the reference to the binding
+            // is a lot more expensive than comparing a pair of text ranges.
+            if seen_function && !scope.kind.is_type() {
+                source_order_sensitive_lookup = false;
+            }
+
+            if scope.kind.is_class() {
+                if seen_function && matches!(symbol, "__class__") {
+                    return None;
+                }
+                if !class_variables_visible {
+                    continue;
+                }
+            }
+
+            class_variables_visible = scope.kind.is_type() && index == 0;
             seen_function |= scope.kind.is_function();
+
+            if let Some(binding_id) = scope.get(symbol) {
+                if source_order_sensitive_lookup {
+                    // we need to look through all the shadowed bindings
+                    // since we may be shadowing a source-order accurate
+                    // runtime binding with a source-order inaccurate one
+                    for shadowed_id in scope.shadowed_bindings(binding_id) {
+                        let binding = &self.bindings[shadowed_id];
+                        if binding.context.is_typing() {
+                            continue;
+                        }
+                        if let BindingKind::Annotation
+                        | BindingKind::Deletion
+                        | BindingKind::UnboundException(..)
+                        | BindingKind::ConditionalDeletion(..) = binding.kind
+                        {
+                            continue;
+                        }
+
+                        // This ensures we perform the correct source-order lookup,
+                        // since the ranges for these two types of bindings are trimmed
+                        // to just the target, but the name is not available until the
+                        // end of the entire statement
+                        let binding_range = match binding.statement(self) {
+                            Some(Stmt::Assign(stmt)) => stmt.range(),
+                            Some(Stmt::AnnAssign(stmt)) => stmt.range(),
+                            Some(Stmt::ClassDef(stmt)) => stmt.range(),
+                            _ => binding.range,
+                        };
+
+                        if binding_range.ordering(range).is_lt() {
+                            return Some(shadowed_id);
+                        }
+                    }
+                } else {
+                    let candidate_id = match self.bindings[binding_id].kind {
+                        BindingKind::Annotation => continue,
+                        BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                        BindingKind::ConditionalDeletion(binding_id) => binding_id,
+                        BindingKind::UnboundException(Some(binding_id)) => binding_id,
+                        _ => binding_id,
+                    };
+
+                    if self.bindings[candidate_id].context.is_typing() {
+                        continue;
+                    }
+
+                    return Some(candidate_id);
+                }
+            }
+
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return None;
+                }
+            }
         }
 
         None
@@ -1266,24 +1405,32 @@ impl<'a> SemanticModel<'a> {
             "anyio" => self.seen.insert(Modules::ANYIO),
             "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
+            "copy" => self.seen.insert(Modules::COPY),
             "contextvars" => self.seen.insert(Modules::CONTEXTVARS),
             "dataclasses" => self.seen.insert(Modules::DATACLASSES),
             "datetime" => self.seen.insert(Modules::DATETIME),
             "django" => self.seen.insert(Modules::DJANGO),
             "fastapi" => self.seen.insert(Modules::FASTAPI),
+            "flask" => self.seen.insert(Modules::FLASK),
             "logging" => self.seen.insert(Modules::LOGGING),
+            "markupsafe" => self.seen.insert(Modules::MARKUPSAFE),
             "mock" => self.seen.insert(Modules::MOCK),
             "numpy" => self.seen.insert(Modules::NUMPY),
             "os" => self.seen.insert(Modules::OS),
             "pandas" => self.seen.insert(Modules::PANDAS),
             "pytest" => self.seen.insert(Modules::PYTEST),
             "re" => self.seen.insert(Modules::RE),
+            "regex" => self.seen.insert(Modules::REGEX),
             "six" => self.seen.insert(Modules::SIX),
             "subprocess" => self.seen.insert(Modules::SUBPROCESS),
             "tarfile" => self.seen.insert(Modules::TARFILE),
             "trio" => self.seen.insert(Modules::TRIO),
             "typing" => self.seen.insert(Modules::TYPING),
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
+            "attr" | "attrs" => self.seen.insert(Modules::ATTRS),
+            "airflow" => self.seen.insert(Modules::AIRFLOW),
+            "hashlib" => self.seen.insert(Modules::HASHLIB),
+            "crypt" => self.seen.insert(Modules::CRYPT),
             _ => {}
         }
     }
@@ -1379,38 +1526,48 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in a nested union expression (e.g., the inner `Union` in
     /// `Union[Union[int, str], float]`).
     pub fn in_nested_union(&self) -> bool {
-        // Ex) `Union[Union[int, str], float]`
-        if self
-            .current_expression_grandparent()
-            .and_then(Expr::as_subscript_expr)
-            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Union"))
-        {
-            return true;
-        }
+        let mut parent_expressions = self.current_expressions().skip(1);
 
-        // Ex) `int | Union[str, float]`
-        if self.current_expression_parent().is_some_and(|parent| {
-            matches!(
-                parent,
-                Expr::BinOp(ast::ExprBinOp {
-                    op: Operator::BitOr,
-                    ..
-                })
-            )
-        }) {
-            return true;
+        match parent_expressions.next() {
+            // The parent expression is of the inner union is a single `typing.Union`.
+            // Ex) `Union[Union[a, b]]`
+            Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Union"),
+            // The parent expression is of the inner union is a tuple with two or more
+            // comma-separated elements and the parent of that tuple is a `typing.Union`.
+            // Ex) `Union[Union[a, b], Union[c, d]]`
+            Some(Expr::Tuple(_)) => parent_expressions
+                .next()
+                .and_then(Expr::as_subscript_expr)
+                .is_some_and(|grandparent| self.match_typing_expr(&grandparent.value, "Union")),
+            // The parent expression of the inner union is a PEP604-style union.
+            // Ex) `a | b | c` or `Union[a, b] | c`
+            // In contrast to `typing.Union`, PEP604-style unions are always binary operations, e.g.
+            // the expression `a | b | c` is represented by two binary unions: `(a | b) | c`.
+            Some(Expr::BinOp(bin_op)) => bin_op.op.is_bit_or(),
+            // Not a nested union otherwise.
+            _ => false,
         }
-
-        false
     }
 
     /// Return `true` if the model is in a nested literal expression (e.g., the inner `Literal` in
     /// `Literal[Literal[int, str], float]`).
     pub fn in_nested_literal(&self) -> bool {
-        // Ex) `Literal[Literal[int, str], float]`
-        self.current_expression_grandparent()
-            .and_then(Expr::as_subscript_expr)
-            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Literal"))
+        let mut parent_expressions = self.current_expressions().skip(1);
+
+        match parent_expressions.next() {
+            // The parent expression of the current `Literal` is a tuple, and the
+            // grandparent is a `Literal`.
+            // Ex) `Literal[Literal[str], Literal[int]]`
+            Some(Expr::Tuple(_)) => parent_expressions
+                .next()
+                .and_then(Expr::as_subscript_expr)
+                .is_some_and(|grandparent| self.match_typing_expr(&grandparent.value, "Literal")),
+            // The parent expression of the current `Literal` is also a `Literal`.
+            // Ex) `Literal[Literal[str]]`
+            Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Literal"),
+            // Not a nested literal otherwise
+            _ => false,
+        }
     }
 
     /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
@@ -1656,9 +1813,50 @@ impl<'a> SemanticModel<'a> {
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
 
+    /// Return `true` if the model is visiting the value expression
+    /// of a [PEP 613] type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+    /// ```
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    pub const fn in_annotated_type_alias_value(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::ANNOTATED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the model is visiting the value expression
+    /// of a [PEP 695] type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// type OptStr = str | None  # We're visiting the RHS
+    /// ```
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    pub const fn in_deferred_type_alias_value(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DEFERRED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the model is visiting the value expression of
+    /// either kind of type alias.
+    pub const fn in_type_alias_value(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPE_ALIAS)
+    }
+
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
+    }
+
+    /// Return `true` if the model is in an `assert` statement.
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
     }
 
     /// Return `true` if the model is in an f-string.
@@ -1737,12 +1935,6 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_named_expression_assignment(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT)
-    }
-
-    /// Return `true` if the model is in a comprehension assignment (e.g., `_ for x in y`).
-    pub const fn in_comprehension_assignment(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::COMPREHENSION_ASSIGNMENT)
     }
 
     /// Return `true` if the model is visiting the r.h.s. of an `__all__` definition
@@ -1856,6 +2048,14 @@ bitflags! {
         const CONTEXTVARS = 1 << 19;
         const ANYIO = 1 << 20;
         const FASTAPI = 1 << 21;
+        const COPY = 1 << 22;
+        const MARKUPSAFE = 1 << 23;
+        const FLASK = 1 << 24;
+        const ATTRS = 1 << 25;
+        const REGEX = 1 << 26;
+        const AIRFLOW = 1 << 27;
+        const HASHLIB = 1 << 28;
+        const CRYPT = 1 << 29;
     }
 }
 
@@ -2135,14 +2335,6 @@ bitflags! {
         /// ```
         const NAMED_EXPRESSION_ASSIGNMENT = 1 << 19;
 
-        /// The model is in a comprehension variable assignment.
-        ///
-        /// For example, the model could be visiting `x` in:
-        /// ```python
-        /// [_ for x in range(10)]
-        /// ```
-        const COMPREHENSION_ASSIGNMENT = 1 << 20;
-
         /// The model is in a docstring as described in [PEP 257].
         ///
         /// For example, the model could be visiting either the module, class,
@@ -2162,7 +2354,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const PEP_257_DOCSTRING = 1 << 21;
+        const PEP_257_DOCSTRING = 1 << 20;
 
         /// The model is visiting the r.h.s. of a module-level `__all__` definition.
         ///
@@ -2174,7 +2366,7 @@ bitflags! {
         /// __all__ = ("bar",)
         /// __all__ += ("baz,")
         /// ```
-        const DUNDER_ALL_DEFINITION = 1 << 22;
+        const DUNDER_ALL_DEFINITION = 1 << 21;
 
         /// The model is in an f-string replacement field.
         ///
@@ -2183,7 +2375,7 @@ bitflags! {
         /// ```python
         /// f"first {x} second {y}"
         /// ```
-        const F_STRING_REPLACEMENT_FIELD = 1 << 23;
+        const F_STRING_REPLACEMENT_FIELD = 1 << 22;
 
         /// The model is visiting the bases tuple of a class.
         ///
@@ -2193,11 +2385,11 @@ bitflags! {
         /// class Baz(Foo, Bar):
         ///     pass
         /// ```
-        const CLASS_BASE = 1 << 24;
+        const CLASS_BASE = 1 << 23;
 
         /// The model is visiting a class base that was initially deferred
         /// while traversing the AST. (This only happens in stub files.)
-        const DEFERRED_CLASS_BASE = 1 << 25;
+        const DEFERRED_CLASS_BASE = 1 << 24;
 
         /// The model is in an attribute docstring.
         ///
@@ -2222,7 +2414,37 @@ bitflags! {
         /// static-analysis tools.
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const ATTRIBUTE_DOCSTRING = 1 << 26;
+        const ATTRIBUTE_DOCSTRING = 1 << 25;
+
+        /// The model is in the value expression of a [PEP 613] explicit type alias.
+        ///
+        /// For example:
+        /// ```python
+        /// from typing import TypeAlias
+        ///
+        /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+        /// ```
+        ///
+        /// [PEP 613]: https://peps.python.org/pep-0613/
+        const ANNOTATED_TYPE_ALIAS = 1 << 27;
+
+        /// The model is in the value expression of a [PEP 695] type statement.
+        ///
+        /// For example:
+        /// ```python
+        /// type OptStr = str | None  # We're visiting the RHS
+        /// ```
+        ///
+        /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+        const DEFERRED_TYPE_ALIAS = 1 << 28;
+
+        /// The model is visiting an `assert` statement.
+        ///
+        /// For example, the model might be visiting `y` in
+        /// ```python
+        /// assert (y := x**2) > 42, y
+        /// ```
+        const ASSERT_STATEMENT = 1 << 29;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
@@ -2240,6 +2462,9 @@ bitflags! {
         /// The context is in a typing-only context.
         const TYPING_CONTEXT = Self::TYPE_CHECKING_BLOCK.bits() | Self::TYPING_ONLY_ANNOTATION.bits() |
             Self::STRING_TYPE_DEFINITION.bits() | Self::TYPE_PARAM_DEFINITION.bits();
+
+        /// The context is in any type alias.
+        const TYPE_ALIAS = Self::ANNOTATED_TYPE_ALIAS.bits() | Self::DEFERRED_TYPE_ALIAS.bits();
     }
 }
 

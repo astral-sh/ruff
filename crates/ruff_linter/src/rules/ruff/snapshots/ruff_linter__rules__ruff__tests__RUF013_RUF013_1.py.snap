@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF013_1.py:4:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
   |

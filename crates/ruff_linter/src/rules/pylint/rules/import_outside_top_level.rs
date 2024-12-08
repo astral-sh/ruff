@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
@@ -42,13 +42,13 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct ImportOutsideTopLevel;
+#[derive(ViolationMetadata)]
+pub(crate) struct ImportOutsideTopLevel;
 
 impl Violation for ImportOutsideTopLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`import` should be at the top-level of a file")
+        "`import` should be at the top-level of a file".to_string()
     }
 }
 

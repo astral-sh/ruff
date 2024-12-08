@@ -279,7 +279,7 @@ pub fn is_immutable_func(
     extend_immutable_calls: &[QualifiedName],
 ) -> bool {
     semantic
-        .resolve_qualified_name(func)
+        .resolve_qualified_name(map_subscript(func))
         .is_some_and(|qualified_name| {
             is_immutable_return_type(qualified_name.segments())
                 || extend_immutable_calls
@@ -306,7 +306,7 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
         | Expr::ListComp(_)
         | Expr::DictComp(_)
         | Expr::SetComp(_) => true,
-        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(func, semantic),
+        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(map_subscript(func), semantic),
         _ => false,
     }
 }
@@ -373,7 +373,7 @@ where
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
-        // Ex) x | y
+        // Ex) `x | y`
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::BitOr,
             left,
@@ -396,17 +396,21 @@ where
             return;
         }
 
-        // Ex) Union[x, y]
+        // Ex) `Union[x, y]`
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Union") {
                 if let Expr::Tuple(tuple) = &**slice {
                     // Traverse each element of the tuple within the union recursively to handle cases
-                    // such as `Union[..., Union[...]]
+                    // such as `Union[..., Union[...]]`
                     tuple
                         .iter()
                         .for_each(|elem| inner(func, semantic, elem, Some(expr)));
                     return;
                 }
+
+                // Ex) `Union[Union[a, b]]` and `Union[a | b | c]`
+                inner(func, semantic, slice, Some(expr));
+                return;
             }
         }
 
@@ -435,18 +439,19 @@ where
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
-        // Ex) Literal[x, y]
+        // Ex) `Literal[x, y]`
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if semantic.match_typing_expr(value, "Literal") {
                 match &**slice {
                     Expr::Tuple(tuple) => {
                         // Traverse each element of the tuple within the literal recursively to handle cases
-                        // such as `Literal[..., Literal[...]]
+                        // such as `Literal[..., Literal[...]]`
                         for element in tuple {
                             inner(func, semantic, element, Some(expr));
                         }
                     }
                     other => {
+                        // Ex) `Literal[Literal[...]]`
                         inner(func, semantic, other, Some(expr));
                     }
                 }
@@ -736,6 +741,43 @@ impl TypeChecker for IoBaseChecker {
     }
 }
 
+pub struct PathlibPathChecker;
+
+impl PathlibPathChecker {
+    fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            [
+                "pathlib",
+                "Path"
+                    | "PosixPath"
+                    | "PurePath"
+                    | "PurePosixPath"
+                    | "PureWindowsPath"
+                    | "WindowsPath"
+            ]
+        )
+    }
+}
+
+impl TypeChecker for PathlibPathChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_pathlib_path_constructor(semantic, annotation)
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_pathlib_path_constructor(semantic, func)
+    }
+}
+
 /// Test whether the given binding can be considered a list.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
@@ -817,6 +859,12 @@ pub fn is_io_base(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// implements `io.IOBase`).
 pub fn is_io_base_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     IoBaseChecker::match_initializer(expr, semantic)
+}
+
+/// Test whether the given binding can be considered a `pathlib.PurePath`
+/// or an instance of a subclass thereof.
+pub fn is_pathlib_path(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<PathlibPathChecker>(binding, semantic)
 }
 
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].

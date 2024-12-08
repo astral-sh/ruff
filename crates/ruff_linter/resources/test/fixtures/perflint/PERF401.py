@@ -87,3 +87,41 @@ def f():
     result = []
     async for i in items:
         result.append(i)  # PERF401
+
+
+def f():
+    result, _ = [1,2,3,4], ...
+    for i in range(10):
+        result.append(i*2)  # PERF401
+
+
+def f():
+    result = []
+    if True:
+        for i in range(10):  # single-line comment 1 should be protected
+            # single-line comment 2 should be protected
+            if i % 2: # single-line comment 3 should be protected 
+                result.append(i) # PERF401
+
+
+def f():
+    result = [] # comment after assignment should be protected
+    for i in range(10):  # single-line comment 1 should be protected
+        # single-line comment 2 should be protected
+        if i % 2: # single-line comment 3 should be protected 
+            result.append(i) # PERF401
+
+
+def f():
+    result = []
+    for i in range(10):
+        """block comment stops the fix"""
+        result.append(i*2)  # Ok
+
+def f(param):
+    # PERF401
+    # make sure the fix does not panic if there is no comments
+    if param:
+        new_layers = []
+        for value in param:
+            new_layers.append(value * 3)

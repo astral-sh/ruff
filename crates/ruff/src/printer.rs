@@ -27,11 +27,11 @@ bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
     pub(crate) struct Flags: u8 {
         /// Whether to show violations when emitting diagnostics.
-        const SHOW_VIOLATIONS = 0b0000_0001;
+        const SHOW_VIOLATIONS = 1 << 0;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
-        const SHOW_FIX_SUMMARY = 0b0000_0100;
+        const SHOW_FIX_SUMMARY = 1 << 1;
         /// Whether to show a diff of each fixed violation when emitting diagnostics.
-        const SHOW_FIX_DIFF = 0b0000_1000;
+        const SHOW_FIX_DIFF = 1 << 2;
     }
 }
 

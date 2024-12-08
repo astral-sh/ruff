@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
@@ -46,8 +46,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct OutdatedVersionBlock {
+#[derive(ViolationMetadata)]
+pub(crate) struct OutdatedVersionBlock {
     reason: Reason,
 }
 
@@ -56,18 +56,16 @@ impl Violation for OutdatedVersionBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OutdatedVersionBlock { reason } = self;
-        match reason {
+        match self.reason {
             Reason::AlwaysFalse | Reason::AlwaysTrue => {
-                format!("Version block is outdated for minimum Python version")
+                "Version block is outdated for minimum Python version".to_string()
             }
-            Reason::Invalid => format!("Version specifier is invalid"),
+            Reason::Invalid => "Version specifier is invalid".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let OutdatedVersionBlock { reason } = self;
-        match reason {
+        match self.reason {
             Reason::AlwaysFalse | Reason::AlwaysTrue => {
                 Some("Remove outdated version block".to_string())
             }

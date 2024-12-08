@@ -2,82 +2,92 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
-UP044.py:5:17: UP044 [*] Use `*` for unpacking
+UP044.py:6:17: UP044 [*] Use `*` for unpacking
   |
-3 | Shape = TypeVarTuple('Shape')
-4 | 
-5 | class C(Generic[Unpack[Shape]]):
+6 | class C(Generic[Unpack[Shape]]):
   |                 ^^^^^^^^^^^^^ UP044
-6 |     pass
+7 |     pass
   |
   = help: Convert to `*` for unpacking
 
-ℹ Safe fix
-2 2 | 
-3 3 | Shape = TypeVarTuple('Shape')
+ℹ Unsafe fix
+3 3 | Shape = TypeVarTuple("Shape")
 4 4 | 
-5   |-class C(Generic[Unpack[Shape]]):
-  5 |+class C(Generic[*Shape]):
-6 6 |     pass
-7 7 | 
-8 8 | class D(Generic[Unpack  [Shape]]):
+5 5 | 
+6   |-class C(Generic[Unpack[Shape]]):
+  6 |+class C(Generic[*Shape]):
+7 7 |     pass
+8 8 | 
+9 9 | 
 
-UP044.py:8:17: UP044 [*] Use `*` for unpacking
-  |
-6 |     pass
-7 | 
-8 | class D(Generic[Unpack  [Shape]]):
-  |                 ^^^^^^^^^^^^^^^ UP044
-9 |     pass
-  |
-  = help: Convert to `*` for unpacking
-
-ℹ Safe fix
-5 5 | class C(Generic[Unpack[Shape]]):
-6 6 |     pass
-7 7 | 
-8   |-class D(Generic[Unpack  [Shape]]):
-  8 |+class D(Generic[*Shape]):
-9 9 |     pass
-10 10 | 
-11 11 | def f(*args: Unpack[tuple[int, ...]]): pass
-
-UP044.py:11:14: UP044 [*] Use `*` for unpacking
+UP044.py:10:17: UP044 [*] Use `*` for unpacking
    |
- 9 |     pass
-10 | 
-11 | def f(*args: Unpack[tuple[int, ...]]): pass
+10 | class D(Generic[Unpack[Shape]]):
+   |                 ^^^^^^^^^^^^^ UP044
+11 |     pass
+   |
+   = help: Convert to `*` for unpacking
+
+ℹ Unsafe fix
+7  7  |     pass
+8  8  | 
+9  9  | 
+10    |-class D(Generic[Unpack[Shape]]):
+   10 |+class D(Generic[*Shape]):
+11 11 |     pass
+12 12 | 
+13 13 | 
+
+UP044.py:14:14: UP044 [*] Use `*` for unpacking
+   |
+14 | def f(*args: Unpack[tuple[int, ...]]):
    |              ^^^^^^^^^^^^^^^^^^^^^^^ UP044
-12 | 
-13 | def f(*args: Unpack[other.Type]): pass
+15 |     pass
    |
    = help: Convert to `*` for unpacking
 
-ℹ Safe fix
-8  8  | class D(Generic[Unpack  [Shape]]):
-9  9  |     pass
-10 10 | 
-11    |-def f(*args: Unpack[tuple[int, ...]]): pass
-   11 |+def f(*args: *tuple[int, ...]): pass
+ℹ Unsafe fix
+11 11 |     pass
 12 12 | 
-13 13 | def f(*args: Unpack[other.Type]): pass
-14 14 | 
+13 13 | 
+14    |-def f(*args: Unpack[tuple[int, ...]]):
+   14 |+def f(*args: *tuple[int, ...]):
+15 15 |     pass
+16 16 | 
+17 17 | 
 
-UP044.py:13:14: UP044 [*] Use `*` for unpacking
+UP044.py:18:14: UP044 [*] Use `*` for unpacking
    |
-11 | def f(*args: Unpack[tuple[int, ...]]): pass
-12 | 
-13 | def f(*args: Unpack[other.Type]): pass
+18 | def f(*args: Unpack[other.Type]):
    |              ^^^^^^^^^^^^^^^^^^ UP044
+19 |     pass
    |
    = help: Convert to `*` for unpacking
 
-ℹ Safe fix
-10 10 | 
-11 11 | def f(*args: Unpack[tuple[int, ...]]): pass
-12 12 | 
-13    |-def f(*args: Unpack[other.Type]): pass
-   13 |+def f(*args: *other.Type): pass
-14 14 | 
-15 15 | 
-16 16 | # Not valid unpackings but they are valid syntax
+ℹ Unsafe fix
+15 15 |     pass
+16 16 | 
+17 17 | 
+18    |-def f(*args: Unpack[other.Type]):
+   18 |+def f(*args: *other.Type):
+19 19 |     pass
+20 20 | 
+21 21 | 
+
+UP044.py:22:27: UP044 [*] Use `*` for unpacking
+   |
+22 | def f(*args: Generic[int, Unpack[int]]):
+   |                           ^^^^^^^^^^^ UP044
+23 |     pass
+   |
+   = help: Convert to `*` for unpacking
+
+ℹ Unsafe fix
+19 19 |     pass
+20 20 | 
+21 21 | 
+22    |-def f(*args: Generic[int, Unpack[int]]):
+   22 |+def f(*args: Generic[int, *int]):
+23 23 |     pass
+24 24 | 
+25 25 |

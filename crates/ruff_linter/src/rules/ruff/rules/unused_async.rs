@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
@@ -29,8 +29,8 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 /// def foo():
 ///     bar()
 /// ```
-#[violation]
-pub struct UnusedAsync {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedAsync {
     name: String,
 }
 

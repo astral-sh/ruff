@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
@@ -68,24 +68,29 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
-#[violation]
-pub struct MutableArgumentDefault;
+#[derive(ViolationMetadata)]
+pub(crate) struct MutableArgumentDefault;
 
 impl Violation for MutableArgumentDefault {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use mutable data structures for argument defaults")
+        "Do not use mutable data structures for argument defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `None`; initialize within function"))
+        Some("Replace with `None`; initialize within function".to_string())
     }
 }
 
 /// B006
 pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    // Skip stub files
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     for ParameterWithDefault {
         parameter,
         default,

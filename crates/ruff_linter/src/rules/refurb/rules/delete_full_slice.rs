@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::{is_dict, is_list};
 use ruff_python_semantic::SemanticModel;
@@ -43,15 +43,15 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html?highlight=list#mutable-sequence-types)
 /// - [Python documentation: `dict.clear()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#dict.clear)
-#[violation]
-pub struct DeleteFullSlice;
+#[derive(ViolationMetadata)]
+pub(crate) struct DeleteFullSlice;
 
 impl Violation for DeleteFullSlice {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `clear` over deleting a full slice")
+        "Prefer `clear` over deleting a full slice".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

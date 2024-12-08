@@ -27,10 +27,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingReturnTypeStaticMethod,
         Rule::MissingReturnTypeUndocumentedPublicFunction,
         Rule::MissingTypeArgs,
-        Rule::MissingTypeCls,
         Rule::MissingTypeFunctionArgument,
         Rule::MissingTypeKwargs,
-        Rule::MissingTypeSelf,
     ]);
     let enforce_stubs = checker.source_type.is_stub() && checker.enabled(Rule::DocstringInStub);
     let enforce_stubs_and_runtime = checker.enabled(Rule::IterMethodReturnIterable);
@@ -155,7 +153,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
 
         // flake8-pyi
         if enforce_stubs {
-            flake8_pyi::rules::docstring_in_stubs(checker, docstring);
+            flake8_pyi::rules::docstring_in_stubs(checker, definition, docstring);
         }
         if enforce_stubs_and_runtime {
             flake8_pyi::rules::iter_method_return_iterable(checker, definition);

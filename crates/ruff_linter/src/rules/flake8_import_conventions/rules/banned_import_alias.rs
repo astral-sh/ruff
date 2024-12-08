@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
@@ -32,8 +32,8 @@ use crate::rules::flake8_import_conventions::settings::BannedAliases;
 ///
 /// ## Options
 /// - `lint.flake8-import-conventions.banned-aliases`
-#[violation]
-pub struct BannedImportAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct BannedImportAlias {
     name: String,
     asname: String,
 }

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F821_1.py:11:11: F821 Undefined name `Model`
    |
@@ -28,5 +29,3 @@ F821_1.py:30:12: F821 Undefined name `Model`
 30 | x = Match["Model"]
    |            ^^^^^ F821
    |
-
-

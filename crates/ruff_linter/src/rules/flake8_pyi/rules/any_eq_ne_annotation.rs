@@ -1,7 +1,7 @@
 use ruff_python_ast::Parameters;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,8 +41,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
 /// - [Mypy documentation: Any vs. object](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
-#[violation]
-pub struct AnyEqNeAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct AnyEqNeAnnotation {
     method_name: String,
 }
 
@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for AnyEqNeAnnotation {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `object`")
+        "Replace with `object`".to_string()
     }
 }
 

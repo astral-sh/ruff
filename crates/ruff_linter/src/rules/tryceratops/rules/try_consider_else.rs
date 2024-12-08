@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_text_size::Ranged;
 
@@ -46,13 +46,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Errors and Exceptions](https://docs.python.org/3/tutorial/errors.html)
-#[violation]
-pub struct TryConsiderElse;
+#[derive(ViolationMetadata)]
+pub(crate) struct TryConsiderElse;
 
 impl Violation for TryConsiderElse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Consider moving this statement to an `else` block")
+        "Consider moving this statement to an `else` block".to_string()
     }
 }
 

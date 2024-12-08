@@ -1,5 +1,5 @@
 use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::fix::snippet::SourceCodeSnippet;
 
@@ -48,8 +48,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 ///
 /// [SIM101]: https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
-#[violation]
-pub struct RepeatedIsinstanceCalls {
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedIsinstanceCalls {
     expression: SourceCodeSnippet,
 }
 
@@ -57,20 +57,18 @@ pub struct RepeatedIsinstanceCalls {
 impl AlwaysFixableViolation for RepeatedIsinstanceCalls {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedIsinstanceCalls { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!("Merge `isinstance` calls: `{expression}`")
         } else {
-            format!("Merge `isinstance` calls")
+            "Merge `isinstance` calls".to_string()
         }
     }
 
     fn fix_title(&self) -> String {
-        let RepeatedIsinstanceCalls { expression } = self;
-        if let Some(expression) = expression.full_display() {
+        if let Some(expression) = self.expression.full_display() {
             format!("Replace with `{expression}`")
         } else {
-            format!("Replace with merged `isinstance` call")
+            "Replace with merged `isinstance` call".to_string()
         }
     }
 }

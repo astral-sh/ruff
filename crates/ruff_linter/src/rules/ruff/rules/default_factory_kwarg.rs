@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use ast::Keyword;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_constant;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -49,8 +49,8 @@ use crate::Locator;
 /// defaultdict(int)
 /// defaultdict(list)
 /// ```
-#[violation]
-pub struct DefaultFactoryKwarg {
+#[derive(ViolationMetadata)]
+pub(crate) struct DefaultFactoryKwarg {
     default_factory: SourceCodeSnippet,
 }
 
@@ -59,7 +59,7 @@ impl Violation for DefaultFactoryKwarg {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`default_factory` is a positional-only argument to `defaultdict`")
+        "`default_factory` is a positional-only argument to `defaultdict`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

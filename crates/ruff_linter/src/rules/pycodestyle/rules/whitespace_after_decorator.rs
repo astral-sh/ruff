@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Decorator;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -30,13 +30,13 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 
-#[violation]
-pub struct WhitespaceAfterDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct WhitespaceAfterDecorator;
 
 impl AlwaysFixableViolation for WhitespaceAfterDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Whitespace after decorator")
+        "Whitespace after decorator".to_string()
     }
 
     fn fix_title(&self) -> String {

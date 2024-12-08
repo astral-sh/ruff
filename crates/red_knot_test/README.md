@@ -184,8 +184,11 @@ The tests are run independently, in independent in-memory file systems and with 
 [Salsa](https://github.com/salsa-rs/salsa) databases. This means that each is a from-scratch run of
 the type checker, with no data persisting from any previous test.
 
-Due to `cargo test` limitations, an entire test suite (Markdown file) is run as a single Rust test,
-so it's not possible to select individual tests within it to run.
+It is possible to filter to individual tests within a single markdown file using the
+`MDTEST_TEST_FILTER` environment variable. This variable will match any tests which contain the
+value as a case-sensitive substring in its name. An example test name is
+`unpacking.md - Unpacking - Tuple - Multiple assignment`, which contains the name of the markdown
+file and its parent headers joined together with hyphens.
 
 ## Structured test suites
 
@@ -221,6 +224,22 @@ Float", and "Literals - Strings".
 A header-demarcated section must either be a test or a grouping header; it cannot be both. That is,
 a header section can either contain embedded files (making it a test), or it can contain more
 deeply-nested headers (headers with more `#`), but it cannot contain both.
+
+## Configuration
+
+The test framework supports a TOML-based configuration format, which is a subset of the full red-knot
+configuration format. This configuration can be specified in fenced code blocks with `toml` as the
+language tag:
+
+````markdown
+```toml
+[environment]
+target-version = "3.10"
+```
+````
+
+This configuration will apply to all tests in the same section, and all nested sections within that
+section. Nested sections can override configurations from their parent sections.
 
 ## Documentation of tests
 
@@ -279,30 +298,6 @@ possible in these files.
 
 A fenced code block with no language will always be an error.
 
-### Configuration
-
-We will add the ability to specify non-default red-knot configurations to use in tests, by including
-a TOML code block:
-
-````markdown
-```toml
-[tool.knot]
-warn-on-any = true
-```
-
-```py
-from typing import Any
-
-def f(x: Any):  # error: [use-of-any]
-    pass
-```
-````
-
-It should be possible to include a TOML code block in a single test (as shown), or in a grouping
-section, in which case it applies to all nested tests within that grouping section. Configurations
-at multiple level are allowed and merged, with the most-nested (closest to the test) taking
-precedence.
-
 ### Running just a single test from a suite
 
 Having each test in a suite always run as a distinct Rust test would require writing our own test
@@ -314,11 +309,11 @@ variable.
 
 ### Configuring search paths and kinds
 
-The red-knot TOML configuration format hasn't been designed yet, and we may want to implement
+The red-knot TOML configuration format hasn't been finalized, and we may want to implement
 support in the test framework for configuring search paths before it is designed. If so, we can
-define some configuration options for now under the `[tool.knot.tests]` namespace. In the future,
-perhaps some of these can be replaced by real red-knot configuration options; some or all may also
-be kept long-term as test-specific options.
+define some configuration options for now under the `[tests]` namespace. In the future, perhaps
+some of these can be replaced by real red-knot configuration options; some or all may also be
+kept long-term as test-specific options.
 
 Some configuration options we will want to provide:
 
@@ -336,13 +331,13 @@ non-default value using the `workspace-root` config.
 
 ### Specifying a custom typeshed
 
-Some tests will need to override the default typeshed with custom files. The `[tool.knot.tests]`
-configuration option `typeshed-root` should be usable for this:
+Some tests will need to override the default typeshed with custom files. The `[environment]`
+configuration option `typeshed-path` can be used to do this:
 
 ````markdown
 ```toml
-[tool.knot.tests]
-typeshed-root = "/typeshed"
+[environment]
+typeshed-path = "/typeshed"
 ```
 
 This file is importable as part of our custom typeshed, because it is within `/typeshed`, which we

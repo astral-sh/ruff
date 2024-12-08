@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::comments::shebang::ShebangDirective;
 
@@ -30,13 +30,13 @@ use crate::comments::shebang::ShebangDirective;
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
-#[violation]
-pub struct ShebangMissingPython;
+#[derive(ViolationMetadata)]
+pub(crate) struct ShebangMissingPython;
 
 impl Violation for ShebangMissingPython {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Shebang should contain `python`")
+        "Shebang should contain `python`".to_string()
     }
 }
 

@@ -946,3 +946,64 @@ FURB118.py:95:17: FURB118 [*] Use `operator.itemgetter((1,          2))` instead
 94 95 | # Without a slice, trivia is retained
 95    |-op_itemgetter = lambda x: x[1,          2]
    96 |+op_itemgetter = operator.itemgetter((1,          2))
+96 97 | 
+97 98 | 
+98 99 | # All methods in classes are ignored, even those defined using lambdas:
+
+FURB118.py:129:14: FURB118 [*] Use `operator.itemgetter(slice(-2, None))` instead of defining a lambda
+    |
+127 |         "slicer, expected",
+128 |         [
+129 |             (lambda x: x[-2:], "foo"),
+    |              ^^^^^^^^^^^^^^^^ FURB118
+130 |             (lambda x: x[-5:-3], "bar"),
+131 |         ],
+    |
+    = help: Replace with `operator.itemgetter(slice(-2, None))`
+
+ℹ Unsafe fix
+111 111 | # Lambdas wrapped in function calls could also still be method definitions!
+112 112 | # To avoid false positives, we shouldn't flag any of these either:
+113 113 | from typing import final, override, no_type_check
+    114 |+import operator
+114 115 | 
+115 116 | 
+116 117 | class Foo:
+--------------------------------------------------------------------------------
+126 127 |     @pytest.mark.parametrize(
+127 128 |         "slicer, expected",
+128 129 |         [
+129     |-            (lambda x: x[-2:], "foo"),
+    130 |+            (operator.itemgetter(slice(-2, None)), "foo"),
+130 131 |             (lambda x: x[-5:-3], "bar"),
+131 132 |         ],
+132 133 |     )
+
+FURB118.py:130:14: FURB118 [*] Use `operator.itemgetter(slice(-5, -3))` instead of defining a lambda
+    |
+128 |         [
+129 |             (lambda x: x[-2:], "foo"),
+130 |             (lambda x: x[-5:-3], "bar"),
+    |              ^^^^^^^^^^^^^^^^^^ FURB118
+131 |         ],
+132 |     )
+    |
+    = help: Replace with `operator.itemgetter(slice(-5, -3))`
+
+ℹ Unsafe fix
+111 111 | # Lambdas wrapped in function calls could also still be method definitions!
+112 112 | # To avoid false positives, we shouldn't flag any of these either:
+113 113 | from typing import final, override, no_type_check
+    114 |+import operator
+114 115 | 
+115 116 | 
+116 117 | class Foo:
+--------------------------------------------------------------------------------
+127 128 |         "slicer, expected",
+128 129 |         [
+129 130 |             (lambda x: x[-2:], "foo"),
+130     |-            (lambda x: x[-5:-3], "bar"),
+    131 |+            (operator.itemgetter(slice(-5, -3)), "bar"),
+131 132 |         ],
+132 133 |     )
+133 134 |     def test_inlet_asset_alias_extra_slice(self, slicer, expected):

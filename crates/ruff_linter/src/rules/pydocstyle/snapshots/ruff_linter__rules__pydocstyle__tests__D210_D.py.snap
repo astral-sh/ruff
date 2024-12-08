@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
     |
@@ -70,5 +71,3 @@ D.py:581:5: D210 No whitespaces allowed surrounding docstring text
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
     |
     = help: Trim surrounding whitespace
-
-

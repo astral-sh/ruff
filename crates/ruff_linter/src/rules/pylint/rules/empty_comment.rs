@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::{is_python_whitespace, CommentRanges};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
@@ -27,19 +27,19 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Pylint documentation](https://pylint.pycqa.org/en/latest/user_guide/messages/refactor/empty-comment.html)
-#[violation]
-pub struct EmptyComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct EmptyComment;
 
 impl Violation for EmptyComment {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line with empty comment")
+        "Line with empty comment".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Delete the empty comment"))
+        Some("Delete the empty comment".to_string())
     }
 }
 

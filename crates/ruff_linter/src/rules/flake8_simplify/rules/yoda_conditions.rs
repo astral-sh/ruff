@@ -4,7 +4,7 @@ use anyhow::Result;
 use libcst_native::CompOp;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
@@ -47,8 +47,8 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
-#[violation]
-pub struct YodaConditions {
+#[derive(ViolationMetadata)]
+pub(crate) struct YodaConditions {
     suggestion: Option<SourceCodeSnippet>,
 }
 
@@ -57,7 +57,7 @@ impl Violation for YodaConditions {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Yoda condition detected")
+        "Yoda condition detected".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

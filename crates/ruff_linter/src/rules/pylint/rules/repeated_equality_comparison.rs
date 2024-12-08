@@ -3,13 +3,12 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::hashable::HashableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
@@ -29,6 +28,10 @@ use crate::Locator;
 /// If the items are hashable, use a `set` for efficiency; otherwise, use a
 /// `tuple`.
 ///
+/// In [preview], this rule will try to determine if the values are hashable
+/// and the fix will use a `set` if they are. If unable to determine, the fix
+/// will use a `tuple` and continue to suggest the use of a `set`.
+///
 /// ## Example
 /// ```python
 /// foo == "bar" or foo == "baz" or foo == "qux"
@@ -43,35 +46,41 @@ use crate::Locator;
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
-#[violation]
-pub struct RepeatedEqualityComparison {
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
+    all_hashable: bool,
 }
 
 impl AlwaysFixableViolation for RepeatedEqualityComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedEqualityComparison { expression } = self;
-        if let Some(expression) = expression.full_display() {
-            format!(
-                "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
-            )
-        } else {
-            format!(
+        match (self.expression.full_display(), self.all_hashable) {
+            (Some(expression), false) => {
+                format!("Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable.")
+            }
+            (Some(expression), true) => {
+                format!("Consider merging multiple comparisons: `{expression}`.")
+            }
+            (None, false) => {
                 "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
-            )
+                    .to_string()
+            }
+            (None, true) => "Consider merging multiple comparisons.".to_string(),
         }
     }
 
     fn fix_title(&self) -> String {
-        format!("Merge multiple comparisons")
+        "Merge multiple comparisons".to_string()
     }
 }
 
 /// PLR1714
 pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast::ExprBoolOp) {
     // Map from expression hash to (starting offset, number of comparisons, list
-    let mut value_to_comparators: FxHashMap<HashableExpr, (TextSize, Vec<&Expr>, Vec<usize>)> =
+    let mut value_to_comparators: FxHashMap<ComparableExpr, (&Expr, Vec<&Expr>, Vec<usize>)> =
         FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
 
     for (i, value) in bool_op.values.iter().enumerate() {
@@ -82,7 +91,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         if matches!(left, Expr::Name(_) | Expr::Attribute(_)) {
             let (_, left_matches, index_matches) = value_to_comparators
                 .entry(left.into())
-                .or_insert_with(|| (left.start(), Vec::new(), Vec::new()));
+                .or_insert_with(|| (left, Vec::new(), Vec::new()));
             left_matches.push(right);
             index_matches.push(i);
         }
@@ -90,15 +99,15 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         if matches!(right, Expr::Name(_) | Expr::Attribute(_)) {
             let (_, right_matches, index_matches) = value_to_comparators
                 .entry(right.into())
-                .or_insert_with(|| (right.start(), Vec::new(), Vec::new()));
+                .or_insert_with(|| (right, Vec::new(), Vec::new()));
             right_matches.push(left);
             index_matches.push(i);
         }
     }
 
-    for (value, (_, comparators, indices)) in value_to_comparators
-        .iter()
-        .sorted_by_key(|(_, (start, _, _))| *start)
+    for (expr, comparators, indices) in value_to_comparators
+        .into_values()
+        .sorted_by_key(|(expr, _, _)| expr.start())
     {
         // If there's only one comparison, there's nothing to merge.
         if comparators.len() == 1 {
@@ -112,9 +121,9 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
             if last.is_some_and(|last| last + 1 == *index) {
                 let (indices, comparators) = sequences.last_mut().unwrap();
                 indices.push(*index);
-                comparators.push(*comparator);
+                comparators.push(comparator);
             } else {
-                sequences.push((vec![*index], vec![*comparator]));
+                sequences.push((vec![*index], vec![comparator]));
             }
             last = Some(*index);
         }
@@ -124,14 +133,23 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                 continue;
             }
 
+            // if we can determine that all the values are hashable, we can use a set
+            // TODO: improve with type inference
+            let all_hashable = checker.settings.preview.is_enabled()
+                && comparators
+                    .iter()
+                    .all(|comparator| comparator.is_literal_expr());
+
             let mut diagnostic = Diagnostic::new(
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
-                        value.as_expr(),
+                        expr,
                         bool_op.op,
                         &comparators,
                         checker.locator(),
+                        all_hashable,
                     )),
+                    all_hashable,
                 },
                 bool_op.range(),
             );
@@ -143,22 +161,31 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
             let before = bool_op.values.iter().take(*first).cloned();
             let after = bool_op.values.iter().skip(last + 1).cloned();
 
+            let comparator = if all_hashable {
+                Expr::Set(ast::ExprSet {
+                    elts: comparators.iter().copied().cloned().collect(),
+                    range: TextRange::default(),
+                })
+            } else {
+                Expr::Tuple(ast::ExprTuple {
+                    elts: comparators.iter().copied().cloned().collect(),
+                    range: TextRange::default(),
+                    ctx: ExprContext::Load,
+                    parenthesized: true,
+                })
+            };
+
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().expr(&Expr::BoolOp(ast::ExprBoolOp {
                     op: bool_op.op,
                     values: before
                         .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
-                            left: Box::new(value.as_expr().clone()),
+                            left: Box::new(expr.clone()),
                             ops: match bool_op.op {
                                 BoolOp::Or => Box::from([CmpOp::In]),
                                 BoolOp::And => Box::from([CmpOp::NotIn]),
                             },
-                            comparators: Box::from([Expr::Tuple(ast::ExprTuple {
-                                elts: comparators.iter().copied().cloned().collect(),
-                                range: TextRange::default(),
-                                ctx: ExprContext::Load,
-                                parenthesized: true,
-                            })]),
+                            comparators: Box::from([comparator]),
                             range: bool_op.range(),
                         })))
                         .chain(after)
@@ -234,11 +261,13 @@ fn to_allowed_value<'a>(
 }
 
 /// Generate a string like `obj in (a, b, c)` or `obj not in (a, b, c)`.
+/// If `all_hashable` is `true`, the string will use a set instead of a tuple.
 fn merged_membership_test(
     left: &Expr,
     op: BoolOp,
     comparators: &[&Expr],
     locator: &Locator,
+    all_hashable: bool,
 ) -> String {
     let op = match op {
         BoolOp::Or => "in",
@@ -249,5 +278,10 @@ fn merged_membership_test(
         .iter()
         .map(|comparator| locator.slice(comparator))
         .join(", ");
+
+    if all_hashable {
+        return format!("{left} {op} {{{members}}}",);
+    }
+
     format!("{left} {op} ({members})",)
 }

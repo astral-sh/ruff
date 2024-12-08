@@ -1,5 +1,30 @@
 # Breaking Changes
 
+## 0.8.0
+
+- **Default to Python 3.9**
+
+    Ruff now defaults to Python 3.9 instead of 3.8 if no explicit Python version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version) or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires) ([#13896](https://github.com/astral-sh/ruff/pull/13896))
+
+- **Changed location of `pydoclint` diagnostics**
+
+    [`pydoclint`](https://docs.astral.sh/ruff/rules/#pydoclint-doc) diagnostics now point to the first-line of the problematic docstring. Previously, this was not the case.
+
+    If you've opted into these preview rules but have them suppressed using
+    [`noqa`](https://docs.astral.sh/ruff/linter/#error-suppression) comments in
+    some places, this change may mean that you need to move the `noqa` suppression
+    comments. Most users should be unaffected by this change.
+
+- **Use XDG (i.e. `~/.local/bin`) instead of the Cargo home directory in the standalone installer**
+
+    Previously, Ruff's installer used `$CARGO_HOME` or `~/.cargo/bin` for its target install directory. Now, Ruff will be installed into `$XDG_BIN_HOME`, `$XDG_DATA_HOME/../bin`, or `~/.local/bin` (in that order).
+
+    This change is only relevant to users of the standalone Ruff installer (using the shell or PowerShell script). If you installed Ruff using uv or pip, you should be unaffected.
+
+- **Changes to the line width calculation**
+
+    Ruff now uses a new version of the [unicode-width](https://github.com/unicode-rs/unicode-width) Rust crate to calculate the line width. In very rare cases, this may lead to lines containing Unicode characters being reformatted, or being considered too long when they were not before ([`E501`](https://docs.astral.sh/ruff/rules/line-too-long/)).
+
 ## 0.7.0
 
 - The pytest rules `PT001` and `PT023` now default to omitting the decorator parentheses when there are no arguments
@@ -167,7 +192,7 @@ flag or `unsafe-fixes` configuration option can be used to enable unsafe fixes.
 
 See the [docs](https://docs.astral.sh/ruff/configuration/#fix-safety) for details.
 
-### Remove formatter-conflicting rules from the default rule set  ([#7900](https://github.com/astral-sh/ruff/pull/7900))
+### Remove formatter-conflicting rules from the default rule set ([#7900](https://github.com/astral-sh/ruff/pull/7900))
 
 Previously, Ruff enabled all implemented rules in Pycodestyle (`E`) by default. Ruff now only includes the
 Pycodestyle prefixes `E4`, `E7`, and `E9` to exclude rules that conflict with automatic formatters. Consequently,

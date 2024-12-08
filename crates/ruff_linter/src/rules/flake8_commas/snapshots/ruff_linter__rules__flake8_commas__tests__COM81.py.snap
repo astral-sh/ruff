@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_commas/mod.rs
+snapshot_kind: text
 ---
 COM81.py:4:18: COM812 [*] Trailing comma missing
   |

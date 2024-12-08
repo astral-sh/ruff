@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -25,13 +25,14 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 /// - [Paramiko documentation: `SSHClient.exec_command()`](https://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient.exec_command)
-#[violation]
-pub struct ParamikoCall;
+#[derive(ViolationMetadata)]
+pub(crate) struct ParamikoCall;
 
 impl Violation for ParamikoCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible shell injection via Paramiko call; check inputs are properly sanitized")
+        "Possible shell injection via Paramiko call; check inputs are properly sanitized"
+            .to_string()
     }
 }
 

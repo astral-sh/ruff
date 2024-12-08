@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::typing;
@@ -33,13 +33,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Paramiko documentation: set_missing_host_key_policy](https://docs.paramiko.org/en/latest/api/client.html#paramiko.client.SSHClient.set_missing_host_key_policy)
-#[violation]
-pub struct SSHNoHostKeyVerification;
+#[derive(ViolationMetadata)]
+pub(crate) struct SSHNoHostKeyVerification;
 
 impl Violation for SSHNoHostKeyVerification {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Paramiko call with policy set to automatically trust the unknown host key")
+        "Paramiko call with policy set to automatically trust the unknown host key".to_string()
     }
 }
 

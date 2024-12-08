@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, StringLiteralFlags};
 use ruff_python_semantic::SemanticModel;
@@ -42,8 +42,8 @@ use crate::fix::edits::add_argument;
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
-#[violation]
-pub struct UnspecifiedEncoding {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnspecifiedEncoding {
     function_name: String,
     mode: ModeArgument,
 }
@@ -67,7 +67,7 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
     }
 
     fn fix_title(&self) -> String {
-        format!("Add explicit `encoding` argument")
+        "Add explicit `encoding` argument".to_string()
     }
 }
 

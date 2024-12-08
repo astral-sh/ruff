@@ -1,7 +1,7 @@
 use ruff_python_ast::{Expr, StmtAssign};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -41,13 +41,13 @@ use crate::checkers::ast::Checker;
 /// class Klass:
 ///     X: TypeAlias = int
 /// ```
-#[violation]
-pub struct ComplexAssignmentInStub;
+#[derive(ViolationMetadata)]
+pub(crate) struct ComplexAssignmentInStub;
 
 impl Violation for ComplexAssignmentInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Stubs should not contain assignments to attributes or multiple targets")
+        "Stubs should not contain assignments to attributes or multiple targets".to_string()
     }
 }
 

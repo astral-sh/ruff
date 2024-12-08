@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{
@@ -36,20 +36,18 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#typesseq-mutable)
-#[violation]
-pub struct LoopIteratorMutation {
+#[derive(ViolationMetadata)]
+pub(crate) struct LoopIteratorMutation {
     name: Option<SourceCodeSnippet>,
 }
 
 impl Violation for LoopIteratorMutation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LoopIteratorMutation { name } = self;
-
-        if let Some(name) = name.as_ref().and_then(SourceCodeSnippet::full_display) {
+        if let Some(name) = self.name.as_ref().and_then(SourceCodeSnippet::full_display) {
             format!("Mutation to loop iterable `{name}` during iteration")
         } else {
-            format!("Mutation to loop iterable during iteration")
+            "Mutation to loop iterable during iteration".to_string()
         }
     }
 }

@@ -51,12 +51,12 @@ reveal_type(c)  # revealed: tuple[str, int]
 reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 
 # TODO: homogenous tuples, PEP-646 tuples
-reveal_type(e)  # revealed: @Todo
-reveal_type(f)  # revealed: @Todo
-reveal_type(g)  # revealed: @Todo
+reveal_type(e)  # revealed: @Todo(full tuple[...] support)
+reveal_type(f)  # revealed: @Todo(full tuple[...] support)
+reveal_type(g)  # revealed: @Todo(full tuple[...] support)
 
 # TODO: support more kinds of type expressions in annotations
-reveal_type(h)  # revealed: @Todo
+reveal_type(h)  # revealed: @Todo(full tuple[...] support)
 
 reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]
@@ -109,4 +109,30 @@ c: builtins.tuple[builtins.tuple[builtins.int, builtins.int], builtins.int] = ((
 
 # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `tuple[tuple[int, int], int]`"
 c: builtins.tuple[builtins.tuple[builtins.int, builtins.int], builtins.int] = "foo"
+```
+
+## Future annotations are deferred
+
+```py
+from __future__ import annotations
+
+x: Foo
+
+class Foo:
+    pass
+
+x = Foo()
+reveal_type(x)  # revealed: Foo
+```
+
+## Annotations in stub files are deferred
+
+```pyi path=main.pyi
+x: Foo
+
+class Foo:
+    pass
+
+x = Foo()
+reveal_type(x)  # revealed: Foo
 ```

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3.11/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3.11/library/functions.html#max)
-#[violation]
-pub struct IfExprMinMax {
+#[derive(ViolationMetadata)]
+pub(crate) struct IfExprMinMax {
     min_max: MinMax,
     expression: SourceCodeSnippet,
     replacement: SourceCodeSnippet,

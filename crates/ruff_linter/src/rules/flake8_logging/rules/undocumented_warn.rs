@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -32,18 +32,19 @@ use crate::importer::ImportRequest;
 ///
 /// logging.basicConfig(level=logging.WARNING)
 /// ```
-#[violation]
-pub struct UndocumentedWarn;
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedWarn;
 
 impl Violation for UndocumentedWarn {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of undocumented `logging.WARN` constant")
+        "Use of undocumented `logging.WARN` constant".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace `logging.WARN` with `logging.WARNING`"))
+        Some("Replace `logging.WARN` with `logging.WARNING`".to_string())
     }
 }
 

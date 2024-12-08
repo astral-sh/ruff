@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-
+use itertools::Itertools;
 use ruff_formatter::{format_args, write, FormatContext};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
@@ -8,6 +7,7 @@ use ruff_python_ast::str_prefix::{
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
@@ -20,7 +20,7 @@ use crate::preview::{
 };
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
-    is_fstring_with_quoted_debug_expression,
+    is_fstring_with_quoted_debug_expression, is_fstring_with_quoted_format_spec_and_debug,
     is_fstring_with_triple_quoted_literal_expression_containing_quotes, QuoteMetadata,
 };
 use crate::string::{normalize_string, StringLikeExtensions, StringNormalizer, StringQuotes};
@@ -41,12 +41,20 @@ impl<'a> FormatImplicitConcatenatedString<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let expanded = FormatImplicitConcatenatedStringExpanded::new(self.string);
+        let flat = FormatImplicitConcatenatedStringFlat::new(self.string, f.context());
+        let expanded = FormatImplicitConcatenatedStringExpanded::new(
+            self.string,
+            if flat.is_some() {
+                ImplicitConcatenatedLayout::MaybeFlat
+            } else {
+                ImplicitConcatenatedLayout::Multipart
+            },
+        );
 
         // If the string can be joined, try joining the implicit concatenated string into a single string
         // if it fits on the line. Otherwise, parenthesize the string parts and format each part on its
         // own line.
-        if let Some(flat) = FormatImplicitConcatenatedStringFlat::new(self.string, f.context()) {
+        if let Some(flat) = flat {
             write!(
                 f,
                 [if_group_fits_on_line(&flat), if_group_breaks(&expanded)]
@@ -60,13 +68,14 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
 /// Formats an implicit concatenated string where parts are separated by a space or line break.
 pub(crate) struct FormatImplicitConcatenatedStringExpanded<'a> {
     string: StringLike<'a>,
+    layout: ImplicitConcatenatedLayout,
 }
 
 impl<'a> FormatImplicitConcatenatedStringExpanded<'a> {
-    pub(crate) fn new(string: StringLike<'a>) -> Self {
+    pub(crate) fn new(string: StringLike<'a>, layout: ImplicitConcatenatedLayout) -> Self {
         assert!(string.is_implicit_concatenated());
 
-        Self { string }
+        Self { string, layout }
     }
 }
 
@@ -77,6 +86,19 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 
         let join_implicit_concatenated_string_enabled =
             is_join_implicit_concatenated_string_enabled(f.context());
+
+        // Keep implicit concatenated strings expanded unless they're already written on a single line.
+        if matches!(self.layout, ImplicitConcatenatedLayout::Multipart)
+            && join_implicit_concatenated_string_enabled
+            && self.string.parts().tuple_windows().any(|(a, b)| {
+                f.context()
+                    .source()
+                    .contains_line_break(TextRange::new(a.end(), b.start()))
+            })
+        {
+            expand_parent().fmt(f)?;
+        }
+
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for part in self.string.parts() {
@@ -108,6 +130,14 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum ImplicitConcatenatedLayout {
+    /// The string might get joined into a single string if it fits on a single line.
+    MaybeFlat,
+    /// The string will remain a multipart string.
+    Multipart,
+}
+
 /// Formats an implicit concatenated string where parts are joined into a single string if possible.
 pub(crate) struct FormatImplicitConcatenatedStringFlat<'a> {
     string: StringLike<'a>,
@@ -124,7 +154,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             }
 
             // Multiline strings can never fit on a single line.
-            if !string.is_fstring() && string.is_multiline(context.source()) {
+            if string.is_multiline(context) {
                 return None;
             }
 
@@ -157,34 +187,8 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 }
 
                 if let StringLikePart::FString(fstring) = part {
-                    if fstring.elements.iter().any(|element| match element {
-                        // Same as for other literals. Multiline literals can't fit on a single line.
-                        FStringElement::Literal(literal) => {
-                            context.source().contains_line_break(literal.range())
-                        }
-                        FStringElement::Expression(expression) => {
-                            if is_f_string_formatting_enabled(context) {
-                                // Expressions containing comments can't be joined.
-                                context.comments().contains_comments(expression.into())
-                            } else {
-                                // Multiline f-string expressions can't be joined if the f-string formatting is disabled because
-                                // the string gets inserted in verbatim preserving the newlines.
-                                context.source().contains_line_break(expression.range())
-                            }
-                        }
-                    }) {
-                        return None;
-                    }
-
-                    // Avoid invalid syntax for pre Python 312:
-                    // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
-                    // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
-                    if !context.options().target_version().supports_pep_701() {
-                        if is_fstring_with_quoted_debug_expression(fstring, context)
-                            || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
-                                fstring, context,
-                            )
-                        {
+                    if context.options().target_version().supports_pep_701() {
+                        if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
                             if preserve_quotes_requirement
                                 .is_some_and(|quote| quote != part.flags().quote_style())
                             {
@@ -192,6 +196,21 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             }
                             preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
+                    }
+                    // Avoid invalid syntax for pre Python 312:
+                    // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
+                    // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
+                    else if is_fstring_with_quoted_debug_expression(fstring, context)
+                        || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                            fstring, context,
+                        )
+                    {
+                        if preserve_quotes_requirement
+                            .is_some_and(|quote| quote != part.flags().quote_style())
+                        {
+                            return None;
+                        }
+                        preserve_quotes_requirement = Some(part.flags().quote_style());
                     }
                 }
             }
@@ -208,26 +227,30 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 StringLike::FString(_) => AnyStringPrefix::Format(FStringPrefix::Regular),
             };
 
-            // Only determining the preferred quote for the first string is sufficient
-            // because we don't support joining triple quoted strings with non triple quoted strings.
-            let quote = if let Ok(preferred_quote) =
-                Quote::try_from(normalizer.preferred_quote_style(first_part))
-            {
-                for part in string.parts() {
-                    let part_quote_metadata =
-                        QuoteMetadata::from_part(part, context, preferred_quote);
-
-                    if let Some(merged) = merged_quotes.as_mut() {
-                        *merged = part_quote_metadata.merge(merged)?;
-                    } else {
-                        merged_quotes = Some(part_quote_metadata);
-                    }
-                }
-
-                merged_quotes?.choose(preferred_quote)
+            let quote = if let Some(quote) = preserve_quotes_requirement {
+                quote
             } else {
-                // Use the quotes of the first part if the quotes should be preserved.
-                first_part.flags().quote_style()
+                // Only determining the preferred quote for the first string is sufficient
+                // because we don't support joining triple quoted strings with non triple quoted strings.
+                if let Ok(preferred_quote) =
+                    Quote::try_from(normalizer.preferred_quote_style(first_part))
+                {
+                    for part in string.parts() {
+                        let part_quote_metadata =
+                            QuoteMetadata::from_part(part, context, preferred_quote);
+
+                        if let Some(merged) = merged_quotes.as_mut() {
+                            *merged = part_quote_metadata.merge(merged)?;
+                        } else {
+                            merged_quotes = Some(part_quote_metadata);
+                        }
+                    }
+
+                    merged_quotes?.choose(preferred_quote)
+                } else {
+                    // Use the quotes of the first part if the quotes should be preserved.
+                    first_part.flags().quote_style()
+                }
             };
 
             Some(AnyStringFlags::new(prefix, quote, false))

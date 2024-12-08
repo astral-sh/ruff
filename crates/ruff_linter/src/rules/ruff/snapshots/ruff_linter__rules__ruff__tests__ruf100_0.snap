@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
 ---
 RUF100_0.py:9:12: RUF100 [*] Unused blanket `noqa` directive
    |

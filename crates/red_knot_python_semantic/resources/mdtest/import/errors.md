@@ -55,3 +55,24 @@ from b import x
 
 x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
 ```
+
+## Import cycle
+
+```py path=a.py
+class A: ...
+
+reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[object]]
+import b
+
+class C(b.B): ...
+
+reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Literal[A], Literal[object]]
+```
+
+```py path=b.py
+from a import A
+
+class B(A): ...
+
+reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[A], Literal[object]]
+```

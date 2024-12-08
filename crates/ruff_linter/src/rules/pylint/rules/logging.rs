@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -36,13 +36,13 @@ use crate::rules::pyflakes::cformat::CFormatSummary;
 ///     logging.error("%s error occurred: %s", type(e), e)
 ///     raise
 /// ```
-#[violation]
-pub struct LoggingTooFewArgs;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingTooFewArgs;
 
 impl Violation for LoggingTooFewArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Not enough arguments for `logging` format string")
+        "Not enough arguments for `logging` format string".to_string()
     }
 }
 
@@ -73,13 +73,13 @@ impl Violation for LoggingTooFewArgs {
 ///     logging.error("%s error occurred: %s", type(e), e)
 ///     raise
 /// ```
-#[violation]
-pub struct LoggingTooManyArgs;
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingTooManyArgs;
 
 impl Violation for LoggingTooManyArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many arguments for `logging` format string")
+        "Too many arguments for `logging` format string".to_string()
     }
 }
 

@@ -1,0 +1,6 @@
+[project]
+name = "hello-world"
+version = "0.1.0"
+# PEP 639 - passing
+license = "MIT OR GPL-2.0-or-later OR (FSFUL AND BSD-2-Clause)"
+license-files = ["LICEN[CS]E*", "AUTHORS*", "licenses/LICENSE.MIT"]

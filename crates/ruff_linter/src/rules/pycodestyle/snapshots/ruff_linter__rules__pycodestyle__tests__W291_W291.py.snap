@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 W291.py:1:23: W291 [*] Trailing whitespace
   |
@@ -73,5 +74,3 @@ W291.py:14:10: W291 [*] Trailing whitespace
 14    |-    1 + 2 
    14 |+    1 + 2
 15 15 | }'
-
-

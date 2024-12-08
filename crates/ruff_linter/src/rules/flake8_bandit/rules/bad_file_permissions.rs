@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::{Modules, SemanticModel};
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `os.chmod`](https://docs.python.org/3/library/os.html#os.chmod)
 /// - [Python documentation: `stat`](https://docs.python.org/3/library/stat.html)
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
-#[violation]
-pub struct BadFilePermissions {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadFilePermissions {
     reason: Reason,
 }
 
@@ -47,7 +47,9 @@ impl Violation for BadFilePermissions {
             Reason::Permissive(mask) => {
                 format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory")
             }
-            Reason::Invalid => format!("`os.chmod` setting an invalid mask on file or directory"),
+            Reason::Invalid => {
+                "`os.chmod` setting an invalid mask on file or directory".to_string()
+            }
         }
     }
 }

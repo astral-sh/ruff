@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use ast::whitespace::indentation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 use ruff_python_codegen::Stylist;
@@ -46,16 +46,15 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Python documentation: `break` and `continue` Statements, and `else` Clauses on Loops](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
-#[violation]
-pub struct UselessElseOnLoop;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessElseOnLoop;
 
 impl Violation for UselessElseOnLoop {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents"
-        )
+        "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

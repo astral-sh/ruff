@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+snapshot_kind: text
 ---
 N818.py:9:7: N818 Exception name `C` should be named with an Error suffix
    |
@@ -14,5 +15,3 @@ N818.py:17:7: N818 Exception name `E` should be named with an Error suffix
    |       ^ N818
 18 |     pass
    |
-
-

@@ -63,28 +63,15 @@ impl ResolvedReference {
             .intersects(SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION)
     }
 
-    /// Return `true` if the context is in a "simple" string type definition.
-    pub const fn in_simple_string_type_definition(&self) -> bool {
+    /// Return `true` if the context is in a string type definition.
+    pub const fn in_string_type_definition(&self) -> bool {
         self.flags
-            .intersects(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
+            .intersects(SemanticModelFlags::STRING_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the context is in a "complex" string type definition.
-    pub const fn in_complex_string_type_definition(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION)
-    }
-
-    /// Return `true` if the context is in a `__future__` type definition.
-    pub const fn in_future_type_definition(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
-    }
-
-    /// Return `true` if the context is in any kind of deferred type definition.
-    pub const fn in_deferred_type_definition(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::DEFERRED_TYPE_DEFINITION)
+    /// Return `true` if the context is in any kind of type definition.
+    pub const fn in_type_definition(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in a type-checking block.
@@ -97,6 +84,19 @@ impl ResolvedReference {
     pub const fn in_dunder_all_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
+    }
+
+    /// Return `true` if the context is in the r.h.s. of a [PEP 613] type alias.
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    pub const fn in_annotated_type_alias_value(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::ANNOTATED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the context is inside an `assert` statement
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
     }
 }
 

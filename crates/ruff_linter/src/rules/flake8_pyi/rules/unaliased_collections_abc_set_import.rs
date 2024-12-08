@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind, Scope};
 use ruff_text_size::Ranged;
@@ -40,21 +40,19 @@ use crate::renamer::Renamer;
 /// re-exported if they are included in `__all__`, use a "redundant"
 /// `import foo as foo` alias, or are imported via a `*` import. As such, the
 /// fix is marked as safe in more cases for `.pyi` files.
-#[violation]
-pub struct UnaliasedCollectionsAbcSetImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnaliasedCollectionsAbcSetImport;
 
 impl Violation for UnaliasedCollectionsAbcSetImport {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin"
-        )
+        "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Alias `Set` to `AbstractSet`"))
+        Some("Alias `Set` to `AbstractSet`".to_string())
     }
 }
 
