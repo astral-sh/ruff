@@ -296,7 +296,7 @@ RUF046.py:31:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove unnecessary conversion to `int`
 
-ℹ Safe fix
+ℹ Unsafe fix
 28 28 | ### `round()`
 29 29 | 
 30 30 | ## Errors
@@ -316,12 +316,12 @@ RUF046.py:32:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove unnecessary conversion to `int`
 
-ℹ Safe fix
+ℹ Unsafe fix
 29 29 | 
 30 30 | ## Errors
 31 31 | int(round(0))
 32    |-int(round(0, 0))
-   32 |+round(0)
+   32 |+round(0, 0)
 33 33 | int(round(0, None))
 34 34 | 
 35 35 | int(round(0.1))
@@ -337,12 +337,12 @@ RUF046.py:33:1: RUF046 [*] Value being casted is already an integer
    |
    = help: Remove unnecessary conversion to `int`
 
-ℹ Safe fix
+ℹ Unsafe fix
 30 30 | ## Errors
 31 31 | int(round(0))
 32 32 | int(round(0, 0))
 33    |-int(round(0, None))
-   33 |+round(0)
+   33 |+round(0, None)
 34 34 | 
 35 35 | int(round(0.1))
 36 36 | int(round(0.1, None))
@@ -382,7 +382,7 @@ RUF046.py:36:1: RUF046 [*] Value being casted is already an integer
 34 34 | 
 35 35 | int(round(0.1))
 36    |-int(round(0.1, None))
-   36 |+round(0.1)
+   36 |+round(0.1, None)
 37 37 | 
 38 38 | # Argument type is not checked
 39 39 | foo = type("Foo", (), {"__round__": lambda self: 4.2})()
@@ -408,6 +408,25 @@ RUF046.py:41:1: RUF046 [*] Value being casted is already an integer
 43 43 | int(round(foo, None))
 44 44 | 
 
+RUF046.py:42:1: RUF046 [*] Value being casted is already an integer
+   |
+41 | int(round(foo))
+42 | int(round(foo, 0))
+   | ^^^^^^^^^^^^^^^^^^ RUF046
+43 | int(round(foo, None))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+39 39 | foo = type("Foo", (), {"__round__": lambda self: 4.2})()
+40 40 | 
+41 41 | int(round(foo))
+42    |-int(round(foo, 0))
+   42 |+round(foo, 0)
+43 43 | int(round(foo, None))
+44 44 | 
+45 45 | ## No errors
+
 RUF046.py:43:1: RUF046 [*] Value being casted is already an integer
    |
 41 | int(round(foo))
@@ -424,7 +443,82 @@ RUF046.py:43:1: RUF046 [*] Value being casted is already an integer
 41 41 | int(round(foo))
 42 42 | int(round(foo, 0))
 43    |-int(round(foo, None))
-   43 |+round(foo)
+   43 |+round(foo, None)
 44 44 | 
 45 45 | ## No errors
 46 46 | int(round(0, 3.14))
+
+RUF046.py:46:1: RUF046 [*] Value being casted is already an integer
+   |
+45 | ## No errors
+46 | int(round(0, 3.14))
+   | ^^^^^^^^^^^^^^^^^^^ RUF046
+47 | int(round(0, non_literal))
+48 | int(round(0, 0), base)
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+43 43 | int(round(foo, None))
+44 44 | 
+45 45 | ## No errors
+46    |-int(round(0, 3.14))
+   46 |+round(0, 3.14)
+47 47 | int(round(0, non_literal))
+48 48 | int(round(0, 0), base)
+49 49 | int(round(0, 0, extra=keyword))
+
+RUF046.py:47:1: RUF046 [*] Value being casted is already an integer
+   |
+45 | ## No errors
+46 | int(round(0, 3.14))
+47 | int(round(0, non_literal))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
+48 | int(round(0, 0), base)
+49 | int(round(0, 0, extra=keyword))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+44 44 | 
+45 45 | ## No errors
+46 46 | int(round(0, 3.14))
+47    |-int(round(0, non_literal))
+   47 |+round(0, non_literal)
+48 48 | int(round(0, 0), base)
+49 49 | int(round(0, 0, extra=keyword))
+50 50 | int(round(0.1, 0))
+
+RUF046.py:49:1: RUF046 [*] Value being casted is already an integer
+   |
+47 | int(round(0, non_literal))
+48 | int(round(0, 0), base)
+49 | int(round(0, 0, extra=keyword))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
+50 | int(round(0.1, 0))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+46 46 | int(round(0, 3.14))
+47 47 | int(round(0, non_literal))
+48 48 | int(round(0, 0), base)
+49    |-int(round(0, 0, extra=keyword))
+   49 |+round(0, 0, extra=keyword)
+50 50 | int(round(0.1, 0))
+
+RUF046.py:50:1: RUF046 [*] Value being casted is already an integer
+   |
+48 | int(round(0, 0), base)
+49 | int(round(0, 0, extra=keyword))
+50 | int(round(0.1, 0))
+   | ^^^^^^^^^^^^^^^^^^ RUF046
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+47 47 | int(round(0, non_literal))
+48 48 | int(round(0, 0), base)
+49 49 | int(round(0, 0, extra=keyword))
+50    |-int(round(0.1, 0))
+   50 |+round(0.1, 0)
