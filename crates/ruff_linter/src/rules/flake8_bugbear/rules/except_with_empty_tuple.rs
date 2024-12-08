@@ -59,7 +59,7 @@ pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &Ex
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = type_.as_ref() else {
         return;
     };
-    
+
     if elts.is_empty() {
         let is_star = checker
             .semantic()
