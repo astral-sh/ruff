@@ -1185,6 +1185,8 @@ impl<'db> Type<'db> {
                     | KnownClass::Set
                     | KnownClass::Dict
                     | KnownClass::Slice
+                    | KnownClass::BaseException
+                    | KnownClass::BaseExceptionGroup
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
@@ -1857,6 +1859,8 @@ pub enum KnownClass {
     Set,
     Dict,
     Slice,
+    BaseException,
+    BaseExceptionGroup,
     // Types
     GenericAlias,
     ModuleType,
@@ -1887,6 +1891,8 @@ impl<'db> KnownClass {
             Self::List => "list",
             Self::Type => "type",
             Self::Slice => "slice",
+            Self::BaseException => "BaseException",
+            Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -1914,6 +1920,12 @@ impl<'db> KnownClass {
             .unwrap_or(Type::Unknown)
     }
 
+    pub fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.to_class_literal(db)
+            .into_class_literal()
+            .map(|ClassLiteralType { class }| Type::subclass_of(class))
+    }
+
     /// Return the module in which we should look up the definition for this class
     pub(crate) fn canonical_module(self, db: &'db dyn Db) -> CoreStdlibModule {
         match self {
@@ -1928,6 +1940,8 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::Slice => CoreStdlibModule::Builtins,
             Self::VersionInfo => CoreStdlibModule::Sys,
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
@@ -1971,6 +1985,8 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::FunctionType
             | Self::SpecialForm
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::TypeVar => false,
         }
     }
@@ -1992,6 +2008,8 @@ impl<'db> KnownClass {
             "dict" => Self::Dict,
             "list" => Self::List,
             "slice" => Self::Slice,
+            "BaseException" => Self::BaseException,
+            "BaseExceptionGroup" => Self::BaseExceptionGroup,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -2028,6 +2046,8 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::ModuleType
             | Self::VersionInfo
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::FunctionType => module.name() == self.canonical_module(db).as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
