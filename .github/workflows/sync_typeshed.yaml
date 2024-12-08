@@ -25,11 +25,13 @@ jobs:
         name: Checkout Ruff
         with:
           path: ruff
+          persist-credentials: true
       - uses: actions/checkout@v4
         name: Checkout typeshed
         with:
           repository: python/typeshed
           path: typeshed
+          persist-credentials: true
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
