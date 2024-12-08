@@ -248,6 +248,17 @@ impl From<&Expr> for ResolvedPythonType {
                                 left.coerce(right),
                             ));
                         }
+                        // Ex) `"1" * 2` or `2 * "1"`
+                        (
+                            ResolvedPythonType::Atom(PythonType::String),
+                            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
+                        )
+                        | (
+                            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
+                            ResolvedPythonType::Atom(PythonType::String),
+                        ) if matches!(op, Operator::Mult) => {
+                            return ResolvedPythonType::Atom(PythonType::String);
+                        }
                         (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
                             return ResolvedPythonType::TypeError;
                         }
@@ -475,6 +486,14 @@ mod tests {
         assert_eq!(
             ResolvedPythonType::from(parse("1.0 * 2j").expr()),
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
+        );
+        assert_eq!(
+            ResolvedPythonType::from(parse("'AA' * 2").expr()),
+            ResolvedPythonType::Atom(PythonType::String)
+        );
+        assert_eq!(
+            ResolvedPythonType::from(parse("4 * 'AA'").expr()),
+            ResolvedPythonType::Atom(PythonType::String)
         );
         assert_eq!(
             ResolvedPythonType::from(parse("1 / True").expr()),
