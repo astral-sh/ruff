@@ -82,10 +82,10 @@ impl IterableKind {
         let binding = semantic.binding(binding_id);
 
         match () {
-            _ if is_list(binding, semantic) => Some(IterableKind::List),
-            _ if is_set(binding, semantic) => Some(IterableKind::Set),
-            _ if is_dict(binding, semantic) => Some(IterableKind::Dict),
-            _ => None,
+            () if is_list(binding, semantic) => Some(IterableKind::List),
+            () if is_set(binding, semantic) => Some(IterableKind::Set),
+            () if is_dict(binding, semantic) => Some(IterableKind::Dict),
+            () => None,
         }
     }
 }
@@ -105,7 +105,7 @@ impl Iterable {
     }
 
     fn has_unpack(&self) -> bool {
-        self.elements.iter().any(|it| it.is_unpack())
+        self.elements.iter().any(Element::is_unpack)
     }
 
     fn element_exprs(&self, locator: &Locator) -> String {
@@ -182,8 +182,8 @@ impl Element {
         match self {
             Self::Single(..) => in_source.to_string(),
             Self::DictItem { key, .. } => locator.slice(key).to_string(),
-            Self::StarUnpack(..) => format!("*({})", in_source),
-            Self::DictUnpack(..) => format!("**({})", in_source),
+            Self::StarUnpack(..) => format!("*({in_source})"),
+            Self::DictUnpack(..) => format!("**({in_source})"),
         }
     }
 }
@@ -199,7 +199,7 @@ impl From<&Expr> for Element {
 
 impl From<&DictItem> for Element {
     fn from(item: &DictItem) -> Self {
-        let key = item.key.as_ref().map(|key| key.range());
+        let key = item.key.as_ref().map(Ranged::range);
         let value = item.value.range();
 
         match key {
@@ -318,7 +318,7 @@ pub(crate) fn unnecessary_intermediate_representation_call(checker: &mut Checker
                 return;
             };
 
-            list_extend_single(checker, range, target, iterable);
+            list_extend_single(checker, range, target, &iterable);
         }
 
         (IterableKind::Set, method @ ("update" | "difference_update")) => {
@@ -326,7 +326,7 @@ pub(crate) fn unnecessary_intermediate_representation_call(checker: &mut Checker
                 return;
             };
 
-            set_update_single(checker, range, target, method, iterable);
+            set_update_single(checker, range, target, method, &iterable);
         }
 
         (IterableKind::Dict, "update") if !keywords.is_empty() && in_stmt_context => {
@@ -371,7 +371,7 @@ fn list_extend_single(
     checker: &mut Checker,
     range: TextRange,
     target: &ExprName,
-    iterable: Iterable,
+    iterable: &Iterable,
 ) {
     list_iadd_single(checker, range, target, iterable);
 }
@@ -383,7 +383,7 @@ fn set_update_single(
     range: TextRange,
     target: &ExprName,
     method: &str,
-    iterable: Iterable,
+    iterable: &Iterable,
 ) {
     let op = match method {
         "update" => Operator::BitOr,
@@ -418,7 +418,7 @@ fn dict_update_single_unpack(
     let method = "update";
     let diagnostic = use_single_arg_method_call(range, target_expr, method, element_expr);
 
-    checker.diagnostics.push(diagnostic)
+    checker.diagnostics.push(diagnostic);
 }
 
 /// `d.update(**foo)` -> `d.update(foo)`
@@ -463,7 +463,7 @@ fn dict_update_single_keyword(
     let value_expr = locator.slice(value);
     let key_expr = generator.expr(&create_string_expr(name.to_string()));
 
-    let diagnostic = use_item_assignment(range, target_expr, value_expr, &*key_expr);
+    let diagnostic = use_item_assignment(range, target_expr, value_expr, &key_expr);
 
     checker.diagnostics.push(diagnostic);
 }
@@ -490,17 +490,17 @@ pub(crate) fn unnecessary_intermediate_representation_aug_assign(
     match (target_kind, op, iterable.kind) {
         (IterableKind::List, Operator::Add, _) => {
             if iterable.len() == 1 {
-                list_iadd_single(checker, range, target, iterable);
+                list_iadd_single(checker, range, target, &iterable);
             } else {
-                list_iadd_multiple(checker, range, target, iterable);
+                list_iadd_multiple(checker, range, target, &iterable);
             }
         }
 
         (IterableKind::Set, _, IterableKind::Set) => {
             if iterable.len() == 1 {
-                set_iop_single(checker, range, target, op, iterable);
+                set_iop_single(checker, range, target, op, &iterable);
             } else {
-                set_iop_multiple(checker, range, op, target, iterable);
+                set_iop_multiple(checker, range, op, target, &iterable);
             }
         }
 
@@ -526,7 +526,7 @@ fn list_iadd_single(
     checker: &mut Checker,
     range: TextRange,
     target: &ExprName,
-    iterable: Iterable,
+    iterable: &Iterable,
 ) {
     let [element] = &iterable.elements[..] else {
         return;
@@ -555,7 +555,7 @@ fn list_iadd_multiple(
     checker: &mut Checker,
     range: TextRange,
     target: &ExprName,
-    iterable: Iterable,
+    iterable: &Iterable,
 ) {
     if iterable.is_empty() || iterable.has_unpack() {
         return;
@@ -580,7 +580,7 @@ fn set_iop_single(
     range: TextRange,
     target: &ExprName,
     op: Operator,
-    iterable: Iterable,
+    iterable: &Iterable,
 ) {
     let [element] = &iterable.elements[..] else {
         return;
@@ -613,7 +613,7 @@ fn set_iop_multiple(
     range: TextRange,
     op: Operator,
     target: &ExprName,
-    iterable: Iterable,
+    iterable: &Iterable,
 ) {
     if iterable.is_empty() || iterable.has_unpack() {
         return;
