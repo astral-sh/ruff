@@ -146,7 +146,7 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding) -> Optio
         if let Some(fix) = get_possible_fix(name, shadowed_kind, binding.scope, checker) {
             diagnostic.try_set_fix(|| {
                 Renamer::rename(name, &fix, scope, semantic, checker.stylist())
-                    .map(|(edit, rest)| Fix::safe_edits(edit, rest))
+                    .map(|(edit, rest)| Fix::unsafe_edits(edit, rest))
             });
         }
     }
