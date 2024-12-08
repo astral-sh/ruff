@@ -304,7 +304,7 @@ line_length = 79
             r#"
 [tool.black]
 [tool.ruff.lint]
-select = ["E123"]
+select = ["E123456"]
 "#,
         )
         .is_err());
