@@ -209,14 +209,14 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
         }
     }
 
-    let is_star = checker
-        .semantic()
-        .current_statement()
-        .as_try_stmt()
-        .is_some_and(|try_stmt| try_stmt.is_star);
     if checker.enabled(Rule::DuplicateTryBlockException) {
         for (name, exprs) in duplicates {
             for expr in exprs {
+                let is_star = checker
+                    .semantic()
+                    .current_statement()
+                    .as_try_stmt()
+                    .is_some_and(|try_stmt| try_stmt.is_star);
                 checker.diagnostics.push(Diagnostic::new(
                     DuplicateTryBlockException {
                         name: name.segments().join("."),
