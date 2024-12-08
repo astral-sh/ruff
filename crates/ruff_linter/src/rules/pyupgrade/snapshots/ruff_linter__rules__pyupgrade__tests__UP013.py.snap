@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
   |
@@ -242,6 +241,8 @@ UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 42 | # Empty dict call
 43 | MyType = TypedDict("MyType", dict())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
+44 | 
+45 | # Unsafe fix if comments are present
    |
    = help: Convert `MyType` to class syntax
 
@@ -252,3 +253,26 @@ UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 43    |-MyType = TypedDict("MyType", dict())
    43 |+class MyType(TypedDict):
    44 |+    pass
+44 45 | 
+45 46 | # Unsafe fix if comments are present
+46 47 | X = TypedDict("X", {
+
+UP013.py:46:1: UP013 [*] Convert `X` from `TypedDict` functional to class syntax
+   |
+45 |   # Unsafe fix if comments are present
+46 | / X = TypedDict("X", {
+47 | |     "some_config": int,  # important
+48 | | })
+   | |__^ UP013
+   |
+   = help: Convert `X` to class syntax
+
+ℹ Unsafe fix
+43 43 | MyType = TypedDict("MyType", dict())
+44 44 | 
+45 45 | # Unsafe fix if comments are present
+46    |-X = TypedDict("X", {
+47    |-    "some_config": int,  # important
+48    |-})
+   46 |+class X(TypedDict):
+   47 |+    some_config: int
