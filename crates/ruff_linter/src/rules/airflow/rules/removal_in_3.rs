@@ -419,3 +419,16 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
         _ => {}
     }
 }
+
+/// AIR303
+pub(crate) fn moved_to_provider_in_3(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return;
+    }
+
+    match expr {
+        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => removed_name(checker, expr, ranged),
+        ranged @ Expr::Name(_) => removed_name(checker, expr, ranged),
+        _ => {}
+    }
+}
