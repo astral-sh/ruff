@@ -225,7 +225,7 @@ RUF042.py:21:22: RUF042 [*] Unnecessary intermediate representation
    21 |+def f(l: list[Any]): l.extend(("ext", "end"))                   # `l.extend(("ext", "end"))` (safe)
 22 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
 23 23 | 
-24 24 | def f(l: list[Any]): l += (*unpack,)                       # `l.extend(unpack)` (safe)
+24 24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
 
 RUF042.py:22:22: RUF042 [*] Unnecessary intermediate representation
    |
@@ -234,7 +234,7 @@ RUF042.py:22:22: RUF042 [*] Unnecessary intermediate representation
 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF042
 23 | 
-24 | def f(l: list[Any]): l += (*unpack,)                       # `l.extend(unpack)` (safe)
+24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
    |
    = help: Replace with `.extend()`
 
@@ -245,16 +245,16 @@ RUF042.py:22:22: RUF042 [*] Unnecessary intermediate representation
 22    |-def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
    22 |+def f(l: list[Any]): l.extend(("ext", "end"))             # `l.extend(("ext", "end"))` (safe)
 23 23 | 
-24 24 | def f(l: list[Any]): l += (*unpack,)                       # `l.extend(unpack)` (safe)
-25 25 | def f(l: list[Any]): l += [*unpack]                        # `l.extend(unpack)` (safe)
+24 24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+25 25 | def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
 
 RUF042.py:24:22: RUF042 [*] Unnecessary intermediate representation
    |
 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
 23 | 
-24 | def f(l: list[Any]): l += (*unpack,)                       # `l.extend(unpack)` (safe)
+24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
    |                      ^^^^^^^^^^^^^^^ RUF042
-25 | def f(l: list[Any]): l += [*unpack]                        # `l.extend(unpack)` (safe)
+25 | def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
    |
    = help: Replace with `.extend()`
 
@@ -262,16 +262,16 @@ RUF042.py:24:22: RUF042 [*] Unnecessary intermediate representation
 21 21 | def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
 22 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
 23 23 | 
-24    |-def f(l: list[Any]): l += (*unpack,)                       # `l.extend(unpack)` (safe)
-   24 |+def f(l: list[Any]): l.extend(unpack)                       # `l.extend(unpack)` (safe)
-25 25 | def f(l: list[Any]): l += [*unpack]                        # `l.extend(unpack)` (safe)
+24    |-def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+   24 |+def f(l: list[Any]): l.extend(extend)                       # `l.extend(extend)` (safe)
+25 25 | def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
 26 26 | 
 27 27 | 
 
 RUF042.py:25:22: RUF042 [*] Unnecessary intermediate representation
    |
-24 | def f(l: list[Any]): l += (*unpack,)                       # `l.extend(unpack)` (safe)
-25 | def f(l: list[Any]): l += [*unpack]                        # `l.extend(unpack)` (safe)
+24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+25 | def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
    |                      ^^^^^^^^^^^^^^ RUF042
    |
    = help: Replace with `.extend()`
@@ -279,9 +279,9 @@ RUF042.py:25:22: RUF042 [*] Unnecessary intermediate representation
 ℹ Safe fix
 22 22 | def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
 23 23 | 
-24 24 | def f(l: list[Any]): l += (*unpack,)                       # `l.extend(unpack)` (safe)
-25    |-def f(l: list[Any]): l += [*unpack]                        # `l.extend(unpack)` (safe)
-   25 |+def f(l: list[Any]): l.extend(unpack)                        # `l.extend(unpack)` (safe)
+24 24 | def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+25    |-def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
+   25 |+def f(l: list[Any]): l.extend(extend)                        # `l.extend(extend)` (safe)
 26 26 | 
 27 27 | 
 28 28 | ### Sets

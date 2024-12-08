@@ -21,8 +21,8 @@ def f(l: list[Any]): l += ["ext", "end"]                   # `l.extend(("ext", "
 def f(l: list[Any]): l += {"ext", "end"}                   # `l.extend(("ext", "end"))` (safe)
 def f(l: list[Any]): l += {"ext": 0, "end": 1}             # `l.extend(("ext", "end"))` (safe)
 
-def f(l: list[Any]): l += (*unpack,)                       # `l.extend(unpack)` (safe)
-def f(l: list[Any]): l += [*unpack]                        # `l.extend(unpack)` (safe)
+def f(l: list[Any]): l += (*extend,)                       # `l.extend(extend)` (safe)
+def f(l: list[Any]): l += [*extend]                        # `l.extend(extend)` (safe)
 
 
 ### Sets
