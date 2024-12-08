@@ -157,7 +157,7 @@ pub(super) struct SymbolBindings {
     constraints: Constraints,
 
     /// For each live binding, which [`ScopedConstraintId`] were active *at the time of the binding*?
-    constraints_active_at_binding: Constraints,
+    pub(crate) constraints_active_at_binding: Constraints,
 
     /// Could the symbol be unbound at this point?
     may_be_unbound: bool,

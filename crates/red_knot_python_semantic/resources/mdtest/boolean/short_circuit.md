@@ -36,13 +36,10 @@ if (x := 1) and bool_instance():
 
 ```py
 if True or (x := 1):
-    # TODO: infer that the second arm is never executed, and raise `unresolved-reference`.
-    # error: [possibly-unresolved-reference]
+    # error: [unresolved-reference]
     reveal_type(x)  # revealed: Never
 
 if True and (x := 1):
-    # TODO: infer that the second arm is always executed, do not raise a diagnostic
-    # error: [possibly-unresolved-reference]
     reveal_type(x)  # revealed: Literal[1]
 ```
 
