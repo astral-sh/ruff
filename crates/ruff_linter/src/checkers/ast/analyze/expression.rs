@@ -1129,6 +1129,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::StarmapZip) {
                 ruff::rules::starmap_zip(checker, call);
             }
+            if checker.enabled(Rule::UnnecessaryIntermediateRepresentation) {
+                ruff::rules::unnecessary_intermediate_representation_call(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[

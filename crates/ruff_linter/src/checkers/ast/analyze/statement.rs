@@ -1104,6 +1104,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_aug_assign(checker, aug_assign);
             }
+            if checker.enabled(Rule::UnnecessaryIntermediateRepresentation) {
+                ruff::rules::unnecessary_intermediate_representation_aug_assign(
+                    checker, aug_assign,
+                );
+            }
         }
         Stmt::If(
             if_ @ ast::StmtIf {

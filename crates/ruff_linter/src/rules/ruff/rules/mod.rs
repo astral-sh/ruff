@@ -36,6 +36,7 @@ pub(crate) use static_key_dict_comprehension::*;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) use test_rules::*;
 pub(crate) use unnecessary_cast_to_int::*;
+pub(crate) use unnecessary_intermediate_representation::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unnecessary_literal_within_deque_call::*;
@@ -92,6 +93,7 @@ mod suppression_comment_visitor;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) mod test_rules;
 mod unnecessary_cast_to_int;
+mod unnecessary_intermediate_representation;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unnecessary_literal_within_deque_call;
