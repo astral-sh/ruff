@@ -1,0 +1,247 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF057.py:8:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+ 6 | ### Errors
+ 7 | 
+ 8 | round(1, 0)
+   | ^^^^^^^^^^^ RUF057
+ 9 | round(1, ndigits=0)
+10 | round(number=1, ndigits=0)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+5 5 | 
+6 6 | ### Errors
+7 7 | 
+8   |-round(1, 0)
+  8 |+round(1)
+9 9 | round(1, ndigits=0)
+10 10 | round(number=1, ndigits=0)
+11 11 | 
+
+RUF057.py:9:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+ 8 | round(1, 0)
+ 9 | round(1, ndigits=0)
+   | ^^^^^^^^^^^^^^^^^^^ RUF057
+10 | round(number=1, ndigits=0)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+6  6  | ### Errors
+7  7  | 
+8  8  | round(1, 0)
+9     |-round(1, ndigits=0)
+   9  |+round(1)
+10 10 | round(number=1, ndigits=0)
+11 11 | 
+12 12 | round(1, None)
+
+RUF057.py:10:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+ 8 | round(1, 0)
+ 9 | round(1, ndigits=0)
+10 | round(number=1, ndigits=0)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF057
+11 | 
+12 | round(1, None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+7  7  | 
+8  8  | round(1, 0)
+9  9  | round(1, ndigits=0)
+10    |-round(number=1, ndigits=0)
+   10 |+round(1)
+11 11 | 
+12 12 | round(1, None)
+13 13 | round(1, ndigits=None)
+
+RUF057.py:12:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+10 | round(number=1, ndigits=0)
+11 | 
+12 | round(1, None)
+   | ^^^^^^^^^^^^^^ RUF057
+13 | round(1, ndigits=None)
+14 | round(number=1, ndigits=None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+9  9  | round(1, ndigits=0)
+10 10 | round(number=1, ndigits=0)
+11 11 | 
+12    |-round(1, None)
+   12 |+round(1)
+13 13 | round(1, ndigits=None)
+14 14 | round(number=1, ndigits=None)
+15 15 | 
+
+RUF057.py:13:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+12 | round(1, None)
+13 | round(1, ndigits=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^ RUF057
+14 | round(number=1, ndigits=None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+10 10 | round(number=1, ndigits=0)
+11 11 | 
+12 12 | round(1, None)
+13    |-round(1, ndigits=None)
+   13 |+round(1)
+14 14 | round(number=1, ndigits=None)
+15 15 | 
+16 16 | round(1., None)
+
+RUF057.py:14:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+12 | round(1, None)
+13 | round(1, ndigits=None)
+14 | round(number=1, ndigits=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF057
+15 | 
+16 | round(1., None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+11 11 | 
+12 12 | round(1, None)
+13 13 | round(1, ndigits=None)
+14    |-round(number=1, ndigits=None)
+   14 |+round(1)
+15 15 | 
+16 16 | round(1., None)
+17 17 | round(1., ndigits=None)
+
+RUF057.py:16:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+14 | round(number=1, ndigits=None)
+15 | 
+16 | round(1., None)
+   | ^^^^^^^^^^^^^^^ RUF057
+17 | round(1., ndigits=None)
+18 | round(number=1., ndigits=None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+13 13 | round(1, ndigits=None)
+14 14 | round(number=1, ndigits=None)
+15 15 | 
+16    |-round(1., None)
+   16 |+round(1.)
+17 17 | round(1., ndigits=None)
+18 18 | round(number=1., ndigits=None)
+19 19 | 
+
+RUF057.py:17:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+16 | round(1., None)
+17 | round(1., ndigits=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF057
+18 | round(number=1., ndigits=None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+14 14 | round(number=1, ndigits=None)
+15 15 | 
+16 16 | round(1., None)
+17    |-round(1., ndigits=None)
+   17 |+round(1.)
+18 18 | round(number=1., ndigits=None)
+19 19 | 
+20 20 | round(foo, None)
+
+RUF057.py:18:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+16 | round(1., None)
+17 | round(1., ndigits=None)
+18 | round(number=1., ndigits=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF057
+19 | 
+20 | round(foo, None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+15 15 | 
+16 16 | round(1., None)
+17 17 | round(1., ndigits=None)
+18    |-round(number=1., ndigits=None)
+   18 |+round(1.)
+19 19 | 
+20 20 | round(foo, None)
+21 21 | round(foo, ndigits=None)
+
+RUF057.py:20:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+18 | round(number=1., ndigits=None)
+19 | 
+20 | round(foo, None)
+   | ^^^^^^^^^^^^^^^^ RUF057
+21 | round(foo, ndigits=None)
+22 | round(number=foo, ndigits=None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+17 17 | round(1., ndigits=None)
+18 18 | round(number=1., ndigits=None)
+19 19 | 
+20    |-round(foo, None)
+   20 |+round(foo)
+21 21 | round(foo, ndigits=None)
+22 22 | round(number=foo, ndigits=None)
+23 23 | 
+
+RUF057.py:21:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+20 | round(foo, None)
+21 | round(foo, ndigits=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF057
+22 | round(number=foo, ndigits=None)
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+18 18 | round(number=1., ndigits=None)
+19 19 | 
+20 20 | round(foo, None)
+21    |-round(foo, ndigits=None)
+   21 |+round(foo)
+22 22 | round(number=foo, ndigits=None)
+23 23 | 
+24 24 | ### No errors
+
+RUF057.py:22:1: RUF057 [*] Unnecessary argument to `round`'s `ndigits`
+   |
+20 | round(foo, None)
+21 | round(foo, ndigits=None)
+22 | round(number=foo, ndigits=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF057
+23 | 
+24 | ### No errors
+   |
+   = help: Remove second argument
+
+ℹ Safe fix
+19 19 | 
+20 20 | round(foo, None)
+21 21 | round(foo, ndigits=None)
+22    |-round(number=foo, ndigits=None)
+   22 |+round(foo)
+23 23 | 
+24 24 | ### No errors
+25 25 |
