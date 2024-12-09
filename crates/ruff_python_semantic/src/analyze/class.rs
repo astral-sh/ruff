@@ -130,9 +130,9 @@ pub enum IsMetaclass {
     Maybe,
 }
 
-impl From<IsMetaclass> for bool {
-    fn from(value: IsMetaclass) -> Self {
-        matches!(value, IsMetaclass::Yes)
+impl IsMetaclass {
+    pub const fn is_yes(self) -> bool {
+        matches!(self, IsMetaclass::Yes)
     }
 }
 
@@ -212,21 +212,16 @@ fn expr_might_be_old_style_typevar_like(expr: &Expr, semantic: &SemanticModel) -
     match expr {
         Expr::Attribute(..) => true,
         Expr::Name(name) => might_be_old_style_typevar_like(name, semantic),
-
-        Expr::Starred(ExprStarred { value, .. }) => match value.as_ref() {
-            Expr::Attribute(..) => true,
-            Expr::Name(name) => might_be_old_style_typevar_like(name, semantic),
-            _ => false,
-        },
-
+        Expr::Starred(ExprStarred { value, .. }) => {
+            expr_might_be_old_style_typevar_like(value, semantic)
+        }
         _ => false,
     }
 }
 
 fn might_be_old_style_typevar_like(name: &ExprName, semantic: &SemanticModel) -> bool {
     let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return false;
+        return !semantic.has_builtin_binding(&name.id);
     };
-
     typing::is_type_var_like(binding, semantic)
 }
