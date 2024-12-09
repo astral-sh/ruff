@@ -3969,21 +3969,18 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "ureq"
-version = "2.11.0"
+version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b30e6f97efe1fa43535ee241ee76967d3ff6ff3953ebb430d8d55c5393029e7b"
+checksum = "02d1a66277ed75f640d608235660df48c8e3c19f3b4edb6a263315626cc3c01d"
 dependencies = [
  "base64 0.22.0",
  "flate2",
- "litemap",
  "log",
  "once_cell",
  "rustls",
  "rustls-pki-types",
  "url",
  "webpki-roots",
- "yoke",
- "zerofrom",
 ]
 
 [[package]]
