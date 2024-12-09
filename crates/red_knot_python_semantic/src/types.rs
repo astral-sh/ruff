@@ -1700,6 +1700,12 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn in_type_expression(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            // In a type expression, a bare `type` is a synonym for `type[Any]`
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Type) =>
+            {
+                Type::subclass_of_base(ClassBase::Any)
+            }
             Type::ClassLiteral(_) | Type::SubclassOf(_) => self.to_instance(db),
             Type::Union(union) => union.map(db, |element| element.in_type_expression(db)),
             Type::Unknown => Type::Unknown,
