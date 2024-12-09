@@ -64,11 +64,19 @@ enum ChangeKind {
 /// Return the [`ChangeKind`] based on the list of modified file paths.
 ///
 /// Returns `None` if no relevant changes were detected.
-fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
+fn change_detected(event: &notify::Event) -> Option<ChangeKind> {
     // If any `.toml` files were modified, return `ChangeKind::Configuration`. Otherwise, return
     // `ChangeKind::SourceFile` if any `.py`, `.pyi`, `.pyw`, or `.ipynb` files were modified.
     let mut source_file = false;
-    for path in paths {
+
+    if event.kind.is_access() || event.kind.is_other() {
+        return None;
+    }
+
+    if event.need_rescan() {
+        return Some(ChangeKind::Configuration);
+    }
+    for path in &event.paths {
         if let Some(suffix) = path.extension() {
             match suffix.to_str() {
                 Some("toml") => {
@@ -377,7 +385,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         loop {
             match rx.recv() {
                 Ok(event) => {
-                    let Some(change_kind) = change_detected(&event?.paths) else {
+                    let Some(change_kind) = change_detected(&event?) else {
                         continue;
                     };
 
@@ -483,73 +491,113 @@ mod test_file_change_detector {
     fn detect_correct_file_change() {
         assert_eq!(
             Some(ChangeKind::Configuration),
-            change_detected(&[
-                PathBuf::from("tmp/pyproject.toml"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("tmp/pyproject.toml"),
+                    PathBuf::from("tmp/bin/ruff.rs"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             Some(ChangeKind::Configuration),
-            change_detected(&[
-                PathBuf::from("pyproject.toml"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("pyproject.toml"),
+                    PathBuf::from("tmp/bin/ruff.rs"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             Some(ChangeKind::Configuration),
-            change_detected(&[
-                PathBuf::from("tmp1/tmp2/tmp3/pyproject.toml"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("tmp1/tmp2/tmp3/pyproject.toml"),
+                    PathBuf::from("tmp/bin/ruff.rs"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             Some(ChangeKind::Configuration),
-            change_detected(&[
-                PathBuf::from("tmp/ruff.toml"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("tmp/ruff.toml"),
+                    PathBuf::from("tmp/bin/ruff.rs"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             Some(ChangeKind::Configuration),
-            change_detected(&[
-                PathBuf::from("tmp/.ruff.toml"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("tmp/.ruff.toml"),
+                    PathBuf::from("tmp/bin/ruff.rs"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             Some(ChangeKind::SourceFile),
-            change_detected(&[
-                PathBuf::from("tmp/rule.py"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("tmp/rule.py"),
+                    PathBuf::from("tmp/bin/ruff.rs"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             Some(ChangeKind::SourceFile),
-            change_detected(&[
-                PathBuf::from("tmp/rule.pyi"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("tmp/rule.pyi"),
+                    PathBuf::from("tmp/bin/ruff.rs"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             Some(ChangeKind::Configuration),
-            change_detected(&[
-                PathBuf::from("pyproject.toml"),
-                PathBuf::from("tmp/rule.py"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("pyproject.toml"),
+                    PathBuf::from("tmp/rule.py"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             Some(ChangeKind::Configuration),
-            change_detected(&[
-                PathBuf::from("tmp/rule.py"),
-                PathBuf::from("pyproject.toml"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("tmp/rule.py"),
+                    PathBuf::from("pyproject.toml"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
         assert_eq!(
             None,
-            change_detected(&[
-                PathBuf::from("tmp/rule.js"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ]),
+            change_detected(&notify::Event {
+                kind: notify::EventKind::Create(notify::event::CreateKind::File),
+                paths: vec![
+                    PathBuf::from("tmp/rule.js"),
+                    PathBuf::from("tmp/bin/ruff.rs"),
+                ],
+                attrs: notify::event::EventAttributes::default(),
+            }),
         );
     }
 }

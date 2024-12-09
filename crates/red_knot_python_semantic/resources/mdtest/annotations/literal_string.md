@@ -12,7 +12,7 @@ Parts of the testcases defined here were adapted from [the specification's examp
 It can be used anywhere a type is accepted:
 
 ```py
-from typing import LiteralString
+from typing_extensions import LiteralString
 
 x: LiteralString
 
@@ -25,7 +25,7 @@ def f():
 `LiteralString` cannot be used within `Literal`:
 
 ```py
-from typing import Literal, LiteralString
+from typing_extensions import Literal, LiteralString
 
 bad_union: Literal["hello", LiteralString]  # error: [invalid-literal-parameter]
 bad_nesting: Literal[LiteralString]  # error: [invalid-literal-parameter]
@@ -36,7 +36,7 @@ bad_nesting: Literal[LiteralString]  # error: [invalid-literal-parameter]
 `LiteralString` cannot be parametrized.
 
 ```py
-from typing import LiteralString
+from typing_extensions import LiteralString
 
 a: LiteralString[str]  # error: [invalid-type-parameter]
 b: LiteralString["foo"]  # error: [invalid-type-parameter]
@@ -47,7 +47,7 @@ b: LiteralString["foo"]  # error: [invalid-type-parameter]
 Subclassing `LiteralString` leads to a runtime error.
 
 ```py
-from typing import LiteralString
+from typing_extensions import LiteralString
 
 class C(LiteralString): ...  # error: [invalid-base]
 ```
@@ -57,6 +57,8 @@ class C(LiteralString): ...  # error: [invalid-base]
 ### Common operations
 
 ```py
+from typing_extensions import LiteralString
+
 foo: LiteralString = "foo"
 reveal_type(foo)  # revealed: Literal["foo"]
 
@@ -85,6 +87,8 @@ reveal_type(template.format(foo, bar))  # revealed: @Todo(call todo)
 vice versa.
 
 ```py
+from typing_extensions import Literal, LiteralString
+
 def coinflip() -> bool:
     return True
 
@@ -112,6 +116,8 @@ qux_3: LiteralString = baz_3  # error: [invalid-assignment]
 ### Narrowing
 
 ```py
+from typing_extensions import LiteralString
+
 lorem: LiteralString = "lorem" * 1_000_000_000
 
 reveal_type(lorem)  # revealed: LiteralString
@@ -123,6 +129,24 @@ reveal_type(lorem)  # revealed: LiteralString
 
 if "" < lorem == "ipsum":
     reveal_type(lorem)  # revealed: Literal["ipsum"]
+```
+
+## `typing.LiteralString`
+
+`typing.LiteralString` is only available in Python 3.11 and later:
+
+```toml
+[environment]
+target-version = "3.11"
+```
+
+```py
+from typing import LiteralString
+
+x: LiteralString = "foo"
+
+def f():
+    reveal_type(x)  # revealed: LiteralString
 ```
 
 [1]: https://typing.readthedocs.io/en/latest/spec/literal.html#literalstring

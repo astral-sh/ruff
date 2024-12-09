@@ -225,6 +225,18 @@ fn definition_expression_ty<'db>(
     }
 }
 
+/// Get the type of an expression from an arbitrary scope.
+///
+/// Can cause query cycles if used carelessly; caller must be sure that type inference isn't
+/// currently in progress for the expression's scope.
+fn expression_ty<'db>(db: &'db dyn Db, file: File, expression: &ast::Expr) -> Type<'db> {
+    let index = semantic_index(db, file);
+    let file_scope = index.expression_scope_id(expression);
+    let scope = file_scope.to_scope_id(db, file);
+    let expr_id = expression.scoped_expression_id(db, scope);
+    infer_scope_types(db, scope).expression_ty(expr_id)
+}
+
 /// Infer the combined type of an iterator of bindings.
 ///
 /// Will return a union if there is more than one binding.

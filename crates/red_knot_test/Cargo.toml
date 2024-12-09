@@ -27,6 +27,8 @@ regex = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 smallvec = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 

@@ -606,7 +606,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let function_table = index.symbol_table(function_scope_id);
         assert_eq!(
             names(&function_table),
-            vec!["a", "b", "c", "args", "d", "kwargs"],
+            vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
         let use_def = index.use_def_map(function_scope_id);
@@ -618,21 +618,30 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                         .expect("symbol exists"),
                 )
                 .unwrap();
-            assert!(matches!(
-                binding.kind(&db),
-                DefinitionKind::ParameterWithDefault(_)
-            ));
-        }
-        for name in ["args", "kwargs"] {
-            let binding = use_def
-                .first_public_binding(
-                    function_table
-                        .symbol_id_by_name(name)
-                        .expect("symbol exists"),
-                )
-                .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
+        let args_binding = use_def
+            .first_public_binding(
+                function_table
+                    .symbol_id_by_name("args")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            args_binding.kind(&db),
+            DefinitionKind::VariadicPositionalParameter(_)
+        ));
+        let kwargs_binding = use_def
+            .first_public_binding(
+                function_table
+                    .symbol_id_by_name("kwargs")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            kwargs_binding.kind(&db),
+            DefinitionKind::VariadicKeywordParameter(_)
+        ));
     }
 
     #[test]
@@ -654,7 +663,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let lambda_table = index.symbol_table(lambda_scope_id);
         assert_eq!(
             names(&lambda_table),
-            vec!["a", "b", "c", "args", "d", "kwargs"],
+            vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
         let use_def = index.use_def_map(lambda_scope_id);
@@ -662,17 +671,30 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
                 .unwrap();
-            assert!(matches!(
-                binding.kind(&db),
-                DefinitionKind::ParameterWithDefault(_)
-            ));
-        }
-        for name in ["args", "kwargs"] {
-            let binding = use_def
-                .first_public_binding(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
-                .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
+        let args_binding = use_def
+            .first_public_binding(
+                lambda_table
+                    .symbol_id_by_name("args")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            args_binding.kind(&db),
+            DefinitionKind::VariadicPositionalParameter(_)
+        ));
+        let kwargs_binding = use_def
+            .first_public_binding(
+                lambda_table
+                    .symbol_id_by_name("kwargs")
+                    .expect("symbol exists"),
+            )
+            .unwrap();
+        assert!(matches!(
+            kwargs_binding.kind(&db),
+            DefinitionKind::VariadicKeywordParameter(_)
+        ));
     }
 
     /// Test case to validate that the comprehension scope is correctly identified and that the target
