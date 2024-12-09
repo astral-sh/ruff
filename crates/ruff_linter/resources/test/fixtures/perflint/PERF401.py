@@ -185,6 +185,21 @@ def f():
 
 def f():
     result = []
+    for val in range(5):
+        result.append(val * 2)  # PERF401
+    val = 1
+    print(val)
+
+
+def f():
+    i = [1, 2, 3]
+    result = []
+    for i in i:
+        result.append(i + 1)  # PERF401
+
+
+def f():
+    result = []
     for i in range(  # Comment 1 should not be duplicated
         (
             2  # Comment 2

@@ -92,10 +92,10 @@ impl Violation for ManualListComprehension {
 
 /// PERF401
 pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::StmtFor) {
-    let Expr::Name(loop_target_name) = &*for_stmt.target else {
+    let Expr::Name(ast::ExprName { id, .. }) = &*for_stmt.target else {
         return;
     };
-    let id = &loop_target_name.id;
+    let for_stmt_target_id = id;
 
     let (stmt, if_test) = match &*for_stmt.body {
         // ```python
@@ -233,31 +233,40 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     // filtered = [x for x in y]
     // print(x)
     // ```
-    let for_loop_target = checker
+    let last_target_binding = checker
         .semantic()
-        .lookup_symbol(id)
-        .map(|id| checker.semantic().binding(id))
+        .lookup_symbol(for_stmt_target_id)
         .expect("for loop target must exist");
-    // TODO: this currently does not properly find usages outside the for loop; figure out why
-    if for_loop_target
-        .references()
-        .map(|id| checker.semantic().reference(id))
-        .inspect(|reference| {
-            // println!("{}", checker.locator().slice(reference.range()));
-            let binding_string = checker
-                .locator()
-                .slice(for_loop_target.statement(checker.semantic()).unwrap());
-            dbg!(binding_string);
-            println!(
-                "{}",
-                checker
-                    .locator()
-                    .slice(checker.locator().full_lines_range(reference.range()))
-            );
+
+    let mut bindings = [last_target_binding].into_iter().chain(
+        checker
+            .semantic()
+            .shadowed_bindings(checker.semantic().scope_id, last_target_binding)
+            .filter_map(|shadowed| shadowed.same_scope().then_some(shadowed.shadowed_id())),
+    );
+
+    let target_binding = bindings
+        .find_map(|binding_id| {
+            let binding = checker.semantic().binding(binding_id);
+            if binding
+                .statement(checker.semantic())
+                .and_then(Stmt::as_for_stmt)
+                == Some(for_stmt)
+            {
+                Some(binding)
+            } else {
+                None
+            }
         })
-        .any(|reference| !for_stmt.range.contains_range(reference.range()))
+        .expect("for target binding must exist");
+
+    drop(bindings);
+
+    if target_binding
+        .references()
+        .map(|reference| checker.semantic().reference(reference))
+        .any(|r| !for_stmt.range.contains_range(r.range()))
     {
-        println!("found reference outside of loop");
         return;
     }
 
@@ -312,15 +321,10 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         count < 2
     });
 
-    // If the binding has multiple statements on its line, it gets more complicated to fix, so we use an extend
-    // TODO: make this work
-    let binding_only_stmt_on_line = binding_stmt.is_some_and(|_binding_stmt| true);
-
     // A list extend works in every context, while a list comprehension only works when all the criteria are true
     let comprehension_type = if binding_is_empty_list
         && assignment_in_same_statement
         && binding_has_one_target
-        && binding_only_stmt_on_line
         && binding_unused_between
     {
         ComprehensionType::ListComprehension
@@ -452,10 +456,10 @@ fn convert_to_list_extend(
                     ast::Stmt::Assign(assign) => Some(assign.range),
                     _ => None,
                 })
-                // .map(|range| locator.full_lines_range(range))
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
+            // If the binding has multiple statements on its line, only remove the list assignment
             let binding_is_multiple_exprs = {
                 let binding_text = locator
                     .slice(locator.full_lines_range(binding_stmt_range))
