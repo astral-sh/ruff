@@ -43,6 +43,8 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
+use crate::semantic_index::use_def::bitset::ReverseBitSetIterator;
+
 use super::bitset::{BitSet, BitSetIterator};
 use ruff_index::newtype_index;
 use smallvec::SmallVec;
@@ -64,14 +66,14 @@ const INLINE_BINDING_BLOCKS: usize = 3;
 
 /// A [`BitSet`] of [`ScopedDefinitionId`], representing live bindings of a symbol in a scope.
 type Bindings = BitSet<INLINE_BINDING_BLOCKS>;
-type BindingsIterator<'a> = BitSetIterator<'a, INLINE_BINDING_BLOCKS>;
+type BindingsIterator<'a> = ReverseBitSetIterator<'a, INLINE_BINDING_BLOCKS>;
 
 /// Can reference this * 64 total declarations inline; more will fall back to the heap.
 const INLINE_DECLARATION_BLOCKS: usize = 3;
 
 /// A [`BitSet`] of [`ScopedDefinitionId`], representing live declarations of a symbol in a scope.
 type Declarations = BitSet<INLINE_DECLARATION_BLOCKS>;
-type DeclarationsIterator<'a> = BitSetIterator<'a, INLINE_DECLARATION_BLOCKS>;
+type DeclarationsIterator<'a> = ReverseBitSetIterator<'a, INLINE_DECLARATION_BLOCKS>;
 
 /// Can reference this * 64 total constraints inline; more will fall back to the heap.
 const INLINE_CONSTRAINT_BLOCKS: usize = 2;
@@ -137,8 +139,8 @@ impl SymbolDeclarations {
     /// Return an iterator over live declarations for this symbol.
     pub(super) fn iter(&self) -> DeclarationIdIterator {
         DeclarationIdIterator {
-            inner: self.live_declarations.iter(),
-            branching_conditions: self.branching_conditions.iter(),
+            inner: self.live_declarations.iter_rev(),
+            branching_conditions: self.branching_conditions.iter().rev(),
         }
     }
 
@@ -215,9 +217,9 @@ impl SymbolBindings {
     /// Iterate over currently live bindings for this symbol.
     pub(super) fn iter(&self) -> BindingIdWithConstraintsIterator {
         BindingIdWithConstraintsIterator {
-            definitions: self.live_bindings.iter(),
-            constraints: self.constraints.iter(),
-            branching_conditions: self.branching_conditions.iter(),
+            definitions: self.live_bindings.iter_rev(),
+            constraints: self.constraints.iter().rev(),
+            branching_conditions: self.branching_conditions.iter().rev(),
         }
     }
 
@@ -507,8 +509,8 @@ pub(super) struct BindingIdWithConstraints<'a> {
 #[derive(Debug, Clone)]
 pub(super) struct BindingIdWithConstraintsIterator<'a> {
     definitions: BindingsIterator<'a>,
-    constraints: ConstraintsIterator<'a>,
-    branching_conditions: BranchingConditionsIterator<'a>,
+    constraints: std::iter::Rev<ConstraintsIterator<'a>>,
+    branching_conditions: std::iter::Rev<BranchingConditionsIterator<'a>>,
 }
 
 impl<'a> Iterator for BindingIdWithConstraintsIterator<'a> {
@@ -537,8 +539,6 @@ impl<'a> Iterator for BindingIdWithConstraintsIterator<'a> {
         }
     }
 }
-
-impl std::iter::FusedIterator for BindingIdWithConstraintsIterator<'_> {}
 
 #[derive(Debug, Clone)]
 pub(super) struct ConstraintIdIterator<'a> {
@@ -575,7 +575,7 @@ impl std::iter::FusedIterator for BranchingConditionIdIterator<'_> {}
 #[derive(Debug)]
 pub(super) struct DeclarationIdIterator<'a> {
     inner: DeclarationsIterator<'a>,
-    branching_conditions: BranchingConditionsIterator<'a>,
+    branching_conditions: std::iter::Rev<BranchingConditionsIterator<'a>>,
 }
 
 impl<'a> Iterator for DeclarationIdIterator<'a> {

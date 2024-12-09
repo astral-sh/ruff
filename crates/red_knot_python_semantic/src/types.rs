@@ -261,63 +261,56 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Option<Type<'db>> {
-    let def_types = bindings_with_constraints.map(
-        |BindingWithConstraints {
-             binding,
-             constraints,
-             branching_conditions,
-         }| {
-            let result = branching_conditions.branch_condition_truthiness(db);
+    let def_types = bindings_with_constraints
+        .map(
+            |BindingWithConstraints {
+                 binding,
+                 constraints,
+                 branching_conditions,
+             }| {
+                let result = branching_conditions.branch_condition_truthiness(db);
 
-            if result.any_always_false {
-                // TODO: do we need to call binding_ty(…) even if we don't need the result?
-                (None, UnconditionallyVisible::No)
-            } else {
-                let unconditionally_visible =
-                    if result.at_least_one_condition && result.all_always_true {
-                        UnconditionallyVisible::Yes
-                    } else {
-                        UnconditionallyVisible::No
-                    };
-
-                let mut constraint_tys = constraints
-                    .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
-                    .peekable();
-
-                let binding_ty = binding_ty(db, binding);
-                if constraint_tys.peek().is_some() {
-                    let intersection_ty = constraint_tys
-                        .fold(
-                            IntersectionBuilder::new(db).add_positive(binding_ty),
-                            IntersectionBuilder::add_positive,
-                        )
-                        .build();
-                    (Some(intersection_ty), unconditionally_visible)
+                if result.any_always_false {
+                    // TODO: do we need to call binding_ty(…) even if we don't need the result?
+                    (None, UnconditionallyVisible::No)
                 } else {
-                    (Some(binding_ty), unconditionally_visible)
+                    let unconditionally_visible =
+                        if result.at_least_one_condition && result.all_always_true {
+                            UnconditionallyVisible::Yes
+                        } else {
+                            UnconditionallyVisible::No
+                        };
+
+                    let mut constraint_tys = constraints
+                        .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+                        .peekable();
+
+                    let binding_ty = binding_ty(db, binding);
+                    if constraint_tys.peek().is_some() {
+                        let intersection_ty = constraint_tys
+                            .fold(
+                                IntersectionBuilder::new(db).add_positive(binding_ty),
+                                IntersectionBuilder::add_positive,
+                            )
+                            .build();
+                        (Some(intersection_ty), unconditionally_visible)
+                    } else {
+                        (Some(binding_ty), unconditionally_visible)
+                    }
                 }
-            }
-        },
-    );
+            },
+        )
+        .take_while_inclusive(|(_, uv)| *uv != UnconditionallyVisible::Yes)
+        .map(|(ty, _)| ty);
 
     // TODO: get rid of all the collects and clean up, obviously
     let def_types: Vec<_> = def_types.collect();
 
-    if !def_types.is_empty() && def_types.iter().all(|(ty, _)| ty.is_none()) {
+    if !def_types.is_empty() && def_types.iter().all(|ty| ty.is_none()) {
         return Some(Type::Unknown);
     }
 
-    // shrink the vector to only include everything from the last unconditionally visible binding
-    let def_types: Vec<_> = def_types
-        .iter()
-        .rev()
-        .take_while_inclusive(|(_, unconditionally_visible)| {
-            *unconditionally_visible != UnconditionallyVisible::Yes
-        })
-        .map(|(ty, _)| ty.unwrap_or(Type::Never))
-        .collect();
-
-    let mut def_types = def_types.into_iter().rev();
+    let mut def_types = def_types.iter().map(|ty| ty.unwrap_or(Type::Never)).rev();
 
     if let Some(first) = def_types.next() {
         if let Some(second) = def_types.next() {
@@ -354,32 +347,24 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|(declaration, branching_conditions)| {
-        let result = branching_conditions.branch_condition_truthiness(db);
+    let decl_types = declarations
+        .map(|(declaration, branching_conditions)| {
+            let result = branching_conditions.branch_condition_truthiness(db);
 
-        if result.any_always_false {
-            (Type::Never, UnconditionallyVisible::No)
-        } else {
-            if result.at_least_one_condition && result.all_always_true {
-                (declaration_ty(db, declaration), UnconditionallyVisible::Yes)
+            if result.any_always_false {
+                (Type::Never, UnconditionallyVisible::No)
             } else {
-                (declaration_ty(db, declaration), UnconditionallyVisible::No)
+                if result.at_least_one_condition && result.all_always_true {
+                    (declaration_ty(db, declaration), UnconditionallyVisible::Yes)
+                } else {
+                    (declaration_ty(db, declaration), UnconditionallyVisible::No)
+                }
             }
-        }
-    });
-
-    // TODO: get rid of all the collects and clean up, obviously
-    let decl_types: Vec<_> = decl_types.collect();
-
-    // shrink the vector to only include everything from the last unconditionally visible binding
-    let decl_types: Vec<_> = decl_types
-        .iter()
-        .rev()
-        .take_while_inclusive(|(_, unconditionally_visible)| {
-            *unconditionally_visible != UnconditionallyVisible::Yes
         })
-        .map(|(ty, _)| *ty)
-        .collect();
+        .take_while_inclusive(|(_, uv)| *uv != UnconditionallyVisible::Yes)
+        .map(|(ty, _)| ty);
+
+    let decl_types: Vec<_> = decl_types.collect();
 
     let decl_types = decl_types.into_iter().rev();
 
