@@ -16,7 +16,6 @@ pub(crate) use self::infer::{
 pub(crate) use self::signatures::Signature;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -352,41 +351,12 @@ fn declarations_ty<'db>(
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
     let decl_types = declarations.map(|(declaration, branching_conditions)| {
-        let test_expr_tys = || {
-            branching_conditions.clone().map(|c| {
-                let ty = if let ConstraintNode::Expression(test_expr) = c.node {
-                    let inference = infer_expression_types(db, test_expr);
-                    let scope = test_expr.scope(db);
-                    inference.expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope))
-                } else {
-                    // TODO: handle other constraint nodes
-                    todo_type!()
-                };
+        let result = branching_conditions.branch_condition_truthiness(db);
 
-                (c, ty)
-            })
-        };
-
-        if test_expr_tys().any(|(c, test_expr_ty)| {
-            if c.is_positive {
-                test_expr_ty.bool(db).is_always_false()
-            } else {
-                test_expr_ty.bool(db).is_always_true()
-            }
-        }) {
+        if result.any_always_false {
             (Type::Never, UnconditionallyVisible::No)
         } else {
-            let mut test_expr_tys_iter = test_expr_tys().peekable();
-
-            if test_expr_tys_iter.peek().is_some()
-                && test_expr_tys_iter.all(|(c, test_expr_ty)| {
-                    if c.is_positive {
-                        test_expr_ty.bool(db).is_always_true()
-                    } else {
-                        test_expr_ty.bool(db).is_always_false()
-                    }
-                })
-            {
+            if result.at_least_one_condition && result.all_always_true {
                 (declaration_ty(db, declaration), UnconditionallyVisible::Yes)
             } else {
                 (declaration_ty(db, declaration), UnconditionallyVisible::No)

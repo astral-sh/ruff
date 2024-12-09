@@ -230,12 +230,11 @@ use crate::semantic_index::branching::BranchingCondition;
 use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
-use crate::semantic_index::use_def::bitset::BitSet;
 use crate::semantic_index::use_def::symbol_state::{
     BranchingConditionIdIterator, BranchingConditions, ScopedBranchingConditionId,
 };
 use crate::symbol::Boundness;
-use crate::types::{infer_expression_types, KnownClass, Truthiness};
+use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
@@ -396,7 +395,7 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'a, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
-            all_constraints: &self.all_constraints,
+            all_branching_conditions: &self.all_branching_conditions,
             inner: declarations.iter(),
             may_be_undeclared: declarations.may_be_undeclared(),
         }
@@ -478,7 +477,7 @@ impl<'db> Iterator for BranchingConditionsIterator<'_, 'db> {
     }
 }
 
-pub struct BranchConditionTruthiness {
+pub(crate) struct BranchConditionTruthiness {
     pub any_always_false: bool,
     pub all_always_true: bool,
     pub at_least_one_condition: bool,
@@ -525,7 +524,7 @@ impl std::iter::FusedIterator for BranchingConditionsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
-    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
     inner: DeclarationIdIterator<'map>,
     may_be_undeclared: bool,
 }
@@ -537,15 +536,15 @@ impl DeclarationsIterator<'_, '_> {
 }
 
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
-    type Item = (Definition<'db>, ConstraintsIterator<'map, 'db>);
+    type Item = (Definition<'db>, BranchingConditionsIterator<'map, 'db>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|(def_id, constraints)| {
+        self.inner.next().map(|(def_id, branching_condition_ids)| {
             (
                 self.all_definitions[def_id],
-                ConstraintsIterator {
-                    all_constraints: self.all_constraints,
-                    constraint_ids: constraints,
+                BranchingConditionsIterator {
+                    all_branching_conditions: self.all_branching_conditions,
+                    branching_condition_ids,
                 },
             )
         })
