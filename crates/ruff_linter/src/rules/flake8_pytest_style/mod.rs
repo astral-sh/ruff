@@ -293,6 +293,26 @@ mod tests {
         Ok(())
     }
 
+    /// This test ensure that PT006 and PT007 don't conflict when both of them suggest a fix that
+    /// edits `argvalues` for `pytest.mark.parametrize`.
+    #[test]
+    fn test_pytest_style_pt006_and_pt007() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_pytest_style")
+                .join(Path::new("PT006_and_PT007.py"))
+                .as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::PytestParametrizeNamesWrongType,
+                    Rule::PytestParametrizeValuesWrongType,
+                ])
+            },
+        )?;
+        assert_messages!("PT006_and_PT007", diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::PytestParametrizeNamesWrongType, Path::new("PT006.py"))]
     fn test_pytest_style_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(

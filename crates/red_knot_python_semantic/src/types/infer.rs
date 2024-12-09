@@ -4684,6 +4684,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
+            ast::Expr::Subscript(ast::ExprSubscript {
+                value,
+                slice: parameters,
+                ..
+            }) => {
+                let parameters_ty = match self.infer_expression(value) {
+                    Type::KnownInstance(KnownInstanceType::Union) => match &**parameters {
+                        ast::Expr::Tuple(tuple) => {
+                            let ty = UnionType::from_elements(
+                                self.db,
+                                tuple
+                                    .iter()
+                                    .map(|element| self.infer_subclass_of_type_expression(element)),
+                            );
+                            self.store_expression_type(parameters, ty);
+                            ty
+                        }
+                        _ => self.infer_subclass_of_type_expression(parameters),
+                    },
+                    _ => {
+                        self.infer_type_expression(parameters);
+                        todo_type!("unsupported nested subscript in type[X]")
+                    }
+                };
+                self.store_expression_type(slice, parameters_ty);
+                parameters_ty
+            }
             // TODO: subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);

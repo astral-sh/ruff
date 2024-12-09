@@ -132,7 +132,7 @@ RUF041.py:12:1: RUF041 [*] Unnecessary nested `Literal`
 12 | / Literal[
 13 | |     1, # comment 1
 14 | |     Literal[ # another comment
-15 | |         1 # yet annother comment
+15 | |         1 # yet another comment
 16 | |     ]
 17 | | ]  # once
    | |_^ RUF041
@@ -148,7 +148,7 @@ RUF041.py:12:1: RUF041 [*] Unnecessary nested `Literal`
 12    |-Literal[
 13    |-    1, # comment 1
 14    |-    Literal[ # another comment
-15    |-        1 # yet annother comment
+15    |-        1 # yet another comment
 16    |-    ]
 17    |-]  # once
    12 |+Literal[1, 1]  # once

@@ -88,7 +88,7 @@ reveal_type(f())  # revealed: @Todo(unsupported type[X] special form)
 class C: ...
 ```
 
-## Union of classes
+## New-style union of classes
 
 ```py
 class BasicUser: ...
@@ -103,6 +103,41 @@ def get_user() -> type[BasicUser | ProUser | A.B.C]:
 
 # revealed: type[BasicUser] | type[ProUser] | type[C]
 reveal_type(get_user())
+```
+
+## Old-style union of classes
+
+```py
+from typing import Union
+
+class BasicUser: ...
+class ProUser: ...
+
+class A:
+    class B:
+        class C: ...
+
+def f(a: type[Union[BasicUser, ProUser, A.B.C]], b: type[Union[str]], c: type[Union[BasicUser, Union[ProUser, A.B.C]]]):
+    reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(b)  # revealed: type[str]
+    reveal_type(c)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+```
+
+## New-style and old-style unions in combination
+
+```py
+from typing import Union
+
+class BasicUser: ...
+class ProUser: ...
+
+class A:
+    class B:
+        class C: ...
+
+def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Union[ProUser, A.B.C | str]]]):
+    reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(b)  # revealed: type[BasicUser] | type[ProUser] | type[C] | type[str]
 ```
 
 ## Illegal parameters

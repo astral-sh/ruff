@@ -32,7 +32,7 @@ impl super::SyncNotificationHandler for DidOpen {
 
         session.open_text_document(uri.clone(), document);
 
-        // Publish diagnostics if the client doesnt support pull diagnostics
+        // Publish diagnostics if the client doesn't support pull diagnostics
         if !session.resolved_client_capabilities().pull_diagnostics {
             let snapshot = session
                 .take_snapshot(uri.clone())
