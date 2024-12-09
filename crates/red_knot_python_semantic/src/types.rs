@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use indexmap::IndexSet;
 use itertools::Itertools;
-
+use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -2310,7 +2310,7 @@ impl<'db> CallOutcome<'db> {
             }) => {
                 diagnostics.add(
                     node,
-                    "call-non-callable",
+                    DiagnosticId::lint("call-non-callable"),
                     format_args!(
                         "Object of type `{}` is not callable",
                         not_callable_ty.display(db)
@@ -2325,7 +2325,7 @@ impl<'db> CallOutcome<'db> {
             }) => {
                 diagnostics.add(
                     node,
-                    "call-non-callable",
+                    DiagnosticId::lint("call-non-callable"),
                     format_args!(
                         "Object of type `{}` is not callable (due to union element `{}`)",
                         called_ty.display(db),
@@ -2341,7 +2341,7 @@ impl<'db> CallOutcome<'db> {
             }) => {
                 diagnostics.add(
                     node,
-                    "call-non-callable",
+                    DiagnosticId::lint("call-non-callable"),
                     format_args!(
                         "Object of type `{}` is not callable (due to union elements {})",
                         called_ty.display(db),
@@ -2356,7 +2356,7 @@ impl<'db> CallOutcome<'db> {
             }) => {
                 diagnostics.add(
                     node,
-                    "call-non-callable",
+                    DiagnosticId::lint("call-non-callable"),
                     format_args!(
                         "Object of type `{}` is not callable (possibly unbound `__call__` method)",
                         called_ty.display(db)
@@ -2382,7 +2382,7 @@ impl<'db> CallOutcome<'db> {
             } => {
                 diagnostics.add(
                     node,
-                    "revealed-type",
+                    DiagnosticId::RevealedType,
                     format_args!("Revealed type is `{}`", revealed_ty.display(db)),
                 );
                 Ok(*return_ty)
