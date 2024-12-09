@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
 use crate::rules::flake8_bugbear::rules::is_infinite_iterator;
 use crate::settings::types::PythonVersion;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Arguments, ExprCall};
 
@@ -28,9 +28,12 @@ use ruff_python_ast::{Arguments, ExprCall};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe for `batched` calls that contain
-/// `**kwargs`, as adding a `strict` keyword argument to such a call may lead
-/// to a duplicate keyword argument error.
+/// The fix for this rule adds a `strict=False` argument.
+/// It does not change runtime behaviour, since `False` is already the default value.
+/// However, it is marked as unsafe as it might not preserve the original intention.
+///
+/// For calls that has `**kwargs`, the fix will be marked as display-only
+/// due to the risk of introducing a duplicate keyword argument error.
 ///
 /// ## Known deviations
 /// Unlike the upstream `B911`, this rule will not report infinite iterators
@@ -41,14 +44,16 @@ use ruff_python_ast::{Arguments, ExprCall};
 #[derive(ViolationMetadata)]
 pub(crate) struct BatchedWithoutExplicitStrict;
 
-impl AlwaysFixableViolation for BatchedWithoutExplicitStrict {
+impl Violation for BatchedWithoutExplicitStrict {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`batched()` without an explicit `strict=` parameter".to_string()
+        "`itertools.batched()` without an explicit `strict=` parameter".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Add explicit value for parameter `strict=`".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Add explicit value for parameter `strict=`".to_string())
     }
 }
 
@@ -73,10 +78,6 @@ pub(crate) fn batched_without_explicit_strict(checker: &mut Checker, call: &Expr
         return;
     }
 
-    if has_kwargs(arguments) {
-        return;
-    }
-
     let Some(first_positional) = arguments.find_positional(0) else {
         return;
     };
@@ -92,14 +93,6 @@ pub(crate) fn batched_without_explicit_strict(checker: &mut Checker, call: &Expr
 }
 
 #[inline]
-fn has_kwargs(arguments: &Arguments) -> bool {
-    arguments
-        .keywords
-        .iter()
-        .any(|keyword| keyword.arg.is_none())
-}
-
-#[inline]
 fn add_strict_fix(checker: &Checker, arguments: &Arguments) -> Fix {
     let edit = add_argument(
         "strict=False",
@@ -108,5 +101,19 @@ fn add_strict_fix(checker: &Checker, arguments: &Arguments) -> Fix {
         checker.locator().contents(),
     );
 
-    Fix::safe_edit(edit)
+    let applicability = if has_kwargs(arguments) {
+        Applicability::DisplayOnly
+    } else {
+        Applicability::Unsafe
+    };
+
+    Fix::applicable_edit(edit, applicability)
+}
+
+#[inline]
+fn has_kwargs(arguments: &Arguments) -> bool {
+    arguments
+        .keywords
+        .iter()
+        .any(|keyword| keyword.arg.is_none())
 }

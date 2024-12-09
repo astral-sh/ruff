@@ -12,6 +12,9 @@ batched(itertools.batched([1, 2, 3], strict=True))
 batched(repeat(1, 1))
 batched(repeat(1, times=4))
 
+# No fix
+batched([], **kwargs)
+
 # No errors
 batched()
 batched(range(3), 0, strict=True)
@@ -38,6 +41,9 @@ itertools.batched(itertools.batched([1, 2, 3], strict=True))
 # Errors (limited iterators).
 itertools.batched(repeat(1, 1))
 itertools.batched(repeat(1, times=4))
+
+# No fix
+itertools.batched([], **kwargs)
 
 # No errors
 itertools.batched()
