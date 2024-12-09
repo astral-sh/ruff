@@ -259,9 +259,8 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     let shadowed_references: Vec<_> = checker
         .semantic()
         .shadowed_bindings(checker.semantic().scope_id, target_binding_id)
-        .filter_map(|shadowed| shadowed.same_scope().then_some(shadowed.shadowed_id()))
-        .flat_map(|shadowed_id| {
-            let shadowed_binding = checker.semantic().binding(shadowed_id);
+        .flat_map(|shadowed| {
+            let shadowed_binding = checker.semantic().binding(shadowed.shadowed_id());
             shadowed_binding.references()
         })
         .collect();
