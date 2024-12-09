@@ -2300,6 +2300,7 @@ dependencies = [
  "red_knot_vendored",
  "ruff_db",
  "ruff_index",
+ "ruff_macros",
  "ruff_python_ast",
  "ruff_python_literal",
  "ruff_python_parser",

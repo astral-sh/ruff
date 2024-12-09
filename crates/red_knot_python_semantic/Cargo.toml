@@ -13,6 +13,7 @@ license = { workspace = true }
 [dependencies]
 ruff_db = { workspace = true }
 ruff_index = { workspace = true }
+ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_stdlib = { workspace = true }
