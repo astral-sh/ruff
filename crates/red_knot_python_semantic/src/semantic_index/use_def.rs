@@ -230,7 +230,7 @@ use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::bitset::BitSet;
-use crate::semantic_index::use_def::symbol_state::INLINE_CONSTRAINT_BLOCKS;
+use crate::semantic_index::use_def::symbol_state::BranchingConditions;
 use crate::symbol::Boundness;
 use crate::types::{infer_expression_types, KnownClass};
 use ruff_index::IndexVec;
@@ -312,8 +312,7 @@ impl<'db> UseDefMap<'db> {
             for binding in bindings.iter() {
                 let definition = self.all_definitions[binding.definition];
                 let mut constraint_ids = binding.constraint_ids.peekable();
-                let mut active_constraint_ids =
-                    binding.constraints_active_at_binding_ids.peekable();
+                let mut active_constraint_ids = binding.branching_conditions_ids.peekable();
 
                 println!("  * {definition:?}");
 
@@ -394,7 +393,7 @@ impl<'db> UseDefMap<'db> {
         let mut definitely_unbound = true;
         for binding in bindings_iter {
             let test_expr_tys = || {
-                binding.constraints_active_at_binding.clone().map(|c| {
+                binding.branching_conditions.clone().map(|c| {
                     let ty = if let ConstraintNode::Expression(test_expr) = c.node {
                         let inference = infer_expression_types(db, test_expr);
                         let scope = test_expr.scope(db);
@@ -553,9 +552,9 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                     all_constraints: self.all_constraints,
                     constraint_ids: def_id_with_constraints.constraint_ids,
                 },
-                constraints_active_at_binding: ConstraintsIterator {
+                branching_conditions: ConstraintsIterator {
                     all_constraints: self.all_constraints,
-                    constraint_ids: def_id_with_constraints.constraints_active_at_binding_ids,
+                    constraint_ids: def_id_with_constraints.branching_conditions_ids,
                 },
             })
     }
@@ -566,7 +565,7 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Definition<'db>,
     pub(crate) constraints: ConstraintsIterator<'map, 'db>,
-    pub(crate) constraints_active_at_binding: ConstraintsIterator<'map, 'db>,
+    pub(crate) branching_conditions: ConstraintsIterator<'map, 'db>,
 }
 
 #[derive(Debug, Clone)]
@@ -624,10 +623,8 @@ pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 }
 
-type ActiveConstraints = BitSet<INLINE_CONSTRAINT_BLOCKS>;
-
 #[derive(Clone, Debug)]
-pub(super) struct ActiveConstraintsSnapshot(ActiveConstraints);
+pub(super) struct BranchingConditionsSnapshot(BranchingConditions);
 
 #[derive(Debug, Default)]
 pub(super) struct UseDefMapBuilder<'db> {
@@ -637,7 +634,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Constraint`].
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
-    active_constraints: ActiveConstraints,
+    branching_conditions: BranchingConditions,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -662,7 +659,7 @@ impl<'db> UseDefMapBuilder<'db> {
             binding,
             SymbolDefinitions::Declarations(symbol_state.declarations().clone()),
         );
-        symbol_state.record_binding(def_id, &self.active_constraints);
+        symbol_state.record_binding(def_id, &self.branching_conditions);
     }
 
     pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
@@ -670,7 +667,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for state in &mut self.symbol_states {
             state.record_constraint(constraint_id);
         }
-        self.active_constraints.insert(constraint_id.as_u32());
+        self.branching_conditions.insert(constraint_id.as_u32());
     }
 
     pub(super) fn record_declaration(
@@ -684,7 +681,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declaration,
             SymbolDefinitions::Bindings(symbol_state.bindings().clone()),
         );
-        symbol_state.record_declaration(def_id, &self.active_constraints);
+        symbol_state.record_declaration(def_id, &self.branching_conditions);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -695,8 +692,8 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store anything in self.definitions_by_definition.
         let def_id = self.all_definitions.push(definition);
         let symbol_state = &mut self.symbol_states[symbol];
-        symbol_state.record_declaration(def_id, &self.active_constraints);
-        symbol_state.record_binding(def_id, &self.active_constraints);
+        symbol_state.record_declaration(def_id, &self.branching_conditions);
+        symbol_state.record_binding(def_id, &self.branching_conditions);
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
@@ -715,8 +712,8 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn constraints_snapshot(&self) -> ActiveConstraintsSnapshot {
-        ActiveConstraintsSnapshot(self.active_constraints.clone())
+    pub(super) fn constraints_snapshot(&self) -> BranchingConditionsSnapshot {
+        BranchingConditionsSnapshot(self.branching_conditions.clone())
     }
 
     /// Restore the current builder symbols state to the given snapshot.
@@ -737,8 +734,8 @@ impl<'db> UseDefMapBuilder<'db> {
             .resize(num_symbols, SymbolState::undefined());
     }
 
-    pub(super) fn restore_constraints(&mut self, snapshot: ActiveConstraintsSnapshot) {
-        self.active_constraints = snapshot.0;
+    pub(super) fn restore_constraints(&mut self, snapshot: BranchingConditionsSnapshot) {
+        self.branching_conditions = snapshot.0;
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either

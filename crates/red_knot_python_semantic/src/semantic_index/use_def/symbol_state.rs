@@ -43,8 +43,6 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use crate::semantic_index::use_def::ActiveConstraints;
-
 use super::bitset::{BitSet, BitSetIterator};
 use ruff_index::newtype_index;
 use smallvec::SmallVec;
@@ -72,7 +70,7 @@ type Declarations = BitSet<INLINE_DECLARATION_BLOCKS>;
 type DeclarationsIterator<'a> = BitSetIterator<'a, INLINE_DECLARATION_BLOCKS>;
 
 /// Can reference this * 64 total constraints inline; more will fall back to the heap.
-pub(crate) const INLINE_CONSTRAINT_BLOCKS: usize = 2;
+const INLINE_CONSTRAINT_BLOCKS: usize = 2;
 
 /// Can keep inline this many live bindings per symbol at a given time; more will go to heap.
 const INLINE_BINDINGS_PER_SYMBOL: usize = 4;
@@ -83,13 +81,16 @@ type Constraints = SmallVec<InlineConstraintArray>;
 type ConstraintsIterator<'a> = std::slice::Iter<'a, BitSet<INLINE_CONSTRAINT_BLOCKS>>;
 type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
 
+const INLINE_BRANCHING_CONDITIONS: usize = 2;
+pub(super) type BranchingConditions = BitSet<INLINE_BRANCHING_CONDITIONS>;
+
 /// Live declarations for a single symbol at some point in control flow.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
     live_declarations: Declarations,
 
-    constraints_active_at_declaration: Constraints, // TODO: rename to constraints_active_at_declaration
+    branching_conditions: Constraints,
 
     /// Could the symbol be un-declared at this point?
     may_be_undeclared: bool,
@@ -99,7 +100,7 @@ impl SymbolDeclarations {
     fn undeclared() -> Self {
         Self {
             live_declarations: Declarations::default(),
-            constraints_active_at_declaration: Constraints::default(),
+            branching_conditions: Constraints::default(),
             may_be_undeclared: true,
         }
     }
@@ -108,17 +109,16 @@ impl SymbolDeclarations {
     fn record_declaration(
         &mut self,
         declaration_id: ScopedDefinitionId,
-        active_constraints: &ActiveConstraints,
+        branching_conditions: &BranchingConditions,
     ) {
         self.live_declarations = Declarations::with(declaration_id.into());
         self.may_be_undeclared = false;
 
         // TODO: unify code with below
-        self.constraints_active_at_declaration = Constraints::with_capacity(1);
-        self.constraints_active_at_declaration
-            .push(BitSet::default());
-        for active_constraint_id in active_constraints.iter() {
-            self.constraints_active_at_declaration[0].insert(active_constraint_id);
+        self.branching_conditions = Constraints::with_capacity(1);
+        self.branching_conditions.push(BitSet::default());
+        for active_constraint_id in branching_conditions.iter() {
+            self.branching_conditions[0].insert(active_constraint_id);
         }
     }
 
@@ -131,7 +131,7 @@ impl SymbolDeclarations {
     pub(super) fn iter(&self) -> DeclarationIdIterator {
         DeclarationIdIterator {
             inner: self.live_declarations.iter(),
-            constraints_active_at_binding: self.constraints_active_at_declaration.iter(),
+            branching_conditions: self.branching_conditions.iter(),
         }
     }
 
@@ -156,8 +156,8 @@ pub(super) struct SymbolBindings {
     /// binding in `live_bindings`.
     constraints: Constraints,
 
-    /// For each live binding, which [`ScopedConstraintId`] were active *at the time of the binding*?
-    pub(crate) constraints_active_at_binding: Constraints,
+    /// For each live binding, which [`BranchingCondition`]s were active *at the time of the binding*?
+    pub(crate) branching_conditions: Constraints,
 
     /// Could the symbol be unbound at this point?
     may_be_unbound: bool,
@@ -168,7 +168,7 @@ impl SymbolBindings {
         Self {
             live_bindings: Bindings::default(),
             constraints: Constraints::default(),
-            constraints_active_at_binding: Constraints::default(),
+            branching_conditions: Constraints::default(),
             may_be_unbound: true,
         }
     }
@@ -182,17 +182,17 @@ impl SymbolBindings {
     pub(super) fn record_binding(
         &mut self,
         binding_id: ScopedDefinitionId,
-        active_constraints: &ActiveConstraints,
+        branching_conditions: &BranchingConditions,
     ) {
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
         self.live_bindings = Bindings::with(binding_id.into());
         self.constraints = Constraints::with_capacity(1);
         self.constraints.push(BitSet::default());
-        self.constraints_active_at_binding = Constraints::with_capacity(1);
-        self.constraints_active_at_binding.push(BitSet::default());
-        for active_constraint_id in active_constraints.iter() {
-            self.constraints_active_at_binding[0].insert(active_constraint_id);
+        self.branching_conditions = Constraints::with_capacity(1);
+        self.branching_conditions.push(BitSet::default());
+        for id in branching_conditions.iter() {
+            self.branching_conditions[0].insert(id);
         }
         self.may_be_unbound = false;
     }
@@ -209,7 +209,7 @@ impl SymbolBindings {
         BindingIdWithConstraintsIterator {
             definitions: self.live_bindings.iter(),
             constraints: self.constraints.iter(),
-            constraints_active_at_binding: self.constraints_active_at_binding.iter(),
+            branching_conditions: self.branching_conditions.iter(),
         }
     }
 
@@ -242,9 +242,10 @@ impl SymbolState {
     pub(super) fn record_binding(
         &mut self,
         binding_id: ScopedDefinitionId,
-        active_constraints: &ActiveConstraints,
+        branching_conditions: &BranchingConditions,
     ) {
-        self.bindings.record_binding(binding_id, active_constraints);
+        self.bindings
+            .record_binding(binding_id, branching_conditions);
     }
 
     /// Add given constraint to all live bindings.
@@ -261,10 +262,10 @@ impl SymbolState {
     pub(super) fn record_declaration(
         &mut self,
         declaration_id: ScopedDefinitionId,
-        active_constraints: &ActiveConstraints,
+        branching_conditions: &BranchingConditions,
     ) {
         self.declarations
-            .record_declaration(declaration_id, active_constraints);
+            .record_declaration(declaration_id, branching_conditions);
     }
 
     /// Merge another [`SymbolState`] into this one.
@@ -273,79 +274,71 @@ impl SymbolState {
             bindings: SymbolBindings {
                 live_bindings: Bindings::default(),
                 constraints: Constraints::default(),
-                constraints_active_at_binding: Constraints::default(), // TODO
+                branching_conditions: Constraints::default(), // TODO
                 may_be_unbound: self.bindings.may_be_unbound || b.bindings.may_be_unbound,
             },
             declarations: SymbolDeclarations {
                 live_declarations: self.declarations.live_declarations.clone(),
-                constraints_active_at_declaration: Constraints::default(), // TODO
+                branching_conditions: Constraints::default(), // TODO
                 may_be_undeclared: self.declarations.may_be_undeclared
                     || b.declarations.may_be_undeclared,
             },
         };
 
-        // let mut constraints_active_at_binding = BitSet::default();
-        // for active_constraint_id in active_constraints.0 {
-        //     constraints_active_at_binding.insert(active_constraint_id.as_u32());
-        // }
-
         std::mem::swap(&mut a, self);
-        // self.declarations
-        //     .live_declarations
-        //     .union(&b.declarations.live_declarations);
 
         let mut a_decls_iter = a.declarations.live_declarations.iter();
         let mut b_decls_iter = b.declarations.live_declarations.iter();
-        let mut a_constraints_active_at_declaration_iter =
-            a.declarations.constraints_active_at_declaration.into_iter();
-        let mut b_constraints_active_at_declaration_iter =
-            b.declarations.constraints_active_at_declaration.into_iter();
+        let mut a_declaration_branching_conditions_iter =
+            a.declarations.branching_conditions.into_iter();
+        let mut b_cdeclaration_branching_conditions_iter =
+            b.declarations.branching_conditions.into_iter();
 
         let mut opt_a_decl: Option<u32> = a_decls_iter.next();
         let mut opt_b_decl: Option<u32> = b_decls_iter.next();
 
         let push = |decl,
-                    constraints_active_at_declaration_iter: &mut ConstraintsIntoIterator,
+                    declaration_branching_conditions_iter: &mut ConstraintsIntoIterator,
                     merged: &mut Self| {
             merged.declarations.live_declarations.insert(decl);
-            let constraints_active_at_binding = constraints_active_at_declaration_iter
+            let branching_conditions = declaration_branching_conditions_iter
                 .next()
-                .expect("declarations and constraints_active_at_binding length mismatch");
+                .expect("declarations and branching_conditions length mismatch");
             merged
                 .declarations
-                .constraints_active_at_declaration
-                .push(constraints_active_at_binding);
+                .branching_conditions
+                .push(branching_conditions);
         };
 
         loop {
             match (opt_a_decl, opt_b_decl) {
                 (Some(a_decl), Some(b_decl)) => match a_decl.cmp(&b_decl) {
                     std::cmp::Ordering::Less => {
-                        push(a_decl, &mut a_constraints_active_at_declaration_iter, self);
+                        push(a_decl, &mut a_declaration_branching_conditions_iter, self);
                         opt_a_decl = a_decls_iter.next();
                     }
                     std::cmp::Ordering::Greater => {
-                        push(b_decl, &mut b_constraints_active_at_declaration_iter, self);
+                        push(b_decl, &mut b_cdeclaration_branching_conditions_iter, self);
                         opt_b_decl = b_decls_iter.next();
                     }
                     std::cmp::Ordering::Equal => {
-                        push(a_decl, &mut b_constraints_active_at_declaration_iter, self);
+                        push(a_decl, &mut b_cdeclaration_branching_conditions_iter, self);
                         self.declarations
-                            .constraints_active_at_declaration
+                            .branching_conditions
                             .last_mut()
                             .unwrap()
-                            .intersect(&a_constraints_active_at_declaration_iter.next().unwrap());
+                            .intersect(&a_declaration_branching_conditions_iter.next().unwrap());
 
                         opt_a_decl = a_decls_iter.next();
                         opt_b_decl = b_decls_iter.next();
                     }
                 },
                 (Some(a_decl), None) => {
-                    push(a_decl, &mut a_constraints_active_at_declaration_iter, self);
+                    push(a_decl, &mut a_declaration_branching_conditions_iter, self);
                     opt_a_decl = a_decls_iter.next();
                 }
                 (None, Some(b_decl)) => {
-                    push(b_decl, &mut b_constraints_active_at_declaration_iter, self);
+                    push(b_decl, &mut b_cdeclaration_branching_conditions_iter, self);
                     opt_b_decl = b_decls_iter.next();
                 }
                 (None, None) => break,
@@ -356,10 +349,8 @@ impl SymbolState {
         let mut b_defs_iter = b.bindings.live_bindings.iter();
         let mut a_constraints_iter = a.bindings.constraints.into_iter();
         let mut b_constraints_iter = b.bindings.constraints.into_iter();
-        let mut a_constraints_active_at_binding_iter =
-            a.bindings.constraints_active_at_binding.into_iter();
-        let mut b_constraints_active_at_binding_iter =
-            b.bindings.constraints_active_at_binding.into_iter();
+        let mut a_binding_branching_conditions_iter = a.bindings.branching_conditions.into_iter();
+        let mut b_binding_branching_conditions_iter = b.bindings.branching_conditions.into_iter();
 
         let mut opt_a_def: Option<u32> = a_defs_iter.next();
         let mut opt_b_def: Option<u32> = b_defs_iter.next();
@@ -373,7 +364,7 @@ impl SymbolState {
         // Helper to push `def`, with constraints in `constraints_iter`, onto `self`.
         let push = |def,
                     constraints_iter: &mut ConstraintsIntoIterator,
-                    constraints_active_at_binding_iter: &mut ConstraintsIntoIterator,
+                    branching_conditions_iter: &mut ConstraintsIntoIterator,
                     merged: &mut Self| {
             merged.bindings.live_bindings.insert(def);
             // SAFETY: we only ever create SymbolState with either no definitions and no constraint
@@ -384,14 +375,14 @@ impl SymbolState {
             let constraints = constraints_iter
                 .next()
                 .expect("definitions and constraints length mismatch");
-            let constraints_active_at_binding = constraints_active_at_binding_iter
+            let branching_conditions = branching_conditions_iter
                 .next()
-                .expect("definitions and constraints_active_at_binding length mismatch");
+                .expect("definitions and branching_conditions length mismatch");
             merged.bindings.constraints.push(constraints);
             merged
                 .bindings
-                .constraints_active_at_binding
-                .push(constraints_active_at_binding);
+                .branching_conditions
+                .push(branching_conditions);
         };
 
         loop {
@@ -402,7 +393,7 @@ impl SymbolState {
                         push(
                             a_def,
                             &mut a_constraints_iter,
-                            &mut a_constraints_active_at_binding_iter,
+                            &mut a_binding_branching_conditions_iter,
                             self,
                         );
                         opt_a_def = a_defs_iter.next();
@@ -412,7 +403,7 @@ impl SymbolState {
                         push(
                             b_def,
                             &mut b_constraints_iter,
-                            &mut b_constraints_active_at_binding_iter,
+                            &mut b_binding_branching_conditions_iter,
                             self,
                         );
                         opt_b_def = b_defs_iter.next();
@@ -422,7 +413,7 @@ impl SymbolState {
                         push(
                             a_def,
                             &mut b_constraints_iter,
-                            &mut b_constraints_active_at_binding_iter,
+                            &mut b_binding_branching_conditions_iter,
                             self,
                         );
                         // SAFETY: we only ever create SymbolState with either no definitions and
@@ -433,10 +424,7 @@ impl SymbolState {
                         let a_constraints = a_constraints_iter
                             .next()
                             .expect("definitions and constraints length mismatch");
-                        // let _a_constraints_active_at_binding =
-                        //     a_constraints_active_at_binding_iter.next().expect(
-                        //         "definitions and constraints_active_at_binding length mismatch",
-                        //     ); // TODO: perform check that we see the same constraints in both paths
+                        // TODO: perform check that we see the same branching_conditions in both paths?
 
                         // If the same definition is visible through both paths, any constraint
                         // that applies on only one path is irrelevant to the resulting type from
@@ -456,7 +444,7 @@ impl SymbolState {
                     push(
                         a_def,
                         &mut a_constraints_iter,
-                        &mut a_constraints_active_at_binding_iter,
+                        &mut a_binding_branching_conditions_iter,
                         self,
                     );
                     opt_a_def = a_defs_iter.next();
@@ -466,7 +454,7 @@ impl SymbolState {
                     push(
                         b_def,
                         &mut b_constraints_iter,
-                        &mut b_constraints_active_at_binding_iter,
+                        &mut b_binding_branching_conditions_iter,
                         self,
                     );
                     opt_b_def = b_defs_iter.next();
@@ -505,14 +493,14 @@ impl Default for SymbolState {
 pub(super) struct BindingIdWithConstraints<'a> {
     pub(super) definition: ScopedDefinitionId,
     pub(super) constraint_ids: ConstraintIdIterator<'a>,
-    pub(super) constraints_active_at_binding_ids: ConstraintIdIterator<'a>,
+    pub(super) branching_conditions_ids: ConstraintIdIterator<'a>,
 }
 
 #[derive(Debug, Clone)]
 pub(super) struct BindingIdWithConstraintsIterator<'a> {
     definitions: BindingsIterator<'a>,
     constraints: ConstraintsIterator<'a>,
-    constraints_active_at_binding: ConstraintsIterator<'a>,
+    branching_conditions: ConstraintsIterator<'a>,
 }
 
 impl<'a> Iterator for BindingIdWithConstraintsIterator<'a> {
@@ -522,17 +510,17 @@ impl<'a> Iterator for BindingIdWithConstraintsIterator<'a> {
         match (
             self.definitions.next(),
             self.constraints.next(),
-            self.constraints_active_at_binding.next(),
+            self.branching_conditions.next(),
         ) {
             (None, None, None) => None,
-            (Some(def), Some(constraints), Some(constraints_active_at_binding)) => {
+            (Some(def), Some(constraints), Some(branching_conditions)) => {
                 Some(BindingIdWithConstraints {
                     definition: ScopedDefinitionId::from_u32(def),
                     constraint_ids: ConstraintIdIterator {
                         wrapped: constraints.iter(),
                     },
-                    constraints_active_at_binding_ids: ConstraintIdIterator {
-                        wrapped: constraints_active_at_binding.iter(),
+                    branching_conditions_ids: ConstraintIdIterator {
+                        wrapped: branching_conditions.iter(),
                     },
                 })
             }
@@ -562,7 +550,7 @@ impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 #[derive(Debug)]
 pub(super) struct DeclarationIdIterator<'a> {
     inner: DeclarationsIterator<'a>,
-    constraints_active_at_binding: ConstraintsIterator<'a>,
+    branching_conditions: ConstraintsIterator<'a>,
 }
 
 impl<'a> Iterator for DeclarationIdIterator<'a> {
@@ -570,16 +558,16 @@ impl<'a> Iterator for DeclarationIdIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // self.inner.next().map(ScopedDefinitionId::from_u32)
-        match (self.inner.next(), self.constraints_active_at_binding.next()) {
+        match (self.inner.next(), self.branching_conditions.next()) {
             (None, None) => None,
-            (Some(declaration), Some(constraints_active_at_binding)) => Some((
+            (Some(declaration), Some(branching_conditions)) => Some((
                 ScopedDefinitionId::from_u32(declaration),
                 ConstraintIdIterator {
-                    wrapped: constraints_active_at_binding.iter(),
+                    wrapped: branching_conditions.iter(),
                 },
             )),
             // SAFETY: see above.
-            _ => unreachable!("declarations and constraints_active_at_binding length mismatch"),
+            _ => unreachable!("declarations and branching_conditions length mismatch"),
         }
     }
 }

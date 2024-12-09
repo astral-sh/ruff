@@ -266,10 +266,10 @@ fn bindings_ty<'db>(
         |BindingWithConstraints {
              binding,
              constraints,
-             constraints_active_at_binding,
+             branching_conditions,
          }| {
             let test_expr_tys = || {
-                constraints_active_at_binding.clone().map(|c| {
+                branching_conditions.clone().map(|c| {
                     let ty = if let ConstraintNode::Expression(test_expr) = c.node {
                         let inference = infer_expression_types(db, test_expr);
                         let scope = test_expr.scope(db);
@@ -379,9 +379,9 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|(declaration, constraints_active_at_declaration)| {
+    let decl_types = declarations.map(|(declaration, branching_conditions)| {
         let test_expr_tys = || {
-            constraints_active_at_declaration.clone().map(|c| {
+            branching_conditions.clone().map(|c| {
                 let ty = if let ConstraintNode::Expression(test_expr) = c.node {
                     let inference = infer_expression_types(db, test_expr);
                     let scope = test_expr.scope(db);

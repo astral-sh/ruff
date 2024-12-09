@@ -173,6 +173,42 @@ else:
 reveal_type(x)  # revealed: Literal[3, 4]
 ```
 
+### Combination with non-conditional control flow
+
+```py path=try_if_true.py
+def may_raise() -> None: ...
+
+x = 1
+
+try:
+    may_raise()
+    if True:
+        x = 2
+    else:
+        x = 3
+except:
+    x = 4
+
+reveal_type(x)  # revealed: Literal[2, 4]
+```
+
+```py path=if_true_try.py
+def may_raise() -> None: ...
+
+x = 1
+
+if True:
+    try:
+        may_raise()
+        x = 2
+    except:
+        x = 3
+else:
+    x = 4
+
+reveal_type(x)  # revealed: Literal[2, 3]
+```
+
 ## If expressions
 
 See also: tests in [expression/if.md](expression/if.md).
