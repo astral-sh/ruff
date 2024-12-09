@@ -20,8 +20,10 @@ int(math.lcm())
 int(math.isqrt())
 int(math.perm())
 
-int(round(1))
 int(round(1, 0))
+int(round(1, 10))
+
+int(round(1))
 int(round(1, None))
 
 int(round(1.))
@@ -34,8 +36,10 @@ int(math.ceil())
 int(math.floor())
 int(math.trunc())
 
-int(round(inferred_int))
 int(round(inferred_int, 0))
+int(round(inferred_int, 10))
+
+int(round(inferred_int))
 int(round(inferred_int, None))
 
 int(round(inferred_float))
@@ -60,5 +64,7 @@ int(round(unknown, 0))
 int(round(unknown, unknown))
 
 int(round(0, 3.14))
+int(round(inferred_int, 3.14))
+
 int(round(0, 0), base)
 int(round(0, 0, extra=keyword))

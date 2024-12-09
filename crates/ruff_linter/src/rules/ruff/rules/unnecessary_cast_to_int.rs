@@ -131,7 +131,7 @@ enum Rounded {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Ndigits {
     NotGiven,
-    LiteralZero,
+    LiteralInt,
     LiteralNone,
     Other,
 }
@@ -173,24 +173,21 @@ fn replace_with_round(
         None => Ndigits::NotGiven,
         Some(Expr::NoneLiteral(_)) => Ndigits::LiteralNone,
 
-        Some(Expr::NumberLiteral(ExprNumberLiteral { value, .. })) => {
-            if is_literal_zero(value) {
-                Ndigits::LiteralZero
-            } else {
-                Ndigits::Other
-            }
-        }
+        Some(Expr::NumberLiteral(ExprNumberLiteral { value, .. })) => match value {
+            Number::Int(..) => Ndigits::LiteralInt,
+            _ => Ndigits::Other,
+        },
 
         _ => Ndigits::Other,
     };
 
     let applicability = match (number_kind, ndigits_kind) {
-        (Rounded::LiteralInt, Ndigits::LiteralZero)
+        (Rounded::LiteralInt, Ndigits::LiteralInt)
         | (Rounded::LiteralInt | Rounded::LiteralFloat, Ndigits::NotGiven | Ndigits::LiteralNone) => {
             Applicability::Safe
         }
 
-        (Rounded::InferredInt, Ndigits::LiteralZero)
+        (Rounded::InferredInt, Ndigits::LiteralInt)
         | (
             Rounded::InferredInt | Rounded::InferredFloat | Rounded::Other,
             Ndigits::NotGiven | Ndigits::LiteralNone,
@@ -202,14 +199,6 @@ fn replace_with_round(
     let edit = replace_with_inner(checker, outer_range, inner_range);
 
     Some(Fix::applicable_edit(edit, applicability))
-}
-
-fn is_literal_zero(value: &Number) -> bool {
-    let Number::Int(int) = value else {
-        return false;
-    };
-
-    matches!(int.as_u8(), Some(0))
 }
 
 fn replace_with_inner(checker: &Checker, outer_range: TextRange, inner_range: TextRange) -> Edit {
