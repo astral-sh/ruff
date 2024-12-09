@@ -32,6 +32,10 @@ use ruff_python_ast::{Arguments, ExprCall};
 /// `**kwargs`, as adding a `strict` keyword argument to such a call may lead
 /// to a duplicate keyword argument error.
 ///
+/// ## Known deviations
+/// Unlike the upstream `B911`, this rule will not report infinite iterators
+/// (e.g., `itertools.cycle(...)`).
+///
 /// ## References
 /// - [Python documentation: `batched`](https://docs.python.org/3/library/itertools.html#batched)
 #[derive(ViolationMetadata)]
@@ -60,12 +64,24 @@ pub(crate) fn batched_without_explicit_strict(checker: &mut Checker, call: &Expr
     let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
         return;
     };
-    let first_positional = arguments.args.first();
 
-    if !matches!(qualified_name.segments(), ["itertools", "batched"])
-        || arguments.find_keyword("strict").is_some()
-        || first_positional.is_some_and(|it| is_infinite_iterator(it, semantic))
-    {
+    if !matches!(qualified_name.segments(), ["itertools", "batched"]) {
+        return;
+    }
+
+    if arguments.find_keyword("strict").is_some() {
+        return;
+    }
+
+    if has_kwargs(arguments) {
+        return;
+    }
+
+    let Some(first_positional) = arguments.find_positional(0) else {
+        return;
+    };
+
+    if is_infinite_iterator(first_positional, semantic) {
         return;
     }
 
@@ -76,6 +92,14 @@ pub(crate) fn batched_without_explicit_strict(checker: &mut Checker, call: &Expr
 }
 
 #[inline]
+fn has_kwargs(arguments: &Arguments) -> bool {
+    arguments
+        .keywords
+        .iter()
+        .any(|keyword| keyword.arg.is_none())
+}
+
+#[inline]
 fn add_strict_fix(checker: &Checker, arguments: &Arguments) -> Fix {
     let edit = add_argument(
         "strict=False",
@@ -83,19 +107,6 @@ fn add_strict_fix(checker: &Checker, arguments: &Arguments) -> Fix {
         checker.comment_ranges(),
         checker.locator().contents(),
     );
-    let applicability = if has_kwargs(arguments) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
 
-    Fix::applicable_edit(edit, applicability)
-}
-
-#[inline]
-fn has_kwargs(arguments: &Arguments) -> bool {
-    arguments
-        .keywords
-        .iter()
-        .any(|keyword| keyword.arg.is_none())
+    Fix::safe_edit(edit)
 }
