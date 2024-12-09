@@ -1,4 +1,4 @@
-# Class defenitions in stubs
+# Class definitions in stubs
 
 ## Cyclical class definition
 

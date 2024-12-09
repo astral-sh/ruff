@@ -151,6 +151,6 @@ PRESELECT *
 FROM {var}.table
 """
 
-# to be handled seperately
+# to be handled separately
 # query58 = f"SELECT\
 #  * FROM {var}.table"

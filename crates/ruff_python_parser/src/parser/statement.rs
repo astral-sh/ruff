@@ -2140,7 +2140,7 @@ impl<'src> Parser<'src> {
     /// it's used in the context of a subscript expression or as a list expression:
     ///
     /// ```python
-    /// # Subcript expression; `match` is an identifier
+    /// # Subscript expression; `match` is an identifier
     /// match[x]
     ///
     /// # List expression; `match` is a keyword

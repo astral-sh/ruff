@@ -12,7 +12,7 @@ t.Literal[1, t.Literal[2, t.Literal[1]]]
 Literal[
     1, # comment 1
     Literal[ # another comment
-        1 # yet annother comment
+        1 # yet another comment
     ]
 ]  # once
 
