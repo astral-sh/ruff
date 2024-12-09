@@ -406,7 +406,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Get the already-inferred type of an expression node.
     ///
-    /// PANIC if the expression is not within this region, or if no type has yet been inferred for
+    /// ## Panics
+    /// If the expression is not within this region, or if no type has yet been inferred for
     /// this node.
     #[track_caller]
     fn expression_ty(&self, expr: &ast::Expr) -> Type<'db> {
