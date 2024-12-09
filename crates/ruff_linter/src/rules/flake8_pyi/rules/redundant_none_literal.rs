@@ -1,11 +1,13 @@
+use std::borrow::BorrowMut;
+
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, ExprBinOp, ExprNoneLiteral, ExprSubscript, Operator};
+use ruff_python_ast::{self as ast, name::Name, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator};
 use ruff_python_semantic::{
     analyze::typing::{traverse_literal, traverse_union},
     SemanticModel,
 };
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use smallvec::SmallVec;
 
@@ -73,16 +75,19 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
 
     let mut none_exprs: SmallVec<[&ExprNoneLiteral; 1]> = SmallVec::new();
     let mut other_literal_elements_seen = false;
+    let mut literal_elements: Vec<&Expr> = Vec::new();
 
-    let mut find_none = |expr: &'a Expr, _parent: &'a Expr| {
+    let mut find_literal_elements = |expr: &'a Expr, _parent: &'a Expr| {
         if let Expr::NoneLiteral(none_expr) = expr {
             none_exprs.push(none_expr);
         } else {
             other_literal_elements_seen = true;
+            literal_elements.push(expr);
         }
     };
 
-    traverse_literal(&mut find_none, checker.semantic(), literal_expr);
+
+    traverse_literal(&mut find_literal_elements, checker.semantic(), literal_expr);
 
     if none_exprs.is_empty() {
         return;
@@ -91,7 +96,16 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.
     let fix = if other_literal_elements_seen {
-        None
+        create_fix_edit_2(checker.borrow_mut(), literal_expr, &literal_elements).map(|edit| {
+            Fix::applicable_edit(
+                edit,
+                if checker.comment_ranges().intersects(literal_expr.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            )
+        })
     } else {
         create_fix_edit(checker.semantic(), literal_expr).map(|edit| {
             Fix::applicable_edit(
@@ -166,4 +180,83 @@ fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit
     }
 
     is_fixable.then(|| Edit::range_replacement("None".to_string(), literal_expr.range()))
+}
+
+
+fn create_fix_edit_2(checker: &mut Checker, literal_expr: &Expr, literal_elements: &[&Expr]) -> Option<Edit> {
+    let enclosing_pep604_union = checker.semantic()
+        .current_expressions()
+        .skip(1)
+        .take_while(|expr| {
+            matches!(
+                expr,
+                Expr::BinOp(ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                })
+            )
+        })
+        .last();
+
+    let mut is_fixable = true;
+    if let Some(enclosing_pep604_union) = enclosing_pep604_union {
+        traverse_union(
+            &mut |expr, _| {
+                if matches!(expr, Expr::NoneLiteral(_)) {
+                    is_fixable = false;
+                }
+                if expr != literal_expr {
+                    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
+                        if checker.semantic().match_typing_expr(value, "Literal")
+                            && matches!(**slice, Expr::NoneLiteral(_))
+                        {
+                            is_fixable = false;
+                        }
+                    }
+                }
+            },
+            checker.semantic(),
+            enclosing_pep604_union,
+        );
+    }
+
+    let bin_or = Expr::BinOp(
+        ExprBinOp {
+            range: TextRange::default(),
+            left: Box::new(Expr::Subscript(ast::ExprSubscript {
+                value: Box::new(ruff_python_ast::Expr::Name(ast::ExprName{
+                    range: TextRange::default(),
+                    id: Name::new("Literal"),
+                    ctx: ExprContext::Load,
+                })),
+                range: TextRange::default(),
+                ctx: ExprContext::Load,
+                slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                        elts: literal_elements.iter().copied().cloned().collect(),
+                        range: TextRange::default(),
+                        ctx: ExprContext::Load,
+                        parenthesized: true,
+                    })),
+            })),
+            op: ruff_python_ast::Operator::BitOr,
+            right: Box::new(Expr::Subscript(ast::ExprSubscript {
+                value: Box::new(ruff_python_ast::Expr::Name(ast::ExprName{
+                    range: TextRange::default(),
+                    id: Name::new("Literal"),
+                    ctx: ExprContext::Load,
+                })),
+                range: TextRange::default(),
+                ctx: ExprContext::Load,
+                slice: Box::new(Expr::NoneLiteral(
+                    ExprNoneLiteral {
+                        range: TextRange::default(),
+                    }
+                )),
+            })),
+        }
+    );
+
+    let content = checker.generator().expr(&bin_or);
+
+    is_fixable.then(|| Edit::range_replacement(content, literal_expr.range()))
 }
