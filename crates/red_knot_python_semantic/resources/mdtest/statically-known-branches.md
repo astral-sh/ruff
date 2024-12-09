@@ -231,7 +231,7 @@ reveal_type(x)  # revealed: Literal[2]
 
 ## Boolean expressions
 
-### Always true
+### Always true, `or`
 
 ```py
 (x := 1) == 1 or (x := 2)
@@ -239,12 +239,28 @@ reveal_type(x)  # revealed: Literal[2]
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Always false
+### Always true, `and`
+
+```py
+(x := 1) == 1 and (x := 2)
+
+reveal_type(x)  # revealed: Literal[2]
+```
+
+### Always false, `or`
 
 ```py
 (x := 1) == 0 or (x := 2)
 
 reveal_type(x)  # revealed: Literal[2]
+```
+
+### Always false, `and`
+
+```py
+(x := 1) == 0 and (x := 2)
+
+reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## While loops
