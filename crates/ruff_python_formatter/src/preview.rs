@@ -23,7 +23,7 @@ pub(crate) fn is_f_string_formatting_enabled(context: &PyFormatContext) -> bool 
 }
 
 /// See [#13539](https://github.com/astral-sh/ruff/pull/13539)
-/// Remove `Quoting` when stabalizing this preview style.
+/// Remove `Quoting` when stabilizing this preview style.
 pub(crate) fn is_f_string_implicit_concatenated_string_literal_quotes_enabled(
     context: &PyFormatContext,
 ) -> bool {

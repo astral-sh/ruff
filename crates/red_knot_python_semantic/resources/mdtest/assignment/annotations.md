@@ -50,7 +50,7 @@ reveal_type(b)  # revealed: tuple[int]
 reveal_type(c)  # revealed: tuple[str, int]
 reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 
-# TODO: homogenous tuples, PEP-646 tuples
+# TODO: homogeneous tuples, PEP-646 tuples
 reveal_type(e)  # revealed: @Todo(full tuple[...] support)
 reveal_type(f)  # revealed: @Todo(full tuple[...] support)
 reveal_type(g)  # revealed: @Todo(full tuple[...] support)

@@ -58,7 +58,7 @@ DOC201_numpy.py:152:5: DOC201 `return` is not documented in docstring
 154 | |     Parameters
 155 | |     ----------
 156 | |     x : int
-157 | |         An interger.
+157 | |         An integer.
 158 | |     """
     | |_______^ DOC201
 159 |       if x < 0:
@@ -76,7 +76,7 @@ DOC201_numpy.py:167:5: DOC201 `return` is not documented in docstring
 169 | |     Parameters
 170 | |     ----------
 171 | |     x : int
-172 | |         An interger.
+172 | |         An integer.
 173 | |     """
     | |_______^ DOC201
 174 |       if x < 0:

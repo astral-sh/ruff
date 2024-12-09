@@ -63,7 +63,6 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::expression_ty;
 use super::string_annotation::parse_string_annotation;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -407,11 +406,35 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Get the already-inferred type of an expression node.
     ///
-    /// PANIC if no type has been inferred for this node.
+    /// ## Panics
+    /// If the expression is not within this region, or if no type has yet been inferred for
+    /// this node.
     #[track_caller]
     fn expression_ty(&self, expr: &ast::Expr) -> Type<'db> {
         self.types
             .expression_ty(expr.scoped_expression_id(self.db, self.scope()))
+    }
+
+    /// Get the type of an expression from any scope in the same file.
+    ///
+    /// If the expression is in the current scope, and we are inferring the entire scope, just look
+    /// up the expression in our own results, otherwise call [`infer_scope_types()`] for the scope
+    /// of the expression.
+    ///
+    /// ## Panics
+    ///
+    /// If the expression is in the current scope but we haven't yet inferred a type for it.
+    ///
+    /// Can cause query cycles if the expression is from a different scope and type inference is
+    /// already in progress for that scope (further up the stack).
+    fn file_expression_ty(&self, expression: &ast::Expr) -> Type<'db> {
+        let file_scope = self.index.expression_scope_id(expression);
+        let expr_scope = file_scope.to_scope_id(self.db, self.file);
+        let expr_id = expression.scoped_expression_id(self.db, expr_scope);
+        match self.region {
+            InferenceRegion::Scope(scope) if scope == expr_scope => self.expression_ty(expression),
+            _ => infer_scope_types(self.db, expr_scope).expression_ty(expr_id),
+        }
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -1081,9 +1104,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = parameter_with_default;
         let default_ty = default
             .as_ref()
-            .map(|default| expression_ty(self.db, self.file, default));
+            .map(|default| self.file_expression_ty(default));
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let declared_ty = expression_ty(self.db, self.file, annotation);
+            let declared_ty = self.file_expression_ty(annotation);
             let inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db, declared_ty) {
                     UnionType::from_elements(self.db, [declared_ty, default_ty])
@@ -1127,7 +1150,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let _annotated_ty = expression_ty(self.db, self.file, annotation);
+            let _annotated_ty = self.file_expression_ty(annotation);
             // TODO `tuple[annotated_ty, ...]`
             let ty = KnownClass::Tuple.to_instance(self.db);
             self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
@@ -1152,7 +1175,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let _annotated_ty = expression_ty(self.db, self.file, annotation);
+            let _annotated_ty = self.file_expression_ty(annotation);
             // TODO `dict[str, annotated_ty]`
             let ty = KnownClass::Dict.to_instance(self.db);
             self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
@@ -4683,6 +4706,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("type[...] must have exactly one type argument"),
                 );
                 Type::Unknown
+            }
+            ast::Expr::Subscript(ast::ExprSubscript {
+                value,
+                slice: parameters,
+                ..
+            }) => {
+                let parameters_ty = match self.infer_expression(value) {
+                    Type::KnownInstance(KnownInstanceType::Union) => match &**parameters {
+                        ast::Expr::Tuple(tuple) => {
+                            let ty = UnionType::from_elements(
+                                self.db,
+                                tuple
+                                    .iter()
+                                    .map(|element| self.infer_subclass_of_type_expression(element)),
+                            );
+                            self.store_expression_type(parameters, ty);
+                            ty
+                        }
+                        _ => self.infer_subclass_of_type_expression(parameters),
+                    },
+                    _ => {
+                        self.infer_type_expression(parameters);
+                        todo_type!("unsupported nested subscript in type[X]")
+                    }
+                };
+                self.store_expression_type(slice, parameters_ty);
+                parameters_ty
             }
             // TODO: subscripts, etc.
             _ => {

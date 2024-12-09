@@ -60,7 +60,18 @@ pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, call: &ast::ExprCall
         return;
     }
 
-    if call.arguments.find_keyword("stacklevel").is_some() {
+    if call.arguments.find_argument("stacklevel", 2).is_some()
+        || call
+            .arguments
+            .args
+            .iter()
+            .any(ruff_python_ast::Expr::is_starred_expr)
+        || call
+            .arguments
+            .keywords
+            .iter()
+            .any(|keyword| keyword.arg.is_none())
+    {
         return;
     }
     let mut diagnostic = Diagnostic::new(NoExplicitStacklevel, call.func.range());

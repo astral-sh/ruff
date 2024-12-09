@@ -22,7 +22,7 @@ reveal_type(sys.version_info[:2] == (3, 10))  # revealed: Literal[True]
 
 ### Grandchild
 
-The same should work for arbitrarly nested sections:
+The same should work for arbitrarily nested sections:
 
 ```py
 reveal_type(sys.version_info[:2] == (3, 10))  # revealed: Literal[True]
