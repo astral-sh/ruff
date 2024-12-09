@@ -282,7 +282,7 @@ impl<'a> Checker<'a> {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
-        // unused members on a single import. We need to pre-emptively omit any
+        // unused members on a single import. We need to preemptively omit any
         // members from the fix that will eventually be excluded by a `noqa`.
         // Unfortunately, we _do_ want to register a `Diagnostic` for each
         // eventually-ignored import, so that our `noqa` counts are accurate.
