@@ -33,7 +33,7 @@ def _(flag: bool):
 ```py
 if True or (x := 1):
     # error: [unresolved-reference]
-    reveal_type(x)  # revealed: Never
+    reveal_type(x)  # revealed: Unknown
 
 if True and (x := 1):
     reveal_type(x)  # revealed: Literal[1]
