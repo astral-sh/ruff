@@ -190,6 +190,8 @@ reveal_type(x)  # revealed: Literal[3, 4]
 
 ### Combination with non-conditional control flow
 
+#### `try` ... `except`
+
 ```py path=try_if_true.py
 def may_raise() -> None: ...
 
@@ -222,6 +224,68 @@ else:
     x = 4
 
 reveal_type(x)  # revealed: Literal[2, 3]
+```
+
+#### `for` loops
+
+```py path=for_if_true.py
+def iterable() -> list[()]: ...
+
+x = 1
+
+for _ in iterable():
+    if True:
+        x = 2
+    else:
+        x = 3
+
+reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+```py path=for_else_if_true.py
+def iterable() -> list[()]: ...
+
+x = 1
+
+for _ in iterable():
+    x = 2
+else:
+    if True:
+        x = 3
+    else:
+        x = 4
+
+reveal_type(x)  # revealed: Literal[3]
+```
+
+```py path=if_true_for.py
+def iterable() -> list[()]: ...
+
+x = 1
+
+if True:
+    for _ in iterable():
+        x = 2
+else:
+    x = 3
+
+reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+```py path=if_true_for_else.py
+def iterable() -> list[()]: ...
+
+x = 1
+
+if True:
+    for _ in iterable():
+        x = 2
+    else:
+        x = 3
+else:
+    x = 4
+
+reveal_type(x)  # revealed: Literal[3]
 ```
 
 ## If expressions

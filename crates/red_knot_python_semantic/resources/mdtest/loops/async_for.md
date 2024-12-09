@@ -19,6 +19,7 @@ async def foo():
 
     # TODO: should reveal `Unknown` because `__aiter__` is not defined
     # revealed: @Todo(async iterables/iterators)
+    # error: [possibly-unresolved-reference]
     reveal_type(x)
 ```
 
@@ -38,6 +39,7 @@ async def foo():
     async for x in IntAsyncIterable():
         pass
 
+    # error: [possibly-unresolved-reference]
     # revealed: @Todo(async iterables/iterators)
     reveal_type(x)
 ```
