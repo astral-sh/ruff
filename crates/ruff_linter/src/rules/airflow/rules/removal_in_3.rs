@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
@@ -43,6 +43,8 @@ pub(crate) struct Airflow3Removal {
 }
 
 impl Violation for Airflow3Removal {
+    const FIX_AVAILABILITY : FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Airflow3Removal {
@@ -59,6 +61,10 @@ impl Violation for Airflow3Removal {
             }
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        return Some("Replace deprecated keywords in Airflow 3.0".to_string());
+    }
 }
 
 fn diagnostic_for_argument(
@@ -67,7 +73,7 @@ fn diagnostic_for_argument(
     replacement: Option<&str>,
 ) -> Option<Diagnostic> {
     let keyword = arguments.find_keyword(deprecated)?;
-    Some(Diagnostic::new(
+    let mut diagnostic = Some(Diagnostic::new(
         Airflow3Removal {
             deprecated: (*deprecated).to_string(),
             replacement: match replacement {
@@ -79,7 +85,16 @@ fn diagnostic_for_argument(
             .arg
             .as_ref()
             .map_or_else(|| keyword.range(), Ranged::range),
-    ))
+    ));
+
+    match diagnostic {
+	Some(ref mut diagnostic) => {
+	    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(replacement?.to_string(), diagnostic.range)))
+	}
+	None => {}
+    }
+
+    return diagnostic
 }
 
 fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {

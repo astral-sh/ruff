@@ -11,6 +11,7 @@ AIR302_names.py:52:1: AIR302 `airflow.PY36` is removed in Airflow 3.0; use `sys.
 53 | 
 54 | AWSAthenaHook
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:52:7: AIR302 `airflow.PY37` is removed in Airflow 3.0; use `sys.version_info` instead
    |
@@ -21,6 +22,7 @@ AIR302_names.py:52:7: AIR302 `airflow.PY37` is removed in Airflow 3.0; use `sys.
 53 | 
 54 | AWSAthenaHook
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:52:13: AIR302 `airflow.PY38` is removed in Airflow 3.0; use `sys.version_info` instead
    |
@@ -31,6 +33,7 @@ AIR302_names.py:52:13: AIR302 `airflow.PY38` is removed in Airflow 3.0; use `sys
 53 | 
 54 | AWSAthenaHook
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:52:19: AIR302 `airflow.PY39` is removed in Airflow 3.0; use `sys.version_info` instead
    |
@@ -41,6 +44,7 @@ AIR302_names.py:52:19: AIR302 `airflow.PY39` is removed in Airflow 3.0; use `sys
 53 | 
 54 | AWSAthenaHook
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:52:25: AIR302 `airflow.PY310` is removed in Airflow 3.0; use `sys.version_info` instead
    |
@@ -51,6 +55,7 @@ AIR302_names.py:52:25: AIR302 `airflow.PY310` is removed in Airflow 3.0; use `sy
 53 | 
 54 | AWSAthenaHook
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:52:32: AIR302 `airflow.PY311` is removed in Airflow 3.0; use `sys.version_info` instead
    |
@@ -61,6 +66,7 @@ AIR302_names.py:52:32: AIR302 `airflow.PY311` is removed in Airflow 3.0; use `sy
 53 | 
 54 | AWSAthenaHook
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:52:39: AIR302 `airflow.PY312` is removed in Airflow 3.0; use `sys.version_info` instead
    |
@@ -71,6 +77,7 @@ AIR302_names.py:52:39: AIR302 `airflow.PY312` is removed in Airflow 3.0; use `sy
 53 | 
 54 | AWSAthenaHook
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:54:1: AIR302 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0
    |
@@ -80,6 +87,7 @@ AIR302_names.py:54:1: AIR302 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is 
    | ^^^^^^^^^^^^^ AIR302
 55 | TaskStateTrigger
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:55:1: AIR302 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
    |
@@ -89,6 +97,7 @@ AIR302_names.py:55:1: AIR302 `airflow.triggers.external_task.TaskStateTrigger` i
 56 | 
 57 | requires_access
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:57:1: AIR302 `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0; use `airflow.api_connexion.security.requires_access_*` instead
    |
@@ -99,6 +108,7 @@ AIR302_names.py:57:1: AIR302 `airflow.api_connexion.security.requires_access` is
 58 | 
 59 | AllowListValidator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:59:1: AIR302 `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0; use `airflow.metrics.validators.PatternAllowListValidator` instead
    |
@@ -108,6 +118,7 @@ AIR302_names.py:59:1: AIR302 `airflow.metrics.validators.AllowListValidator` is 
    | ^^^^^^^^^^^^^^^^^^ AIR302
 60 | BlockListValidator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:60:1: AIR302 `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0; use `airflow.metrics.validators.PatternBlockListValidator` instead
    |
@@ -117,6 +128,7 @@ AIR302_names.py:60:1: AIR302 `airflow.metrics.validators.BlockListValidator` is 
 61 | 
 62 | SubDagOperator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:62:1: AIR302 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0
    |
@@ -127,6 +139,7 @@ AIR302_names.py:62:1: AIR302 `airflow.operators.subdag.SubDagOperator` is remove
 63 | 
 64 | dates.date_range
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:64:7: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0; use `airflow.timetables.` instead
    |
@@ -136,6 +149,7 @@ AIR302_names.py:64:7: AIR302 `airflow.utils.dates.date_range` is removed in Airf
    |       ^^^^^^^^^^ AIR302
 65 | dates.days_ago
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:65:7: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0; use `pendulum.today('UTC').add(days=-N, ...)` instead
    |
@@ -145,6 +159,7 @@ AIR302_names.py:65:7: AIR302 `airflow.utils.dates.days_ago` is removed in Airflo
 66 | 
 67 | date_range
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:67:1: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0; use `airflow.timetables.` instead
    |
@@ -155,6 +170,7 @@ AIR302_names.py:67:1: AIR302 `airflow.utils.dates.date_range` is removed in Airf
 68 | days_ago
 69 | parse_execution_date
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:68:1: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0; use `pendulum.today('UTC').add(days=-N, ...)` instead
    |
@@ -164,6 +180,7 @@ AIR302_names.py:68:1: AIR302 `airflow.utils.dates.days_ago` is removed in Airflo
 69 | parse_execution_date
 70 | round_time
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:69:1: AIR302 `airflow.utils.dates.parse_execution_date` is removed in Airflow 3.0
    |
@@ -174,6 +191,7 @@ AIR302_names.py:69:1: AIR302 `airflow.utils.dates.parse_execution_date` is remov
 70 | round_time
 71 | scale_time_units
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:70:1: AIR302 `airflow.utils.dates.round_time` is removed in Airflow 3.0
    |
@@ -184,6 +202,7 @@ AIR302_names.py:70:1: AIR302 `airflow.utils.dates.round_time` is removed in Airf
 71 | scale_time_units
 72 | infer_time_unit
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:71:1: AIR302 `airflow.utils.dates.scale_time_units` is removed in Airflow 3.0
    |
@@ -193,6 +212,7 @@ AIR302_names.py:71:1: AIR302 `airflow.utils.dates.scale_time_units` is removed i
    | ^^^^^^^^^^^^^^^^ AIR302
 72 | infer_time_unit
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:72:1: AIR302 `airflow.utils.dates.infer_time_unit` is removed in Airflow 3.0
    |
@@ -201,6 +221,7 @@ AIR302_names.py:72:1: AIR302 `airflow.utils.dates.infer_time_unit` is removed in
 72 | infer_time_unit
    | ^^^^^^^^^^^^^^^ AIR302
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:79:1: AIR302 `airflow.configuration.get` is removed in Airflow 3.0; use `airflow.configuration.conf.get` instead
    |
@@ -211,6 +232,7 @@ AIR302_names.py:79:1: AIR302 `airflow.configuration.get` is removed in Airflow 3
 80 | 
 81 | get_connection, load_connections
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:79:6: AIR302 `airflow.configuration.getboolean` is removed in Airflow 3.0; use `airflow.configuration.conf.getboolean` instead
    |
@@ -221,6 +243,7 @@ AIR302_names.py:79:6: AIR302 `airflow.configuration.getboolean` is removed in Ai
 80 | 
 81 | get_connection, load_connections
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:79:18: AIR302 `airflow.configuration.getfloat` is removed in Airflow 3.0; use `airflow.configuration.conf.getfloat` instead
    |
@@ -231,6 +254,7 @@ AIR302_names.py:79:18: AIR302 `airflow.configuration.getfloat` is removed in Air
 80 | 
 81 | get_connection, load_connections
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:79:28: AIR302 `airflow.configuration.getint` is removed in Airflow 3.0; use `airflow.configuration.conf.getint` instead
    |
@@ -241,6 +265,7 @@ AIR302_names.py:79:28: AIR302 `airflow.configuration.getint` is removed in Airfl
 80 | 
 81 | get_connection, load_connections
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:79:36: AIR302 `airflow.configuration.has_option` is removed in Airflow 3.0; use `airflow.configuration.conf.has_option` instead
    |
@@ -251,6 +276,7 @@ AIR302_names.py:79:36: AIR302 `airflow.configuration.has_option` is removed in A
 80 | 
 81 | get_connection, load_connections
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:79:48: AIR302 `airflow.configuration.remove_option` is removed in Airflow 3.0; use `airflow.configuration.conf.remove_option` instead
    |
@@ -261,6 +287,7 @@ AIR302_names.py:79:48: AIR302 `airflow.configuration.remove_option` is removed i
 80 | 
 81 | get_connection, load_connections
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:79:63: AIR302 `airflow.configuration.as_dict` is removed in Airflow 3.0; use `airflow.configuration.conf.as_dict` instead
    |
@@ -271,6 +298,7 @@ AIR302_names.py:79:63: AIR302 `airflow.configuration.as_dict` is removed in Airf
 80 | 
 81 | get_connection, load_connections
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:79:72: AIR302 `airflow.configuration.set` is removed in Airflow 3.0; use `airflow.configuration.conf.set` instead
    |
@@ -281,6 +309,7 @@ AIR302_names.py:79:72: AIR302 `airflow.configuration.set` is removed in Airflow 
 80 | 
 81 | get_connection, load_connections
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:81:1: AIR302 `airflow.secrets.local_filesystem.get_connection` is removed in Airflow 3.0; use `airflow.secrets.local_filesystem.load_connections_dict` instead
    |
@@ -289,6 +318,7 @@ AIR302_names.py:81:1: AIR302 `airflow.secrets.local_filesystem.get_connection` i
 81 | get_connection, load_connections
    | ^^^^^^^^^^^^^^ AIR302
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:81:17: AIR302 `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0; use `airflow.secrets.local_filesystem.load_connections_dict` instead
    |
@@ -297,6 +327,7 @@ AIR302_names.py:81:17: AIR302 `airflow.secrets.local_filesystem.load_connections
 81 | get_connection, load_connections
    |                 ^^^^^^^^^^^^^^^^ AIR302
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:84:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is removed in Airflow 3.0; use `airflow.sensors.external_task.ExternalTaskSensorLink` instead
    |
@@ -305,6 +336,7 @@ AIR302_names.py:84:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskS
 85 | BashOperator
 86 | BaseBranchOperator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:85:1: AIR302 `airflow.operators.bash_operator.BashOperator` is removed in Airflow 3.0; use `airflow.operators.bash.BashOperator` instead
    |
@@ -314,6 +346,7 @@ AIR302_names.py:85:1: AIR302 `airflow.operators.bash_operator.BashOperator` is r
 86 | BaseBranchOperator
 87 | EmptyOperator, DummyOperator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:86:1: AIR302 `airflow.operators.branch_operator.BaseBranchOperator` is removed in Airflow 3.0; use `airflow.operators.branch.BaseBranchOperator` instead
    |
@@ -324,6 +357,7 @@ AIR302_names.py:86:1: AIR302 `airflow.operators.branch_operator.BaseBranchOperat
 87 | EmptyOperator, DummyOperator
 88 | dummy_operator.EmptyOperator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:87:16: AIR302 `airflow.operators.dummy.DummyOperator` is removed in Airflow 3.0; use `airflow.operators.empty.EmptyOperator` instead
    |
@@ -334,6 +368,7 @@ AIR302_names.py:87:16: AIR302 `airflow.operators.dummy.DummyOperator` is removed
 88 | dummy_operator.EmptyOperator
 89 | dummy_operator.DummyOperator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:88:16: AIR302 `airflow.operators.dummy_operator.EmptyOperator` is removed in Airflow 3.0; use `airflow.operators.empty.EmptyOperator` instead
    |
@@ -344,6 +379,7 @@ AIR302_names.py:88:16: AIR302 `airflow.operators.dummy_operator.EmptyOperator` i
 89 | dummy_operator.DummyOperator
 90 | EmailOperator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:89:16: AIR302 `airflow.operators.dummy_operator.DummyOperator` is removed in Airflow 3.0; use `airflow.operators.empty.EmptyOperator` instead
    |
@@ -354,6 +390,7 @@ AIR302_names.py:89:16: AIR302 `airflow.operators.dummy_operator.DummyOperator` i
 90 | EmailOperator
 91 | BaseSensorOperator
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:90:1: AIR302 `airflow.operators.email_operator.EmailOperator` is removed in Airflow 3.0; use `airflow.operators.email.EmailOperator` instead
    |
@@ -364,6 +401,7 @@ AIR302_names.py:90:1: AIR302 `airflow.operators.email_operator.EmailOperator` is
 91 | BaseSensorOperator
 92 | DateTimeSensor
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:91:1: AIR302 `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0; use `airflow.sensors.base.BaseSensorOperator` instead
    |
@@ -374,6 +412,7 @@ AIR302_names.py:91:1: AIR302 `airflow.sensors.base_sensor_operator.BaseSensorOpe
 92 | DateTimeSensor
 93 | (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:92:1: AIR302 `airflow.sensors.date_time_sensor.DateTimeSensor` is removed in Airflow 3.0; use `airflow.sensors.date_time.DateTimeSensor` instead
    |
@@ -384,6 +423,7 @@ AIR302_names.py:92:1: AIR302 `airflow.sensors.date_time_sensor.DateTimeSensor` i
 93 | (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
 94 | TimeDeltaSensor
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:93:2: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskMarker` is removed in Airflow 3.0; use `airflow.sensors.external_task.ExternalTaskMarker` instead
    |
@@ -393,6 +433,7 @@ AIR302_names.py:93:2: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskM
    |  ^^^^^^^^^^^^^^^^^^ AIR302
 94 | TimeDeltaSensor
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:93:22: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensor` is removed in Airflow 3.0; use `airflow.sensors.external_task.ExternalTaskSensor` instead
    |
@@ -402,6 +443,7 @@ AIR302_names.py:93:22: AIR302 `airflow.sensors.external_task_sensor.ExternalTask
    |                      ^^^^^^^^^^^^^^^^^^ AIR302
 94 | TimeDeltaSensor
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:93:42: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is removed in Airflow 3.0; use `airflow.sensors.external_task.ExternalTaskSensorLink` instead
    |
@@ -411,6 +453,7 @@ AIR302_names.py:93:42: AIR302 `airflow.sensors.external_task_sensor.ExternalTask
    |                                          ^^^^^^^^^^^^^^^^^^^^^^ AIR302
 94 | TimeDeltaSensor
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:94:1: AIR302 `airflow.sensors.time_delta_sensor.TimeDeltaSensor` is removed in Airflow 3.0; use `airflow.sensors.time_delta.TimeDeltaSensor` instead
    |
@@ -421,6 +464,7 @@ AIR302_names.py:94:1: AIR302 `airflow.sensors.time_delta_sensor.TimeDeltaSensor`
 95 | 
 96 | apply_defaults
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:96:1: AIR302 `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0; `apply_defaults` is now unconditionally done and can be safely removed.
    |
@@ -431,6 +475,7 @@ AIR302_names.py:96:1: AIR302 `airflow.utils.decorators.apply_defaults` is remove
 97 | 
 98 | TemporaryDirectory
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:98:1: AIR302 `airflow.utils.file.TemporaryDirectory` is removed in Airflow 3.0
    |
@@ -440,6 +485,7 @@ AIR302_names.py:98:1: AIR302 `airflow.utils.file.TemporaryDirectory` is removed 
    | ^^^^^^^^^^^^^^^^^^ AIR302
 99 | mkdirs
    |
+   = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:99:1: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 3.0; use `pendulum.today('UTC').add(days=-N, ...)` instead
     |
@@ -449,6 +495,7 @@ AIR302_names.py:99:1: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 3
 100 | 
 101 | chain
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:101:1: AIR302 `airflow.utils.helpers.chain` is removed in Airflow 3.0; use `airflow.models.baseoperator.chain` instead
     |
@@ -458,6 +505,7 @@ AIR302_names.py:101:1: AIR302 `airflow.utils.helpers.chain` is removed in Airflo
     | ^^^^^ AIR302
 102 | cross_downstream
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:102:1: AIR302 `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0; use `airflow.models.baseoperator.cross_downstream` instead
     |
@@ -467,6 +515,7 @@ AIR302_names.py:102:1: AIR302 `airflow.utils.helpers.cross_downstream` is remove
 103 | 
 104 | SHUTDOWN
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:104:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
     |
@@ -476,6 +525,7 @@ AIR302_names.py:104:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airfl
     | ^^^^^^^^ AIR302
 105 | terminating_states
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:105:1: AIR302 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
     |
@@ -485,6 +535,7 @@ AIR302_names.py:105:1: AIR302 `airflow.utils.state.terminating_states` is remove
 106 | 
 107 | TriggerRule.DUMMY
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:107:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
     |
@@ -494,6 +545,7 @@ AIR302_names.py:107:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is
     |             ^^^^^ AIR302
 108 | TriggerRule.NONE_FAILED_OR_SKIPPED
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:108:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
     |
@@ -503,6 +555,7 @@ AIR302_names.py:108:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.NONE_FAIL
 109 | 
 110 | test_cycle
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:110:1: AIR302 `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
     |
@@ -513,6 +566,7 @@ AIR302_names.py:110:1: AIR302 `airflow.utils.dag_cycle_tester.test_cycle` is rem
 111 | 
 112 | has_access
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:112:1: AIR302 `airflow.www.auth.has_access` is removed in Airflow 3.0; use `airflow.www.auth.has_access_*` instead
     |
@@ -522,6 +576,7 @@ AIR302_names.py:112:1: AIR302 `airflow.www.auth.has_access` is removed in Airflo
     | ^^^^^^^^^^ AIR302
 113 | get_sensitive_variables_fields, should_hide_value_for_key
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:113:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0; use `airflow.utils.log.secrets_masker.get_sensitive_variables_fields` instead
     |
@@ -529,6 +584,7 @@ AIR302_names.py:113:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields`
 113 | get_sensitive_variables_fields, should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
     |
+    = help: Replace deprecated keywords in Airflow 3.0
 
 AIR302_names.py:113:33: AIR302 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0; use `airflow.utils.log.secrets_masker.should_hide_value_for_key` instead
     |
@@ -536,3 +592,4 @@ AIR302_names.py:113:33: AIR302 `airflow.www.utils.should_hide_value_for_key` is 
 113 | get_sensitive_variables_fields, should_hide_value_for_key
     |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
     |
+    = help: Replace deprecated keywords in Airflow 3.0
