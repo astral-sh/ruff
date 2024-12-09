@@ -173,10 +173,10 @@ fn replace_with_round(
         None => Ndigits::NotGiven,
         Some(Expr::NoneLiteral(_)) => Ndigits::LiteralNone,
 
-        Some(Expr::NumberLiteral(ExprNumberLiteral { value, .. })) => match value {
-            Number::Int(..) => Ndigits::LiteralInt,
-            _ => Ndigits::Other,
-        },
+        Some(Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(..),
+            ..
+        })) => Ndigits::LiteralInt,
 
         _ => Ndigits::Other,
     };
