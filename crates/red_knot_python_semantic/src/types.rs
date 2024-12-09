@@ -303,7 +303,7 @@ fn bindings_ty<'db>(
     // TODO: get rid of all the collects and clean up, obviously
     let def_types: Vec<_> = def_types.collect();
 
-    if !def_types.is_empty() && def_types.iter().all(|(ty, _)| *ty == None) {
+    if !def_types.is_empty() && def_types.iter().all(|(ty, _)| ty.is_none()) {
         return Some(Type::Unknown);
     }
 

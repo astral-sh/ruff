@@ -337,7 +337,7 @@ impl<'db> UseDefMap<'db> {
         db: &dyn crate::db::Db,
         symbol: ScopedSymbolId,
     ) -> Option<Boundness> {
-        self.compute_boundness(db, &self.public_symbols[symbol].bindings())
+        self.compute_boundness(db, self.public_symbols[symbol].bindings())
     }
 
     pub(crate) fn bindings_at_declaration(
