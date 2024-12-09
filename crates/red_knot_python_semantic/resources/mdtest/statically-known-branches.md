@@ -54,6 +54,21 @@ else:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
+### Ambiguous
+
+Just for comparison, we still infer the combined type if the condition is not statically known:
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    x = 2
+
+reveal_type(x)  # revealed: Literal[1, 2]
+```
+
 ### Combination of always true and always false
 
 ```py
@@ -290,6 +305,8 @@ reveal_type(x)  # revealed: Literal[2]
 
 ### Ambiguous
 
+Make sure that we still infer the combined type if the condition is not statically known:
+
 ```py
 def flag() -> bool: ...
 
@@ -297,12 +314,34 @@ x = 1
 
 while flag():
     x = 2
-    break
 
 reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
+### `while` ... `else`
+
+```py path=while_false.py
+while False:
+    x = 1
+else:
+    x = 2
+
+reveal_type(x)  # revealed: Literal[2]
+```
+
+```py path=while_true.py
+while True:
+    x = 1
+    break
+else:
+    x = 2
+
+reveal_type(x)  # revealed: Literal[1]
+```
+
 ## Conditional declarations
+
+### Always false
 
 ```py path=if_false.py
 x: str
@@ -326,6 +365,8 @@ def f() -> None:
     reveal_type(x)  # revealed: str
 ```
 
+### Always true
+
 ```py path=if_true.py
 x: str
 
@@ -348,6 +389,8 @@ def f() -> None:
     reveal_type(x)  # revealed: int
 ```
 
+### Ambiguous
+
 ```py path=if_bool.py
 def flag() -> bool: ...
 
@@ -360,7 +403,7 @@ def f() -> None:
     reveal_type(x)  # revealed: str | int
 ```
 
-## Conditionally defined functions
+## Conditional function definitions
 
 ```py
 def f() -> int: ...
@@ -376,7 +419,21 @@ reveal_type(f())  # revealed: str
 reveal_type(g())  # revealed: int
 ```
 
-## Conditionally defined class attributes
+## Conditional class definitions
+
+```py
+if True:
+    class C:
+        x: int = 1
+
+else:
+    class C:
+        x: str = "a"
+
+reveal_type(C.x)  # revealed: int
+```
+
+## Conditional class attributes
 
 ```py
 class C:
@@ -434,54 +491,78 @@ else:
 x
 ```
 
-### Nested
+### Ambiguous, possibly unbound
+
+For comparison, we still definitions inside non-statically known branches as possibly unbound:
 
 ```py
-if False:
-    if True:
-        x = 1
+def flag() -> bool: ...
 
-if True:
-    if False:
-        y = 1
+if flag():
+    x = 1
 
-if False:
-    if False:
-        z = 1
-
-# error: [unresolved-reference]
-# error: [unresolved-reference]
-# error: [unresolved-reference]
-(x, y, z)
+# error: [possibly-unresolved-reference]
+x
 ```
 
-### Multiple nested conditions
+### Nested conditionals
 
 ```py
+def flag() -> bool: ...
+
+if False:
+    if True:
+        unbound1 = 1
+
 if True:
     if False:
-        x = 1
-    if True:
-        x = 2
+        unbound2 = 1
+
+if False:
+    if False:
+        unbound3 = 1
+
+if False:
+    if flag():
+        unbound4 = 1
+
+if flag():
+    if False:
+        unbound5 = 1
+
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+(unbound1, unbound2, unbound3, unbound4, unbound5)
+```
+
+### Chained conditionals
+
+```py
+if False:
+    x = 1
+if True:
+    x = 2
 
 # x is always bound, no error
 x
 
+if False:
+    y = 1
 if True:
-    if False:
-        y = 1
-    if True:
-        y = 2
+    y = 2
 
 # y is always bound, no error
 y
 
 if False:
-    if False:
-        z = 1
-    if False:
-        z = 2
+    z = 1
+if False:
+    z = 2
 
+# z is never bound:
 # error: [unresolved-reference]
 z
 ```
@@ -495,4 +576,44 @@ if True:
 def f():
     # x is always bound, no error
     x
+```
+
+### Imports of conditionally defined symbols
+
+#### Always false, unbound
+
+```py path=module.py
+if False:
+    symbol = 1
+```
+
+```py
+# error: [unresolved-import]
+from module import symbol
+```
+
+#### Always true, bound
+
+```py path=module.py
+if True:
+    symbol = 1
+```
+
+```py
+# no error
+from module import symbol
+```
+
+#### Ambiguous, possibly unbound
+
+```py path=module.py
+def flag() -> bool: ...
+
+if flag():
+    symbol = 1
+```
+
+```py
+# error: [possibly-unbound-import]
+from module import symbol
 ```
