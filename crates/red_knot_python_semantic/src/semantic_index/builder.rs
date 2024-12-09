@@ -845,6 +845,8 @@ where
                 let pre_loop_constraints = self.constraints_snapshot();
                 let constraint = self.record_expression_constraint(test);
 
+                self.record_expression_constraint(test);
+
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
 

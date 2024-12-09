@@ -485,6 +485,7 @@ impl SymbolState {
     }
 
     /// Could the symbol be unbound?
+    #[cfg(test)]
     pub(super) fn may_be_unbound(&self) -> bool {
         self.bindings.may_be_unbound()
     }
