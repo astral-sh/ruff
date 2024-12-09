@@ -53,9 +53,9 @@ jobs:
           args: --out dist
       - name: "Test sdist"
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
-          ${{ env.MODULE_NAME }} --help
-          python -m ${{ env.MODULE_NAME }} --help
+          pip install dist/${PACKAGE_NAME}-*.tar.gz --force-reinstall
+          "${MODULE_NAME}" --help
+          python -m "${MODULE_NAME}" --help
       - name: "Upload sdist"
         uses: actions/upload-artifact@v4
         with:
@@ -125,7 +125,7 @@ jobs:
           args: --release --locked --out dist
       - name: "Test wheel - aarch64"
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          pip install dist/${PACKAGE_NAME}-*.whl --force-reinstall
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
@@ -186,9 +186,9 @@ jobs:
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
         run: |
-          python -m pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ${{ env.MODULE_NAME }} --help
-          python -m ${{ env.MODULE_NAME }} --help
+          python -m pip install dist/${PACKAGE_NAME}-*.whl --force-reinstall
+          "${MODULE_NAME}" --help
+          python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -236,9 +236,9 @@ jobs:
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ${{ env.MODULE_NAME }} --help
-          python -m ${{ env.MODULE_NAME }} --help
+          pip install dist/${PACKAGE_NAME}-*.whl --force-reinstall
+          "${MODULE_NAME}" --help
+          python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
