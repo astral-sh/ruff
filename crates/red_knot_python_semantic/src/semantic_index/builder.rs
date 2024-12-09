@@ -857,7 +857,7 @@ where
                 let pre_loop = self.flow_snapshot();
                 let pre_loop_constraints = self.branching_conditions_snapshot();
 
-                self.record_expression_constraint(test);
+                let constraint = self.record_expression_constraint(test);
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -877,6 +877,7 @@ where
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop, pre_loop_constraints.clone());
+                self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
