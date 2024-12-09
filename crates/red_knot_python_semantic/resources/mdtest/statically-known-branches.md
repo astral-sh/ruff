@@ -1,8 +1,10 @@
 # Statically-known branches
 
-## Always false
+## If statements
 
-### If
+### Always false
+
+#### If
 
 ```py
 x = 1
@@ -13,7 +15,7 @@ if False:
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Else
+#### Else
 
 ```py
 x = 1
@@ -26,9 +28,9 @@ else:
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-## Always true
+### Always true
 
-### If
+#### If
 
 ```py
 x = 1
@@ -39,7 +41,7 @@ if True:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-### Else
+#### Else
 
 ```py
 x = 1
@@ -52,7 +54,7 @@ else:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-## Combination
+### Combination of always true and always false
 
 ```py
 x = 1
@@ -65,7 +67,7 @@ else:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-## Nested
+### Nested conditionals
 
 ```py path=nested_if_true_if_true.py
 x = 1
@@ -171,7 +173,9 @@ else:
 reveal_type(x)  # revealed: Literal[3, 4]
 ```
 
-## If-expressions
+## If expressions
+
+See also: tests in [expression/if.md](expression/if.md).
 
 ### Always true
 
@@ -205,6 +209,45 @@ reveal_type(x)  # revealed: Literal[1]
 (x := 1) == 0 or (x := 2)
 
 reveal_type(x)  # revealed: Literal[2]
+```
+
+## While loops
+
+### Always false
+
+```py
+x = 1
+
+while False:
+    x = 2
+
+reveal_type(x)  # revealed: Literal[1]
+```
+
+### Always true
+
+```py
+x = 1
+
+while True:
+    x = 2
+    break
+
+reveal_type(x)  # revealed: Literal[2]
+```
+
+### Ambiguous
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+while flag():
+    x = 2
+    break
+
+reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
 ## Conditional declarations
