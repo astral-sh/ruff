@@ -289,6 +289,18 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         );
     }
 
+    pub(super) fn add_invalid_exception(&mut self, db: &dyn Db, node: &ast::Expr, ty: Type) {
+        self.add(
+            node.into(),
+            "invalid-exception",
+            format_args!(
+                "Cannot catch object of type `{}` in an exception handler \
+                (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
+                ty.display(db)
+            ),
+        );
+    }
+
     /// Adds a new diagnostic.
     ///
     /// The diagnostic does not get added if the rule isn't enabled for this file.
