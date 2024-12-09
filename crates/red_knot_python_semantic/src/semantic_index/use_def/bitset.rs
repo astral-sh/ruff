@@ -120,6 +120,15 @@ impl<const B: usize> BitSet<B> {
             current_block: blocks[0],
         }
     }
+
+    pub(super) fn iter_rev(&self) -> ReverseBitSetIterator<'_, B> {
+        let blocks = self.blocks();
+        ReverseBitSetIterator {
+            blocks,
+            current_block_index: self.blocks().len() - 1,
+            current_block: blocks[self.blocks().len() - 1],
+        }
+    }
 }
 
 /// Iterator over values in a [`BitSet`].
@@ -159,10 +168,44 @@ impl<const B: usize> Iterator for BitSetIterator<'_, B> {
 
 impl<const B: usize> std::iter::FusedIterator for BitSetIterator<'_, B> {}
 
+/// Iterator over values in a [`BitSet`].
+#[derive(Debug, Clone)]
+pub(super) struct ReverseBitSetIterator<'a, const B: usize> {
+    /// The blocks we are iterating over.
+    blocks: &'a [u64],
+
+    /// The index of the block we are currently iterating through.
+    current_block_index: usize,
+
+    /// The block we are currently iterating through (and zeroing as we go.)
+    current_block: u64,
+}
+
+impl<const B: usize> Iterator for ReverseBitSetIterator<'_, B> {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.current_block == 0 {
+            if self.current_block_index == 0 {
+                return None;
+            }
+            self.current_block_index -= 1;
+            self.current_block = self.blocks[self.current_block_index];
+        }
+
+        let highest_bit_set = 63 - self.current_block.leading_zeros() as u64;
+        // TODO: efficiency, safety comment, etc.
+        self.current_block &= !(1u64 << highest_bit_set);
+        #[allow(clippy::cast_possible_truncation)]
+        Some(highest_bit_set as u32 + (64 * self.current_block_index) as u32)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::BitSet;
 
+    #[track_caller]
     fn assert_bitset<const B: usize>(bitset: &BitSet<B>, contents: &[u32]) {
         assert_eq!(bitset.iter().collect::<Vec<_>>(), contents);
     }
