@@ -120,8 +120,8 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```shell
 # With uv.
-uv tool install ruff  # Global
-uv add --dev ruff  # Project
+uv add --dev ruff     # to add ruff to your project
+uv tool install ruff  # to install ruff globally
 
 # With pip.
 pip install ruff

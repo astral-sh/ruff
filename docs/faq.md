@@ -223,8 +223,11 @@ Ruff is installable under any Python version from 3.7 onwards.
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
 ```console
-$ uv tool install ruff  # Global
-$ uv add --dev ruff  # Project
+# With uv.
+$ uv add --dev ruff     # to add ruff to your project
+$ uv tool install ruff  # to install ruff globally
+
+# With pip
 $ pip install ruff
 ```
 
