@@ -55,6 +55,10 @@ pub(super) struct ScopedDefinitionId;
 #[newtype_index]
 pub(super) struct ScopedConstraintId;
 
+/// A newtype-index for a branching condition in a particular scope.
+#[newtype_index]
+pub(super) struct ScopedBranchingConditionId;
+
 /// Can reference this * 64 total definitions inline; more will fall back to the heap.
 const INLINE_BINDING_BLOCKS: usize = 3;
 
@@ -83,6 +87,9 @@ type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
 
 const INLINE_BRANCHING_CONDITIONS: usize = 2;
 pub(super) type BranchingConditions = BitSet<INLINE_BRANCHING_CONDITIONS>;
+type BranchingConditionsPerBinding = SmallVec<[BranchingConditions; INLINE_BINDINGS_PER_SYMBOL]>;
+
+type BranchingConditionsIterator<'a> = std::slice::Iter<'a, BitSet<INLINE_CONSTRAINT_BLOCKS>>;
 
 /// Live declarations for a single symbol at some point in control flow.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -156,8 +163,8 @@ pub(super) struct SymbolBindings {
     /// binding in `live_bindings`.
     constraints: Constraints,
 
-    /// For each live binding, which [`BranchingCondition`]s were active *at the time of the binding*?
-    pub(crate) branching_conditions: Constraints,
+    /// For each live binding, which [`BranchingConditions`] were active *at the time of the binding*?
+    pub(crate) branching_conditions: BranchingConditionsPerBinding,
 
     /// Could the symbol be unbound at this point?
     may_be_unbound: bool,
@@ -168,7 +175,7 @@ impl SymbolBindings {
         Self {
             live_bindings: Bindings::default(),
             constraints: Constraints::default(),
-            branching_conditions: Constraints::default(),
+            branching_conditions: BranchingConditionsPerBinding::default(),
             may_be_unbound: true,
         }
     }
@@ -189,7 +196,8 @@ impl SymbolBindings {
         self.live_bindings = Bindings::with(binding_id.into());
         self.constraints = Constraints::with_capacity(1);
         self.constraints.push(BitSet::default());
-        self.branching_conditions = Constraints::with_capacity(1);
+
+        self.branching_conditions = BranchingConditionsPerBinding::with_capacity(1);
         self.branching_conditions.push(BitSet::default());
         for id in branching_conditions.iter() {
             self.branching_conditions[0].insert(id);
@@ -493,14 +501,14 @@ impl Default for SymbolState {
 pub(super) struct BindingIdWithConstraints<'a> {
     pub(super) definition: ScopedDefinitionId,
     pub(super) constraint_ids: ConstraintIdIterator<'a>,
-    pub(super) branching_conditions_ids: ConstraintIdIterator<'a>,
+    pub(super) branching_conditions_ids: BranchingConditionIdIterator<'a>,
 }
 
 #[derive(Debug, Clone)]
 pub(super) struct BindingIdWithConstraintsIterator<'a> {
     definitions: BindingsIterator<'a>,
     constraints: ConstraintsIterator<'a>,
-    branching_conditions: ConstraintsIterator<'a>,
+    branching_conditions: BranchingConditionsIterator<'a>,
 }
 
 impl<'a> Iterator for BindingIdWithConstraintsIterator<'a> {
@@ -519,7 +527,7 @@ impl<'a> Iterator for BindingIdWithConstraintsIterator<'a> {
                     constraint_ids: ConstraintIdIterator {
                         wrapped: constraints.iter(),
                     },
-                    branching_conditions_ids: ConstraintIdIterator {
+                    branching_conditions_ids: BranchingConditionIdIterator {
                         wrapped: branching_conditions.iter(),
                     },
                 })
@@ -546,6 +554,23 @@ impl Iterator for ConstraintIdIterator<'_> {
 }
 
 impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
+
+#[derive(Debug, Clone)]
+pub(super) struct BranchingConditionIdIterator<'a> {
+    wrapped: BitSetIterator<'a, INLINE_CONSTRAINT_BLOCKS>,
+}
+
+impl Iterator for BranchingConditionIdIterator<'_> {
+    type Item = ScopedBranchingConditionId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.wrapped
+            .next()
+            .map(ScopedBranchingConditionId::from_u32)
+    }
+}
+
+impl std::iter::FusedIterator for BranchingConditionIdIterator<'_> {}
 
 #[derive(Debug)]
 pub(super) struct DeclarationIdIterator<'a> {
