@@ -225,7 +225,6 @@ use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
-use crate::db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedUseId};
 use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
