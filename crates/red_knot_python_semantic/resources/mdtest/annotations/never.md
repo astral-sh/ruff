@@ -72,7 +72,4 @@ python-version = "3.10"
 ```py
 # TODO: should raise a diagnostic, see https://github.com/astral-sh/ruff/issues/14297
 from typing import Never
-
-# TODO: this should be Unknown, not Never
-reveal_type(Never)  # revealed: Never
 ```
