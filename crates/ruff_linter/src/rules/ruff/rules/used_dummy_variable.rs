@@ -55,12 +55,12 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe.
 ///
-/// As well as renaming the variable itself, the fix iterates through all references to the
-/// variable and adapts them to become references to the renamed variable. However, some renamings
-/// require other changes such as different arguments to constructor calls or alterations to
-/// comments. Ruff is aware of some of these cases: `_T = TypeVar("_T")` will be fixed to
-/// `T = TypeVar("T")` if the `_T` binding is flagged by this rule. However, in general, cases like
-/// these are hard to detect and hard to automatically fix.
+/// For this rule's fix, Ruff renames the variable and fixes up all known references to
+/// it so they point to the renamed variable. However, some renamings also require other
+/// changes such as different arguments to constructor calls or alterations to comments.
+/// Ruff is aware of some of these cases: `_T = TypeVar("_T")` will be fixed to
+/// `T = TypeVar("T")` if the `_T` binding is flagged by this rule. However, in general,
+/// cases like these are hard to detect and hard to automatically fix.
 ///
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
