@@ -2,6 +2,7 @@ use std::hash::BuildHasherDefault;
 
 use rustc_hash::FxHasher;
 
+use crate::lint::{LintRegistry, LintRegistryBuilder};
 pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{resolve_module, system_module_search_paths, Module};
@@ -27,3 +28,13 @@ mod unpack;
 mod util;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
+
+pub fn default_lint_registry() -> LintRegistry {
+    let mut registry = LintRegistryBuilder::default();
+    register_semantic_lints(&mut registry);
+    registry.build()
+}
+
+pub fn register_semantic_lints(registry: &mut LintRegistryBuilder) {
+    types::register_type_lints(registry);
+}

@@ -1,3 +1,4 @@
+use crate::lint::RuleSelection;
 use ruff_db::files::File;
 use ruff_db::{Db as SourceDb, Upcast};
 
@@ -5,6 +6,8 @@ use ruff_db::{Db as SourceDb, Upcast};
 #[salsa::db]
 pub trait Db: SourceDb + Upcast<dyn SourceDb> {
     fn is_file_open(&self, file: File) -> bool;
+
+    fn rule_selection(&self) -> &RuleSelection;
 }
 
 #[cfg(test)]
@@ -13,15 +16,15 @@ pub(crate) mod tests {
 
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::ProgramSettings;
+    use crate::{default_lint_registry, ProgramSettings};
 
+    use super::Db;
+    use crate::lint::RuleSelection;
     use anyhow::Context;
     use ruff_db::files::{File, Files};
     use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
-
-    use super::Db;
 
     #[salsa::db]
     pub(crate) struct TestDb {
@@ -29,7 +32,8 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
-        events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+        events: Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+        rule_selection: Arc<RuleSelection>,
     }
 
     impl TestDb {
@@ -38,8 +42,9 @@ pub(crate) mod tests {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
                 vendored: red_knot_vendored::file_system().clone(),
-                events: std::sync::Arc::default(),
+                events: Arc::default(),
                 files: Files::default(),
+                rule_selection: Arc::new(RuleSelection::from_registry(&default_lint_registry())),
             }
         }
 
@@ -101,6 +106,10 @@ pub(crate) mod tests {
     impl Db for TestDb {
         fn is_file_open(&self, file: File) -> bool {
             !file.path(self).is_vendored_path()
+        }
+
+        fn rule_selection(&self) -> &RuleSelection {
+            &self.rule_selection
         }
     }
 

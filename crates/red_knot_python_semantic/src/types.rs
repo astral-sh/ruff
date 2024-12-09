@@ -7,6 +7,7 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::diagnostic::register_type_lints;
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{

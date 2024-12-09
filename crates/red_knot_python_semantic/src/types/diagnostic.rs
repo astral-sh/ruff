@@ -1,4 +1,9 @@
-use crate::lint::{Level, LintMetadata, LintStatus};
+use crate::lint::{Level, LintId, LintMetadata, LintRegistryBuilder, LintStatus};
+use crate::types::string_annotation::{
+    BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
+    IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
+    RAW_STRING_TYPE_ANNOTATION,
+};
 use crate::types::{ClassLiteralType, Type};
 use crate::{declare_lint, Db};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
@@ -9,6 +14,47 @@ use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
+
+/// Registers all known type check lints.
+pub(crate) fn register_type_lints(registry: &mut LintRegistryBuilder) {
+    registry.register_lint(&UNRESOLVED_REFERENCE);
+    registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
+    registry.register_lint(&NOT_ITERABLE);
+    registry.register_lint(&INDEX_OUT_OF_BOUNDS);
+    registry.register_lint(&NON_SUBSCRIPTABLE);
+    registry.register_lint(&UNRESOLVED_IMPORT);
+    registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
+    registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
+    registry.register_lint(&INVALID_ASSIGNMENT);
+    registry.register_lint(&INVALID_DECLARATION);
+    registry.register_lint(&CONFLICTING_DECLARATIONS);
+    registry.register_lint(&DIVISION_BY_ZERO);
+    registry.register_lint(&CALL_NON_CALLABLE);
+    registry.register_lint(&INVALID_TYPE_PARAMETER);
+    registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
+    registry.register_lint(&CYCLIC_CLASS_DEFINITION);
+    registry.register_lint(&DUPLICATE_BASE);
+    registry.register_lint(&INVALID_BASE);
+    registry.register_lint(&INCONSISTENT_MRO);
+    registry.register_lint(&INVALID_LITERAL_PARAMETER);
+    registry.register_lint(&CALL_POSSIBLY_UNBOUND_METHOD);
+    registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
+    registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    registry.register_lint(&CONFLICTING_METACLASS);
+    registry.register_lint(&UNSUPPORTED_OPERATOR);
+    registry.register_lint(&INVALID_CONTEXT_MANAGER);
+    registry.register_lint(&UNDEFINED_REVEAL);
+    registry.register_lint(&INVALID_PARAMETER_DEFAULT);
+    registry.register_lint(&INVALID_TYPE_FORM);
+
+    // String annotations
+    registry.register_lint(&FSTRING_TYPE_ANNOTATION);
+    registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
+    registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
+    registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
+    registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
+    registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
+}
 
 declare_lint! {
     /// ## What it does
@@ -644,11 +690,12 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
 
     pub(super) fn add_lint(
         &mut self,
-        lint: &LintMetadata,
+        lint: &'static LintMetadata,
         node: AnyNodeRef,
         message: std::fmt::Arguments,
     ) {
-        let Ok(severity) = Severity::try_from(lint.default_level()) else {
+        // Skip over diagnostics if the rule is disabled.
+        let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
             return;
         };
 

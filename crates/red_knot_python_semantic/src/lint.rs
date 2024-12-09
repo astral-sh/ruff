@@ -1,6 +1,8 @@
 use itertools::Itertools;
 use ruff_db::diagnostic::{LintName, Severity};
-use std::collections::BTreeMap;
+use rustc_hash::FxHashMap;
+use std::hash::Hasher;
+use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct LintMetadata {
@@ -178,4 +180,240 @@ macro_rules! declare_lint {
             ..$crate::lint::lint_metadata_defaults()
         };
     };
+}
+
+/// A unique identifier for a lint rule.
+///
+/// Implements `PartialEq`, `Eq`, and `Hash` based on the `LintMetadata` pointer
+/// for fast comparison and lookup.
+#[derive(Debug, Clone, Copy)]
+pub struct LintId {
+    definition: &'static LintMetadata,
+}
+
+impl LintId {
+    pub const fn of(definition: &'static LintMetadata) -> Self {
+        LintId { definition }
+    }
+}
+
+impl PartialEq for LintId {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.definition, other.definition)
+    }
+}
+
+impl Eq for LintId {}
+
+impl std::hash::Hash for LintId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.definition, state);
+    }
+}
+
+impl std::ops::Deref for LintId {
+    type Target = LintMetadata;
+
+    fn deref(&self) -> &Self::Target {
+        self.definition
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct LintRegistryBuilder {
+    /// Registered lints that haven't been removed.
+    lints: Vec<LintId>,
+
+    /// Lints indexed by name, including aliases and removed rules.
+    by_name: FxHashMap<&'static str, LintEntry>,
+}
+
+impl LintRegistryBuilder {
+    #[track_caller]
+    pub fn register_lint(&mut self, lint: &'static LintMetadata) {
+        assert_eq!(
+            self.by_name.insert(&*lint.name, lint.into()),
+            None,
+            "duplicate lint registration for '{name}'",
+            name = lint.name
+        );
+
+        if !lint.status.is_removed() {
+            self.lints.push(LintId::of(lint));
+        }
+    }
+
+    #[track_caller]
+    pub fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
+        let target = match self.by_name.get(to.name.as_str()) {
+            Some(LintEntry::Lint(target) | LintEntry::Removed(target)) => target,
+            Some(LintEntry::Alias(target)) => {
+                panic!(
+                    "lint alias {from} -> {to:?} points to another alias {target:?}",
+                    target = target.name()
+                )
+            }
+            None => panic!(
+                "lint alias {from} -> {to} points to non-registered lint",
+                to = to.name
+            ),
+        };
+
+        assert_eq!(
+            self.by_name
+                .insert(from.as_str(), LintEntry::Alias(*target)),
+            None,
+            "duplicate lint registration for '{from}'",
+        );
+    }
+
+    pub fn build(self) -> LintRegistry {
+        LintRegistry {
+            lints: self.lints,
+            by_name: self.by_name,
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct LintRegistry {
+    lints: Vec<LintId>,
+    by_name: FxHashMap<&'static str, LintEntry>,
+}
+
+impl LintRegistry {
+    /// Looks up a lint by its name.
+    pub fn get(&self, code: &str) -> Result<LintId, GetLintError> {
+        match self.by_name.get(code) {
+            Some(LintEntry::Lint(metadata)) => Ok(*metadata),
+            Some(LintEntry::Alias(lint)) => {
+                if lint.status.is_removed() {
+                    Err(GetLintError::Removed(lint.name()))
+                } else {
+                    Ok(*lint)
+                }
+            }
+            Some(LintEntry::Removed(lint)) => Err(GetLintError::Removed(lint.name())),
+            None => Err(GetLintError::Unknown(code.to_string())),
+        }
+    }
+
+    /// Returns all registered, non-removed lints.
+    pub fn lints(&self) -> &[LintId] {
+        &self.lints
+    }
+
+    /// Returns an iterator over all known aliases and to their target lints.
+    ///
+    /// This iterator includes aliases that point to removed lints.
+    pub fn aliases(&self) -> impl Iterator<Item = (LintName, LintId)> + use<'_> {
+        self.by_name.iter().filter_map(|(key, value)| {
+            if let LintEntry::Alias(alias) = value {
+                Some((LintName::of(key), *alias))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Iterates over all removed lints.
+    pub fn removed(&self) -> impl Iterator<Item = LintId> + use<'_> {
+        self.by_name.iter().filter_map(|(_, value)| {
+            if let LintEntry::Removed(metadata) = value {
+                Some(*metadata)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+#[derive(Error, Debug, Clone)]
+pub enum GetLintError {
+    /// The name maps to this removed lint.
+    #[error("lint {0} has been removed")]
+    Removed(LintName),
+
+    /// No lint with the given name is known.
+    #[error("unknown lint {0}")]
+    Unknown(String),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum LintEntry {
+    /// An existing lint rule. Can be in preview, stable or deprecated.
+    Lint(LintId),
+    /// A lint rule that has been removed.
+    Removed(LintId),
+    Alias(LintId),
+}
+
+impl From<&'static LintMetadata> for LintEntry {
+    fn from(metadata: &'static LintMetadata) -> Self {
+        if metadata.status.is_removed() {
+            LintEntry::Removed(LintId::of(metadata))
+        } else {
+            LintEntry::Lint(LintId::of(metadata))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RuleSelection {
+    /// Map with the severity for each enabled lint rule.
+    ///
+    /// If a rule isn't present in this map, then it should be considered disabled.
+    lints: FxHashMap<LintId, Severity>,
+}
+
+impl RuleSelection {
+    /// Creates a new rule selection from all known lints in the registry that are enabled
+    /// according to their default severity.
+    pub fn from_registry(registry: &LintRegistry) -> Self {
+        let lints = registry
+            .lints()
+            .iter()
+            .filter_map(|lint| {
+                Severity::try_from(lint.default_level())
+                    .ok()
+                    .map(|severity| (*lint, severity))
+            })
+            .collect();
+
+        RuleSelection { lints }
+    }
+
+    /// Returns an iterator over all enabled lints.
+    pub fn enabled(&self) -> impl Iterator<Item = LintId> + use<'_> {
+        self.lints.keys().copied()
+    }
+
+    /// Returns an iterator over all enabled lints and their severity.
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (LintId, Severity)> + use<'_> {
+        self.lints.iter().map(|(&lint, &severity)| (lint, severity))
+    }
+
+    /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
+    pub fn severity(&self, lint: LintId) -> Option<Severity> {
+        self.lints.get(&lint).copied()
+    }
+
+    /// Enables `lint` and configures with the given `severity`.
+    ///
+    /// Overrides any previous configuration for the lint.
+    pub fn enable(&mut self, lint: LintId, severity: Severity) {
+        self.lints.insert(lint, severity);
+    }
+
+    /// Disables `lint` if it was previously enabled.
+    pub fn disable(&mut self, lint: LintId) {
+        self.lints.remove(&lint);
+    }
+
+    /// Merges the enabled lints from `other` into this selection.
+    ///
+    /// Lints from `other` will override any existing configuration.
+    pub fn merge(&mut self, other: &RuleSelection) {
+        self.lints.extend(other.iter());
+    }
 }
