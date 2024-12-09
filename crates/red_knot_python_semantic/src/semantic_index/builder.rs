@@ -806,7 +806,7 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                let pre_if_constraints = self.branching_conditions_snapshot();
+                let pre_if_condutions = self.branching_conditions_snapshot();
                 let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
@@ -832,7 +832,7 @@ where
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
-                    self.flow_restore(pre_if.clone(), pre_if_constraints.clone());
+                    self.flow_restore(pre_if.clone(), pre_if_condutions.clone());
                     for constraint in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
@@ -843,7 +843,7 @@ where
                     self.visit_body(clause_body);
                 }
                 for post_clause_state in post_clauses {
-                    self.flow_merge(post_clause_state, pre_if_constraints.clone());
+                    self.flow_merge(post_clause_state, pre_if_condutions.clone());
                 }
             }
             ast::Stmt::While(ast::StmtWhile {
@@ -855,7 +855,7 @@ where
                 self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
-                let pre_loop_constraints = self.branching_conditions_snapshot();
+                let pre_loop_conditions = self.branching_conditions_snapshot();
                 let constraint = self.record_expression_constraint(test);
 
                 // Save aside any break states from an outer loop
@@ -875,14 +875,14 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop, pre_loop_constraints.clone());
+                self.flow_merge(pre_loop, pre_loop_conditions.clone());
                 self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(break_state, pre_loop_constraints.clone()); // TODO?
+                    self.flow_merge(break_state, pre_loop_conditions.clone()); // TODO?
                 }
             }
             ast::Stmt::With(ast::StmtWith {
@@ -925,8 +925,10 @@ where
                 self.visit_expr(iter);
 
                 let pre_loop = self.flow_snapshot();
-                let pre_loop_constraints = self.branching_conditions_snapshot();
+                let pre_loop_conditions = self.branching_conditions_snapshot();
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
+
+                self.record_unconditional_branching();
 
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.push_assignment(for_stmt.into());
@@ -946,13 +948,13 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop, pre_loop_constraints.clone());
+                self.flow_merge(pre_loop, pre_loop_conditions.clone());
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(break_state, pre_loop_constraints.clone());
+                    self.flow_merge(break_state, pre_loop_conditions.clone());
                 }
             }
             ast::Stmt::Match(ast::StmtMatch {
@@ -1036,7 +1038,7 @@ where
                     }
 
                     let pre_except_state = self.flow_snapshot();
-                    let pre_except_constraints = self.branching_conditions_snapshot();
+                    let pre_except_conditions = self.branching_conditions_snapshot();
                     let num_handlers = handlers.len();
 
                     self.record_unconditional_branching();
@@ -1079,7 +1081,7 @@ where
                         if i < (num_handlers - 1) {
                             self.flow_restore(
                                 pre_except_state.clone(),
-                                pre_except_constraints.clone(),
+                                pre_except_conditions.clone(),
                             );
                         }
                     }
@@ -1249,15 +1251,15 @@ where
             }) => {
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
-                let pre_if_constraints = self.branching_conditions_snapshot();
+                let pre_if_conditions = self.branching_conditions_snapshot();
                 let constraint = self.record_expression_constraint(test);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if, pre_if_constraints.clone());
+                self.flow_restore(pre_if, pre_if_conditions.clone());
 
                 self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
-                self.flow_merge(post_body, pre_if_constraints);
+                self.flow_merge(post_body, pre_if_conditions);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -1315,7 +1317,7 @@ where
                 op,
             }) => {
                 let mut snapshots = vec![];
-                let pre_op_constraints = self.branching_conditions_snapshot();
+                let pre_op_conditions = self.branching_conditions_snapshot();
                 for (index, value) in values.iter().enumerate() {
                     self.visit_expr(value);
                     // In the last value we don't need to take a snapshot nor add a constraint
@@ -1330,7 +1332,7 @@ where
                     }
                 }
                 for snapshot in snapshots {
-                    self.flow_merge(snapshot, pre_op_constraints.clone());
+                    self.flow_merge(snapshot, pre_op_conditions.clone());
                 }
             }
             _ => {

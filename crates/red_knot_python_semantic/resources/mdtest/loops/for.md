@@ -15,6 +15,7 @@ for x in IntIterable():
     pass
 
 # revealed: int
+# error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
 
@@ -87,6 +88,7 @@ for x in OldStyleIterable():
     pass
 
 # revealed: int
+# error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
 
@@ -97,6 +99,7 @@ for x in (1, "a", b"foo"):
     pass
 
 # revealed: Literal[1] | Literal["a"] | Literal[b"foo"]
+# error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
 
