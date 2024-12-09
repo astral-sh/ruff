@@ -23,7 +23,7 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{ActiveConstraintsSnapshot, FlowSnapshot, UseDefMapBuilder};
+use crate::semantic_index::use_def::{BranchingConditionsSnapshot, FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::Unpack;
 use crate::Db;
@@ -200,20 +200,28 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map().snapshot()
     }
 
-    fn constraints_snapshot(&self) -> ActiveConstraintsSnapshot {
+    fn constraints_snapshot(&self) -> BranchingConditionsSnapshot {
         self.current_use_def_map().constraints_snapshot()
     }
 
-    fn flow_restore(&mut self, state: FlowSnapshot, active_constraints: ActiveConstraintsSnapshot) {
+    fn flow_restore(
+        &mut self,
+        state: FlowSnapshot,
+        branching_conditions: BranchingConditionsSnapshot,
+    ) {
         self.current_use_def_map_mut().restore(state);
         self.current_use_def_map_mut()
-            .restore_constraints(active_constraints);
+            .restore_constraints(branching_conditions);
     }
 
-    fn flow_merge(&mut self, state: FlowSnapshot, active_constraints: ActiveConstraintsSnapshot) {
+    fn flow_merge(
+        &mut self,
+        state: FlowSnapshot,
+        branching_conditions: BranchingConditionsSnapshot,
+    ) {
         self.current_use_def_map_mut().merge(state);
         self.current_use_def_map_mut()
-            .restore_constraints(active_constraints);
+            .restore_constraints(branching_conditions);
     }
 
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
