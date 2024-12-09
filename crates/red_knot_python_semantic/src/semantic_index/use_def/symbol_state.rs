@@ -575,11 +575,11 @@ impl std::iter::FusedIterator for BranchingConditionIdIterator<'_> {}
 #[derive(Debug)]
 pub(super) struct DeclarationIdIterator<'a> {
     inner: DeclarationsIterator<'a>,
-    branching_conditions: ConstraintsIterator<'a>,
+    branching_conditions: BranchingConditionsIterator<'a>,
 }
 
 impl<'a> Iterator for DeclarationIdIterator<'a> {
-    type Item = (ScopedDefinitionId, ConstraintIdIterator<'a>);
+    type Item = (ScopedDefinitionId, BranchingConditionIdIterator<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
         // self.inner.next().map(ScopedDefinitionId::from_u32)
@@ -587,7 +587,7 @@ impl<'a> Iterator for DeclarationIdIterator<'a> {
             (None, None) => None,
             (Some(declaration), Some(branching_conditions)) => Some((
                 ScopedDefinitionId::from_u32(declaration),
-                ConstraintIdIterator {
+                BranchingConditionIdIterator {
                     wrapped: branching_conditions.iter(),
                 },
             )),
