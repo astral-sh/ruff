@@ -251,7 +251,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
             if binding
                 .statement(checker.semantic())
                 .and_then(Stmt::as_for_stmt)
-                == Some(for_stmt)
+                .is_some_and(|stmt| stmt.range == for_stmt.range)
             {
                 Some(binding)
             } else {
