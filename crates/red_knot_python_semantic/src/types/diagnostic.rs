@@ -1,6 +1,6 @@
 use crate::types::{ClassLiteralType, Type};
 use crate::Db;
-use ruff_db::diagnostic::{Diagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -11,16 +11,15 @@ use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TypeCheckDiagnostic {
-    // TODO: Don't use string keys for rules
-    pub(super) rule: String,
+    pub(super) id: DiagnosticId,
     pub(super) message: String,
     pub(super) range: TextRange,
     pub(super) file: File,
 }
 
 impl TypeCheckDiagnostic {
-    pub fn rule(&self) -> &str {
-        &self.rule
+    pub fn id(&self) -> DiagnosticId {
+        self.id
     }
 
     pub fn message(&self) -> &str {
@@ -33,8 +32,8 @@ impl TypeCheckDiagnostic {
 }
 
 impl Diagnostic for TypeCheckDiagnostic {
-    fn rule(&self) -> &str {
-        TypeCheckDiagnostic::rule(self)
+    fn id(&self) -> DiagnosticId {
+        self.id
     }
 
     fn message(&self) -> Cow<str> {
@@ -152,7 +151,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     pub(super) fn add_not_iterable(&mut self, node: AnyNodeRef, not_iterable_ty: Type<'db>) {
         self.add(
             node,
-            "not-iterable",
+            DiagnosticId::lint("not-iterable"),
             format_args!(
                 "Object of type `{}` is not iterable",
                 not_iterable_ty.display(self.db)
@@ -169,7 +168,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     ) {
         self.add(
             node,
-            "not-iterable",
+            DiagnosticId::lint("not-iterable"),
             format_args!(
                 "Object of type `{}` is not iterable because its `__iter__` method is possibly unbound",
                 element_ty.display(self.db)
@@ -188,7 +187,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     ) {
         self.add(
             node,
-            "index-out-of-bounds",
+            DiagnosticId::lint("index-out-of-bounds"),
             format_args!(
                 "Index {index} is out of bounds for {kind} `{}` with length {length}",
                 tuple_ty.display(self.db)
@@ -205,7 +204,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     ) {
         self.add(
             node,
-            "non-subscriptable",
+            DiagnosticId::lint("non-subscriptable"),
             format_args!(
                 "Cannot subscript object of type `{}` with no `{method}` method",
                 non_subscriptable_ty.display(self.db)
@@ -221,7 +220,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     ) {
         self.add(
             import_node.into(),
-            "unresolved-import",
+            DiagnosticId::lint("unresolved-import"),
             format_args!(
                 "Cannot resolve import `{}{}`",
                 ".".repeat(level as usize),
@@ -233,7 +232,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     pub(super) fn add_slice_step_size_zero(&mut self, node: AnyNodeRef) {
         self.add(
             node,
-            "zero-stepsize-in-slice",
+            DiagnosticId::lint("zero-stepsize-in-slice"),
             format_args!("Slice step size can not be zero"),
         );
     }
@@ -246,19 +245,19 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     ) {
         match declared_ty {
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                self.add(node, "invalid-assignment", format_args!(
+                self.add(node, DiagnosticId::lint("invalid-assignment"), format_args!(
                         "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                         class.name(self.db)));
             }
             Type::FunctionLiteral(function) => {
-                self.add(node, "invalid-assignment", format_args!(
+                self.add(node, DiagnosticId::lint("invalid-assignment"), format_args!(
                         "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
                         function.name(self.db)));
             }
             _ => {
                 self.add(
                     node,
-                    "invalid-assignment",
+                    DiagnosticId::lint("invalid-assignment"),
                     format_args!(
                         "Object of type `{}` is not assignable to `{}`",
                         assigned_ty.display(self.db),
@@ -274,7 +273,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
 
         self.add(
             expr_name_node.into(),
-            "possibly-unresolved-reference",
+            DiagnosticId::lint("possibly-unresolved-reference"),
             format_args!("Name `{id}` used when possibly not defined"),
         );
     }
@@ -284,7 +283,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
 
         self.add(
             expr_name_node.into(),
-            "unresolved-reference",
+            DiagnosticId::lint("unresolved-reference"),
             format_args!("Name `{id}` used when not defined"),
         );
     }
@@ -292,7 +291,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     /// Adds a new diagnostic.
     ///
     /// The diagnostic does not get added if the rule isn't enabled for this file.
-    pub(super) fn add(&mut self, node: AnyNodeRef, rule: &str, message: std::fmt::Arguments) {
+    pub(super) fn add(&mut self, node: AnyNodeRef, id: DiagnosticId, message: std::fmt::Arguments) {
         if !self.db.is_file_open(self.file) {
             return;
         }
@@ -305,7 +304,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
 
         self.diagnostics.push(TypeCheckDiagnostic {
             file: self.file,
-            rule: rule.to_string(),
+            id,
             message: message.to_string(),
             range: node.range(),
         });

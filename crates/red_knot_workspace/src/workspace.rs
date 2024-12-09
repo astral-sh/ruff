@@ -6,7 +6,7 @@ use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};
 pub use metadata::{PackageMetadata, WorkspaceDiscoveryError, WorkspaceMetadata};
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::SearchPathSettings;
-use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
 use ruff_db::system::FileType;
@@ -533,8 +533,8 @@ pub struct IOErrorDiagnostic {
 }
 
 impl Diagnostic for IOErrorDiagnostic {
-    fn rule(&self) -> &str {
-        "io"
+    fn id(&self) -> DiagnosticId {
+        DiagnosticId::Io
     }
 
     fn message(&self) -> Cow<str> {
