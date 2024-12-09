@@ -95,37 +95,37 @@ reveal_type(f2())  # revealed: Literal["Foo", "Bar"]
 ## Various string kinds
 
 ```py
-# error: [annotation-raw-string] "Type expressions cannot use raw string literal"
+# error: [raw-string-type-annotation] "Type expressions cannot use raw string literal"
 def f1() -> r"int":
     return 1
 
-# error: [annotation-f-string] "Type expressions cannot use f-strings"
+# error: [fstring-type-annotation] "Type expressions cannot use f-strings"
 def f2() -> f"int":
     return 1
 
-# error: [annotation-byte-string] "Type expressions cannot use bytes literal"
+# error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
 def f3() -> b"int":
     return 1
 
 def f4() -> "int":
     return 1
 
-# error: [annotation-implicit-concat] "Type expressions cannot span multiple string literals"
+# error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
 def f5() -> "in" "t":
     return 1
 
-# error: [annotation-escape-character] "Type expressions cannot contain escape characters"
+# error: [escape-character-in-forward-annotation] "Type expressions cannot contain escape characters"
 def f6() -> "\N{LATIN SMALL LETTER I}nt":
     return 1
 
-# error: [annotation-escape-character] "Type expressions cannot contain escape characters"
+# error: [escape-character-in-forward-annotation] "Type expressions cannot contain escape characters"
 def f7() -> "\x69nt":
     return 1
 
 def f8() -> """int""":
     return 1
 
-# error: [annotation-byte-string] "Type expressions cannot use bytes literal"
+# error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
 def f9() -> "b'int'":
     return 1
 
@@ -208,9 +208,9 @@ i: "{i for i in range(5)}"
 j: "{i: i for i in range(5)}"
 k: "(i for i in range(5))"
 l: "await 1"
-# error: [forward-annotation-syntax-error]
+# error: [invalid-syntax-in-forward-annotation]
 m: "yield 1"
-# error: [forward-annotation-syntax-error]
+# error: [invalid-syntax-in-forward-annotation]
 n: "yield from 1"
 o: "1 < 2"
 p: "call()"
