@@ -1,3 +1,4 @@
+use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_python_ast::str::raw_contents;
@@ -27,7 +28,7 @@ pub(crate) fn parse_string_annotation(
         if prefix.is_raw() {
             diagnostics.add(
                 string_literal.into(),
-                "annotation-raw-string",
+                DiagnosticId::lint("annotation-raw-string"),
                 format_args!("Type expressions cannot use raw string literal"),
             );
         // Compare the raw contents (without quotes) of the expression with the parsed contents
@@ -51,7 +52,7 @@ pub(crate) fn parse_string_annotation(
                 Ok(parsed) => return Ok(parsed),
                 Err(parse_error) => diagnostics.add(
                     string_literal.into(),
-                    "forward-annotation-syntax-error",
+                    DiagnosticId::lint("forward-annotation-syntax-error"),
                     format_args!("Syntax error in forward annotation: {}", parse_error.error),
                 ),
             }
@@ -60,7 +61,7 @@ pub(crate) fn parse_string_annotation(
             // case for annotations that contain escape sequences.
             diagnostics.add(
                 string_expr.into(),
-                "annotation-escape-character",
+                DiagnosticId::lint("annotation-escape-character"),
                 format_args!("Type expressions cannot contain escape characters"),
             );
         }
@@ -68,7 +69,7 @@ pub(crate) fn parse_string_annotation(
         // String is implicitly concatenated.
         diagnostics.add(
             string_expr.into(),
-            "annotation-implicit-concat",
+            DiagnosticId::lint("annotation-implicit-concat"),
             format_args!("Type expressions cannot span multiple string literals"),
         );
     }
