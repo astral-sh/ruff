@@ -4,7 +4,7 @@
 
 ```toml
 [environment]
-target-version = "3.9"
+python-version = "3.9"
 ```
 
 ```py
@@ -15,7 +15,7 @@ reveal_type(...)  # revealed: ellipsis
 
 ```toml
 [environment]
-target-version = "3.10"
+python-version = "3.10"
 ```
 
 ```py
