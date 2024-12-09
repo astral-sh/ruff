@@ -1,5 +1,12 @@
 # Except star
 
+`except*` is only available in Python 3.11 and later:
+
+```toml
+[environment]
+target-version = "3.11"
+```
+
 ## Except\* with BaseException
 
 ```py

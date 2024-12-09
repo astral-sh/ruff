@@ -225,10 +225,17 @@ use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
-use crate::semantic_index::ast_ids::ScopedUseId;
+use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedUseId};
+use crate::semantic_index::branching::BranchingCondition;
+use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::semantic_index::use_def::symbol_state::{
+    BranchingConditionIdIterator, BranchingConditions, ScopedBranchingConditionId,
+};
 use crate::symbol::Boundness;
+use crate::types::{infer_expression_types, Truthiness};
+use crate::Db;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -245,6 +252,9 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Array of [`Constraint`] in this scope.
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
+
+    /// Array of [`BranchingCondition`] in this scope.
+    all_branching_conditions: IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -275,12 +285,44 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    pub(crate) fn use_boundness(&self, use_id: ScopedUseId) -> Boundness {
-        if self.bindings_by_use[use_id].may_be_unbound() {
-            Boundness::PossiblyUnbound
-        } else {
-            Boundness::Bound
+    fn compute_boundness(
+        &self,
+        db: &dyn crate::db::Db,
+        bindings: &SymbolBindings,
+    ) -> Option<Boundness> {
+        let bindings_iter = self.bindings_iterator(bindings);
+
+        let mut definitely_bound = false;
+        let mut definitely_unbound = true;
+        for binding in bindings_iter {
+            let result = binding.branching_conditions.branch_condition_truthiness(db);
+
+            if !result.any_always_false {
+                definitely_unbound = false;
+            }
+
+            if result.all_always_true {
+                definitely_bound = true;
+            }
         }
+
+        if definitely_unbound {
+            None
+        } else {
+            if definitely_bound || !bindings.may_be_unbound() {
+                Some(Boundness::Bound)
+            } else {
+                Some(Boundness::PossiblyUnbound)
+            }
+        }
+    }
+
+    pub(crate) fn use_boundness(
+        &self,
+        db: &dyn crate::db::Db,
+        use_id: ScopedUseId,
+    ) -> Option<Boundness> {
+        self.compute_boundness(db, &self.bindings_by_use[use_id])
     }
 
     pub(crate) fn public_bindings(
@@ -290,12 +332,12 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
     }
 
-    pub(crate) fn public_boundness(&self, symbol: ScopedSymbolId) -> Boundness {
-        if self.public_symbols[symbol].may_be_unbound() {
-            Boundness::PossiblyUnbound
-        } else {
-            Boundness::Bound
-        }
+    pub(crate) fn public_boundness(
+        &self,
+        db: &dyn crate::db::Db,
+        symbol: ScopedSymbolId,
+    ) -> Option<Boundness> {
+        self.compute_boundness(db, self.public_symbols[symbol].bindings())
     }
 
     pub(crate) fn bindings_at_declaration(
@@ -342,6 +384,7 @@ impl<'db> UseDefMap<'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             all_constraints: &self.all_constraints,
+            all_branching_conditions: &self.all_branching_conditions,
             inner: bindings.iter(),
         }
     }
@@ -352,6 +395,7 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'a, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
+            all_branching_conditions: &self.all_branching_conditions,
             inner: declarations.iter(),
             may_be_undeclared: declarations.may_be_undeclared(),
         }
@@ -365,10 +409,11 @@ enum SymbolDefinitions {
     Declarations(SymbolDeclarations),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
     inner: BindingIdWithConstraintsIterator<'map>,
 }
 
@@ -376,15 +421,17 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
     type Item = BindingWithConstraints<'map, 'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .next()
-            .map(|def_id_with_constraints| BindingWithConstraints {
-                binding: self.all_definitions[def_id_with_constraints.definition],
-                constraints: ConstraintsIterator {
-                    all_constraints: self.all_constraints,
-                    constraint_ids: def_id_with_constraints.constraint_ids,
-                },
-            })
+        self.inner.next().map(|binding| BindingWithConstraints {
+            binding: self.all_definitions[binding.definition],
+            constraints: ConstraintsIterator {
+                all_constraints: self.all_constraints,
+                constraint_ids: binding.constraint_ids,
+            },
+            branching_conditions: BranchingConditionsIterator {
+                all_branching_conditions: self.all_branching_conditions,
+                branching_condition_ids: binding.branching_conditions_ids,
+            },
+        })
     }
 }
 
@@ -393,8 +440,10 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Definition<'db>,
     pub(crate) constraints: ConstraintsIterator<'map, 'db>,
+    pub(crate) branching_conditions: BranchingConditionsIterator<'map, 'db>,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     constraint_ids: ConstraintIdIterator<'map>,
@@ -412,8 +461,70 @@ impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
+#[derive(Debug, Clone)]
+pub(crate) struct BranchingConditionsIterator<'map, 'db> {
+    all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
+    branching_condition_ids: BranchingConditionIdIterator<'map>,
+}
+
+impl<'db> Iterator for BranchingConditionsIterator<'_, 'db> {
+    type Item = BranchingCondition<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.branching_condition_ids
+            .next()
+            .map(|branching_condition_id| self.all_branching_conditions[branching_condition_id])
+    }
+}
+
+pub(crate) struct BranchConditionTruthiness {
+    pub any_always_false: bool,
+    pub all_always_true: bool,
+    pub at_least_one_condition: bool,
+}
+
+impl<'db> BranchingConditionsIterator<'_, 'db> {
+    pub(crate) fn branch_condition_truthiness(self, db: &'db dyn Db) -> BranchConditionTruthiness {
+        let mut result = BranchConditionTruthiness {
+            any_always_false: false,
+            all_always_true: true,
+            at_least_one_condition: false,
+        };
+
+        for condition in self {
+            let truthiness = match condition {
+                BranchingCondition::ConditionalOn(Constraint {
+                    node: ConstraintNode::Expression(test_expr),
+                    is_positive,
+                }) => {
+                    let inference = infer_expression_types(db, test_expr);
+                    let scope = test_expr.scope(db);
+                    let ty = inference
+                        .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope));
+
+                    ty.bool(db).negate_if(!is_positive)
+                }
+                BranchingCondition::ConditionalOn(Constraint {
+                    node: ConstraintNode::Pattern(..),
+                    ..
+                }) => Truthiness::Ambiguous,
+                BranchingCondition::Ambiguous => Truthiness::Ambiguous,
+            };
+
+            result.any_always_false |= truthiness.is_always_false();
+            result.all_always_true &= truthiness.is_always_true();
+            result.at_least_one_condition = true;
+        }
+
+        result
+    }
+}
+
+impl std::iter::FusedIterator for BranchingConditionsIterator<'_, '_> {}
+
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
+    all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
     inner: DeclarationIdIterator<'map>,
     may_be_undeclared: bool,
 }
@@ -424,11 +535,19 @@ impl DeclarationsIterator<'_, '_> {
     }
 }
 
-impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
-    type Item = Definition<'db>;
+impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
+    type Item = (Definition<'db>, BranchingConditionsIterator<'map, 'db>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|def_id| self.all_definitions[def_id])
+        self.inner.next().map(|(def_id, branching_condition_ids)| {
+            (
+                self.all_definitions[def_id],
+                BranchingConditionsIterator {
+                    all_branching_conditions: self.all_branching_conditions,
+                    branching_condition_ids,
+                },
+            )
+        })
     }
 }
 
@@ -440,6 +559,9 @@ pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct BranchingConditionsSnapshot(BranchingConditions);
+
 #[derive(Debug, Default)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Definition`].
@@ -447,6 +569,12 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Append-only array of [`Constraint`].
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
+
+    /// Append-only array of [`BranchingCondition`].
+    all_branching_conditions: IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
+
+    /// Active branching conditions.
+    active_branching_conditions: BranchingConditions,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -471,7 +599,7 @@ impl<'db> UseDefMapBuilder<'db> {
             binding,
             SymbolDefinitions::Declarations(symbol_state.declarations().clone()),
         );
-        symbol_state.record_binding(def_id);
+        symbol_state.record_binding(def_id, &self.active_branching_conditions);
     }
 
     pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
@@ -479,6 +607,18 @@ impl<'db> UseDefMapBuilder<'db> {
         for state in &mut self.symbol_states {
             state.record_constraint(constraint_id);
         }
+
+        self.record_branching_condition(BranchingCondition::ConditionalOn(constraint));
+    }
+
+    pub(super) fn record_unconstrained_branch_point(&mut self) {
+        self.record_branching_condition(BranchingCondition::Ambiguous);
+    }
+
+    pub(super) fn record_branching_condition(&mut self, condition: BranchingCondition<'db>) {
+        let condition_id = self.all_branching_conditions.push(condition);
+        self.active_branching_conditions
+            .insert(condition_id.as_u32());
     }
 
     pub(super) fn record_declaration(
@@ -492,7 +632,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declaration,
             SymbolDefinitions::Bindings(symbol_state.bindings().clone()),
         );
-        symbol_state.record_declaration(def_id);
+        symbol_state.record_declaration(def_id, &self.active_branching_conditions);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -503,8 +643,8 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store anything in self.definitions_by_definition.
         let def_id = self.all_definitions.push(definition);
         let symbol_state = &mut self.symbol_states[symbol];
-        symbol_state.record_declaration(def_id);
-        symbol_state.record_binding(def_id);
+        symbol_state.record_declaration(def_id, &self.active_branching_conditions);
+        symbol_state.record_binding(def_id, &self.active_branching_conditions);
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
@@ -523,6 +663,10 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    pub(super) fn branching_conditions_snapshot(&self) -> BranchingConditionsSnapshot {
+        BranchingConditionsSnapshot(self.active_branching_conditions.clone())
+    }
+
     /// Restore the current builder symbols state to the given snapshot.
     pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
@@ -539,6 +683,10 @@ impl<'db> UseDefMapBuilder<'db> {
         // snapshot, the correct state to fill them in with is "undefined".
         self.symbol_states
             .resize(num_symbols, SymbolState::undefined());
+    }
+
+    pub(super) fn restore_branching_conditions(&mut self, snapshot: BranchingConditionsSnapshot) {
+        self.active_branching_conditions = snapshot.0;
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -572,6 +720,7 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             all_constraints: self.all_constraints,
+            all_branching_conditions: self.all_branching_conditions,
             bindings_by_use: self.bindings_by_use,
             public_symbols: self.symbol_states,
             definitions_by_definition: self.definitions_by_definition,
