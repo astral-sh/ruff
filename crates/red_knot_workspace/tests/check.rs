@@ -274,6 +274,4 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // related to circular references in f-string annotations (invalid syntax)
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_14.py", false, true),
-    // related to `collections.namedtuple`
-    ("crates/ruff_linter/resources/test/fixtures/pep8_naming/N806.py", false, true),
 ];

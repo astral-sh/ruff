@@ -88,11 +88,9 @@ reveal_type(f())  # revealed: @Todo(unsupported type[X] special form)
 class C: ...
 ```
 
-## Union of classes
+## New-style union of classes
 
 ```py
-from typing import Union
-
 class BasicUser: ...
 class ProUser: ...
 
@@ -105,24 +103,48 @@ def get_user() -> type[BasicUser | ProUser | A.B.C]:
 
 # revealed: type[BasicUser] | type[ProUser] | type[C]
 reveal_type(get_user())
+```
 
-def get_user_old_style() -> type[Union[BasicUser, ProUser, A.B.C]]:
-    return BasicUser
+## Old-style union of classes
 
-# revealed: type[BasicUser] | type[ProUser] | type[C]
-reveal_type(get_user_old_style())
+```py
+from typing import Union
 
-def get_user_nested() -> type[Union[BasicUser, Union[ProUser, A.B.C]]]:
-    return BasicUser
+class BasicUser: ...
+class ProUser: ...
 
-# revealed: type[BasicUser] | type[ProUser] | type[C]
-reveal_type(get_user_nested())
+class A:
+    class B:
+        class C: ...
 
-def get_user_mixed() -> type[BasicUser | Union[ProUser, A.B.C]]:
-    return BasicUser
+def f(
+    a: type[Union[BasicUser, ProUser, A.B.C]],
+    b: type[Union[str]],
+    c: type[Union[BasicUser, Union[ProUser, A.B.C]]]
+):
+    reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(b)  # revealed: type[str]
+    reveal_type(c)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+```
 
-# revealed: type[BasicUser] | type[ProUser] | type[C]
-reveal_type(get_user_mixed())
+## New-style and old-style unions in combination
+
+```py
+from typing import Union
+
+class BasicUser: ...
+class ProUser: ...
+
+class A:
+    class B:
+        class C: ...
+
+def f(
+    a: type[BasicUser | Union[ProUser, A.B.C]],
+    b: type[Union[BasicUser | Union[ProUser, A.B.C | str]]]
+):
+    reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(b)  # revealed: type[BasicUser] | type[ProUser] | type[C] | type[str]
 ```
 
 ## Illegal parameters
