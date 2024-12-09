@@ -1,14 +1,120 @@
+use std::borrow::Cow;
+use std::fmt::Formatter;
+
+use ruff_python_parser::ParseError;
+use ruff_text_size::TextRange;
+
 use crate::{
     files::File,
     source::{line_index, source_text},
     Db,
 };
-use ruff_python_parser::ParseError;
-use ruff_text_size::TextRange;
-use std::borrow::Cow;
+
+/// A string identifier for a lint rule.
+///
+/// This string is used in command line and configuration interfaces. The name should always
+/// be in kebab case, e.g. `no-foo` (all lower case).
+///
+/// Rules use kebab case, e.g. `no-foo`.
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+pub struct LintName(&'static str);
+
+impl LintName {
+    pub const fn of(name: &'static str) -> Self {
+        Self(name)
+    }
+
+    pub const fn as_str(&self) -> &'static str {
+        self.0
+    }
+}
+
+impl std::ops::Deref for LintName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl std::fmt::Display for LintName {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+impl PartialEq<str> for LintName {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+
+impl PartialEq<&str> for LintName {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+/// Uniquely identifies the kind of a diagnostic.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub enum DiagnosticId {
+    /// Some I/O operation failed
+    Io,
+
+    /// Some code contains a syntax error
+    InvalidSyntax,
+
+    /// A lint violation.
+    ///
+    /// Lint's can be suppressed and some lints can be enabled or disabled in the configuration.
+    Lint(LintName),
+
+    /// A revealed type: Created by `reveal_type(expression)`.
+    RevealedType,
+}
+
+impl DiagnosticId {
+    /// Creates a new `DiagnosticId` for a lint with the given name.
+    pub const fn lint(name: &'static str) -> Self {
+        Self::Lint(LintName::of(name))
+    }
+
+    /// Returns `true` if this `DiagnosticId` represents a lint.
+    pub fn is_lint(&self) -> bool {
+        matches!(self, DiagnosticId::Lint(_))
+    }
+
+    /// Returns `true` if this `DiagnosticId` represents a lint with the given name.
+    pub fn is_lint_named(&self, name: &str) -> bool {
+        matches!(self, DiagnosticId::Lint(self_name) if self_name == name)
+    }
+
+    pub fn matches(&self, name: &str) -> bool {
+        match self {
+            DiagnosticId::Lint(self_name) => name
+                .strip_prefix("lint/")
+                .is_some_and(|rest| rest == &**self_name),
+
+            DiagnosticId::Io => name == "io",
+            DiagnosticId::InvalidSyntax => name == "invalid-syntax",
+            DiagnosticId::RevealedType => name == "revealed-type",
+        }
+    }
+}
+
+impl std::fmt::Display for DiagnosticId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DiagnosticId::InvalidSyntax => f.write_str("invalid-syntax"),
+            DiagnosticId::Io => f.write_str("io"),
+            DiagnosticId::Lint(name) => write!(f, "lint/{name}"),
+            DiagnosticId::RevealedType => f.write_str("revealed-type"),
+        }
+    }
+}
 
 pub trait Diagnostic: Send + Sync + std::fmt::Debug {
-    fn rule(&self) -> &str;
+    fn id(&self) -> DiagnosticId;
 
     fn message(&self) -> std::borrow::Cow<str>;
 
@@ -29,10 +135,12 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
 pub enum Severity {
     Info,
+    Warning,
     Error,
+    Fatal,
 }
 
 pub struct DisplayDiagnostic<'db> {
@@ -50,13 +158,15 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.diagnostic.severity() {
             Severity::Info => f.write_str("info")?,
+            Severity::Warning => f.write_str("warning")?,
             Severity::Error => f.write_str("error")?,
+            Severity::Fatal => f.write_str("fatal")?,
         }
 
         write!(
             f,
             "[{rule}] {path}",
-            rule = self.diagnostic.rule(),
+            rule = self.diagnostic.id(),
             path = self.diagnostic.file().path(self.db)
         )?;
 
@@ -77,8 +187,8 @@ impl<T> Diagnostic for Box<T>
 where
     T: Diagnostic,
 {
-    fn rule(&self) -> &str {
-        (**self).rule()
+    fn id(&self) -> DiagnosticId {
+        (**self).id()
     }
 
     fn message(&self) -> Cow<str> {
@@ -102,8 +212,8 @@ impl<T> Diagnostic for std::sync::Arc<T>
 where
     T: Diagnostic,
 {
-    fn rule(&self) -> &str {
-        (**self).rule()
+    fn id(&self) -> DiagnosticId {
+        (**self).id()
     }
 
     fn message(&self) -> std::borrow::Cow<str> {
@@ -124,8 +234,8 @@ where
 }
 
 impl Diagnostic for Box<dyn Diagnostic> {
-    fn rule(&self) -> &str {
-        (**self).rule()
+    fn id(&self) -> DiagnosticId {
+        (**self).id()
     }
 
     fn message(&self) -> Cow<str> {
@@ -158,8 +268,8 @@ impl ParseDiagnostic {
 }
 
 impl Diagnostic for ParseDiagnostic {
-    fn rule(&self) -> &str {
-        "invalid-syntax"
+    fn id(&self) -> DiagnosticId {
+        DiagnosticId::InvalidSyntax
     }
 
     fn message(&self) -> Cow<str> {

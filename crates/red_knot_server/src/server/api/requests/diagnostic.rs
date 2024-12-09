@@ -86,14 +86,15 @@ fn to_lsp_diagnostic(
 
     let severity = match diagnostic.severity() {
         Severity::Info => DiagnosticSeverity::INFORMATION,
-        Severity::Error => DiagnosticSeverity::ERROR,
+        Severity::Warning => DiagnosticSeverity::WARNING,
+        Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,
     };
 
     Diagnostic {
         range,
         severity: Some(severity),
         tags: None,
-        code: Some(NumberOrString::String(diagnostic.rule().to_string())),
+        code: Some(NumberOrString::String(diagnostic.id().to_string())),
         code_description: None,
         source: Some("red-knot".into()),
         message: diagnostic.message().into_owned(),
