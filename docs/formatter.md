@@ -3,8 +3,6 @@
 The Ruff formatter is an extremely fast Python code formatter designed as a drop-in replacement for
 [Black](https://pypi.org/project/black/), available as part of the `ruff` CLI via `ruff format`.
 
-The Ruff formatter is available as of Ruff [v0.1.2](https://astral.sh/blog/the-ruff-formatter).
-
 ## `ruff format`
 
 `ruff format` is the primary entrypoint to the formatter. It accepts a list of files or
@@ -23,7 +21,7 @@ and instead exit with a non-zero status code upon detecting any unformatted file
 For the full list of supported options, run `ruff format --help`.
 
 !!! note
-    As of Ruff v0.1.7 the `ruff format` command uses the current working directory (`.`) as the default path to format.
+    The `ruff format` command uses the current working directory (`.`) as the default path to format.
     See [the file discovery documentation](configuration.md#python-file-discovery) for details.
 
 ## Philosophy

@@ -20,7 +20,7 @@ $ ruff check path/to/code/    # Lint all files in `path/to/code` (and any subdir
 For the full list of supported options, run `ruff check --help`.
 
 !!! note
-    As of Ruff v0.1.7 the `ruff check` command uses the current working directory (`.`) as the default path to check.
+    The `ruff check` command uses the current working directory (`.`) as the default path to check.
     On older versions, you must provide this manually e.g. `ruff check .`.
     See [the file discovery documentation](configuration.md#python-file-discovery) for details.
 
