@@ -417,8 +417,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Get the type of an expression from any scope in the same file.
     ///
     /// If the expression is in the current scope, and we are inferring the entire scope, just look
-    /// up the expression in our own results, otherwise call [`infer_scope_types`] for the scope of
-    /// the expression.
+    /// up the expression in our own results, otherwise call [`infer_scope_types()`] for the scope
+    /// of the expression.
     ///
     /// ## Panics
     ///
