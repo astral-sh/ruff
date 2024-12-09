@@ -2,429 +2,566 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF046.py:7:1: RUF046 [*] Value being casted is already an integer
-  |
-6 | # Arguments are not checked
-7 | int(id())
-  | ^^^^^^^^^ RUF046
-8 | int(len([]))
-9 | int(ord(foo))
-  |
-  = help: Remove unnecessary conversion to `int`
-
-ℹ Safe fix
-4 4 | ### Safely fixable
-5 5 | 
-6 6 | # Arguments are not checked
-7   |-int(id())
-  7 |+id()
-8 8 | int(len([]))
-9 9 | int(ord(foo))
-10 10 | int(hash(foo, bar))
-
-RUF046.py:8:1: RUF046 [*] Value being casted is already an integer
-   |
- 6 | # Arguments are not checked
- 7 | int(id())
- 8 | int(len([]))
-   | ^^^^^^^^^^^^ RUF046
- 9 | int(ord(foo))
-10 | int(hash(foo, bar))
-   |
-   = help: Remove unnecessary conversion to `int`
-
-ℹ Safe fix
-5 5 | 
-6 6 | # Arguments are not checked
-7 7 | int(id())
-8   |-int(len([]))
-  8 |+len([])
-9 9 | int(ord(foo))
-10 10 | int(hash(foo, bar))
-11 11 | int(int(''))
-
-RUF046.py:9:1: RUF046 [*] Value being casted is already an integer
-   |
- 7 | int(id())
- 8 | int(len([]))
- 9 | int(ord(foo))
-   | ^^^^^^^^^^^^^ RUF046
-10 | int(hash(foo, bar))
-11 | int(int(''))
-   |
-   = help: Remove unnecessary conversion to `int`
-
-ℹ Safe fix
-6  6  | # Arguments are not checked
-7  7  | int(id())
-8  8  | int(len([]))
-9     |-int(ord(foo))
-   9  |+ord(foo)
-10 10 | int(hash(foo, bar))
-11 11 | int(int(''))
-12 12 | 
-
 RUF046.py:10:1: RUF046 [*] Value being casted is already an integer
    |
- 8 | int(len([]))
- 9 | int(ord(foo))
-10 | int(hash(foo, bar))
-   | ^^^^^^^^^^^^^^^^^^^ RUF046
-11 | int(int(''))
+ 8 | ### Safely fixable
+ 9 | 
+10 | int(id())
+   | ^^^^^^^^^ RUF046
+11 | int(len([]))
+12 | int(ord(foo))
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-7  7  | int(id())
-8  8  | int(len([]))
-9  9  | int(ord(foo))
-10    |-int(hash(foo, bar))
-   10 |+hash(foo, bar)
-11 11 | int(int(''))
-12 12 | 
-13 13 | int(math.comb())
+7  7  | 
+8  8  | ### Safely fixable
+9  9  | 
+10    |-int(id())
+   10 |+id()
+11 11 | int(len([]))
+12 12 | int(ord(foo))
+13 13 | int(hash(foo, bar))
 
 RUF046.py:11:1: RUF046 [*] Value being casted is already an integer
    |
- 9 | int(ord(foo))
-10 | int(hash(foo, bar))
-11 | int(int(''))
+10 | int(id())
+11 | int(len([]))
    | ^^^^^^^^^^^^ RUF046
-12 | 
-13 | int(math.comb())
+12 | int(ord(foo))
+13 | int(hash(foo, bar))
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-8  8  | int(len([]))
-9  9  | int(ord(foo))
-10 10 | int(hash(foo, bar))
-11    |-int(int(''))
-   11 |+int('')
-12 12 | 
-13 13 | int(math.comb())
-14 14 | int(math.factorial())
+8  8  | ### Safely fixable
+9  9  | 
+10 10 | int(id())
+11    |-int(len([]))
+   11 |+len([])
+12 12 | int(ord(foo))
+13 13 | int(hash(foo, bar))
+14 14 | int(int(''))
+
+RUF046.py:12:1: RUF046 [*] Value being casted is already an integer
+   |
+10 | int(id())
+11 | int(len([]))
+12 | int(ord(foo))
+   | ^^^^^^^^^^^^^ RUF046
+13 | int(hash(foo, bar))
+14 | int(int(''))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Safe fix
+9  9  | 
+10 10 | int(id())
+11 11 | int(len([]))
+12    |-int(ord(foo))
+   12 |+ord(foo)
+13 13 | int(hash(foo, bar))
+14 14 | int(int(''))
+15 15 | 
 
 RUF046.py:13:1: RUF046 [*] Value being casted is already an integer
    |
-11 | int(int(''))
-12 | 
-13 | int(math.comb())
-   | ^^^^^^^^^^^^^^^^ RUF046
-14 | int(math.factorial())
-15 | int(math.gcd())
+11 | int(len([]))
+12 | int(ord(foo))
+13 | int(hash(foo, bar))
+   | ^^^^^^^^^^^^^^^^^^^ RUF046
+14 | int(int(''))
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-10 10 | int(hash(foo, bar))
-11 11 | int(int(''))
-12 12 | 
-13    |-int(math.comb())
-   13 |+math.comb()
-14 14 | int(math.factorial())
-15 15 | int(math.gcd())
-16 16 | int(math.lcm())
+10 10 | int(id())
+11 11 | int(len([]))
+12 12 | int(ord(foo))
+13    |-int(hash(foo, bar))
+   13 |+hash(foo, bar)
+14 14 | int(int(''))
+15 15 | 
+16 16 | int(math.comb())
 
 RUF046.py:14:1: RUF046 [*] Value being casted is already an integer
    |
-13 | int(math.comb())
-14 | int(math.factorial())
-   | ^^^^^^^^^^^^^^^^^^^^^ RUF046
-15 | int(math.gcd())
-16 | int(math.lcm())
+12 | int(ord(foo))
+13 | int(hash(foo, bar))
+14 | int(int(''))
+   | ^^^^^^^^^^^^ RUF046
+15 | 
+16 | int(math.comb())
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-11 11 | int(int(''))
-12 12 | 
-13 13 | int(math.comb())
-14    |-int(math.factorial())
-   14 |+math.factorial()
-15 15 | int(math.gcd())
-16 16 | int(math.lcm())
-17 17 | int(math.isqrt())
-
-RUF046.py:15:1: RUF046 [*] Value being casted is already an integer
-   |
-13 | int(math.comb())
-14 | int(math.factorial())
-15 | int(math.gcd())
-   | ^^^^^^^^^^^^^^^ RUF046
-16 | int(math.lcm())
-17 | int(math.isqrt())
-   |
-   = help: Remove unnecessary conversion to `int`
-
-ℹ Safe fix
-12 12 | 
-13 13 | int(math.comb())
-14 14 | int(math.factorial())
-15    |-int(math.gcd())
-   15 |+math.gcd()
-16 16 | int(math.lcm())
-17 17 | int(math.isqrt())
-18 18 | int(math.perm())
+11 11 | int(len([]))
+12 12 | int(ord(foo))
+13 13 | int(hash(foo, bar))
+14    |-int(int(''))
+   14 |+int('')
+15 15 | 
+16 16 | int(math.comb())
+17 17 | int(math.factorial())
 
 RUF046.py:16:1: RUF046 [*] Value being casted is already an integer
    |
-14 | int(math.factorial())
-15 | int(math.gcd())
-16 | int(math.lcm())
-   | ^^^^^^^^^^^^^^^ RUF046
-17 | int(math.isqrt())
-18 | int(math.perm())
+14 | int(int(''))
+15 | 
+16 | int(math.comb())
+   | ^^^^^^^^^^^^^^^^ RUF046
+17 | int(math.factorial())
+18 | int(math.gcd())
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-13 13 | int(math.comb())
-14 14 | int(math.factorial())
-15 15 | int(math.gcd())
-16    |-int(math.lcm())
-   16 |+math.lcm()
-17 17 | int(math.isqrt())
-18 18 | int(math.perm())
-19 19 | 
+13 13 | int(hash(foo, bar))
+14 14 | int(int(''))
+15 15 | 
+16    |-int(math.comb())
+   16 |+math.comb()
+17 17 | int(math.factorial())
+18 18 | int(math.gcd())
+19 19 | int(math.lcm())
 
 RUF046.py:17:1: RUF046 [*] Value being casted is already an integer
    |
-15 | int(math.gcd())
-16 | int(math.lcm())
-17 | int(math.isqrt())
-   | ^^^^^^^^^^^^^^^^^ RUF046
-18 | int(math.perm())
+16 | int(math.comb())
+17 | int(math.factorial())
+   | ^^^^^^^^^^^^^^^^^^^^^ RUF046
+18 | int(math.gcd())
+19 | int(math.lcm())
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-14 14 | int(math.factorial())
-15 15 | int(math.gcd())
-16 16 | int(math.lcm())
-17    |-int(math.isqrt())
-   17 |+math.isqrt()
-18 18 | int(math.perm())
-19 19 | 
-20 20 | 
+14 14 | int(int(''))
+15 15 | 
+16 16 | int(math.comb())
+17    |-int(math.factorial())
+   17 |+math.factorial()
+18 18 | int(math.gcd())
+19 19 | int(math.lcm())
+20 20 | int(math.isqrt())
 
 RUF046.py:18:1: RUF046 [*] Value being casted is already an integer
    |
-16 | int(math.lcm())
-17 | int(math.isqrt())
-18 | int(math.perm())
-   | ^^^^^^^^^^^^^^^^ RUF046
+16 | int(math.comb())
+17 | int(math.factorial())
+18 | int(math.gcd())
+   | ^^^^^^^^^^^^^^^ RUF046
+19 | int(math.lcm())
+20 | int(math.isqrt())
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-15 15 | int(math.gcd())
-16 16 | int(math.lcm())
-17 17 | int(math.isqrt())
-18    |-int(math.perm())
-   18 |+math.perm()
-19 19 | 
-20 20 | 
-21 21 | ### Unsafe
+15 15 | 
+16 16 | int(math.comb())
+17 17 | int(math.factorial())
+18    |-int(math.gcd())
+   18 |+math.gcd()
+19 19 | int(math.lcm())
+20 20 | int(math.isqrt())
+21 21 | int(math.perm())
+
+RUF046.py:19:1: RUF046 [*] Value being casted is already an integer
+   |
+17 | int(math.factorial())
+18 | int(math.gcd())
+19 | int(math.lcm())
+   | ^^^^^^^^^^^^^^^ RUF046
+20 | int(math.isqrt())
+21 | int(math.perm())
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Safe fix
+16 16 | int(math.comb())
+17 17 | int(math.factorial())
+18 18 | int(math.gcd())
+19    |-int(math.lcm())
+   19 |+math.lcm()
+20 20 | int(math.isqrt())
+21 21 | int(math.perm())
+22 22 | 
+
+RUF046.py:20:1: RUF046 [*] Value being casted is already an integer
+   |
+18 | int(math.gcd())
+19 | int(math.lcm())
+20 | int(math.isqrt())
+   | ^^^^^^^^^^^^^^^^^ RUF046
+21 | int(math.perm())
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Safe fix
+17 17 | int(math.factorial())
+18 18 | int(math.gcd())
+19 19 | int(math.lcm())
+20    |-int(math.isqrt())
+   20 |+math.isqrt()
+21 21 | int(math.perm())
+22 22 | 
+23 23 | int(round(1, 0))
+
+RUF046.py:21:1: RUF046 [*] Value being casted is already an integer
+   |
+19 | int(math.lcm())
+20 | int(math.isqrt())
+21 | int(math.perm())
+   | ^^^^^^^^^^^^^^^^ RUF046
+22 | 
+23 | int(round(1, 0))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Safe fix
+18 18 | int(math.gcd())
+19 19 | int(math.lcm())
+20 20 | int(math.isqrt())
+21    |-int(math.perm())
+   21 |+math.perm()
+22 22 | 
+23 23 | int(round(1, 0))
+24 24 | int(round(1, 10))
 
 RUF046.py:23:1: RUF046 [*] Value being casted is already an integer
    |
-21 | ### Unsafe
+21 | int(math.perm())
 22 | 
-23 | int(math.ceil())
+23 | int(round(1, 0))
    | ^^^^^^^^^^^^^^^^ RUF046
-24 | int(math.floor())
-25 | int(math.trunc())
+24 | int(round(1, 10))
    |
    = help: Remove unnecessary conversion to `int`
 
-ℹ Unsafe fix
-20 20 | 
-21 21 | ### Unsafe
+ℹ Safe fix
+20 20 | int(math.isqrt())
+21 21 | int(math.perm())
 22 22 | 
-23    |-int(math.ceil())
-   23 |+math.ceil()
-24 24 | int(math.floor())
-25 25 | int(math.trunc())
-26 26 | 
+23    |-int(round(1, 0))
+   23 |+round(1, 0)
+24 24 | int(round(1, 10))
+25 25 | 
+26 26 | int(round(1))
 
 RUF046.py:24:1: RUF046 [*] Value being casted is already an integer
    |
-23 | int(math.ceil())
-24 | int(math.floor())
+23 | int(round(1, 0))
+24 | int(round(1, 10))
    | ^^^^^^^^^^^^^^^^^ RUF046
-25 | int(math.trunc())
+25 | 
+26 | int(round(1))
    |
    = help: Remove unnecessary conversion to `int`
 
-ℹ Unsafe fix
-21 21 | ### Unsafe
+ℹ Safe fix
+21 21 | int(math.perm())
 22 22 | 
-23 23 | int(math.ceil())
-24    |-int(math.floor())
-   24 |+math.floor()
-25 25 | int(math.trunc())
-26 26 | 
-27 27 | 
+23 23 | int(round(1, 0))
+24    |-int(round(1, 10))
+   24 |+round(1, 10)
+25 25 | 
+26 26 | int(round(1))
+27 27 | int(round(1, None))
 
-RUF046.py:25:1: RUF046 [*] Value being casted is already an integer
+RUF046.py:26:1: RUF046 [*] Value being casted is already an integer
    |
-23 | int(math.ceil())
-24 | int(math.floor())
-25 | int(math.trunc())
-   | ^^^^^^^^^^^^^^^^^ RUF046
-   |
-   = help: Remove unnecessary conversion to `int`
-
-ℹ Unsafe fix
-22 22 | 
-23 23 | int(math.ceil())
-24 24 | int(math.floor())
-25    |-int(math.trunc())
-   25 |+math.trunc()
-26 26 | 
-27 27 | 
-28 28 | ### `round()`
-
-RUF046.py:31:1: RUF046 [*] Value being casted is already an integer
-   |
-30 | ## Errors
-31 | int(round(0))
+24 | int(round(1, 10))
+25 | 
+26 | int(round(1))
    | ^^^^^^^^^^^^^ RUF046
-32 | int(round(0, 0))
-33 | int(round(0, None))
+27 | int(round(1, None))
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-28 28 | ### `round()`
-29 29 | 
-30 30 | ## Errors
-31    |-int(round(0))
-   31 |+round(0)
-32 32 | int(round(0, 0))
-33 33 | int(round(0, None))
-34 34 | 
+23 23 | int(round(1, 0))
+24 24 | int(round(1, 10))
+25 25 | 
+26    |-int(round(1))
+   26 |+round(1)
+27 27 | int(round(1, None))
+28 28 | 
+29 29 | int(round(1.))
 
-RUF046.py:32:1: RUF046 [*] Value being casted is already an integer
+RUF046.py:27:1: RUF046 [*] Value being casted is already an integer
    |
-30 | ## Errors
-31 | int(round(0))
-32 | int(round(0, 0))
-   | ^^^^^^^^^^^^^^^^ RUF046
-33 | int(round(0, None))
-   |
-   = help: Remove unnecessary conversion to `int`
-
-ℹ Safe fix
-29 29 | 
-30 30 | ## Errors
-31 31 | int(round(0))
-32    |-int(round(0, 0))
-   32 |+round(0)
-33 33 | int(round(0, None))
-34 34 | 
-35 35 | int(round(0.1))
-
-RUF046.py:33:1: RUF046 [*] Value being casted is already an integer
-   |
-31 | int(round(0))
-32 | int(round(0, 0))
-33 | int(round(0, None))
+26 | int(round(1))
+27 | int(round(1, None))
    | ^^^^^^^^^^^^^^^^^^^ RUF046
-34 | 
-35 | int(round(0.1))
+28 | 
+29 | int(round(1.))
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Safe fix
-30 30 | ## Errors
-31 31 | int(round(0))
-32 32 | int(round(0, 0))
-33    |-int(round(0, None))
-   33 |+round(0)
-34 34 | 
-35 35 | int(round(0.1))
-36 36 | int(round(0.1, None))
+24 24 | int(round(1, 10))
+25 25 | 
+26 26 | int(round(1))
+27    |-int(round(1, None))
+   27 |+round(1, None)
+28 28 | 
+29 29 | int(round(1.))
+30 30 | int(round(1., None))
+
+RUF046.py:29:1: RUF046 [*] Value being casted is already an integer
+   |
+27 | int(round(1, None))
+28 | 
+29 | int(round(1.))
+   | ^^^^^^^^^^^^^^ RUF046
+30 | int(round(1., None))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Safe fix
+26 26 | int(round(1))
+27 27 | int(round(1, None))
+28 28 | 
+29    |-int(round(1.))
+   29 |+round(1.)
+30 30 | int(round(1., None))
+31 31 | 
+32 32 | 
+
+RUF046.py:30:1: RUF046 [*] Value being casted is already an integer
+   |
+29 | int(round(1.))
+30 | int(round(1., None))
+   | ^^^^^^^^^^^^^^^^^^^^ RUF046
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Safe fix
+27 27 | int(round(1, None))
+28 28 | 
+29 29 | int(round(1.))
+30    |-int(round(1., None))
+   30 |+round(1., None)
+31 31 | 
+32 32 | 
+33 33 | ### Unsafe
 
 RUF046.py:35:1: RUF046 [*] Value being casted is already an integer
    |
-33 | int(round(0, None))
+33 | ### Unsafe
 34 | 
-35 | int(round(0.1))
-   | ^^^^^^^^^^^^^^^ RUF046
-36 | int(round(0.1, None))
+35 | int(math.ceil())
+   | ^^^^^^^^^^^^^^^^ RUF046
+36 | int(math.floor())
+37 | int(math.trunc())
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Unsafe fix
-32 32 | int(round(0, 0))
-33 33 | int(round(0, None))
+32 32 | 
+33 33 | ### Unsafe
 34 34 | 
-35    |-int(round(0.1))
-   35 |+round(0.1)
-36 36 | int(round(0.1, None))
-37 37 | 
-38 38 | # Argument type is not checked
+35    |-int(math.ceil())
+   35 |+math.ceil()
+36 36 | int(math.floor())
+37 37 | int(math.trunc())
+38 38 | 
 
 RUF046.py:36:1: RUF046 [*] Value being casted is already an integer
    |
-35 | int(round(0.1))
-36 | int(round(0.1, None))
-   | ^^^^^^^^^^^^^^^^^^^^^ RUF046
-37 | 
-38 | # Argument type is not checked
+35 | int(math.ceil())
+36 | int(math.floor())
+   | ^^^^^^^^^^^^^^^^^ RUF046
+37 | int(math.trunc())
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Unsafe fix
-33 33 | int(round(0, None))
+33 33 | ### Unsafe
 34 34 | 
-35 35 | int(round(0.1))
-36    |-int(round(0.1, None))
-   36 |+round(0.1)
-37 37 | 
-38 38 | # Argument type is not checked
-39 39 | foo = type("Foo", (), {"__round__": lambda self: 4.2})()
+35 35 | int(math.ceil())
+36    |-int(math.floor())
+   36 |+math.floor()
+37 37 | int(math.trunc())
+38 38 | 
+39 39 | int(round(inferred_int, 0))
 
-RUF046.py:41:1: RUF046 [*] Value being casted is already an integer
+RUF046.py:37:1: RUF046 [*] Value being casted is already an integer
    |
-39 | foo = type("Foo", (), {"__round__": lambda self: 4.2})()
-40 | 
-41 | int(round(foo))
-   | ^^^^^^^^^^^^^^^ RUF046
-42 | int(round(foo, 0))
-43 | int(round(foo, None))
+35 | int(math.ceil())
+36 | int(math.floor())
+37 | int(math.trunc())
+   | ^^^^^^^^^^^^^^^^^ RUF046
+38 | 
+39 | int(round(inferred_int, 0))
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Unsafe fix
-38 38 | # Argument type is not checked
-39 39 | foo = type("Foo", (), {"__round__": lambda self: 4.2})()
-40 40 | 
-41    |-int(round(foo))
-   41 |+round(foo)
-42 42 | int(round(foo, 0))
-43 43 | int(round(foo, None))
+34 34 | 
+35 35 | int(math.ceil())
+36 36 | int(math.floor())
+37    |-int(math.trunc())
+   37 |+math.trunc()
+38 38 | 
+39 39 | int(round(inferred_int, 0))
+40 40 | int(round(inferred_int, 10))
+
+RUF046.py:39:1: RUF046 [*] Value being casted is already an integer
+   |
+37 | int(math.trunc())
+38 | 
+39 | int(round(inferred_int, 0))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
+40 | int(round(inferred_int, 10))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+36 36 | int(math.floor())
+37 37 | int(math.trunc())
+38 38 | 
+39    |-int(round(inferred_int, 0))
+   39 |+round(inferred_int, 0)
+40 40 | int(round(inferred_int, 10))
+41 41 | 
+42 42 | int(round(inferred_int))
+
+RUF046.py:40:1: RUF046 [*] Value being casted is already an integer
+   |
+39 | int(round(inferred_int, 0))
+40 | int(round(inferred_int, 10))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
+41 | 
+42 | int(round(inferred_int))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+37 37 | int(math.trunc())
+38 38 | 
+39 39 | int(round(inferred_int, 0))
+40    |-int(round(inferred_int, 10))
+   40 |+round(inferred_int, 10)
+41 41 | 
+42 42 | int(round(inferred_int))
+43 43 | int(round(inferred_int, None))
+
+RUF046.py:42:1: RUF046 [*] Value being casted is already an integer
+   |
+40 | int(round(inferred_int, 10))
+41 | 
+42 | int(round(inferred_int))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
+43 | int(round(inferred_int, None))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+39 39 | int(round(inferred_int, 0))
+40 40 | int(round(inferred_int, 10))
+41 41 | 
+42    |-int(round(inferred_int))
+   42 |+round(inferred_int)
+43 43 | int(round(inferred_int, None))
 44 44 | 
+45 45 | int(round(inferred_float))
 
 RUF046.py:43:1: RUF046 [*] Value being casted is already an integer
    |
-41 | int(round(foo))
-42 | int(round(foo, 0))
-43 | int(round(foo, None))
-   | ^^^^^^^^^^^^^^^^^^^^^ RUF046
+42 | int(round(inferred_int))
+43 | int(round(inferred_int, None))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
 44 | 
-45 | ## No errors
+45 | int(round(inferred_float))
    |
    = help: Remove unnecessary conversion to `int`
 
 ℹ Unsafe fix
-40 40 | 
-41 41 | int(round(foo))
-42 42 | int(round(foo, 0))
-43    |-int(round(foo, None))
-   43 |+round(foo)
+40 40 | int(round(inferred_int, 10))
+41 41 | 
+42 42 | int(round(inferred_int))
+43    |-int(round(inferred_int, None))
+   43 |+round(inferred_int, None)
 44 44 | 
-45 45 | ## No errors
-46 46 | int(round(0, 3.14))
+45 45 | int(round(inferred_float))
+46 46 | int(round(inferred_float, None))
+
+RUF046.py:45:1: RUF046 [*] Value being casted is already an integer
+   |
+43 | int(round(inferred_int, None))
+44 | 
+45 | int(round(inferred_float))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
+46 | int(round(inferred_float, None))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+42 42 | int(round(inferred_int))
+43 43 | int(round(inferred_int, None))
+44 44 | 
+45    |-int(round(inferred_float))
+   45 |+round(inferred_float)
+46 46 | int(round(inferred_float, None))
+47 47 | 
+48 48 | int(round(unknown))
+
+RUF046.py:46:1: RUF046 [*] Value being casted is already an integer
+   |
+45 | int(round(inferred_float))
+46 | int(round(inferred_float, None))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
+47 | 
+48 | int(round(unknown))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+43 43 | int(round(inferred_int, None))
+44 44 | 
+45 45 | int(round(inferred_float))
+46    |-int(round(inferred_float, None))
+   46 |+round(inferred_float, None)
+47 47 | 
+48 48 | int(round(unknown))
+49 49 | int(round(unknown, None))
+
+RUF046.py:48:1: RUF046 [*] Value being casted is already an integer
+   |
+46 | int(round(inferred_float, None))
+47 | 
+48 | int(round(unknown))
+   | ^^^^^^^^^^^^^^^^^^^ RUF046
+49 | int(round(unknown, None))
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+45 45 | int(round(inferred_float))
+46 46 | int(round(inferred_float, None))
+47 47 | 
+48    |-int(round(unknown))
+   48 |+round(unknown)
+49 49 | int(round(unknown, None))
+50 50 | 
+51 51 | 
+
+RUF046.py:49:1: RUF046 [*] Value being casted is already an integer
+   |
+48 | int(round(unknown))
+49 | int(round(unknown, None))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF046
+   |
+   = help: Remove unnecessary conversion to `int`
+
+ℹ Unsafe fix
+46 46 | int(round(inferred_float, None))
+47 47 | 
+48 48 | int(round(unknown))
+49    |-int(round(unknown, None))
+   49 |+round(unknown, None)
+50 50 | 
+51 51 | 
+52 52 | ### No errors
