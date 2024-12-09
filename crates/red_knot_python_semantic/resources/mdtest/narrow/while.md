@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Narrowing in `while` loops
 
 We only make sure that narrowing works for `while` loops in general, we do not exhaustively test all
@@ -56,3 +57,24 @@ while x != 1:
 
     x = next_item()
 ```
+||||||| parent of 8247164bf (Add tests for 'while'-narrowing)
+=======
+# Narrowing in `while` loops
+
+We only make sure that narrowing works for `while` loops in general, we do not exhaustively test all
+narrowing forms here, as they are covered in other tests.
+
+## Basic example
+
+```py
+def next_item() -> int | None: ...
+
+x = next_item()
+
+while x is not None:
+    reveal_type(x)  # revealed: int
+    x = next_item()
+else:
+    reveal_type(x)  # revealed: None
+```
+>>>>>>> 8247164bf (Add tests for 'while'-narrowing)
