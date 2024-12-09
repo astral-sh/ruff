@@ -438,3 +438,25 @@ PERF401.py:229:9: PERF401 [*] Use a list comprehension to create a transformed l
 229     |-        result.append(i[0] + i[1])  # PERF401
     227 |+    result = [i[0] + i[1] for i in (a, b)]  # PERF401
 230 228 |     return result
+231 229 | 
+232 230 | 
+
+PERF401.py:239:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+237 |         print(a)
+238 |     for a in values:
+239 |         result.append(a + 1)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+232 232 | 
+233 233 | def f():
+234 234 |     values = [1, 2, 3]
+235     |-    result = []
+236 235 |     for a in values:
+237 236 |         print(a)
+238     |-    for a in values:
+239     |-        result.append(a + 1)  # PERF401
+    237 |+    result = [a + 1 for a in values]  # PERF401

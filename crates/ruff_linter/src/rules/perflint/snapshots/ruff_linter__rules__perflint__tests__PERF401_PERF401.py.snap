@@ -181,3 +181,12 @@ PERF401.py:229:9: PERF401 Use a list comprehension to create a transformed list
 230 |     return result
     |
     = help: Replace for loop with list comprehension
+
+PERF401.py:239:9: PERF401 Use a list comprehension to create a transformed list
+    |
+237 |         print(a)
+238 |     for a in values:
+239 |         result.append(a + 1)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension

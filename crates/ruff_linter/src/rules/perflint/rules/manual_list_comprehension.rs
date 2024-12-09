@@ -245,25 +245,32 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
             .filter_map(|shadowed| shadowed.same_scope().then_some(shadowed.shadowed_id())),
     );
 
-    let target_binding = bindings
-        .find_map(|binding_id| {
-            let binding = checker.semantic().binding(binding_id);
-            if binding
+    let target_binding_id = bindings
+        .find(|binding_id| {
+            let binding = checker.semantic().binding(*binding_id);
+            binding
                 .statement(checker.semantic())
                 .and_then(Stmt::as_for_stmt)
                 .is_some_and(|stmt| stmt.range == for_stmt.range)
-            {
-                Some(binding)
-            } else {
-                None
-            }
         })
         .expect("for target binding must exist");
+    let target_binding = checker.semantic().binding(target_binding_id);
+    // TODO: should this be a HashMap?
+    let shadowed_references: Vec<_> = checker
+        .semantic()
+        .shadowed_bindings(checker.semantic().scope_id, target_binding_id)
+        .filter_map(|shadowed| shadowed.same_scope().then_some(shadowed.shadowed_id()))
+        .flat_map(|shadowed_id| {
+            let shadowed_binding = checker.semantic().binding(shadowed_id);
+            shadowed_binding.references()
+        })
+        .collect();
 
     drop(bindings);
 
     if target_binding
         .references()
+        .filter(|r_id| !shadowed_references.contains(r_id))
         .map(|reference| checker.semantic().reference(reference))
         .any(|r| !for_stmt.range.contains_range(r.range()))
     {

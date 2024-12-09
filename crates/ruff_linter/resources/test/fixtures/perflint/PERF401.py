@@ -228,3 +228,12 @@ def f():
     for i in a, b:
         result.append(i[0] + i[1])  # PERF401
     return result
+
+
+def f():
+    values = [1, 2, 3]
+    result = []
+    for a in values:
+        print(a)
+    for a in values:
+        result.append(a + 1)  # PERF401
