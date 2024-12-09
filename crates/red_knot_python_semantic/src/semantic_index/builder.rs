@@ -806,7 +806,7 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                let pre_if_condutions = self.branching_conditions_snapshot();
+                let pre_if_conditions = self.branching_conditions_snapshot();
                 let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
@@ -832,7 +832,7 @@ where
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
-                    self.flow_restore(pre_if.clone(), pre_if_condutions.clone());
+                    self.flow_restore(pre_if.clone(), pre_if_conditions.clone());
                     for constraint in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
@@ -843,7 +843,7 @@ where
                     self.visit_body(clause_body);
                 }
                 for post_clause_state in post_clauses {
-                    self.flow_merge(post_clause_state, pre_if_condutions.clone());
+                    self.flow_merge(post_clause_state, pre_if_conditions.clone());
                 }
             }
             ast::Stmt::While(ast::StmtWhile {
@@ -1034,7 +1034,6 @@ where
                     self.flow_restore(pre_try_block_state, pre_try_block_conditions.clone());
                     for state in try_block_snapshots {
                         self.flow_merge(state, pre_try_block_conditions.clone());
-                        // TODO?
                     }
 
                     let pre_except_state = self.flow_snapshot();
