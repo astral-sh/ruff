@@ -3011,7 +3011,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 use_def.use_boundness(self.db, use_id),
             )
         };
-        if boundness == Some(Boundness::PossiblyUnbound) || boundness == None {
+        if boundness == Some(Boundness::PossiblyUnbound) || boundness.is_none() {
             match self.lookup_name(name) {
                 Symbol::Type(looked_up_ty, looked_up_boundness) => {
                     if looked_up_boundness == Boundness::PossiblyUnbound {
