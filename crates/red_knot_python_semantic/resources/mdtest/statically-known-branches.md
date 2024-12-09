@@ -557,7 +557,8 @@ x
 
 ### Ambiguous, possibly unbound
 
-For comparison, we still definitions inside non-statically known branches as possibly unbound:
+For comparison, we still detect definitions inside non-statically known branches as possibly
+unbound:
 
 ```py
 def flag() -> bool: ...
