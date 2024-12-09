@@ -73,7 +73,7 @@ def f[T]():
 A typevar with less than two constraints emits a diagnostic:
 
 ```py
-# error: [invalid-typevar-constraints] "TypeVar must have at least two constrained types"
+# error: [invalid-type-variable-constraints] "TypeVar must have at least two constrained types"
 def f[T: (int,)]():
     pass
 ```

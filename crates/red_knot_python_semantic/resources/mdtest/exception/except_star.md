@@ -47,13 +47,13 @@ except* (KeyboardInterrupt, AttributeError) as e:
 ```py
 try:
     help()
-except* 3 as e:  # error: [invalid-exception]
+except* 3 as e:  # error: [invalid-exception-caught]
     # TODO: Should be `BaseExceptionGroup[Unknown]` --Alex
     reveal_type(e)  # revealed: BaseExceptionGroup
 
 try:
     help()
-except* (AttributeError, 42) as e:  # error: [invalid-exception]
+except* (AttributeError, 42) as e:  # error: [invalid-exception-caught]
     # TODO: Should be `BaseExceptionGroup[AttributeError | Unknown]` --Alex
     reveal_type(e)  # revealed: BaseExceptionGroup
 ```
