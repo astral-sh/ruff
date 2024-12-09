@@ -1,10 +1,11 @@
 use rustc_hash::FxHashSet;
 
+use crate::analyze::typing;
 use crate::{BindingId, SemanticModel};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple};
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
 pub fn any_qualified_base_class(
@@ -129,9 +130,9 @@ pub enum IsMetaclass {
     Maybe,
 }
 
-impl From<IsMetaclass> for bool {
-    fn from(value: IsMetaclass) -> Self {
-        matches!(value, IsMetaclass::Yes)
+impl IsMetaclass {
+    pub const fn is_yes(self) -> bool {
+        matches!(self, IsMetaclass::Yes)
     }
 }
 
@@ -169,4 +170,58 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
         (true, false) => IsMetaclass::Yes,
         (false, _) => IsMetaclass::No,
     }
+}
+
+/// Returns true if a class might generic.
+///
+/// A class is considered generic if at least one of its direct bases
+/// is subscripted with a `TypeVar`-like,
+/// or if it is defined using PEP 695 syntax.
+///
+/// Therefore, a class *might* be generic if it uses PEP-695 syntax
+/// or at least one of its direct bases is a subscript expression that
+/// is subscripted with an object that *might* be a `TypeVar`-like.
+pub fn might_be_generic(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    if class_def.type_params.is_some() {
+        return true;
+    }
+
+    class_def.bases().iter().any(|base| {
+        let Expr::Subscript(ExprSubscript { slice, .. }) = base else {
+            return false;
+        };
+
+        let Expr::Tuple(ExprTuple { elts, .. }) = slice.as_ref() else {
+            return expr_might_be_typevar_like(slice, semantic);
+        };
+
+        elts.iter()
+            .any(|elt| expr_might_be_typevar_like(elt, semantic))
+    })
+}
+
+fn expr_might_be_typevar_like(expr: &Expr, semantic: &SemanticModel) -> bool {
+    is_known_typevar(expr, semantic) || expr_might_be_old_style_typevar_like(expr, semantic)
+}
+
+fn is_known_typevar(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.match_typing_expr(expr, "AnyStr")
+}
+
+fn expr_might_be_old_style_typevar_like(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::Attribute(..) => true,
+        Expr::Name(name) => might_be_old_style_typevar_like(name, semantic),
+        Expr::Starred(ExprStarred { value, .. }) => {
+            expr_might_be_old_style_typevar_like(value, semantic)
+        }
+        _ => false,
+    }
+}
+
+fn might_be_old_style_typevar_like(name: &ExprName, semantic: &SemanticModel) -> bool {
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return !semantic.has_builtin_binding(&name.id);
+    };
+    typing::is_type_var_like(binding, semantic)
 }
