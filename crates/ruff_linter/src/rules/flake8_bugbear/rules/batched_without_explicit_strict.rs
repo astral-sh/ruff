@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
 use crate::rules::flake8_bugbear::rules::is_infinite_iterator;
 use crate::settings::types::PythonVersion;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Arguments, ExprCall};
 
