@@ -4684,6 +4684,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
+            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. })
+                if matches!(
+                    self.infer_expression(value),
+                    Type::KnownInstance(KnownInstanceType::Union)
+                ) =>
+            {
+                let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() else {
+                    return Type::Unknown;
+                };
+
+                if elts.len() < 2 {
+                    return Type::Unknown;
+                }
+
+                let union_ty = UnionType::from_elements(
+                    self.db,
+                    elts.iter()
+                        .map(|it| self.infer_subclass_of_type_expression(it)),
+                );
+                self.store_expression_type(slice, union_ty);
+
+                union_ty
+            }
             // TODO: subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);

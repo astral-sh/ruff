@@ -91,6 +91,8 @@ class C: ...
 ## Union of classes
 
 ```py
+from typing import Union
+
 class BasicUser: ...
 class ProUser: ...
 
@@ -103,6 +105,24 @@ def get_user() -> type[BasicUser | ProUser | A.B.C]:
 
 # revealed: type[BasicUser] | type[ProUser] | type[C]
 reveal_type(get_user())
+
+def get_user_old_style() -> type[Union[BasicUser, ProUser, A.B.C]]:
+    return BasicUser
+
+# revealed: type[BasicUser] | type[ProUser] | type[C]
+reveal_type(get_user_old_style())
+
+def get_user_nested() -> type[Union[BasicUser, Union[ProUser, A.B.C]]]:
+    return BasicUser
+
+# revealed: type[BasicUser] | type[ProUser] | type[C]
+reveal_type(get_user_nested())
+
+def get_user_mixed() -> type[BasicUser | Union[ProUser, A.B.C]]:
+    return BasicUser
+
+# revealed: type[BasicUser] | type[ProUser] | type[C]
+reveal_type(get_user_mixed())
 ```
 
 ## Illegal parameters
