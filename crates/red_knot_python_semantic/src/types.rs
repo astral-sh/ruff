@@ -129,6 +129,13 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
 /// Shorthand for `symbol_by_id` that takes a symbol name instead of an ID.
 fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
+    match file_to_module(db, scope.file(db)) {
+        Some(module) if module.name().as_str() == "typing" && name == "TYPE_CHECKING" => {
+            return Symbol::Type(Type::BooleanLiteral(true), Boundness::Bound);
+        }
+        _ => {}
+    }
+
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
