@@ -172,7 +172,7 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
     }
 }
 
-/// Returns true if a class might generic.
+/// Returns true if a class might be generic.
 ///
 /// A class is considered generic if at least one of its direct bases
 /// is subscripted with a `TypeVar`-like,
