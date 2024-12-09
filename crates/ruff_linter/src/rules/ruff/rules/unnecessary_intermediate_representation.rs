@@ -262,8 +262,8 @@ fn use_single_arg_method_call(
 }
 
 /// Returns a [`Diagnostic`] whose fix suggests replacing `range`
-/// with `{target}.{method}(({element}))` (two pair of parentheses).
-fn use_tuple_method_call(
+/// with `{target}.{method}(({element}))` (two pairs of parentheses).
+fn use_tuple_arg_method_call(
     range: TextRange,
     target: &str,
     method: &str,
@@ -566,7 +566,7 @@ fn list_iadd_multiple(
     let element_exprs = iterable.element_exprs(locator);
 
     let method = "extend";
-    let diagnostic = use_tuple_method_call(range, target_expr, method, &element_exprs);
+    let diagnostic = use_tuple_arg_method_call(range, target_expr, method, &element_exprs);
 
     checker.diagnostics.push(diagnostic);
 }
@@ -631,7 +631,7 @@ fn set_iop_multiple(
     let target_expr = locator.slice(target);
     let element_exprs = iterable.element_exprs(locator);
 
-    let diagnostic = use_tuple_method_call(range, target_expr, method, &element_exprs);
+    let diagnostic = use_tuple_arg_method_call(range, target_expr, method, &element_exprs);
 
     checker.diagnostics.push(diagnostic);
 }
