@@ -71,24 +71,24 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     }
 
-    match call.arguments.find_argument("mode", 1) {
-        None => {}
-        Some(mode_param) => {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param {
-                if let Ok(mode) = OpenMode::from_chars(value.chars()) {
-                    let reduced = mode.reduce();
-                    if reduced != mode {
-                        checker.diagnostics.push(create_diagnostic(
-                            call,
-                            mode_param,
-                            reduced,
-                            checker.tokens(),
-                            checker.stylist(),
-                        ));
-                    }
-                }
-            }
-        }
+    let Some(mode_param) = call.arguments.find_argument("mode", 1) else {
+        return;
+    };
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param else {
+        return;
+    };
+    let Ok(mode) = OpenMode::from_chars(value.chars()) else {
+        return;
+    };
+    let reduced = mode.reduce();
+    if reduced != mode {
+        checker.diagnostics.push(create_diagnostic(
+            call,
+            mode_param,
+            reduced,
+            checker.tokens(),
+            checker.stylist(),
+        ));
     }
 }
 
