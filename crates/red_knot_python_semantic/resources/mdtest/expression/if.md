@@ -9,7 +9,7 @@ def bool_instance() -> bool:
 reveal_type(1 if bool_instance() else 2)  # revealed: Literal[1, 2]
 ```
 
-## Statically known conditions in if expressions
+## Statically known conditions in if-expressions
 
 ```py
 reveal_type(1 if True else 2)  # revealed: Literal[1]
