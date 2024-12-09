@@ -493,7 +493,7 @@ impl<'db> BranchingConditionsIterator<'_, 'db> {
 
         for condition in self {
             let truthiness = match condition {
-                BranchingCondition::Conditional(Constraint {
+                BranchingCondition::ConditionalOn(Constraint {
                     node: ConstraintNode::Expression(test_expr),
                     is_positive,
                 }) => {
@@ -504,11 +504,11 @@ impl<'db> BranchingConditionsIterator<'_, 'db> {
 
                     ty.bool(db).negate_if(!is_positive)
                 }
-                BranchingCondition::Conditional(Constraint {
+                BranchingCondition::ConditionalOn(Constraint {
                     node: ConstraintNode::Pattern(..),
                     ..
                 }) => Truthiness::Ambiguous,
-                BranchingCondition::Unconditional => Truthiness::Ambiguous,
+                BranchingCondition::Ambiguous => Truthiness::Ambiguous,
             };
 
             result.any_always_false |= truthiness.is_always_false();
@@ -608,11 +608,11 @@ impl<'db> UseDefMapBuilder<'db> {
             state.record_constraint(constraint_id);
         }
 
-        self.record_branching_condition(BranchingCondition::Conditional(constraint));
+        self.record_branching_condition(BranchingCondition::ConditionalOn(constraint));
     }
 
-    pub(super) fn record_unconditional_branching(&mut self) {
-        self.record_branching_condition(BranchingCondition::Unconditional);
+    pub(super) fn record_unconstrained_branch_point(&mut self) {
+        self.record_branching_condition(BranchingCondition::Ambiguous);
     }
 
     pub(super) fn record_branching_condition(&mut self, condition: BranchingCondition<'db>) {

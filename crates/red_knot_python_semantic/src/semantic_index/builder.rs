@@ -303,7 +303,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn record_unconditional_branching(&mut self) {
         self.current_use_def_map_mut()
-            .record_unconditional_branching();
+            .record_unconstrained_branch_point();
     }
 
     fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
@@ -1028,7 +1028,7 @@ where
                     // as there necessarily must have been 0 `except` blocks executed
                     // if we hit the `else` block.
                     let post_try_block_state = self.flow_snapshot();
-                    let post_try_block_constraints = self.branching_conditions_snapshot();
+                    let post_try_block_conditions = self.branching_conditions_snapshot();
 
                     // Prepare for visiting the `except` block(s)
                     self.flow_restore(pre_try_block_state, pre_try_block_conditions.clone());
@@ -1088,7 +1088,7 @@ where
 
                     // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
                     // and the entire `try` block must have been executed:
-                    self.flow_restore(post_try_block_state, post_try_block_constraints);
+                    self.flow_restore(post_try_block_state, post_try_block_conditions);
                 }
 
                 self.visit_body(orelse);
