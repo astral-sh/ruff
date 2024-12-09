@@ -117,11 +117,7 @@ class A:
     class B:
         class C: ...
 
-def f(
-    a: type[Union[BasicUser, ProUser, A.B.C]],
-    b: type[Union[str]],
-    c: type[Union[BasicUser, Union[ProUser, A.B.C]]]
-):
+def f(a: type[Union[BasicUser, ProUser, A.B.C]], b: type[Union[str]], c: type[Union[BasicUser, Union[ProUser, A.B.C]]]):
     reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
     reveal_type(b)  # revealed: type[str]
     reveal_type(c)  # revealed: type[BasicUser] | type[ProUser] | type[C]
@@ -139,10 +135,7 @@ class A:
     class B:
         class C: ...
 
-def f(
-    a: type[BasicUser | Union[ProUser, A.B.C]],
-    b: type[Union[BasicUser | Union[ProUser, A.B.C | str]]]
-):
+def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Union[ProUser, A.B.C | str]]]):
     reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
     reveal_type(b)  # revealed: type[BasicUser] | type[ProUser] | type[C] | type[str]
 ```
