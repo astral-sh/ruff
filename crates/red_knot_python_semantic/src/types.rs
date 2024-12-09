@@ -268,46 +268,18 @@ fn bindings_ty<'db>(
              constraints,
              branching_conditions,
          }| {
-            let test_expr_tys = || {
-                branching_conditions.clone().map(|c| {
-                    let ty = if let ConstraintNode::Expression(test_expr) = c.node {
-                        let inference = infer_expression_types(db, test_expr);
-                        let scope = test_expr.scope(db);
-                        inference
-                            .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope))
-                    } else {
-                        // TODO: handle other constraint nodes
-                        todo_type!()
-                    };
+            let result = branching_conditions.branch_condition_truthiness(db);
 
-                    (c, ty)
-                })
-            };
-
-            if test_expr_tys().any(|(c, test_expr_ty)| {
-                if c.is_positive {
-                    test_expr_ty.bool(db).is_always_false()
-                } else {
-                    test_expr_ty.bool(db).is_always_true()
-                }
-            }) {
+            if result.any_always_false {
                 // TODO: do we need to call binding_ty(…) even if we don't need the result?
                 (Type::Never, UnconditionallyVisible::No)
             } else {
-                let mut test_expr_tys_iter = test_expr_tys().peekable();
-
-                let unconditionally_visible = if test_expr_tys_iter.peek().is_some()
-                    && test_expr_tys_iter.all(|(c, test_expr_ty)| {
-                        if c.is_positive {
-                            test_expr_ty.bool(db).is_always_true()
-                        } else {
-                            test_expr_ty.bool(db).is_always_false()
-                        }
-                    }) {
-                    UnconditionallyVisible::Yes
-                } else {
-                    UnconditionallyVisible::No
-                };
+                let unconditionally_visible =
+                    if result.at_least_one_condition && result.all_always_true {
+                        UnconditionallyVisible::Yes
+                    } else {
+                        UnconditionallyVisible::No
+                    };
 
                 let mut constraint_tys = constraints
                     .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
@@ -2644,11 +2616,19 @@ impl Truthiness {
         matches!(self, Truthiness::AlwaysTrue)
     }
 
-    const fn negate(self) -> Self {
+    pub(crate) const fn negate(self) -> Self {
         match self {
             Self::AlwaysTrue => Self::AlwaysFalse,
             Self::AlwaysFalse => Self::AlwaysTrue,
             Self::Ambiguous => Self::Ambiguous,
+        }
+    }
+
+    pub(crate) const fn negate_if(self, condition: bool) -> Self {
+        if condition {
+            self.negate()
+        } else {
+            self
         }
     }
 

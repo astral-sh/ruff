@@ -226,13 +226,17 @@ use self::symbol_state::{
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedUseId};
+use crate::semantic_index::branching::BranchingCondition;
 use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::bitset::BitSet;
-use crate::semantic_index::use_def::symbol_state::BranchingConditions;
+use crate::semantic_index::use_def::symbol_state::{
+    BranchingConditionIdIterator, BranchingConditions, ScopedBranchingConditionId,
+};
 use crate::symbol::Boundness;
-use crate::types::{infer_expression_types, KnownClass};
+use crate::types::{infer_expression_types, KnownClass, Truthiness};
+use crate::Db;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -249,6 +253,9 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Array of [`Constraint`] in this scope.
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
+
+    /// Array of [`BranchingCondition`] in this scope.
+    all_branching_conditions: IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -272,109 +279,6 @@ pub(crate) struct UseDefMap<'db> {
 }
 
 impl<'db> UseDefMap<'db> {
-    #[cfg(test)]
-    #[allow(clippy::print_stdout)]
-    pub(crate) fn print(&self, db: &dyn crate::db::Db) {
-        use crate::semantic_index::constraint::ConstraintNode;
-
-        println!("all_definitions:");
-        println!("================");
-
-        for (id, d) in self.all_definitions.iter_enumerated() {
-            println!(
-                "{:?}: {:?} {:?} {:?}",
-                id,
-                d.category(db),
-                d.scope(db),
-                d.symbol(db),
-            );
-            println!("    {:?}", d.kind(db));
-            println!();
-        }
-
-        println!("all_constraints:");
-        println!("================");
-
-        for (id, c) in self.all_constraints.iter_enumerated() {
-            println!("{:?}: {:?}", id, c.node);
-            if let ConstraintNode::Expression(e) = c.node {
-                println!("    {:?}", e.node_ref(db));
-            }
-        }
-
-        println!();
-
-        println!("bindings_by_use:");
-        println!("================");
-
-        for (id, bindings) in self.bindings_by_use.iter_enumerated() {
-            println!("{id:?}:");
-            for binding in bindings.iter() {
-                let definition = self.all_definitions[binding.definition];
-                let mut constraint_ids = binding.constraint_ids.peekable();
-                let mut active_constraint_ids = binding.branching_conditions_ids.peekable();
-
-                println!("  * {definition:?}");
-
-                if constraint_ids.peek().is_some() {
-                    println!("    Constraints:");
-                    for constraint_id in constraint_ids {
-                        println!("        {:?}", self.all_constraints[constraint_id]);
-                    }
-                } else {
-                    println!("    No constraints");
-                }
-
-                println!();
-
-                if active_constraint_ids.peek().is_some() {
-                    println!("    Active constraints at binding:");
-                    for constraint_id in active_constraint_ids {
-                        println!("        {:?}", self.all_constraints[constraint_id]);
-                    }
-                } else {
-                    println!("    No active constraints at binding");
-                }
-            }
-        }
-
-        println!();
-
-        println!("public_symbols:");
-        println!("================");
-
-        for (id, symbol) in self.public_symbols.iter_enumerated() {
-            println!("{id:?}:");
-            println!("  * Bindings:");
-            for binding in symbol.bindings().iter() {
-                let definition = self.all_definitions[binding.definition];
-                let mut constraint_ids = binding.constraint_ids.peekable();
-
-                println!("    {definition:?}");
-
-                if constraint_ids.peek().is_some() {
-                    println!("      Constraints:");
-                    for constraint_id in constraint_ids {
-                        println!("          {:?}", self.all_constraints[constraint_id]);
-                    }
-                } else {
-                    println!("      No constraints");
-                }
-            }
-
-            println!("  * Declarations:");
-            for (declaration, _) in symbol.declarations().iter() {
-                let definition = self.all_definitions[declaration];
-                println!("    {definition:?}");
-            }
-
-            println!();
-        }
-
-        println!();
-        println!();
-    }
-
     pub(crate) fn bindings_at_use(
         &self,
         use_id: ScopedUseId,
@@ -392,41 +296,13 @@ impl<'db> UseDefMap<'db> {
         let mut definitely_bound = false;
         let mut definitely_unbound = true;
         for binding in bindings_iter {
-            let test_expr_tys = || {
-                binding.branching_conditions.clone().map(|c| {
-                    let ty = if let ConstraintNode::Expression(test_expr) = c.node {
-                        let inference = infer_expression_types(db, test_expr);
-                        let scope = test_expr.scope(db);
-                        inference
-                            .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope))
-                    } else {
-                        // TODO: handle other constraint nodes
-                        KnownClass::Bool.to_instance(db)
-                    };
+            let truthiness = binding.branching_conditions.branch_condition_truthiness(db);
 
-                    (c, ty)
-                })
-            };
-
-            let is_any_always_false = test_expr_tys().any(|(c, test_expr_ty)| {
-                if c.is_positive {
-                    test_expr_ty.bool(db).is_always_false()
-                } else {
-                    test_expr_ty.bool(db).is_always_true()
-                }
-            });
-            if !is_any_always_false {
+            if !truthiness.any_always_false {
                 definitely_unbound = false;
             }
 
-            let are_all_always_true = test_expr_tys().all(|(c, test_expr_ty)| {
-                if c.is_positive {
-                    test_expr_ty.bool(db).is_always_true()
-                } else {
-                    test_expr_ty.bool(db).is_always_false()
-                }
-            });
-            if are_all_always_true {
+            if truthiness.all_always_true {
                 definitely_bound = true;
             }
         }
@@ -509,6 +385,7 @@ impl<'db> UseDefMap<'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             all_constraints: &self.all_constraints,
+            all_branching_conditions: &self.all_branching_conditions,
             inner: bindings.iter(),
         }
     }
@@ -537,6 +414,7 @@ enum SymbolDefinitions {
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
     inner: BindingIdWithConstraintsIterator<'map>,
 }
 
@@ -544,19 +422,17 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
     type Item = BindingWithConstraints<'map, 'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .next()
-            .map(|def_id_with_constraints| BindingWithConstraints {
-                binding: self.all_definitions[def_id_with_constraints.definition],
-                constraints: ConstraintsIterator {
-                    all_constraints: self.all_constraints,
-                    constraint_ids: def_id_with_constraints.constraint_ids,
-                },
-                branching_conditions: ConstraintsIterator {
-                    all_constraints: self.all_constraints,
-                    constraint_ids: def_id_with_constraints.branching_conditions_ids,
-                },
-            })
+        self.inner.next().map(|binding| BindingWithConstraints {
+            binding: self.all_definitions[binding.definition],
+            constraints: ConstraintsIterator {
+                all_constraints: self.all_constraints,
+                constraint_ids: binding.constraint_ids,
+            },
+            branching_conditions: BranchingConditionsIterator {
+                all_branching_conditions: self.all_branching_conditions,
+                branching_condition_ids: binding.branching_conditions_ids,
+            },
+        })
     }
 }
 
@@ -565,7 +441,7 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Definition<'db>,
     pub(crate) constraints: ConstraintsIterator<'map, 'db>,
-    pub(crate) branching_conditions: ConstraintsIterator<'map, 'db>,
+    pub(crate) branching_conditions: BranchingConditionsIterator<'map, 'db>,
 }
 
 #[derive(Debug, Clone)]
@@ -585,6 +461,67 @@ impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
 }
 
 impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
+
+#[derive(Debug, Clone)]
+pub(crate) struct BranchingConditionsIterator<'map, 'db> {
+    all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
+    branching_condition_ids: BranchingConditionIdIterator<'map>,
+}
+
+impl<'db> Iterator for BranchingConditionsIterator<'_, 'db> {
+    type Item = BranchingCondition<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.branching_condition_ids
+            .next()
+            .map(|branching_condition_id| self.all_branching_conditions[branching_condition_id])
+    }
+}
+
+pub struct BranchConditionTruthiness {
+    pub any_always_false: bool,
+    pub all_always_true: bool,
+    pub at_least_one_condition: bool,
+}
+
+impl<'db> BranchingConditionsIterator<'_, 'db> {
+    pub(crate) fn branch_condition_truthiness(self, db: &'db dyn Db) -> BranchConditionTruthiness {
+        let mut result = BranchConditionTruthiness {
+            any_always_false: false,
+            all_always_true: true,
+            at_least_one_condition: false,
+        };
+
+        for condition in self {
+            let truthiness = match condition {
+                BranchingCondition::Conditional(Constraint {
+                    node: ConstraintNode::Expression(test_expr),
+                    is_positive,
+                }) => {
+                    let inference = infer_expression_types(db, test_expr);
+                    let scope = test_expr.scope(db);
+                    let ty = inference
+                        .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope));
+
+                    ty.bool(db).negate_if(!is_positive)
+                }
+                BranchingCondition::Conditional(Constraint {
+                    node: ConstraintNode::Pattern(..),
+                    ..
+                }) => Truthiness::Ambiguous,
+                BranchingCondition::Unconditional => Truthiness::Ambiguous,
+            };
+
+            result.any_always_false |= truthiness.is_always_false();
+            result.all_always_true &= truthiness.is_always_true();
+            result.at_least_one_condition = true;
+        }
+
+        result
+    }
+}
+
+impl std::iter::FusedIterator for BranchingConditionsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
@@ -634,7 +571,11 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Constraint`].
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
-    branching_conditions: BranchingConditions,
+    /// Append-only array of [`BranchingCondition`].
+    all_branching_conditions: IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
+
+    /// Active branching conditions.
+    active_branching_conditions: BranchingConditions,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -659,7 +600,7 @@ impl<'db> UseDefMapBuilder<'db> {
             binding,
             SymbolDefinitions::Declarations(symbol_state.declarations().clone()),
         );
-        symbol_state.record_binding(def_id, &self.branching_conditions);
+        symbol_state.record_binding(def_id, &self.active_branching_conditions);
     }
 
     pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
@@ -667,7 +608,18 @@ impl<'db> UseDefMapBuilder<'db> {
         for state in &mut self.symbol_states {
             state.record_constraint(constraint_id);
         }
-        self.branching_conditions.insert(constraint_id.as_u32());
+
+        self.record_branching_condition(BranchingCondition::Conditional(constraint));
+    }
+
+    pub(super) fn record_unconditional_branching(&mut self) {
+        self.record_branching_condition(BranchingCondition::Unconditional);
+    }
+
+    pub(super) fn record_branching_condition(&mut self, condition: BranchingCondition<'db>) {
+        let condition_id = self.all_branching_conditions.push(condition);
+        self.active_branching_conditions
+            .insert(condition_id.as_u32());
     }
 
     pub(super) fn record_declaration(
@@ -681,7 +633,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declaration,
             SymbolDefinitions::Bindings(symbol_state.bindings().clone()),
         );
-        symbol_state.record_declaration(def_id, &self.branching_conditions);
+        symbol_state.record_declaration(def_id, &self.active_branching_conditions);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -692,8 +644,8 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store anything in self.definitions_by_definition.
         let def_id = self.all_definitions.push(definition);
         let symbol_state = &mut self.symbol_states[symbol];
-        symbol_state.record_declaration(def_id, &self.branching_conditions);
-        symbol_state.record_binding(def_id, &self.branching_conditions);
+        symbol_state.record_declaration(def_id, &self.active_branching_conditions);
+        symbol_state.record_binding(def_id, &self.active_branching_conditions);
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
@@ -712,8 +664,8 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn constraints_snapshot(&self) -> BranchingConditionsSnapshot {
-        BranchingConditionsSnapshot(self.branching_conditions.clone())
+    pub(super) fn branching_conditions_snapshot(&self) -> BranchingConditionsSnapshot {
+        BranchingConditionsSnapshot(self.active_branching_conditions.clone())
     }
 
     /// Restore the current builder symbols state to the given snapshot.
@@ -734,8 +686,8 @@ impl<'db> UseDefMapBuilder<'db> {
             .resize(num_symbols, SymbolState::undefined());
     }
 
-    pub(super) fn restore_constraints(&mut self, snapshot: BranchingConditionsSnapshot) {
-        self.branching_conditions = snapshot.0;
+    pub(super) fn restore_branching_conditions(&mut self, snapshot: BranchingConditionsSnapshot) {
+        self.active_branching_conditions = snapshot.0;
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -769,6 +721,7 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             all_constraints: self.all_constraints,
+            all_branching_conditions: self.all_branching_conditions,
             bindings_by_use: self.bindings_by_use,
             public_symbols: self.symbol_states,
             definitions_by_definition: self.definitions_by_definition,
