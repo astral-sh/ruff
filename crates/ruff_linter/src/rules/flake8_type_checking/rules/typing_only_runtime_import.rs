@@ -282,7 +282,11 @@ pub(crate) fn typing_only_runtime_import(
                 .references()
                 .map(|reference_id| checker.semantic().reference(reference_id))
                 .all(|reference| {
-                    is_typing_reference(reference, &checker.settings.flake8_type_checking)
+                    is_typing_reference(
+                        checker.semantic(),
+                        reference,
+                        &checker.settings.flake8_type_checking,
+                    )
                 })
         {
             let qualified_name = import.qualified_name();
