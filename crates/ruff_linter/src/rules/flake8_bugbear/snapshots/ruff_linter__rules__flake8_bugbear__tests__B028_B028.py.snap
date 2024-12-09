@@ -50,15 +50,15 @@ B028.py:15:1: B028 [*] No explicit `stacklevel` keyword argument found
 14 | 
 15 | warnings.warn(
    | ^^^^^^^^^^^^^ B028
-16 |         DeprecationWarning("test"),
-17 |         # some comments here
+16 |         "test",
+17 |         DeprecationWarning,
    |
    = help: Set `stacklevel=2`
 
 ℹ Unsafe fix
-15 15 | warnings.warn(
-16 16 |         DeprecationWarning("test"),
-17 17 |         # some comments here
-18    |-        source = None # no trailing comma
-   18 |+        source = None, stacklevel=2 # no trailing comma
-19 19 |     )
+16 16 |         "test",
+17 17 |         DeprecationWarning,
+18 18 |         # some comments here
+19    |-        source = None # no trailing comma
+   19 |+        source = None, stacklevel=2 # no trailing comma
+20 20 |     )

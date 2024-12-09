@@ -13,7 +13,8 @@ warnings.warn("test", DeprecationWarning, 1)
 warnings.warn("test", category=DeprecationWarning, stacklevel=1)
 
 warnings.warn(
-        DeprecationWarning("test"),
+        "test",
+        DeprecationWarning,
         # some comments here
         source = None # no trailing comma
     )
