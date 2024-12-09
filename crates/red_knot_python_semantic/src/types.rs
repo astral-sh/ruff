@@ -887,7 +887,7 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
             (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
-                // TODO: Once we have support for final classes, we can determine disjointness in some cases
+                // TODO: Once we have support for final classes, we can determine disjointedness in some cases
                 // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
                 // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
                 // final classes inside `Type::SubclassOf` everywhere.
