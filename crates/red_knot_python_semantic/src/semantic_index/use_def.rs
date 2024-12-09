@@ -295,13 +295,13 @@ impl<'db> UseDefMap<'db> {
         let mut definitely_bound = false;
         let mut definitely_unbound = true;
         for binding in bindings_iter {
-            let truthiness = binding.branching_conditions.branch_condition_truthiness(db);
+            let result = binding.branching_conditions.branch_condition_truthiness(db);
 
-            if !truthiness.any_always_false {
+            if !result.any_always_false {
                 definitely_unbound = false;
             }
 
-            if truthiness.all_always_true {
+            if result.all_always_true {
                 definitely_bound = true;
             }
         }

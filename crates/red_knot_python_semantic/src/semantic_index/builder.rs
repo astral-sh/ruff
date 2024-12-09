@@ -1314,9 +1314,6 @@ where
                 range: _,
                 op,
             }) => {
-                // TODO detect statically known truthy or falsy values (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
                 let mut snapshots = vec![];
                 let pre_op_constraints = self.branching_conditions_snapshot();
                 for (index, value) in values.iter().enumerate() {
