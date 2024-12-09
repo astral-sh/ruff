@@ -267,7 +267,7 @@ fn bindings_ty<'db>(
 
             if result.any_always_false {
                 // TODO: do we need to call binding_ty(…) even if we don't need the result?
-                (Type::Never, UnconditionallyVisible::No)
+                (None, UnconditionallyVisible::No)
             } else {
                 let unconditionally_visible =
                     if result.at_least_one_condition && result.all_always_true {
@@ -288,9 +288,9 @@ fn bindings_ty<'db>(
                             IntersectionBuilder::add_positive,
                         )
                         .build();
-                    (intersection_ty, unconditionally_visible)
+                    (Some(intersection_ty), unconditionally_visible)
                 } else {
-                    (binding_ty, unconditionally_visible)
+                    (Some(binding_ty), unconditionally_visible)
                 }
             }
         },
@@ -299,6 +299,10 @@ fn bindings_ty<'db>(
     // TODO: get rid of all the collects and clean up, obviously
     let def_types: Vec<_> = def_types.collect();
 
+    if !def_types.is_empty() && def_types.iter().all(|(ty, _)| *ty == None) {
+        return Some(Type::Unknown);
+    }
+
     // shrink the vector to only include everything from the last unconditionally visible binding
     let def_types: Vec<_> = def_types
         .iter()
@@ -306,7 +310,7 @@ fn bindings_ty<'db>(
         .take_while_inclusive(|(_, unconditionally_visible)| {
             *unconditionally_visible != UnconditionallyVisible::Yes
         })
-        .map(|(ty, _)| *ty)
+        .map(|(ty, _)| ty.unwrap_or(Type::Never))
         .collect();
 
     let mut def_types = def_types.into_iter().rev();
