@@ -299,8 +299,8 @@ pub(super) enum MroErrorKind<'db> {
 /// This is much more limited than the [`Type`] enum:
 /// all types that would be invalid to have as a class base are
 /// transformed into [`ClassBase::Unknown`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum ClassBase<'db> {
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
+pub enum ClassBase<'db> {
     Any,
     Unknown,
     Todo,
@@ -308,7 +308,7 @@ pub(super) enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+    pub fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             base: ClassBase<'db>,
             db: &'db dyn Db,

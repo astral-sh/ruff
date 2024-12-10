@@ -562,7 +562,11 @@ impl<'db> Type<'db> {
     }
 
     pub const fn subclass_of(class: Class<'db>) -> Self {
-        Self::SubclassOf(SubclassOfType { class })
+        Self::subclass_of_base(ClassBase::Class(class))
+    }
+
+    pub const fn subclass_of_base(base: ClassBase<'db>) -> Self {
+        Self::SubclassOf(SubclassOfType { base })
     }
 
     pub fn string_literal(db: &'db dyn Db, string: &str) -> Self {
@@ -607,8 +611,6 @@ impl<'db> Type<'db> {
             return false;
         }
         match (self, target) {
-            (Type::Unknown | Type::Any | Type::Todo(_), _) => false,
-            (_, Type::Unknown | Type::Any | Type::Todo(_)) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (_, Type::Instance(InstanceType { class }))
@@ -651,19 +653,31 @@ impl<'db> Type<'db> {
                         },
                     )
             }
-            (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Type) =>
-            {
-                true
-            }
             (Type::ClassLiteral(self_class), Type::SubclassOf(target_class)) => {
-                self_class.class.is_subclass_of(db, target_class.class)
-            }
-            (Type::SubclassOf(self_class), Type::SubclassOf(target_class)) => {
-                self_class.class.is_subclass_of(db, target_class.class)
+                self_class.class.is_subclass_of_base(db, target_class.base)
             }
             (
-                Type::SubclassOf(SubclassOfType { class: self_class }),
+                Type::Instance(InstanceType { class: self_class }),
+                Type::SubclassOf(target_class),
+            ) if self_class.is_known(db, KnownClass::Type) => {
+                self_class.is_subclass_of_base(db, target_class.base)
+            }
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(target_class),
+                }),
+            ) => self_class.is_subclass_of(db, target_class),
+            // C ⊆ type
+            // type[C] ⊆ type
+            // Though note that this works regardless of which metaclass C has, not just for type.
+            (
+                Type::ClassLiteral(ClassLiteralType { class: self_class })
+                | Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
                 Type::Instance(InstanceType {
                     class: target_class,
                 }),
@@ -760,6 +774,30 @@ impl<'db> Type<'db> {
                         },
                     )
             }
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any,
+                }),
+                Type::SubclassOf(_),
+            ) => true,
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any,
+                }),
+                Type::Instance(target),
+            ) if target.class.is_known(db, KnownClass::Type) => true,
+            (
+                Type::Instance(class),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any,
+                }),
+            ) if class.class.is_known(db, KnownClass::Type) => true,
+            (
+                Type::ClassLiteral(_) | Type::SubclassOf(_),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any,
+                }),
+            ) => true,
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
@@ -775,27 +813,56 @@ impl<'db> Type<'db> {
             return false;
         }
 
+        // TODO: The following is a workaround that is required to unify the two different versions
+        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
+        // we understand `sys.version_info` branches.
+        if let (
+            Type::Instance(InstanceType { class: self_class }),
+            Type::Instance(InstanceType {
+                class: target_class,
+            }),
+        ) = (self, other)
+        {
+            let self_known = self_class.known(db);
+            if matches!(
+                self_known,
+                Some(KnownClass::NoneType | KnownClass::NoDefaultType)
+            ) && self_known == target_class.known(db)
+            {
+                return true;
+            }
+        }
+
+        // type[object] ≡ type
+        if let (
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(object_class),
+            }),
+            Type::Instance(InstanceType { class: type_class }),
+        )
+        | (
+            Type::Instance(InstanceType { class: type_class }),
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(object_class),
+            }),
+        ) = (self, other)
+        {
+            // This is the only case where "instance of a class" is equivalent to "subclass of a
+            // class", so we don't need to fall through if we're not looking at instance[type] and
+            // type[object] specifically.
+            return object_class.is_known(db, KnownClass::Object)
+                && type_class.is_known(db, KnownClass::Type);
+        }
+
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
 
         // TODO: Once we have support for final classes, we can establish that
         // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
 
-        // TODO: The following is a workaround that is required to unify the two different versions
-        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
-        // we understand `sys.version_info` branches.
+        // For all other cases, types are equivalent iff they have the same internal
+        // representation.
         self == other
-            || matches!((self, other),
-                (
-                    Type::Instance(InstanceType { class: self_class }),
-                    Type::Instance(InstanceType { class: target_class })
-                )
-                if {
-                    let self_known = self_class.known(db);
-                    matches!(self_known, Some(KnownClass::NoneType | KnownClass::NoDefaultType))
-                        && self_known == target_class.known(db)
-                }
-            )
     }
 
     /// Returns true if both `self` and `other` are the same gradual form
@@ -862,7 +929,7 @@ impl<'db> Type<'db> {
 
             (Type::SubclassOf(type_class), Type::ClassLiteral(class_literal))
             | (Type::ClassLiteral(class_literal), Type::SubclassOf(type_class)) => {
-                !class_literal.class.is_subclass_of(db, type_class.class)
+                !class_literal.class.is_subclass_of_base(db, type_class.base)
             }
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
             (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
@@ -1029,7 +1096,8 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::KnownInstance(_) => true,
-            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::Instance(_) => {
+            Type::SubclassOf(SubclassOfType { base }) => matches!(base, ClassBase::Class(_)),
+            Type::ClassLiteral(_) | Type::Instance(_) => {
                 // TODO: Ideally, we would iterate over the MRO of the class, check if all
                 // bases are fully static, and only return `true` if that is the case.
                 //
@@ -1654,7 +1722,10 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
-            Type::SubclassOf(SubclassOfType { class }) => Type::instance(*class),
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => Type::instance(*class),
+            Type::SubclassOf(_) => Type::Any,
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => todo_type!(),
@@ -1683,6 +1754,8 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn in_type_expression(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            // In a type expression, a bare `type` is interpreted as "instance of `type`", which is
+            // equivalent to `type[object]`.
             Type::ClassLiteral(_) | Type::SubclassOf(_) => self.to_instance(db),
             Type::Union(union) => union.map(db, |element| element.in_type_expression(db)),
             Type::Unknown => Type::Unknown,
@@ -1742,9 +1815,7 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            Type::Instance(InstanceType { class }) => {
-                Type::SubclassOf(SubclassOfType { class: *class })
-            }
+            Type::Instance(InstanceType { class }) => Type::subclass_of(*class),
             Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
@@ -1755,7 +1826,9 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
-            Type::SubclassOf(SubclassOfType { class }) => Type::subclass_of(
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => Type::subclass_of(
                 class
                     .try_metaclass(db)
                     .ok()
@@ -1763,10 +1836,9 @@ impl<'db> Type<'db> {
                     .unwrap_or_else(|| KnownClass::Type.to_class_literal(db).expect_class_literal())
                     .class,
             ),
+            Type::SubclassOf(_) => Type::Any,
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
-            // TODO: `type[Any]`?
             Type::Any => Type::Any,
-            // TODO: `type[Unknown]`?
             Type::Unknown => Type::Unknown,
             // TODO intersections
             Type::Intersection(_) => todo_type!(),
@@ -2737,12 +2809,12 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
 /// A type that represents `type[C]`, i.e. the class literal `C` and class literals that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
-    class: Class<'db>,
+    base: ClassBase<'db>,
 }
 
 impl<'db> SubclassOfType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        self.class.class_member(db, name)
+        Type::from(self.base).member(db, name)
     }
 }
 
@@ -2961,6 +3033,8 @@ pub(crate) mod tests {
         Union(Vec<Ty>),
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
+        SubclassOfAny,
+        SubclassOfBuiltinClass(&'static str),
     }
 
     impl Ty {
@@ -2998,6 +3072,13 @@ pub(crate) mod tests {
                     let elements = tys.into_iter().map(|ty| ty.into_type(db));
                     Type::tuple(db, elements)
                 }
+                Ty::SubclassOfAny => Type::subclass_of_base(ClassBase::Any),
+                Ty::SubclassOfBuiltinClass(s) => Type::subclass_of(
+                    builtins_symbol(db, s)
+                        .expect_type()
+                        .expect_class_literal()
+                        .class,
+                ),
             }
         }
     }
@@ -3035,6 +3116,26 @@ pub(crate) mod tests {
     )]
     #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
+    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfAny)]
+    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfBuiltinClass("str"))]
+    #[test_case(Ty::SubclassOfAny, Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::SubclassOfAny)]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("object"),
+        Ty::SubclassOfBuiltinClass("object")
+    )]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfAny)]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("str"),
+        Ty::SubclassOfBuiltinClass("object")
+    )]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfBuiltinClass("str"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfAny)]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::BuiltinInstance("type"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -3052,6 +3153,11 @@ pub(crate) mod tests {
         Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
         Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::None])
     )]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("object"),
+        Ty::SubclassOfBuiltinClass("str")
+    )]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
     fn is_not_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -3206,10 +3312,13 @@ pub(crate) mod tests {
         Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
         Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)])
     )]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
     fn is_equivalent_to(from: Ty, to: Ty) {
         let db = setup_db();
-
-        assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+        let from = from.into_type(&db);
+        let to = to.into_type(&db);
+        assert!(from.is_equivalent_to(&db, to));
+        assert!(to.is_equivalent_to(&db, from));
     }
 
     #[test_case(Ty::Any, Ty::Any)]
@@ -3220,8 +3329,10 @@ pub(crate) mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
     fn is_not_equivalent_to(from: Ty, to: Ty) {
         let db = setup_db();
-
-        assert!(!from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+        let from = from.into_type(&db);
+        let to = to.into_type(&db);
+        assert!(!from.is_equivalent_to(&db, to));
+        assert!(!to.is_equivalent_to(&db, from));
     }
 
     #[test_case(Ty::Never, Ty::Never)]
@@ -3483,6 +3594,9 @@ pub(crate) mod tests {
     #[test_case(Ty::Intersection{pos: vec![Ty::KnownClassInstance(KnownClass::Str)], neg: vec![Ty::LiteralString]})]
     #[test_case(Ty::Tuple(vec![]))]
     #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::KnownClassInstance(KnownClass::Object)]))]
+    #[test_case(Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"))]
     fn is_fully_static(from: Ty) {
         let db = setup_db();
 
@@ -3496,6 +3610,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::Unknown]))]
     #[test_case(Ty::Intersection{pos: vec![Ty::Any], neg: vec![Ty::LiteralString]})]
     #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::Any]))]
+    #[test_case(Ty::SubclassOfAny)]
     fn is_not_fully_static(from: Ty) {
         let db = setup_db();
 
