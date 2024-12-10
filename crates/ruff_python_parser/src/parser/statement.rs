@@ -1366,7 +1366,7 @@ impl<'src> Parser<'src> {
             let (handler, kind) = p.parse_except_clause();
             if is_star.is_none() {
                 is_star = Some(kind.is_star());
-            } else if is_star.is_some_and(|seen_star| seen_star != kind.is_star()) {
+            } else if is_star != Some(kind.is_star()) {
                 mixed_except_ranges.push(handler.range());
             }
             handler
