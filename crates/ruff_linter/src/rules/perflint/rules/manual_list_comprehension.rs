@@ -258,7 +258,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
 
     drop(bindings);
 
-    // If any references to the loop target variable are after the loop, 
+    // If any references to the loop target variable are after the loop,
     // then converting it into a comprehension would cause a NameError
     if target_binding
         .references()
