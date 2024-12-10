@@ -1366,8 +1366,7 @@ impl<'src> Parser<'src> {
         if let Some(handler_err_range) = both_except_types {
             self.add_error(
                 ParseErrorType::OtherError(
-                    "SyntaxError: cannot have both 'except' and 'except*' on the same 'try'"
-                        .to_string(),
+                    "Cannot have both 'except' and 'except*' on the same 'try'".to_string(),
                 ),
                 handler_err_range,
             );
