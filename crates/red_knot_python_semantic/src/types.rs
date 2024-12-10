@@ -3609,8 +3609,10 @@ pub(crate) mod tests {
     #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
     fn is_equivalent_to(from: Ty, to: Ty) {
         let db = setup_db();
-
-        assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+        let from = from.into_type(&db);
+        let to = to.into_type(&db);
+        assert!(from.is_equivalent_to(&db, to));
+        assert!(to.is_equivalent_to(&db, from));
     }
 
     #[test_case(Ty::Any, Ty::Any)]
@@ -3621,8 +3623,10 @@ pub(crate) mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
     fn is_not_equivalent_to(from: Ty, to: Ty) {
         let db = setup_db();
-
-        assert!(!from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+        let from = from.into_type(&db);
+        let to = to.into_type(&db);
+        assert!(!from.is_equivalent_to(&db, to));
+        assert!(!to.is_equivalent_to(&db, from));
     }
 
     #[test_case(Ty::Never, Ty::Never)]
