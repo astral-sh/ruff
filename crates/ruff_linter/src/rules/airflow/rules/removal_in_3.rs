@@ -53,8 +53,8 @@ impl Violation for Airflow3Removal {
         } = self;
         match replacement {
             Replacement::None => format!("`{deprecated}` is removed in Airflow 3.0"),
-            Replacement::Name(name) => {
-                format!("`{deprecated}` is removed in Airflow 3.0; use `{name}` instead")
+            Replacement::Name(_) => {
+                format!("`{deprecated}` is removed in Airflow 3.0.")
             }
             Replacement::Message(message) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; {message}")
@@ -63,7 +63,12 @@ impl Violation for Airflow3Removal {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace deprecated keywords in Airflow 3.0".to_string())
+        let Airflow3Removal { replacement, .. } = self;
+        if let Replacement::Name(name) = replacement {
+            Some(format!("Use `{name}` instead."))
+        } else {
+            None
+        }
     }
 }
 
@@ -73,7 +78,7 @@ fn diagnostic_for_argument(
     replacement: Option<&str>,
 ) -> Option<Diagnostic> {
     let keyword = arguments.find_keyword(deprecated)?;
-    let mut diagnostic = Some(Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: (*deprecated).to_string(),
             replacement: match replacement {
@@ -85,16 +90,14 @@ fn diagnostic_for_argument(
             .arg
             .as_ref()
             .map_or_else(|| keyword.range(), Ranged::range),
-    ));
+    );
 
-    if let Some(ref mut diagnostic) = diagnostic {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            replacement?.to_string(),
-            diagnostic.range,
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        replacement?.to_string(),
+        diagnostic.range,
+    )));
 
-    diagnostic
+    Some(diagnostic)
 }
 
 fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {
