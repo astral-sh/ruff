@@ -267,6 +267,7 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
 }
 
 /// Generate a `Fix` to convert a `TypedDict` from functional to class.
+#[allow(clippy::too_many_arguments)]
 fn convert_to_class(
     stmt: &Stmt,
     class_name: &str,
