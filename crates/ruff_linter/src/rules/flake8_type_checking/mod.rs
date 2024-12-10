@@ -86,13 +86,89 @@ mod tests {
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote2.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote3.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote3.py"))]
-    fn quote(rule_code: Rule, path: &Path) -> Result<()> {
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
+    fn quote_annotations(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "quote_annotations_{}_{}",
+            rule_code.as_ref(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    quote_annotations: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
+    fn quote_casts(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "quote_casts_{}_{}",
+            rule_code.as_ref(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    quote_cast_type_expressions: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
+    fn quote_type_aliases(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "quote_type_aliases_{}_{}",
+            rule_code.as_ref(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    quote_annotated_type_alias_values: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote2.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote3.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote3.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
+    fn quote_all(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("quote_{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     quote_annotations: true,
+                    quote_cast_type_expressions: true,
+                    quote_annotated_type_alias_values: true,
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)
