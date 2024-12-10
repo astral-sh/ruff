@@ -126,7 +126,7 @@ Module(
 4 |       pass
 5 | / except* ExceptionGroup:
 6 | |     pass
-  | |________^ Syntax Error: SyntaxError: cannot have both 'except' and 'except*' on the same 'try'
+  | |________^ Syntax Error: Cannot have both 'except' and 'except*' on the same 'try'
 7 |   try:
 8 |       pass
   |
@@ -137,5 +137,5 @@ Module(
 10 |       pass
 11 | / except:
 12 | |     pass
-   | |________^ Syntax Error: SyntaxError: cannot have both 'except' and 'except*' on the same 'try'
+   | |________^ Syntax Error: Cannot have both 'except' and 'except*' on the same 'try'
    |
