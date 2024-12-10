@@ -131,22 +131,18 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
 
                 // Replace `[` with `(`.
                 let mut elt_start = replace_around_comments(
-                    "(".into(),
+                    "(",
                     call.start(),
                     argument.start() + TextSize::from(1),
-                    &checker.comment_ranges(),
+                    checker.comment_ranges(),
                     checker.locator().contents(),
                 );
                 // Replace `]` with `)` or `,)`.
                 let elt_end = replace_around_comments(
-                    if needs_trailing_comma {
-                        ",)".into()
-                    } else {
-                        ")".into()
-                    },
+                    if needs_trailing_comma { ",)" } else { ")" },
                     argument.end() - TextSize::from(1),
                     call.end(),
-                    &checker.comment_ranges(),
+                    checker.comment_ranges(),
                     checker.locator().contents(),
                 );
                 elt_start.extend(elt_end);

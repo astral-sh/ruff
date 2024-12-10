@@ -93,7 +93,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
         let mut call_start_edits = delete_around_comments(
             call.start(),
             argument.start(),
-            &checker.comment_ranges(),
+            checker.comment_ranges(),
             checker.locator().contents(),
         );
 
@@ -101,7 +101,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
         let call_end_edits = delete_around_comments(
             argument.end(),
             call.end(),
-            &checker.comment_ranges(),
+            checker.comment_ranges(),
             checker.locator().contents(),
         );
 
