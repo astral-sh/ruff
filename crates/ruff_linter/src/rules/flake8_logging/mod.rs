@@ -1,4 +1,5 @@
 //! Rules from [flake8-logging](https://pypi.org/project/flake8-logging/).
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -28,6 +29,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::ExcInfoOutsideExceptionHandler, Path::new("LOG014.py"))]
     #[test_case(Rule::RootLoggerCall, Path::new("LOG015.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
