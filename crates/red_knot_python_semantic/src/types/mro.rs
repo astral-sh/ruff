@@ -336,14 +336,6 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub fn is_assignable_to(self, db: &'db dyn Db, target: ClassBase<'db>) -> bool {
-        match (self, target) {
-            (ClassBase::Any | ClassBase::Todo | ClassBase::Unknown, _) => true,
-            (_, ClassBase::Any | ClassBase::Todo | ClassBase::Unknown) => true,
-            _ => self.is_subtype_of(db, target),
-        }
-    }
-
     /// Return a `ClassBase` representing the class `builtins.object`
     fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
