@@ -3,10 +3,10 @@
 ## Maybe unbound
 
 ```py path=maybe_unbound.py
-def bool_instance() -> bool:
+def coinflip() -> bool:
     return True
 
-if bool_instance():
+if coinflip():
     y = 3
 
 x = y  # error: [possibly-unresolved-reference]
@@ -30,10 +30,10 @@ reveal_type(y)  # revealed: Literal[3]
 ## Maybe unbound annotated
 
 ```py path=maybe_unbound_annotated.py
-def bool_instance() -> bool:
+def coinflip() -> bool:
     return True
 
-if bool_instance():
+if coinflip():
     y: int = 3
 
 x = y  # error: [possibly-unresolved-reference]
@@ -61,10 +61,10 @@ reveal_type(y)  # revealed: int
 Importing a possibly undeclared name still gives us its declared type:
 
 ```py path=maybe_undeclared.py
-def bool_instance() -> bool:
+def coinflip() -> bool:
     return True
 
-if bool_instance():
+if coinflip():
     x: int
 ```
 
@@ -81,10 +81,10 @@ def f(): ...
 ```
 
 ```py path=b.py
-def bool_instance() -> bool:
+def coinflip() -> bool:
     return True
 
-if bool_instance():
+if coinflip():
     from c import f
 else:
     def f(): ...
@@ -107,10 +107,10 @@ x: int
 ```
 
 ```py path=b.py
-def bool_instance() -> bool:
+def coinflip() -> bool:
     return True
 
-if bool_instance():
+if coinflip():
     from c import x
 else:
     x = 1

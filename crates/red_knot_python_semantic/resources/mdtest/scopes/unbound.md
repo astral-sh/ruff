@@ -5,34 +5,39 @@
 Name lookups within a class scope fall back to globals, but lookups of class attributes don't.
 
 ```py
-def _(flag: bool):
-    x = 1
+def coinflip() -> bool:
+    return True
 
-    class C:
-        y = x
-        if flag:
-            x = 2
+flag = coinflip()
+x = 1
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C]` is possibly unbound"
-    reveal_type(C.x)  # revealed: Literal[2]
-    reveal_type(C.y)  # revealed: Literal[1]
+class C:
+    y = x
+    if flag:
+        x = 2
+
+# error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C]` is possibly unbound"
+reveal_type(C.x)  # revealed: Literal[2]
+reveal_type(C.y)  # revealed: Literal[1]
 ```
 
 ## Possibly unbound in class and global scope
 
 ```py
-def _(flag1: bool, flag2: bool):
-    if flag1:
-        x = "abc"
+def coinflip() -> bool:
+    return True
 
-    class C:
-        if flag2:
-            x = 1
+if coinflip():
+    x = "abc"
 
-        # error: [possibly-unresolved-reference]
-        y = x
+class C:
+    if coinflip():
+        x = 1
 
-    reveal_type(C.y)  # revealed: Literal[1] | Literal["abc"]
+    # error: [possibly-unresolved-reference]
+    y = x
+
+reveal_type(C.y)  # revealed: Literal[1] | Literal["abc"]
 ```
 
 ## Unbound function local

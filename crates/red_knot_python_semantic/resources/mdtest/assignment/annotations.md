@@ -78,14 +78,10 @@ c: tuple[str | int, str] = ([], "foo")
 ## PEP-604 annotations are supported
 
 ```py
-def foo(v: str | int | None):
+def foo(v: str | int | None, w: str | str | None, x: str | str):
     reveal_type(v)  # revealed: str | int | None
-
-def bar(v: str | str | None):
-    reveal_type(v)  # revealed: str | None
-
-def baz(v: str | str):
-    reveal_type(v)  # revealed: str
+    reveal_type(w)  # revealed: str | None
+    reveal_type(x)  # revealed: str
 ```
 
 ## Attribute expressions in type annotations are understood
@@ -112,8 +108,7 @@ from __future__ import annotations
 
 x: Foo
 
-class Foo:
-    pass
+class Foo: ...
 
 x = Foo()
 reveal_type(x)  # revealed: Foo
@@ -124,8 +119,7 @@ reveal_type(x)  # revealed: Foo
 ```pyi path=main.pyi
 x: Foo
 
-class Foo:
-    pass
+class Foo: ...
 
 x = Foo()
 reveal_type(x)  # revealed: Foo

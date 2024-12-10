@@ -139,28 +139,26 @@ def _(flag: bool):
 ## Partially bound target union with `__add__`
 
 ```py
-def bool_instance() -> bool:
-    return True
+def f(flag: bool, flag2: bool):
+    class Foo:
+        def __add__(self, other: int) -> str:
+            return "Hello, world!"
+        if flag:
+            def __iadd__(self, other: int) -> int:
+                return 42
 
-class Foo:
-    def __add__(self, other: int) -> str:
-        return "Hello, world!"
-    if bool_instance():
-        def __iadd__(self, other: int) -> int:
-            return 42
+    class Bar:
+        def __add__(self, other: int) -> bytes:
+            return b"Hello, world!"
 
-class Bar:
-    def __add__(self, other: int) -> bytes:
-        return b"Hello, world!"
+        def __iadd__(self, other: int) -> float:
+            return 42.0
 
-    def __iadd__(self, other: int) -> float:
-        return 42.0
+    if flag2:
+        f = Foo()
+    else:
+        f = Bar()
+    f += 12
 
-if bool_instance():
-    f = Foo()
-else:
-    f = Bar()
-f += 12
-
-reveal_type(f)  # revealed: int | str | float
+    reveal_type(f)  # revealed: int | str | float
 ```

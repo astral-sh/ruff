@@ -192,7 +192,7 @@ reveal_type((A(), B()) < (A(), B()))  # revealed: float | set | Literal[False]
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons
 
-> Example: `(int_instance(), "foo") == (int_instance(), "bar")`
+> Example: `(<int instance>, "foo") == (<int instance>, "bar")`
 
 `Eq` and `NotEq` have unique behavior compared to other operators in lexicographic comparisons.
 Specifically, for `Eq`, if any non-equal pair exists within the tuples being compared, we can
@@ -203,43 +203,38 @@ In contrast, with operators like `<` and `>`, the comparison must consider each 
 sequentially, and the final outcome might remain ambiguous until all pairs are compared.
 
 ```py
-def str_instance() -> str:
-    return "hello"
+def _(x: str, y: int):
+    reveal_type("foo" == "bar")  # revealed: Literal[False]
+    reveal_type(("foo",) == ("bar",))  # revealed: Literal[False]
+    reveal_type((4, "foo") == (4, "bar"))  # revealed: Literal[False]
+    reveal_type((y, "foo") == (y, "bar"))  # revealed: Literal[False]
 
-def int_instance() -> int:
-    return 42
+    a = (x, y, "foo")
 
-reveal_type("foo" == "bar")  # revealed: Literal[False]
-reveal_type(("foo",) == ("bar",))  # revealed: Literal[False]
-reveal_type((4, "foo") == (4, "bar"))  # revealed: Literal[False]
-reveal_type((int_instance(), "foo") == (int_instance(), "bar"))  # revealed: Literal[False]
+    reveal_type(a == a)  # revealed: bool
+    reveal_type(a != a)  # revealed: bool
+    reveal_type(a < a)  # revealed: bool
+    reveal_type(a <= a)  # revealed: bool
+    reveal_type(a > a)  # revealed: bool
+    reveal_type(a >= a)  # revealed: bool
 
-a = (str_instance(), int_instance(), "foo")
+    b = (x, y, "bar")
 
-reveal_type(a == a)  # revealed: bool
-reveal_type(a != a)  # revealed: bool
-reveal_type(a < a)  # revealed: bool
-reveal_type(a <= a)  # revealed: bool
-reveal_type(a > a)  # revealed: bool
-reveal_type(a >= a)  # revealed: bool
+    reveal_type(a == b)  # revealed: Literal[False]
+    reveal_type(a != b)  # revealed: Literal[True]
+    reveal_type(a < b)  # revealed: bool
+    reveal_type(a <= b)  # revealed: bool
+    reveal_type(a > b)  # revealed: bool
+    reveal_type(a >= b)  # revealed: bool
 
-b = (str_instance(), int_instance(), "bar")
+    c = (x, y, "foo", "different_length")
 
-reveal_type(a == b)  # revealed: Literal[False]
-reveal_type(a != b)  # revealed: Literal[True]
-reveal_type(a < b)  # revealed: bool
-reveal_type(a <= b)  # revealed: bool
-reveal_type(a > b)  # revealed: bool
-reveal_type(a >= b)  # revealed: bool
-
-c = (str_instance(), int_instance(), "foo", "different_length")
-
-reveal_type(a == c)  # revealed: Literal[False]
-reveal_type(a != c)  # revealed: Literal[True]
-reveal_type(a < c)  # revealed: bool
-reveal_type(a <= c)  # revealed: bool
-reveal_type(a > c)  # revealed: bool
-reveal_type(a >= c)  # revealed: bool
+    reveal_type(a == c)  # revealed: Literal[False]
+    reveal_type(a != c)  # revealed: Literal[True]
+    reveal_type(a < c)  # revealed: bool
+    reveal_type(a <= c)  # revealed: bool
+    reveal_type(a > c)  # revealed: bool
+    reveal_type(a >= c)  # revealed: bool
 ```
 
 #### Error Propagation

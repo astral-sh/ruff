@@ -17,11 +17,9 @@ def f(v: "'int'"):
 ## Type expression
 
 ```py
-def f1(v: "int | str"):
+def f1(v: "int | str", w: "tuple[int, str]"):
     reveal_type(v)  # revealed: int | str
-
-def f2(v: "tuple[int, str]"):
-    reveal_type(v)  # revealed: tuple[int, str]
+    reveal_type(w)  # revealed: tuple[int, str]
 ```
 
 ## Partial
@@ -37,8 +35,7 @@ def f(v: tuple[int, "str"]):
 def f(v: "Foo"):
     reveal_type(v)  # revealed: Foo
 
-class Foo:
-    pass
+class Foo: ...
 ```
 
 ## Deferred (undefined)
@@ -55,8 +52,7 @@ def f(v: "Foo"):
 def f(v: int | "Foo"):
     reveal_type(v)  # revealed: int | Foo
 
-class Foo:
-    pass
+class Foo: ...
 ```
 
 ## `typing.Literal`
@@ -64,52 +60,43 @@ class Foo:
 ```py
 from typing import Literal
 
-def f1(v: Literal["Foo", "Bar"]):
+def f1(v: Literal["Foo", "Bar"], w: 'Literal["Foo", "Bar"]'):
     reveal_type(v)  # revealed: Literal["Foo", "Bar"]
+    reveal_type(w)  # revealed: Literal["Foo", "Bar"]
 
-def f2(v: 'Literal["Foo", "Bar"]'):
-    reveal_type(v)  # revealed: Literal["Foo", "Bar"]
-
-class Foo:
-    pass
+class Foo: ...
 ```
 
 ## Various string kinds
 
 ```py
-# error: [annotation-raw-string] "Type expressions cannot use raw string literal"
-def f1(v: r"int"):
-    reveal_type(v)  # revealed: Unknown
-
-# error: [annotation-f-string] "Type expressions cannot use f-strings"
-def f2(v: f"int"):
-    reveal_type(v)  # revealed: Unknown
-
-# error: [annotation-byte-string] "Type expressions cannot use bytes literal"
-def f3(v: b"int"):
-    reveal_type(v)  # revealed: Unknown
-
-def f4(v: "int"):
-    reveal_type(v)  # revealed: int
-
-# error: [annotation-implicit-concat] "Type expressions cannot span multiple string literals"
-def f5(v: "in" "t"):
-    reveal_type(v)  # revealed: Unknown
-
-# error: [annotation-escape-character] "Type expressions cannot contain escape characters"
-def f6(v: "\N{LATIN SMALL LETTER I}nt"):
-    reveal_type(v)  # revealed: Unknown
-
-# error: [annotation-escape-character] "Type expressions cannot contain escape characters"
-def f7(v: "\x69nt"):
-    reveal_type(v)  # revealed: Unknown
-
-def f8(v: """int"""):
-    reveal_type(v)  # revealed: int
-
-# error: [annotation-byte-string] "Type expressions cannot use bytes literal"
-def f9(v: "b'int'"):
-    reveal_type(v)  # revealed: Unknown
+def f1(
+    # error: [annotation-raw-string] "Type expressions cannot use raw string literal"
+    a: r"int",
+    # error: [annotation-f-string] "Type expressions cannot use f-strings"
+    b: f"int",
+    # error: [annotation-byte-string] "Type expressions cannot use bytes literal"
+    c: b"int",
+    d: "int",
+    # error: [annotation-implicit-concat] "Type expressions cannot span multiple string literals"
+    e: "in" "t",
+    # error: [annotation-escape-character] "Type expressions cannot contain escape characters"
+    f: "\N{LATIN SMALL LETTER I}nt",
+    # error: [annotation-escape-character] "Type expressions cannot contain escape characters"
+    g: "\x69nt",
+    h: """int""",
+    # error: [annotation-byte-string] "Type expressions cannot use bytes literal"
+    i: "b'int'",
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: int
+    reveal_type(e)  # revealed: Unknown
+    reveal_type(f)  # revealed: Unknown
+    reveal_type(g)  # revealed: Unknown
+    reveal_type(h)  # revealed: int
+    reveal_type(i)  # revealed: Unknown
 ```
 
 ## Various string kinds in `typing.Literal`
@@ -145,8 +132,7 @@ c: "Foo"
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Foo`"
 d: "Foo" = 1
 
-class Foo:
-    pass
+class Foo: ...
 
 c = Foo()
 

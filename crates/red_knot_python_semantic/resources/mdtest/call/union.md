@@ -18,10 +18,10 @@ def _(flag: bool):
 ```py
 from nonexistent import f  # error: [unresolved-import] "Cannot resolve import `nonexistent`"
 
-def bool_instance() -> bool:
+def coinflip() -> bool:
     return True
 
-if bool_instance():
+if coinflip():
     def f() -> int:
         return 1
 

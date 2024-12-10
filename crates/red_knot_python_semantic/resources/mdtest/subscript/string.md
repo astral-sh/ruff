@@ -73,13 +73,12 @@ s[:4:0]  # error: [zero-stepsize-in-slice]
 s[0::0]  # error: [zero-stepsize-in-slice]
 s[::0]  # error: [zero-stepsize-in-slice]
 
-def _(m: int, n: int):
+def _(m: int, n: int, s2: str):
     substring1 = s[m:n]
     # TODO: Support overloads... Should be `LiteralString`
     reveal_type(substring1)  # revealed: @Todo(return type)
 
-def _(s: str):
-    substring2 = s[0:5]
+    substring2 = s2[0:5]
     # TODO: Support overloads... Should be `str`
     reveal_type(substring2)  # revealed: @Todo(return type)
 ```
