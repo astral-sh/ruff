@@ -653,11 +653,6 @@ impl<'db> Type<'db> {
                         },
                     )
             }
-            (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Type) =>
-            {
-                true
-            }
             (Type::ClassLiteral(self_class), Type::SubclassOf(target_class)) => {
                 self_class.class.is_subclass_of_base(db, target_class.base)
             }
@@ -674,8 +669,12 @@ impl<'db> Type<'db> {
                     base: ClassBase::Class(target_class),
                 }),
             ) => self_class.is_subclass_of(db, target_class),
+            // C ⊆ type
+            // type[C] ⊆ type
+            // Though note that this works regardless of which metaclass C has, not just for type.
             (
-                Type::SubclassOf(SubclassOfType {
+                Type::ClassLiteral(ClassLiteralType { class: self_class })
+                | Type::SubclassOf(SubclassOfType {
                     base: ClassBase::Class(self_class),
                 }),
                 Type::Instance(target_class),
