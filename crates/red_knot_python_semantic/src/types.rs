@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use indexmap::IndexSet;
 use itertools::Itertools;
-
+use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -25,7 +25,7 @@ use crate::stdlib::{
     builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
 };
 use crate::symbol::{Boundness, Symbol};
-use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
+use crate::types::diagnostic::{TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE};
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -2370,9 +2370,9 @@ impl<'db> CallOutcome<'db> {
                 not_callable_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                diagnostics.add_lint(
+                    &CALL_NON_CALLABLE,
                     node,
-                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable",
                         not_callable_ty.display(db)
@@ -2385,9 +2385,9 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                diagnostics.add_lint(
+                    &CALL_NON_CALLABLE,
                     node,
-                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable (due to union element `{}`)",
                         called_ty.display(db),
@@ -2401,9 +2401,9 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                diagnostics.add_lint(
+                    &CALL_NON_CALLABLE,
                     node,
-                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable (due to union elements {})",
                         called_ty.display(db),
@@ -2416,9 +2416,9 @@ impl<'db> CallOutcome<'db> {
                 callable_ty: called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                diagnostics.add_lint(
+                    &CALL_NON_CALLABLE,
                     node,
-                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable (possibly unbound `__call__` method)",
                         called_ty.display(db)
@@ -2444,7 +2444,8 @@ impl<'db> CallOutcome<'db> {
             } => {
                 diagnostics.add(
                     node,
-                    "revealed-type",
+                    DiagnosticId::RevealedType,
+                    Severity::Info,
                     format_args!("Revealed type is `{}`", revealed_ty.display(db)),
                 );
                 Ok(*return_ty)

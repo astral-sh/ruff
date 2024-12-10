@@ -71,21 +71,21 @@ class Foo: ...
 
 ```py
 def f1(
-    # error: [annotation-raw-string] "Type expressions cannot use raw string literal"
+    # error: [raw-string-type-annotation] "Type expressions cannot use raw string literal"
     a: r"int",
-    # error: [annotation-f-string] "Type expressions cannot use f-strings"
+    # error: [fstring-type-annotation] "Type expressions cannot use f-strings"
     b: f"int",
-    # error: [annotation-byte-string] "Type expressions cannot use bytes literal"
+    # error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
     c: b"int",
     d: "int",
-    # error: [annotation-implicit-concat] "Type expressions cannot span multiple string literals"
+    # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
     e: "in" "t",
-    # error: [annotation-escape-character] "Type expressions cannot contain escape characters"
+    # error: [escape-character-in-forward-annotation] "Type expressions cannot contain escape characters"
     f: "\N{LATIN SMALL LETTER I}nt",
-    # error: [annotation-escape-character] "Type expressions cannot contain escape characters"
+    # error: [escape-character-in-forward-annotation] "Type expressions cannot contain escape characters"
     g: "\x69nt",
     h: """int""",
-    # error: [annotation-byte-string] "Type expressions cannot use bytes literal"
+    # error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
     i: "b'int'",
 ):
     reveal_type(a)  # revealed: Unknown
@@ -164,9 +164,9 @@ i: "{i for i in range(5)}"
 j: "{i: i for i in range(5)}"
 k: "(i for i in range(5))"
 l: "await 1"
-# error: [forward-annotation-syntax-error]
+# error: [invalid-syntax-in-forward-annotation]
 m: "yield 1"
-# error: [forward-annotation-syntax-error]
+# error: [invalid-syntax-in-forward-annotation]
 n: "yield from 1"
 o: "1 < 2"
 p: "call()"
