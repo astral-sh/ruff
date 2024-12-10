@@ -313,7 +313,7 @@ reveal_type(x)  # revealed: Literal[2]
 ### Always true, `or`
 
 ```py
-(x := 1) == 1 or (x := 2)
+(x := 1) or (x := 2)
 
 reveal_type(x)  # revealed: Literal[1]
 ```
@@ -321,7 +321,7 @@ reveal_type(x)  # revealed: Literal[1]
 ### Always true, `and`
 
 ```py
-(x := 1) == 1 and (x := 2)
+(x := 1) and (x := 2)
 
 reveal_type(x)  # revealed: Literal[2]
 ```
@@ -329,7 +329,7 @@ reveal_type(x)  # revealed: Literal[2]
 ### Always false, `or`
 
 ```py
-(x := 1) == 0 or (x := 2)
+(x := 0) or (x := 2)
 
 reveal_type(x)  # revealed: Literal[2]
 ```
@@ -337,9 +337,9 @@ reveal_type(x)  # revealed: Literal[2]
 ### Always false, `and`
 
 ```py
-(x := 1) == 0 and (x := 2)
+(x := 0) and (x := 2)
 
-reveal_type(x)  # revealed: Literal[1]
+reveal_type(x)  # revealed: Literal[0]
 ```
 
 ## While loops
