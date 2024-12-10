@@ -40,6 +40,21 @@ behavior of the Ruff CLI.
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "configuration": "~/path/to/ruff.toml"
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `configurationPreference`
 
 The strategy to use when resolving settings across VS Code and the filesystem. By default, editor
@@ -74,6 +89,21 @@ configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "configurationPreference": "filesystemFirst"
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `exclude`
 
 A list of file patterns to exclude from linting and formatting. See [the
@@ -98,6 +128,21 @@ documentation](https://docs.astral.sh/ruff/settings/#exclude) for more details.
       init_options = {
         settings = {
           exclude = ["**/tests/**"]
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "exclude": ["**/tests/**"]
+            }
+          }
         }
       }
     }
@@ -131,6 +176,21 @@ The line length to use for the linter and formatter.
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "lineLength": 100
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `fixAll`
 
 Whether to register the server as capable of handling `source.fixAll` code actions.
@@ -159,6 +219,21 @@ Whether to register the server as capable of handling `source.fixAll` code actio
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "fixAll": false
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `organizeImports`
 
 Whether to register the server as capable of handling `source.organizeImports` code actions.
@@ -182,6 +257,21 @@ Whether to register the server as capable of handling `source.organizeImports` c
       init_options = {
         settings = {
           organizeImports = false
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "organizeImports": false
+            }
+          }
         }
       }
     }
@@ -217,6 +307,21 @@ Whether to show syntax error diagnostics.
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "showSyntaxErrors": false
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `logLevel`
 
 The log level to use for the server.
@@ -240,6 +345,21 @@ The log level to use for the server.
       init_options = {
         settings = {
           logLevel = "debug"
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "logLevel": "debug"
+            }
+          }
         }
       }
     }
@@ -270,6 +390,21 @@ If not set, logs will be written to stderr.
       init_options = {
         settings = {
           logFile = "~/path/to/ruff.log"
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "logFile": "~/path/to/ruff.log"
+            }
+          }
         }
       }
     }
@@ -311,6 +446,25 @@ Whether to display Quick Fix actions to disable rules via `noqa` suppression com
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "codeAction": {
+                "disableRuleComment": {
+                  "enable": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `fixViolation.enable`
 
 Whether to display Quick Fix actions to autofix violations.
@@ -336,6 +490,25 @@ Whether to display Quick Fix actions to autofix violations.
           codeAction = {
             fixViolation = {
               enable = false
+            }
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "codeAction": {
+                "fixViolation": = {
+                  "enable": false
+                }
+              }
             }
           }
         }
@@ -377,6 +550,25 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "lint": {
+                "enable" = {
+                  "enable": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `preview` {: #lint_preview }
 
 Whether to enable Ruff's preview mode when linting.
@@ -401,6 +593,23 @@ Whether to enable Ruff's preview mode when linting.
         settings = {
           lint = {
             preview = true
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "lint": {
+                "preview": true
+              }
+            }
           }
         }
       }
@@ -437,6 +646,23 @@ Rules to enable by default. See [the documentation](https://docs.astral.sh/ruff/
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "lint": {
+                "select": ["E", "F"]
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `extendSelect`
 
 Rules to enable in addition to those in [`lint.select`](#select).
@@ -461,6 +687,23 @@ Rules to enable in addition to those in [`lint.select`](#select).
         settings = {
           lint = {
             extendSelect = {"W"}
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "lint": {
+                "extendSelect": ["W"]
+              }
+            }
           }
         }
       }
@@ -497,6 +740,23 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
     }
     ```
 
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "lint": {
+                "ignore": ["E4", "E7"]
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ### `extendIgnore`
 
 Rules to disable in addition to those in [`lint.ignore`](#ignore).
@@ -521,6 +781,23 @@ Rules to disable in addition to those in [`lint.ignore`](#ignore).
         settings = {
           lint = {
             extendIgnore = {"W1"}
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "lint": {
+                "extendIgnore": ["W1"]
+              }
+            }
           }
         }
       }
@@ -555,6 +832,23 @@ Whether to enable Ruff's preview mode when formatting.
         settings = {
           format = {
             preview = true
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "format": {
+                "preview": true
+              }
+            }
           }
         }
       }
