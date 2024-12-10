@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
@@ -10,6 +10,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::replace_around_comments;
 
 /// ## What it does
 /// Checks for `TypedDict` declarations that use functional syntax.
@@ -98,6 +99,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             base_class,
             checker.generator(),
             checker.comment_ranges(),
+            checker.locator().contents(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -273,21 +275,22 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
     comment_ranges: &CommentRanges,
+    source: &str,
 ) -> Fix {
-    Fix::applicable_edit(
-        Edit::range_replacement(
-            generator.stmt(&create_class_def_stmt(
-                class_name,
-                body,
-                total_keyword,
-                base_class,
-            )),
-            stmt.range(),
-        ),
-        if comment_ranges.intersects(stmt.range()) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        },
-    )
+    let edits = replace_around_comments(
+        &generator.stmt(&create_class_def_stmt(
+            class_name,
+            body,
+            total_keyword,
+            base_class,
+        )),
+        stmt.start(),
+        stmt.end(),
+        comment_ranges,
+        source,
+    );
+    let Some((edit, rest)) = edits.split_first() else {
+        panic!()
+    };
+    Fix::safe_edits(edit.clone(), rest.to_owned())
 }
