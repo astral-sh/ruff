@@ -13,6 +13,7 @@ class A: ...
 x: type[Any] = object
 x: type[Any] = type
 x: type[Any] = A
+x: type[Any] = A()  # error: [invalid-assignment]
 ```
 
 ## Bare type
@@ -25,9 +26,10 @@ def f(x: type):
 
 class A: ...
 
-x: type[Any] = object
-x: type[Any] = type
-x: type[Any] = A
+x: type = object
+x: type = type
+x: type = A
+x: type = A()  # error: [invalid-assignment]
 ```
 
 ## type[object] != type[Any]
@@ -40,7 +42,8 @@ def f(x: type[object]):
 
 class A: ...
 
-x: type[Any] = object
-x: type[Any] = type
-x: type[Any] = A
+x: type[object] = object
+x: type[object] = type
+x: type[object] = A
+x: type[object] = A()  # error: [invalid-assignment]
 ```
