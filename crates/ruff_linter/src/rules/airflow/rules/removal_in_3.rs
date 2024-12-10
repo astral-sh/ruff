@@ -91,7 +91,7 @@ fn diagnostic_for_argument(
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             replacement?.to_string(),
             diagnostic.range,
-        )))
+        )));
     }
 
     diagnostic
