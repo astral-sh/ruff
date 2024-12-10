@@ -54,7 +54,7 @@ impl Violation for Airflow3Removal {
         match replacement {
             Replacement::None => format!("`{deprecated}` is removed in Airflow 3.0"),
             Replacement::Name(_) => {
-                format!("`{deprecated}` is removed in Airflow 3.0.")
+                format!("`{deprecated}` is removed in Airflow 3.0")
             }
             Replacement::Message(message) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; {message}")
@@ -65,7 +65,7 @@ impl Violation for Airflow3Removal {
     fn fix_title(&self) -> Option<String> {
         let Airflow3Removal { replacement, .. } = self;
         if let Replacement::Name(name) = replacement {
-            Some(format!("Use `{name}` instead."))
+            Some(format!("Use `{name}` instead"))
         } else {
             None
         }
@@ -93,7 +93,7 @@ fn diagnostic_for_argument(
     );
 
     if let Some(replacement) = replacement {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             replacement.to_string(),
             diagnostic.range,
         )));
