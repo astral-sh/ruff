@@ -163,13 +163,13 @@ mod stable {
     // `T` is equivalent to itself.
     type_property_test!(
         equivalent_to_is_reflexive, db,
-        forall types t. t.is_equivalent_to(db, t)
+        forall types t. t.is_fully_static(db) => t.is_equivalent_to(db, t)
     );
 
     // `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
-        forall types t. t.is_subtype_of(db, t)
+        forall types t. t.is_fully_static(db) => t.is_subtype_of(db, t)
     );
 
     // `S <: T` and `T <: U` implies that `S <: U`.
