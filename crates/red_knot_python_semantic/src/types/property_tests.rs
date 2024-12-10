@@ -214,6 +214,12 @@ mod stable {
         forall types t. t.is_singleton(db) => t.is_single_valued(db)
     );
 
+    // If `T` contains a gradual form, it should not participate in equivalence
+    type_property_test!(
+        non_fully_static_types_do_not_participate_in_equivalence, db,
+        forall types s, t. !s.is_fully_static(db) => !s.is_equivalent_to(db, t) && !t.is_equivalent_to(db, s)
+    );
+
     // If `T` contains a gradual form, it should not participate in subtyping
     type_property_test!(
         non_fully_static_types_do_not_participate_in_subtyping, db,
