@@ -1,8 +1,8 @@
-use std::borrow::BorrowMut;
-
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, name::Name, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator};
+use ruff_python_ast::{
+    self as ast, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator,
+};
 use ruff_python_semantic::{
     analyze::typing::{traverse_literal, traverse_union},
     SemanticModel,
@@ -76,6 +76,12 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     let mut none_exprs: SmallVec<[&ExprNoneLiteral; 1]> = SmallVec::new();
     let mut other_literal_elements_seen = false;
     let mut literal_elements: Vec<&Expr> = Vec::new();
+    let mut literal_subscript = None;
+    if let Expr::Subscript(ast::ExprSubscript { value, .. }) = literal_expr {
+        if checker.semantic().match_typing_expr(value, "Literal") {
+            literal_subscript = Some(value.as_ref());
+        }
+    };
 
     let mut find_literal_elements = |expr: &'a Expr, _parent: &'a Expr| {
         if let Expr::NoneLiteral(none_expr) = expr {
@@ -86,9 +92,11 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
         }
     };
 
+    let Some(literal_subscript) = literal_subscript else {
+        return;
+    };
 
     traverse_literal(&mut find_literal_elements, checker.semantic(), literal_expr);
-
     if none_exprs.is_empty() {
         return;
     }
@@ -96,7 +104,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.
     let fix = if other_literal_elements_seen {
-        create_fix_edit_2(checker.borrow_mut(), literal_expr, &literal_elements).map(|edit| {
+        create_fix_edit_2(checker, literal_expr, literal_elements, literal_subscript).map(|edit| {
             Fix::applicable_edit(
                 edit,
                 if checker.comment_ranges().intersects(literal_expr.range()) {
@@ -182,9 +190,14 @@ fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit
     is_fixable.then(|| Edit::range_replacement("None".to_string(), literal_expr.range()))
 }
 
-
-fn create_fix_edit_2(checker: &mut Checker, literal_expr: &Expr, literal_elements: &[&Expr]) -> Option<Edit> {
-    let enclosing_pep604_union = checker.semantic()
+fn create_fix_edit_2(
+    checker: &mut Checker,
+    literal_expr: &Expr,
+    literal_elements: Vec<&Expr>,
+    literal_subscript: &Expr,
+) -> Option<Edit> {
+    let enclosing_pep604_union = checker
+        .semantic()
         .current_expressions()
         .skip(1)
         .take_while(|expr| {
@@ -220,41 +233,24 @@ fn create_fix_edit_2(checker: &mut Checker, literal_expr: &Expr, literal_element
         );
     }
 
-    let bin_or = Expr::BinOp(
-        ExprBinOp {
+    let bin_or = Expr::BinOp(ExprBinOp {
+        range: TextRange::default(),
+        left: Box::new(Expr::Subscript(ast::ExprSubscript {
+            value: Box::new(literal_subscript.clone()),
             range: TextRange::default(),
-            left: Box::new(Expr::Subscript(ast::ExprSubscript {
-                value: Box::new(ruff_python_ast::Expr::Name(ast::ExprName{
-                    range: TextRange::default(),
-                    id: Name::new("Literal"),
-                    ctx: ExprContext::Load,
-                })),
+            ctx: ExprContext::Load,
+            slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                elts: literal_elements.into_iter().cloned().collect(),
                 range: TextRange::default(),
                 ctx: ExprContext::Load,
-                slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                        elts: literal_elements.iter().copied().cloned().collect(),
-                        range: TextRange::default(),
-                        ctx: ExprContext::Load,
-                        parenthesized: true,
-                    })),
+                parenthesized: true,
             })),
-            op: ruff_python_ast::Operator::BitOr,
-            right: Box::new(Expr::Subscript(ast::ExprSubscript {
-                value: Box::new(ruff_python_ast::Expr::Name(ast::ExprName{
-                    range: TextRange::default(),
-                    id: Name::new("Literal"),
-                    ctx: ExprContext::Load,
-                })),
-                range: TextRange::default(),
-                ctx: ExprContext::Load,
-                slice: Box::new(Expr::NoneLiteral(
-                    ExprNoneLiteral {
-                        range: TextRange::default(),
-                    }
-                )),
-            })),
-        }
-    );
+        })),
+        op: ruff_python_ast::Operator::BitOr,
+        right: Box::new(Expr::NoneLiteral(ExprNoneLiteral {
+            range: TextRange::default(),
+        })),
+    });
 
     let content = checker.generator().expr(&bin_or);
 
