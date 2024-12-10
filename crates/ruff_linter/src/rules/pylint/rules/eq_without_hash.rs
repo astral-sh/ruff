@@ -11,14 +11,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// A class that implements `__eq__` but not `__hash__` will have its hash
-/// method implicitly set to `None`. This will cause the class to be
-/// unhashable, will in turn cause issues when using the class as a key in a
-/// dictionary or a member of a set.
-///
-/// ## Known problems
-/// Does not check for `__hash__` implementations in superclasses.
+/// method implicitly set to `None`, regardless of if a super class defines
+/// `__hash__`. This will cause the class to be unhashable, will in turn
+/// cause issues when using the class as a key in a dictionary or a member
+/// of a set.
 ///
 /// ## Example
+///
 /// ```python
 /// class Person:
 ///     def __init__(self):
@@ -29,6 +28,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Person:
 ///     def __init__(self):
@@ -40,6 +40,69 @@ use crate::checkers::ast::Checker;
 ///     def __hash__(self):
 ///         return hash(self.name)
 /// ```
+///
+/// ### When inheriting
+///
+/// The mere presence of an `__eq__` function will cause the classes `__hash__` to be `None` and must be explicitly
+/// implemented:
+///
+/// ```python
+/// class Person:
+///     def __init__(self):
+///         self.name = "monty"
+///
+///     def __eq__(self, other):
+///         return isinstance(other, Person) and other.name == self.name
+///
+///     def __hash__(self):
+///         return hash(self.name)
+///
+///
+/// class Developer(Person):
+///     def __init__(self):
+///         super().__init__()
+///         self.language = "python"
+///
+///     def __eq__(self, other):
+///         return (
+///             super().__eq__(other)
+///             and isinstance(other, Developer)
+///             and self.language == other.language
+///         )
+///
+///
+/// hash(Developer())  # TypeError: unhashable type: 'Developer'
+/// ```
+///
+/// It is idiomatic to write a hash function using a tuple of members required for the `__eq__` function to operate:
+///
+/// ```python
+/// class Developer(Person):
+///     ...
+///     def __hash__(self):
+///         return hash((self.name, self.other))
+/// ```
+///
+/// ### When the hash logic is identical
+///
+/// ```python
+/// class Derived(Base):
+///     def __eq__(self, other): ...
+///
+///     def __hash__(self):
+///         return super().__hash__()
+/// ```
+///
+/// or:
+///
+/// ```python
+/// class Derived(Base):
+///     def __eq__(self, other): ...
+///
+///     __hash__ = Base.__hash__
+/// ```
+/// ## References
+/// - [Python documentation: `object.__hash__`](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
 #[derive(ViolationMetadata)]
 pub(crate) struct EqWithoutHash;
 
