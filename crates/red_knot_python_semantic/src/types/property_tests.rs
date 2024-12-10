@@ -163,13 +163,13 @@ mod stable {
     // `T` is equivalent to itself.
     type_property_test!(
         equivalent_to_is_reflexive, db,
-        forall types t. t.is_equivalent_to(db, t)
+        forall types t. t.is_fully_static(db) => t.is_equivalent_to(db, t)
     );
 
     // `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
-        forall types t. t.is_subtype_of(db, t)
+        forall types t. t.is_fully_static(db) => t.is_subtype_of(db, t)
     );
 
     // `S <: T` and `T <: U` implies that `S <: U`.
@@ -212,6 +212,12 @@ mod stable {
     type_property_test!(
         singleton_implies_single_valued, db,
         forall types t. t.is_singleton(db) => t.is_single_valued(db)
+    );
+
+    // If `T` contains a gradual form, it should not participate in equivalence
+    type_property_test!(
+        non_fully_static_types_do_not_participate_in_equivalence, db,
+        forall types s, t. !s.is_fully_static(db) => !s.is_equivalent_to(db, t) && !t.is_equivalent_to(db, s)
     );
 
     // If `T` contains a gradual form, it should not participate in subtyping
