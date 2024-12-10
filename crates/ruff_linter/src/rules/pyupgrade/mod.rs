@@ -83,6 +83,7 @@ mod tests {
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_utf8.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_utf8_other.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_utf8_code_other.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_code_utf8_utf8.py"))]
     #[test_case(
         Rule::UTF8EncodingDeclaration,
         Path::new("UP009_hashbang_utf8_other.py")

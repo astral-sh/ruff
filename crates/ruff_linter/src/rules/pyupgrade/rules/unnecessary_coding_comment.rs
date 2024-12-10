@@ -4,7 +4,6 @@ use regex::Regex;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_index::Indexer;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::TextRange;
@@ -62,78 +61,70 @@ struct CodingCommentRanges {
 pub(crate) fn unnecessary_coding_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
-    indexer: &Indexer,
     comment_ranges: &CommentRanges,
 ) {
-    // The coding comment must be on one of the first two lines.
-    // Since each comment spans at least one line,
-    // we only need to check the first two comments,
-    // plus a third to make sure it would not become a new coding comment.
-    let mut coding_comments = comment_ranges
-        .iter()
-        .take(3)
-        .map(|comment_range| coding_comment(locator, indexer, *comment_range));
+    let mut coding_comments = coding_comments_on_first_three_lines(locator, comment_ranges);
 
     let first = coding_comments.next().flatten();
     let second = coding_comments.next().flatten();
     let third = coding_comments.next().flatten();
 
     // Table: https://github.com/astral-sh/ruff/pull/14728#issuecomment-2518114454
-    match [first, second, third] {
-        [Some(CodingComment::UTF8(ranges)), None | Some(CodingComment::UTF8(..)), _]
-        | [None, Some(CodingComment::UTF8(ranges)), None | Some(CodingComment::UTF8(..))] => {
+    match (first, second, third) {
+        (Some(CodingComment::UTF8(ranges)), None | Some(CodingComment::UTF8(..)), _)
+        | (None, Some(CodingComment::UTF8(ranges)), None | Some(CodingComment::UTF8(..))) => {
             report(diagnostics, ranges.line_range, ranges.self_range);
         }
         _ => {}
     }
 }
 
+fn coding_comments_on_first_three_lines<'a>(
+    locator: &'a Locator<'a>,
+    comment_ranges: &'a CommentRanges,
+) -> impl Iterator<Item = Option<CodingComment>> + use<'a> {
+    let first_line_trimmed = locator.full_line_str(0.into()).trim();
+
+    let seen_code = !first_line_trimmed.is_empty() && !first_line_trimmed.starts_with('#');
+
+    // The coding comment must be on one of the first two lines.
+    // Since each comment spans at least one line,
+    // we only need to check the first two comments,
+    // plus a third to make sure it would not become a new coding comment.
+    comment_ranges.iter().take(3).map(move |comment_range| {
+        if seen_code {
+            return None;
+        }
+
+        let line_range = locator.full_line_range(comment_range.start());
+        let line_index = locator.count_lines(TextRange::up_to(line_range.start()));
+
+        if line_index > 2 {
+            return None;
+        }
+
+        // If leading content is not whitespace then it's not a valid coding comment e.g.
+        // ```
+        // print(x) # coding=utf8
+        // ```
+        let before_hash_sign =
+            locator.slice(TextRange::new(line_range.start(), comment_range.start()));
+
+        if !before_hash_sign.trim().is_empty() {
+            return None;
+        }
+
+        coding_comment(locator, *comment_range, line_range)
+    })
+}
+
 fn coding_comment(
     locator: &Locator,
-    indexer: &Indexer,
     self_range: TextRange,
+    line_range: TextRange,
 ) -> Option<CodingComment> {
-    // If leading content is not whitespace then it's not a valid coding comment e.g.
-    // ```
-    // print(x) # coding=utf8
-    // ```
-    let line_range = locator.full_line_range(self_range.start());
-    if !locator
-        .slice(TextRange::new(line_range.start(), self_range.start()))
-        .trim()
-        .is_empty()
-    {
-        return None;
-    }
-
-    // If the line is after a continuation then it's not a valid coding comment e.g.
-    // ```
-    // x = 1 \
-    //    # coding=utf8
-    // x = 2
-    // ```
-    if indexer
-        .preceded_by_continuations(line_range.start(), locator.contents())
-        .is_some()
-    {
-        return None;
-    }
-
     let part_of_interest = CODING_COMMENT_REGEX.captures(locator.slice(line_range))?;
     let coding_name = part_of_interest.name("name")?.as_str();
-
-    let line_index = locator.count_lines_until(line_range.start());
-
-    // Aside from the first two lines,
-    // we also need to check the third for overridden coding comments:
-    // ```
-    // #!/usr/bin/python
-    // # -*- coding: utf-8 -*-
-    // # -*- coding: ascii -*-
-    // ```
-    if line_index > 2 {
-        return None;
-    }
 
     let ranges = CodingCommentRanges {
         self_range,
