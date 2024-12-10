@@ -92,9 +92,9 @@ fn diagnostic_for_argument(
             .map_or_else(|| keyword.range(), Ranged::range),
     );
 
-    if replacement.is_some() {
+    if let Some(replacement) = replacement {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            replacement?.to_string(),
+            replacement.to_string(),
             diagnostic.range,
         )));
     }
