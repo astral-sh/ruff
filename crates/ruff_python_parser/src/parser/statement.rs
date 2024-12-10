@@ -1332,14 +1332,12 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Try);
         self.expect(TokenKind::Colon);
 
-        let mut is_star = false;
+        let mut is_star: Option<bool> = None;
 
         let try_body = self.parse_body(Clause::Try);
 
         let has_except = self.at(TokenKind::Except);
 
-        // TODO(dhruvmanila): Raise syntax error if there are both 'except' and 'except*'
-        // on the same 'try'
         // test_err try_stmt_mixed_except_kind
         // try:
         //     pass
@@ -1353,11 +1351,27 @@ impl<'src> Parser<'src> {
         //     pass
         // except:
         //     pass
+        let mut both_except_types = None;
         let handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
-            is_star |= kind.is_star();
+            if is_star.is_none() {
+                is_star = Some(kind.is_star());
+            } else if is_star.is_some_and(|seen_star| seen_star != kind.is_star()) {
+                both_except_types = Some(handler.range());
+            }
             handler
         });
+        // Empty handler has `is_star` false.
+        let is_star = is_star.unwrap_or_default();
+        if let Some(handler_err_range) = both_except_types {
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "SyntaxError: cannot have both 'except' and 'except*' on the same 'try'"
+                        .to_string(),
+                ),
+                handler_err_range,
+            );
+        }
 
         // test_err try_stmt_misspelled_except
         // try:
