@@ -3,7 +3,7 @@
 ## `typing.TYPE_CHECKING`
 
 This constant is `True` when in type-checking mode, `False` otherwise. The symbol is defined to be
-`False` at runtime. In typeshed, it is annotated as `bool`. This tests makes sure that we infer
+`False` at runtime. In typeshed, it is annotated as `bool`. This test makes sure that we infer
 `Literal[True]` for it anyways.
 
 ### Basic
