@@ -1,0 +1,141 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_mixed_except_kind.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..128,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..63,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 14..30,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 26..30,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 31..63,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 39..53,
+                                            id: Name("ExceptionGroup"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 59..63,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 64..127,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 73..77,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 78..110,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 86..100,
+                                            id: Name("ExceptionGroup"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 106..110,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 111..127,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 123..127,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+3 |   except:
+4 |       pass
+5 | / except* ExceptionGroup:
+6 | |     pass
+  | |________^ Syntax Error: SyntaxError: cannot have both 'except' and 'except*' on the same 'try'
+7 |   try:
+8 |       pass
+  |
+
+
+   |
+ 9 |   except* ExceptionGroup:
+10 |       pass
+11 | / except:
+12 | |     pass
+   | |________^ Syntax Error: SyntaxError: cannot have both 'except' and 'except*' on the same 'try'
+   |
