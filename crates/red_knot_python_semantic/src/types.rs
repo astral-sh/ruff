@@ -609,8 +609,6 @@ impl<'db> Type<'db> {
             return false;
         }
         match (self, target) {
-            (Type::Unknown | Type::Any | Type::Todo(_), _) => false,
-            (_, Type::Unknown | Type::Any | Type::Todo(_)) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (_, Type::Instance(InstanceType { class }))
