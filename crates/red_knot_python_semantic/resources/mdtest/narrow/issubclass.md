@@ -7,7 +7,7 @@ Narrowing for `issubclass(class, classinfo)` expressions.
 ### Basic example
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     t = int if flag else str
 
     if issubclass(t, bytes):
@@ -30,7 +30,7 @@ def _(flag: bool) -> None:
 ### Proper narrowing in `elif` and `else` branches
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     t = int if flag1 else str if flag2 else bytes
 
     if issubclass(t, int):
@@ -54,7 +54,7 @@ class Derived1(Base): ...
 class Derived2(Base): ...
 class Unrelated: ...
 
-def _(flag1: bool, flag2: bool, flag3: bool) -> None:
+def _(flag1: bool, flag2: bool, flag3: bool):
     t1 = Derived1 if flag1 else Derived2
 
     if issubclass(t1, Base):
@@ -84,7 +84,7 @@ def _(flag1: bool, flag2: bool, flag3: bool) -> None:
 class A: ...
 class B: ...
 
-def _(t: type[object]) -> None:
+def _(t: type[object]):
     if issubclass(t, A):
         reveal_type(t)  # revealed: type[A]
         if issubclass(t, B):
@@ -101,7 +101,7 @@ def _(t: type[object]) -> None:
 # error: [possibly-unbound-import] "Member `NoneType` of module `types` is possibly unbound"
 from types import NoneType
 
-def _(flag: bool) -> None:
+def _(flag: bool):
     t = int if flag else NoneType
 
     if issubclass(t, NoneType):
@@ -119,7 +119,7 @@ def _(flag: bool) -> None:
 ```py
 class Unrelated: ...
 
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     t = int if flag1 else str if flag2 else bytes
 
     if issubclass(t, (int, (Unrelated, (bytes,)))):

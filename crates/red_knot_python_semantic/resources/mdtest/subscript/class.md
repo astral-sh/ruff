@@ -21,7 +21,7 @@ reveal_type(Identity[0])  # revealed: str
 ## Class getitem union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class UnionClassGetItem:
         if flag:
             def __class_getitem__(cls, item: int) -> str:
@@ -36,7 +36,7 @@ def _(flag: bool) -> None:
 ## Class getitem with class union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class A:
         def __class_getitem__(cls, item: int) -> str:
             return item
@@ -54,7 +54,7 @@ def _(flag: bool) -> None:
 ## Class getitem with unbound method union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         class Spam:
             def __class_getitem__(self, x: int) -> str:
@@ -70,7 +70,7 @@ def _(flag: bool) -> None:
 ## TODO: Class getitem non-class union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         class Eggs:
             def __class_getitem__(self, x: int) -> str:

@@ -49,7 +49,7 @@ reveal_type(x)  # revealed: int
 ## Method union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class Foo:
         if flag:
             def __iadd__(self, other: int) -> str:
@@ -67,7 +67,7 @@ def _(flag: bool) -> None:
 ## Partially bound `__iadd__`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class Foo:
         if flag:
             def __iadd__(self, other: str) -> int:
@@ -85,7 +85,7 @@ def _(flag: bool) -> None:
 ## Partially bound with `__add__`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class Foo:
         def __add__(self, other: str) -> str:
             return "Hello, world!"
@@ -124,7 +124,7 @@ reveal_type(f)  # revealed: int | str | float
 ## Target union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class Foo:
         def __iadd__(self, other: int) -> str:
             return "Hello, world!"

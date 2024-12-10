@@ -30,7 +30,7 @@ reveal_type(Identity()[0])  # revealed: int
 ## Getitem union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class Identity:
         if flag:
             def __getitem__(self, index: int) -> int:

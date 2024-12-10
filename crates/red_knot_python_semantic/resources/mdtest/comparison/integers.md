@@ -20,7 +20,7 @@ reveal_type(1 <= "" and 0 < 1)  # revealed: bool
 
 ```py
 # TODO: implement lookup of `__eq__` on typeshed `int` stub.
-def _(a: int, b: int) -> None:
+def _(a: int, b: int):
     reveal_type(1 == a)  # revealed: bool
     reveal_type(9 < a)  # revealed: bool
     reveal_type(a < b)  # revealed: bool

@@ -5,7 +5,7 @@
 Name lookups within a class scope fall back to globals, but lookups of class attributes don't.
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1
 
     class C:
@@ -21,7 +21,7 @@ def _(flag: bool) -> None:
 ## Possibly unbound in class and global scope
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     if flag1:
         x = "abc"
 

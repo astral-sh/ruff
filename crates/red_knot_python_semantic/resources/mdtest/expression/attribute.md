@@ -3,7 +3,7 @@
 ## Boundness
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class A:
         always_bound = 1
 

@@ -22,7 +22,7 @@ reveal_type(b)  # revealed: Unknown
 ## Possibly unbound `__call__` method
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class PossiblyNotCallable:
         if flag:
             def __call__(self) -> int: ...
@@ -35,7 +35,7 @@ def _(flag: bool) -> None:
 ## Possibly unbound callable
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         class PossiblyUnbound:
             def __call__(self) -> int: ...
@@ -59,7 +59,7 @@ reveal_type(a())  # revealed: Unknown
 ## Possibly non-callable `__call__`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class NonCallable:
         if flag:
             __call__ = 1

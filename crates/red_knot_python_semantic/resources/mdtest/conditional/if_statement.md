@@ -3,7 +3,7 @@
 ## Simple if
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     y = 1
     y = 2
 
@@ -16,7 +16,7 @@ def _(flag: bool) -> None:
 ## Simple if-elif-else
 
 ```py
-def _(flag: bool, flag2: bool) -> None:
+def _(flag: bool, flag2: bool):
     y = 1
     y = 2
 
@@ -44,7 +44,7 @@ def _(flag: bool, flag2: bool) -> None:
 ## Single symbol across if-elif-else
 
 ```py
-def _(flag: bool, flag2: bool) -> None:
+def _(flag: bool, flag2: bool):
     if flag:
         y = 1
     elif flag2:
@@ -58,7 +58,7 @@ def _(flag: bool, flag2: bool) -> None:
 ## if-elif-else without else assignment
 
 ```py
-def _(flag: bool, flag2: bool) -> None:
+def _(flag: bool, flag2: bool):
     y = 0
 
     if flag:
@@ -74,7 +74,7 @@ def _(flag: bool, flag2: bool) -> None:
 ## if-elif-else with intervening assignment
 
 ```py
-def _(flag: bool, flag2: bool) -> None:
+def _(flag: bool, flag2: bool):
     y = 0
 
     if flag:
@@ -91,7 +91,7 @@ def _(flag: bool, flag2: bool) -> None:
 ## Nested if statement
 
 ```py
-def _(flag: bool, flag2: bool) -> None:
+def _(flag: bool, flag2: bool):
     y = 0
 
     if flag:
@@ -104,7 +104,7 @@ def _(flag: bool, flag2: bool) -> None:
 ## if-elif without else
 
 ```py
-def _(flag: bool, flag2: bool) -> None:
+def _(flag: bool, flag2: bool):
     y = 1
     y = 2
 

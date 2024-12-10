@@ -3,7 +3,7 @@
 ## Single `match` pattern
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = None if flag else 1
 
     reveal_type(x)  # revealed: None | Literal[1]

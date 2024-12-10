@@ -106,7 +106,7 @@ reveal_type(x)
 ## With non-callable iterator
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class NotIterable:
         if flag:
             __iter__ = 1
@@ -156,7 +156,7 @@ class Test2:
     def __iter__(self) -> TestIter:
         return TestIter()
 
-def _(flag: bool) -> None:
+def _(flag: bool):
     for x in Test() if flag else Test2():
         reveal_type(x)  # revealed: int
 ```
@@ -207,7 +207,7 @@ class Test2:
     def __iter__(self) -> TestIter3 | TestIter4:
         return TestIter3()
 
-def _(flag: bool) -> None:
+def _(flag: bool):
     for x in Test() if flag else Test2():
         reveal_type(x)  # revealed: int | Exception | str | tuple[int, int] | bytes | memoryview
 ```
@@ -223,7 +223,7 @@ class Test:
     def __iter__(self) -> TestIter:
         return TestIter()
 
-def _(flag: bool) -> None:
+def _(flag: bool):
     # error: [not-iterable] "Object of type `Test | Literal[42]` is not iterable because its `__iter__` method is possibly unbound"
     for x in Test() if flag else 42:
         reveal_type(x)  # revealed: int
@@ -244,7 +244,7 @@ class Test2:
     def __iter__(self) -> int:
         return 42
 
-def _(flag: bool) -> None:
+def _(flag: bool):
     # error: "Object of type `Test | Test2` is not iterable"
     for x in Test() if flag else Test2():
         reveal_type(x)  # revealed: Unknown

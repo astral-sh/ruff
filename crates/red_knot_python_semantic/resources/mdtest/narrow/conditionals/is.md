@@ -3,7 +3,7 @@
 ## `is None`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = None if flag else 1
 
     if x is None:
@@ -17,7 +17,7 @@ def _(flag: bool) -> None:
 ## `is` for other types
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class A: ...
     x = A()
     y = x if flag else None
@@ -33,7 +33,7 @@ def _(flag: bool) -> None:
 ## `is` in chained comparisons
 
 ```py
-def _(x_flag: bool, y_flag: bool) -> None:
+def _(x_flag: bool, y_flag: bool):
     x = True if x_flag else False
     y = True if y_flag else False
 
@@ -53,7 +53,7 @@ def _(x_flag: bool, y_flag: bool) -> None:
 ## `is` in elif clause
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     x = None if flag1 else (1 if flag2 else True)
 
     reveal_type(x)  # revealed: None | Literal[1] | Literal[True]

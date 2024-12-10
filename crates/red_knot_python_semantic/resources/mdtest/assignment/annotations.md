@@ -78,13 +78,13 @@ c: tuple[str | int, str] = ([], "foo")
 ## PEP-604 annotations are supported
 
 ```py
-def foo(v: str | int | None) -> None:
+def foo(v: str | int | None):
     reveal_type(v)  # revealed: str | int | None
 
-def bar(v: str | str | None) -> None:
+def bar(v: str | str | None):
     reveal_type(v)  # revealed: str | None
 
-def baz(v: str | str) -> None:
+def baz(v: str | str):
     reveal_type(v)  # revealed: str
 ```
 

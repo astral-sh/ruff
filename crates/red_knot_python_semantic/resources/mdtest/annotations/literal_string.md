@@ -89,7 +89,7 @@ vice versa.
 ```py
 from typing_extensions import Literal, LiteralString
 
-def _(flag: bool) -> None:
+def _(flag: bool):
     foo_1: Literal["foo"] = "foo"
     bar_1: LiteralString = foo_1  # fine
 

@@ -3,7 +3,7 @@
 ## Shadow after incompatible declarations is OK
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         x: str
     else:

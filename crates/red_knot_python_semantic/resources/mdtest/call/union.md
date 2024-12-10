@@ -3,7 +3,7 @@
 ## Union of return types
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         def f() -> int:
             return 1
@@ -33,7 +33,7 @@ reveal_type(f())  # revealed: Unknown | int
 Calling a union with a non-callable element should emit a diagnostic.
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         f = 1
     else:
@@ -48,7 +48,7 @@ def _(flag: bool) -> None:
 Calling a union with multiple non-callable elements should mention all of them in the diagnostic.
 
 ```py
-def _(flag: bool, flag2: bool) -> None:
+def _(flag: bool, flag2: bool):
     if flag:
         f = 1
     elif flag2:
@@ -66,7 +66,7 @@ def _(flag: bool, flag2: bool) -> None:
 Calling a union with no callable elements can emit a simpler diagnostic.
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         f = 1
     else:

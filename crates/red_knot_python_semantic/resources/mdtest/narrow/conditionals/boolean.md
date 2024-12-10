@@ -6,7 +6,7 @@
 class A: ...
 class B: ...
 
-def _(x: A | B) -> None:
+def _(x: A | B):
     if isinstance(x, A) and isinstance(x, B):
         reveal_type(x)  # revealed:  A & B
     else:
@@ -19,7 +19,7 @@ def _(x: A | B) -> None:
 class A: ...
 class B: ...
 
-def _(flag: bool, x: A | B) -> None:
+def _(flag: bool, x: A | B):
     if isinstance(x, A) and flag:
         reveal_type(x)  # revealed: A
     else:
@@ -39,7 +39,7 @@ def _(flag: bool, x: A | B) -> None:
 class A: ...
 class B: ...
 
-def _(x: A | B) -> None:
+def _(x: A | B):
     if isinstance(x, A) and True:
         reveal_type(x)  # revealed: A
     else:
@@ -76,7 +76,7 @@ def _(x: A | B) -> None:
 class A: ...
 class B: ...
 
-def _(x: A | B, y: A | B) -> None:
+def _(x: A | B, y: A | B):
     if isinstance(x, A) and isinstance(y, B):
         reveal_type(x)  # revealed: A
         reveal_type(y)  # revealed: B
@@ -96,7 +96,7 @@ class A: ...
 class B: ...
 class C: ...
 
-def _(x: A | B | C) -> None:
+def _(x: A | B | C):
     if isinstance(x, A) or isinstance(x, B):
         reveal_type(x)  # revealed:  A | B
     else:
@@ -110,7 +110,7 @@ class A: ...
 class B: ...
 class C: ...
 
-def _(flag: bool, x: A | B | C) -> None:
+def _(flag: bool, x: A | B | C):
     if isinstance(x, A) or isinstance(x, B) or flag:
         reveal_type(x)  # revealed:  A | B | C
     else:
@@ -124,7 +124,7 @@ class A: ...
 class B: ...
 class C: ...
 
-def _(x: A | B | C, y: A | B | C) -> None:
+def _(x: A | B | C, y: A | B | C):
     if isinstance(x, A) or isinstance(y, A):
         # The predicate might be satisfied by the right side, so the type of `x` can’t be narrowed down here.
         reveal_type(x)  # revealed:  A | B | C
@@ -150,7 +150,7 @@ class A: ...
 class B: ...
 class C: ...
 
-def _(x: A | B | C) -> None:
+def _(x: A | B | C):
     if isinstance(x, B) and not isinstance(x, C):
         reveal_type(x)  # revealed:  B & ~C
     else:
@@ -165,7 +165,7 @@ class A: ...
 class B: ...
 class C: ...
 
-def _(x: A | B | C) -> None:
+def _(x: A | B | C):
     if isinstance(x, B) or not isinstance(x, C):
         reveal_type(x)  # revealed: B | A & ~C
     else:
@@ -179,7 +179,7 @@ class A: ...
 class B: ...
 class C: ...
 
-def _(x: A | B | C) -> None:
+def _(x: A | B | C):
     if isinstance(x, A) or (isinstance(x, B) and not isinstance(x, C)):
         reveal_type(x)  # revealed:  A | B & ~C
     else:
@@ -194,7 +194,7 @@ class A: ...
 class B: ...
 class C: ...
 
-def _(x: A | B | C) -> None:
+def _(x: A | B | C):
     if isinstance(x, A) and (isinstance(x, B) or not isinstance(x, C)):
         # A & (B | ~C) -> (A & B) | (A & ~C)
         reveal_type(x)  # revealed:  A & B | A & ~C
@@ -212,7 +212,7 @@ def _(x: A | B | C) -> None:
 ## Boolean expression internal narrowing
 
 ```py
-def _(x: str | None, y: str | None) -> None:
+def _(x: str | None, y: str | None):
     if x is None and y is not x:
         reveal_type(y)  # revealed: str
 

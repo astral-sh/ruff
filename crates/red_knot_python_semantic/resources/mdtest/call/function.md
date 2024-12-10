@@ -57,7 +57,7 @@ x = nonsense()  # error: "Object of type `Literal[123]` is not callable"
 ## Potentially unbound function
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         def foo() -> int:
             return 42

@@ -10,7 +10,7 @@ x: str  # error: [invalid-declaration] "Cannot declare type `str` for inferred t
 ## Incompatible declarations
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         x: str
     else:
@@ -22,7 +22,7 @@ def _(flag: bool) -> None:
 ## Partial declarations
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         x: int
 
@@ -32,7 +32,7 @@ def _(flag: bool) -> None:
 ## Incompatible declarations with bad assignment
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         x: str
     else:

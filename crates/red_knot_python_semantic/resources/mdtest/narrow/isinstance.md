@@ -5,7 +5,7 @@ Narrowing for `isinstance(object, classinfo)` expressions.
 ## `classinfo` is a single type
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1 if flag else "a"
 
     if isinstance(x, int):
@@ -26,7 +26,7 @@ Note: `isinstance(x, (int, str))` should not be confused with `isinstance(x, tup
 The former is equivalent to `isinstance(x, int | str)`:
 
 ```py
-def _(flag: bool, flag1: bool, flag2: bool) -> None:
+def _(flag: bool, flag1: bool, flag2: bool):
     x = 1 if flag else "a"
 
     if isinstance(x, (int, str)):
@@ -61,7 +61,7 @@ def _(flag: bool, flag1: bool, flag2: bool) -> None:
 ## `classinfo` is a nested tuple of types
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1 if flag else "a"
 
     if isinstance(x, (bool, (bytes, int))):
@@ -98,7 +98,7 @@ else:
 ## No narrowing for instances of `builtins.type`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     t = type("t", (), {})
 
     # This isn't testing what we want it to test if we infer anything more precise here:
@@ -113,7 +113,7 @@ def _(flag: bool) -> None:
 ## Do not use custom `isinstance` for narrowing
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     def isinstance(x, t):
         return True
     x = 1 if flag else "a"
@@ -125,7 +125,7 @@ def _(flag: bool) -> None:
 ## Do support narrowing if `isinstance` is aliased
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     isinstance_alias = isinstance
 
     x = 1 if flag else "a"
@@ -139,7 +139,7 @@ def _(flag: bool) -> None:
 ```py
 from builtins import isinstance as imported_isinstance
 
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1 if flag else "a"
 
     if imported_isinstance(x, int):
@@ -149,7 +149,7 @@ def _(flag: bool) -> None:
 ## Do not narrow if second argument is not a type
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1 if flag else "a"
 
     # TODO: this should cause us to emit a diagnostic during
@@ -166,7 +166,7 @@ def _(flag: bool) -> None:
 ## Do not narrow if there are keyword arguments
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1 if flag else "a"
 
     # TODO: this should cause us to emit a diagnostic

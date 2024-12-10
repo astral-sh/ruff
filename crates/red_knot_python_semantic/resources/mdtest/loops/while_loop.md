@@ -3,7 +3,7 @@
 ## Basic While Loop
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1
     while flag:
         x = 2
@@ -14,7 +14,7 @@ def _(flag: bool) -> None:
 ## While with else (no break)
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1
     while flag:
         x = 2
@@ -28,7 +28,7 @@ def _(flag: bool) -> None:
 ## While with Else (may break)
 
 ```py
-def _(flag: bool, flag2: bool) -> None:
+def _(flag: bool, flag2: bool):
     x = 1
     y = 0
     while flag:

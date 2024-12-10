@@ -5,7 +5,7 @@ The `not` operator negates a constraint.
 ## `not is None`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = None if flag else 1
 
     if not x is None:
@@ -19,7 +19,7 @@ def _(flag: bool) -> None:
 ## `not isinstance`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1 if flag else "a"
 
     if not isinstance(x, (int)):

@@ -5,7 +5,7 @@
 Comparisons on union types need to consider all possible cases:
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     one_or_two = 1 if flag else 2
 
     reveal_type(one_or_two <= 2)  # revealed: Literal[True]
@@ -53,7 +53,7 @@ With unions on both sides, we need to consider the full cross product of options
 resulting (union) type:
 
 ```py
-def _(flag_s: bool, flag_l: bool) -> None:
+def _(flag_s: bool, flag_l: bool):
     small = 1 if flag_s else 2
     large = 2 if flag_l else 3
 
@@ -71,7 +71,7 @@ back to `bool` for the result type instead of trying to infer something more pre
 (supported) variants:
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = [1, 2] if flag else 1
 
     result = 1 in x  # error: "Operator `in` is not supported"

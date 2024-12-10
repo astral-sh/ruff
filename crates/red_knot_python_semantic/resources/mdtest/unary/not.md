@@ -35,7 +35,7 @@ y = 1
 ## Union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         p = 1
         q = 3.3

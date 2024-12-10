@@ -5,7 +5,7 @@
 ```py
 class A: ...
 
-def _(c: type[A]) -> None:
+def _(c: type[A]):
     reveal_type(c)  # revealed: type[A]
 ```
 
@@ -15,7 +15,7 @@ def _(c: type[A]) -> None:
 class A:
     class B: ...
 
-def f(c: type[A.B]) -> None:
+def f(c: type[A.B]):
     reveal_type(c)  # revealed: type[B]
 ```
 
@@ -26,7 +26,7 @@ class A:
     class B:
         class C: ...
 
-def f(c: type[A.B.C]) -> None:
+def f(c: type[A.B.C]):
     reveal_type(c)  # revealed: type[C]
 ```
 
@@ -35,7 +35,7 @@ def f(c: type[A.B.C]) -> None:
 ```py
 from a import A
 
-def f(c: type[A]) -> None:
+def f(c: type[A]):
     reveal_type(c)  # revealed: type[A]
 ```
 
@@ -48,7 +48,7 @@ class A: ...
 ```py
 import a
 
-def f(c: type[a.B]) -> None:
+def f(c: type[a.B]):
     reveal_type(c)  # revealed: type[B]
 ```
 
@@ -63,7 +63,7 @@ import a.b
 
 # TODO: no diagnostic
 # error: [unresolved-attribute]
-def f(c: type[a.b.C]) -> None:
+def f(c: type[a.b.C]):
     reveal_type(c)  # revealed: @Todo(unsupported type[X] special form)
 ```
 
@@ -84,7 +84,7 @@ class A:
     class B:
         class C: ...
 
-def _(u: type[BasicUser | ProUser | A.B.C]) -> None:
+def _(u: type[BasicUser | ProUser | A.B.C]):
     # revealed: type[BasicUser] | type[ProUser] | type[C]
     reveal_type(u)
 ```

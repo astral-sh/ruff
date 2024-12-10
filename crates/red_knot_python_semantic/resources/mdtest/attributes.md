@@ -3,7 +3,7 @@
 ## Union of attributes
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         class C1:
             x = 1
@@ -64,7 +64,7 @@ reveal_type(A.X)  # revealed: Literal[42]
 In this example, the `x` attribute is not defined in the `C2` element of the union:
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     class C1:
         x = 1
 
@@ -85,7 +85,7 @@ We raise the same diagnostic if the attribute is possibly-unbound in at least on
 union:
 
 ```py
-def _(flag: bool, flag1: bool, flag2: bool) -> None:
+def _(flag: bool, flag1: bool, flag2: bool):
     class C1:
         x = 1
 
@@ -107,7 +107,7 @@ def _(flag: bool, flag1: bool, flag2: bool) -> None:
 If the symbol is unbound in all elements of the union, we detect that:
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class C1: ...
     class C2: ...
     C = C1 if flag else C2

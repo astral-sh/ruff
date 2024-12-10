@@ -21,7 +21,7 @@ with Manager() as f:
 ## Union context manager
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class Manager1:
         def __enter__(self) -> str:
             return "foo"
@@ -101,7 +101,7 @@ with Manager():
 ## Context expression with possibly-unbound union variants
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class Manager1:
         def __enter__(self) -> str:
             return "foo"
@@ -120,7 +120,7 @@ def _(flag: bool) -> None:
 ## Context expression with "sometimes" callable `__enter__` method
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class Manager:
         if flag:
             def __enter__(self) -> str:

@@ -3,7 +3,7 @@
 ## `x != None`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = None if flag else 1
 
     if x != None:
@@ -16,7 +16,7 @@ def _(flag: bool) -> None:
 ## `!=` for other singleton types
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = True if flag else False
 
     if x != False:
@@ -29,7 +29,7 @@ def _(flag: bool) -> None:
 ## `x != y` where `y` is of literal type
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = 1 if flag else 2
 
     if x != 1:
@@ -39,7 +39,7 @@ def _(flag: bool) -> None:
 ## `x != y` where `y` is a single-valued type
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class A: ...
     class B: ...
     C = A if flag else B
@@ -54,7 +54,7 @@ def _(flag: bool) -> None:
 ## `x != y` where `y` has multiple single-valued options
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     x = 1 if flag1 else 2
     y = 2 if flag2 else 3
 
@@ -70,7 +70,7 @@ def _(flag1: bool, flag2: bool) -> None:
 Only single-valued types should narrow the type:
 
 ```py
-def _(flag: bool, a: int, y: int) -> None:
+def _(flag: bool, a: int, y: int):
     x = a if flag else None
 
     if x != y:
@@ -80,7 +80,7 @@ def _(flag: bool, a: int, y: int) -> None:
 ## Mix of single-valued and non-single-valued types
 
 ```py
-def _(flag1: bool, flag2: bool, a: int) -> None:
+def _(flag1: bool, flag2: bool, a: int):
     x = 1 if flag1 else 2
     y = 2 if flag2 else a
 

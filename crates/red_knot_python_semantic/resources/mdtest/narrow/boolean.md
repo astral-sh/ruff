@@ -9,7 +9,7 @@ Similarly, in `and` expressions, the right-hand side is evaluated only if the le
 ## Narrowing in `or`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class A: ...
     x: A | None = A() if flag else None
 
@@ -21,7 +21,7 @@ def _(flag: bool) -> None:
 ## Narrowing in `and`
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class A: ...
     x: A | None = A() if flag else None
 
@@ -33,7 +33,7 @@ def _(flag: bool) -> None:
 ## Multiple `and` arms
 
 ```py
-def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool) -> None:
+def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
     class A: ...
     x: A | None = A() if flag1 else None
 
@@ -45,7 +45,7 @@ def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool) -> None:
 ## Multiple `or` arms
 
 ```py
-def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool) -> None:
+def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
     class A: ...
     x: A | None = A() if flag1 else None
 
@@ -57,7 +57,7 @@ def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool) -> None:
 ## Multiple predicates
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     class A: ...
     x: A | None | Literal[1] = A() if flag1 else None if flag2 else 1
 
@@ -67,7 +67,7 @@ def _(flag1: bool, flag2: bool) -> None:
 ## Mix of `and` and `or`
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     class A: ...
     x: A | None | Literal[1] = A() if flag1 else None if flag2 else 1
 

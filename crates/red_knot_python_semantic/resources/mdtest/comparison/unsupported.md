@@ -1,7 +1,7 @@
 # Comparison: Unsupported operators
 
 ```py
-def _(flag: bool, flag1: bool, flag2: bool) -> None:
+def _(flag: bool, flag1: bool, flag2: bool):
     class A: ...
     a = 1 in 7  # error: "Operator `in` is not supported for types `Literal[1]` and `Literal[7]`"
     reveal_type(a)  # revealed: bool

@@ -14,7 +14,7 @@ class Child1(Base):
 
 class Child2(Base): ...
 
-def _(x: Base) -> None:
+def _(x: Base):
     c1 = Child1()
 
     # Create an intersection type through narrowing:
@@ -71,7 +71,7 @@ if x != "abc":
 #### Integers
 
 ```py
-def _(x: int) -> None:
+def _(x: int):
     if x != 1:
         reveal_type(x)  # revealed: int & ~Literal[1]
 
@@ -87,7 +87,7 @@ def _(x: int) -> None:
 ```py
 class A: ...
 
-def _(o: object) -> None:
+def _(o: object):
     a = A()
     n = None
 
@@ -111,7 +111,7 @@ class Container:
 
 class NonContainer: ...
 
-def _(x: object) -> None:
+def _(x: object):
     if isinstance(x, Container):
         if isinstance(x, NonContainer):
             reveal_type(x)  # revealed: Container & NonContainer
@@ -131,7 +131,7 @@ class Container:
 
 class NonContainer: ...
 
-def _(x: object) -> None:
+def _(x: object):
     if isinstance(x, Container):
         if not isinstance(x, NonContainer):
             reveal_type(x)  # revealed: Container & ~NonContainer

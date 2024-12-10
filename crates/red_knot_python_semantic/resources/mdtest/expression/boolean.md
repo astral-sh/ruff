@@ -3,7 +3,7 @@
 ## OR
 
 ```py
-def _(foo: str) -> None:
+def _(foo: str):
     reveal_type(True or False)  # revealed: Literal[True]
     reveal_type("x" or "y" or "z")  # revealed: Literal["x"]
     reveal_type("" or "y" or "z")  # revealed: Literal["y"]
@@ -17,7 +17,7 @@ def _(foo: str) -> None:
 ## AND
 
 ```py
-def _(foo: str) -> None:
+def _(foo: str):
     reveal_type(True and False)  # revealed: Literal[False]
     reveal_type(False and True)  # revealed: Literal[False]
     reveal_type(foo and False)  # revealed: str | Literal[False]
@@ -30,7 +30,7 @@ def _(foo: str) -> None:
 ## Simple function calls to bool
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag:
         x = True
     else:

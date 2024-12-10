@@ -3,7 +3,7 @@
 ## Multiple negative contributions
 
 ```py
-def _(x: int) -> None:
+def _(x: int):
     if x != 1:
         if x != 2:
             if x != 3:
@@ -13,7 +13,7 @@ def _(x: int) -> None:
 ## Multiple negative contributions with simplification
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     x = 1 if flag1 else 2 if flag2 else 3
 
     if x != 1:
@@ -25,7 +25,7 @@ def _(flag1: bool, flag2: bool) -> None:
 ## elif-else blocks
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     x = 1 if flag1 else 2 if flag2 else 3
 
     if x != 1:

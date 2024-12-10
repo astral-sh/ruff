@@ -281,7 +281,7 @@ reveal_type(42 + 4.2)  # revealed: int
 # TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(3 + 3j)  # revealed: int
 
-def _(x: bool, y: int) -> None:
+def _(x: bool, y: int):
     reveal_type(x + y)  # revealed: int
     reveal_type(4.2 + x)  # revealed: float
 

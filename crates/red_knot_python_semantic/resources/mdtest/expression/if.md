@@ -3,7 +3,7 @@
 ## Union
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     reveal_type(1 if flag else 2)  # revealed: Literal[1, 2]
 ```
 
@@ -28,7 +28,7 @@ reveal_type(1 if 0 else 2)  # revealed: Literal[2]
 The test inside an if expression should not affect code outside of the expression.
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x: Literal[42, "hello"] = 42 if flag else "hello"
 
     reveal_type(x)  # revealed: Literal[42] | Literal["hello"]

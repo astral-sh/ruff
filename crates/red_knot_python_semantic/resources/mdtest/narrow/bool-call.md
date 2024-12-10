@@ -1,7 +1,7 @@
 ## Narrowing for `bool(..)` checks
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
 
     x = 1 if flag else None
 

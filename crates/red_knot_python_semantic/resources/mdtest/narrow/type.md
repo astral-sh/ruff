@@ -6,7 +6,7 @@
 class A: ...
 class B: ...
 
-def _(x: A | B) -> None:
+def _(x: A | B):
     if type(x) is A:
         reveal_type(x)  # revealed: A
     else:
@@ -22,7 +22,7 @@ def _(x: A | B) -> None:
 class A: ...
 class B: ...
 
-def _(x: A | B) -> None:
+def _(x: A | B):
     if type(x) is not A:
         # Same reasoning as above: no narrowing should occur here.
         reveal_type(x)  # revealed: A | B
@@ -46,7 +46,7 @@ class IsEqualToEverything(type):
 class A(metaclass=IsEqualToEverything): ...
 class B(metaclass=IsEqualToEverything): ...
 
-def _(x: A | B) -> None:
+def _(x: A | B):
     if type(x) == A:
         reveal_type(x)  # revealed: A | B
 
@@ -63,7 +63,7 @@ class B: ...
 def type(x):
     return int
 
-def _(x: A | B) -> None:
+def _(x: A | B):
     if type(x) is A:
         reveal_type(x)  # revealed: A | B
     else:
@@ -75,7 +75,7 @@ def _(x: A | B) -> None:
 No narrowing should occur if `type` is used to dynamically create a class:
 
 ```py
-def _(x: str | int) -> None:
+def _(x: str | int):
     if type(x, (), {}) is str:
         reveal_type(x)  # revealed: str | int
     else:
@@ -87,7 +87,7 @@ def _(x: str | int) -> None:
 `type` can't be used with a keyword argument:
 
 ```py
-def _(x: str | int) -> None:
+def _(x: str | int):
     # TODO: we could issue a diagnostic here
     if type(object=x) is str:
         reveal_type(x)  # revealed: str | int
@@ -101,7 +101,7 @@ class B: ...
 
 alias_for_type = type
 
-def _(x: A | B) -> None:
+def _(x: A | B):
     if alias_for_type(x) is A:
         reveal_type(x)  # revealed: A
 ```
@@ -112,7 +112,7 @@ def _(x: A | B) -> None:
 class Base: ...
 class Derived(Base): ...
 
-def _(x: Base) -> None:
+def _(x: Base):
     if type(x) is Base:
         # Ideally, this could be narrower, but there is now way to
         # express a constraint like `Base & ~ProperSubtypeOf[Base]`.

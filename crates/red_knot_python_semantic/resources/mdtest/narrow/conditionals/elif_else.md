@@ -3,7 +3,7 @@
 ## Positive contributions become negative in elif-else blocks
 
 ```py
-def _(x: int) -> None:
+def _(x: int):
     if x == 1:
         # cannot narrow; could be a subclass of `int`
         reveal_type(x)  # revealed: int
@@ -16,7 +16,7 @@ def _(x: int) -> None:
 ## Positive contributions become negative in elif-else blocks, with simplification
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     x = 1 if flag1 else 2 if flag2 else 3
 
     if x == 1:
@@ -32,7 +32,7 @@ def _(flag1: bool, flag2: bool) -> None:
 ## Multiple negative contributions using elif, with simplification
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     x = 1 if flag1 else 2 if flag2 else 3
 
     if x != 1:

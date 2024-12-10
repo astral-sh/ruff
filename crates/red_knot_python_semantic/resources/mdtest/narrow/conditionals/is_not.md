@@ -5,7 +5,7 @@
 The type guard removes `None` from the union type:
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = None if flag else 1
 
     if x is not None:
@@ -19,7 +19,7 @@ def _(flag: bool) -> None:
 ## `is not` for other singleton types
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     x = True if flag else False
     reveal_type(x)  # revealed: bool
 
@@ -47,7 +47,7 @@ else:
 ## `is not` for other types
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     class A: ...
     x = A()
     y = x if flag else None
@@ -65,7 +65,7 @@ def _(flag: bool) -> None:
 The type guard removes `False` from the union type of the tested value only.
 
 ```py
-def _(x_flag: bool, y_flag: bool) -> None:
+def _(x_flag: bool, y_flag: bool):
     x = True if x_flag else False
     y = True if y_flag else False
 

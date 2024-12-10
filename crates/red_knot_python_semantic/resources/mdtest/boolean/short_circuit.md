@@ -7,7 +7,7 @@ Similarly, in `and` expressions, if the left-hand side is falsy, the right-hand 
 evaluated.
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if flag or (x := 1):
         # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: Literal[1]
@@ -20,7 +20,7 @@ def _(flag: bool) -> None:
 ## First expression is always evaluated
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     if (x := 1) or flag:
         reveal_type(x)  # revealed: Literal[1]
 
@@ -45,7 +45,7 @@ if True and (x := 1):
 ## Later expressions can always use variables from earlier expressions
 
 ```py
-def _(flag: bool) -> None:
+def _(flag: bool):
     flag or (x := 1) or reveal_type(x)  # revealed: Literal[1]
 
     # error: [unresolved-reference]
@@ -55,7 +55,7 @@ def _(flag: bool) -> None:
 ## Nested expressions
 
 ```py
-def _(flag1: bool, flag2: bool) -> None:
+def _(flag1: bool, flag2: bool):
     if flag1 or ((x := 1) and flag2):
         # error: [possibly-unresolved-reference]
         reveal_type(x)  # revealed: Literal[1]

@@ -58,7 +58,7 @@ reveal_type(c >= d)  # revealed: Literal[True]
 #### Results with Ambiguity
 
 ```py
-def _(x: bool, y: int) -> None:
+def _(x: bool, y: int):
     a = (x,)
     b = (y,)
 
@@ -248,7 +248,7 @@ Errors occurring within a tuple comparison should propagate outward. However, if
 comparison can clearly conclude before encountering an error, the error should not be raised.
 
 ```py
-def _(n: int, s: str) -> None:
+def _(n: int, s: str):
     class A: ...
     # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`"
     A() < A()
@@ -285,7 +285,7 @@ def _(n: int, s: str) -> None:
 "Membership Test Comparisons" refers to the operators `in` and `not in`.
 
 ```py
-def _(n: int) -> None:
+def _(n: int):
     a = (1, 2)
     b = ((3, 4), (1, 2))
     c = ((1, 2, 3), (4, 5, 6))
