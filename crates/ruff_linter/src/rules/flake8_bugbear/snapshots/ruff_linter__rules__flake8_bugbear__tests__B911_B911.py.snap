@@ -1,0 +1,169 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
+---
+B911.py:5:1: B911 `itertools.batched()` without an explicit `strict` parameter
+  |
+4 | # Errors
+5 | batched(range(3), 1)
+  | ^^^^^^^^^^^^^^^^^^^^ B911
+6 | batched("abc", 2)
+7 | batched([i for i in range(42)], some_n)
+  |
+  = help: Add an explicit `strict` parameter
+
+B911.py:6:1: B911 `itertools.batched()` without an explicit `strict` parameter
+  |
+4 | # Errors
+5 | batched(range(3), 1)
+6 | batched("abc", 2)
+  | ^^^^^^^^^^^^^^^^^ B911
+7 | batched([i for i in range(42)], some_n)
+8 | batched((foo for foo in cycle()))
+  |
+  = help: Add an explicit `strict` parameter
+
+B911.py:7:1: B911 `itertools.batched()` without an explicit `strict` parameter
+  |
+5 | batched(range(3), 1)
+6 | batched("abc", 2)
+7 | batched([i for i in range(42)], some_n)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+8 | batched((foo for foo in cycle()))
+9 | batched(itertools.batched([1, 2, 3], strict=True))
+  |
+  = help: Add an explicit `strict` parameter
+
+B911.py:8:1: B911 `itertools.batched()` without an explicit `strict` parameter
+  |
+6 | batched("abc", 2)
+7 | batched([i for i in range(42)], some_n)
+8 | batched((foo for foo in cycle()))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+9 | batched(itertools.batched([1, 2, 3], strict=True))
+  |
+  = help: Add an explicit `strict` parameter
+
+B911.py:9:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+ 7 | batched([i for i in range(42)], some_n)
+ 8 | batched((foo for foo in cycle()))
+ 9 | batched(itertools.batched([1, 2, 3], strict=True))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+10 | 
+11 | # Errors (limited iterators).
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:12:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+11 | # Errors (limited iterators).
+12 | batched(repeat(1, 1))
+   | ^^^^^^^^^^^^^^^^^^^^^ B911
+13 | batched(repeat(1, times=4))
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:13:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+11 | # Errors (limited iterators).
+12 | batched(repeat(1, 1))
+13 | batched(repeat(1, times=4))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+14 | 
+15 | # No fix
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:16:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+15 | # No fix
+16 | batched([], **kwargs)
+   | ^^^^^^^^^^^^^^^^^^^^^ B911
+17 | 
+18 | # No errors
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:35:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+34 | # Errors
+35 | itertools.batched(range(3), 1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+36 | itertools.batched("abc", 2)
+37 | itertools.batched([i for i in range(42)], some_n)
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:36:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+34 | # Errors
+35 | itertools.batched(range(3), 1)
+36 | itertools.batched("abc", 2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+37 | itertools.batched([i for i in range(42)], some_n)
+38 | itertools.batched((foo for foo in cycle()))
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:37:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+35 | itertools.batched(range(3), 1)
+36 | itertools.batched("abc", 2)
+37 | itertools.batched([i for i in range(42)], some_n)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+38 | itertools.batched((foo for foo in cycle()))
+39 | itertools.batched(itertools.batched([1, 2, 3], strict=True))
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:38:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+36 | itertools.batched("abc", 2)
+37 | itertools.batched([i for i in range(42)], some_n)
+38 | itertools.batched((foo for foo in cycle()))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+39 | itertools.batched(itertools.batched([1, 2, 3], strict=True))
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:39:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+37 | itertools.batched([i for i in range(42)], some_n)
+38 | itertools.batched((foo for foo in cycle()))
+39 | itertools.batched(itertools.batched([1, 2, 3], strict=True))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+40 | 
+41 | # Errors (limited iterators).
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:42:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+41 | # Errors (limited iterators).
+42 | itertools.batched(repeat(1, 1))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+43 | itertools.batched(repeat(1, times=4))
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:43:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+41 | # Errors (limited iterators).
+42 | itertools.batched(repeat(1, 1))
+43 | itertools.batched(repeat(1, times=4))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+44 | 
+45 | # No fix
+   |
+   = help: Add an explicit `strict` parameter
+
+B911.py:46:1: B911 `itertools.batched()` without an explicit `strict` parameter
+   |
+45 | # No fix
+46 | itertools.batched([], **kwargs)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B911
+47 | 
+48 | # No errors
+   |
+   = help: Add an explicit `strict` parameter
