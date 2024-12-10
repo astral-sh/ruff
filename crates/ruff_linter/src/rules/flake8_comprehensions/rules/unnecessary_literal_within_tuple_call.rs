@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr};
@@ -6,6 +6,7 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::replace_around_comments;
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -129,13 +130,15 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
                 };
 
                 // Replace `[` with `(`.
-                let elt_start = Edit::replacement(
+                let mut elt_start = replace_around_comments(
                     "(".into(),
                     call.start(),
                     argument.start() + TextSize::from(1),
+                    &checker.comment_ranges(),
+                    checker.locator().contents(),
                 );
                 // Replace `]` with `)` or `,)`.
-                let elt_end = Edit::replacement(
+                let elt_end = replace_around_comments(
                     if needs_trailing_comma {
                         ",)".into()
                     } else {
@@ -143,8 +146,12 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
                     },
                     argument.end() - TextSize::from(1),
                     call.end(),
+                    &checker.comment_ranges(),
+                    checker.locator().contents(),
                 );
-                Fix::unsafe_edits(elt_start, [elt_end])
+                elt_start.extend(elt_end);
+                let (edit, rest) = elt_start.split_first().unwrap();
+                Fix::unsafe_edits(edit.clone(), rest.to_owned())
             });
         }
 

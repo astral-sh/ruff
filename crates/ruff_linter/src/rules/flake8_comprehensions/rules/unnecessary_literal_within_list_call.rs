@@ -1,3 +1,4 @@
+use crate::fix::edits::delete_around_comments;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
@@ -89,10 +90,20 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
     // Convert `list([1, 2])` to `[1, 2]`
     let fix = {
         // Delete from the start of the call to the start of the argument.
-        let call_start = Edit::deletion(call.start(), argument.start());
+        let mut call_start_edits = delete_around_comments(
+            call.start(),
+            argument.start(),
+            &checker.comment_ranges(),
+            checker.locator().contents(),
+        );
 
         // Delete from the end of the argument to the end of the call.
-        let call_end = Edit::deletion(argument.end(), call.end());
+        let call_end_edits = delete_around_comments(
+            argument.end(),
+            call.end(),
+            &checker.comment_ranges(),
+            checker.locator().contents(),
+        );
 
         // If this is a tuple, we also need to convert the inner argument to a list.
         if argument.is_tuple_expr() {
@@ -109,10 +120,18 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
                 argument.end() - TextSize::from(1),
                 argument.end(),
             );
-
-            Fix::unsafe_edits(call_start, [argument_start, argument_end, call_end])
+            call_start_edits.extend(
+                std::iter::once(argument_start)
+                    .chain(std::iter::once(argument_end))
+                    .chain(call_end_edits),
+            );
+            let (edit, rest) = call_start_edits.split_first().unwrap();
+            Fix::unsafe_edits(edit.clone(), rest.to_owned())
         } else {
-            Fix::unsafe_edits(call_start, [call_end])
+            call_start_edits.extend(call_end_edits);
+
+            let (edit, rest) = call_start_edits.split_first().unwrap();
+            Fix::unsafe_edits(edit.clone(), rest.to_owned())
         }
     };
 
