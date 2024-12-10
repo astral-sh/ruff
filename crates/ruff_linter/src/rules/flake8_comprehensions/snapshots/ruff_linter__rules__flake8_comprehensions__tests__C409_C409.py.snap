@@ -130,10 +130,11 @@ C409.py:12:1: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as 
 12    |-tuple(  # comment
 13    |-    [1, 2]
 14    |-)
-   12 |+(1, 2)
-15 13 | 
-16 14 | tuple([  # comment
-17 15 |     1, 2
+   12 |+# comment
+   13 |+(1, 2)
+15 14 | 
+16 15 | tuple([  # comment
+17 16 |     1, 2
 
 C409.py:16:1: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
    |
