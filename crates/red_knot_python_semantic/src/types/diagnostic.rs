@@ -73,7 +73,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// TODO
+    /// TODO #14889
     pub(crate) static INDEX_OUT_OF_BOUNDS = {
         summary: "detects index out of bounds errors",
         status: LintStatus::preview("1.0.0"),
@@ -113,7 +113,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static POSSIBLY_UNBOUND_IMPORT = {
         summary: "detects possibly unbound imports",
         status: LintStatus::preview("1.0.0"),
@@ -140,7 +140,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
         status: LintStatus::preview("1.0.0"),
@@ -149,7 +149,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static INVALID_DECLARATION = {
         summary: "detects invalid declarations",
         status: LintStatus::preview("1.0.0"),
@@ -158,7 +158,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static CONFLICTING_DECLARATIONS = {
         summary: "detects conflicting declarations",
         status: LintStatus::preview("1.0.0"),
@@ -204,7 +204,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// TODO
+    /// TODO #14889
     pub(crate) static INVALID_TYPE_PARAMETER = {
         summary: "detects invalid type parameters",
         status: LintStatus::preview("1.0.0"),
@@ -213,7 +213,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static INVALID_TYPE_VARIABLE_CONSTRAINTS = {
         summary: "detects invalid type variable constraints",
         status: LintStatus::preview("1.0.0"),
@@ -226,7 +226,7 @@ declare_lint! {
     /// Checks for class definitions with a cyclic inheritance chain.
     ///
     /// ## Why is it bad?
-    /// TODO
+    /// TODO #14889
     pub(crate) static CYCLIC_CLASS_DEFINITION = {
         summary: "detects cyclic class definitions",
         status: LintStatus::preview("1.0.0"),
@@ -235,7 +235,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static DUPLICATE_BASE = {
         summary: "detects class definitions with duplicate bases",
         status: LintStatus::preview("1.0.0"),
@@ -244,7 +244,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static INVALID_BASE = {
         summary: "detects class definitions with an invalid base",
         status: LintStatus::preview("1.0.0"),
@@ -253,7 +253,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static INCONSISTENT_MRO = {
         summary: "detects class definitions with an inconsistent MRO",
         status: LintStatus::preview("1.0.0"),
@@ -264,6 +264,8 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for invalid parameters to `typing.Literal`.
+    ///
+    /// TODO #14889
     pub(crate) static INVALID_LITERAL_PARAMETER = {
         summary: "detects invalid literal parameters",
         status: LintStatus::preview("1.0.0"),
@@ -274,6 +276,8 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for calls to possibly unbound methods.
+    ///
+    /// TODO #14889
     pub(crate) static CALL_POSSIBLY_UNBOUND_METHOD = {
         summary: "detects calls to possibly unbound methods",
         status: LintStatus::preview("1.0.0"),
@@ -284,6 +288,8 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for possibly unbound attributes.
+    ///
+    /// TODO #14889
     pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
         summary: "detects references to possibly unbound attributes",
         status: LintStatus::preview("1.0.0"),
@@ -294,6 +300,8 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for unresolved attributes.
+    ///
+    /// TODO #14889
     pub(crate) static UNRESOLVED_ATTRIBUTE = {
         summary: "detects references to unresolved attributes",
         status: LintStatus::preview("1.0.0"),
@@ -302,7 +310,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static CONFLICTING_METACLASS = {
         summary: "detects conflicting metaclasses",
         status: LintStatus::preview("1.0.0"),
@@ -313,6 +321,8 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.
+    ///
+    /// TODO #14889
     pub(crate) static UNSUPPORTED_OPERATOR = {
         summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::preview("1.0.0"),
@@ -321,7 +331,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static INVALID_CONTEXT_MANAGER = {
         summary: "detects expressions used in with statements that don't implement the context manager protocol",
         status: LintStatus::preview("1.0.0"),
@@ -335,6 +345,9 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Using `reveal_type` without importing it will raise a `NameError` at runtime.
+    ///
+    /// ## Examples
+    /// TODO #14889
     pub(crate) static UNDEFINED_REVEAL = {
         summary: "detects usages of `reveal_type` without importing it",
         status: LintStatus::preview("1.0.0"),
@@ -345,6 +358,9 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for default values that can't be assigned to the parameter's annotated type.
+    ///
+    /// ## Why is this bad?
+    /// TODO #14889
     pub(crate) static INVALID_PARAMETER_DEFAULT = {
         summary: "detects default values that can't be assigned to the parameter's annotated type",
         status: LintStatus::preview("1.0.0"),
@@ -355,6 +371,9 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for invalid type expressions.
+    ///
+    /// ## Why is this bad?
+    /// TODO #14889
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::preview("1.0.0"),

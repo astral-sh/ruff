@@ -110,7 +110,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static INVALID_SYNTAX_IN_FORWARD_ANNOTATION = {
         summary: "detects invalid syntax in forward annotations",
         status: LintStatus::preview("1.0.0"),
@@ -119,7 +119,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO
+    /// TODO #14889
     pub(crate) static ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION = {
         summary: "detects forward type annotations with escape characters",
         status: LintStatus::preview("1.0.0"),
