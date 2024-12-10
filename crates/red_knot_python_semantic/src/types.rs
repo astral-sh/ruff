@@ -847,6 +847,9 @@ impl<'db> Type<'db> {
             }),
         ) = (self, other)
         {
+            // This is the only case where "instance of a class" is equivalent to "subclass of a
+            // class", so we don't need to fall through if we're not looking at instance[type] and
+            // type[object] specifically.
             return object_class.is_known(db, KnownClass::Object)
                 && type_class.is_known(db, KnownClass::Type);
         }
