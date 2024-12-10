@@ -70,6 +70,6 @@ python-version = "3.10"
 ```
 
 ```py
-# TODO: should raise a diagnostic, see https://github.com/astral-sh/ruff/issues/14297
+# error: [unresolved-import]
 from typing import Never
 ```

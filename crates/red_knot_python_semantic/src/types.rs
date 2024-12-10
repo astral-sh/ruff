@@ -17,7 +17,7 @@ pub(crate) use self::signatures::Signature;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{self as symbol, FileScopeId, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
@@ -71,10 +71,22 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
-    if use_def.has_public_declarations(symbol) {
-        let declarations = use_def.public_declarations(symbol);
-        // If the symbol is undeclared in some paths, include the inferred type in the public type.
-        let undeclared_ty = if declarations.may_be_undeclared() {
+    let declaredness = use_def.declaredness(db, use_def.public_declarations(symbol));
+
+    let undeclared_ty = match declaredness {
+        None => {
+            return bindings_ty(db, use_def.public_bindings(symbol))
+                .map(|bindings_ty| {
+                    if let Some(boundness) = use_def.public_boundness(db, symbol) {
+                        Symbol::Type(bindings_ty, boundness)
+                    } else {
+                        Symbol::Unbound
+                    }
+                })
+                .unwrap_or(Symbol::Unbound);
+        }
+        Some(Boundness::PossiblyUnbound) => {
+            // If the symbol is undeclared in some paths, include the inferred type in the public type.
             Some(
                 bindings_ty(db, use_def.public_bindings(symbol))
                     .map(|bindings_ty| {
@@ -86,47 +98,22 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
                     })
                     .unwrap_or(Symbol::Unbound),
             )
-        } else {
-            None
-        };
-        // Intentionally ignore conflicting declared types; that's not our problem, it's the
-        // problem of the module we are importing from.
-
-        // TODO: Our handling of boundness currently only depends on bindings, and ignores
-        // declarations. This is inconsistent, since we only look at bindings if the symbol
-        // may be undeclared. Consider the following example:
-        // ```py
-        // x: int
-        //
-        // if flag:
-        //     y: int
-        // else
-        //     y = 3
-        // ```
-        // If we import from this module, we will currently report `x` as a definitely-bound
-        // symbol (even though it has no bindings at all!) but report `y` as possibly-unbound
-        // (even though every path has either a binding or a declaration for it.)
-
-        match undeclared_ty {
-            Some(Symbol::Type(ty, boundness)) => Symbol::Type(
-                declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
-                boundness,
-            ),
-            None | Some(Symbol::Unbound) => Symbol::Type(
-                declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
-                Boundness::Bound,
-            ),
         }
-    } else {
-        bindings_ty(db, use_def.public_bindings(symbol))
-            .map(|bindings_ty| {
-                if let Some(boundness) = use_def.public_boundness(db, symbol) {
-                    Symbol::Type(bindings_ty, boundness)
-                } else {
-                    Symbol::Unbound
-                }
-            })
-            .unwrap_or(Symbol::Unbound)
+        Some(Boundness::Bound) => None,
+    };
+
+    // Intentionally ignore conflicting declared types; that's not our problem, it's the
+    // problem of the module we are importing from.
+    let declarations = use_def.public_declarations(symbol);
+    match undeclared_ty {
+        Some(Symbol::Type(ty, boundness)) => Symbol::Type(
+            declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
+            boundness,
+        ),
+        None | Some(Symbol::Unbound) => Symbol::Type(
+            declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
+            Boundness::Bound,
+        ),
     }
 }
 
@@ -268,7 +255,7 @@ fn bindings_ty<'db>(
                  constraints,
                  branching_conditions,
              }| {
-                let result = branching_conditions.branch_condition_truthiness(db);
+                let result = branching_conditions.truthiness(db);
 
                 if result.any_always_false {
                     // TODO: do we need to call binding_ty(…) even if we don't need the result?
@@ -349,7 +336,7 @@ fn declarations_ty<'db>(
 ) -> DeclaredTypeResult<'db> {
     let decl_types = declarations
         .map(|(declaration, branching_conditions)| {
-            let result = branching_conditions.branch_condition_truthiness(db);
+            let result = branching_conditions.truthiness(db);
 
             if result.any_always_false {
                 (Type::Never, UnconditionallyVisible::No)
