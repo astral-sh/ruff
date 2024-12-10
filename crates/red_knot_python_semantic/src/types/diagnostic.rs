@@ -31,7 +31,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for references to names that are possibly not defined..
+    /// Checks for references to names that are possibly not defined.
     ///
     /// ## Why is this bad?
     /// Using an undefined variable will raise a `NameError` at runtime.
@@ -45,7 +45,7 @@ declare_lint! {
     /// print(x)  # NameError: name 'x' is not defined
     /// ```
     pub(crate) static POSSIBLY_UNRESOLVED_REFERENCE = {
-        summary: "detects references to possibly unresolved references",
+        summary: "detects references to possibly undefined names",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }
@@ -65,7 +65,7 @@ declare_lint! {
     ///     pass
     /// ```
     pub(crate) static NOT_ITERABLE = {
-        summary: "detects objects that are not iterable",
+        summary: "detects iteration over an object that is not iterable",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -83,7 +83,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for objects that do not support subscripting but are used in a context that requires them to be.
+    /// Checks for subscripting objects that do not support subscripting.
     ///
     /// ## Why is this bad?
     /// Subscripting an object that does not support it will raise a `TypeError` at runtime.
@@ -93,7 +93,7 @@ declare_lint! {
     /// 4[1]  # TypeError: 'int' object is not subscriptable
     /// ```
     pub(crate) static NON_SUBSCRIPTABLE = {
-        summary: "detects objects that do not support subscripting",
+        summary: "detects subscripting objects that do not support subscripting",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -314,7 +314,7 @@ declare_lint! {
     /// ## What it does
     /// Checks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.
     pub(crate) static UNSUPPORTED_OPERATOR = {
-        summary: "detects binary expressions where the operands don't support the operator",
+        summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -354,7 +354,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `type[]` usages that have too many or too few type arguments.
+    /// Checks for invalid type expressions.
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::preview("1.0.0"),

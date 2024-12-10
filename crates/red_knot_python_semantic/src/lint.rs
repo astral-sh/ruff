@@ -20,8 +20,11 @@ pub struct LintMetadata {
 
     pub status: LintStatus,
 
-    /// Location where this lint is declared: `file_name:line`
-    pub source: &'static str,
+    /// The source file in which the lint is declared.
+    pub file: &'static str,
+
+    /// The 1-based line number in the source `file` where the lint is declared.
+    pub line: u32,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -71,7 +74,7 @@ impl LintMetadata {
         self.summary
     }
 
-    /// Returns the documentation line by line with leading and trailing whitespace removed.
+    /// Returns the documentation line by line with one leading space and all trailing whitespace removed.
     pub fn documentation_lines(&self) -> impl Iterator<Item = &str> {
         self.raw_documentation
             .lines()
@@ -91,8 +94,12 @@ impl LintMetadata {
         &self.status
     }
 
-    pub fn source(&self) -> &str {
-        self.source
+    pub fn file(&self) -> &str {
+        self.file
+    }
+
+    pub fn line(&self) -> u32 {
+        self.line
     }
 }
 
@@ -104,30 +111,43 @@ pub const fn lint_metadata_defaults() -> LintMetadata {
         raw_documentation: "",
         default_level: Level::Error,
         status: LintStatus::preview("0.0.0"),
-        source: "",
+        file: "",
+        line: 1,
     }
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum LintStatus {
-    /// The rule has been added to the linter, but is not yet stable.
+    /// The lint has been added to the linter, but is not yet stable.
     Preview {
-        /// When the rule was added to preview
+        /// The version in which the lint was added.
         since: &'static str,
     },
 
-    /// Stable rule that was added in the version defined by `since`.
-    Stable { since: &'static str },
-
-    /// The rule has been deprecated since (version) and will be removed in the future.
-    Deprecated {
+    /// The lint is stable.
+    Stable {
+        /// The version in which the lint was stabilized.
         since: &'static str,
+    },
+
+    /// The lint is deprecated and no longer recommended for use.
+    Deprecated {
+        /// The version in which the lint was deprecated.
+        since: &'static str,
+
+        /// The reason why the lint has been deprecated.
+        ///
+        /// This should explain why the lint has been deprecated and if there's a replacement lint that users
+        /// can use instead.
         reason: &'static str,
     },
 
-    /// The rule has been removed since (version) and using it will result in an error.
+    /// The lint has been removed and can no longer be used.
     Removed {
+        /// The version in which the lint was removed.
         since: &'static str,
+
+        /// The reason why the lint has been removed.
         reason: &'static str,
     },
 }
@@ -197,7 +217,8 @@ macro_rules! declare_lint {
             summary: $summary,
             raw_documentation: concat!($($doc,)+ "\n"),
             status: $status,
-            source: concat!(file!(), ":", line!()),
+            file: file!(),
+            line: line!(),
             $( $key: $value, )*
             ..$crate::lint::lint_metadata_defaults()
         };
