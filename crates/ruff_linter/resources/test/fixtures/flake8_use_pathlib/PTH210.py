@@ -18,31 +18,37 @@ windows_path: pathlib.WindowsPath = pathlib.WindowsPath()
 
 
 ### Errors
+path.with_suffix(".")
 path.with_suffix("py")
 path.with_suffix(r"s")
 path.with_suffix(u'' "json")
 path.with_suffix(suffix="js")
 
+posix_path.with_suffix(".")
 posix_path.with_suffix("py")
 posix_path.with_suffix(r"s")
 posix_path.with_suffix(u'' "json")
 posix_path.with_suffix(suffix="js")
 
+pure_path.with_suffix(".")
 pure_path.with_suffix("py")
 pure_path.with_suffix(r"s")
 pure_path.with_suffix(u'' "json")
 pure_path.with_suffix(suffix="js")
 
+pure_posix_path.with_suffix(".")
 pure_posix_path.with_suffix("py")
 pure_posix_path.with_suffix(r"s")
 pure_posix_path.with_suffix(u'' "json")
 pure_posix_path.with_suffix(suffix="js")
 
+pure_windows_path.with_suffix(".")
 pure_windows_path.with_suffix("py")
 pure_windows_path.with_suffix(r"s")
 pure_windows_path.with_suffix(u'' "json")
 pure_windows_path.with_suffix(suffix="js")
 
+windows_path.with_suffix(".")
 windows_path.with_suffix("py")
 windows_path.with_suffix(r"s")
 windows_path.with_suffix(u'' "json")
