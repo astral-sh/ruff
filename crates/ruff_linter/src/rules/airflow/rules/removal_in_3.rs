@@ -92,10 +92,12 @@ fn diagnostic_for_argument(
             .map_or_else(|| keyword.range(), Ranged::range),
     );
 
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        replacement?.to_string(),
-        diagnostic.range,
-    )));
+    if replacement.is_some() {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            replacement?.to_string(),
+            diagnostic.range,
+        )));
+    }
 
     Some(diagnostic)
 }
