@@ -9,9 +9,9 @@ def f(x: type[Any]):
 
 class A: ...
 
-f(object)
-f(type)
-f(A)
+x: type[Any] = object
+x: type[Any] = type
+x: type[Any] = A
 ```
 
 ## Bare type
@@ -23,9 +23,9 @@ def f(x: type):
 
 class A: ...
 
-f(object)
-f(type)
-f(A)
+x: type[Any] = object
+x: type[Any] = type
+x: type[Any] = A
 ```
 
 ## type[object] != type[Any]
@@ -37,7 +37,7 @@ def f(x: type[object]):
 
 class A: ...
 
-f(object)
-f(type)
-f(A)
+x: type[Any] = object
+x: type[Any] = type
+x: type[Any] = A
 ```
