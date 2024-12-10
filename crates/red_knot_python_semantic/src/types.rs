@@ -3310,7 +3310,7 @@ pub(crate) mod tests {
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
         SubclassOfAny,
-        SubclassOfClass(&'static str),
+        SubclassOfBuiltinClass(&'static str),
     }
 
     impl Ty {
@@ -3349,7 +3349,7 @@ pub(crate) mod tests {
                     Type::tuple(db, elements)
                 }
                 Ty::SubclassOfAny => Type::subclass_of_base(ClassBase::Any),
-                Ty::SubclassOfClass(s) => Type::subclass_of(
+                Ty::SubclassOfBuiltinClass(s) => Type::subclass_of(
                     builtins_symbol(db, s)
                         .expect_type()
                         .expect_class_literal()
@@ -3393,18 +3393,24 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
     #[test_case(Ty::SubclassOfAny, Ty::SubclassOfAny)]
-    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfClass("object"))]
-    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfClass("str"))]
+    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfBuiltinClass("str"))]
     #[test_case(Ty::SubclassOfAny, Ty::BuiltinInstance("type"))]
-    #[test_case(Ty::SubclassOfClass("object"), Ty::SubclassOfAny)]
-    #[test_case(Ty::SubclassOfClass("object"), Ty::SubclassOfClass("object"))]
-    #[test_case(Ty::SubclassOfClass("object"), Ty::BuiltinInstance("type"))]
-    #[test_case(Ty::SubclassOfClass("str"), Ty::SubclassOfAny)]
-    #[test_case(Ty::SubclassOfClass("str"), Ty::SubclassOfClass("object"))]
-    #[test_case(Ty::SubclassOfClass("str"), Ty::SubclassOfClass("str"))]
-    #[test_case(Ty::SubclassOfClass("str"), Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::SubclassOfAny)]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("object"),
+        Ty::SubclassOfBuiltinClass("object")
+    )]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfAny)]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("str"),
+        Ty::SubclassOfBuiltinClass("object")
+    )]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfBuiltinClass("str"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinInstance("type"))]
     #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfAny)]
-    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfClass("object"))]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
     #[test_case(Ty::BuiltinInstance("type"), Ty::BuiltinInstance("type"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
@@ -3423,8 +3429,11 @@ pub(crate) mod tests {
         Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
         Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::None])
     )]
-    #[test_case(Ty::SubclassOfClass("object"), Ty::SubclassOfClass("str"))]
-    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfClass("str"))]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("object"),
+        Ty::SubclassOfBuiltinClass("str")
+    )]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
     fn is_not_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
