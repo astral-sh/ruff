@@ -654,10 +654,11 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(self_class), Type::SubclassOf(target_class)) => {
                 self_class.class.is_subclass_of_base(db, target_class.base)
             }
-            (Type::Instance(self_class), Type::SubclassOf(target_class))
-                if self_class.class.is_known(db, KnownClass::Type) =>
-            {
-                self_class.class.is_subclass_of_base(db, target_class.base)
+            (
+                Type::Instance(InstanceType { class: self_class }),
+                Type::SubclassOf(target_class),
+            ) if self_class.is_known(db, KnownClass::Type) => {
+                self_class.is_subclass_of_base(db, target_class.base)
             }
             (
                 Type::SubclassOf(SubclassOfType {
@@ -675,11 +676,13 @@ impl<'db> Type<'db> {
                 | Type::SubclassOf(SubclassOfType {
                     base: ClassBase::Class(self_class),
                 }),
-                Type::Instance(target_class),
+                Type::Instance(InstanceType {
+                    class: target_class,
+                }),
             ) if self_class
                 .metaclass(db)
                 .into_class_literal()
-                .map(|meta| meta.class.is_subclass_of(db, target_class.class))
+                .map(|meta| meta.class.is_subclass_of(db, target_class))
                 .unwrap_or(false) =>
             {
                 true
