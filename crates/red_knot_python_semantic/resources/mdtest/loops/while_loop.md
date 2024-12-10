@@ -69,3 +69,16 @@ else:
 
 reveal_type(x)  # revealed: Literal[3, 4, 5]
 ```
+
+## Possibly unbound
+
+```py
+def bool_instance() -> bool:
+    return True
+
+while bool_instance():
+    x = 1
+
+# error: [possibly-unresolved-reference]
+x
+```

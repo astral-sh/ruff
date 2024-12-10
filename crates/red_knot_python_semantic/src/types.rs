@@ -70,55 +70,61 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
-    if use_def.has_public_declarations(symbol) {
-        let declarations = use_def.public_declarations(symbol);
-        // If the symbol is undeclared in some paths, include the inferred type in the public type.
-        let undeclared_ty = if declarations.may_be_undeclared() {
+    let declaredness = use_def.public_declarations(symbol).declaredness(db);
+
+    let undeclared_ty = match declaredness {
+        None => {
+            return bindings_ty(db, use_def.public_bindings(symbol))
+                .map(|bindings_ty| {
+                    if let Some(boundness) = use_def.public_boundness(db, symbol) {
+                        Symbol::Type(bindings_ty, boundness)
+                    } else {
+                        Symbol::Unbound
+                    }
+                })
+                .unwrap_or(Symbol::Unbound);
+        }
+        Some(Boundness::PossiblyUnbound) => {
+            // If the symbol is undeclared in some paths, include the inferred type in the public type.
             Some(
                 bindings_ty(db, use_def.public_bindings(symbol))
-                    .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
+                    .map(|bindings_ty| {
+                        if let Some(boundness) = use_def.public_boundness(db, symbol) {
+                            Symbol::Type(bindings_ty, boundness)
+                        } else {
+                            Symbol::Unbound
+                        }
+                    })
                     .unwrap_or(Symbol::Unbound),
             )
-        } else {
-            None
-        };
-        // Intentionally ignore conflicting declared types; that's not our problem, it's the
-        // problem of the module we are importing from.
-
-        // TODO: Our handling of boundness currently only depends on bindings, and ignores
-        // declarations. This is inconsistent, since we only look at bindings if the symbol
-        // may be undeclared. Consider the following example:
-        // ```py
-        // x: int
-        //
-        // if flag:
-        //     y: int
-        // else
-        //     y = 3
-        // ```
-        // If we import from this module, we will currently report `x` as a definitely-bound
-        // symbol (even though it has no bindings at all!) but report `y` as possibly-unbound
-        // (even though every path has either a binding or a declaration for it.)
-
-        match undeclared_ty {
-            Some(Symbol::Type(ty, boundness)) => Symbol::Type(
-                declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
-                boundness,
-            ),
-            None | Some(Symbol::Unbound) => Symbol::Type(
-                declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
-                Boundness::Bound,
-            ),
         }
-    } else {
-        bindings_ty(db, use_def.public_bindings(symbol))
-            .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
-            .unwrap_or(Symbol::Unbound)
+        Some(Boundness::Bound) => None,
+    };
+
+    // Intentionally ignore conflicting declared types; that's not our problem, it's the
+    // problem of the module we are importing from.
+    let declarations = use_def.public_declarations(symbol);
+    match undeclared_ty {
+        Some(Symbol::Type(ty, boundness)) => Symbol::Type(
+            declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
+            boundness,
+        ),
+        None | Some(Symbol::Unbound) => Symbol::Type(
+            declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
+            Boundness::Bound,
+        ),
     }
 }
 
 /// Shorthand for `symbol_by_id` that takes a symbol name instead of an ID.
 fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
+    match file_to_module(db, scope.file(db)) {
+        Some(module) if module.name().as_str() == "typing" && name == "TYPE_CHECKING" => {
+            return Symbol::Type(Type::BooleanLiteral(true), Boundness::Bound);
+        }
+        _ => {}
+    }
+
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
@@ -227,6 +233,12 @@ fn definition_expression_ty<'db>(
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UnconditionallyVisible {
+    Yes,
+    No,
+}
+
 /// Infer the combined type of an iterator of bindings.
 ///
 /// Will return a union if there is more than one binding.
@@ -234,28 +246,56 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Option<Type<'db>> {
-    let mut def_types = bindings_with_constraints.map(
-        |BindingWithConstraints {
-             binding,
-             constraints,
-         }| {
-            let mut constraint_tys = constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
-                .peekable();
+    let def_types = bindings_with_constraints
+        .map(
+            |BindingWithConstraints {
+                 binding,
+                 constraints,
+                 branching_conditions,
+             }| {
+                let result = branching_conditions.truthiness(db);
 
-            let binding_ty = binding_ty(db, binding);
-            if constraint_tys.peek().is_some() {
-                constraint_tys
-                    .fold(
-                        IntersectionBuilder::new(db).add_positive(binding_ty),
-                        IntersectionBuilder::add_positive,
-                    )
-                    .build()
-            } else {
-                binding_ty
-            }
-        },
-    );
+                if result.any_always_false {
+                    // TODO: do we need to call binding_ty(…) even if we don't need the result?
+                    (None, UnconditionallyVisible::No)
+                } else {
+                    let unconditionally_visible =
+                        if result.at_least_one_condition && result.all_always_true {
+                            UnconditionallyVisible::Yes
+                        } else {
+                            UnconditionallyVisible::No
+                        };
+
+                    let mut constraint_tys = constraints
+                        .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+                        .peekable();
+
+                    let binding_ty = binding_ty(db, binding);
+                    if constraint_tys.peek().is_some() {
+                        let intersection_ty = constraint_tys
+                            .fold(
+                                IntersectionBuilder::new(db).add_positive(binding_ty),
+                                IntersectionBuilder::add_positive,
+                            )
+                            .build();
+                        (Some(intersection_ty), unconditionally_visible)
+                    } else {
+                        (Some(binding_ty), unconditionally_visible)
+                    }
+                }
+            },
+        )
+        .take_while_inclusive(|(_, uv)| *uv != UnconditionallyVisible::Yes)
+        .map(|(ty, _)| ty);
+
+    // TODO: get rid of all the collects and clean up, obviously
+    let def_types: Vec<_> = def_types.collect();
+
+    if !def_types.is_empty() && def_types.iter().all(Option::is_none) {
+        return Some(Type::Unknown);
+    }
+
+    let mut def_types = def_types.iter().map(|ty| ty.unwrap_or(Type::Never)).rev();
 
     if let Some(first) = def_types.next() {
         if let Some(second) = def_types.next() {
@@ -292,7 +332,26 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+    let decl_types = declarations
+        .map(|(declaration, branching_conditions)| {
+            let result = branching_conditions.truthiness(db);
+
+            if result.any_always_false {
+                (Type::Never, UnconditionallyVisible::No)
+            } else {
+                if result.at_least_one_condition && result.all_always_true {
+                    (declaration_ty(db, declaration), UnconditionallyVisible::Yes)
+                } else {
+                    (declaration_ty(db, declaration), UnconditionallyVisible::No)
+                }
+            }
+        })
+        .take_while_inclusive(|(_, uv)| *uv != UnconditionallyVisible::Yes)
+        .map(|(ty, _)| ty);
+
+    let decl_types: Vec<_> = decl_types.collect();
+
+    let decl_types = decl_types.into_iter().rev();
 
     let mut all_types = undeclared_ty.into_iter().chain(decl_types);
 
@@ -780,22 +839,7 @@ impl<'db> Type<'db> {
 
         // TODO: Once we have support for final classes, we can establish that
         // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
-
-        // TODO: The following is a workaround that is required to unify the two different versions
-        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
-        // we understand `sys.version_info` branches.
         self == other
-            || matches!((self, other),
-                (
-                    Type::Instance(InstanceType { class: self_class }),
-                    Type::Instance(InstanceType { class: target_class })
-                )
-                if {
-                    let self_known = self_class.known(db);
-                    matches!(self_known, Some(KnownClass::NoneType | KnownClass::NoDefaultType))
-                        && self_known == target_class.known(db)
-                }
-            )
     }
 
     /// Returns true if both `self` and `other` are the same gradual form
@@ -1341,7 +1385,7 @@ impl<'db> Type<'db> {
     ///
     /// This is used to determine the value that would be returned
     /// when `bool(x)` is called on an object `x`.
-    fn bool(&self, db: &'db dyn Db) -> Truthiness {
+    pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
             Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
@@ -2268,11 +2312,27 @@ impl Truthiness {
         matches!(self, Truthiness::Ambiguous)
     }
 
-    const fn negate(self) -> Self {
+    pub(crate) const fn is_always_false(self) -> bool {
+        matches!(self, Truthiness::AlwaysFalse)
+    }
+
+    pub(crate) const fn is_always_true(self) -> bool {
+        matches!(self, Truthiness::AlwaysTrue)
+    }
+
+    pub(crate) const fn negate(self) -> Self {
         match self {
             Self::AlwaysTrue => Self::AlwaysFalse,
             Self::AlwaysFalse => Self::AlwaysTrue,
             Self::Ambiguous => Self::Ambiguous,
+        }
+    }
+
+    pub(crate) const fn negate_if(self, condition: bool) -> Self {
+        if condition {
+            self.negate()
+        } else {
+            self
         }
     }
 
