@@ -18,11 +18,15 @@ x: type[Any] = A()  # error: [invalid-assignment]
 
 ## Bare type
 
+The interpretation of bare `type` is not clear: existing wording in the spec does not match the
+behavior of mypy or pyright. For now we interpret it as simply "an instance of `builtins.type`",
+which is equivalent to `type[object]`. This is similar to the current behavior of mypy, and pyright
+in strict mode.
+
 ```py
 def f(x: type):
-    reveal_type(x)  # revealed: type[Any]
-    # TODO: could be `<object.__repr__ type> & Any`
-    reveal_type(x.__repr__)  # revealed: Any
+    reveal_type(x)  # revealed: type
+    reveal_type(x.__repr__)  # revealed: @Todo(instance attributes)
 
 class A: ...
 
