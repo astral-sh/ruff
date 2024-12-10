@@ -5,10 +5,10 @@
 Name lookups within a class scope fall back to globals, but lookups of class attributes don't.
 
 ```py
-def bool_instance() -> bool:
+def coinflip() -> bool:
     return True
 
-flag = bool_instance()
+flag = coinflip()
 x = 1
 
 class C:
@@ -24,14 +24,14 @@ reveal_type(C.y)  # revealed: Literal[1]
 ## Possibly unbound in class and global scope
 
 ```py
-def bool_instance() -> bool:
+def coinflip() -> bool:
     return True
 
-if bool_instance():
+if coinflip():
     x = "abc"
 
 class C:
-    if bool_instance():
+    if coinflip():
         x = 1
 
     # error: [possibly-unresolved-reference]
