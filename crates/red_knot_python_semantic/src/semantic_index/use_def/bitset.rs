@@ -32,10 +32,6 @@ impl<const B: usize> BitSet<B> {
         bitset
     }
 
-    pub(super) fn is_empty(&self) -> bool {
-        self.blocks().iter().all(|&b| b == 0)
-    }
-
     /// Convert from Inline to Heap, if needed, and resize the Heap vector, if needed.
     fn resize(&mut self, value: u32) {
         let num_blocks_needed = (value / 64) + 1;
@@ -193,7 +189,7 @@ impl<const B: usize> Iterator for ReverseBitSetIterator<'_, B> {
             self.current_block = self.blocks[self.current_block_index];
         }
 
-        let highest_bit_set = 63 - self.current_block.leading_zeros() as u64;
+        let highest_bit_set = 63 - u64::from(self.current_block.leading_zeros());
         // TODO: efficiency, safety comment, etc.
         self.current_block &= !(1u64 << highest_bit_set);
         #[allow(clippy::cast_possible_truncation)]
@@ -342,12 +338,5 @@ mod tests {
         b.insert(45);
         assert!(matches!(b, BitSet::Inline(_)));
         assert_bitset(&b, &[45, 120]);
-    }
-
-    #[test]
-    fn empty() {
-        let b = BitSet::<1>::default();
-
-        assert!(b.is_empty());
     }
 }

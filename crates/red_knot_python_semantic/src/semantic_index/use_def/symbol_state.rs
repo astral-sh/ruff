@@ -144,10 +144,6 @@ impl SymbolDeclarations {
         }
     }
 
-    pub(super) fn is_empty(&self) -> bool {
-        self.live_declarations.is_empty()
-    }
-
     pub(super) fn may_be_undeclared(&self) -> bool {
         self.may_be_undeclared
     }
