@@ -43,7 +43,7 @@ pub(crate) struct Airflow3Removal {
 }
 
 impl Violation for Airflow3Removal {
-    const FIX_AVAILABILITY : FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -63,7 +63,7 @@ impl Violation for Airflow3Removal {
     }
 
     fn fix_title(&self) -> Option<String> {
-        return Some("Replace deprecated keywords in Airflow 3.0".to_string());
+        Some("Replace deprecated keywords in Airflow 3.0".to_string())
     }
 }
 
@@ -87,14 +87,14 @@ fn diagnostic_for_argument(
             .map_or_else(|| keyword.range(), Ranged::range),
     ));
 
-    match diagnostic {
-	Some(ref mut diagnostic) => {
-	    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(replacement?.to_string(), diagnostic.range)))
-	}
-	None => {}
+    if let Some(ref mut diagnostic) = diagnostic {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            replacement?.to_string(),
+            diagnostic.range,
+        )))
     }
 
-    return diagnostic
+    diagnostic
 }
 
 fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {
