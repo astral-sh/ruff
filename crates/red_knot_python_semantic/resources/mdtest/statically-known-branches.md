@@ -84,7 +84,9 @@ reveal_type(x)  # revealed: Literal[2]
 
 ### Nested conditionals
 
-```py path=nested_if_true_if_true.py
+#### `if True` inside `if True`
+
+```py
 x = 1
 
 if True:
@@ -98,7 +100,9 @@ else:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-```py path=nested_if_true_if_false.py
+#### `if False` inside `if True`
+
+```py
 x = 1
 
 if True:
@@ -112,7 +116,9 @@ else:
 reveal_type(x)  # revealed: Literal[3]
 ```
 
-```py path=nested_if_true_if_bool.py
+#### `if <bool>` inside `if True`
+
+```py
 def flag() -> bool: ...
 
 x = 1
@@ -128,7 +134,9 @@ else:
 reveal_type(x)  # revealed: Literal[2, 3]
 ```
 
-```py path=nested_if_bool_if_true.py
+#### `if True` inside `if <bool>`
+
+```py
 def flag() -> bool: ...
 
 x = 1
@@ -144,7 +152,9 @@ else:
 reveal_type(x)  # revealed: Literal[2, 4]
 ```
 
-```py path=nested_else_if_true.py
+#### `if True` inside `if False` ... `else`
+
+```py
 x = 1
 
 if False:
@@ -158,7 +168,9 @@ else:
 reveal_type(x)  # revealed: Literal[3]
 ```
 
-```py path=nested_else_if_false.py
+#### `if False` inside `if False` ... `else`
+
+```py
 x = 1
 
 if False:
@@ -172,7 +184,9 @@ else:
 reveal_type(x)  # revealed: Literal[4]
 ```
 
-```py path=nested_else_if_bool.py
+#### `if <bool>` inside `if False` ... `else`
+
+```py
 def flag() -> bool: ...
 
 x = 1
@@ -192,7 +206,9 @@ reveal_type(x)  # revealed: Literal[3, 4]
 
 #### `try` ... `except`
 
-```py path=try_if_true.py
+##### `if True` inside `try`
+
+```py
 def may_raise() -> None: ...
 
 x = 1
@@ -209,7 +225,9 @@ except:
 reveal_type(x)  # revealed: Literal[2, 4]
 ```
 
-```py path=if_true_try.py
+##### `try` inside `if True`
+
+```py
 def may_raise() -> None: ...
 
 x = 1
@@ -228,7 +246,9 @@ reveal_type(x)  # revealed: Literal[2, 3]
 
 #### `for` loops
 
-```py path=for_if_true.py
+##### `if True` inside `for`
+
+```py
 def iterable() -> list[()]: ...
 
 x = 1
@@ -242,7 +262,9 @@ for _ in iterable():
 reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
-```py path=for_else_if_true.py
+##### `if True` inside `for` ... `else`
+
+```py
 def iterable() -> list[()]: ...
 
 x = 1
@@ -258,7 +280,9 @@ else:
 reveal_type(x)  # revealed: Literal[3]
 ```
 
-```py path=if_true_for.py
+##### `for` inside `if True`
+
+```py
 def iterable() -> list[()]: ...
 
 x = 1
@@ -272,7 +296,9 @@ else:
 reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
-```py path=if_true_for_else.py
+##### `for` ... `else` inside `if True`
+
+```py
 def iterable() -> list[()]: ...
 
 x = 1
@@ -384,7 +410,9 @@ reveal_type(x)  # revealed: Literal[1, 2]
 
 ### `while` ... `else`
 
-```py path=while_false.py
+#### `while False`
+
+```py
 while False:
     x = 1
 else:
@@ -393,7 +421,9 @@ else:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-```py path=while_true.py
+#### `while True`
+
+```py
 while True:
     x = 1
     break
@@ -407,7 +437,9 @@ reveal_type(x)  # revealed: Literal[1]
 
 ### Always false
 
-```py path=if_false.py
+#### `if False`
+
+```py
 x: str
 
 if False:
@@ -417,7 +449,9 @@ def f() -> None:
     reveal_type(x)  # revealed: str
 ```
 
-```py path=if_true_else.py
+#### `if True … else`
+
+```py
 x: str
 
 if True:
@@ -431,7 +465,9 @@ def f() -> None:
 
 ### Always true
 
-```py path=if_true.py
+#### `if True`
+
+```py
 x: str
 
 if True:
@@ -441,7 +477,9 @@ def f() -> None:
     reveal_type(x)  # revealed: int
 ```
 
-```py path=if_false_else.py
+#### `if False … else`
+
+```py
 x: str
 
 if False:
@@ -455,7 +493,7 @@ def f() -> None:
 
 ### Ambiguous
 
-```py path=if_bool.py
+```py
 def flag() -> bool: ...
 
 x: str
