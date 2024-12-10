@@ -44,21 +44,21 @@ B028.py:9:1: B028 [*] No explicit `stacklevel` keyword argument found
 12 12 | warnings.warn("test", DeprecationWarning, 1)
 13 13 | warnings.warn("test", category=DeprecationWarning, stacklevel=1)
 
-B028.py:15:1: B028 [*] No explicit `stacklevel` keyword argument found
+B028.py:22:1: B028 [*] No explicit `stacklevel` keyword argument found
    |
-13 | warnings.warn("test", category=DeprecationWarning, stacklevel=1)
-14 | 
-15 | warnings.warn(
+20 | warnings.warn(*args, **kwargs)
+21 | 
+22 | warnings.warn(
    | ^^^^^^^^^^^^^ B028
-16 |         "test",
-17 |         DeprecationWarning,
+23 |         "test",
+24 |         DeprecationWarning,
    |
    = help: Set `stacklevel=2`
 
 ℹ Unsafe fix
-16 16 |         "test",
-17 17 |         DeprecationWarning,
-18 18 |         # some comments here
-19    |-        source = None # no trailing comma
-   19 |+        source = None, stacklevel=2 # no trailing comma
-20 20 |     )
+23 23 |         "test",
+24 24 |         DeprecationWarning,
+25 25 |         # some comments here
+26    |-        source = None # no trailing comma
+   26 |+        source = None, stacklevel=2 # no trailing comma
+27 27 |     )

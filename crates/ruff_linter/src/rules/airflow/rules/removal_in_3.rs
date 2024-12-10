@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
@@ -43,6 +43,8 @@ pub(crate) struct Airflow3Removal {
 }
 
 impl Violation for Airflow3Removal {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Airflow3Removal {
@@ -51,12 +53,21 @@ impl Violation for Airflow3Removal {
         } = self;
         match replacement {
             Replacement::None => format!("`{deprecated}` is removed in Airflow 3.0"),
-            Replacement::Name(name) => {
-                format!("`{deprecated}` is removed in Airflow 3.0; use `{name}` instead")
+            Replacement::Name(_) => {
+                format!("`{deprecated}` is removed in Airflow 3.0")
             }
             Replacement::Message(message) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; {message}")
             }
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Airflow3Removal { replacement, .. } = self;
+        if let Replacement::Name(name) = replacement {
+            Some(format!("Use `{name}` instead"))
+        } else {
+            None
         }
     }
 }
@@ -67,7 +78,7 @@ fn diagnostic_for_argument(
     replacement: Option<&str>,
 ) -> Option<Diagnostic> {
     let keyword = arguments.find_keyword(deprecated)?;
-    Some(Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: (*deprecated).to_string(),
             replacement: match replacement {
@@ -79,7 +90,16 @@ fn diagnostic_for_argument(
             .arg
             .as_ref()
             .map_or_else(|| keyword.range(), Ranged::range),
-    ))
+    );
+
+    if let Some(replacement) = replacement {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            replacement.to_string(),
+            diagnostic.range,
+        )));
+    }
+
+    Some(diagnostic)
 }
 
 fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {

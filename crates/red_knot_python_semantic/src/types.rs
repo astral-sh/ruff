@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use indexmap::IndexSet;
 use itertools::Itertools;
-
+use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -25,7 +25,7 @@ use crate::stdlib::{
     builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
 };
 use crate::symbol::{Boundness, Symbol};
-use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
+use crate::types::diagnostic::{TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE};
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -223,18 +223,6 @@ fn definition_expression_ty<'db>(
         // expression is in a type-params sub-scope
         infer_scope_types(db, scope).expression_ty(expr_id)
     }
-}
-
-/// Get the type of an expression from an arbitrary scope.
-///
-/// Can cause query cycles if used carelessly; caller must be sure that type inference isn't
-/// currently in progress for the expression's scope.
-fn expression_ty<'db>(db: &'db dyn Db, file: File, expression: &ast::Expr) -> Type<'db> {
-    let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
-    let scope = file_scope.to_scope_id(db, file);
-    let expr_id = expression.scoped_expression_id(db, scope);
-    infer_scope_types(db, scope).expression_ty(expr_id)
 }
 
 /// Infer the combined type of an iterator of bindings.
@@ -899,7 +887,7 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
             (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
-                // TODO: Once we have support for final classes, we can determine disjointness in some cases
+                // TODO: Once we have support for final classes, we can determine disjointedness in some cases
                 // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
                 // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
                 // final classes inside `Type::SubclassOf` everywhere.
@@ -1185,6 +1173,8 @@ impl<'db> Type<'db> {
                     | KnownClass::Set
                     | KnownClass::Dict
                     | KnownClass::Slice
+                    | KnownClass::BaseException
+                    | KnownClass::BaseExceptionGroup
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
@@ -1857,6 +1847,8 @@ pub enum KnownClass {
     Set,
     Dict,
     Slice,
+    BaseException,
+    BaseExceptionGroup,
     // Types
     GenericAlias,
     ModuleType,
@@ -1887,6 +1879,8 @@ impl<'db> KnownClass {
             Self::List => "list",
             Self::Type => "type",
             Self::Slice => "slice",
+            Self::BaseException => "BaseException",
+            Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -1914,6 +1908,12 @@ impl<'db> KnownClass {
             .unwrap_or(Type::Unknown)
     }
 
+    pub fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.to_class_literal(db)
+            .into_class_literal()
+            .map(|ClassLiteralType { class }| Type::subclass_of(class))
+    }
+
     /// Return the module in which we should look up the definition for this class
     pub(crate) fn canonical_module(self, db: &'db dyn Db) -> CoreStdlibModule {
         match self {
@@ -1928,6 +1928,8 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::Slice => CoreStdlibModule::Builtins,
             Self::VersionInfo => CoreStdlibModule::Sys,
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
@@ -1971,6 +1973,8 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::FunctionType
             | Self::SpecialForm
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::TypeVar => false,
         }
     }
@@ -1992,6 +1996,8 @@ impl<'db> KnownClass {
             "dict" => Self::Dict,
             "list" => Self::List,
             "slice" => Self::Slice,
+            "BaseException" => Self::BaseException,
+            "BaseExceptionGroup" => Self::BaseExceptionGroup,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -2028,6 +2034,8 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::ModuleType
             | Self::VersionInfo
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::FunctionType => module.name() == self.canonical_module(db).as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
@@ -2300,9 +2308,9 @@ impl<'db> CallOutcome<'db> {
                 not_callable_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                diagnostics.add_lint(
+                    &CALL_NON_CALLABLE,
                     node,
-                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable",
                         not_callable_ty.display(db)
@@ -2315,9 +2323,9 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                diagnostics.add_lint(
+                    &CALL_NON_CALLABLE,
                     node,
-                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable (due to union element `{}`)",
                         called_ty.display(db),
@@ -2331,9 +2339,9 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                diagnostics.add_lint(
+                    &CALL_NON_CALLABLE,
                     node,
-                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable (due to union elements {})",
                         called_ty.display(db),
@@ -2346,9 +2354,9 @@ impl<'db> CallOutcome<'db> {
                 callable_ty: called_ty,
                 return_ty,
             }) => {
-                diagnostics.add(
+                diagnostics.add_lint(
+                    &CALL_NON_CALLABLE,
                     node,
-                    "call-non-callable",
                     format_args!(
                         "Object of type `{}` is not callable (possibly unbound `__call__` method)",
                         called_ty.display(db)
@@ -2374,7 +2382,8 @@ impl<'db> CallOutcome<'db> {
             } => {
                 diagnostics.add(
                     node,
-                    "revealed-type",
+                    DiagnosticId::RevealedType,
+                    Severity::Info,
                     format_args!("Revealed type is `{}`", revealed_ty.display(db)),
                 );
                 Ok(*return_ty)

@@ -1,15 +1,16 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
-
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::settings::types::PythonVersion;
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze;
+use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for methods that are annotated with a fixed return type which
@@ -71,6 +72,10 @@ use ruff_text_size::{Ranged, TextRange};
 ///     async def __aenter__(self) -> Self: ...
 ///     def __iadd__(self, other: Foo) -> Self: ...
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe as it changes the meaning of your type annotations.
+///
 /// ## References
 /// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
 #[derive(ViolationMetadata)]
@@ -104,12 +109,12 @@ impl Violation for NonSelfReturnType {
 /// PYI034
 pub(crate) fn non_self_return_type(
     checker: &mut Checker,
-    stmt: &Stmt,
+    stmt: &ast::Stmt,
     is_async: bool,
     name: &str,
-    decorator_list: &[Decorator],
-    returns: Option<&Expr>,
-    parameters: &Parameters,
+    decorator_list: &[ast::Decorator],
+    returns: Option<&ast::Expr>,
+    parameters: &ast::Parameters,
 ) {
     let semantic = checker.semantic();
 
@@ -126,7 +131,7 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if analyze::class::is_metaclass(class_def, semantic).into() {
+    if analyze::class::is_metaclass(class_def, semantic).is_yes() {
         return;
     }
 
@@ -183,37 +188,11 @@ pub(crate) fn non_self_return_type(
 /// Add a diagnostic for the given method.
 fn add_diagnostic(
     checker: &mut Checker,
-    stmt: &Stmt,
-    returns: &Expr,
+    stmt: &ast::Stmt,
+    returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
     method_name: &str,
 ) {
-    /// Return an [`Edit`] that imports `typing.Self` from `typing` or `typing_extensions`.
-    fn import_self(checker: &Checker, range: TextRange) -> Option<Edit> {
-        let target_version = checker.settings.target_version.as_tuple();
-        let source_module = if target_version >= (3, 11) {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-
-        let (importer, semantic) = (checker.importer(), checker.semantic());
-        let request = ImportRequest::import_from(source_module, "Self");
-
-        let (edit, ..) = importer
-            .get_or_import_symbol(&request, range.start(), semantic)
-            .ok()?;
-
-        Some(edit)
-    }
-
-    /// Generate a [`Fix`] that replaces the return type with `Self`.
-    fn replace_with_self(checker: &mut Checker, range: TextRange) -> Option<Fix> {
-        let import_self = import_self(checker, range)?;
-        let replace_with_self = Edit::range_replacement("Self".to_string(), range);
-        Some(Fix::unsafe_edits(import_self, [replace_with_self]))
-    }
-
     let mut diagnostic = Diagnostic::new(
         NonSelfReturnType {
             class_name: class_def.name.to_string(),
@@ -221,10 +200,70 @@ fn add_diagnostic(
         },
         stmt.identifier(),
     );
-    if let Some(fix) = replace_with_self(checker, returns.range()) {
-        diagnostic.set_fix(fix);
-    }
+
+    diagnostic.try_set_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
+
     checker.diagnostics.push(diagnostic);
+}
+
+fn replace_with_self_fix(
+    checker: &mut Checker,
+    stmt: &ast::Stmt,
+    returns: &ast::Expr,
+    class_def: &ast::StmtClassDef,
+) -> anyhow::Result<Fix> {
+    let semantic = checker.semantic();
+
+    let (self_import, self_binding) = {
+        let source_module = if checker.settings.target_version >= PythonVersion::Py311 {
+            "typing"
+        } else {
+            "typing_extensions"
+        };
+
+        let (importer, semantic) = (checker.importer(), checker.semantic());
+        let request = ImportRequest::import_from(source_module, "Self");
+        importer.get_or_import_symbol(&request, returns.start(), semantic)?
+    };
+
+    let mut others = Vec::with_capacity(2);
+
+    let remove_first_argument_type_hint = || -> Option<Edit> {
+        let ast::StmtFunctionDef { parameters, .. } = stmt.as_function_def_stmt()?;
+        let first = parameters.iter().next()?;
+        let annotation = first.annotation()?;
+
+        is_class_reference(semantic, annotation, &class_def.name)
+            .then(|| Edit::deletion(first.name().end(), annotation.end()))
+    };
+
+    others.extend(remove_first_argument_type_hint());
+    others.push(Edit::range_replacement(self_binding, returns.range()));
+
+    let applicability = if might_be_generic(class_def, checker.semantic()) {
+        Applicability::DisplayOnly
+    } else {
+        Applicability::Unsafe
+    };
+
+    Ok(Fix::applicable_edits(self_import, others, applicability))
+}
+
+/// Return true if `annotation` is either `ClassName` or `type[ClassName]`
+fn is_class_reference(semantic: &SemanticModel, annotation: &ast::Expr, expected: &str) -> bool {
+    if is_name(annotation, expected) {
+        return true;
+    }
+
+    let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = annotation else {
+        return false;
+    };
+
+    if !semantic.match_builtin_expr(value, "type") && !semantic.match_typing_expr(value, "Type") {
+        return false;
+    }
+
+    is_name(slice, expected)
 }
 
 /// Returns `true` if the method is an in-place binary operator.
@@ -248,15 +287,15 @@ fn is_inplace_bin_op(name: &str) -> bool {
 }
 
 /// Return `true` if the given expression resolves to the given name.
-fn is_name(expr: &Expr, name: &str) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = expr else {
+fn is_name(expr: &ast::Expr, name: &str) -> bool {
+    let ast::Expr::Name(ast::ExprName { id, .. }) = expr else {
         return false;
     };
     id.as_str() == name
 }
 
 /// Return `true` if the given expression resolves to `typing.Self`.
-fn is_self(expr: &Expr, checker: &Checker) -> bool {
+fn is_self(expr: &ast::Expr, checker: &Checker) -> bool {
     checker.match_maybe_stringized_annotation(expr, |expr| {
         checker.semantic().match_typing_expr(expr, "Self")
     })
@@ -273,7 +312,7 @@ fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) 
 }
 
 /// Return `true` if the given expression resolves to `collections.abc.Iterable` or `collections.abc.Iterator`.
-fn is_iterable_or_iterator(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|qualified_name| {
@@ -296,7 +335,7 @@ fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticM
 }
 
 /// Return `true` if the given expression resolves to `collections.abc.AsyncIterable` or `collections.abc.AsyncIterator`.
-fn is_async_iterable_or_iterator(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_async_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|qualified_name| {

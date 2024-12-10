@@ -14,21 +14,19 @@ class Child1(Base):
 
 class Child2(Base): ...
 
-def get_base() -> Base: ...
+def _(x: Base):
+    c1 = Child1()
 
-x = get_base()
-c1 = Child1()
+    # Create an intersection type through narrowing:
+    if isinstance(x, Child1):
+        if isinstance(x, Child2):
+            reveal_type(x)  # revealed: Child1 & Child2
 
-# Create an intersection type through narrowing:
-if isinstance(x, Child1):
-    if isinstance(x, Child2):
-        reveal_type(x)  # revealed: Child1 & Child2
+            reveal_type(x == 1)  # revealed: Literal[True]
 
-        reveal_type(x == 1)  # revealed: Literal[True]
-
-        # Other comparison operators fall back to the base type:
-        reveal_type(x > 1)  # revealed: bool
-        reveal_type(x is c1)  # revealed: bool
+            # Other comparison operators fall back to the base type:
+            reveal_type(x > 1)  # revealed: bool
+            reveal_type(x is c1)  # revealed: bool
 ```
 
 ## Negative contributions
@@ -73,18 +71,15 @@ if x != "abc":
 #### Integers
 
 ```py
-def get_int() -> int: ...
+def _(x: int):
+    if x != 1:
+        reveal_type(x)  # revealed: int & ~Literal[1]
 
-x = get_int()
+        reveal_type(x != 1)  # revealed: Literal[True]
+        reveal_type(x != 2)  # revealed: bool
 
-if x != 1:
-    reveal_type(x)  # revealed: int & ~Literal[1]
-
-    reveal_type(x != 1)  # revealed: Literal[True]
-    reveal_type(x != 2)  # revealed: bool
-
-    reveal_type(x == 1)  # revealed: Literal[False]
-    reveal_type(x == 2)  # revealed: bool
+        reveal_type(x == 1)  # revealed: Literal[False]
+        reveal_type(x == 2)  # revealed: bool
 ```
 
 ### Identity comparisons
@@ -92,18 +87,15 @@ if x != 1:
 ```py
 class A: ...
 
-def get_object() -> object: ...
+def _(o: object):
+    a = A()
+    n = None
 
-o = object()
+    if o is not None:
+        reveal_type(o)  # revealed: object & ~None
 
-a = A()
-n = None
-
-if o is not None:
-    reveal_type(o)  # revealed: object & ~None
-
-    reveal_type(o is n)  # revealed: Literal[False]
-    reveal_type(o is not n)  # revealed: Literal[True]
+        reveal_type(o is n)  # revealed: Literal[False]
+        reveal_type(o is not n)  # revealed: Literal[True]
 ```
 
 ## Diagnostics
@@ -119,16 +111,13 @@ class Container:
 
 class NonContainer: ...
 
-def get_object() -> object: ...
+def _(x: object):
+    if isinstance(x, Container):
+        if isinstance(x, NonContainer):
+            reveal_type(x)  # revealed: Container & NonContainer
 
-x = get_object()
-
-if isinstance(x, Container):
-    if isinstance(x, NonContainer):
-        reveal_type(x)  # revealed: Container & NonContainer
-
-        # error: [unsupported-operator] "Operator `in` is not supported for types `int` and `NonContainer`"
-        reveal_type(2 in x)  # revealed: bool
+            # error: [unsupported-operator] "Operator `in` is not supported for types `int` and `NonContainer`"
+            reveal_type(2 in x)  # revealed: bool
 ```
 
 ### Unsupported operators for negative contributions
@@ -142,14 +131,11 @@ class Container:
 
 class NonContainer: ...
 
-def get_object() -> object: ...
+def _(x: object):
+    if isinstance(x, Container):
+        if not isinstance(x, NonContainer):
+            reveal_type(x)  # revealed: Container & ~NonContainer
 
-x = get_object()
-
-if isinstance(x, Container):
-    if not isinstance(x, NonContainer):
-        reveal_type(x)  # revealed: Container & ~NonContainer
-
-        # No error here!
-        reveal_type(2 in x)  # revealed: bool
+            # No error here!
+            reveal_type(2 in x)  # revealed: bool
 ```
