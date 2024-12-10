@@ -62,14 +62,14 @@ def foo(
 ```py
 try:
     pass
-# error: [invalid-exception] "Cannot catch object of type `Literal[3]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+# error: [invalid-exception-caught] "Cannot catch object of type `Literal[3]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
 except 3 as e:
     reveal_type(e)  # revealed: Unknown
 
 try:
     pass
-# error: [invalid-exception] "Cannot catch object of type `Literal["foo"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
-# error: [invalid-exception] "Cannot catch object of type `Literal[b"bar"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+# error: [invalid-exception-caught] "Cannot catch object of type `Literal["foo"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+# error: [invalid-exception-caught] "Cannot catch object of type `Literal[b"bar"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
 except (ValueError, OSError, "foo", b"bar") as e:
     reveal_type(e)  # revealed: ValueError | OSError | Unknown
 
@@ -80,10 +80,10 @@ def foo(
 ):
     try:
         help()
-    # error: [invalid-exception]
+    # error: [invalid-exception-caught]
     except x as e:
         reveal_type(e)  # revealed: Unknown
-    # error: [invalid-exception]
+    # error: [invalid-exception-caught]
     except y as f:
         reveal_type(f)  # revealed: OSError | RuntimeError | Unknown
     except z as g:
