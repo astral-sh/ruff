@@ -3892,6 +3892,9 @@ pub(crate) mod tests {
     #[test_case(Ty::Intersection{pos: vec![Ty::KnownClassInstance(KnownClass::Str)], neg: vec![Ty::LiteralString]})]
     #[test_case(Ty::Tuple(vec![]))]
     #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::KnownClassInstance(KnownClass::Object)]))]
+    #[test_case(Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"))]
     fn is_fully_static(from: Ty) {
         let db = setup_db();
 
@@ -3905,6 +3908,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::Unknown]))]
     #[test_case(Ty::Intersection{pos: vec![Ty::Any], neg: vec![Ty::LiteralString]})]
     #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::Any]))]
+    #[test_case(Ty::SubclassOfAny)]
     fn is_not_fully_static(from: Ty) {
         let db = setup_db();
 
