@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_mixed_except
 ```
 Module(
     ModModule {
-        range: 0..128,
+        range: 0..242,
         body: [
             Try(
                 StmtTry {
@@ -115,6 +115,95 @@ Module(
                     is_star: true,
                 },
             ),
+            Try(
+                StmtTry {
+                    range: 128..241,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 137..141,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 142..158,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 154..158,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 159..175,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 171..175,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 176..208,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 184..198,
+                                            id: Name("ExceptionGroup"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 204..208,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 209..241,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 217..231,
+                                            id: Name("ExceptionGroup"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 237..241,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
         ],
     },
 )
@@ -137,5 +226,27 @@ Module(
 10 |       pass
 11 | / except:
 12 | |     pass
+   | |________^ Syntax Error: Cannot have both 'except' and 'except*' on the same 'try'
+13 |   try:
+14 |       pass
+   |
+
+
+   |
+17 |   except:
+18 |       pass
+19 | / except* ExceptionGroup:
+20 | |     pass
+   | |________^ Syntax Error: Cannot have both 'except' and 'except*' on the same 'try'
+21 |   except* ExceptionGroup:
+22 |       pass
+   |
+
+
+   |
+19 |   except* ExceptionGroup:
+20 |       pass
+21 | / except* ExceptionGroup:
+22 | |     pass
    | |________^ Syntax Error: Cannot have both 'except' and 'except*' on the same 'try'
    |

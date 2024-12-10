@@ -1351,19 +1351,29 @@ impl<'src> Parser<'src> {
         //     pass
         // except:
         //     pass
-        let mut both_except_types = None;
+        // try:
+        //     pass
+        // except:
+        //     pass
+        // except:
+        //     pass
+        // except* ExceptionGroup:
+        //     pass
+        // except* ExceptionGroup:
+        //     pass
+        let mut mixed_except_ranges = Vec::new();
         let handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
             if is_star.is_none() {
                 is_star = Some(kind.is_star());
             } else if is_star.is_some_and(|seen_star| seen_star != kind.is_star()) {
-                both_except_types = Some(handler.range());
+                mixed_except_ranges.push(handler.range());
             }
             handler
         });
         // Empty handler has `is_star` false.
         let is_star = is_star.unwrap_or_default();
-        if let Some(handler_err_range) = both_except_types {
+        for handler_err_range in mixed_except_ranges {
             self.add_error(
                 ParseErrorType::OtherError(
                     "Cannot have both 'except' and 'except*' on the same 'try'".to_string(),
