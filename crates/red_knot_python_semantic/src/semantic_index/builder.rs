@@ -303,7 +303,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn record_unconditional_branching(&mut self) {
         self.current_use_def_map_mut()
-            .record_unconstrained_branch_point();
+            .record_unconditional_branching();
     }
 
     fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
@@ -949,6 +949,7 @@ where
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop, pre_loop_conditions.clone());
+                self.record_unconditional_branching();
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break

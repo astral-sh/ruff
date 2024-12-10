@@ -628,7 +628,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_branching_condition(BranchingCondition::ConditionalOn(constraint));
     }
 
-    pub(super) fn record_unconstrained_branch_point(&mut self) {
+    pub(super) fn record_unconditional_branching(&mut self) {
         self.record_branching_condition(BranchingCondition::Ambiguous);
     }
 
