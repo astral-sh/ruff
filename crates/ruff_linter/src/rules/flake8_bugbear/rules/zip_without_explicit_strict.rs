@@ -61,7 +61,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
             .arguments
             .args
             .iter()
-            .any(|arg| is_infinite_iterator(arg, semantic))
+            .any(|arg| is_infinite_iterable(arg, semantic))
     {
         checker.diagnostics.push(
             Diagnostic::new(ZipWithoutExplicitStrict, call.range()).with_fix(Fix::applicable_edit(
@@ -89,7 +89,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
 
 /// Return `true` if the [`Expr`] appears to be an infinite iterator (e.g., a call to
 /// `itertools.cycle` or similar).
-pub(crate) fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
