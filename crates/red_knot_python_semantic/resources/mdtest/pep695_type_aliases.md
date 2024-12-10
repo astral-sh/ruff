@@ -1,6 +1,6 @@
-# Type aliases
+# PEP 695 type aliases
 
-Type aliases are only available in Python 3.12 and later:
+PEP 695 type aliases are only available in Python 3.12 and later:
 
 ```toml
 [environment]
