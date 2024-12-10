@@ -464,7 +464,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: revealed: Foo",
-                    r#"unexpected error: 1 [lint/not-revealed-type] "Revealed type is `Foo`""#,
+                    r#"unexpected error: 1 [lint:not-revealed-type] "Revealed type is `Foo`""#,
                 ],
             )],
         );
@@ -581,7 +581,7 @@ mod tests {
                 0,
                 &[
                     "used built-in `reveal_type`: add a `# revealed` assertion on this line (\
-                    original diagnostic: [lint/undefined-reveal] \"undefined reveal message\")",
+                    original diagnostic: [lint:undefined-reveal] \"undefined reveal message\")",
                     r#"unexpected error: [revealed-type] "Revealed type is `Literal[1]`""#,
                 ],
             )],
@@ -613,7 +613,7 @@ mod tests {
                 &[
                     "unmatched assertion: error: [something-else]",
                     "used built-in `reveal_type`: add a `# revealed` assertion on this line (\
-                    original diagnostic: 1 [lint/undefined-reveal] \"undefined reveal message\")",
+                    original diagnostic: 1 [lint:undefined-reveal] \"undefined reveal message\")",
                     r#"unexpected error: 13 [revealed-type] "Revealed type is `Literal[1]`""#,
                 ],
             )],
@@ -658,7 +658,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: error: [some-rule]",
-                    r#"unexpected error: 1 [lint/anything] "Any message""#,
+                    r#"unexpected error: 1 [lint:anything] "Any message""#,
                 ],
             )],
         );
@@ -695,7 +695,7 @@ mod tests {
                 0,
                 &[
                     r#"unmatched assertion: error: "contains this""#,
-                    r#"unexpected error: 1 [lint/anything] "Any message""#,
+                    r#"unexpected error: 1 [lint:anything] "Any message""#,
                 ],
             )],
         );
@@ -732,7 +732,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: error: 2 [rule]",
-                    r#"unexpected error: 1 [lint/rule] "Any message""#,
+                    r#"unexpected error: 1 [lint:rule] "Any message""#,
                 ],
             )],
         );
@@ -797,7 +797,7 @@ mod tests {
                 0,
                 &[
                     r#"unmatched assertion: error: 2 [some-rule] "contains this""#,
-                    r#"unexpected error: 1 [lint/some-rule] "message contains this""#,
+                    r#"unexpected error: 1 [lint:some-rule] "message contains this""#,
                 ],
             )],
         );
@@ -820,7 +820,7 @@ mod tests {
                 0,
                 &[
                     r#"unmatched assertion: error: 1 [some-rule] "contains this""#,
-                    r#"unexpected error: 1 [lint/other-rule] "message contains this""#,
+                    r#"unexpected error: 1 [lint:other-rule] "message contains this""#,
                 ],
             )],
         );
@@ -843,7 +843,7 @@ mod tests {
                 0,
                 &[
                     r#"unmatched assertion: error: 1 [some-rule] "contains this""#,
-                    r#"unexpected error: 1 [lint/some-rule] "Any message""#,
+                    r#"unexpected error: 1 [lint:some-rule] "Any message""#,
                 ],
             )],
         );
@@ -877,9 +877,9 @@ mod tests {
             result,
             &[
                 (1, &["unmatched assertion: error: [line-one]"]),
-                (2, &[r#"unexpected error: [lint/line-two] "msg""#]),
+                (2, &[r#"unexpected error: [lint:line-two] "msg""#]),
                 (4, &["unmatched assertion: error: [line-four]"]),
-                (5, &[r#"unexpected error: [lint/line-five] "msg""#]),
+                (5, &[r#"unexpected error: [lint:line-five] "msg""#]),
                 (6, &["unmatched assertion: error: [line-six]"]),
             ],
         );
@@ -905,7 +905,7 @@ mod tests {
 
         assert_fail(
             result,
-            &[(2, &[r#"unexpected error: [lint/line-two] "msg""#])],
+            &[(2, &[r#"unexpected error: [lint:line-two] "msg""#])],
         );
     }
 
@@ -972,7 +972,7 @@ mod tests {
 
         assert_fail(
             result,
-            &[(3, &[r#"unexpected error: 1 [lint/third-rule] "msg""#])],
+            &[(3, &[r#"unexpected error: 1 [lint:third-rule] "msg""#])],
         );
     }
 
@@ -1021,7 +1021,7 @@ mod tests {
                 0,
                 &[
                     "invalid assertion: no rule or message text",
-                    r#"unexpected error: 1 [lint/some-rule] "some message""#,
+                    r#"unexpected error: 1 [lint:some-rule] "some message""#,
                 ],
             )],
         );
@@ -1046,7 +1046,7 @@ mod tests {
                 0,
                 &[
                     "invalid assertion: no rule or message text",
-                    r#"unexpected error: 1 [lint/some-rule] "some message""#,
+                    r#"unexpected error: 1 [lint:some-rule] "some message""#,
                 ],
             )],
         );

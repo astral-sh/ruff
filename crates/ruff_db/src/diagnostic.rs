@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::fmt::Formatter;
 
+use thiserror::Error;
+
 use ruff_python_parser::ParseError;
 use ruff_text_size::TextRange;
 
@@ -66,7 +68,7 @@ pub enum DiagnosticId {
 
     /// A lint violation.
     ///
-    /// Lint's can be suppressed and some lints can be enabled or disabled in the configuration.
+    /// Lints can be suppressed and some lints can be enabled or disabled in the configuration.
     Lint(LintName),
 
     /// A revealed type: Created by `reveal_type(expression)`.
@@ -90,25 +92,47 @@ impl DiagnosticId {
     }
 
     pub fn matches(&self, name: &str) -> bool {
-        match self {
-            DiagnosticId::Lint(self_name) => name
-                .strip_prefix("lint/")
-                .is_some_and(|rest| rest == &**self_name),
+        match self.as_str() {
+            Ok(id) => id == name,
+            Err(DiagnosticAsStrError::Category { category, name }) => name
+                .strip_prefix(category)
+                .and_then(|prefix| prefix.strip_prefix(":"))
+                .is_some_and(|rest| rest == name),
+        }
+    }
 
-            DiagnosticId::Io => name == "io",
-            DiagnosticId::InvalidSyntax => name == "invalid-syntax",
-            DiagnosticId::RevealedType => name == "revealed-type",
+    pub fn as_str(&self) -> Result<&str, DiagnosticAsStrError> {
+        match self {
+            DiagnosticId::Io => Ok("io"),
+            DiagnosticId::InvalidSyntax => Ok("invalid-syntax"),
+            DiagnosticId::Lint(name) => Err(DiagnosticAsStrError::Category {
+                category: "lint",
+                name: name.as_str(),
+            }),
+            DiagnosticId::RevealedType => Ok("revealed-type"),
         }
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
+pub enum DiagnosticAsStrError {
+    /// The id can't be converted to a string because it belongs to a sub-category.
+    #[error("id from a sub-category: {category}:{name}")]
+    Category {
+        /// The id's category.
+        category: &'static str,
+        /// The diagnostic id in this category.
+        name: &'static str,
+    },
+}
+
 impl std::fmt::Display for DiagnosticId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DiagnosticId::InvalidSyntax => f.write_str("invalid-syntax"),
-            DiagnosticId::Io => f.write_str("io"),
-            DiagnosticId::Lint(name) => write!(f, "lint/{name}"),
-            DiagnosticId::RevealedType => f.write_str("revealed-type"),
+        match self.as_str() {
+            Ok(name) => f.write_str(name),
+            Err(DiagnosticAsStrError::Category { category, name }) => {
+                write!(f, "{category}:{name}")
+            }
         }
     }
 }
@@ -116,7 +140,7 @@ impl std::fmt::Display for DiagnosticId {
 pub trait Diagnostic: Send + Sync + std::fmt::Debug {
     fn id(&self) -> DiagnosticId;
 
-    fn message(&self) -> std::borrow::Cow<str>;
+    fn message(&self) -> Cow<str>;
 
     fn file(&self) -> File;
 
