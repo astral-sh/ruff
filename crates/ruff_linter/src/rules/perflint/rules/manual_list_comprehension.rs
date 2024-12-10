@@ -255,23 +255,15 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         })
         .expect("for target binding must exist");
     let target_binding = checker.semantic().binding(target_binding_id);
-    // TODO: should this be a HashMap?
-    let shadowed_references: Vec<_> = checker
-        .semantic()
-        .shadowed_bindings(checker.semantic().scope_id, target_binding_id)
-        .flat_map(|shadowed| {
-            let shadowed_binding = checker.semantic().binding(shadowed.shadowed_id());
-            shadowed_binding.references()
-        })
-        .collect();
 
     drop(bindings);
 
+    // If any references to the loop target variable are after the loop, 
+    // then converting it into a comprehension would cause a NameError
     if target_binding
         .references()
-        .filter(|r_id| !shadowed_references.contains(r_id))
         .map(|reference| checker.semantic().reference(reference))
-        .any(|r| !for_stmt.range.contains_range(r.range()))
+        .any(|other_reference| for_stmt.end() < other_reference.start())
     {
         return;
     }
