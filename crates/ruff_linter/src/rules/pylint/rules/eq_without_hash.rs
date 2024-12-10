@@ -11,12 +11,10 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// A class that implements `__eq__` but not `__hash__` will have its hash
-/// method implicitly set to `None`. This will cause the class to be
-/// unhashable, will in turn cause issues when using the class as a key in a
-/// dictionary or a member of a set.
-///
-/// ## Known problems
-/// Does not check for `__hash__` implementations in superclasses.
+/// method implicitly set to `None`, regardless of if a super class defines
+/// `__hash__`. This will cause the class to be unhashable, will in turn
+/// cause issues when using the class as a key in a dictionary or a member
+/// of a set.
 ///
 /// ## Example
 /// ```python
