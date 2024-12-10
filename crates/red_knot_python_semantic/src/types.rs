@@ -666,9 +666,14 @@ impl<'db> Type<'db> {
             {
                 self_class.class.is_subclass_of_base(db, target_class.base)
             }
-            (Type::SubclassOf(self_class), Type::SubclassOf(target_class)) => {
-                self_class.base.is_subtype_of(db, target_class.base)
-            }
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(target_class),
+                }),
+            ) => self_class.is_subclass_of(db, target_class),
             (
                 Type::SubclassOf(SubclassOfType {
                     base: ClassBase::Class(self_class),

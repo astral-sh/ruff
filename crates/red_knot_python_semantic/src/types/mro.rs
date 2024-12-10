@@ -328,14 +328,6 @@ impl<'db> ClassBase<'db> {
         Display { base: self, db }
     }
 
-    pub fn is_subtype_of(self, db: &'db dyn Db, target: ClassBase<'db>) -> bool {
-        match (self, target) {
-            (ClassBase::Any | ClassBase::Todo | ClassBase::Unknown, _) => false,
-            (_, ClassBase::Any | ClassBase::Todo | ClassBase::Unknown) => false,
-            (ClassBase::Class(class), ClassBase::Class(target)) => class.is_subclass_of(db, target),
-        }
-    }
-
     /// Return a `ClassBase` representing the class `builtins.object`
     fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
