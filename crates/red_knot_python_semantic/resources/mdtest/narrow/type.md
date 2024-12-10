@@ -6,18 +6,14 @@
 class A: ...
 class B: ...
 
-def get_a_or_b() -> A | B:
-    return A()
-
-x = get_a_or_b()
-
-if type(x) is A:
-    reveal_type(x)  # revealed: A
-else:
-    # It would be wrong to infer `B` here. The type
-    # of `x` could be a subclass of `A`, so we need
-    # to infer the full union type:
-    reveal_type(x)  # revealed: A | B
+def _(x: A | B):
+    if type(x) is A:
+        reveal_type(x)  # revealed: A
+    else:
+        # It would be wrong to infer `B` here. The type
+        # of `x` could be a subclass of `A`, so we need
+        # to infer the full union type:
+        reveal_type(x)  # revealed: A | B
 ```
 
 ## `type(x) is not C`
@@ -26,16 +22,12 @@ else:
 class A: ...
 class B: ...
 
-def get_a_or_b() -> A | B:
-    return A()
-
-x = get_a_or_b()
-
-if type(x) is not A:
-    # Same reasoning as above: no narrowing should occur here.
-    reveal_type(x)  # revealed: A | B
-else:
-    reveal_type(x)  # revealed: A
+def _(x: A | B):
+    if type(x) is not A:
+        # Same reasoning as above: no narrowing should occur here.
+        reveal_type(x)  # revealed: A | B
+    else:
+        reveal_type(x)  # revealed: A
 ```
 
 ## `type(x) == C`, `type(x) != C`
@@ -54,16 +46,12 @@ class IsEqualToEverything(type):
 class A(metaclass=IsEqualToEverything): ...
 class B(metaclass=IsEqualToEverything): ...
 
-def get_a_or_b() -> A | B:
-    return B()
+def _(x: A | B):
+    if type(x) == A:
+        reveal_type(x)  # revealed: A | B
 
-x = get_a_or_b()
-
-if type(x) == A:
-    reveal_type(x)  # revealed: A | B
-
-if type(x) != A:
-    reveal_type(x)  # revealed: A | B
+    if type(x) != A:
+        reveal_type(x)  # revealed: A | B
 ```
 
 ## No narrowing for custom `type` callable
@@ -75,15 +63,11 @@ class B: ...
 def type(x):
     return int
 
-def get_a_or_b() -> A | B:
-    return A()
-
-x = get_a_or_b()
-
-if type(x) is A:
-    reveal_type(x)  # revealed: A | B
-else:
-    reveal_type(x)  # revealed: A | B
+def _(x: A | B):
+    if type(x) is A:
+        reveal_type(x)  # revealed: A | B
+    else:
+        reveal_type(x)  # revealed: A | B
 ```
 
 ## No narrowing for multiple arguments
@@ -91,15 +75,11 @@ else:
 No narrowing should occur if `type` is used to dynamically create a class:
 
 ```py
-def get_str_or_int() -> str | int:
-    return "test"
-
-x = get_str_or_int()
-
-if type(x, (), {}) is str:
-    reveal_type(x)  # revealed: str | int
-else:
-    reveal_type(x)  # revealed: str | int
+def _(x: str | int):
+    if type(x, (), {}) is str:
+        reveal_type(x)  # revealed: str | int
+    else:
+        reveal_type(x)  # revealed: str | int
 ```
 
 ## No narrowing for keyword arguments
@@ -107,14 +87,10 @@ else:
 `type` can't be used with a keyword argument:
 
 ```py
-def get_str_or_int() -> str | int:
-    return "test"
-
-x = get_str_or_int()
-
-# TODO: we could issue a diagnostic here
-if type(object=x) is str:
-    reveal_type(x)  # revealed: str | int
+def _(x: str | int):
+    # TODO: we could issue a diagnostic here
+    if type(object=x) is str:
+        reveal_type(x)  # revealed: str | int
 ```
 
 ## Narrowing if `type` is aliased
@@ -125,13 +101,9 @@ class B: ...
 
 alias_for_type = type
 
-def get_a_or_b() -> A | B:
-    return A()
-
-x = get_a_or_b()
-
-if alias_for_type(x) is A:
-    reveal_type(x)  # revealed: A
+def _(x: A | B):
+    if alias_for_type(x) is A:
+        reveal_type(x)  # revealed: A
 ```
 
 ## Limitations
@@ -140,13 +112,9 @@ if alias_for_type(x) is A:
 class Base: ...
 class Derived(Base): ...
 
-def get_base() -> Base:
-    return Base()
-
-x = get_base()
-
-if type(x) is Base:
-    # Ideally, this could be narrower, but there is now way to
-    # express a constraint like `Base & ~ProperSubtypeOf[Base]`.
-    reveal_type(x)  # revealed: Base
+def _(x: Base):
+    if type(x) is Base:
+        # Ideally, this could be narrower, but there is now way to
+        # express a constraint like `Base & ~ProperSubtypeOf[Base]`.
+        reveal_type(x)  # revealed: Base
 ```

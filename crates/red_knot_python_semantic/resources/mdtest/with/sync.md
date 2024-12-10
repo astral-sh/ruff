@@ -21,25 +21,23 @@ with Manager() as f:
 ## Union context manager
 
 ```py
-def coinflip() -> bool:
-    return True
+def _(flag: bool):
+    class Manager1:
+        def __enter__(self) -> str:
+            return "foo"
 
-class Manager1:
-    def __enter__(self) -> str:
-        return "foo"
+        def __exit__(self, exc_type, exc_value, traceback): ...
 
-    def __exit__(self, exc_type, exc_value, traceback): ...
+    class Manager2:
+        def __enter__(self) -> int:
+            return 42
 
-class Manager2:
-    def __enter__(self) -> int:
-        return 42
+        def __exit__(self, exc_type, exc_value, traceback): ...
 
-    def __exit__(self, exc_type, exc_value, traceback): ...
+    context_expr = Manager1() if flag else Manager2()
 
-context_expr = Manager1() if coinflip() else Manager2()
-
-with context_expr as f:
-    reveal_type(f)  # revealed: str | int
+    with context_expr as f:
+        reveal_type(f)  # revealed: str | int
 ```
 
 ## Context manager without an `__enter__` or `__exit__` method
@@ -103,39 +101,34 @@ with Manager():
 ## Context expression with possibly-unbound union variants
 
 ```py
-def coinflip() -> bool:
-    return True
+def _(flag: bool):
+    class Manager1:
+        def __enter__(self) -> str:
+            return "foo"
 
-class Manager1:
-    def __enter__(self) -> str:
-        return "foo"
+        def __exit__(self, exc_type, exc_value, traceback): ...
 
-    def __exit__(self, exc_type, exc_value, traceback): ...
+    class NotAContextManager: ...
+    context_expr = Manager1() if flag else NotAContextManager()
 
-class NotAContextManager: ...
-
-context_expr = Manager1() if coinflip() else NotAContextManager()
-
-# error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__enter__` is possibly unbound"
-# error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__exit__` is possibly unbound"
-with context_expr as f:
-    reveal_type(f)  # revealed: str
+    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__enter__` is possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__exit__` is possibly unbound"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str
 ```
 
 ## Context expression with "sometimes" callable `__enter__` method
 
 ```py
-def coinflip() -> bool:
-    return True
+def _(flag: bool):
+    class Manager:
+        if flag:
+            def __enter__(self) -> str:
+                return "abcd"
 
-class Manager:
-    if coinflip():
-        def __enter__(self) -> str:
-            return "abcd"
+        def __exit__(self, *args): ...
 
-    def __exit__(self, *args): ...
-
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
-with Manager() as f:
-    reveal_type(f)  # revealed: str
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
+    with Manager() as f:
+        reveal_type(f)  # revealed: str
 ```

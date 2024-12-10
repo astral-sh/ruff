@@ -6,8 +6,7 @@
 def bool_instance() -> bool:
     return True
 
-flag = bool_instance()
-if flag:
+if bool_instance():
     y = 3
 
 x = y  # error: [possibly-unresolved-reference]
@@ -34,10 +33,9 @@ reveal_type(y)  # revealed: Literal[3]
 def bool_instance() -> bool:
     return True
 
-flag = bool_instance()
-
-if flag:
+if bool_instance():
     y: int = 3
+
 x = y  # error: [possibly-unresolved-reference]
 
 # revealed: Literal[3]
@@ -86,11 +84,9 @@ def f(): ...
 def bool_instance() -> bool:
     return True
 
-flag = bool_instance()
-if flag:
+if bool_instance():
     from c import f
 else:
-
     def f(): ...
 ```
 
@@ -114,8 +110,7 @@ x: int
 def bool_instance() -> bool:
     return True
 
-flag = bool_instance()
-if flag:
+if bool_instance():
     from c import x
 else:
     x = 1

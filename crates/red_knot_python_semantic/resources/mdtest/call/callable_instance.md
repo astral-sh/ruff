@@ -22,29 +22,27 @@ reveal_type(b)  # revealed: Unknown
 ## Possibly unbound `__call__` method
 
 ```py
-def flag() -> bool: ...
+def _(flag: bool):
+    class PossiblyNotCallable:
+        if flag:
+            def __call__(self) -> int: ...
 
-class PossiblyNotCallable:
-    if flag():
-        def __call__(self) -> int: ...
-
-a = PossiblyNotCallable()
-result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
-reveal_type(result)  # revealed: int
+    a = PossiblyNotCallable()
+    result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+    reveal_type(result)  # revealed: int
 ```
 
 ## Possibly unbound callable
 
 ```py
-def flag() -> bool: ...
+def _(flag: bool):
+    if flag:
+        class PossiblyUnbound:
+            def __call__(self) -> int: ...
 
-if flag():
-    class PossiblyUnbound:
-        def __call__(self) -> int: ...
-
-# error: [possibly-unresolved-reference]
-a = PossiblyUnbound()
-reveal_type(a())  # revealed: int
+    # error: [possibly-unresolved-reference]
+    a = PossiblyUnbound()
+    reveal_type(a())  # revealed: int
 ```
 
 ## Non-callable `__call__`
@@ -61,15 +59,14 @@ reveal_type(a())  # revealed: Unknown
 ## Possibly non-callable `__call__`
 
 ```py
-def flag() -> bool: ...
+def _(flag: bool):
+    class NonCallable:
+        if flag:
+            __call__ = 1
+        else:
+            def __call__(self) -> int: ...
 
-class NonCallable:
-    if flag():
-        __call__ = 1
-    else:
-        def __call__(self) -> int: ...
-
-a = NonCallable()
-# error: "Object of type `Literal[1] | Literal[__call__]` is not callable (due to union element `Literal[1]`)"
-reveal_type(a())  # revealed: Unknown | int
+    a = NonCallable()
+    # error: "Object of type `Literal[1] | Literal[__call__]` is not callable (due to union element `Literal[1]`)"
+    reveal_type(a())  # revealed: Unknown | int
 ```

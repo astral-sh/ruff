@@ -30,18 +30,14 @@ reveal_type(Identity()[0])  # revealed: int
 ## Getitem union
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    class Identity:
+        if flag:
+            def __getitem__(self, index: int) -> int:
+                return index
+        else:
+            def __getitem__(self, index: int) -> str:
+                return str(index)
 
-class Identity:
-    if bool_instance():
-
-        def __getitem__(self, index: int) -> int:
-            return index
-    else:
-
-        def __getitem__(self, index: int) -> str:
-            return str(index)
-
-reveal_type(Identity()[0])  # revealed: int | str
+    reveal_type(Identity()[0])  # revealed: int | str
 ```

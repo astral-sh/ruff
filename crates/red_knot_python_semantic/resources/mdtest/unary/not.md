@@ -35,29 +35,25 @@ y = 1
 ## Union
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    if flag:
+        p = 1
+        q = 3.3
+        r = "hello"
+        s = "world"
+        t = 0
+    else:
+        p = "hello"
+        q = 4
+        r = ""
+        s = 0
+        t = ""
 
-flag = bool_instance()
-
-if flag:
-    p = 1
-    q = 3.3
-    r = "hello"
-    s = "world"
-    t = 0
-else:
-    p = "hello"
-    q = 4
-    r = ""
-    s = 0
-    t = ""
-
-reveal_type(not p)  # revealed: Literal[False]
-reveal_type(not q)  # revealed: bool
-reveal_type(not r)  # revealed: bool
-reveal_type(not s)  # revealed: bool
-reveal_type(not t)  # revealed: Literal[True]
+    reveal_type(not p)  # revealed: Literal[False]
+    reveal_type(not q)  # revealed: bool
+    reveal_type(not r)  # revealed: bool
+    reveal_type(not s)  # revealed: bool
+    reveal_type(not t)  # revealed: Literal[True]
 ```
 
 ## Integer literal

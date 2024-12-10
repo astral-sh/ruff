@@ -31,6 +31,7 @@ reveal_type(y)
 ```py
 y = 1
 y = 2
+
 match 0:
     case 1:
         y = 3
