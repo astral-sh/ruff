@@ -682,3 +682,29 @@ if flag():
 # error: [possibly-unbound-import]
 from module import symbol
 ```
+
+#### Always false, undeclared
+
+```py path=module.py
+if False:
+    symbol: int
+```
+
+```py
+# error: [unresolved-import]
+from module import symbol
+
+reveal_type(symbol)  # revealed: Unknown
+```
+
+#### Always true, declared
+
+```py path=module.py
+if True:
+    symbol: int
+```
+
+```py
+# no error
+from module import symbol
+```

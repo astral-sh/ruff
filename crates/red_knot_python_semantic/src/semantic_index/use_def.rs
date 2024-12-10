@@ -285,17 +285,20 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    fn compute_boundness(
+    fn compute_boundness<'map, C>(
         &self,
         db: &dyn crate::db::Db,
-        bindings: &SymbolBindings,
-    ) -> Option<Boundness> {
-        let bindings_iter = self.bindings_iterator(bindings);
-
+        conditions: C,
+        may_be_undefined: bool,
+    ) -> Option<Boundness>
+    where
+        'db: 'map,
+        C: Iterator<Item = BranchingConditionsIterator<'map, 'db>>,
+    {
         let mut definitely_bound = false;
         let mut definitely_unbound = true;
-        for binding in bindings_iter {
-            let result = binding.branching_conditions.branch_condition_truthiness(db);
+        for condition in conditions {
+            let result = condition.truthiness(db);
 
             if !result.any_always_false {
                 definitely_unbound = false;
@@ -309,7 +312,7 @@ impl<'db> UseDefMap<'db> {
         if definitely_unbound {
             None
         } else {
-            if definitely_bound || !bindings.may_be_unbound() {
+            if definitely_bound || !may_be_undefined {
                 Some(Boundness::Bound)
             } else {
                 Some(Boundness::PossiblyUnbound)
@@ -322,7 +325,11 @@ impl<'db> UseDefMap<'db> {
         db: &dyn crate::db::Db,
         use_id: ScopedUseId,
     ) -> Option<Boundness> {
-        self.compute_boundness(db, &self.bindings_by_use[use_id])
+        let bindings = &self.bindings_by_use[use_id];
+        let conditions = self
+            .bindings_iterator(bindings)
+            .map(|binding| binding.branching_conditions);
+        self.compute_boundness(db, conditions, bindings.may_be_unbound())
     }
 
     pub(crate) fn public_bindings(
@@ -337,7 +344,11 @@ impl<'db> UseDefMap<'db> {
         db: &dyn crate::db::Db,
         symbol: ScopedSymbolId,
     ) -> Option<Boundness> {
-        self.compute_boundness(db, self.public_symbols[symbol].bindings())
+        let bindings = self.public_symbols[symbol].bindings();
+        let conditions = self
+            .bindings_iterator(bindings)
+            .map(|binding| binding.branching_conditions);
+        self.compute_boundness(db, conditions, bindings.may_be_unbound())
     }
 
     pub(crate) fn bindings_at_declaration(
@@ -373,8 +384,26 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations)
     }
 
-    pub(crate) fn has_public_declarations(&self, symbol: ScopedSymbolId) -> bool {
-        !self.public_symbols[symbol].declarations().is_empty()
+    pub(crate) fn declaredness<'map>(
+        &self,
+        db: &dyn crate::db::Db,
+        declarations: DeclarationsIterator<'map, 'db>,
+    ) -> Option<Boundness> {
+        let may_be_undeclared = declarations.may_be_undeclared;
+        let conditions = declarations.map(|(_, conditions)| conditions);
+        self.compute_boundness(db, conditions, may_be_undeclared)
+    }
+
+    pub(crate) fn may_be_undeclared<'map>(
+        &self,
+        db: &dyn crate::db::Db,
+        declarations: DeclarationsIterator<'map, 'db>,
+    ) -> bool {
+        match self.declaredness(db, declarations) {
+            Some(Boundness::Bound) => false,
+            Some(Boundness::PossiblyUnbound) => true,
+            None => true,
+        }
     }
 
     fn bindings_iterator<'a>(
@@ -484,7 +513,7 @@ pub(crate) struct BranchConditionTruthiness {
 }
 
 impl<'db> BranchingConditionsIterator<'_, 'db> {
-    pub(crate) fn branch_condition_truthiness(self, db: &'db dyn Db) -> BranchConditionTruthiness {
+    pub(crate) fn truthiness(self, db: &'db dyn Db) -> BranchConditionTruthiness {
         let mut result = BranchConditionTruthiness {
             any_always_false: false,
             all_always_true: true,
@@ -522,17 +551,12 @@ impl<'db> BranchingConditionsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for BranchingConditionsIterator<'_, '_> {}
 
+#[derive(Clone)]
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
     all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
     inner: DeclarationIdIterator<'map>,
     may_be_undeclared: bool,
-}
-
-impl DeclarationsIterator<'_, '_> {
-    pub(crate) fn may_be_undeclared(&self) -> bool {
-        self.may_be_undeclared
-    }
 }
 
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {

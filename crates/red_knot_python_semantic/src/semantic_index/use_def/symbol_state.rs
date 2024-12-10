@@ -99,7 +99,7 @@ pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
     live_declarations: Declarations,
 
-    branching_conditions: Constraints,
+    branching_conditions: BranchingConditionsPerBinding,
 
     /// Could the symbol be un-declared at this point?
     may_be_undeclared: bool,
@@ -109,7 +109,7 @@ impl SymbolDeclarations {
     fn undeclared() -> Self {
         Self {
             live_declarations: Declarations::default(),
-            branching_conditions: Constraints::default(),
+            branching_conditions: BranchingConditionsPerBinding::default(),
             may_be_undeclared: true,
         }
     }
@@ -124,7 +124,7 @@ impl SymbolDeclarations {
         self.may_be_undeclared = false;
 
         // TODO: unify code with below
-        self.branching_conditions = Constraints::with_capacity(1);
+        self.branching_conditions = BranchingConditionsPerBinding::with_capacity(1);
         self.branching_conditions.push(BitSet::default());
         for active_constraint_id in branching_conditions.iter() {
             self.branching_conditions[0].insert(active_constraint_id);
@@ -572,7 +572,7 @@ impl Iterator for BranchingConditionIdIterator<'_> {
 
 impl std::iter::FusedIterator for BranchingConditionIdIterator<'_> {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct DeclarationIdIterator<'a> {
     inner: DeclarationsIterator<'a>,
     branching_conditions: std::iter::Rev<BranchingConditionsIterator<'a>>,
