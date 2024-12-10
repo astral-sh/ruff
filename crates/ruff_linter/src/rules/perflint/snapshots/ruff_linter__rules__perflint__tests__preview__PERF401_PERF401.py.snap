@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
-snapshot_kind: text
 ---
 PERF401.py:6:13: PERF401 [*] Use a list comprehension to create a transformed list
   |
@@ -114,7 +113,7 @@ PERF401.py:95:9: PERF401 [*] Use `list.extend` to create a transformed list
 PERF401.py:104:17: PERF401 [*] Use `list.extend` to create a transformed list
     |
 102 |             # single-line comment 2 should be protected
-103 |             if i % 2: # single-line comment 3 should be protected 
+103 |             if i % 2: # single-line comment 3 should be protected
 104 |                 result.append(i) # PERF401
     |                 ^^^^^^^^^^^^^^^^ PERF401
     |
@@ -126,11 +125,11 @@ PERF401.py:104:17: PERF401 [*] Use `list.extend` to create a transformed list
 100 100 |     if True:
 101     |-        for i in range(10):  # single-line comment 1 should be protected
 102     |-            # single-line comment 2 should be protected
-103     |-            if i % 2: # single-line comment 3 should be protected 
+103     |-            if i % 2: # single-line comment 3 should be protected
 104     |-                result.append(i) # PERF401
     101 |+        # single-line comment 1 should be protected
     102 |+        # single-line comment 2 should be protected
-    103 |+        # single-line comment 3 should be protected 
+    103 |+        # single-line comment 3 should be protected
     104 |+        result.extend(i for i in range(10) if i % 2) # PERF401
 105 105 | 
 106 106 | 
@@ -139,7 +138,7 @@ PERF401.py:104:17: PERF401 [*] Use `list.extend` to create a transformed list
 PERF401.py:112:13: PERF401 [*] Use a list comprehension to create a transformed list
     |
 110 |         # single-line comment 2 should be protected
-111 |         if i % 2: # single-line comment 3 should be protected 
+111 |         if i % 2: # single-line comment 3 should be protected
 112 |             result.append(i) # PERF401
     |             ^^^^^^^^^^^^^^^^ PERF401
     |
@@ -152,11 +151,11 @@ PERF401.py:112:13: PERF401 [*] Use a list comprehension to create a transformed 
 108     |-    result = [] # comment after assignment should be protected
 109     |-    for i in range(10):  # single-line comment 1 should be protected
 110     |-        # single-line comment 2 should be protected
-111     |-        if i % 2: # single-line comment 3 should be protected 
+111     |-        if i % 2: # single-line comment 3 should be protected
 112     |-            result.append(i) # PERF401
     108 |+    # single-line comment 1 should be protected
     109 |+    # single-line comment 2 should be protected
-    110 |+    # single-line comment 3 should be protected 
+    110 |+    # single-line comment 3 should be protected
     111 |+    # PERF401
     112 |+    result = [i for i in range(10) if i % 2] # comment after assignment should be protected
 113 113 | 
@@ -180,3 +179,78 @@ PERF401.py:127:13: PERF401 [*] Use a list comprehension to create a transformed 
 126     |-        for value in param:
 127     |-            new_layers.append(value * 3)
     125 |+        new_layers = [value * 3 for value in param]
+128 126 | 
+129 127 | 
+130 128 | def f():
+
+PERF401.py:134:13: PERF401 [*] Use `list.extend` with an async comprehension to create a transformed list
+    |
+132 |     async for msg in channel.history():
+133 |         if msg.id == 123:
+134 |             msgs.append(msg)
+    |             ^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+129 129 | 
+130 130 | def f():
+131 131 |     msgs: list[Message] = []
+132     |-    async for msg in channel.history():
+133     |-        if msg.id == 123:
+134     |-            msgs.append(msg)
+    132 |+    msgs.extend([msg async for msg in channel.history() if msg.id == 123])
+135 133 | 
+136 134 | 
+137 135 | def f():
+
+PERF401.py:143:13: PERF401 [*] Use `list.extend` with an async comprehension to create a transformed list
+    |
+141 |     ):  # ccc
+142 |         if msg.id == 123:  # ddd
+143 |             msgs.append(msg)  # eee
+    |             ^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list.extend
+
+ℹ Unsafe fix
+136 136 | 
+137 137 | def f():
+138 138 |     msgs: list[Message] = []
+139     |-    async for msg in channel.history(  # aaa
+    139 |+    # ccc
+    140 |+    # ddd
+    141 |+    msgs.extend([msg async for msg in channel.history(  # aaa
+140 142 |         limit=100,  # bbb
+141     |-    ):  # ccc
+142     |-        if msg.id == 123:  # ddd
+143     |-            msgs.append(msg)  # eee
+    143 |+    ) if msg.id == 123])  # eee
+144 144 | 
+145 145 | 
+146 146 | def f():
+
+PERF401.py:152:13: PERF401 [*] Use an async list comprehension to create a transformed list
+    |
+150 |     ):  # ddd
+151 |         if msg.id == 123:  # eee
+152 |             msgs.append(msg)  # fff
+    |             ^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+144 144 | 
+145 145 | 
+146 146 | def f():
+147     |-    msgs = []  # aaa
+148     |-    async for msg in channel.history(  # bbb
+    147 |+    # ddd
+    148 |+    # eee
+    149 |+    # fff
+    150 |+    msgs = [msg async for msg in channel.history(  # bbb
+149 151 |         limit=100,  # ccc
+150     |-    ):  # ddd
+151     |-        if msg.id == 123:  # eee
+152     |-            msgs.append(msg)  # fff
+    152 |+    ) if msg.id == 123]  # aaa
