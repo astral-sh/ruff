@@ -17,7 +17,7 @@ pub(crate) use self::signatures::Signature;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::{self as symbol, FileScopeId, ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
@@ -71,7 +71,7 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
-    let declaredness = use_def.declaredness(db, use_def.public_declarations(symbol));
+    let declaredness = use_def.public_declarations(symbol).declaredness(db);
 
     let undeclared_ty = match declaredness {
         None => {
@@ -293,7 +293,7 @@ fn bindings_ty<'db>(
     // TODO: get rid of all the collects and clean up, obviously
     let def_types: Vec<_> = def_types.collect();
 
-    if !def_types.is_empty() && def_types.iter().all(|ty| ty.is_none()) {
+    if !def_types.is_empty() && def_types.iter().all(Option::is_none) {
         return Some(Type::Unknown);
     }
 

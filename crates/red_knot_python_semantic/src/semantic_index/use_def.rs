@@ -244,6 +244,40 @@ use super::constraint::Constraint;
 mod bitset;
 mod symbol_state;
 
+fn compute_boundness<'db, 'map, C>(
+    db: &dyn crate::db::Db,
+    conditions: C,
+    may_be_undefined: bool,
+) -> Option<Boundness>
+where
+    'db: 'map,
+    C: Iterator<Item = BranchingConditionsIterator<'map, 'db>>,
+{
+    let mut definitely_bound = false;
+    let mut definitely_unbound = true;
+    for condition in conditions {
+        let result = condition.truthiness(db);
+
+        if !result.any_always_false {
+            definitely_unbound = false;
+        }
+
+        if result.all_always_true {
+            definitely_bound = true;
+        }
+    }
+
+    if definitely_unbound {
+        None
+    } else {
+        if definitely_bound || !may_be_undefined {
+            Some(Boundness::Bound)
+        } else {
+            Some(Boundness::PossiblyUnbound)
+        }
+    }
+}
+
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct UseDefMap<'db> {
@@ -285,41 +319,6 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    fn compute_boundness<'map, C>(
-        &self,
-        db: &dyn crate::db::Db,
-        conditions: C,
-        may_be_undefined: bool,
-    ) -> Option<Boundness>
-    where
-        'db: 'map,
-        C: Iterator<Item = BranchingConditionsIterator<'map, 'db>>,
-    {
-        let mut definitely_bound = false;
-        let mut definitely_unbound = true;
-        for condition in conditions {
-            let result = condition.truthiness(db);
-
-            if !result.any_always_false {
-                definitely_unbound = false;
-            }
-
-            if result.all_always_true {
-                definitely_bound = true;
-            }
-        }
-
-        if definitely_unbound {
-            None
-        } else {
-            if definitely_bound || !may_be_undefined {
-                Some(Boundness::Bound)
-            } else {
-                Some(Boundness::PossiblyUnbound)
-            }
-        }
-    }
-
     pub(crate) fn use_boundness(
         &self,
         db: &dyn crate::db::Db,
@@ -329,7 +328,7 @@ impl<'db> UseDefMap<'db> {
         let conditions = self
             .bindings_iterator(bindings)
             .map(|binding| binding.branching_conditions);
-        self.compute_boundness(db, conditions, bindings.may_be_unbound())
+        compute_boundness(db, conditions, bindings.may_be_unbound())
     }
 
     pub(crate) fn public_bindings(
@@ -348,7 +347,7 @@ impl<'db> UseDefMap<'db> {
         let conditions = self
             .bindings_iterator(bindings)
             .map(|binding| binding.branching_conditions);
-        self.compute_boundness(db, conditions, bindings.may_be_unbound())
+        compute_boundness(db, conditions, bindings.may_be_unbound())
     }
 
     pub(crate) fn bindings_at_declaration(
@@ -382,28 +381,6 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'_, 'db> {
         let declarations = self.public_symbols[symbol].declarations();
         self.declarations_iterator(declarations)
-    }
-
-    pub(crate) fn declaredness<'map>(
-        &self,
-        db: &dyn crate::db::Db,
-        declarations: DeclarationsIterator<'map, 'db>,
-    ) -> Option<Boundness> {
-        let may_be_undeclared = declarations.may_be_undeclared;
-        let conditions = declarations.map(|(_, conditions)| conditions);
-        self.compute_boundness(db, conditions, may_be_undeclared)
-    }
-
-    pub(crate) fn may_be_undeclared<'map>(
-        &self,
-        db: &dyn crate::db::Db,
-        declarations: DeclarationsIterator<'map, 'db>,
-    ) -> bool {
-        match self.declaredness(db, declarations) {
-            Some(Boundness::Bound) => false,
-            Some(Boundness::PossiblyUnbound) => true,
-            None => true,
-        }
     }
 
     fn bindings_iterator<'a>(
@@ -557,6 +534,22 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
     inner: DeclarationIdIterator<'map>,
     may_be_undeclared: bool,
+}
+
+impl DeclarationsIterator<'_, '_> {
+    pub(crate) fn declaredness(self, db: &dyn crate::db::Db) -> Option<Boundness> {
+        let may_be_undeclared = self.may_be_undeclared;
+        let conditions = self.map(|(_, conditions)| conditions);
+        compute_boundness(db, conditions, may_be_undeclared)
+    }
+
+    pub(crate) fn may_be_undeclared(self, db: &dyn crate::db::Db) -> bool {
+        match self.declaredness(db) {
+            Some(Boundness::Bound) => false,
+            Some(Boundness::PossiblyUnbound) => true,
+            None => true,
+        }
+    }
 }
 
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {

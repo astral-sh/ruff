@@ -783,7 +783,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(binding.is_binding(self.db));
         let use_def = self.index.use_def_map(binding.file_scope(self.db));
         let declarations = use_def.declarations_at_binding(binding);
-        let undeclared_ty = if use_def.may_be_undeclared(self.db, declarations.clone()) {
+        let undeclared_ty = if declarations.clone().may_be_undeclared(self.db) {
             Some(Type::Unknown)
         } else {
             None
