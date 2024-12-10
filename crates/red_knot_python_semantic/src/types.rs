@@ -817,18 +817,40 @@ impl<'db> Type<'db> {
         // TODO: The following is a workaround that is required to unify the two different versions
         // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
         // we understand `sys.version_info` branches.
-        self == other
-            || matches!((self, other),
-                (
-                    Type::Instance(InstanceType { class: self_class }),
-                    Type::Instance(InstanceType { class: target_class })
-                )
-                if {
-                    let self_known = self_class.known(db);
-                    matches!(self_known, Some(KnownClass::NoneType | KnownClass::NoDefaultType))
-                        && self_known == target_class.known(db)
-                }
+        match (self, other) {
+            (
+                Type::Instance(InstanceType { class: self_class }),
+                Type::Instance(InstanceType {
+                    class: target_class,
+                }),
+            ) if {
+                let self_known = self_class.known(db);
+                matches!(
+                    self_known,
+                    Some(KnownClass::NoneType | KnownClass::NoDefaultType)
+                ) && self_known == target_class.known(db)
+            } =>
+            {
+                true
+            }
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(object_class),
+                }),
+                Type::Instance(InstanceType { class: type_class }),
             )
+            | (
+                Type::Instance(InstanceType { class: type_class }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(object_class),
+                }),
+            ) if object_class.is_known(db, KnownClass::Object)
+                && type_class.is_known(db, KnownClass::Type) =>
+            {
+                true
+            }
+            _ => self == other,
+        }
     }
 
     /// Returns true if both `self` and `other` are the same gradual form
@@ -3588,6 +3610,7 @@ pub(crate) mod tests {
         Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
         Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)])
     )]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
     fn is_equivalent_to(from: Ty, to: Ty) {
         let db = setup_db();
 
