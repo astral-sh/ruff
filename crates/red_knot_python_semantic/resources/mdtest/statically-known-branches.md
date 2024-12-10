@@ -314,6 +314,28 @@ else:
 reveal_type(x)  # revealed: Literal[3]
 ```
 
+##### `for` loop with `break` inside `if True`
+
+```py
+def iterable() -> list[()]: ...
+def flag() -> bool: ...
+
+x = 1
+
+if True:
+    x = 2
+    for _ in iterable():
+        x = 3
+        if flag():
+            break
+    else:
+        x = 4
+else:
+    x = 5
+
+reveal_type(x)  # revealed: Literal[3, 4]
+```
+
 ## If expressions
 
 See also: tests in [expression/if.md](expression/if.md).
