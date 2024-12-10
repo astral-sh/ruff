@@ -116,7 +116,6 @@ def _(flag: bool) -> None:
 def _(flag: bool) -> None:
     def isinstance(x, t):
         return True
-
     x = 1 if flag else "a"
 
     if isinstance(x, int):

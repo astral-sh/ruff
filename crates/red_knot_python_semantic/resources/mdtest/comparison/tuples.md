@@ -250,7 +250,6 @@ comparison can clearly conclude before encountering an error, the error should n
 ```py
 def _(n: int, s: str) -> None:
     class A: ...
-
     # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`"
     A() < A()
     # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`"

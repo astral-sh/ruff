@@ -42,7 +42,6 @@ def _(flag: bool) -> None:
 def _(flag: bool) -> None:
     class A: ...
     class B: ...
-
     C = A if flag else B
 
     if C != A:

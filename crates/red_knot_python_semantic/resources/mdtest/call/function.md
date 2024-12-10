@@ -61,7 +61,6 @@ def _(flag: bool) -> None:
     if flag:
         def foo() -> int:
             return 42
-
     # error: [possibly-unresolved-reference]
     reveal_type(foo())  # revealed: int
 ```

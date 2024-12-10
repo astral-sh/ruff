@@ -109,7 +109,6 @@ def _(flag: bool) -> None:
         def __exit__(self, exc_type, exc_value, traceback): ...
 
     class NotAContextManager: ...
-
     context_expr = Manager1() if flag else NotAContextManager()
 
     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__enter__` is possibly unbound"

@@ -62,7 +62,6 @@ def _(flag: bool) -> None:
 
     else:
         class Spam: ...
-
     # error: [call-possibly-unbound-method] "Method `__class_getitem__` of type `Literal[Spam, Spam]` is possibly unbound"
     # revealed: str
     reveal_type(Spam[42])
@@ -76,6 +75,7 @@ def _(flag: bool) -> None:
         class Eggs:
             def __class_getitem__(self, x: int) -> str:
                 return "foo"
+
     else:
         Eggs = 1
 

@@ -7,6 +7,7 @@ def _(flag: bool) -> None:
     if flag:
         class C1:
             x = 1
+
     else:
         class C1:
             x = 2
@@ -109,7 +110,6 @@ If the symbol is unbound in all elements of the union, we detect that:
 def _(flag: bool) -> None:
     class C1: ...
     class C2: ...
-
     C = C1 if flag else C2
 
     # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"

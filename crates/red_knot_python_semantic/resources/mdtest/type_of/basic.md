@@ -87,8 +87,6 @@ class A:
 def _(u: type[BasicUser | ProUser | A.B.C]) -> None:
     # revealed: type[BasicUser] | type[ProUser] | type[C]
     reveal_type(u)
-
-
 ```
 
 ## Old-style union of classes

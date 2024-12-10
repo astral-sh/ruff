@@ -49,7 +49,6 @@ else:
 ```py
 def _(flag: bool) -> None:
     class A: ...
-
     x = A()
     y = x if flag else None
 
