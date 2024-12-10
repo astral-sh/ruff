@@ -3,75 +3,60 @@
 ## Simple
 
 ```py
-def f() -> "int":
-    return 1
-
-reveal_type(f())  # revealed: int
+def f(v: "int") -> None:
+    reveal_type(v)  # revealed: int
 ```
 
 ## Nested
 
 ```py
-def f() -> "'int'":
-    return 1
-
-reveal_type(f())  # revealed: int
+def f(v: "'int'") -> None:
+    reveal_type(v)  # revealed: int
 ```
 
 ## Type expression
 
 ```py
-def f1() -> "int | str":
-    return 1
+def f1(v: "int | str") -> None:
+    reveal_type(v)  # revealed: int | str
 
-def f2() -> "tuple[int, str]":
-    return 1
-
-reveal_type(f1())  # revealed: int | str
-reveal_type(f2())  # revealed: tuple[int, str]
+def f2(v: "tuple[int, str]") -> None:
+    reveal_type(v)  # revealed: tuple[int, str]
 ```
 
 ## Partial
 
 ```py
-def f() -> tuple[int, "str"]:
-    return 1
-
-reveal_type(f())  # revealed: tuple[int, str]
+def f(v: tuple[int, "str"]) -> None:
+    reveal_type(v)  # revealed: tuple[int, str]
 ```
 
 ## Deferred
 
 ```py
-def f() -> "Foo":
-    return Foo()
+def f(v: "Foo") -> None:
+    reveal_type(v)  # revealed: Foo
 
 class Foo:
     pass
-
-reveal_type(f())  # revealed: Foo
 ```
 
 ## Deferred (undefined)
 
 ```py
 # error: [unresolved-reference]
-def f() -> "Foo":
-    pass
-
-reveal_type(f())  # revealed: Unknown
+def f(v: "Foo") -> None:
+    reveal_type(v)  # revealed: Unknown
 ```
 
 ## Partial deferred
 
 ```py
-def f() -> int | "Foo":
-    return 1
+def f(v: int | "Foo") -> None:
+    reveal_type(v)  # revealed: int | Foo
 
 class Foo:
     pass
-
-reveal_type(f())  # revealed: int | Foo
 ```
 
 ## `typing.Literal`
@@ -79,65 +64,52 @@ reveal_type(f())  # revealed: int | Foo
 ```py
 from typing import Literal
 
-def f1() -> Literal["Foo", "Bar"]:
-    return "Foo"
+def f1(v: Literal["Foo", "Bar"]) -> None:
+    reveal_type(v)  # revealed: Literal["Foo", "Bar"]
 
-def f2() -> 'Literal["Foo", "Bar"]':
-    return "Foo"
+def f2(v: 'Literal["Foo", "Bar"]') -> None:
+    reveal_type(v)  # revealed: Literal["Foo", "Bar"]
 
 class Foo:
     pass
-
-reveal_type(f1())  # revealed: Literal["Foo", "Bar"]
-reveal_type(f2())  # revealed: Literal["Foo", "Bar"]
 ```
 
 ## Various string kinds
 
 ```py
 # error: [annotation-raw-string] "Type expressions cannot use raw string literal"
-def f1() -> r"int":
-    return 1
+def f1(v: r"int") -> None:
+    reveal_type(v)  # revealed: Unknown
 
 # error: [annotation-f-string] "Type expressions cannot use f-strings"
-def f2() -> f"int":
-    return 1
+def f2(v: f"int") -> None:
+    reveal_type(v)  # revealed: Unknown
 
 # error: [annotation-byte-string] "Type expressions cannot use bytes literal"
-def f3() -> b"int":
-    return 1
+def f3(v: b"int") -> None:
+    reveal_type(v)  # revealed: Unknown
 
-def f4() -> "int":
-    return 1
+def f4(v: "int") -> None:
+    reveal_type(v)  # revealed: int
 
 # error: [annotation-implicit-concat] "Type expressions cannot span multiple string literals"
-def f5() -> "in" "t":
-    return 1
+def f5(v: "in" "t") -> None:
+    reveal_type(v)  # revealed: Unknown
 
 # error: [annotation-escape-character] "Type expressions cannot contain escape characters"
-def f6() -> "\N{LATIN SMALL LETTER I}nt":
-    return 1
+def f6(v: "\N{LATIN SMALL LETTER I}nt") -> None:
+    reveal_type(v)  # revealed: Unknown
 
 # error: [annotation-escape-character] "Type expressions cannot contain escape characters"
-def f7() -> "\x69nt":
-    return 1
+def f7(v: "\x69nt") -> None:
+    reveal_type(v)  # revealed: Unknown
 
-def f8() -> """int""":
-    return 1
+def f8(v: """int""") -> None:
+    reveal_type(v)  # revealed: int
 
 # error: [annotation-byte-string] "Type expressions cannot use bytes literal"
-def f9() -> "b'int'":
-    return 1
-
-reveal_type(f1())  # revealed: Unknown
-reveal_type(f2())  # revealed: Unknown
-reveal_type(f3())  # revealed: Unknown
-reveal_type(f4())  # revealed: int
-reveal_type(f5())  # revealed: Unknown
-reveal_type(f6())  # revealed: Unknown
-reveal_type(f7())  # revealed: Unknown
-reveal_type(f8())  # revealed: int
-reveal_type(f9())  # revealed: Unknown
+def f9(v: "b'int'") -> None:
+    reveal_type(v)  # revealed: Unknown
 ```
 
 ## Various string kinds in `typing.Literal`
@@ -145,10 +117,8 @@ reveal_type(f9())  # revealed: Unknown
 ```py
 from typing import Literal
 
-def f() -> Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]:
-    return "normal"
-
-reveal_type(f())  # revealed: Literal["a", "b", "de", "f", "g", "h"] | Literal[b"c"]
+def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]) -> None:
+    reveal_type(v)  # revealed: Literal["a", "b", "de", "f", "g", "h"] | Literal[b"c"]
 ```
 
 ## Class variables

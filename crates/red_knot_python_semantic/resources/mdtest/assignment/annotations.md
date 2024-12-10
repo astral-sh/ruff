@@ -78,20 +78,14 @@ c: tuple[str | int, str] = ([], "foo")
 ## PEP-604 annotations are supported
 
 ```py
-def foo() -> str | int | None:
-    return None
+def foo(v: str | int | None) -> None:
+    reveal_type(v)  # revealed: str | int | None
 
-reveal_type(foo())  # revealed: str | int | None
+def bar(v: str | str | None) -> None:
+    reveal_type(v)  # revealed: str | None
 
-def bar() -> str | str | None:
-    return None
-
-reveal_type(bar())  # revealed: str | None
-
-def baz() -> str | str:
-    return "Hello, world!"
-
-reveal_type(baz())  # revealed: str
+def baz(v: str | str) -> None:
+    reveal_type(v)  # revealed: str
 ```
 
 ## Attribute expressions in type annotations are understood

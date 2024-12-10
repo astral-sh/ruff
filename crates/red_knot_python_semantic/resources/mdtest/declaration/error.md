@@ -10,42 +10,35 @@ x: str  # error: [invalid-declaration] "Cannot declare type `str` for inferred t
 ## Incompatible declarations
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    if flag:
+        x: str
+    else:
+        x: int
 
-flag = bool_instance()
-if flag:
-    x: str
-else:
-    x: int
-x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: str, int"
+    x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: str, int"
 ```
 
 ## Partial declarations
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    if flag:
+        x: int
 
-flag = bool_instance()
-if flag:
-    x: int
-x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: Unknown, int"
+    x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: Unknown, int"
 ```
 
 ## Incompatible declarations with bad assignment
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    if flag:
+        x: str
+    else:
+        x: int
 
-flag = bool_instance()
-if flag:
-    x: str
-else:
-    x: int
-
-# error: [conflicting-declarations]
-# error: [invalid-assignment]
-x = b"foo"
+    # error: [conflicting-declarations]
+    # error: [invalid-assignment]
+    x = b"foo"
 ```

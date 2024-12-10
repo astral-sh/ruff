@@ -3,54 +3,45 @@
 ## OR
 
 ```py
-def foo() -> str:
-    pass
-
-reveal_type(True or False)  # revealed: Literal[True]
-reveal_type("x" or "y" or "z")  # revealed: Literal["x"]
-reveal_type("" or "y" or "z")  # revealed: Literal["y"]
-reveal_type(False or "z")  # revealed: Literal["z"]
-reveal_type(False or True)  # revealed: Literal[True]
-reveal_type(False or False)  # revealed: Literal[False]
-reveal_type(foo() or False)  # revealed: str | Literal[False]
-reveal_type(foo() or True)  # revealed: str | Literal[True]
+def _(foo: str) -> None:
+    reveal_type(True or False)  # revealed: Literal[True]
+    reveal_type("x" or "y" or "z")  # revealed: Literal["x"]
+    reveal_type("" or "y" or "z")  # revealed: Literal["y"]
+    reveal_type(False or "z")  # revealed: Literal["z"]
+    reveal_type(False or True)  # revealed: Literal[True]
+    reveal_type(False or False)  # revealed: Literal[False]
+    reveal_type(foo or False)  # revealed: str | Literal[False]
+    reveal_type(foo or True)  # revealed: str | Literal[True]
 ```
 
 ## AND
 
 ```py
-def foo() -> str:
-    pass
-
-reveal_type(True and False)  # revealed: Literal[False]
-reveal_type(False and True)  # revealed: Literal[False]
-reveal_type(foo() and False)  # revealed: str | Literal[False]
-reveal_type(foo() and True)  # revealed: str | Literal[True]
-reveal_type("x" and "y" and "z")  # revealed: Literal["z"]
-reveal_type("x" and "y" and "")  # revealed: Literal[""]
-reveal_type("" and "y")  # revealed: Literal[""]
+def _(foo: str) -> None:
+    reveal_type(True and False)  # revealed: Literal[False]
+    reveal_type(False and True)  # revealed: Literal[False]
+    reveal_type(foo and False)  # revealed: str | Literal[False]
+    reveal_type(foo and True)  # revealed: str | Literal[True]
+    reveal_type("x" and "y" and "z")  # revealed: Literal["z"]
+    reveal_type("x" and "y" and "")  # revealed: Literal[""]
+    reveal_type("" and "y")  # revealed: Literal[""]
 ```
 
 ## Simple function calls to bool
 
 ```py
-def returns_bool() -> bool:
-    return True
+def _(flag: bool) -> None:
+    if flag:
+        x = True
+    else:
+        x = False
 
-if returns_bool():
-    x = True
-else:
-    x = False
-
-reveal_type(x)  # revealed: bool
+    reveal_type(x)  # revealed: bool
 ```
 
 ## Complex
 
 ```py
-def foo() -> str:
-    pass
-
 reveal_type("x" and "y" or "z")  # revealed: Literal["y"]
 reveal_type("x" or "y" and "z")  # revealed: Literal["x"]
 reveal_type("" and "y" or "z")  # revealed: Literal["z"]

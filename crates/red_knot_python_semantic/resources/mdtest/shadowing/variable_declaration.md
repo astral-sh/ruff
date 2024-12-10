@@ -3,14 +3,11 @@
 ## Shadow after incompatible declarations is OK
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    if flag:
+        x: str
+    else:
+        x: int
 
-flag = bool_instance()
-
-if flag:
-    x: str
-else:
-    x: int
-x: bytes = b"foo"
+    x: bytes = b"foo"
 ```

@@ -5,10 +5,8 @@
 ```py
 class A: ...
 
-def f() -> type[A]:
-    return A
-
-reveal_type(f())  # revealed: type[A]
+def _(c: type[A]) -> None:
+    reveal_type(c)  # revealed: type[A]
 ```
 
 ## Nested class literal
@@ -17,10 +15,8 @@ reveal_type(f())  # revealed: type[A]
 class A:
     class B: ...
 
-def f() -> type[A.B]:
-    return A.B
-
-reveal_type(f())  # revealed: type[B]
+def f(c: type[A.B]) -> None:
+    reveal_type(c)  # revealed: type[B]
 ```
 
 ## Deeply nested class literal
@@ -30,10 +26,8 @@ class A:
     class B:
         class C: ...
 
-def f() -> type[A.B.C]:
-    return A.B.C
-
-reveal_type(f())  # revealed: type[C]
+def f(c: type[A.B.C]) -> None:
+    reveal_type(c)  # revealed: type[C]
 ```
 
 ## Class literal from another module
@@ -41,10 +35,8 @@ reveal_type(f())  # revealed: type[C]
 ```py
 from a import A
 
-def f() -> type[A]:
-    return A
-
-reveal_type(f())  # revealed: type[A]
+def f(c: type[A]) -> None:
+    reveal_type(c)  # revealed: type[A]
 ```
 
 ```py path=a.py
@@ -56,10 +48,8 @@ class A: ...
 ```py
 import a
 
-def f() -> type[a.B]:
-    return a.B
-
-reveal_type(f())  # revealed: type[B]
+def f(c: type[a.B]) -> None:
+    reveal_type(c)  # revealed: type[B]
 ```
 
 ```py path=a.py
@@ -73,12 +63,8 @@ import a.b
 
 # TODO: no diagnostic
 # error: [unresolved-attribute]
-def f() -> type[a.b.C]:
-    # TODO: no diagnostic
-    # error: [unresolved-attribute]
-    return a.b.C
-
-reveal_type(f())  # revealed: @Todo(unsupported type[X] special form)
+def f(c: type[a.b.C]) -> None:
+    reveal_type(c)  # revealed: @Todo(unsupported type[X] special form)
 ```
 
 ```py path=a/__init__.py
@@ -98,11 +84,11 @@ class A:
     class B:
         class C: ...
 
-def get_user() -> type[BasicUser | ProUser | A.B.C]:
-    return BasicUser
+def _(u: type[BasicUser | ProUser | A.B.C]) -> None:
+    # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(u)
 
-# revealed: type[BasicUser] | type[ProUser] | type[C]
-reveal_type(get_user())
+
 ```
 
 ## Old-style union of classes
@@ -147,6 +133,5 @@ class A: ...
 class B: ...
 
 # error: [invalid-type-form]
-def get_user() -> type[A, B]:
-    return A
+_: type[A, B]
 ```

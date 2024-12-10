@@ -7,29 +7,25 @@ Similarly, in `and` expressions, if the left-hand side is falsy, the right-hand 
 evaluated.
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    if flag or (x := 1):
+        # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: Literal[1]
 
-if bool_instance() or (x := 1):
-    # error: [possibly-unresolved-reference]
-    reveal_type(x)  # revealed: Literal[1]
-
-if bool_instance() and (x := 1):
-    # error: [possibly-unresolved-reference]
-    reveal_type(x)  # revealed: Literal[1]
+    if flag and (x := 1):
+        # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## First expression is always evaluated
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    if (x := 1) or flag:
+        reveal_type(x)  # revealed: Literal[1]
 
-if (x := 1) or bool_instance():
-    reveal_type(x)  # revealed: Literal[1]
-
-if (x := 1) and bool_instance():
-    reveal_type(x)  # revealed: Literal[1]
+    if (x := 1) and flag:
+        reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Statically known truthiness
@@ -49,30 +45,26 @@ if True and (x := 1):
 ## Later expressions can always use variables from earlier expressions
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    flag or (x := 1) or reveal_type(x)  # revealed: Literal[1]
 
-bool_instance() or (x := 1) or reveal_type(x)  # revealed: Literal[1]
-
-# error: [unresolved-reference]
-bool_instance() or reveal_type(y) or (y := 1)  # revealed: Unknown
+    # error: [unresolved-reference]
+    flag or reveal_type(y) or (y := 1)  # revealed: Unknown
 ```
 
 ## Nested expressions
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag1: bool, flag2: bool) -> None:
+    if flag1 or ((x := 1) and flag2):
+        # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: Literal[1]
 
-if bool_instance() or ((x := 1) and bool_instance()):
+    if ((y := 1) and flag1) or flag2:
+        reveal_type(y)  # revealed: Literal[1]
+
     # error: [possibly-unresolved-reference]
-    reveal_type(x)  # revealed: Literal[1]
-
-if ((y := 1) and bool_instance()) or bool_instance():
-    reveal_type(y)  # revealed: Literal[1]
-
-# error: [possibly-unresolved-reference]
-if (bool_instance() and (z := 1)) or reveal_type(z):  # revealed: Literal[1]
-    # error: [possibly-unresolved-reference]
-    reveal_type(z)  # revealed: Literal[1]
+    if (flag1 and (z := 1)) or reveal_type(z):  # revealed: Literal[1]
+        # error: [possibly-unresolved-reference]
+        reveal_type(z)  # revealed: Literal[1]
 ```

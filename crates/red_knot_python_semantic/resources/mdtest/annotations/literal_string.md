@@ -89,28 +89,26 @@ vice versa.
 ```py
 from typing_extensions import Literal, LiteralString
 
-def coinflip() -> bool:
-    return True
+def _(flag: bool) -> None:
+    foo_1: Literal["foo"] = "foo"
+    bar_1: LiteralString = foo_1  # fine
 
-foo_1: Literal["foo"] = "foo"
-bar_1: LiteralString = foo_1  # fine
+    foo_2 = "foo" if flag else "bar"
+    reveal_type(foo_2)  # revealed: Literal["foo", "bar"]
+    bar_2: LiteralString = foo_2  # fine
 
-foo_2 = "foo" if coinflip() else "bar"
-reveal_type(foo_2)  # revealed: Literal["foo", "bar"]
-bar_2: LiteralString = foo_2  # fine
+    foo_3: LiteralString = "foo" * 1_000_000_000
+    bar_3: str = foo_2  # fine
 
-foo_3: LiteralString = "foo" * 1_000_000_000
-bar_3: str = foo_2  # fine
+    baz_1: str = str()
+    qux_1: LiteralString = baz_1  # error: [invalid-assignment]
 
-baz_1: str = str()
-qux_1: LiteralString = baz_1  # error: [invalid-assignment]
+    baz_2: LiteralString = "baz" * 1_000_000_000
+    qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]
 
-baz_2: LiteralString = "baz" * 1_000_000_000
-qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]
-
-baz_3 = "foo" if coinflip() else 1
-reveal_type(baz_3)  # revealed: Literal["foo"] | Literal[1]
-qux_3: LiteralString = baz_3  # error: [invalid-assignment]
+    baz_3 = "foo" if flag else 1
+    reveal_type(baz_3)  # revealed: Literal["foo"] | Literal[1]
+    qux_3: LiteralString = baz_3  # error: [invalid-assignment]
 ```
 
 ### Narrowing

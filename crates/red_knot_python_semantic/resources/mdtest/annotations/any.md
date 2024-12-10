@@ -68,8 +68,6 @@ x: Subclass = 1  # error: [invalid-assignment]
 # TODO: no diagnostic
 y: int = Subclass()  # error: [invalid-assignment]
 
-def f() -> Subclass:
-    pass
-
-reveal_type(f())  # revealed: Subclass
+def _(s: Subclass) -> None:
+    reveal_type(s)  # revealed: Subclass
 ```

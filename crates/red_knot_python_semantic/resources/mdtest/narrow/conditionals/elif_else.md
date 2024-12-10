@@ -3,55 +3,47 @@
 ## Positive contributions become negative in elif-else blocks
 
 ```py
-def int_instance() -> int:
-    return 42
-
-x = int_instance()
-
-if x == 1:
-    # cannot narrow; could be a subclass of `int`
-    reveal_type(x)  # revealed: int
-elif x == 2:
-    reveal_type(x)  # revealed: int & ~Literal[1]
-elif x != 3:
-    reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[2] & ~Literal[3]
+def _(x: int) -> None:
+    if x == 1:
+        # cannot narrow; could be a subclass of `int`
+        reveal_type(x)  # revealed: int
+    elif x == 2:
+        reveal_type(x)  # revealed: int & ~Literal[1]
+    elif x != 3:
+        reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[2] & ~Literal[3]
 ```
 
 ## Positive contributions become negative in elif-else blocks, with simplification
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag1: bool, flag2: bool) -> None:
+    x = 1 if flag1 else 2 if flag2 else 3
 
-x = 1 if bool_instance() else 2 if bool_instance() else 3
-
-if x == 1:
-    # TODO should be Literal[1]
-    reveal_type(x)  # revealed: Literal[1, 2, 3]
-elif x == 2:
-    # TODO should be Literal[2]
-    reveal_type(x)  # revealed: Literal[2, 3]
-else:
-    reveal_type(x)  # revealed: Literal[3]
+    if x == 1:
+        # TODO should be Literal[1]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
+    elif x == 2:
+        # TODO should be Literal[2]
+        reveal_type(x)  # revealed: Literal[2, 3]
+    else:
+        reveal_type(x)  # revealed: Literal[3]
 ```
 
 ## Multiple negative contributions using elif, with simplification
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag1: bool, flag2: bool) -> None:
+    x = 1 if flag1 else 2 if flag2 else 3
 
-x = 1 if bool_instance() else 2 if bool_instance() else 3
-
-if x != 1:
-    reveal_type(x)  # revealed: Literal[2, 3]
-elif x != 2:
-    # TODO should be `Literal[1]`
-    reveal_type(x)  # revealed: Literal[1, 3]
-elif x == 3:
-    # TODO should be Never
-    reveal_type(x)  # revealed: Literal[1, 2, 3]
-else:
-    # TODO should be Never
-    reveal_type(x)  # revealed: Literal[1, 2]
+    if x != 1:
+        reveal_type(x)  # revealed: Literal[2, 3]
+    elif x != 2:
+        # TODO should be `Literal[1]`
+        reveal_type(x)  # revealed: Literal[1, 3]
+    elif x == 3:
+        # TODO should be Never
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
+    else:
+        # TODO should be Never
+        reveal_type(x)  # revealed: Literal[1, 2]
 ```

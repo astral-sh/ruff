@@ -5,49 +5,46 @@
 Comparisons on union types need to consider all possible cases:
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    one_or_two = 1 if flag else 2
 
-flag = bool_instance()
-one_or_two = 1 if flag else 2
+    reveal_type(one_or_two <= 2)  # revealed: Literal[True]
+    reveal_type(one_or_two <= 1)  # revealed: bool
+    reveal_type(one_or_two <= 0)  # revealed: Literal[False]
 
-reveal_type(one_or_two <= 2)  # revealed: Literal[True]
-reveal_type(one_or_two <= 1)  # revealed: bool
-reveal_type(one_or_two <= 0)  # revealed: Literal[False]
+    reveal_type(2 >= one_or_two)  # revealed: Literal[True]
+    reveal_type(1 >= one_or_two)  # revealed: bool
+    reveal_type(0 >= one_or_two)  # revealed: Literal[False]
 
-reveal_type(2 >= one_or_two)  # revealed: Literal[True]
-reveal_type(1 >= one_or_two)  # revealed: bool
-reveal_type(0 >= one_or_two)  # revealed: Literal[False]
+    reveal_type(one_or_two < 1)  # revealed: Literal[False]
+    reveal_type(one_or_two < 2)  # revealed: bool
+    reveal_type(one_or_two < 3)  # revealed: Literal[True]
 
-reveal_type(one_or_two < 1)  # revealed: Literal[False]
-reveal_type(one_or_two < 2)  # revealed: bool
-reveal_type(one_or_two < 3)  # revealed: Literal[True]
+    reveal_type(one_or_two > 0)  # revealed: Literal[True]
+    reveal_type(one_or_two > 1)  # revealed: bool
+    reveal_type(one_or_two > 2)  # revealed: Literal[False]
 
-reveal_type(one_or_two > 0)  # revealed: Literal[True]
-reveal_type(one_or_two > 1)  # revealed: bool
-reveal_type(one_or_two > 2)  # revealed: Literal[False]
+    reveal_type(one_or_two == 3)  # revealed: Literal[False]
+    reveal_type(one_or_two == 1)  # revealed: bool
 
-reveal_type(one_or_two == 3)  # revealed: Literal[False]
-reveal_type(one_or_two == 1)  # revealed: bool
+    reveal_type(one_or_two != 3)  # revealed: Literal[True]
+    reveal_type(one_or_two != 1)  # revealed: bool
 
-reveal_type(one_or_two != 3)  # revealed: Literal[True]
-reveal_type(one_or_two != 1)  # revealed: bool
+    a_or_ab = "a" if flag else "ab"
 
-a_or_ab = "a" if flag else "ab"
+    reveal_type(a_or_ab in "ab")  # revealed: Literal[True]
+    reveal_type("a" in a_or_ab)  # revealed: Literal[True]
 
-reveal_type(a_or_ab in "ab")  # revealed: Literal[True]
-reveal_type("a" in a_or_ab)  # revealed: Literal[True]
+    reveal_type("c" not in a_or_ab)  # revealed: Literal[True]
+    reveal_type("a" not in a_or_ab)  # revealed: Literal[False]
 
-reveal_type("c" not in a_or_ab)  # revealed: Literal[True]
-reveal_type("a" not in a_or_ab)  # revealed: Literal[False]
+    reveal_type("b" in a_or_ab)  # revealed: bool
+    reveal_type("b" not in a_or_ab)  # revealed: bool
 
-reveal_type("b" in a_or_ab)  # revealed: bool
-reveal_type("b" not in a_or_ab)  # revealed: bool
+    one_or_none = 1 if flag else None
 
-one_or_none = 1 if flag else None
-
-reveal_type(one_or_none is None)  # revealed: bool
-reveal_type(one_or_none is not None)  # revealed: bool
+    reveal_type(one_or_none is None)  # revealed: bool
+    reveal_type(one_or_none is not None)  # revealed: bool
 ```
 
 ## Union on both sides of the comparison
@@ -56,18 +53,15 @@ With unions on both sides, we need to consider the full cross product of options
 resulting (union) type:
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag_s: bool, flag_l: bool) -> None:
+    small = 1 if flag_s else 2
+    large = 2 if flag_l else 3
 
-flag_s, flag_l = bool_instance(), bool_instance()
-small = 1 if flag_s else 2
-large = 2 if flag_l else 3
+    reveal_type(small <= large)  # revealed: Literal[True]
+    reveal_type(small >= large)  # revealed: bool
 
-reveal_type(small <= large)  # revealed: Literal[True]
-reveal_type(small >= large)  # revealed: bool
-
-reveal_type(small < large)  # revealed: bool
-reveal_type(small > large)  # revealed: Literal[False]
+    reveal_type(small < large)  # revealed: bool
+    reveal_type(small > large)  # revealed: Literal[False]
 ```
 
 ## Unsupported operations
@@ -77,12 +71,9 @@ back to `bool` for the result type instead of trying to infer something more pre
 (supported) variants:
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool) -> None:
+    x = [1, 2] if flag else 1
 
-flag = bool_instance()
-x = [1, 2] if flag else 1
-
-result = 1 in x  # error: "Operator `in` is not supported"
-reveal_type(result)  # revealed: bool
+    result = 1 in x  # error: "Operator `in` is not supported"
+    reveal_type(result)  # revealed: bool
 ```
