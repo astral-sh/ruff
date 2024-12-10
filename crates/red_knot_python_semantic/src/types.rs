@@ -813,49 +813,53 @@ impl<'db> Type<'db> {
             return false;
         }
 
+        // TODO: The following is a workaround that is required to unify the two different versions
+        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
+        // we understand `sys.version_info` branches.
+        if let (
+            Type::Instance(InstanceType { class: self_class }),
+            Type::Instance(InstanceType {
+                class: target_class,
+            }),
+        ) = (self, other)
+        {
+            let self_known = self_class.known(db);
+            if matches!(
+                self_known,
+                Some(KnownClass::NoneType | KnownClass::NoDefaultType)
+            ) && self_known == target_class.known(db)
+            {
+                return true;
+            }
+        }
+
+        // type[object] ≡ type
+        if let (
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(object_class),
+            }),
+            Type::Instance(InstanceType { class: type_class }),
+        )
+        | (
+            Type::Instance(InstanceType { class: type_class }),
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(object_class),
+            }),
+        ) = (self, other)
+        {
+            return object_class.is_known(db, KnownClass::Object)
+                && type_class.is_known(db, KnownClass::Type);
+        }
+
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
 
         // TODO: Once we have support for final classes, we can establish that
         // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
 
-        // TODO: The following is a workaround that is required to unify the two different versions
-        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
-        // we understand `sys.version_info` branches.
-        match (self, other) {
-            (
-                Type::Instance(InstanceType { class: self_class }),
-                Type::Instance(InstanceType {
-                    class: target_class,
-                }),
-            ) if {
-                let self_known = self_class.known(db);
-                matches!(
-                    self_known,
-                    Some(KnownClass::NoneType | KnownClass::NoDefaultType)
-                ) && self_known == target_class.known(db)
-            } =>
-            {
-                true
-            }
-            (
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(object_class),
-                }),
-                Type::Instance(InstanceType { class: type_class }),
-            )
-            | (
-                Type::Instance(InstanceType { class: type_class }),
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(object_class),
-                }),
-            ) if object_class.is_known(db, KnownClass::Object)
-                && type_class.is_known(db, KnownClass::Type) =>
-            {
-                true
-            }
-            _ => self == other,
-        }
+        // For all other cases, types are equivalent iff they have the same internal
+        // representation.
+        self == other
     }
 
     /// Returns true if both `self` and `other` are the same gradual form
