@@ -225,18 +225,6 @@ fn definition_expression_ty<'db>(
     }
 }
 
-/// Get the type of an expression from an arbitrary scope.
-///
-/// Can cause query cycles if used carelessly; caller must be sure that type inference isn't
-/// currently in progress for the expression's scope.
-fn expression_ty<'db>(db: &'db dyn Db, file: File, expression: &ast::Expr) -> Type<'db> {
-    let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
-    let scope = file_scope.to_scope_id(db, file);
-    let expr_id = expression.scoped_expression_id(db, scope);
-    infer_scope_types(db, scope).expression_ty(expr_id)
-}
-
 /// Infer the combined type of an iterator of bindings.
 ///
 /// Will return a union if there is more than one binding.
@@ -905,7 +893,7 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
             (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
-                // TODO: Once we have support for final classes, we can determine disjointness in some cases
+                // TODO: Once we have support for final classes, we can determine disjointedness in some cases
                 // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
                 // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
                 // final classes inside `Type::SubclassOf` everywhere.
@@ -1191,6 +1179,8 @@ impl<'db> Type<'db> {
                     | KnownClass::Set
                     | KnownClass::Dict
                     | KnownClass::Slice
+                    | KnownClass::BaseException
+                    | KnownClass::BaseExceptionGroup
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
@@ -1871,6 +1861,8 @@ pub enum KnownClass {
     Set,
     Dict,
     Slice,
+    BaseException,
+    BaseExceptionGroup,
     // Types
     GenericAlias,
     ModuleType,
@@ -1901,6 +1893,8 @@ impl<'db> KnownClass {
             Self::List => "list",
             Self::Type => "type",
             Self::Slice => "slice",
+            Self::BaseException => "BaseException",
+            Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -1928,6 +1922,12 @@ impl<'db> KnownClass {
             .unwrap_or(Type::Unknown)
     }
 
+    pub fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.to_class_literal(db)
+            .into_class_literal()
+            .map(|ClassLiteralType { class }| Type::subclass_of(class))
+    }
+
     /// Return the module in which we should look up the definition for this class
     pub(crate) fn canonical_module(self, db: &'db dyn Db) -> CoreStdlibModule {
         match self {
@@ -1942,6 +1942,8 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::Slice => CoreStdlibModule::Builtins,
             Self::VersionInfo => CoreStdlibModule::Sys,
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
@@ -1985,6 +1987,8 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::FunctionType
             | Self::SpecialForm
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::TypeVar => false,
         }
     }
@@ -2006,6 +2010,8 @@ impl<'db> KnownClass {
             "dict" => Self::Dict,
             "list" => Self::List,
             "slice" => Self::Slice,
+            "BaseException" => Self::BaseException,
+            "BaseExceptionGroup" => Self::BaseExceptionGroup,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -2042,6 +2048,8 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::ModuleType
             | Self::VersionInfo
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::FunctionType => module.name() == self.canonical_module(db).as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {

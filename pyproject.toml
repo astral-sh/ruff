@@ -106,6 +106,7 @@ changelog_contributors = false
 version_files = [
   "README.md",
   "docs/integrations.md",
+  "docs/tutorial.md",
   "crates/ruff/Cargo.toml",
   "crates/ruff_linter/Cargo.toml",
   "crates/ruff_wasm/Cargo.toml",

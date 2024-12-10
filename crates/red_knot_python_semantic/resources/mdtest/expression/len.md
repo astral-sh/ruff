@@ -211,8 +211,7 @@ reveal_type(len(SecondRequiredArgument()))  # revealed: Literal[1]
 ### No `__len__`
 
 ```py
-class NoDunderLen:
-    pass
+class NoDunderLen: ...
 
 # TODO: Emit a diagnostic
 reveal_type(len(NoDunderLen()))  # revealed: int

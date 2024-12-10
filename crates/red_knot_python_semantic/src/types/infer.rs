@@ -63,7 +63,6 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::expression_ty;
 use super::string_annotation::parse_string_annotation;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -407,11 +406,35 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Get the already-inferred type of an expression node.
     ///
-    /// PANIC if no type has been inferred for this node.
+    /// ## Panics
+    /// If the expression is not within this region, or if no type has yet been inferred for
+    /// this node.
     #[track_caller]
     fn expression_ty(&self, expr: &ast::Expr) -> Type<'db> {
         self.types
             .expression_ty(expr.scoped_expression_id(self.db, self.scope()))
+    }
+
+    /// Get the type of an expression from any scope in the same file.
+    ///
+    /// If the expression is in the current scope, and we are inferring the entire scope, just look
+    /// up the expression in our own results, otherwise call [`infer_scope_types()`] for the scope
+    /// of the expression.
+    ///
+    /// ## Panics
+    ///
+    /// If the expression is in the current scope but we haven't yet inferred a type for it.
+    ///
+    /// Can cause query cycles if the expression is from a different scope and type inference is
+    /// already in progress for that scope (further up the stack).
+    fn file_expression_ty(&self, expression: &ast::Expr) -> Type<'db> {
+        let file_scope = self.index.expression_scope_id(expression);
+        let expr_scope = file_scope.to_scope_id(self.db, self.file);
+        let expr_id = expression.scoped_expression_id(self.db, expr_scope);
+        match self.region {
+            InferenceRegion::Scope(scope) if scope == expr_scope => self.expression_ty(expression),
+            _ => infer_scope_types(self.db, expr_scope).expression_ty(expr_id),
+        }
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -1081,9 +1104,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = parameter_with_default;
         let default_ty = default
             .as_ref()
-            .map(|default| expression_ty(self.db, self.file, default));
+            .map(|default| self.file_expression_ty(default));
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let declared_ty = expression_ty(self.db, self.file, annotation);
+            let declared_ty = self.file_expression_ty(annotation);
             let inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db, declared_ty) {
                     UnionType::from_elements(self.db, [declared_ty, default_ty])
@@ -1127,7 +1150,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let _annotated_ty = expression_ty(self.db, self.file, annotation);
+            let _annotated_ty = self.file_expression_ty(annotation);
             // TODO `tuple[annotated_ty, ...]`
             let ty = KnownClass::Tuple.to_instance(self.db);
             self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
@@ -1152,7 +1175,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let _annotated_ty = expression_ty(self.db, self.file, annotation);
+            let _annotated_ty = self.file_expression_ty(annotation);
             // TODO `dict[str, annotated_ty]`
             let ty = KnownClass::Dict.to_instance(self.db);
             self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
@@ -1512,40 +1535,56 @@ impl<'db> TypeInferenceBuilder<'db> {
         except_handler_definition: &ExceptHandlerDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let node_ty = except_handler_definition
-            .handled_exceptions()
-            .map(|ty| self.infer_expression(ty))
-            // If there is no handled exception, it's invalid syntax;
-            // a diagnostic will have already been emitted
-            .unwrap_or(Type::Unknown);
+        let node = except_handler_definition.handled_exceptions();
+
+        // If there is no handled exception, it's invalid syntax;
+        // a diagnostic will have already been emitted
+        let node_ty = node.map_or(Type::Unknown, |ty| self.infer_expression(ty));
+
+        // If it's an `except*` handler, this won't actually be the type of the bound symbol;
+        // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
+        let symbol_ty = if let Type::Tuple(tuple) = node_ty {
+            let type_base_exception = KnownClass::BaseException
+                .to_subclass_of(self.db)
+                .unwrap_or(Type::Unknown);
+            let mut builder = UnionBuilder::new(self.db);
+            for element in tuple.elements(self.db).iter().copied() {
+                builder = builder.add(if element.is_assignable_to(self.db, type_base_exception) {
+                    element.to_instance(self.db)
+                } else {
+                    if let Some(node) = node {
+                        self.diagnostics
+                            .add_invalid_exception(self.db, node, element);
+                    }
+                    Type::Unknown
+                });
+            }
+            builder.build()
+        } else if node_ty.is_subtype_of(self.db, KnownClass::Tuple.to_instance(self.db)) {
+            todo_type!("Homogeneous tuple in exception handler")
+        } else {
+            let type_base_exception = KnownClass::BaseException
+                .to_subclass_of(self.db)
+                .unwrap_or(Type::Unknown);
+            if node_ty.is_assignable_to(self.db, type_base_exception) {
+                node_ty.to_instance(self.db)
+            } else {
+                if let Some(node) = node {
+                    self.diagnostics
+                        .add_invalid_exception(self.db, node, node_ty);
+                }
+                Type::Unknown
+            }
+        };
 
         let symbol_ty = if except_handler_definition.is_star() {
-            // TODO should be generic --Alex
+            // TODO: we should infer `ExceptionGroup` if `node_ty` is a subtype of `tuple[type[Exception], ...]`
+            // (needs support for homogeneous tuples).
             //
-            // TODO should infer `ExceptionGroup` if all caught exceptions
-            // are subclasses of `Exception` --Alex
-            builtins_symbol(self.db, "BaseExceptionGroup")
-                .ignore_possibly_unbound()
-                .unwrap_or(Type::Unknown)
-                .to_instance(self.db)
+            // TODO: should be generic with `symbol_ty` as the generic parameter
+            KnownClass::BaseExceptionGroup.to_instance(self.db)
         } else {
-            // TODO: anything that's a consistent subtype of
-            // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
-            // anything else is invalid and should lead to a diagnostic being reported --Alex
-            match node_ty {
-                Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(class),
-                Type::Tuple(tuple) => UnionType::from_elements(
-                    self.db,
-                    tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal().map_or(
-                            todo_type!("exception type"),
-                            |ClassLiteralType { class }| Type::instance(class),
-                        )
-                    }),
-                ),
-                _ => todo_type!("exception type"),
-            }
+            symbol_ty
         };
 
         self.add_binding(

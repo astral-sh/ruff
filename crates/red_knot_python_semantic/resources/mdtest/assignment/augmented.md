@@ -49,134 +49,116 @@ reveal_type(x)  # revealed: int
 ## Method union
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    class Foo:
+        if flag:
+            def __iadd__(self, other: int) -> str:
+                return "Hello, world!"
+        else:
+            def __iadd__(self, other: int) -> int:
+                return 42
 
-flag = bool_instance()
+    f = Foo()
+    f += 12
 
-class Foo:
-    if bool_instance():
-        def __iadd__(self, other: int) -> str:
-            return "Hello, world!"
-    else:
-        def __iadd__(self, other: int) -> int:
-            return 42
-
-f = Foo()
-f += 12
-
-reveal_type(f)  # revealed: str | int
+    reveal_type(f)  # revealed: str | int
 ```
 
 ## Partially bound `__iadd__`
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    class Foo:
+        if flag:
+            def __iadd__(self, other: str) -> int:
+                return 42
 
-class Foo:
-    if bool_instance():
-        def __iadd__(self, other: str) -> int:
-            return 42
+    f = Foo()
 
-f = Foo()
+    # TODO: We should emit an `unsupported-operator` error here, possibly with the information
+    # that `Foo.__iadd__` may be unbound as additional context.
+    f += "Hello, world!"
 
-# TODO: We should emit an `unsupported-operator` error here, possibly with the information
-# that `Foo.__iadd__` may be unbound as additional context.
-f += "Hello, world!"
-
-reveal_type(f)  # revealed: int | Unknown
+    reveal_type(f)  # revealed: int | Unknown
 ```
 
 ## Partially bound with `__add__`
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    class Foo:
+        def __add__(self, other: str) -> str:
+            return "Hello, world!"
+        if flag:
+            def __iadd__(self, other: str) -> int:
+                return 42
 
-class Foo:
-    def __add__(self, other: str) -> str:
-        return "Hello, world!"
-    if bool_instance():
-        def __iadd__(self, other: str) -> int:
-            return 42
+    f = Foo()
+    f += "Hello, world!"
 
-f = Foo()
-f += "Hello, world!"
-
-reveal_type(f)  # revealed: int | str
+    reveal_type(f)  # revealed: int | str
 ```
 
 ## Partially bound target union
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag1: bool, flag2: bool):
+    class Foo:
+        def __add__(self, other: int) -> str:
+            return "Hello, world!"
+        if flag1:
+            def __iadd__(self, other: int) -> int:
+                return 42
 
-class Foo:
-    def __add__(self, other: int) -> str:
-        return "Hello, world!"
-    if bool_instance():
-        def __iadd__(self, other: int) -> int:
-            return 42
+    if flag2:
+        f = Foo()
+    else:
+        f = 42.0
+    f += 12
 
-if bool_instance():
-    f = Foo()
-else:
-    f = 42.0
-f += 12
-
-reveal_type(f)  # revealed: int | str | float
+    reveal_type(f)  # revealed: int | str | float
 ```
 
 ## Target union
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(flag: bool):
+    class Foo:
+        def __iadd__(self, other: int) -> str:
+            return "Hello, world!"
 
-flag = bool_instance()
+    if flag:
+        f = Foo()
+    else:
+        f = 42.0
+    f += 12
 
-class Foo:
-    def __iadd__(self, other: int) -> str:
-        return "Hello, world!"
-
-if flag:
-    f = Foo()
-else:
-    f = 42.0
-f += 12
-
-reveal_type(f)  # revealed: str | float
+    reveal_type(f)  # revealed: str | float
 ```
 
 ## Partially bound target union with `__add__`
 
 ```py
-def bool_instance() -> bool:
-    return True
+def f(flag: bool, flag2: bool):
+    class Foo:
+        def __add__(self, other: int) -> str:
+            return "Hello, world!"
+        if flag:
+            def __iadd__(self, other: int) -> int:
+                return 42
 
-flag = bool_instance()
+    class Bar:
+        def __add__(self, other: int) -> bytes:
+            return b"Hello, world!"
 
-class Foo:
-    def __add__(self, other: int) -> str:
-        return "Hello, world!"
-    if bool_instance():
-        def __iadd__(self, other: int) -> int:
-            return 42
+        def __iadd__(self, other: int) -> float:
+            return 42.0
 
-class Bar:
-    def __add__(self, other: int) -> bytes:
-        return b"Hello, world!"
+    if flag2:
+        f = Foo()
+    else:
+        f = Bar()
+    f += 12
 
-    def __iadd__(self, other: int) -> float:
-        return 42.0
-
-if flag:
-    f = Foo()
-else:
-    f = Bar()
-f += 12
-
-reveal_type(f)  # revealed: int | str | float
+    reveal_type(f)  # revealed: int | str | float
 ```
