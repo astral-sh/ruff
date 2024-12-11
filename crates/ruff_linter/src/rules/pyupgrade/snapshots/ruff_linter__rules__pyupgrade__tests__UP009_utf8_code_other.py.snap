@@ -2,4 +2,16 @@
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 snapshot_kind: text
 ---
+UP009_utf8_code_other.py:1:1: UP009 [*] UTF-8 encoding declaration is unnecessary
+  |
+1 | # -*- coding: utf8 -*-
+  | ^^^^^^^^^^^^^^^^^^^^^^ UP009
+2 | print("the following is not a coding comment")
+3 | # -*- coding: ascii -*-
+  |
+  = help: Remove unnecessary coding comment
 
+ℹ Safe fix
+1   |-# -*- coding: utf8 -*-
+2 1 | print("the following is not a coding comment")
+3 2 | # -*- coding: ascii -*-

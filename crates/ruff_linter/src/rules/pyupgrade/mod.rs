@@ -88,6 +88,7 @@ mod tests {
         Rule::UTF8EncodingDeclaration,
         Path::new("UP009_hashbang_utf8_other.py")
     )]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_many_empty_lines.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
