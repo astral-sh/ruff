@@ -1660,12 +1660,6 @@ impl<'db> Type<'db> {
             };
         }
 
-        if matches!(self, Type::Unknown | Type::Any | Type::Todo(_)) {
-            // Explicit handling of `Unknown` and `Any` necessary until `type[Unknown]` and
-            // `type[Any]` are not defined as `Todo` anymore.
-            return IterationOutcome::Iterable { element_ty: self };
-        }
-
         let dunder_iter_result = self.call_dunder(db, "__iter__", &[self]);
         match dunder_iter_result {
             CallDunderResult::CallOutcome(ref call_outcome)
