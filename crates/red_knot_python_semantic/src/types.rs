@@ -251,10 +251,50 @@ fn definition_expression_ty<'db>(
     }
 }
 
+/// The 'visibility' of a binding or declaration.
+///
+/// Consider the following example:
+/// ```py
+/// x = 1
+///
+/// if True:
+///     x = 2
+///
+/// if False:
+///     x = 3
+///
+/// if flag():
+///    x = 4
+/// ```
+/// When we infer the type of `x`, we look back "through" the bindings in reverse order.
+/// The first binding is `x = 4`. It is "transparent" because we could have either taken
+/// the `if flag()` branch or not. The second binding `x = 3` is "invisible" because we
+/// can statically determine that the `if False` branch is never taken. The third binding
+/// `x = 2` is "opaque" because we can statically determine that the `if True` branch is
+/// always taken. If the visibility of a binding is "opaque", bindings behind it are not
+/// visible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum UnconditionallyVisible {
-    Yes,
-    No,
+enum Visibility<'db> {
+    Invisible,
+    Transparent(Type<'db>),
+    Opaque(Type<'db>),
+}
+
+impl<'db> Visibility<'db> {
+    fn is_not_opaque(&self) -> bool {
+        !matches!(self, Visibility::Opaque(_))
+    }
+
+    fn is_invisible(&self) -> bool {
+        matches!(self, Visibility::Invisible)
+    }
+
+    fn unwrap_or_never(self) -> Type<'db> {
+        match self {
+            Visibility::Invisible => Type::Never,
+            Visibility::Transparent(ty) | Visibility::Opaque(ty) => ty,
+        }
+    }
 }
 
 /// Infer the combined type of an iterator of bindings.
@@ -264,7 +304,7 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Option<Type<'db>> {
-    let def_types = bindings_with_constraints
+    let types = bindings_with_constraints
         .map(
             |BindingWithConstraints {
                  binding,
@@ -274,51 +314,50 @@ fn bindings_ty<'db>(
                 let result = StaticTruthiness::analyze(db, branching_conditions);
 
                 if result.any_always_false {
-                    (None, UnconditionallyVisible::No)
+                    Visibility::Invisible
                 } else {
-                    let unconditionally_visible =
-                        if result.at_least_one_condition && result.all_always_true {
-                            UnconditionallyVisible::Yes
-                        } else {
-                            UnconditionallyVisible::No
-                        };
-
                     let mut constraint_tys = constraints
                         .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
                         .peekable();
 
                     let binding_ty = binding_ty(db, binding);
-                    if constraint_tys.peek().is_some() {
+                    let ty = if constraint_tys.peek().is_some() {
                         let intersection_ty = constraint_tys
                             .fold(
                                 IntersectionBuilder::new(db).add_positive(binding_ty),
                                 IntersectionBuilder::add_positive,
                             )
                             .build();
-                        (Some(intersection_ty), unconditionally_visible)
+                        intersection_ty
                     } else {
-                        (Some(binding_ty), unconditionally_visible)
+                        binding_ty
+                    };
+
+                    if result.at_least_one_condition && result.all_always_true {
+                        Visibility::Opaque(ty)
+                    } else {
+                        Visibility::Transparent(ty)
                     }
                 }
             },
         )
-        .take_while_inclusive(|(_, uv)| *uv != UnconditionallyVisible::Yes)
-        .map(|(ty, _)| ty);
+        .take_while_inclusive(Visibility::is_not_opaque);
 
-    // TODO: get rid of all the collects and clean up, obviously
-    let def_types: Vec<_> = def_types.collect();
+    // TODO: try to get rid of the `collect` here
+    let types: Vec<_> = types.collect();
 
-    if !def_types.is_empty() && def_types.iter().all(Option::is_none) {
+    if !types.is_empty() && types.iter().all(Visibility::is_invisible) {
+        // If all bindings are invisible, the symbol is unbound.
         return Some(Type::Unknown);
     }
 
-    let mut def_types = def_types.iter().map(|ty| ty.unwrap_or(Type::Never)).rev();
+    let mut types = types.iter().map(|v| v.unwrap_or_never()).rev();
 
-    if let Some(first) = def_types.next() {
-        if let Some(second) = def_types.next() {
+    if let Some(first) = types.next() {
+        if let Some(second) = types.next() {
             Some(UnionType::from_elements(
                 db,
-                [first, second].into_iter().chain(def_types),
+                [first, second].into_iter().chain(types),
             ))
         } else {
             Some(first)
@@ -349,28 +388,28 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations
+    let types = declarations
         .map(|(declaration, branching_conditions)| {
             let result = StaticTruthiness::analyze(db, branching_conditions);
 
             if result.any_always_false {
-                (Type::Never, UnconditionallyVisible::No)
+                Visibility::Invisible
             } else {
                 if result.at_least_one_condition && result.all_always_true {
-                    (declaration_ty(db, declaration), UnconditionallyVisible::Yes)
+                    Visibility::Opaque(declaration_ty(db, declaration))
                 } else {
-                    (declaration_ty(db, declaration), UnconditionallyVisible::No)
+                    Visibility::Transparent(declaration_ty(db, declaration))
                 }
             }
         })
-        .take_while_inclusive(|(_, uv)| *uv != UnconditionallyVisible::Yes)
-        .map(|(ty, _)| ty);
+        .take_while_inclusive(Visibility::is_not_opaque)
+        .map(|v| v.unwrap_or_never());
 
-    let decl_types: Vec<_> = decl_types.collect();
+    // TODO: try to get rid of the `collect` here (see above)
+    let types: Vec<_> = types.collect();
+    let types = types.into_iter().rev();
 
-    let decl_types = decl_types.into_iter().rev();
-
-    let mut all_types = undeclared_ty.into_iter().chain(decl_types);
+    let mut all_types = undeclared_ty.into_iter().chain(types);
 
     let first = all_types.next().expect(
         "declarations_ty must not be called with zero declarations and no may-be-undeclared",
