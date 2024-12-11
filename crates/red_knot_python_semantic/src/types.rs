@@ -75,6 +75,20 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
     // on inference from bindings.
     let declaredness = use_def.public_declarations(symbol).declaredness(db);
 
+    // TODO: Our handling of boundness currently only depends on bindings, and ignores
+    // declarations. This is inconsistent, since we only look at bindings if the symbol
+    // may be undeclared. Consider the following example:
+    // ```py
+    // x: int
+    //
+    // if flag:
+    //     y: int
+    // else
+    //     y = 3
+    // ```
+    // If we import from this module, we will currently report `x` as a definitely-bound
+    // symbol (even though it has no bindings at all!) but report `y` as possibly-unbound
+    // (even though every path has either a binding or a declaration for it.)
     let undeclared_ty = match declaredness {
         None => {
             return bindings_ty(db, use_def.public_bindings(symbol))

@@ -379,7 +379,6 @@ impl SymbolState {
                             .last_mut()
                             .unwrap()
                             .intersect(&a_constraints);
-
                         opt_a_def = a_defs_iter.next();
                         opt_b_def = b_defs_iter.next();
                     }
