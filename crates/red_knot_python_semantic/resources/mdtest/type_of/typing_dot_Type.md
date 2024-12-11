@@ -1,4 +1,4 @@
-# Type
+# `typing.Type`
 
 ## Annotation
 
@@ -9,16 +9,10 @@ from typing import Type
 
 class A: ...
 
-def _(c: Type) -> None:
+def _(c: Type, d: Type[A], e: Type[A]):
     reveal_type(c)  # revealed: type
-
-def _(c: Type[A]) -> None:
-    reveal_type(c)  # revealed: type[A]
-
-def _(c: type[A], d: Type[A]) -> None:
+    reveal_type(d)  # revealed: type[A]
     c = d  # fine
-
-def _(c: type[A], d: Type[A]) -> None:
     d = c  # fine
 ```
 
