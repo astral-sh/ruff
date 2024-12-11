@@ -23,4 +23,4 @@ For details, see [Black compatibility](https://docs.astral.sh/ruff/formatter/#bl
 
 ## Getting started
 
-The Ruff formatter is available as of Ruff v0.1.2. Head to [The Ruff Formatter](https://docs.astral.sh/ruff/formatter/) for usage instructions and a comparison to Black.
+Head to [The Ruff Formatter](https://docs.astral.sh/ruff/formatter/) for usage instructions and a comparison to Black.

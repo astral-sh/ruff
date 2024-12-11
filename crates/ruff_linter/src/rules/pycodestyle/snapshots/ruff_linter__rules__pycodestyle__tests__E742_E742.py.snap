@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E742.py:1:7: E742 Ambiguous class name: `l`
   |
@@ -21,5 +22,3 @@ E742.py:9:7: E742 Ambiguous class name: `O`
    |       ^ E742
 10 |     pass
    |
-
-

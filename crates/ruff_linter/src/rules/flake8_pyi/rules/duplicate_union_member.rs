@@ -6,7 +6,7 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple, Operator};
 use ruff_python_semantic::analyze::typing::traverse_union;
@@ -39,8 +39,8 @@ use crate::importer::ImportRequest;
 ///
 /// ## References
 /// - [Python documentation: `typing.Union`](https://docs.python.org/3/library/typing.html#typing.Union)
-#[violation]
-pub struct DuplicateUnionMember {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateUnionMember {
     duplicate_name: String,
 }
 
@@ -142,7 +142,7 @@ enum UnionKind {
     PEP604,
 }
 
-// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
+/// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
 fn generate_pep604_fix(
     checker: &Checker,
     nodes: Vec<&Expr>,
@@ -173,7 +173,7 @@ fn generate_pep604_fix(
     )
 }
 
-// Generate a [`Fix`] for two or more type expresisons, e.g. `typing.Union[int, float, complex]`.
+/// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
 fn generate_union_fix(
     checker: &Checker,
     nodes: Vec<&Expr>,

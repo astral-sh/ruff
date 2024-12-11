@@ -4,9 +4,9 @@ use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
+use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
+use crate::types::{todo_type, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
 use crate::Db;
 
 /// Unpacks the value expression type to their respective targets.
@@ -29,7 +29,7 @@ impl<'db> Unpacker<'db> {
         match target {
             ast::Expr::Name(target_name) => {
                 self.targets
-                    .insert(target_name.scoped_ast_id(self.db, scope), value_ty);
+                    .insert(target_name.scoped_expression_id(self.db, scope), value_ty);
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.unpack(value, value_ty, scope);
@@ -59,7 +59,7 @@ impl<'db> Unpacker<'db> {
                             // TODO: Combine the types into a list type. If the
                             // starred_element_types is empty, then it should be `List[Any]`.
                             // combine_types(starred_element_types);
-                            element_types.push(Type::Todo);
+                            element_types.push(todo_type!("starred unpacking"));
 
                             element_types.extend_from_slice(
                                 // SAFETY: Safe because of the length check above.
@@ -72,7 +72,7 @@ impl<'db> Unpacker<'db> {
                             // index.
                             element_types.resize(elts.len() - 1, Type::Unknown);
                             // TODO: This should be `list[Unknown]`
-                            element_types.insert(starred_index, Type::Todo);
+                            element_types.insert(starred_index, todo_type!("starred unpacking"));
                             Cow::Owned(element_types)
                         }
                     } else {
@@ -95,7 +95,8 @@ impl<'db> Unpacker<'db> {
                     // there would be a cost and it's not clear that it's worth it.
                     let value_ty = Type::tuple(
                         self.db,
-                        &vec![Type::LiteralString; string_literal_ty.len(self.db)],
+                        std::iter::repeat(Type::LiteralString)
+                            .take(string_literal_ty.python_len(self.db)),
                     );
                     self.unpack(target, value_ty, scope);
                 }

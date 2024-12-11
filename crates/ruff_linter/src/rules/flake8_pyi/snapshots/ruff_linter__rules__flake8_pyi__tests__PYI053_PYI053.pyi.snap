@@ -153,7 +153,7 @@ PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters
 68 | fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
 69 | 
-70 | # see https://github.com/astral-sh/ruff/issues/12995
+70 | from typing import TypeAlias, Literal, Annotated
    |
    = help: Replace with `...`
 
@@ -164,5 +164,5 @@ PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters
 68    |-fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
    68 |+fbaz: str = ...  # Error: PYI053
 69 69 | 
-70 70 | # see https://github.com/astral-sh/ruff/issues/12995
-71 71 | def foo(bar: typing.Literal["a", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]):...
+70 70 | from typing import TypeAlias, Literal, Annotated
+71 71 |

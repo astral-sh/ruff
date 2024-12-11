@@ -1,10 +1,11 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_non_visible_characters.py
+snapshot_kind: text
 ---
 ## Input
 ```python
-# Regresssion test for https://github.com/astral-sh/ruff/issues/11724
+# Regression test for https://github.com/astral-sh/ruff/issues/11724
 
 '''
 
@@ -14,7 +15,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_
 
 ## Output
 ```python
-# Regresssion test for https://github.com/astral-sh/ruff/issues/11724
+# Regression test for https://github.com/astral-sh/ruff/issues/11724
 
 """
 

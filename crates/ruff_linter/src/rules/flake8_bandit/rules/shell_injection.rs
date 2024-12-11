@@ -1,7 +1,7 @@
 //! Checks relating to shell injection.
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -36,8 +36,8 @@ use crate::{
 /// ## References
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
-#[violation]
-pub struct SubprocessPopenWithShellEqualsTrue {
+#[derive(ViolationMetadata)]
+pub(crate) struct SubprocessPopenWithShellEqualsTrue {
     safety: Safety,
     is_exact: bool,
 }
@@ -78,8 +78,8 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
 ///
 /// [#4045]: https://github.com/astral-sh/ruff/issues/4045
-#[violation]
-pub struct SubprocessWithoutShellEqualsTrue;
+#[derive(ViolationMetadata)]
+pub(crate) struct SubprocessWithoutShellEqualsTrue;
 
 impl Violation for SubprocessWithoutShellEqualsTrue {
     #[derive_message_formats]
@@ -116,8 +116,8 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 ///
 /// ## References
 /// - [Python documentation: Security Considerations](https://docs.python.org/3/library/subprocess.html#security-considerations)
-#[violation]
-pub struct CallWithShellEqualsTrue {
+#[derive(ViolationMetadata)]
+pub(crate) struct CallWithShellEqualsTrue {
     is_exact: bool,
 }
 
@@ -168,8 +168,8 @@ impl Violation for CallWithShellEqualsTrue {
 ///
 /// ## References
 /// - [Python documentation: `subprocess`](https://docs.python.org/3/library/subprocess.html)
-#[violation]
-pub struct StartProcessWithAShell {
+#[derive(ViolationMetadata)]
+pub(crate) struct StartProcessWithAShell {
     safety: Safety,
 }
 
@@ -209,8 +209,8 @@ impl Violation for StartProcessWithAShell {
 /// ```
 ///
 /// [start-process-with-a-shell]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell/#start-process-with-a-shell-s605
-#[violation]
-pub struct StartProcessWithNoShell;
+#[derive(ViolationMetadata)]
+pub(crate) struct StartProcessWithNoShell;
 
 impl Violation for StartProcessWithNoShell {
     #[derive_message_formats]
@@ -244,8 +244,8 @@ impl Violation for StartProcessWithNoShell {
 /// ## References
 /// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
 /// - [Common Weakness Enumeration: CWE-426](https://cwe.mitre.org/data/definitions/426.html)
-#[violation]
-pub struct StartProcessWithPartialPath;
+#[derive(ViolationMetadata)]
+pub(crate) struct StartProcessWithPartialPath;
 
 impl Violation for StartProcessWithPartialPath {
     #[derive_message_formats]
@@ -277,8 +277,8 @@ impl Violation for StartProcessWithPartialPath {
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
-#[violation]
-pub struct UnixCommandWildcardInjection;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnixCommandWildcardInjection;
 
 impl Violation for UnixCommandWildcardInjection {
     #[derive_message_formats]
@@ -311,7 +311,8 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 Some(ShellKeyword {
-                    truthiness: Truthiness::False | Truthiness::Falsey | Truthiness::Unknown,
+                    truthiness:
+                        Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
                 }) => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(

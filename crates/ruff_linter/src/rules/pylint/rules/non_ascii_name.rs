@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_semantic::{Binding, BindingKind};
 use ruff_text_size::Ranged;
 
@@ -25,8 +25,8 @@ use crate::Locator;
 /// ```
 ///
 /// [PEP 672]: https://peps.python.org/pep-0672/
-#[violation]
-pub struct NonAsciiName {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonAsciiName {
     name: String,
     kind: Kind,
 }

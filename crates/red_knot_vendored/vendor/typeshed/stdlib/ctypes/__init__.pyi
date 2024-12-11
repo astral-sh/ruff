@@ -10,13 +10,11 @@ from _ctypes import (
     _CanCastTo as _CanCastTo,
     _CArgObject as _CArgObject,
     _CData as _CData,
-    _CDataMeta as _CDataMeta,
+    _CDataType as _CDataType,
     _CField as _CField,
     _Pointer as _Pointer,
     _PointerLike as _PointerLike,
     _SimpleCData as _SimpleCData,
-    _StructUnionBase as _StructUnionBase,
-    _StructUnionMeta as _StructUnionMeta,
     addressof as addressof,
     alignment as alignment,
     byref as byref,
@@ -28,7 +26,7 @@ from _ctypes import (
 )
 from ctypes._endian import BigEndianStructure as BigEndianStructure, LittleEndianStructure as LittleEndianStructure
 from typing import Any, ClassVar, Generic, TypeVar
-from typing_extensions import TypeAlias
+from typing_extensions import Self, TypeAlias, deprecated
 
 if sys.platform == "win32":
     from _ctypes import FormatError as FormatError, get_last_error as get_last_error, set_last_error as set_last_error
@@ -41,6 +39,7 @@ if sys.version_info >= (3, 9):
 
 _T = TypeVar("_T")
 _DLLT = TypeVar("_DLLT", bound=CDLL)
+_CT = TypeVar("_CT", bound=_CData)
 
 DEFAULT_MODE: int
 
@@ -48,7 +47,7 @@ class ArgumentError(Exception): ...
 
 class CDLL:
     _func_flags_: ClassVar[int]
-    _func_restype_: ClassVar[_CData]
+    _func_restype_: ClassVar[_CDataType]
     _name: str
     _handle: int
     _FuncPtr: type[_FuncPointer]
@@ -91,15 +90,21 @@ class _NamedFuncPointer(_FuncPointer):
     __name__: str
 
 def CFUNCTYPE(
-    restype: type[_CData] | None, *argtypes: type[_CData], use_errno: bool = ..., use_last_error: bool = ...
+    restype: type[_CData | _CDataType] | None,
+    *argtypes: type[_CData | _CDataType],
+    use_errno: bool = ...,
+    use_last_error: bool = ...,
 ) -> type[_FuncPointer]: ...
 
 if sys.platform == "win32":
     def WINFUNCTYPE(
-        restype: type[_CData] | None, *argtypes: type[_CData], use_errno: bool = ..., use_last_error: bool = ...
+        restype: type[_CData | _CDataType] | None,
+        *argtypes: type[_CData | _CDataType],
+        use_errno: bool = ...,
+        use_last_error: bool = ...,
     ) -> type[_FuncPointer]: ...
 
-def PYFUNCTYPE(restype: type[_CData] | None, *argtypes: type[_CData]) -> type[_FuncPointer]: ...
+def PYFUNCTYPE(restype: type[_CData | _CDataType] | None, *argtypes: type[_CData | _CDataType]) -> type[_FuncPointer]: ...
 
 # Any type that can be implicitly converted to c_void_p when passed as a C function argument.
 # (bytes is not included here, see below.)
@@ -112,12 +117,17 @@ _CVoidConstPLike: TypeAlias = _CVoidPLike | bytes
 
 _CastT = TypeVar("_CastT", bound=_CanCastTo)
 
-def cast(obj: _CData | _CArgObject | int, typ: type[_CastT]) -> _CastT: ...
+def cast(obj: _CData | _CDataType | _CArgObject | int, typ: type[_CastT]) -> _CastT: ...
 def create_string_buffer(init: int | bytes, size: int | None = None) -> Array[c_char]: ...
 
 c_buffer = create_string_buffer
 
 def create_unicode_buffer(init: int | str, size: int | None = None) -> Array[c_wchar]: ...
+@deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.15")
+def SetPointerType(
+    pointer: type[_Pointer[Any]], cls: Any  # noqa: F811  # Redefinition of unused `pointer` from line 22
+) -> None: ...
+def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...  # Soft Deprecated, no plans to remove
 
 if sys.platform == "win32":
     def DllCanUnloadNow() -> int: ...
@@ -126,12 +136,12 @@ if sys.platform == "win32":
 
 def memmove(dst: _CVoidPLike, src: _CVoidConstPLike, count: int) -> int: ...
 def memset(dst: _CVoidPLike, c: int, count: int) -> int: ...
-def string_at(address: _CVoidConstPLike, size: int = -1) -> bytes: ...
+def string_at(ptr: _CVoidConstPLike, size: int = -1) -> bytes: ...
 
 if sys.platform == "win32":
     def WinError(code: int | None = None, descr: str | None = None) -> OSError: ...
 
-def wstring_at(address: _CVoidConstPLike, size: int = -1) -> str: ...
+def wstring_at(ptr: _CVoidConstPLike, size: int = -1) -> str: ...
 
 class c_byte(_SimpleCData[int]): ...
 
@@ -140,6 +150,8 @@ class c_char(_SimpleCData[bytes]):
 
 class c_char_p(_PointerLike, _SimpleCData[bytes | None]):
     def __init__(self, value: int | bytes | None = ...) -> None: ...
+    @classmethod
+    def from_param(cls, value: Any, /) -> Self | _CArgObject: ...
 
 class c_double(_SimpleCData[float]): ...
 class c_longdouble(_SimpleCData[float]): ...  # can be an alias for c_double
@@ -155,7 +167,13 @@ class c_uint(_SimpleCData[int]): ...  # can be an alias for c_ulong
 class c_ulong(_SimpleCData[int]): ...
 class c_ulonglong(_SimpleCData[int]): ...  # can be an alias for c_ulong
 class c_ushort(_SimpleCData[int]): ...
-class c_void_p(_PointerLike, _SimpleCData[int | None]): ...
+
+class c_void_p(_PointerLike, _SimpleCData[int | None]):
+    @classmethod
+    def from_param(cls, value: Any, /) -> Self | _CArgObject: ...
+
+c_voidp = c_void_p  # backwards compatibility (to a bug)
+
 class c_wchar(_SimpleCData[str]): ...
 
 c_int8 = c_byte
@@ -174,6 +192,8 @@ class c_uint64(_SimpleCData[int]): ...
 
 class c_wchar_p(_PointerLike, _SimpleCData[str | None]):
     def __init__(self, value: int | str | None = ...) -> None: ...
+    @classmethod
+    def from_param(cls, value: Any, /) -> Self | _CArgObject: ...
 
 class c_bool(_SimpleCData[bool]):
     def __init__(self, value: bool = ...) -> None: ...

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableKeyword;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::Ranged;
@@ -9,13 +9,13 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
-/// Checks for unnecessary `list`, `reversed`, `set`, `sorted`, and `tuple`
-/// call within `list`, `set`, `sorted`, and `tuple` calls.
+/// Checks for unnecessary `list()`, `reversed()`, `set()`, `sorted()`, and
+/// `tuple()` call within `list()`, `set()`, `sorted()`, and `tuple()` calls.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to double-cast or double-process iterables by wrapping
-/// the listed functions within an additional `list`, `set`, `sorted`, or
-/// `tuple` call. Doing so is redundant and can be confusing for readers.
+/// the listed functions within an additional `list()`, `set()`, `sorted()`, or
+/// `tuple()` call. Doing so is redundant and can be confusing for readers.
 ///
 /// ## Examples
 /// ```python
@@ -27,8 +27,8 @@ use crate::rules::flake8_comprehensions::fixes;
 /// list(iterable)
 /// ```
 ///
-/// This rule applies to a variety of functions, including `list`, `reversed`,
-/// `set`, `sorted`, and `tuple`. For example:
+/// This rule applies to a variety of functions, including `list()`, `reversed()`,
+/// `set()`, `sorted()`, and `tuple()`. For example:
 ///
 /// - Instead of `list(list(iterable))`, use `list(iterable)`.
 /// - Instead of `list(tuple(iterable))`, use `list(iterable)`.
@@ -47,8 +47,8 @@ use crate::rules::flake8_comprehensions::fixes;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-#[violation]
-pub struct UnnecessaryDoubleCastOrProcess {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDoubleCastOrProcess {
     inner: String,
     outer: String,
 }
@@ -57,12 +57,12 @@ impl AlwaysFixableViolation for UnnecessaryDoubleCastOrProcess {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryDoubleCastOrProcess { inner, outer } = self;
-        format!("Unnecessary `{inner}` call within `{outer}()`")
+        format!("Unnecessary `{inner}()` call within `{outer}()`")
     }
 
     fn fix_title(&self) -> String {
         let UnnecessaryDoubleCastOrProcess { inner, .. } = self;
-        format!("Remove the inner `{inner}` call")
+        format!("Remove the inner `{inner}()` call")
     }
 }
 

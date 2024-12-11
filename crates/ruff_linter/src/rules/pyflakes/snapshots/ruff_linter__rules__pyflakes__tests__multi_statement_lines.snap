@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 multi_statement_lines.py:2:12: F401 [*] `foo1` imported but unused
   |
@@ -320,6 +321,4 @@ multi_statement_lines.py:62:8: F401 [*] `foo16` imported but unused
 60 60 | # error.)
 61    |-x = 1; \
 62    |-import foo16
-   61 |+x = 1; 
-
-
+   61 |+x = 1;

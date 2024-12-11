@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use crate::checkers::ast::Checker;
 
@@ -10,13 +10,15 @@ use crate::checkers::ast::Checker;
 /// Checks for uses of `assert expression, print(message)`.
 ///
 /// ## Why is this bad?
-/// The return value of the second expression is used as the contents of the
-/// `AssertionError` raised by the `assert` statement. Using a `print` expression
-/// in this context will output the message to `stdout`, before raising an
-/// empty `AssertionError(None)`.
+/// If an `assert x, y` assertion fails, the Python interpreter raises an
+/// `AssertionError`, and the evaluated value of `y` is used as the contents of
+/// that assertion error. The `print` function always returns `None`, however,
+/// so the evaluated value of a call to `print` will always be `None`.
 ///
-/// Instead, remove the `print` and pass the message directly as the second
-/// expression, allowing `stderr` to capture the message in a well-formatted context.
+/// Using a `print` call in this context will therefore output the message to
+/// `stdout`, before raising an empty `AssertionError(None)`. Instead, remove
+/// the `print` and pass the message directly as the second expression,
+/// allowing `stderr` to capture the message in a well-formatted context.
 ///
 /// ## Example
 /// ```python
@@ -35,13 +37,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
-#[violation]
-pub struct AssertWithPrintMessage;
+#[derive(ViolationMetadata)]
+pub(crate) struct AssertWithPrintMessage;
 
 impl AlwaysFixableViolation for AssertWithPrintMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`print()` expression in `assert` statement is likely unintentional".to_string()
+        "`print()` call in `assert` statement is likely unintentional".to_string()
     }
 
     fn fix_title(&self) -> String {

@@ -279,7 +279,7 @@ impl<'a> Iterator for SectionContextsIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for SectionContextsIter<'a> {
+impl DoubleEndedIterator for SectionContextsIter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let back = self.inner.next_back()?;
         Some(SectionContext {

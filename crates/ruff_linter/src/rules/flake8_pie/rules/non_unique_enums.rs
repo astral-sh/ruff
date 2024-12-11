@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt};
 use ruff_text_size::Ranged;
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `enum.Enum`](https://docs.python.org/3/library/enum.html#enum.Enum)
-#[violation]
-pub struct NonUniqueEnums {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonUniqueEnums {
     value: String,
 }
 

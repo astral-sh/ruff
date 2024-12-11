@@ -186,7 +186,7 @@ impl<'a> Resolver<'a> {
     pub fn package_roots(
         &'a self,
         files: &[&'a Path],
-    ) -> FxHashMap<&'a Path, Option<PackageRoot<'_>>> {
+    ) -> FxHashMap<&'a Path, Option<PackageRoot<'a>>> {
         // Pre-populate the module cache, since the list of files could (but isn't
         // required to) contain some `__init__.py` files.
         let mut package_cache: FxHashMap<&Path, bool> = FxHashMap::default();

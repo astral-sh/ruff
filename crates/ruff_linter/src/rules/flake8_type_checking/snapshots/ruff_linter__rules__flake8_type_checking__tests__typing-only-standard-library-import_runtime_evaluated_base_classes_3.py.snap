@@ -1,12 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
 ---
-runtime_evaluated_base_classes_3.py:5:18: TCH003 [*] Move standard library import `uuid.UUID` into a type-checking block
+runtime_evaluated_base_classes_3.py:5:18: TC003 [*] Move standard library import `uuid.UUID` into a type-checking block
   |
 3 | import datetime
 4 | import pathlib
-5 | from uuid import UUID  # TCH003
-  |                  ^^^^ TCH003
+5 | from uuid import UUID  # TC003
+  |                  ^^^^ TC003
 6 | 
 7 | import pydantic
   |
@@ -16,7 +17,7 @@ runtime_evaluated_base_classes_3.py:5:18: TCH003 [*] Move standard library impor
 2  2  | 
 3  3  | import datetime
 4  4  | import pathlib
-5     |-from uuid import UUID  # TCH003
+5     |-from uuid import UUID  # TC003
 6  5  | 
 7  6  | import pydantic
 8  7  | from pydantic import BaseModel
@@ -27,5 +28,3 @@ runtime_evaluated_base_classes_3.py:5:18: TCH003 [*] Move standard library impor
 9  12 | 
 10 13 | 
 11 14 | class A(pydantic.BaseModel):
-
-

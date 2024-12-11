@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::open_mode::OpenMode;
@@ -35,8 +35,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
-#[violation]
-pub struct BadOpenMode {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadOpenMode {
     mode: String,
 }
 

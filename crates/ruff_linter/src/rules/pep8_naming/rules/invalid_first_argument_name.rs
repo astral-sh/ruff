@@ -1,11 +1,11 @@
 use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
-use ruff_python_semantic::analyze::class::is_metaclass;
+use ruff_python_semantic::analyze::class::{is_metaclass, IsMetaclass};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -58,8 +58,8 @@ use crate::renamer::Renamer;
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-#[violation]
-pub struct InvalidFirstArgumentNameForMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidFirstArgumentNameForMethod {
     argument_name: String,
 }
 
@@ -124,8 +124,8 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-#[violation]
-pub struct InvalidFirstArgumentNameForClassMethod {
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidFirstArgumentNameForClassMethod {
     argument_name: String,
 }
 
@@ -212,13 +212,11 @@ pub(crate) fn invalid_first_argument_name(
         function_type::FunctionType::Function | function_type::FunctionType::StaticMethod => {
             return;
         }
-        function_type::FunctionType::Method => {
-            if is_metaclass(parent, semantic) {
-                FunctionType::ClassMethod
-            } else {
-                FunctionType::Method
-            }
-        }
+        function_type::FunctionType::Method => match is_metaclass(parent, semantic) {
+            IsMetaclass::Yes => FunctionType::ClassMethod,
+            IsMetaclass::No => FunctionType::Method,
+            IsMetaclass::Maybe => return,
+        },
         function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
     };
     if !checker.enabled(function_type.rule()) {

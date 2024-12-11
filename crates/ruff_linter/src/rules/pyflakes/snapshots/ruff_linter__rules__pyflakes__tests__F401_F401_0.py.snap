@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
 ---
 F401_0.py:2:8: F401 [*] `functools` imported but unused
   |
@@ -282,5 +283,3 @@ F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but 
 120 120 | 
 121     |-from datameta_client_lib.model_helpers import (
 122     |-noqa )
-
-

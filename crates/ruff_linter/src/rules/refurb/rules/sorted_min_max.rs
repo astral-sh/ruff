@@ -3,7 +3,7 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::FixAvailability;
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::Number;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -47,8 +47,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
-#[violation]
-pub struct SortedMinMax {
+#[derive(ViolationMetadata)]
+pub(crate) struct SortedMinMax {
     min_max: MinMax,
 }
 

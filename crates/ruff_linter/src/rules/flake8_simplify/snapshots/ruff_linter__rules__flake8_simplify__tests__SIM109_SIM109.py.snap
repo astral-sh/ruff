@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+snapshot_kind: text
 ---
 SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
@@ -74,5 +75,3 @@ SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
 15 15 |     d
 16 16 | 
 17 17 | # OK
-
-

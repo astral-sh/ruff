@@ -2,7 +2,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 /// if dct.get("key"):
 ///     ...
 /// ```
-#[violation]
-pub struct UnnecessaryKeyCheck;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryKeyCheck;
 
 impl AlwaysFixableViolation for UnnecessaryKeyCheck {
     #[derive_message_formats]

@@ -710,7 +710,7 @@ automatically decide between the two based on the Ruff version and extension set
     1. If the Ruff version is >= `0.5.3`, use the native language server unless any deprecated
         settings are detected. In that case, show a warning and use
         [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) instead.
-    1. If the Ruff version is \< `0.5.3`, use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A
+    1. If the Ruff version is < `0.5.3`, use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A
         warning will be displayed if settings specific to the native server are detected.
 - `true`: Same as `on`
 - `false`: Same as `off`

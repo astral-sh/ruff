@@ -457,10 +457,10 @@ where
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
+    Py38,
     // Make sure to also change the default for `ruff_linter::settings::types::PythonVersion`
     // when changing the default here.
     #[default]
-    Py38,
     Py39,
     Py310,
     Py311,
@@ -474,5 +474,25 @@ impl PythonVersion {
     /// [PEP 701]: https://peps.python.org/pep-0701/
     pub fn supports_pep_701(self) -> bool {
         self >= Self::Py312
+    }
+
+    pub fn as_tuple(self) -> (u8, u8) {
+        match self {
+            Self::Py37 => (3, 7),
+            Self::Py38 => (3, 8),
+            Self::Py39 => (3, 9),
+            Self::Py310 => (3, 10),
+            Self::Py311 => (3, 11),
+            Self::Py312 => (3, 12),
+            Self::Py313 => (3, 13),
+        }
+    }
+
+    pub fn latest() -> Self {
+        Self::Py313
+    }
+
+    pub fn minimal_supported() -> Self {
+        Self::Py37
     }
 }

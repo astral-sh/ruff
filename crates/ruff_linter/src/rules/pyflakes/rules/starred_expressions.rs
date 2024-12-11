@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## What it does
 /// Checks for the use of too many expressions in starred assignment statements.
@@ -16,8 +16,8 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## References
 /// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
-#[violation]
-pub struct ExpressionsInStarAssignment;
+#[derive(ViolationMetadata)]
+pub(crate) struct ExpressionsInStarAssignment;
 
 impl Violation for ExpressionsInStarAssignment {
     #[derive_message_formats]
@@ -42,8 +42,8 @@ impl Violation for ExpressionsInStarAssignment {
 ///
 /// ## References
 /// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
-#[violation]
-pub struct MultipleStarredExpressions;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleStarredExpressions;
 
 impl Violation for MultipleStarredExpressions {
     #[derive_message_formats]

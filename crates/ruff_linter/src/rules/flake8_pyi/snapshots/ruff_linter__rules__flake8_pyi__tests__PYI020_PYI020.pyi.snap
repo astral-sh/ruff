@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+snapshot_kind: text
 ---
 PYI020.pyi:7:10: PYI020 [*] Quoted annotations should not be included in stubs
   |
@@ -183,5 +184,3 @@ PYI020.pyi:24:8: PYI020 [*] Quoted annotations should not be included in stubs
 25 25 | 
 26 26 | # These two shouldn't trigger Y020 -- empty strings can't be "quoted annotations"
 27 27 | k = ""  # Y052 Need type annotation for "k"
-
-

@@ -3,11 +3,14 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_import_conventions, flake8_pyi, pyflakes, pylint, ruff};
+use crate::rules::{
+    flake8_import_conventions, flake8_pyi, flake8_type_checking, pyflakes, pylint, ruff,
+};
 
 /// Run lint rules over the [`Binding`]s.
 pub(crate) fn bindings(checker: &mut Checker) {
     if !checker.any_enabled(&[
+        Rule::AssignmentInAssert,
         Rule::InvalidAllFormat,
         Rule::InvalidAllObject,
         Rule::NonAsciiName,
@@ -15,6 +18,8 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnconventionalImportAlias,
         Rule::UnsortedDunderSlots,
         Rule::UnusedVariable,
+        Rule::UnquotedTypeAlias,
+        Rule::UsedDummyVariable,
     ]) {
         return;
     }
@@ -72,8 +77,25 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 checker.diagnostics.push(diagnostic);
             }
         }
+        if checker.enabled(Rule::UnquotedTypeAlias) {
+            if let Some(diagnostics) =
+                flake8_type_checking::rules::unquoted_type_alias(checker, binding)
+            {
+                checker.diagnostics.extend(diagnostics);
+            }
+        }
         if checker.enabled(Rule::UnsortedDunderSlots) {
             if let Some(diagnostic) = ruff::rules::sort_dunder_slots(checker, binding) {
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::UsedDummyVariable) {
+            if let Some(diagnostic) = ruff::rules::used_dummy_variable(checker, binding) {
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::AssignmentInAssert) {
+            if let Some(diagnostic) = ruff::rules::assignment_in_assert(checker, binding) {
                 checker.diagnostics.push(diagnostic);
             }
         }

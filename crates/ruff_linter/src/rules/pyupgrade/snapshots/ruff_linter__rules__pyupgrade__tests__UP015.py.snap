@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP015.py:1:1: UP015 [*] Unnecessary open mode parameters
   |

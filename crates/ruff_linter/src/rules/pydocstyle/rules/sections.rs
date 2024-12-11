@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::ParameterWithDefault;
@@ -35,6 +35,9 @@ use crate::rules::pydocstyle::settings::Convention;
 /// consistent indentation. In each section, the header should match the
 /// indentation of the docstring's opening quotes, and the body should be
 /// indented one level further.
+///
+/// This rule is enabled when using the `numpy` and `google` conventions, and
+/// disabled when using the `pep257` convention.
 ///
 /// ## Example
 /// ```python
@@ -86,8 +89,8 @@ use crate::rules::pydocstyle::settings::Convention;
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct SectionNotOverIndented {
+#[derive(ViolationMetadata)]
+pub(crate) struct SectionNotOverIndented {
     name: String,
 }
 
@@ -189,8 +192,8 @@ impl AlwaysFixableViolation for SectionNotOverIndented {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct SectionUnderlineNotOverIndented {
+#[derive(ViolationMetadata)]
+pub(crate) struct SectionUnderlineNotOverIndented {
     name: String,
 }
 
@@ -218,6 +221,9 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// Multiline docstrings are typically composed of a summary line, followed by
 /// a blank line, followed by a series of sections. Each section typically has
 /// a header and a body.
+///
+/// This rule is enabled when using the `numpy` and `google` conventions, and
+/// disabled when using the `pep257` convention.
 ///
 /// ## Example
 /// ```python
@@ -269,8 +275,8 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct CapitalizeSectionName {
+#[derive(ViolationMetadata)]
+pub(crate) struct CapitalizeSectionName {
     name: String,
 }
 
@@ -367,8 +373,8 @@ impl AlwaysFixableViolation for CapitalizeSectionName {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct NewLineAfterSectionName {
+#[derive(ViolationMetadata)]
+pub(crate) struct NewLineAfterSectionName {
     name: String,
 }
 
@@ -470,8 +476,8 @@ impl AlwaysFixableViolation for NewLineAfterSectionName {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct DashedUnderlineAfterSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct DashedUnderlineAfterSection {
     name: String,
 }
 
@@ -576,8 +582,8 @@ impl AlwaysFixableViolation for DashedUnderlineAfterSection {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct SectionUnderlineAfterName {
+#[derive(ViolationMetadata)]
+pub(crate) struct SectionUnderlineAfterName {
     name: String,
 }
 
@@ -680,8 +686,8 @@ impl AlwaysFixableViolation for SectionUnderlineAfterName {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct SectionUnderlineMatchesSectionLength {
+#[derive(ViolationMetadata)]
+pub(crate) struct SectionUnderlineMatchesSectionLength {
     name: String,
 }
 
@@ -777,8 +783,8 @@ impl AlwaysFixableViolation for SectionUnderlineMatchesSectionLength {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct NoBlankLineAfterSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct NoBlankLineAfterSection {
     name: String,
 }
 
@@ -870,8 +876,8 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct NoBlankLineBeforeSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct NoBlankLineBeforeSection {
     name: String,
 }
 
@@ -965,8 +971,8 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct BlankLineAfterLastSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLineAfterLastSection {
     name: String,
 }
 
@@ -1049,16 +1055,13 @@ impl AlwaysFixableViolation for BlankLineAfterLastSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
-/// ## Options
-/// - `lint.pydocstyle.convention`
-///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct EmptyDocstringSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct EmptyDocstringSection {
     name: String,
 }
 
@@ -1134,8 +1137,8 @@ impl Violation for EmptyDocstringSection {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct SectionNameEndsInColon {
+#[derive(ViolationMetadata)]
+pub(crate) struct SectionNameEndsInColon {
     name: String,
 }
 
@@ -1217,8 +1220,8 @@ impl AlwaysFixableViolation for SectionNameEndsInColon {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedParam {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedParam {
     /// The name of the function being documented.
     definition: String,
     /// The names of the undocumented parameters.
@@ -1294,16 +1297,13 @@ impl Violation for UndocumentedParam {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
-/// ## Options
-/// - `lint.pydocstyle.convention`
-///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct BlankLinesBetweenHeaderAndContent {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLinesBetweenHeaderAndContent {
     name: String,
 }
 

@@ -47,7 +47,7 @@
 //! The **declared type** represents the code author's declaration (usually through a type
 //! annotation) that a given variable should not be assigned any type outside the declared type. In
 //! our model, declared types are also control-flow-sensitive; we allow the code author to
-//! explicitly re-declare the same variable with a different type. So for a given binding of a
+//! explicitly redeclare the same variable with a different type. So for a given binding of a
 //! variable, we will want to ask which declarations of that variable can reach that binding, in
 //! order to determine whether the binding is permitted, or should be a type error. For example:
 //!
@@ -62,7 +62,7 @@
 //! assignable to `str`. This is the purpose of declared types: they prevent accidental assignment
 //! of the wrong type to a variable.
 //!
-//! But in some cases it is useful to "shadow" or "re-declare" a variable with a new type, and we
+//! But in some cases it is useful to "shadow" or "redeclare" a variable with a new type, and we
 //! permit this, as long as it is done with an explicit re-annotation. So `path: Path =
 //! Path(path)`, with the explicit `: Path` annotation, is permitted.
 //!
@@ -400,7 +400,7 @@ pub(crate) struct ConstraintsIterator<'map, 'db> {
     constraint_ids: ConstraintIdIterator<'map>,
 }
 
-impl<'map, 'db> Iterator for ConstraintsIterator<'map, 'db> {
+impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
     type Item = Constraint<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -424,7 +424,7 @@ impl DeclarationsIterator<'_, '_> {
     }
 }
 
-impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
+impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
     type Item = Definition<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {

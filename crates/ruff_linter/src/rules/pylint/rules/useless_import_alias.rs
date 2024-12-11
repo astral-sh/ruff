@@ -1,7 +1,7 @@
 use ruff_python_ast::Alias;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -27,8 +27,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import numpy
 /// ```
-#[violation]
-pub struct UselessImportAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
 }
 

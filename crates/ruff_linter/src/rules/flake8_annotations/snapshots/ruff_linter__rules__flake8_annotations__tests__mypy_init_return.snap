@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+snapshot_kind: text
 ---
 mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special method `__init__`
   |
@@ -77,5 +78,3 @@ mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special 
 47    |-    def __init__(self, *arg):
    47 |+    def __init__(self, *arg) -> None:
 48 48 |         ...
-
-

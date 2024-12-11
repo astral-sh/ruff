@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+snapshot_kind: text
 ---
 reorder_within_section.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -12,5 +13,3 @@ reorder_within_section.py:1:1: I001 [*] Import block is un-sorted or un-formatte
   1 |+import os
 1 2 | import sys
 2   |-import os
-
-

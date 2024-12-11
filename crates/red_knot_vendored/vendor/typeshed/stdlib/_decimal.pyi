@@ -17,19 +17,12 @@ from decimal import (
     Rounded as Rounded,
     Subnormal as Subnormal,
     Underflow as Underflow,
+    _ContextManager,
 )
-from types import TracebackType
 from typing import Final
 from typing_extensions import TypeAlias
 
 _TrapType: TypeAlias = type[DecimalException]
-
-class _ContextManager:
-    new_context: Context
-    saved_context: Context
-    def __init__(self, new_context: Context) -> None: ...
-    def __enter__(self) -> Context: ...
-    def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None: ...
 
 __version__: Final[str]
 __libmpdec_version__: Final[str]

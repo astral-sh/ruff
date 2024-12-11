@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::{Scope, ScopeKind};
 
@@ -19,8 +19,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-locals`
-#[violation]
-pub struct TooManyLocals {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyLocals {
     current_amount: usize,
     max_amount: usize,
 }

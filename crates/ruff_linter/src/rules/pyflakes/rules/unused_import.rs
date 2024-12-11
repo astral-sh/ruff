@@ -5,7 +5,7 @@ use anyhow::{anyhow, bail, Result};
 use std::collections::BTreeMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
@@ -94,8 +94,8 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
 /// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
-#[violation]
-pub struct UnusedImport {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedImport {
     /// Qualified name of the import
     name: String,
     /// Unqualified name of the import
@@ -462,7 +462,7 @@ struct ImportBinding<'a> {
     parent_range: Option<TextRange>,
 }
 
-impl<'a> ImportBinding<'a> {
+impl ImportBinding<'_> {
     /// The symbol that is stored in the outer scope as a result of this import.
     ///
     /// For example:

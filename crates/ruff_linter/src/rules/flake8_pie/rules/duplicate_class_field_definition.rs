@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysFixableViolation, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
@@ -31,8 +31,8 @@ use crate::fix;
 ///     name = Tom
 ///     ...
 /// ```
-#[violation]
-pub struct DuplicateClassFieldDefinition {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateClassFieldDefinition {
     name: String,
 }
 

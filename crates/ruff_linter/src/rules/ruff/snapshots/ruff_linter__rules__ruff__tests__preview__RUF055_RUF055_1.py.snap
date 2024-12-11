@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF055_1.py:9:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+ 7 | pat1 = "needle"
+ 8 | 
+ 9 | re.sub(pat1, "", haystack)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+10 | 
+11 | # aliases are not followed, so this one should not trigger the rule
+   |
+   = help: Replace with `haystack.replace(pat1, "")`
+
+ℹ Safe fix
+6  6  | 
+7  7  | pat1 = "needle"
+8  8  | 
+9     |-re.sub(pat1, "", haystack)
+   9  |+haystack.replace(pat1, "")
+10 10 | 
+11 11 | # aliases are not followed, so this one should not trigger the rule
+12 12 | if pat4 := pat1:
+
+RUF055_1.py:17:1: RUF055 [*] Plain string pattern passed to `re` function
+   |
+15 | # also works for the `repl` argument in sub
+16 | repl = "new"
+17 | re.sub(r"abc", repl, haystack)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |
+   = help: Replace with `haystack.replace("abc", repl)`
+
+ℹ Safe fix
+14 14 | 
+15 15 | # also works for the `repl` argument in sub
+16 16 | repl = "new"
+17    |-re.sub(r"abc", repl, haystack)
+   17 |+haystack.replace("abc", repl)

@@ -34,8 +34,7 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
         check_options=CheckOptions(select="ALL"),
     ),
-    # Disabled due to use of explicit `select` with `E999`, which is no longer
-    # supported in `--preview`.
+    # Disabled due to use of explicit `select` with `E999`, which has been removed.
     # See: https://github.com/astral-sh/ruff/pull/12129
     # Project(
     #     repo=Repository(owner="demisto", name="content", ref="master"),
@@ -136,4 +135,5 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="encode", name="httpx", ref="master")),
     Project(repo=Repository(owner="mesonbuild", name="meson-python", ref="main")),
     Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
+    Project(repo=Repository(owner="astropy", name="astropy", ref="main")),
 ]

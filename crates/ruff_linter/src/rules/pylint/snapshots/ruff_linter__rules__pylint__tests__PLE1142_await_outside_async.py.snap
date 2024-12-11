@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
 ---
 await_outside_async.py:15:11: PLE1142 `await` should be used within an async function
    |

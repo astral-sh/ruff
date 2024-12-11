@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_code_examples_dynamic_line_width.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -308,7 +309,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -859,7 +860,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -1385,7 +1386,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 
@@ -1936,7 +1937,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Python
 ```
 

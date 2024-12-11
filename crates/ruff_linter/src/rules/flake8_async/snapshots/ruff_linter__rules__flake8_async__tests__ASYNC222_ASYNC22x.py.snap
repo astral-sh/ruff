@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+snapshot_kind: text
 ---
 ASYNC22x.py:20:5: ASYNC222 Async functions should not wait on processes with blocking methods
    |

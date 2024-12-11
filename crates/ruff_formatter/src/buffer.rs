@@ -1,10 +1,11 @@
 use super::{write, Arguments, FormatElement};
 use crate::format_element::Interned;
-use crate::prelude::LineMode;
+use crate::prelude::{LineMode, Tag};
 use crate::{FormatResult, FormatState};
 use rustc_hash::FxHashMap;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
+use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 
 /// A trait for writing or formatting into [`FormatElement`]-accepting buffers or streams.
@@ -262,7 +263,7 @@ impl<'inner, Context, Inspector> Inspect<'inner, Context, Inspector> {
     }
 }
 
-impl<'inner, Context, Inspector> Buffer for Inspect<'inner, Context, Inspector>
+impl<Context, Inspector> Buffer for Inspect<'_, Context, Inspector>
 where
     Inspector: FnMut(&FormatElement),
 {
@@ -294,10 +295,12 @@ where
     }
 }
 
-/// A Buffer that removes any soft line breaks.
+/// A Buffer that removes any soft line breaks or [`if_group_breaks`](crate::builders::if_group_breaks) elements.
 ///
 /// - Removes [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::Soft).
 /// - Replaces [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::SoftOrSpace) with a [`Space`](FormatElement::Space)
+/// - Removes [`if_group_breaks`](crate::builders::if_group_breaks) and all its content.
+/// - Unwraps the content of [`if_group_fits_on_line`](crate::builders::if_group_fits_on_line) elements (but retains it).
 ///
 /// # Examples
 ///
@@ -350,6 +353,8 @@ pub struct RemoveSoftLinesBuffer<'a, Context> {
     /// It's fine to not snapshot the cache. The worst that can happen is that it holds on interned elements
     /// that are now unused. But there's little harm in that and the cache is cleaned when dropping the buffer.
     interned_cache: FxHashMap<Interned, Interned>,
+
+    state: RemoveSoftLineBreaksState,
 }
 
 impl<'a, Context> RemoveSoftLinesBuffer<'a, Context> {
@@ -357,6 +362,7 @@ impl<'a, Context> RemoveSoftLinesBuffer<'a, Context> {
     pub fn new(inner: &'a mut dyn Buffer<Context = Context>) -> Self {
         Self {
             inner,
+            state: RemoveSoftLineBreaksState::default(),
             interned_cache: FxHashMap::default(),
         }
     }
@@ -375,15 +381,18 @@ fn clean_interned(
     if let Some(cleaned) = interned_cache.get(interned) {
         cleaned.clone()
     } else {
+        let mut state = RemoveSoftLineBreaksState::default();
+
         // Find the first soft line break element or interned element that must be changed
         let result = interned
             .iter()
             .enumerate()
             .find_map(|(index, element)| match element {
-                FormatElement::Line(LineMode::Soft | LineMode::SoftOrSpace) => {
+                FormatElement::Line(LineMode::SoftOrSpace) => {
                     let mut cleaned = Vec::new();
-                    cleaned.extend_from_slice(&interned[..index]);
-                    Some((cleaned, &interned[index..]))
+                    let (before, after) = interned.split_at(index);
+                    cleaned.extend_from_slice(before);
+                    Some((cleaned, &after[1..]))
                 }
                 FormatElement::Interned(inner) => {
                     let cleaned_inner = clean_interned(inner, interned_cache);
@@ -398,19 +407,32 @@ fn clean_interned(
                     }
                 }
 
-                _ => None,
+                element => {
+                    if state.should_drop(element) {
+                        let mut cleaned = Vec::new();
+                        let (before, after) = interned.split_at(index);
+                        cleaned.extend_from_slice(before);
+                        Some((cleaned, &after[1..]))
+                    } else {
+                        None
+                    }
+                }
             });
 
         let result = match result {
             // Copy the whole interned buffer so that becomes possible to change the necessary elements.
             Some((mut cleaned, rest)) => {
                 for element in rest {
+                    if state.should_drop(element) {
+                        continue;
+                    }
+
                     let element = match element {
-                        FormatElement::Line(LineMode::Soft) => continue,
                         FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
                         FormatElement::Interned(interned) => {
                             FormatElement::Interned(clean_interned(interned, interned_cache))
                         }
+
                         element => element.clone(),
                     };
                     cleaned.push(element);
@@ -431,12 +453,16 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
     type Context = Context;
 
     fn write_element(&mut self, element: FormatElement) {
+        if self.state.should_drop(&element) {
+            return;
+        }
+
         let element = match element {
-            FormatElement::Line(LineMode::Soft) => return,
             FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
             FormatElement::Interned(interned) => {
                 FormatElement::Interned(self.clean_interned(&interned))
             }
+
             element => element,
         };
 
@@ -456,12 +482,81 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
     }
 
     fn snapshot(&self) -> BufferSnapshot {
-        self.inner.snapshot()
+        BufferSnapshot::Any(Box::new(RemoveSoftLinebreaksSnapshot {
+            inner: self.inner.snapshot(),
+            state: self.state,
+        }))
     }
 
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
-        self.inner.restore_snapshot(snapshot);
+        let RemoveSoftLinebreaksSnapshot { inner, state } = snapshot.unwrap_any();
+        self.inner.restore_snapshot(inner);
+        self.state = state;
     }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+enum RemoveSoftLineBreaksState {
+    #[default]
+    Default,
+    InIfGroupBreaks {
+        conditional_content_level: NonZeroUsize,
+    },
+}
+
+impl RemoveSoftLineBreaksState {
+    fn should_drop(&mut self, element: &FormatElement) -> bool {
+        match self {
+            Self::Default => match element {
+                FormatElement::Line(LineMode::Soft) => true,
+
+                // Entered the start of an `if_group_breaks` or `if_group_fits`
+                // For `if_group_breaks`: Remove the start and end tag and all content in between.
+                // For `if_group_fits_on_line`: Unwrap the content. This is important because the enclosing group
+                // might still *expand* if the content exceeds the line width limit, in which case the
+                // `if_group_fits_on_line` content would be removed.
+                FormatElement::Tag(Tag::StartConditionalContent(condition)) => {
+                    if condition.mode.is_expanded() {
+                        *self = Self::InIfGroupBreaks {
+                            conditional_content_level: NonZeroUsize::new(1).unwrap(),
+                        };
+                    }
+                    true
+                }
+                FormatElement::Tag(Tag::EndConditionalContent) => true,
+                _ => false,
+            },
+            Self::InIfGroupBreaks {
+                conditional_content_level,
+            } => {
+                match element {
+                    // A nested `if_group_breaks` or `if_group_fits_on_line`
+                    FormatElement::Tag(Tag::StartConditionalContent(_)) => {
+                        *conditional_content_level = conditional_content_level.saturating_add(1);
+                    }
+                    // The end of an `if_group_breaks` or `if_group_fits_on_line`.
+                    FormatElement::Tag(Tag::EndConditionalContent) => {
+                        if let Some(level) = NonZeroUsize::new(conditional_content_level.get() - 1)
+                        {
+                            *conditional_content_level = level;
+                        } else {
+                            // Found the end tag of the initial `if_group_breaks`. Skip this element but retain
+                            // the elements coming after
+                            *self = RemoveSoftLineBreaksState::Default;
+                        }
+                    }
+                    _ => {}
+                }
+
+                true
+            }
+        }
+    }
+}
+
+struct RemoveSoftLinebreaksSnapshot {
+    inner: BufferSnapshot,
+    state: RemoveSoftLineBreaksState,
 }
 
 pub trait BufferExtensions: Buffer + Sized {
@@ -561,7 +656,7 @@ where
         let elements = buffer.elements();
 
         let recorded = if self.start > elements.len() {
-            // May happen if buffer was rewinded.
+            // May happen if buffer was rewound.
             &[]
         } else {
             &elements[self.start..]

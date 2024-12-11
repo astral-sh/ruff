@@ -151,7 +151,7 @@ impl Document {
         propagate_expands(self, &mut enclosing, &mut interned);
     }
 
-    pub fn display<'a>(&'a self, source_code: SourceCode<'a>) -> DisplayDocument {
+    pub fn display<'a>(&'a self, source_code: SourceCode<'a>) -> DisplayDocument<'a> {
         DisplayDocument {
             elements: self.elements.as_slice(),
             source_code,

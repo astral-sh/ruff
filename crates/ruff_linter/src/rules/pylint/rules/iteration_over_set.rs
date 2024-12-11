@@ -1,7 +1,7 @@
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::HashableExpr;
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
@@ -30,8 +30,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
-#[violation]
-pub struct IterationOverSet;
+#[derive(ViolationMetadata)]
+pub(crate) struct IterationOverSet;
 
 impl AlwaysFixableViolation for IterationOverSet {
     #[derive_message_formats]

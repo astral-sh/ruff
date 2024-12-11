@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 W292_4.py:1:2: W292 [*] No newline at end of file
   |
@@ -10,6 +11,4 @@ W292_4.py:1:2: W292 [*] No newline at end of file
 
 ℹ Safe fix
 1   |- 
-  1 |+ 
-
-
+  1 |+

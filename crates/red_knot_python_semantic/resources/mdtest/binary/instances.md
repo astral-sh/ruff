@@ -281,20 +281,12 @@ reveal_type(42 + 4.2)  # revealed: int
 # TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(3 + 3j)  # revealed: int
 
-def returns_int() -> int:
-    return 42
+def _(x: bool, y: int):
+    reveal_type(x + y)  # revealed: int
+    reveal_type(4.2 + x)  # revealed: float
 
-def returns_bool() -> bool:
-    return True
-
-x = returns_bool()
-y = returns_int()
-
-reveal_type(x + y)  # revealed: int
-reveal_type(4.2 + x)  # revealed: float
-
-# TODO should be float, need to check arg type and fall back to `rhs.__radd__`
-reveal_type(y + 4.12)  # revealed: int
+    # TODO should be float, need to check arg type and fall back to `rhs.__radd__`
+    reveal_type(y + 4.12)  # revealed: int
 ```
 
 ## With literal types
@@ -317,7 +309,7 @@ reveal_type(1 + A())  # revealed: int
 reveal_type(A() + "foo")  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
 # TODO overloads
-reveal_type("foo" + A())  # revealed: @Todo
+reveal_type("foo" + A())  # revealed: @Todo(return type)
 
 reveal_type(A() + b"foo")  # revealed: A
 # TODO should be `A` since `bytes.__add__` doesn't support `A` instances
@@ -325,7 +317,7 @@ reveal_type(b"foo" + A())  # revealed: bytes
 
 reveal_type(A() + ())  # revealed: A
 # TODO this should be `A`, since `tuple.__add__` doesn't support `A` instances
-reveal_type(() + A())  # revealed: @Todo
+reveal_type(() + A())  # revealed: @Todo(return type)
 
 literal_string_instance = "foo" * 1_000_000_000
 # the test is not testing what it's meant to be testing if this isn't a `LiteralString`:
@@ -334,7 +326,7 @@ reveal_type(literal_string_instance)  # revealed: LiteralString
 reveal_type(A() + literal_string_instance)  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
 # TODO overloads
-reveal_type(literal_string_instance + A())  # revealed: @Todo
+reveal_type(literal_string_instance + A())  # revealed: @Todo(return type)
 ```
 
 ## Operations involving instances of classes inheriting from `Any`

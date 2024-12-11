@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
@@ -40,8 +40,8 @@ use super::super::helpers::is_sys;
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersionCmpStr3;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersionCmpStr3;
 
 impl Violation for SysVersionCmpStr3 {
     #[derive_message_formats]
@@ -87,8 +87,8 @@ impl Violation for SysVersionCmpStr3 {
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersionInfo0Eq3;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersionInfo0Eq3;
 
 impl Violation for SysVersionInfo0Eq3 {
     #[derive_message_formats]
@@ -127,8 +127,8 @@ impl Violation for SysVersionInfo0Eq3 {
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersionInfo1CmpInt;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersionInfo1CmpInt;
 
 impl Violation for SysVersionInfo1CmpInt {
     #[derive_message_formats]
@@ -169,8 +169,8 @@ impl Violation for SysVersionInfo1CmpInt {
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersionInfoMinorCmpInt;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersionInfoMinorCmpInt;
 
 impl Violation for SysVersionInfoMinorCmpInt {
     #[derive_message_formats]
@@ -212,8 +212,8 @@ impl Violation for SysVersionInfoMinorCmpInt {
 /// ## References
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct SysVersionCmpStr10;
+#[derive(ViolationMetadata)]
+pub(crate) struct SysVersionCmpStr10;
 
 impl Violation for SysVersionCmpStr10 {
     #[derive_message_formats]

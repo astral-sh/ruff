@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_python_semantic::SemanticModel;
@@ -30,8 +30,8 @@ use crate::registry::AsRule;
 /// async def foo():
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
-#[violation]
-pub struct CreateSubprocessInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct CreateSubprocessInAsyncFunction;
 
 impl Violation for CreateSubprocessInAsyncFunction {
     #[derive_message_formats]
@@ -62,8 +62,8 @@ impl Violation for CreateSubprocessInAsyncFunction {
 /// async def foo():
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
-#[violation]
-pub struct RunProcessInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct RunProcessInAsyncFunction;
 
 impl Violation for RunProcessInAsyncFunction {
     #[derive_message_formats]
@@ -98,8 +98,8 @@ impl Violation for RunProcessInAsyncFunction {
 /// async def foo():
 ///     await asyncio.loop.run_in_executor(None, wait_for_process)
 /// ```
-#[violation]
-pub struct WaitForProcessInAsyncFunction;
+#[derive(ViolationMetadata)]
+pub(crate) struct WaitForProcessInAsyncFunction;
 
 impl Violation for WaitForProcessInAsyncFunction {
     #[derive_message_formats]

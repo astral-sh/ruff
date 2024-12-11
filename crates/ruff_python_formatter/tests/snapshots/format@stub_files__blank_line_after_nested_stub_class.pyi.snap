@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/stub_files/blank_line_after_nested_stub_class.pyi
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -201,7 +202,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
-target_version             = Py38
+target_version             = Py39
 source_type                = Stub
 ```
 

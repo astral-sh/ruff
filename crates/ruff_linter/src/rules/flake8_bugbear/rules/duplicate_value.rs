@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::HashableExpr;
 use ruff_python_ast::Expr;
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// {1, 2, 3}
 /// ```
-#[violation]
-pub struct DuplicateValue {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateValue {
     value: String,
     existing: String,
 }

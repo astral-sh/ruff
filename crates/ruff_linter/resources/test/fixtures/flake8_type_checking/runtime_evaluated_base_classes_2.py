@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import geopandas as gpd  # TCH002
+import geopandas as gpd  # TC002
 import pydantic
-import pyproj  # TCH002
+import pyproj  # TC002
 from pydantic import BaseModel
 
 import numpy

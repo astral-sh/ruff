@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
+snapshot_kind: text
 ---
 DTZ901.py:5:1: DTZ901 Use of `datetime.datetime.max` without timezone information
   |
@@ -39,40 +40,40 @@ DTZ901.py:9:1: DTZ901 Use of `datetime.datetime.min` without timezone informatio
   |
   = help: Replace with `datetime.datetime.min.replace(tzinfo=...)`
 
-DTZ901.py:21:1: DTZ901 Use of `datetime.datetime.max` without timezone information
+DTZ901.py:27:1: DTZ901 Use of `datetime.datetime.max` without timezone information
    |
-20 | # Error
-21 | datetime.max
+26 | # Error
+27 | datetime.max
    | ^^^^^^^^^^^^ DTZ901
-22 | datetime.min
+28 | datetime.min
    |
    = help: Replace with `datetime.datetime.max.replace(tzinfo=...)`
 
-DTZ901.py:22:1: DTZ901 Use of `datetime.datetime.min` without timezone information
+DTZ901.py:28:1: DTZ901 Use of `datetime.datetime.min` without timezone information
    |
-20 | # Error
-21 | datetime.max
-22 | datetime.min
+26 | # Error
+27 | datetime.max
+28 | datetime.min
    | ^^^^^^^^^^^^ DTZ901
-23 | 
-24 | datetime.max.replace(year=...)
+29 | 
+30 | datetime.max.replace(year=...)
    |
    = help: Replace with `datetime.datetime.min.replace(tzinfo=...)`
 
-DTZ901.py:24:1: DTZ901 Use of `datetime.datetime.max` without timezone information
+DTZ901.py:30:1: DTZ901 Use of `datetime.datetime.max` without timezone information
    |
-22 | datetime.min
-23 | 
-24 | datetime.max.replace(year=...)
+28 | datetime.min
+29 | 
+30 | datetime.max.replace(year=...)
    | ^^^^^^^^^^^^ DTZ901
-25 | datetime.min.replace(hour=...)
+31 | datetime.min.replace(hour=...)
    |
    = help: Replace with `datetime.datetime.max.replace(tzinfo=...)`
 
-DTZ901.py:25:1: DTZ901 Use of `datetime.datetime.min` without timezone information
+DTZ901.py:31:1: DTZ901 Use of `datetime.datetime.min` without timezone information
    |
-24 | datetime.max.replace(year=...)
-25 | datetime.min.replace(hour=...)
+30 | datetime.max.replace(year=...)
+31 | datetime.min.replace(hour=...)
    | ^^^^^^^^^^^^ DTZ901
    |
    = help: Replace with `datetime.datetime.min.replace(tzinfo=...)`

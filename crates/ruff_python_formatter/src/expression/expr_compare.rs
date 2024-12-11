@@ -29,7 +29,7 @@ impl NeedsParentheses for ExprCompare {
         } else if let Ok(string) = StringLike::try_from(&*self.left) {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
             if !string.is_implicit_concatenated()
-                && string.is_multiline(context.source())
+                && string.is_multiline(context)
                 && !context.comments().has(string)
                 && self.comparators.first().is_some_and(|right| {
                     has_parentheses(right, context).is_some() && !context.comments().has(right)

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
   |

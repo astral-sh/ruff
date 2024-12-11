@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S611.py:5:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
   |
@@ -56,5 +57,3 @@ S611.py:13:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
 13 | User.objects.annotate(val=RawSQL(params=[], sql='{}secure'.format('no')))
    |                           ^^^^^^ S611
    |
-
-

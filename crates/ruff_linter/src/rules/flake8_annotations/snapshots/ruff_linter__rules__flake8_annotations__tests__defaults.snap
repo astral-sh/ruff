@@ -157,14 +157,6 @@ annotation_presence.py:65:39: ANN401 Dynamically typed expressions (typing.Any) 
 66 |     pass
    |
 
-annotation_presence.py:75:13: ANN101 Missing type annotation for `self` in method
-   |
-74 |     # ANN101
-75 |     def foo(self, a: int, b: int) -> int:
-   |             ^^^^ ANN101
-76 |         pass
-   |
-
 annotation_presence.py:79:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
    |
 78 |     # ANN401
@@ -212,23 +204,6 @@ annotation_presence.py:95:59: ANN401 Dynamically typed expressions (typing.Any) 
    |                                                           ^^^ ANN401
 96 |         pass
    |
-
-annotation_presence.py:130:13: ANN102 Missing type annotation for `cls` in classmethod
-    |
-128 |     # ANN102
-129 |     @classmethod
-130 |     def foo(cls, a: int, b: int) -> int:
-    |             ^^^ ANN102
-131 |         pass
-    |
-
-annotation_presence.py:134:13: ANN101 Missing type annotation for `self` in method
-    |
-133 |     # ANN101
-134 |     def foo(self, /, a: int, b: int) -> int:
-    |             ^^^^ ANN101
-135 |         pass
-    |
 
 annotation_presence.py:149:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
     |
@@ -323,14 +298,3 @@ annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for spec
 165     |-    def __init__(self):
     165 |+    def __init__(self) -> None:
 166 166 |         print(f"{self.attr=}")
-
-annotation_presence.py:165:18: ANN101 Missing type annotation for `self` in method
-    |
-163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
-164 | class Class:
-165 |     def __init__(self):
-    |                  ^^^^ ANN101
-166 |         print(f"{self.attr=}")
-    |
-
-

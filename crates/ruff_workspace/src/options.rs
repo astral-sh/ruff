@@ -1,6 +1,7 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use serde::{Deserialize, Serialize};
+use serde::de::{self};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
@@ -34,6 +35,7 @@ use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
+use ruff_python_stdlib::identifiers::is_identifier;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -322,8 +324,8 @@ pub struct Options {
     /// file than it would for an equivalent runtime file with the same target
     /// version.
     #[option(
-        default = r#""py38""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
+        default = r#""py39""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -1007,7 +1009,7 @@ impl Flake8AnnotationsOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BanditOptions {
-    /// A list of directories to consider temporary.
+    /// A list of directories to consider temporary (see `S108`).
     #[option(
         default = "[\"/tmp\", \"/var/tmp\", \"/dev/shm\"]",
         value_type = "list[str]",
@@ -1016,7 +1018,7 @@ pub struct Flake8BanditOptions {
     pub hardcoded_tmp_directory: Option<Vec<String>>,
 
     /// A list of directories to consider temporary, in addition to those
-    /// specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory).
+    /// specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory) (see `S108`).
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -1327,7 +1329,7 @@ pub struct Flake8ImportConventionsOptions {
             scipy = "sp"
         "#
     )]
-    pub aliases: Option<FxHashMap<String, String>>,
+    pub aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
     /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
@@ -1340,7 +1342,7 @@ pub struct Flake8ImportConventionsOptions {
             "dask.dataframe" = "dd"
         "#
     )]
-    pub extend_aliases: Option<FxHashMap<String, String>>,
+    pub extend_aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to its banned import aliases.
     #[option(
@@ -1370,14 +1372,84 @@ pub struct Flake8ImportConventionsOptions {
     pub banned_from: Option<FxHashSet<String>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct ModuleName(String);
+
+impl ModuleName {
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ModuleName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        if name.is_empty() || name.split('.').any(|part| !is_identifier(part)) {
+            Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"a sequence of Python identifiers delimited by periods",
+            ))
+        } else {
+            Ok(Self(name))
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Alias(String);
+
+impl Alias {
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Alias {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        // Assigning to "__debug__" is a SyntaxError
+        // see the note here:
+        // https://docs.python.org/3/library/constants.html#debug__
+        if &*name == "__debug__" {
+            return Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"an assignable Python identifier",
+            ));
+        }
+        if is_identifier(&name) {
+            Ok(Self(name))
+        } else {
+            Err(de::Error::invalid_value(
+                de::Unexpected::Str(&name),
+                &"a Python identifier",
+            ))
+        }
+    }
+}
+
 impl Flake8ImportConventionsOptions {
     pub fn into_settings(self) -> flake8_import_conventions::settings::Settings {
-        let mut aliases = match self.aliases {
-            Some(options_aliases) => options_aliases,
+        let mut aliases: FxHashMap<String, String> = match self.aliases {
+            Some(options_aliases) => options_aliases
+                .into_iter()
+                .map(|(module, alias)| (module.into_string(), alias.into_string()))
+                .collect(),
             None => flake8_import_conventions::settings::default_aliases(),
         };
         if let Some(extend_aliases) = self.extend_aliases {
-            aliases.extend(extend_aliases);
+            aliases.extend(
+                extend_aliases
+                    .into_iter()
+                    .map(|(module, alias)| (module.into_string(), alias.into_string())),
+            );
         }
 
         flake8_import_conventions::settings::Settings {
@@ -2099,7 +2171,7 @@ pub struct IsortOptions {
     /// Use `-1` for automatic determination.
     ///
     /// Ruff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to
-    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).
+    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#blank-lines)).
     ///
     /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
     /// it enforces at least one empty and at most two empty lines after imports.
@@ -3408,7 +3480,9 @@ pub struct AnalyzeOptions {
 mod tests {
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
+    use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
+    use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
 
     #[test]
     fn flake8_self_options() {
@@ -3454,6 +3528,30 @@ mod tests {
         assert_eq!(
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_default() {
+        assert_eq!(
+            FormatterPythonVersion::default().as_tuple(),
+            LinterPythonVersion::default().as_tuple()
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_latest() {
+        assert_eq!(
+            FormatterPythonVersion::latest().as_tuple(),
+            LinterPythonVersion::latest().as_tuple()
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_minimal_supported() {
+        assert_eq!(
+            FormatterPythonVersion::minimal_supported().as_tuple(),
+            LinterPythonVersion::minimal_supported().as_tuple()
         );
     }
 }

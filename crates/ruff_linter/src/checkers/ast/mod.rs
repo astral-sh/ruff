@@ -222,7 +222,7 @@ pub(crate) struct Checker<'a> {
     analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
     pub(crate) diagnostics: Vec<Diagnostic>,
-    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
+    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
@@ -282,7 +282,7 @@ impl<'a> Checker<'a> {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
-        // unused members on a single import. We need to pre-emptively omit any
+        // unused members on a single import. We need to preemptively omit any
         // members from the fix that will eventually be excluded by a `noqa`.
         // Unfortunately, we _do_ want to register a `Diagnostic` for each
         // eventually-ignored import, so that our `noqa` counts are accurate.
@@ -453,6 +453,8 @@ impl<'a> Checker<'a> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        let in_preview = self.settings.preview.is_enabled();
+
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -504,7 +506,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
                     || imports::is_sys_path_modification(stmt, self.semantic())
-                    || imports::is_os_environ_modification(stmt, self.semantic()))
+                    || imports::is_os_environ_modification(stmt, self.semantic())
+                    || (in_preview && imports::is_pytest_importorskip(stmt, self.semantic())))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -879,9 +882,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit
-                    .type_param_definitions
-                    .push((value, self.semantic.snapshot()));
+                self.visit_deferred_type_alias_value(value);
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
@@ -952,7 +953,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 if let Some(expr) = value {
                     if self.semantic.match_typing_expr(annotation, "TypeAlias") {
-                        self.visit_type_definition(expr);
+                        self.visit_annotated_type_alias_value(expr);
                     } else {
                         self.visit_expr(expr);
                     }
@@ -964,10 +965,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 msg,
                 range: _,
             }) => {
+                let snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::ASSERT_STATEMENT;
                 self.visit_boolean_test(test);
                 if let Some(expr) = msg {
                     self.visit_expr(expr);
                 }
+                self.semantic.flags = snapshot;
             }
             Stmt::With(ast::StmtWith {
                 items,
@@ -1277,6 +1281,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
+
+                            if self.enabled(Rule::RuntimeCastValue) {
+                                flake8_type_checking::rules::runtime_cast_value(self, arg);
+                            }
                         }
                         for arg in args {
                             self.visit_expr(arg);
@@ -1842,6 +1850,45 @@ impl<'a> Checker<'a> {
         self.semantic.flags = snapshot;
     }
 
+    /// Visit an [`Expr`], and treat it as the value expression
+    /// of a [PEP 613] type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptStr: TypeAlias = str | None  # We're visiting the RHS
+    /// ```
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    fn visit_annotated_type_alias_value(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::ANNOTATED_TYPE_ALIAS;
+        self.visit_type_definition(expr);
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as the value expression
+    /// of a [PEP 695] type alias.
+    ///
+    /// For example:
+    /// ```python
+    /// type OptStr = str | None  # We're visiting the RHS
+    /// ```
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    fn visit_deferred_type_alias_value(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        // even though we don't visit these nodes immediately we need to
+        // modify the semantic flags before we push the expression and its
+        // corresponding semantic snapshot
+        self.semantic.flags |= SemanticModelFlags::DEFERRED_TYPE_ALIAS;
+        self.visit
+            .type_param_definitions
+            .push((expr, self.semantic.snapshot()));
+        self.semantic.flags = snapshot;
+    }
+
     /// Visit an [`Expr`], and treat it as a type definition.
     fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
@@ -1900,6 +1947,9 @@ impl<'a> Checker<'a> {
 
         if self.semantic.in_exception_handler() {
             flags |= BindingFlags::IN_EXCEPT_HANDLER;
+        }
+        if self.semantic.in_assert_statement() {
+            flags |= BindingFlags::IN_ASSERT_STATEMENT;
         }
 
         // Create the `Binding`.
@@ -1999,6 +2049,21 @@ impl<'a> Checker<'a> {
         let mut flags = BindingFlags::empty();
         if helpers::is_unpacking_assignment(parent, expr) {
             flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
+        }
+
+        match parent {
+            Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+                // TODO: It is a bit unfortunate that we do this check twice
+                //       maybe we should change how we visit this statement
+                //       so the semantic flag for the type alias sticks around
+                //       until after we've handled this store, so we can check
+                //       the flag instead of duplicating this check
+                if self.semantic.match_typing_expr(annotation, "TypeAlias") {
+                    flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
+                }
+            }
+            _ => {}
         }
 
         let scope = self.semantic.current_scope();
@@ -2256,7 +2321,17 @@ impl<'a> Checker<'a> {
 
                     self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    self.visit_expr(parsed_annotation.expression());
+                    let parsed_expr = parsed_annotation.expression();
+                    self.visit_expr(parsed_expr);
+                    if self.semantic.in_type_alias_value() {
+                        if self.enabled(Rule::QuotedTypeAlias) {
+                            flake8_type_checking::rules::quoted_type_alias(
+                                self,
+                                parsed_expr,
+                                string_expr,
+                            );
+                        }
+                    }
                     self.parsed_type_annotation = None;
                 } else {
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {

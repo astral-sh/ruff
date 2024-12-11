@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
 
 use crate::checkers::ast::Checker;
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 ///
 /// def func(version=ssl.PROTOCOL_TLSv1_2): ...
 /// ```
-#[violation]
-pub struct SslWithBadDefaults {
+#[derive(ViolationMetadata)]
+pub(crate) struct SslWithBadDefaults {
     protocol: String,
 }
 

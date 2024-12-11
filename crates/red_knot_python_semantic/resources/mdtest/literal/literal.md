@@ -51,6 +51,8 @@ invalid1: Literal[3 + 4]
 invalid2: Literal[4 + 3j]
 # error: [invalid-literal-parameter]
 invalid3: Literal[(3, 4)]
+
+hello = "hello"
 invalid4: Literal[
     1 + 2,  # error: [invalid-literal-parameter]
     "foo",
@@ -76,7 +78,7 @@ from other import Literal
 a1: Literal[26]
 
 def f():
-    reveal_type(a1)  # revealed: @Todo
+    reveal_type(a1)  # revealed: @Todo(generics)
 ```
 
 ## Detecting typing_extensions.Literal

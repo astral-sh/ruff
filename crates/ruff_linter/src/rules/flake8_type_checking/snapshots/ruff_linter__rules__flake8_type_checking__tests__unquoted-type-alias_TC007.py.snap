@@ -1,0 +1,192 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC007.py:15:16: TC007 [*] Add quotes to type alias
+   |
+13 | a: TypeAlias = int  # OK
+14 | b: TypeAlias = Dict  # OK
+15 | c: TypeAlias = Foo   # TC007
+   |                ^^^ TC007
+16 | d: TypeAlias = Foo | None  # TC007
+17 | e: TypeAlias = OptStr   # TC007
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+12 12 | 
+13 13 | a: TypeAlias = int  # OK
+14 14 | b: TypeAlias = Dict  # OK
+15    |-c: TypeAlias = Foo   # TC007
+   15 |+c: TypeAlias = "Foo"   # TC007
+16 16 | d: TypeAlias = Foo | None  # TC007
+17 17 | e: TypeAlias = OptStr   # TC007
+18 18 | f: TypeAlias = Bar   # TC007
+
+TC007.py:16:16: TC007 [*] Add quotes to type alias
+   |
+14 | b: TypeAlias = Dict  # OK
+15 | c: TypeAlias = Foo   # TC007
+16 | d: TypeAlias = Foo | None  # TC007
+   |                ^^^ TC007
+17 | e: TypeAlias = OptStr   # TC007
+18 | f: TypeAlias = Bar   # TC007
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+13 13 | a: TypeAlias = int  # OK
+14 14 | b: TypeAlias = Dict  # OK
+15 15 | c: TypeAlias = Foo   # TC007
+16    |-d: TypeAlias = Foo | None  # TC007
+   16 |+d: TypeAlias = "Foo | None"  # TC007
+17 17 | e: TypeAlias = OptStr   # TC007
+18 18 | f: TypeAlias = Bar   # TC007
+19 19 | g: TypeAlias = Foo | Bar  # TC007 x2
+
+TC007.py:17:16: TC007 [*] Add quotes to type alias
+   |
+15 | c: TypeAlias = Foo   # TC007
+16 | d: TypeAlias = Foo | None  # TC007
+17 | e: TypeAlias = OptStr   # TC007
+   |                ^^^^^^ TC007
+18 | f: TypeAlias = Bar   # TC007
+19 | g: TypeAlias = Foo | Bar  # TC007 x2
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+14 14 | b: TypeAlias = Dict  # OK
+15 15 | c: TypeAlias = Foo   # TC007
+16 16 | d: TypeAlias = Foo | None  # TC007
+17    |-e: TypeAlias = OptStr   # TC007
+   17 |+e: TypeAlias = "OptStr"   # TC007
+18 18 | f: TypeAlias = Bar   # TC007
+19 19 | g: TypeAlias = Foo | Bar  # TC007 x2
+20 20 | h: TypeAlias = Foo[str]  # TC007
+
+TC007.py:18:16: TC007 [*] Add quotes to type alias
+   |
+16 | d: TypeAlias = Foo | None  # TC007
+17 | e: TypeAlias = OptStr   # TC007
+18 | f: TypeAlias = Bar   # TC007
+   |                ^^^ TC007
+19 | g: TypeAlias = Foo | Bar  # TC007 x2
+20 | h: TypeAlias = Foo[str]  # TC007
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+15 15 | c: TypeAlias = Foo   # TC007
+16 16 | d: TypeAlias = Foo | None  # TC007
+17 17 | e: TypeAlias = OptStr   # TC007
+18    |-f: TypeAlias = Bar   # TC007
+   18 |+f: TypeAlias = "Bar"   # TC007
+19 19 | g: TypeAlias = Foo | Bar  # TC007 x2
+20 20 | h: TypeAlias = Foo[str]  # TC007
+21 21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+
+TC007.py:19:16: TC007 [*] Add quotes to type alias
+   |
+17 | e: TypeAlias = OptStr   # TC007
+18 | f: TypeAlias = Bar   # TC007
+19 | g: TypeAlias = Foo | Bar  # TC007 x2
+   |                ^^^ TC007
+20 | h: TypeAlias = Foo[str]  # TC007
+21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+16 16 | d: TypeAlias = Foo | None  # TC007
+17 17 | e: TypeAlias = OptStr   # TC007
+18 18 | f: TypeAlias = Bar   # TC007
+19    |-g: TypeAlias = Foo | Bar  # TC007 x2
+   19 |+g: TypeAlias = "Foo | Bar"  # TC007 x2
+20 20 | h: TypeAlias = Foo[str]  # TC007
+21 21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22 22 |     Bar)
+
+TC007.py:19:22: TC007 [*] Add quotes to type alias
+   |
+17 | e: TypeAlias = OptStr   # TC007
+18 | f: TypeAlias = Bar   # TC007
+19 | g: TypeAlias = Foo | Bar  # TC007 x2
+   |                      ^^^ TC007
+20 | h: TypeAlias = Foo[str]  # TC007
+21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+16 16 | d: TypeAlias = Foo | None  # TC007
+17 17 | e: TypeAlias = OptStr   # TC007
+18 18 | f: TypeAlias = Bar   # TC007
+19    |-g: TypeAlias = Foo | Bar  # TC007 x2
+   19 |+g: TypeAlias = "Foo | Bar"  # TC007 x2
+20 20 | h: TypeAlias = Foo[str]  # TC007
+21 21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22 22 |     Bar)
+
+TC007.py:20:16: TC007 [*] Add quotes to type alias
+   |
+18 | f: TypeAlias = Bar   # TC007
+19 | g: TypeAlias = Foo | Bar  # TC007 x2
+20 | h: TypeAlias = Foo[str]  # TC007
+   |                ^^^ TC007
+21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22 |     Bar)
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+17 17 | e: TypeAlias = OptStr   # TC007
+18 18 | f: TypeAlias = Bar   # TC007
+19 19 | g: TypeAlias = Foo | Bar  # TC007 x2
+20    |-h: TypeAlias = Foo[str]  # TC007
+   20 |+h: TypeAlias = "Foo[str]"  # TC007
+21 21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22 22 |     Bar)
+23 23 | 
+
+TC007.py:21:17: TC007 [*] Add quotes to type alias
+   |
+19 | g: TypeAlias = Foo | Bar  # TC007 x2
+20 | h: TypeAlias = Foo[str]  # TC007
+21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+   |                 ^^^ TC007
+22 |     Bar)
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+18 18 | f: TypeAlias = Bar   # TC007
+19 19 | g: TypeAlias = Foo | Bar  # TC007 x2
+20 20 | h: TypeAlias = Foo[str]  # TC007
+21    |-i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22    |-    Bar)
+   21 |+i: TypeAlias = ("Foo | Bar")
+23 22 | 
+24 23 | type C = Foo   # OK
+25 24 | type D = Foo | None  # OK
+
+TC007.py:22:5: TC007 [*] Add quotes to type alias
+   |
+20 | h: TypeAlias = Foo[str]  # TC007
+21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22 |     Bar)
+   |     ^^^ TC007
+23 | 
+24 | type C = Foo   # OK
+   |
+   = help: Add quotes
+
+ℹ Unsafe fix
+18 18 | f: TypeAlias = Bar   # TC007
+19 19 | g: TypeAlias = Foo | Bar  # TC007 x2
+20 20 | h: TypeAlias = Foo[str]  # TC007
+21    |-i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22    |-    Bar)
+   21 |+i: TypeAlias = ("Foo | Bar")
+23 22 | 
+24 23 | type C = Foo   # OK
+25 24 | type D = Foo | None  # OK

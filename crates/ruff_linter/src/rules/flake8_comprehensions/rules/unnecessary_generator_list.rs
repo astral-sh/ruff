@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -11,11 +11,11 @@ use crate::checkers::ast::Checker;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary generators that can be rewritten as `list`
-/// comprehensions (or with `list` directly).
+/// Checks for unnecessary generators that can be rewritten as list
+/// comprehensions (or with `list()` directly).
 ///
 /// ## Why is this bad?
-/// It is unnecessary to use `list` around a generator expression, since
+/// It is unnecessary to use `list()` around a generator expression, since
 /// there are equivalent comprehensions for these types. Using a
 /// comprehension is clearer and more idiomatic.
 ///
@@ -40,8 +40,8 @@ use super::helpers;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-#[violation]
-pub struct UnnecessaryGeneratorList {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryGeneratorList {
     short_circuit: bool,
 }
 
@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
         if self.short_circuit {
             "Unnecessary generator (rewrite using `list()`)".to_string()
         } else {
-            "Unnecessary generator (rewrite as a `list` comprehension)".to_string()
+            "Unnecessary generator (rewrite as a list comprehension)".to_string()
         }
     }
 
@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
         if self.short_circuit {
             "Rewrite using `list()`".to_string()
         } else {
-            "Rewrite as a `list` comprehension".to_string()
+            "Rewrite as a list comprehension".to_string()
         }
     }
 }
@@ -74,49 +74,47 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
     ) else {
         return;
     };
-    if !checker.semantic().has_builtin_binding("list") {
-        return;
-    }
 
-    let Some(ExprGenerator {
+    let ast::Expr::Generator(ExprGenerator {
         elt,
         generators,
         parenthesized,
         ..
-    }) = argument.as_generator_expr()
+    }) = argument
     else {
         return;
     };
+
+    if !checker.semantic().has_builtin_binding("list") {
+        return;
+    }
 
     // Short-circuit: given `list(x for x in y)`, generate `list(y)` (in lieu of `[x for x in y]`).
     if let [generator] = generators.as_slice() {
         if generator.ifs.is_empty() && !generator.is_async {
             if ComparableExpr::from(elt) == ComparableExpr::from(&generator.target) {
-                let mut diagnostic = Diagnostic::new(
+                let diagnostic = Diagnostic::new(
                     UnnecessaryGeneratorList {
                         short_circuit: true,
                     },
                     call.range(),
                 );
                 let iterator = format!("list({})", checker.locator().slice(generator.iter.range()));
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    iterator,
-                    call.range(),
-                )));
-                checker.diagnostics.push(diagnostic);
+                let fix = Fix::unsafe_edit(Edit::range_replacement(iterator, call.range()));
+                checker.diagnostics.push(diagnostic.with_fix(fix));
                 return;
             }
         }
     }
 
     // Convert `list(f(x) for x in y)` to `[f(x) for x in y]`.
-    let mut diagnostic = Diagnostic::new(
+    let diagnostic = Diagnostic::new(
         UnnecessaryGeneratorList {
             short_circuit: false,
         },
         call.range(),
     );
-    diagnostic.set_fix({
+    let fix = {
         // Replace `list(` with `[`.
         let call_start = Edit::replacement(
             "[".to_string(),
@@ -153,7 +151,6 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
         } else {
             Fix::unsafe_edits(call_start, [call_end])
         }
-    });
-
-    checker.diagnostics.push(diagnostic);
+    };
+    checker.diagnostics.push(diagnostic.with_fix(fix));
 }

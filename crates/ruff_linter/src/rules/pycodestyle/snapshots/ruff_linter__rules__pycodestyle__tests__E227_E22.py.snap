@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+snapshot_kind: text
 ---
 E22.py:72:13: E227 [*] Missing whitespace around bitwise or shift operator
    |
@@ -168,5 +169,3 @@ E22.py:154:11: E227 [*] Missing whitespace around bitwise or shift operator
 155 155 | print >> sys.stdout, "x is an integer."
 156 156 | x = x / 2 - 1
 157 157 | x = 1 @ 2
-
-

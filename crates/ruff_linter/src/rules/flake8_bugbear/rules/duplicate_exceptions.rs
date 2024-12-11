@@ -3,7 +3,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
@@ -39,16 +39,21 @@ use crate::registry::Rule;
 ///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
-#[violation]
-pub struct DuplicateTryBlockException {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateTryBlockException {
     name: String,
+    is_star: bool,
 }
 
 impl Violation for DuplicateTryBlockException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateTryBlockException { name } = self;
-        format!("try-except block with duplicate exception `{name}`")
+        let DuplicateTryBlockException { name, is_star } = self;
+        if *is_star {
+            format!("try-except* block with duplicate exception `{name}`")
+        } else {
+            format!("try-except block with duplicate exception `{name}`")
+        }
     }
 }
 
@@ -81,8 +86,8 @@ impl Violation for DuplicateTryBlockException {
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
-#[violation]
-pub struct DuplicateHandlerException {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateHandlerException {
     pub names: Vec<String>,
 }
 
@@ -207,9 +212,15 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
     if checker.enabled(Rule::DuplicateTryBlockException) {
         for (name, exprs) in duplicates {
             for expr in exprs {
+                let is_star = checker
+                    .semantic()
+                    .current_statement()
+                    .as_try_stmt()
+                    .is_some_and(|try_stmt| try_stmt.is_star);
                 checker.diagnostics.push(Diagnostic::new(
                     DuplicateTryBlockException {
                         name: name.segments().join("."),
+                        is_star,
                     },
                     expr.range(),
                 ));

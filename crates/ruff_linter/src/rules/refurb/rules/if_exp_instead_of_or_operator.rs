@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
@@ -38,8 +38,8 @@ use crate::Locator;
 /// For example, `foo` will be called twice in `foo() if foo() else bar()`
 /// (assuming `foo()` returns a truthy value), but only once in
 /// `foo() or bar()`.
-#[violation]
-pub struct IfExpInsteadOfOrOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct IfExpInsteadOfOrOperator;
 
 impl Violation for IfExpInsteadOfOrOperator {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

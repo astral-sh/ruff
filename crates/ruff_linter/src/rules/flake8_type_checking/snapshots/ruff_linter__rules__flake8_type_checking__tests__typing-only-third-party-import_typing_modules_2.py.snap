@@ -1,11 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
 ---
-typing_modules_2.py:7:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+typing_modules_2.py:7:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   |
 6 | def func():
 7 |     from pandas import DataFrame
-  |                        ^^^^^^^^^ TCH002
+  |                        ^^^^^^^^^ TC002
 8 | 
 9 |     df: DataFrame
   |
@@ -23,5 +24,3 @@ typing_modules_2.py:7:24: TCH002 [*] Move third-party import `pandas.DataFrame` 
 7     |-    from pandas import DataFrame
 8  10 | 
 9  11 |     df: DataFrame
-
-

@@ -1,37 +1,51 @@
+use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::Program;
 use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
-use std::path::Path;
+use salsa::Setter;
 
 mod assertion;
+mod config;
 mod db;
 mod diagnostic;
 mod matcher;
 mod parser;
 
+const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &Path, long_title: &str, short_title: &str) {
+pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str) {
     let source = std::fs::read_to_string(path).unwrap();
     let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
-            panic!("Error parsing `{}`: {err}", path.to_str().unwrap())
+            panic!("Error parsing `{path}`: {err:?}")
         }
     };
 
     let mut db = db::Db::setup(SystemPathBuf::from("/src"));
 
+    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
+        if filter.as_ref().is_some_and(|f| !test.name().contains(f)) {
+            continue;
+        }
+
+        Program::get(&db)
+            .set_target_version(&mut db)
+            .to(test.target_version());
+
         // Remove all files so that the db is in a "fresh" state.
         db.memory_file_system().remove_all();
         Files::sync_all(&mut db);
@@ -54,6 +68,15 @@ pub fn run(path: &Path, long_title: &str, short_title: &str) {
                     }
                 }
             }
+
+            println!(
+                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}=\"{}\"",
+                test.name()
+            );
+            println!(
+                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
+                test.name()
+            );
         }
     }
 

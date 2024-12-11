@@ -180,8 +180,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::RedundantNumericUnion) {
                 flake8_pyi::rules::redundant_numeric_union(checker, parameters);
             }
-            if checker.enabled(Rule::PrePep570PositionalArgument) {
-                flake8_pyi::rules::pre_pep570_positional_argument(checker, function_def);
+            if checker.enabled(Rule::Pep484StylePositionalOnlyParameter) {
+                flake8_pyi::rules::pep_484_positional_parameter(checker, function_def);
             }
             if checker.enabled(Rule::DunderFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
@@ -293,8 +293,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::PytestFixtureIncorrectParenthesesStyle,
                 Rule::PytestFixturePositionalArgs,
                 Rule::PytestExtraneousScopeFunction,
-                Rule::PytestMissingFixtureNameUnderscore,
-                Rule::PytestIncorrectFixtureNameUnderscore,
                 Rule::PytestFixtureParamWithoutValue,
                 Rule::PytestDeprecatedYieldFixture,
                 Rule::PytestFixtureFinalizerCallback,
@@ -304,7 +302,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             ]) {
                 flake8_pytest_style::rules::fixture(
                     checker,
-                    stmt,
                     name,
                     parameters,
                     returns.as_deref(),
@@ -312,12 +309,20 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     body,
                 );
             }
-            if checker.any_enabled(&[
-                Rule::PytestParametrizeNamesWrongType,
-                Rule::PytestParametrizeValuesWrongType,
-                Rule::PytestDuplicateParametrizeTestCases,
-            ]) {
-                flake8_pytest_style::rules::parametrize(checker, decorator_list);
+            // In preview mode, calls are analyzed. To avoid duplicate diagnostics,
+            // skip analyzing the decorators.
+            if !checker.settings.preview.is_enabled()
+                && checker.any_enabled(&[
+                    Rule::PytestParametrizeNamesWrongType,
+                    Rule::PytestParametrizeValuesWrongType,
+                    Rule::PytestDuplicateParametrizeTestCases,
+                ])
+            {
+                for decorator in decorator_list {
+                    if let Some(call) = decorator.expression.as_call_expr() {
+                        flake8_pytest_style::rules::parametrize(checker, call);
+                    }
+                }
             }
             if checker.any_enabled(&[
                 Rule::PytestIncorrectMarkParenthesesStyle,
@@ -594,18 +599,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::NonAsciiImportName) {
                     pylint::rules::non_ascii_module_import(checker, alias);
                 }
-                // TODO(charlie): Remove when stabilizing A004.
-                if let Some(asname) = &alias.asname {
-                    if checker.settings.preview.is_disabled()
-                        && checker.enabled(Rule::BuiltinVariableShadowing)
-                    {
-                        flake8_builtins::rules::builtin_variable_shadowing(
-                            checker,
-                            asname,
-                            asname.range(),
-                        );
-                    }
-                }
+
                 if checker.enabled(Rule::Debugger) {
                     if let Some(diagnostic) =
                         flake8_debugger::rules::debugger_import(stmt, None, &alias.name)
@@ -914,19 +908,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             },
                             stmt.range(),
                         ));
-                    }
-                } else {
-                    // TODO(charlie): Remove when stabilizing A004.
-                    if let Some(asname) = &alias.asname {
-                        if checker.settings.preview.is_disabled()
-                            && checker.enabled(Rule::BuiltinVariableShadowing)
-                        {
-                            flake8_builtins::rules::builtin_variable_shadowing(
-                                checker,
-                                asname,
-                                asname.range(),
-                            );
-                        }
                     }
                 }
                 if checker.enabled(Rule::RelativeImports) {
@@ -1254,6 +1235,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::IfKeyInDictDel) {
+                ruff::rules::if_key_in_dict_del(checker, if_);
+            }
         }
         Stmt::Assert(
             assert_stmt @ ast::StmtAssert {
@@ -1294,6 +1278,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::AssertWithPrintMessage) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
+            }
+            if checker.enabled(Rule::InvalidAssertMessageLiteralArgument) {
+                ruff::rules::invalid_assert_message_literal_argument(checker, assert_stmt);
             }
         }
         Stmt::With(
@@ -1558,9 +1545,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker, stmt, targets, value,
                 );
             }
-            if checker.enabled(Rule::UnpackedListComprehension) {
-                pyupgrade::rules::unpacked_list_comprehension(checker, targets, value);
-            }
             if checker.enabled(Rule::PandasDfVariableName) {
                 if let Some(diagnostic) = pandas_vet::rules::assignment_to_df(targets) {
                     checker.diagnostics.push(diagnostic);
@@ -1571,11 +1555,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 .rules
                 .enabled(Rule::AirflowVariableNameTaskIdMismatch)
             {
-                if let Some(diagnostic) =
-                    airflow::rules::variable_name_task_id(checker, targets, value)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
+                airflow::rules::variable_name_task_id(checker, targets, value);
             }
             if checker.settings.rules.enabled(Rule::SelfAssigningVariable) {
                 pylint::rules::self_assignment(checker, assign);

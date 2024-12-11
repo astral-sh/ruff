@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return_type_parameters.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -60,7 +61,7 @@ def test_return_union_with_elements_exceeding_length(
 
 
 #########################################################################################
-# Multiline stirngs (NeedsParentheses::Never)
+# Multiline strings (NeedsParentheses::Never)
 #########################################################################################
 
 
@@ -259,7 +260,7 @@ def test_return_union_with_elements_exceeding_length(
 
 
 #########################################################################################
-# Multiline stirngs (NeedsParentheses::Never)
+# Multiline strings (NeedsParentheses::Never)
 #########################################################################################
 
 

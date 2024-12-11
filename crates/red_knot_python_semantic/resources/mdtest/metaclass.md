@@ -171,7 +171,7 @@ def f(*args, **kwargs) -> int: ...
 class A(metaclass=f): ...
 
 # TODO should be `type[int]`
-reveal_type(A.__class__)  # revealed: @Todo
+reveal_type(A.__class__)  # revealed: @Todo(metaclass not a class)
 ```
 
 ## Cyclic
@@ -179,9 +179,9 @@ reveal_type(A.__class__)  # revealed: @Todo
 Retrieving the metaclass of a cyclically defined class should not cause an infinite loop.
 
 ```py path=a.pyi
-class A(B): ...  # error: [cyclic-class-def]
-class B(C): ...  # error: [cyclic-class-def]
-class C(A): ...  # error: [cyclic-class-def]
+class A(B): ...  # error: [cyclic-class-definition]
+class B(C): ...  # error: [cyclic-class-definition]
+class C(A): ...  # error: [cyclic-class-definition]
 
 reveal_type(A.__class__)  # revealed: Unknown
 ```

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -31,8 +31,8 @@ use crate::Locator;
 ///     "dog"
 /// )
 /// ```
-#[violation]
-pub struct ExplicitStringConcatenation;
+#[derive(ViolationMetadata)]
+pub(crate) struct ExplicitStringConcatenation;
 
 impl Violation for ExplicitStringConcatenation {
     #[derive_message_formats]

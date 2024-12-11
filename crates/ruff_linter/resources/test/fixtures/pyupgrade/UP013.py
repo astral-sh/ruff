@@ -41,3 +41,8 @@ MyType = TypedDict("MyType", {})
 
 # Empty dict call
 MyType = TypedDict("MyType", dict())
+
+# Unsafe fix if comments are present
+X = TypedDict("X", {
+    "some_config": int,  # important
+})

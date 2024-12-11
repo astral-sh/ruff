@@ -36,6 +36,10 @@ mod tests {
         Rule::BuiltinModuleShadowing,
         Path::new("A005/modules/package/bisect.py")
     )]
+    #[test_case(
+        Rule::BuiltinModuleShadowing,
+        Path::new("A005/modules/_abc/__init__.py")
+    )]
     #[test_case(Rule::BuiltinModuleShadowing, Path::new("A005/modules/package/xml.py"))]
     #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -90,6 +94,10 @@ mod tests {
     #[test_case(
         Rule::BuiltinModuleShadowing,
         Path::new("A005/modules/package/bisect.py")
+    )]
+    #[test_case(
+        Rule::BuiltinModuleShadowing,
+        Path::new("A005/modules/_abc/__init__.py")
     )]
     #[test_case(Rule::BuiltinModuleShadowing, Path::new("A005/modules/package/xml.py"))]
     fn builtins_allowed_modules(rule_code: Rule, path: &Path) -> Result<()> {

@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -32,8 +32,8 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// datetime.max.replace(tzinfo=datetime.UTC)
 /// ```
-#[violation]
-pub struct DatetimeMinMax {
+#[derive(ViolationMetadata)]
+pub(crate) struct DatetimeMinMax {
     min_max: MinMax,
 }
 
@@ -70,7 +70,7 @@ pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
         _ => return,
     };
 
-    if followed_by_replace_tzinfo(checker.semantic()) {
+    if usage_is_safe(checker.semantic()) {
         return;
     }
 
@@ -79,8 +79,8 @@ pub(crate) fn datetime_max_min(checker: &mut Checker, expr: &Expr) {
         .push(Diagnostic::new(DatetimeMinMax { min_max }, expr.range()));
 }
 
-/// Check if the current expression has the pattern `foo.replace(tzinfo=bar)`.
-fn followed_by_replace_tzinfo(semantic: &SemanticModel) -> bool {
+/// Check if the current expression has the pattern `foo.replace(tzinfo=bar)` or `foo.time()`.
+fn usage_is_safe(semantic: &SemanticModel) -> bool {
     let Some(parent) = semantic.current_expression_parent() else {
         return false;
     };
@@ -90,7 +90,7 @@ fn followed_by_replace_tzinfo(semantic: &SemanticModel) -> bool {
 
     match (parent, grandparent) {
         (Expr::Attribute(ExprAttribute { attr, .. }), Expr::Call(ExprCall { arguments, .. })) => {
-            attr.as_str() == "replace" && arguments.find_keyword("tzinfo").is_some()
+            attr == "time" || (attr == "replace" && arguments.find_keyword("tzinfo").is_some())
         }
         _ => false,
     }

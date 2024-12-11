@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, CmpOp, Expr, Int};
 use ruff_text_size::Ranged;
@@ -32,8 +32,8 @@ use crate::registry::Rule;
 ///
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
-#[violation]
-pub struct UnrecognizedVersionInfoCheck;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnrecognizedVersionInfoCheck;
 
 impl Violation for UnrecognizedVersionInfoCheck {
     #[derive_message_formats]
@@ -71,8 +71,8 @@ impl Violation for UnrecognizedVersionInfoCheck {
 ///
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
-#[violation]
-pub struct PatchVersionComparison;
+#[derive(ViolationMetadata)]
+pub(crate) struct PatchVersionComparison;
 
 impl Violation for PatchVersionComparison {
     #[derive_message_formats]
@@ -107,8 +107,8 @@ impl Violation for PatchVersionComparison {
 ///
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.readthedocs.io/en/latest/spec/directives.html#version-and-platform-checks)
-#[violation]
-pub struct WrongTupleLengthVersionComparison {
+#[derive(ViolationMetadata)]
+pub(crate) struct WrongTupleLengthVersionComparison {
     expected_length: usize,
 }
 

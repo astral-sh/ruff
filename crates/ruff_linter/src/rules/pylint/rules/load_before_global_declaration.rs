@@ -1,7 +1,7 @@
 use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
@@ -40,8 +40,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
-#[violation]
-pub struct LoadBeforeGlobalDeclaration {
+#[derive(ViolationMetadata)]
+pub(crate) struct LoadBeforeGlobalDeclaration {
     name: String,
     row: SourceRow,
 }

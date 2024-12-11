@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB110.py:1:5: FURB110 [*] Replace ternary `if` expression with `or` operator
   |

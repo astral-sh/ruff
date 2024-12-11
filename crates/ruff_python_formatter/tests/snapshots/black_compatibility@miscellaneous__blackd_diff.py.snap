@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellaneous/blackd_diff.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -51,5 +52,3 @@ def abc ():
 print(   "Incorrect formatting"    
 )
 ```
-
-

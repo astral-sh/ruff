@@ -29,22 +29,20 @@ if sys.platform != "win32":
         F_TLOCK as F_TLOCK,
         F_ULOCK as F_ULOCK,
         NGROUPS_MAX as NGROUPS_MAX,
+        O_ACCMODE as O_ACCMODE,
         O_APPEND as O_APPEND,
         O_ASYNC as O_ASYNC,
+        O_CLOEXEC as O_CLOEXEC,
         O_CREAT as O_CREAT,
-        O_DIRECT as O_DIRECT,
         O_DIRECTORY as O_DIRECTORY,
         O_DSYNC as O_DSYNC,
         O_EXCL as O_EXCL,
-        O_LARGEFILE as O_LARGEFILE,
         O_NDELAY as O_NDELAY,
-        O_NOATIME as O_NOATIME,
         O_NOCTTY as O_NOCTTY,
         O_NOFOLLOW as O_NOFOLLOW,
         O_NONBLOCK as O_NONBLOCK,
         O_RDONLY as O_RDONLY,
         O_RDWR as O_RDWR,
-        O_RSYNC as O_RSYNC,
         O_SYNC as O_SYNC,
         O_TRUNC as O_TRUNC,
         O_WRONLY as O_WRONLY,
@@ -64,13 +62,9 @@ if sys.platform != "win32":
         RTLD_NODELETE as RTLD_NODELETE,
         RTLD_NOLOAD as RTLD_NOLOAD,
         RTLD_NOW as RTLD_NOW,
-        SCHED_BATCH as SCHED_BATCH,
         SCHED_FIFO as SCHED_FIFO,
-        SCHED_IDLE as SCHED_IDLE,
         SCHED_OTHER as SCHED_OTHER,
-        SCHED_RESET_ON_FORK as SCHED_RESET_ON_FORK,
         SCHED_RR as SCHED_RR,
-        SCHED_SPORADIC as SCHED_SPORADIC,
         SEEK_DATA as SEEK_DATA,
         SEEK_HOLE as SEEK_HOLE,
         ST_NOSUID as ST_NOSUID,
@@ -233,6 +227,9 @@ if sys.platform != "win32":
     if sys.version_info >= (3, 9):
         from os import CLD_KILLED as CLD_KILLED, CLD_STOPPED as CLD_STOPPED, waitstatus_to_exitcode as waitstatus_to_exitcode
 
+    if sys.version_info >= (3, 10):
+        from os import O_FSYNC as O_FSYNC
+
     if sys.version_info >= (3, 11):
         from os import login_tty as login_tty
 
@@ -254,10 +251,13 @@ if sys.platform != "win32":
         )
 
     if sys.platform != "linux":
-        from os import chflags as chflags, lchflags as lchflags, lchmod as lchmod
+        from os import O_EXLOCK as O_EXLOCK, O_SHLOCK as O_SHLOCK, chflags as chflags, lchflags as lchflags, lchmod as lchmod
 
     if sys.platform != "linux" and sys.platform != "darwin":
-        from os import EX_NOTFOUND as EX_NOTFOUND
+        from os import EX_NOTFOUND as EX_NOTFOUND, SCHED_SPORADIC as SCHED_SPORADIC
+
+    if sys.platform != "linux" and sys.version_info >= (3, 13):
+        from os import O_EXEC as O_EXEC, O_SEARCH as O_SEARCH
 
     if sys.platform != "darwin":
         from os import (
@@ -271,6 +271,15 @@ if sys.platform != "win32":
             RWF_HIPRI as RWF_HIPRI,
             RWF_NOWAIT as RWF_NOWAIT,
             RWF_SYNC as RWF_SYNC,
+            ST_APPEND as ST_APPEND,
+            ST_MANDLOCK as ST_MANDLOCK,
+            ST_NOATIME as ST_NOATIME,
+            ST_NODEV as ST_NODEV,
+            ST_NODIRATIME as ST_NODIRATIME,
+            ST_NOEXEC as ST_NOEXEC,
+            ST_RELATIME as ST_RELATIME,
+            ST_SYNCHRONOUS as ST_SYNCHRONOUS,
+            ST_WRITE as ST_WRITE,
             fdatasync as fdatasync,
             getresgid as getresgid,
             getresuid as getresuid,
@@ -315,7 +324,16 @@ if sys.platform != "win32":
             MFD_HUGE_MASK as MFD_HUGE_MASK,
             MFD_HUGE_SHIFT as MFD_HUGE_SHIFT,
             MFD_HUGETLB as MFD_HUGETLB,
+            O_DIRECT as O_DIRECT,
+            O_LARGEFILE as O_LARGEFILE,
+            O_NOATIME as O_NOATIME,
+            O_PATH as O_PATH,
+            O_RSYNC as O_RSYNC,
+            O_TMPFILE as O_TMPFILE,
             RTLD_DEEPBIND as RTLD_DEEPBIND,
+            SCHED_BATCH as SCHED_BATCH,
+            SCHED_IDLE as SCHED_IDLE,
+            SCHED_RESET_ON_FORK as SCHED_RESET_ON_FORK,
             XATTR_CREATE as XATTR_CREATE,
             XATTR_REPLACE as XATTR_REPLACE,
             XATTR_SIZE_MAX as XATTR_SIZE_MAX,
@@ -373,6 +391,8 @@ if sys.platform != "win32":
                 PRIO_DARWIN_PROCESS as PRIO_DARWIN_PROCESS,
                 PRIO_DARWIN_THREAD as PRIO_DARWIN_THREAD,
             )
+    if sys.platform == "darwin" and sys.version_info >= (3, 10):
+        from os import O_EVTONLY as O_EVTONLY, O_NOFOLLOW_ANY as O_NOFOLLOW_ANY, O_SYMLINK as O_SYMLINK
 
     # Not same as os.environ or os.environb
     # Because of this variable, we can't do "from posix import *" in os/__init__.pyi

@@ -1,8 +1,9 @@
 use itertools::Itertools;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    name::Name, parenthesize::parenthesized_range, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
+    parenthesize::{parentheses_iterator, parenthesized_range},
+    BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -33,21 +34,17 @@ use crate::checkers::ast::Checker;
 /// if a < b < c:
 ///     pass
 /// ```
-#[violation]
-pub struct BooleanChainedComparison {
-    variable: Name,
-}
+#[derive(ViolationMetadata)]
+pub(crate) struct BooleanChainedComparison;
 
-impl Violation for BooleanChainedComparison {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for BooleanChainedComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Contains chained boolean comparison that can be simplified".to_string()
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Use a single compare expression".to_string())
+    fn fix_title(&self) -> String {
+        "Use a single compare expression".to_string()
     }
 }
 
@@ -66,11 +63,11 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
     let locator = checker.locator();
     let comment_ranges = checker.comment_ranges();
 
-    // retrieve all compare statements from expression
+    // retrieve all compare expressions from boolean expression
     let compare_expressions = expr_bool_op
         .values
         .iter()
-        .map(|stmt| stmt.as_compare_expr().unwrap());
+        .map(|expr| expr.as_compare_expr().unwrap());
 
     let diagnostics = compare_expressions
         .tuple_windows()
@@ -78,7 +75,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
             are_compare_expr_simplifiable(left_compare, right_compare)
         })
         .filter_map(|(left_compare, right_compare)| {
-            let Expr::Name(left_compare_right) = left_compare.comparators.first()? else {
+            let Expr::Name(left_compare_right) = left_compare.comparators.last()? else {
                 return None;
             };
 
@@ -90,45 +87,73 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
                 return None;
             }
 
-            let left_has_paren = parenthesized_range(
+            let left_paren_count = parentheses_iterator(
                 left_compare.into(),
-                expr_bool_op.into(),
+                Some(expr_bool_op.into()),
                 comment_ranges,
                 locator.contents(),
             )
-            .is_some();
+            .count();
 
-            let right_has_paren = parenthesized_range(
+            let right_paren_count = parentheses_iterator(
                 right_compare.into(),
-                expr_bool_op.into(),
+                Some(expr_bool_op.into()),
                 comment_ranges,
                 locator.contents(),
             )
-            .is_some();
+            .count();
 
-            // Do not offer a fix if there are any parentheses
-            // TODO: We can support a fix here, we just need to be careful to balance the
-            // parentheses which requires a more sophisticated edit
-            let fix = if left_has_paren || right_has_paren {
-                None
-            } else {
-                let edit = Edit::range_replacement(
-                    left_compare_right.id().to_string(),
-                    TextRange::new(left_compare_right.start(), right_compare_left.end()),
-                );
-                Some(Fix::safe_edit(edit))
+            // Create the edit that removes the comparison operator
+
+            // In `a<(b) and ((b))<c`, we need to handle the
+            // parentheses when specifying the fix range.
+            let left_compare_right_range = parenthesized_range(
+                left_compare_right.into(),
+                left_compare.into(),
+                comment_ranges,
+                locator.contents(),
+            )
+            .unwrap_or(left_compare_right.range());
+            let right_compare_left_range = parenthesized_range(
+                right_compare_left.into(),
+                right_compare.into(),
+                comment_ranges,
+                locator.contents(),
+            )
+            .unwrap_or(right_compare_left.range());
+            let edit = Edit::range_replacement(
+                locator.slice(left_compare_right_range).to_string(),
+                TextRange::new(
+                    left_compare_right_range.start(),
+                    right_compare_left_range.end(),
+                ),
+            );
+
+            // Balance left and right parentheses
+            let fix = match left_paren_count.cmp(&right_paren_count) {
+                std::cmp::Ordering::Less => {
+                    let balance_parens_edit = Edit::insertion(
+                        "(".repeat(right_paren_count - left_paren_count),
+                        left_compare.start(),
+                    );
+                    Fix::safe_edits(edit, [balance_parens_edit])
+                }
+                std::cmp::Ordering::Equal => Fix::safe_edit(edit),
+                std::cmp::Ordering::Greater => {
+                    let balance_parens_edit = Edit::insertion(
+                        ")".repeat(left_paren_count - right_paren_count),
+                        right_compare.end(),
+                    );
+                    Fix::safe_edits(edit, [balance_parens_edit])
+                }
             };
 
             let mut diagnostic = Diagnostic::new(
-                BooleanChainedComparison {
-                    variable: left_compare_right.id().clone(),
-                },
+                BooleanChainedComparison,
                 TextRange::new(left_compare.start(), right_compare.end()),
             );
 
-            if let Some(fix) = fix {
-                diagnostic.set_fix(fix);
-            }
+            diagnostic.set_fix(fix);
 
             Some(diagnostic)
         });
@@ -138,17 +163,15 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
 
 /// Checks whether two compare expressions are simplifiable
 fn are_compare_expr_simplifiable(left: &ExprCompare, right: &ExprCompare) -> bool {
-    let [left_operator] = &*left.ops else {
-        return false;
-    };
-
-    let [right_operator] = &*right.ops else {
-        return false;
-    };
-
-    matches!(
-        (left_operator, right_operator),
-        (CmpOp::Lt | CmpOp::LtE, CmpOp::Lt | CmpOp::LtE)
-            | (CmpOp::Gt | CmpOp::GtE, CmpOp::Gt | CmpOp::GtE)
-    )
+    left.ops
+        .iter()
+        .chain(right.ops.iter())
+        .tuple_windows::<(_, _)>()
+        .all(|(left_operator, right_operator)| {
+            matches!(
+                (left_operator, right_operator),
+                (CmpOp::Lt | CmpOp::LtE, CmpOp::Lt | CmpOp::LtE)
+                    | (CmpOp::Gt | CmpOp::GtE, CmpOp::Gt | CmpOp::GtE)
+            )
+        })
 }

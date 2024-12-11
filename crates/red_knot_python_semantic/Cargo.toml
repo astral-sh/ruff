@@ -13,7 +13,8 @@ license = { workspace = true }
 [dependencies]
 ruff_db = { workspace = true }
 ruff_index = { workspace = true }
-ruff_python_ast = { workspace = true, features = ["salsa"] }
+ruff_macros = { workspace = true }
+ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_stdlib = { workspace = true }
 ruff_source_file = { workspace = true }
@@ -33,6 +34,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 rustc-hash = { workspace = true }
 hashbrown = { workspace = true }
+serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
 test-case = { workspace = true }
@@ -48,6 +50,8 @@ anyhow = { workspace = true }
 dir-test = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
+quickcheck = { version = "1.0.3", default-features = false }
+quickcheck_macros = { version = "1.0.0" }
 
 [lints]
 workspace = true

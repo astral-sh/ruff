@@ -1,10 +1,10 @@
 use itertools::Itertools;
 
 use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct UnusedCodes {
+pub(crate) struct UnusedCodes {
     pub disabled: Vec<String>,
     pub duplicated: Vec<String>,
     pub unknown: Vec<String>,
@@ -41,8 +41,8 @@ pub struct UnusedCodes {
 ///
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
-#[violation]
-pub struct UnusedNOQA {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnusedNOQA {
     pub codes: Option<UnusedCodes>,
 }
 

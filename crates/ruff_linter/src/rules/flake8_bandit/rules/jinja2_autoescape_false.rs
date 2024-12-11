@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Jinja documentation: API](https://jinja.palletsprojects.com/en/latest/api/#autoescaping)
 /// - [Common Weakness Enumeration: CWE-94](https://cwe.mitre.org/data/definitions/94.html)
-#[violation]
-pub struct Jinja2AutoescapeFalse {
+#[derive(ViolationMetadata)]
+pub(crate) struct Jinja2AutoescapeFalse {
     value: bool,
 }
 

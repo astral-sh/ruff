@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_python_semantic::SemanticModel;
@@ -32,8 +32,8 @@ use crate::checkers::ast::Checker;
 /// ```pyi
 /// def foo(arg: str = ...) -> None: ...
 /// ```
-#[violation]
-pub struct StringOrBytesTooLong;
+#[derive(ViolationMetadata)]
+pub(crate) struct StringOrBytesTooLong;
 
 impl AlwaysFixableViolation for StringOrBytesTooLong {
     #[derive_message_formats]
@@ -59,7 +59,7 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         return;
     }
 
-    if semantic.in_annotation() {
+    if semantic.in_type_definition() | semantic.in_deferred_type_definition() {
         return;
     }
 

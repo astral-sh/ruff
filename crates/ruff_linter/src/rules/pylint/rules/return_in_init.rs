@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_text_size::Ranged;
 
@@ -34,8 +34,8 @@ use crate::rules::pylint::helpers::in_dunder_method;
 ///
 /// ## References
 /// - [CodeQL: `py-explicit-return-in-init`](https://codeql.github.com/codeql-query-help/python/py-explicit-return-in-init/)
-#[violation]
-pub struct ReturnInInit;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReturnInInit;
 
 impl Violation for ReturnInInit {
     #[derive_message_formats]

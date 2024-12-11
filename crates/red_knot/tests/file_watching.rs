@@ -1,14 +1,12 @@
 #![allow(clippy::disallowed_names)]
 
 use std::io::Write;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
-
 use red_knot_python_semantic::{resolve_module, ModuleName, Program, PythonVersion, SitePackages};
-use red_knot_workspace::db::RootDatabase;
-use red_knot_workspace::watch;
-use red_knot_workspace::watch::{directory_watcher, WorkspaceWatcher};
+use red_knot_workspace::db::{Db, RootDatabase};
+use red_knot_workspace::watch::{directory_watcher, ChangeEvent, WorkspaceWatcher};
 use red_knot_workspace::workspace::settings::{Configuration, SearchPathConfiguration};
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File, FileError};
@@ -19,7 +17,7 @@ use ruff_db::Upcast;
 struct TestCase {
     db: RootDatabase,
     watcher: Option<WorkspaceWatcher>,
-    changes_receiver: crossbeam::channel::Receiver<Vec<watch::ChangeEvent>>,
+    changes_receiver: crossbeam::channel::Receiver<Vec<ChangeEvent>>,
     /// The temporary directory that contains the test files.
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
@@ -40,45 +38,87 @@ impl TestCase {
         &self.db
     }
 
-    fn stop_watch(&mut self) -> Vec<watch::ChangeEvent> {
-        self.try_stop_watch(Duration::from_secs(10))
-            .expect("Expected watch changes but observed none")
+    #[track_caller]
+    fn stop_watch<M>(&mut self, matcher: M) -> Vec<ChangeEvent>
+    where
+        M: MatchEvent,
+    {
+        // track_caller is unstable for lambdas -> That's why this is a fn
+        #[track_caller]
+        fn panic_with_formatted_events(events: Vec<ChangeEvent>) -> Vec<ChangeEvent> {
+            panic!(
+                "Didn't observe expected change:\n{}",
+                events
+                    .into_iter()
+                    .map(|event| format!("  - {event:?}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            )
+        }
+
+        self.try_stop_watch(matcher, Duration::from_secs(10))
+            .unwrap_or_else(panic_with_formatted_events)
     }
 
-    fn try_stop_watch(&mut self, timeout: Duration) -> Option<Vec<watch::ChangeEvent>> {
+    fn try_stop_watch<M>(
+        &mut self,
+        mut matcher: M,
+        timeout: Duration,
+    ) -> Result<Vec<ChangeEvent>, Vec<ChangeEvent>>
+    where
+        M: MatchEvent,
+    {
+        tracing::debug!("Try stopping watch with timeout {:?}", timeout);
+
         let watcher = self
             .watcher
             .take()
             .expect("Cannot call `stop_watch` more than once");
 
-        let mut all_events = self
-            .changes_receiver
-            .recv_timeout(timeout)
-            .unwrap_or_default();
-        watcher.flush();
-        watcher.stop();
+        let start = Instant::now();
+        let mut all_events = Vec::new();
 
+        loop {
+            let events = self
+                .changes_receiver
+                .recv_timeout(Duration::from_millis(100))
+                .unwrap_or_default();
+
+            if events
+                .iter()
+                .any(|event| matcher.match_event(event) || event.is_rescan())
+            {
+                all_events.extend(events);
+                break;
+            }
+
+            all_events.extend(events);
+
+            if start.elapsed() > timeout {
+                return Err(all_events);
+            }
+        }
+
+        watcher.flush();
+        tracing::debug!("Flushed file watcher");
+        watcher.stop();
+        tracing::debug!("Stopping file watcher");
+
+        // Consume remaining events
         for event in &self.changes_receiver {
             all_events.extend(event);
         }
 
-        if all_events.is_empty() {
-            return None;
-        }
-
-        Some(all_events)
+        Ok(all_events)
     }
 
-    #[cfg(unix)]
-    fn take_watch_changes(&self) -> Vec<watch::ChangeEvent> {
+    fn take_watch_changes(&self) -> Vec<ChangeEvent> {
         self.try_take_watch_changes(Duration::from_secs(10))
             .expect("Expected watch changes but observed none")
     }
 
-    fn try_take_watch_changes(&self, timeout: Duration) -> Option<Vec<watch::ChangeEvent>> {
-        let Some(watcher) = &self.watcher else {
-            return None;
-        };
+    fn try_take_watch_changes(&self, timeout: Duration) -> Option<Vec<ChangeEvent>> {
+        let watcher = self.watcher.as_ref()?;
 
         let mut all_events = self
             .changes_receiver
@@ -100,7 +140,7 @@ impl TestCase {
         Some(all_events)
     }
 
-    fn apply_changes(&mut self, changes: Vec<watch::ChangeEvent>) {
+    fn apply_changes(&mut self, changes: Vec<ChangeEvent>) {
         self.db.apply_changes(changes, Some(&self.configuration));
     }
 
@@ -110,8 +150,8 @@ impl TestCase {
     ) -> anyhow::Result<()> {
         let program = Program::get(self.db());
 
-        self.configuration.search_paths = configuration.clone();
-        let new_settings = configuration.into_settings(self.db.workspace().root(&self.db));
+        let new_settings = configuration.to_settings(self.db.workspace().root(&self.db));
+        self.configuration.search_paths = configuration;
 
         program.update_search_paths(&mut self.db, &new_settings)?;
 
@@ -133,6 +173,23 @@ impl TestCase {
 
     fn system_file(&self, path: impl AsRef<SystemPath>) -> Result<File, FileError> {
         system_path_to_file(self.db(), path.as_ref())
+    }
+}
+
+trait MatchEvent {
+    fn match_event(&mut self, event: &ChangeEvent) -> bool;
+}
+
+fn event_for_file(name: &str) -> impl MatchEvent + '_ {
+    |event: &ChangeEvent| event.file_name() == Some(name)
+}
+
+impl<F> MatchEvent for F
+where
+    F: FnMut(&ChangeEvent) -> bool,
+{
+    fn match_event(&mut self, event: &ChangeEvent) -> bool {
+        (*self)(event)
     }
 }
 
@@ -204,7 +261,9 @@ where
             .as_utf8_path()
             .canonicalize_utf8()
             .with_context(|| "Failed to canonicalize root path.")?,
-    );
+    )
+    .simplified()
+    .to_path_buf();
 
     let workspace_path = root_path.join("workspace");
 
@@ -241,8 +300,7 @@ where
         search_paths,
     };
 
-    let workspace =
-        WorkspaceMetadata::from_path(&workspace_path, &system, Some(configuration.clone()))?;
+    let workspace = WorkspaceMetadata::discover(&workspace_path, &system, Some(&configuration))?;
 
     let db = RootDatabase::new(workspace, system)?;
 
@@ -310,7 +368,7 @@ fn new_file() -> anyhow::Result<()> {
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("foo.py"));
 
     case.apply_changes(changes);
 
@@ -333,7 +391,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("foo.py"));
 
     case.apply_changes(changes);
 
@@ -355,7 +413,7 @@ fn changed_file() -> anyhow::Result<()> {
 
     update_file(&foo_path, "print('Version 2')")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("foo.py"));
 
     assert!(!changes.is_empty());
 
@@ -380,7 +438,7 @@ fn deleted_file() -> anyhow::Result<()> {
 
     std::fs::remove_file(foo_path.as_std_path())?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("foo.py"));
 
     case.apply_changes(changes);
 
@@ -412,7 +470,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
         trash_path.join("foo.py").as_std_path(),
     )?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("foo.py"));
 
     case.apply_changes(changes);
 
@@ -444,7 +502,7 @@ fn move_file_to_workspace() -> anyhow::Result<()> {
 
     std::fs::rename(foo_path.as_std_path(), foo_in_workspace_path.as_std_path())?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("foo.py"));
 
     case.apply_changes(changes);
 
@@ -472,7 +530,7 @@ fn rename_file() -> anyhow::Result<()> {
 
     std::fs::rename(foo_path.as_std_path(), bar_path.as_std_path())?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("bar.py"));
 
     case.apply_changes(changes);
 
@@ -516,7 +574,7 @@ fn directory_moved_to_workspace() -> anyhow::Result<()> {
     std::fs::rename(sub_original_path.as_std_path(), sub_new_path.as_std_path())
         .with_context(|| "Failed to move sub directory")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("sub"));
 
     case.apply_changes(changes);
 
@@ -575,7 +633,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     std::fs::rename(sub_path.as_std_path(), trashed_sub.as_std_path())
         .with_context(|| "Failed to move the sub directory to the trash")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("sub"));
 
     case.apply_changes(changes);
 
@@ -637,7 +695,8 @@ fn directory_renamed() -> anyhow::Result<()> {
     std::fs::rename(sub_path.as_std_path(), foo_baz.as_std_path())
         .with_context(|| "Failed to move the sub directory")?;
 
-    let changes = case.stop_watch();
+    // Linux and windows only emit an event for the newly created root directory, but not for every new component.
+    let changes = case.stop_watch(event_for_file("sub"));
 
     case.apply_changes(changes);
 
@@ -710,7 +769,7 @@ fn directory_deleted() -> anyhow::Result<()> {
     std::fs::remove_dir_all(sub_path.as_std_path())
         .with_context(|| "Failed to remove the sub directory")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("sub"));
 
     case.apply_changes(changes);
 
@@ -747,7 +806,7 @@ fn search_path() -> anyhow::Result<()> {
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("a.py"));
 
     case.apply_changes(changes);
 
@@ -778,7 +837,7 @@ fn add_search_path() -> anyhow::Result<()> {
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("a.py"));
 
     case.apply_changes(changes);
 
@@ -807,9 +866,9 @@ fn remove_search_path() -> anyhow::Result<()> {
 
     std::fs::write(site_packages.join("a.py").as_std_path(), "class A: ...")?;
 
-    let changes = case.try_stop_watch(Duration::from_millis(100));
+    let changes = case.try_stop_watch(|_: &ChangeEvent| true, Duration::from_millis(100));
 
-    assert_eq!(changes, None);
+    assert_eq!(changes, Err(vec![]));
 
     Ok(())
 }
@@ -847,7 +906,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
         "os: 3.0-",
     )?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("VERSIONS"));
 
     case.apply_changes(changes);
 
@@ -900,7 +959,7 @@ fn hard_links_in_workspace() -> anyhow::Result<()> {
     // Write to the hard link target.
     update_file(foo_path, "print('Version 2')").context("Failed to update foo.py")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(event_for_file("foo.py"));
 
     case.apply_changes(changes);
 
@@ -971,7 +1030,7 @@ fn hard_links_to_target_outside_workspace() -> anyhow::Result<()> {
     // Write to the hard link target.
     update_file(foo_path, "print('Version 2')").context("Failed to update foo.py")?;
 
-    let changes = case.stop_watch();
+    let changes = case.stop_watch(ChangeEvent::is_changed);
 
     case.apply_changes(changes);
 
@@ -1010,7 +1069,7 @@ mod unix {
         )
         .with_context(|| "Failed to set file permissions.")?;
 
-        let changes = case.stop_watch();
+        let changes = case.stop_watch(event_for_file("foo.py"));
 
         case.apply_changes(changes);
 
@@ -1108,7 +1167,7 @@ mod unix {
         update_file(baz_workspace, "def baz(): print('Version 3')")
             .context("Failed to update bar/baz.py")?;
 
-        let changes = case.stop_watch();
+        let changes = case.stop_watch(event_for_file("baz.py"));
 
         case.apply_changes(changes);
 
@@ -1179,7 +1238,7 @@ mod unix {
         update_file(&patched_bar_baz, "def baz(): print('Version 2')")
             .context("Failed to update bar/baz.py")?;
 
-        let changes = case.stop_watch();
+        let changes = case.stop_watch(event_for_file("baz.py"));
 
         case.apply_changes(changes);
 
@@ -1287,7 +1346,7 @@ mod unix {
         update_file(&baz_original, "def baz(): print('Version 2')")
             .context("Failed to update bar/baz.py")?;
 
-        let changes = case.stop_watch();
+        let changes = case.stop_watch(event_for_file("baz.py"));
 
         case.apply_changes(changes);
 
@@ -1310,4 +1369,138 @@ mod unix {
 
         Ok(())
     }
+}
+
+#[test]
+fn nested_packages_delete_root() -> anyhow::Result<()> {
+    let mut case = setup(|root: &SystemPath, workspace_root: &SystemPath| {
+        std::fs::write(
+            workspace_root.join("pyproject.toml").as_std_path(),
+            r#"
+            [project]
+            name = "inner"
+            "#,
+        )?;
+
+        std::fs::write(
+            root.join("pyproject.toml").as_std_path(),
+            r#"
+            [project]
+            name = "outer"
+            "#,
+        )?;
+
+        Ok(())
+    })?;
+
+    assert_eq!(
+        case.db().workspace().root(case.db()),
+        &*case.workspace_path("")
+    );
+
+    std::fs::remove_file(case.workspace_path("pyproject.toml").as_std_path())?;
+
+    let changes = case.stop_watch(ChangeEvent::is_deleted);
+
+    case.apply_changes(changes);
+
+    // It should now pick up the outer workspace.
+    assert_eq!(case.db().workspace().root(case.db()), case.root_path());
+
+    Ok(())
+}
+
+#[test]
+fn added_package() -> anyhow::Result<()> {
+    let mut case = setup([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "inner"
+
+            [tool.knot.workspace]
+            members = ["packages/*"]
+            "#,
+        ),
+        (
+            "packages/a/pyproject.toml",
+            r#"
+            [project]
+            name = "a"
+            "#,
+        ),
+    ])?;
+
+    assert_eq!(case.db().workspace().packages(case.db()).len(), 2);
+
+    std::fs::create_dir(case.workspace_path("packages/b").as_std_path())
+        .context("failed to create folder for package 'b'")?;
+
+    // It seems that the file watcher won't pick up on file changes shortly after the folder
+    // was created... I suspect this is because most file watchers don't support recursive
+    // file watching. Instead, file-watching libraries manually implement recursive file watching
+    // by setting a watcher for each directory. But doing this obviously "lags" behind.
+    case.take_watch_changes();
+
+    std::fs::write(
+        case.workspace_path("packages/b/pyproject.toml")
+            .as_std_path(),
+        r#"
+            [project]
+            name = "b"
+            "#,
+    )
+    .context("failed to write pyproject.toml for package b")?;
+
+    let changes = case.stop_watch(event_for_file("pyproject.toml"));
+
+    case.apply_changes(changes);
+
+    assert_eq!(case.db().workspace().packages(case.db()).len(), 3);
+
+    Ok(())
+}
+
+#[test]
+fn removed_package() -> anyhow::Result<()> {
+    let mut case = setup([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "inner"
+
+            [tool.knot.workspace]
+            members = ["packages/*"]
+            "#,
+        ),
+        (
+            "packages/a/pyproject.toml",
+            r#"
+            [project]
+            name = "a"
+            "#,
+        ),
+        (
+            "packages/b/pyproject.toml",
+            r#"
+            [project]
+            name = "b"
+            "#,
+        ),
+    ])?;
+
+    assert_eq!(case.db().workspace().packages(case.db()).len(), 3);
+
+    std::fs::remove_dir_all(case.workspace_path("packages/b").as_std_path())
+        .context("failed to remove package 'b'")?;
+
+    let changes = case.stop_watch(ChangeEvent::is_deleted);
+
+    case.apply_changes(changes);
+
+    assert_eq!(case.db().workspace().packages(case.db()).len(), 2);
+
+    Ok(())
 }

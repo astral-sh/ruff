@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
@@ -68,8 +68,8 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
-#[violation]
-pub struct MutableArgumentDefault;
+#[derive(ViolationMetadata)]
+pub(crate) struct MutableArgumentDefault;
 
 impl Violation for MutableArgumentDefault {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;

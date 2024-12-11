@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+snapshot_kind: text
 ---
 B030.py:12:8: B030 `except` handlers should only be exception classes or tuples of exception classes
    |
@@ -46,7 +47,7 @@ B030.py:33:29: B030 `except` handlers should only be exception classes or tuples
 34 |     pass
    |
 
-B030.py:39:28: B030 `except` handlers should only be exception classes or tuples of exception classes
+B030.py:39:28: B030 `except*` handlers should only be exception classes or tuples of exception classes
    |
 37 | try:
 38 |     pass
@@ -62,4 +63,40 @@ B030.py:131:8: B030 `except` handlers should only be exception classes or tuples
 131 | except (a, b) * (c, d):  # B030
     |        ^^^^^^^^^^^^^^^ B030
 132 |     pass
+    |
+
+B030.py:136:9: B030 `except*` handlers should only be exception classes or tuples of exception classes
+    |
+134 | try:
+135 |     pass
+136 | except* 1:  # Error
+    |         ^ B030
+137 |     pass
+    |
+
+B030.py:141:10: B030 `except*` handlers should only be exception classes or tuples of exception classes
+    |
+139 | try:
+140 |     pass
+141 | except* (1, ValueError):  # Error
+    |          ^ B030
+142 |     pass
+    |
+
+B030.py:146:22: B030 `except*` handlers should only be exception classes or tuples of exception classes
+    |
+144 | try:
+145 |     pass
+146 | except* (ValueError, (RuntimeError, (KeyError, TypeError))):  # Error
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B030
+147 |     pass
+    |
+
+B030.py:151:9: B030 `except*` handlers should only be exception classes or tuples of exception classes
+    |
+149 | try:
+150 |     pass
+151 | except* (a, b) * (c, d):  # B030
+    |         ^^^^^^^^^^^^^^^ B030
+152 |     pass
     |

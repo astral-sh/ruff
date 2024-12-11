@@ -35,12 +35,12 @@ def import_fixture(fixture: Path, fixture_set: str):
             # If there's no output marker, treat the whole file as already pre-formatted
             expected = input
 
-        options = {}
+        black_options = {}
         extension = "py"
 
         if flags:
             if "--preview" in flags or "--unstable" in flags:
-                options["preview"] = "enabled"
+                black_options["preview"] = "enabled"
 
             if "--pyi" in flags:
                 extension = "pyi"
@@ -53,20 +53,22 @@ def import_fixture(fixture: Path, fixture_set: str):
                 [_, length_and_rest] = flags.split("--line-length=", 1)
                 length = length_and_rest.split(" ", 1)[0]
                 length = int(length)
-                options["line_width"] = 1 if length == 0 else length
+                black_options["line_width"] = 1 if length == 0 else length
 
             if "--minimum-version=" in flags:
                 [_, version] = flags.split("--minimum-version=", 1)
                 version = version.split(" ", 1)[0]
                 # Convert 3.10 to py310
-                options["target_version"] = f"py{version.strip().replace('.', '')}"
+                black_options["target_version"] = f"py{version.strip().replace('.', '')}"
 
             if "--skip-magic-trailing-comma" in flags:
-                options["magic_trailing_comma"] = "ignore"
+                black_options["magic_trailing_comma"] = "ignore"
 
         fixture_path = output_directory.joinpath(fixture.name).with_suffix(f".{extension}")
         expect_path = fixture_path.with_suffix(f".{extension}.expect")
         options_path = fixture_path.with_suffix(".options.json")
+
+        options = OPTIONS_OVERRIDES.get(fixture.name, black_options)
 
         if len(options) > 0:
             if extension == "pyi":
@@ -108,6 +110,16 @@ IGNORE_LIST = [
     # Tests line ranges that fall outside the source range. This is a CLI test case and not a formatting test case.
     "line_ranges_outside_source.py",
 ]
+
+# Specs for which to override the formatter options
+OPTIONS_OVERRIDES = {
+    "context_managers_38.py": {
+        "target_version": "py38"
+    },
+    "context_managers_autodetect_38.py" : {
+        "target_version": "py38"
+    }
+}
 
 
 def import_fixtures(black_dir: str):

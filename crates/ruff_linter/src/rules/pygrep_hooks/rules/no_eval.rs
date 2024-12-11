@@ -1,5 +1,5 @@
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 /// ## Removed
 /// This rule is identical to [S307] which should be used instead.
@@ -29,8 +29,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [_Eval really is dangerous_ by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
 ///
 /// [S307]: https://docs.astral.sh/ruff/rules/suspicious-eval-usage/
-#[violation]
-pub struct Eval;
+#[derive(ViolationMetadata)]
+pub(crate) struct Eval;
 
 /// PGH001
 impl Violation for Eval {

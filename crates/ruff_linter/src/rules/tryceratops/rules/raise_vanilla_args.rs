@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
@@ -43,8 +43,8 @@ use crate::checkers::ast::Checker;
 ///     if x < 0:
 ///         raise CantBeNegative(x)
 /// ```
-#[violation]
-pub struct RaiseVanillaArgs;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseVanillaArgs;
 
 impl Violation for RaiseVanillaArgs {
     #[derive_message_formats]

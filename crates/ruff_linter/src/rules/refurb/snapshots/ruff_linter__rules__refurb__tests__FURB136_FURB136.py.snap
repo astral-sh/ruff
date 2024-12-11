@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+snapshot_kind: text
 ---
 FURB136.py:4:1: FURB136 [*] Replace `x if x > y else y` with `max(y, x)`
   |
@@ -190,5 +191,3 @@ FURB136.py:22:1: FURB136 [*] Replace `if` expression with `max(y, x)`
 24    |-    > y
 25    |-) else y  # FURB136
    22 |+max(y, x)  # FURB136
-
-

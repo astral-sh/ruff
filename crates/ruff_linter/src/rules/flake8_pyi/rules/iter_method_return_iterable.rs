@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_text_size::Ranged;
 
@@ -68,8 +68,8 @@ use crate::checkers::ast::Checker;
 /// class Klass:
 ///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
-#[violation]
-pub struct IterMethodReturnIterable {
+#[derive(ViolationMetadata)]
+pub(crate) struct IterMethodReturnIterable {
     is_async: bool,
 }
 

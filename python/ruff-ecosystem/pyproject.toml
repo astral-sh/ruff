@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "ruff-ecosystem"
 version = "0.0.0"
 requires-python = ">=3.11"
-dependencies = ["unidiff==0.7.5", "tomli_w==1.1.0", "tomli==2.0.2"]
+dependencies = ["unidiff==0.7.5", "tomli_w==1.1.0", "tomli==2.2.1"]
 
 [project.scripts]
 ruff-ecosystem = "ruff_ecosystem.cli:entrypoint"

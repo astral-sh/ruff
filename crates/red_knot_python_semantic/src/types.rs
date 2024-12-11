@@ -2,11 +2,12 @@ use std::hash::Hash;
 
 use indexmap::IndexSet;
 use itertools::Itertools;
-
+use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
@@ -14,7 +15,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::signatures::Signature;
 use crate::module_resolver::file_to_module;
-use crate::semantic_index::ast_ids::HasScopedAstId;
+use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
@@ -25,12 +26,14 @@ use crate::stdlib::{
     builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
 };
 use crate::symbol::{Boundness, Symbol};
+use crate::types::call::{CallDunderResult, CallOutcome};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 
 mod builder;
+mod call;
 mod diagnostic;
 mod display;
 mod infer;
@@ -39,6 +42,9 @@ mod narrow;
 mod signatures;
 mod string_annotation;
 mod unpacker;
+
+#[cfg(test)]
+mod property_tests;
 
 #[salsa::tracked(return_ref)]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
@@ -207,7 +213,7 @@ fn definition_expression_ty<'db>(
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
-    let expr_id = expression.scoped_ast_id(db, scope);
+    let expr_id = expression.scoped_expression_id(db, scope);
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
@@ -299,13 +305,7 @@ fn declarations_ty<'db>(
     let declared_ty = if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db).add(first);
         for other in [second].into_iter().chain(all_types) {
-            // Make sure not to emit spurious errors relating to `Type::Todo`,
-            // since we only infer this type due to a limitation in our current model.
-            //
-            // `Unknown` is different here, since we might infer `Unknown`
-            // for one of these due to a variable being defined in one possible
-            // control-flow branch but not another one.
-            if !first.is_equivalent_to(db, other) && !first.is_todo() && !other.is_todo() {
+            if !first.is_equivalent_to(db, other) {
                 conflicting.push(other);
             }
             builder = builder.add(other);
@@ -324,6 +324,61 @@ fn declarations_ty<'db>(
     }
 }
 
+/// Meta data for `Type::Todo`, which represents a known limitation in red-knot.
+#[cfg(debug_assertions)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TodoType {
+    FileAndLine(&'static str, u32),
+    Message(&'static str),
+}
+
+#[cfg(debug_assertions)]
+impl std::fmt::Display for TodoType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TodoType::FileAndLine(file, line) => write!(f, "[{file}:{line}]"),
+            TodoType::Message(msg) => write!(f, "({msg})"),
+        }
+    }
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TodoType;
+
+#[cfg(not(debug_assertions))]
+impl std::fmt::Display for TodoType {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+/// Create a `Type::Todo` variant to represent a known limitation in the type system.
+///
+/// It can be used with a custom message (preferred): `todo_type!("PEP 604 not supported")`,
+/// or simply using `todo_type!()`, which will include information about the file and line.
+#[cfg(debug_assertions)]
+macro_rules! todo_type {
+    () => {
+        Type::Todo(crate::types::TodoType::FileAndLine(file!(), line!()))
+    };
+    ($message:literal) => {
+        Type::Todo(crate::types::TodoType::Message($message))
+    };
+}
+
+#[cfg(not(debug_assertions))]
+macro_rules! todo_type {
+    () => {
+        Type::Todo(crate::types::TodoType)
+    };
+    ($message:literal) => {
+        Type::Todo(crate::types::TodoType)
+    };
+}
+
+pub(crate) use todo_type;
+
 /// Representation of a type: a set of possible values at runtime.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
@@ -340,7 +395,9 @@ pub enum Type<'db> {
     /// General rule: `Todo` should only propagate when the presence of the input `Todo` caused the
     /// output to be unknown. An output should only be `Todo` if fixing all `Todo` inputs to be not
     /// `Todo` would change the output type.
-    Todo,
+    ///
+    /// This variant should be created with the `todo_type!` macro.
+    Todo(TodoType),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -384,7 +441,7 @@ impl<'db> Type<'db> {
     }
 
     pub const fn is_todo(&self) -> bool {
-        matches!(self, Type::Todo)
+        matches!(self, Type::Todo(_))
     }
 
     pub const fn class_literal(class: Class<'db>) -> Self {
@@ -480,6 +537,19 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::IntLiteral variant")
     }
 
+    pub const fn into_known_instance(self) -> Option<KnownInstanceType<'db>> {
+        match self {
+            Type::KnownInstance(known_instance) => Some(known_instance),
+            _ => None,
+        }
+    }
+
+    #[track_caller]
+    pub fn expect_known_instance(self) -> KnownInstanceType<'db> {
+        self.into_known_instance()
+            .expect("Expected a Type::KnownInstance variant")
+    }
+
     pub const fn is_boolean_literal(&self) -> bool {
         matches!(self, Type::BooleanLiteral(..))
     }
@@ -493,7 +563,11 @@ impl<'db> Type<'db> {
     }
 
     pub const fn subclass_of(class: Class<'db>) -> Self {
-        Self::SubclassOf(SubclassOfType { class })
+        Self::subclass_of_base(ClassBase::Class(class))
+    }
+
+    pub const fn subclass_of_base(base: ClassBase<'db>) -> Self {
+        Self::SubclassOf(SubclassOfType { base })
     }
 
     pub fn string_literal(db: &'db dyn Db, string: &str) -> Self {
@@ -504,8 +578,11 @@ impl<'db> Type<'db> {
         Self::BytesLiteral(BytesLiteralType::new(db, bytes))
     }
 
-    pub fn tuple(db: &'db dyn Db, elements: &[Type<'db>]) -> Self {
-        Self::Tuple(TupleType::new(db, elements))
+    pub fn tuple<T: Into<Type<'db>>>(
+        db: &'db dyn Db,
+        elements: impl IntoIterator<Item = T>,
+    ) -> Self {
+        TupleType::from_elements(db, elements)
     }
 
     #[must_use]
@@ -524,14 +601,17 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is a [subtype of] type `target`.
     ///
+    /// This method returns `false` if either `self` or `other` is not fully static.
+    ///
     /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.is_equivalent_to(db, target) {
             return true;
         }
+        if !self.is_fully_static(db) || !target.is_fully_static(db) {
+            return false;
+        }
         match (self, target) {
-            (Type::Unknown | Type::Any | Type::Todo, _) => false,
-            (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (_, Type::Instance(InstanceType { class }))
@@ -574,19 +654,31 @@ impl<'db> Type<'db> {
                         },
                     )
             }
-            (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Type) =>
-            {
-                true
-            }
             (Type::ClassLiteral(self_class), Type::SubclassOf(target_class)) => {
-                self_class.class.is_subclass_of(db, target_class.class)
-            }
-            (Type::SubclassOf(self_class), Type::SubclassOf(target_class)) => {
-                self_class.class.is_subclass_of(db, target_class.class)
+                self_class.class.is_subclass_of_base(db, target_class.base)
             }
             (
-                Type::SubclassOf(SubclassOfType { class: self_class }),
+                Type::Instance(InstanceType { class: self_class }),
+                Type::SubclassOf(target_class),
+            ) if self_class.is_known(db, KnownClass::Type) => {
+                self_class.is_subclass_of_base(db, target_class.base)
+            }
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(target_class),
+                }),
+            ) => self_class.is_subclass_of(db, target_class),
+            // C ⊆ type
+            // type[C] ⊆ type
+            // Though note that this works regardless of which metaclass C has, not just for type.
+            (
+                Type::ClassLiteral(ClassLiteralType { class: self_class })
+                | Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
                 Type::Instance(InstanceType {
                     class: target_class,
                 }),
@@ -649,9 +741,6 @@ impl<'db> Type<'db> {
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_subtype_of(db, right)
             }
-            (left, Type::KnownInstance(right)) => {
-                left.is_subtype_of(db, right.instance_fallback(db))
-            }
             (Type::Instance(left), Type::Instance(right)) => left.is_instance_of(db, right.class),
             // TODO
             _ => false,
@@ -666,8 +755,8 @@ impl<'db> Type<'db> {
             return true;
         }
         match (self, target) {
-            (Type::Unknown | Type::Any | Type::Todo, _) => true,
-            (_, Type::Unknown | Type::Any | Type::Todo) => true,
+            (Type::Unknown | Type::Any | Type::Todo(_), _) => true,
+            (_, Type::Unknown | Type::Any | Type::Todo(_)) => true,
             (Type::Union(union), ty) => union
                 .elements(db)
                 .iter()
@@ -686,34 +775,106 @@ impl<'db> Type<'db> {
                         },
                     )
             }
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any,
+                }),
+                Type::SubclassOf(_),
+            ) => true,
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any,
+                }),
+                Type::Instance(target),
+            ) if target.class.is_known(db, KnownClass::Type) => true,
+            (
+                Type::Instance(class),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any,
+                }),
+            ) if class.class.is_known(db, KnownClass::Type) => true,
+            (
+                Type::ClassLiteral(_) | Type::SubclassOf(_),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any,
+                }),
+            ) => true,
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
     }
 
-    /// Return true if this type is equivalent to type `other`.
+    /// Return true if this type is [equivalent to] type `other`.
+    ///
+    /// This method returns `false` if either `self` or `other` is not fully static.
+    ///
+    /// [equivalent to]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        if !(self.is_fully_static(db) && other.is_fully_static(db)) {
+            return false;
+        }
+
+        // TODO: The following is a workaround that is required to unify the two different versions
+        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
+        // we understand `sys.version_info` branches.
+        if let (
+            Type::Instance(InstanceType { class: self_class }),
+            Type::Instance(InstanceType {
+                class: target_class,
+            }),
+        ) = (self, other)
+        {
+            let self_known = self_class.known(db);
+            if matches!(
+                self_known,
+                Some(KnownClass::NoneType | KnownClass::NoDefaultType)
+            ) && self_known == target_class.known(db)
+            {
+                return true;
+            }
+        }
+
+        // type[object] ≡ type
+        if let (
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(object_class),
+            }),
+            Type::Instance(InstanceType { class: type_class }),
+        )
+        | (
+            Type::Instance(InstanceType { class: type_class }),
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(object_class),
+            }),
+        ) = (self, other)
+        {
+            // This is the only case where "instance of a class" is equivalent to "subclass of a
+            // class", so we don't need to fall through if we're not looking at instance[type] and
+            // type[object] specifically.
+            return object_class.is_known(db, KnownClass::Object)
+                && type_class.is_known(db, KnownClass::Type);
+        }
+
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
 
         // TODO: Once we have support for final classes, we can establish that
         // `Type::SubclassOf('FinalClass')` is equivalent to `Type::ClassLiteral('FinalClass')`.
 
-        // TODO: The following is a workaround that is required to unify the two different versions
-        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
-        // we understand `sys.version_info` branches.
+        // For all other cases, types are equivalent iff they have the same internal
+        // representation.
         self == other
-            || matches!((self, other),
-                (
-                    Type::Instance(InstanceType { class: self_class }),
-                    Type::Instance(InstanceType { class: target_class })
-                )
-                if {
-                    let self_known = self_class.known(db);
-                    matches!(self_known, Some(KnownClass::NoneType | KnownClass::NoDefaultType))
-                        && self_known == target_class.known(db)
-                }
-            )
+    }
+
+    /// Returns true if both `self` and `other` are the same gradual form
+    /// (limited to `Any`, `Unknown`, or `Todo`).
+    pub(crate) fn is_same_gradual_form(self, other: Type<'db>) -> bool {
+        matches!(
+            (self, other),
+            (Type::Unknown, Type::Unknown)
+                | (Type::Any, Type::Any)
+                | (Type::Todo(_), Type::Todo(_))
+        )
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -726,7 +887,7 @@ impl<'db> Type<'db> {
 
             (Type::Any, _) | (_, Type::Any) => false,
             (Type::Unknown, _) | (_, Type::Unknown) => false,
-            (Type::Todo, _) | (_, Type::Todo) => false,
+            (Type::Todo(_), _) | (_, Type::Todo(_)) => false,
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
@@ -769,7 +930,7 @@ impl<'db> Type<'db> {
 
             (Type::SubclassOf(type_class), Type::ClassLiteral(class_literal))
             | (Type::ClassLiteral(class_literal), Type::SubclassOf(type_class)) => {
-                !class_literal.class.is_subclass_of(db, type_class.class)
+                !class_literal.class.is_subclass_of_base(db, type_class.base)
             }
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
             (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
@@ -922,6 +1083,64 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns true if the type does not contain any gradual forms (as a sub-part).
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Any | Type::Unknown | Type::Todo(_) => false,
+            Type::Never
+            | Type::FunctionLiteral(..)
+            | Type::ModuleLiteral(..)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            | Type::KnownInstance(_) => true,
+            Type::SubclassOf(SubclassOfType { base }) => matches!(base, ClassBase::Class(_)),
+            Type::ClassLiteral(_) | Type::Instance(_) => {
+                // TODO: Ideally, we would iterate over the MRO of the class, check if all
+                // bases are fully static, and only return `true` if that is the case.
+                //
+                // This does not work yet, because we currently infer `Unknown` for some
+                // generic base classes that we don't understand yet. For example, `str`
+                // is defined as `class str(Sequence[str])` in typeshed and we currently
+                // compute its MRO as `(str, Unknown, object)`. This would make us think
+                // that `str` is a gradual type, which causes all sorts of downstream
+                // issues because it does not participate in equivalence/subtyping etc.
+                //
+                // Another problem is that we run into problems if we eagerly query the
+                // MRO of class literals here. I have not fully investigated this, but
+                // iterating over the MRO alone, without even acting on it, causes us to
+                // infer `Unknown` for many classes.
+
+                true
+            }
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|elem| elem.is_fully_static(db)),
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .all(|elem| elem.is_fully_static(db))
+                    && intersection
+                        .negative(db)
+                        .iter()
+                        .all(|elem| elem.is_fully_static(db))
+            }
+            Type::Tuple(tuple) => tuple
+                .elements(db)
+                .iter()
+                .all(|elem| elem.is_fully_static(db)),
+            // TODO: Once we support them, make sure that we return `false` for other types
+            // containing gradual forms such as `tuple[Any, ...]` or `Callable[..., str]`.
+            // Conversely, make sure to return `true` for homogeneous tuples such as
+            // `tuple[int, ...]`, once we add support for them.
+        }
+    }
+
     /// Return true if there is just a single inhabitant for this type.
     ///
     /// Note: This function aims to have no false positives, but might return `false`
@@ -931,7 +1150,7 @@ impl<'db> Type<'db> {
             Type::Any
             | Type::Never
             | Type::Unknown
-            | Type::Todo
+            | Type::Todo(_)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
@@ -1007,7 +1226,10 @@ impl<'db> Type<'db> {
 
             Type::Instance(InstanceType { class }) => match class.known(db) {
                 Some(
-                    KnownClass::NoneType | KnownClass::NoDefaultType | KnownClass::VersionInfo,
+                    KnownClass::NoneType
+                    | KnownClass::NoDefaultType
+                    | KnownClass::VersionInfo
+                    | KnownClass::TypeAliasType,
                 ) => true,
                 Some(
                     KnownClass::Bool
@@ -1022,6 +1244,8 @@ impl<'db> Type<'db> {
                     | KnownClass::Set
                     | KnownClass::Dict
                     | KnownClass::Slice
+                    | KnownClass::BaseException
+                    | KnownClass::BaseExceptionGroup
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
@@ -1034,7 +1258,7 @@ impl<'db> Type<'db> {
             Type::Any
             | Type::Never
             | Type::Unknown
-            | Type::Todo
+            | Type::Todo(_)
             | Type::Union(..)
             | Type::Intersection(..)
             | Type::LiteralString => false,
@@ -1048,16 +1272,20 @@ impl<'db> Type<'db> {
     /// as accessed from instances of the `Bar` class.
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        if name == "__class__" {
+            return self.to_meta_type(db).into();
+        }
+
         match self {
             Type::Any => Type::Any.into(),
             Type::Never => {
                 // TODO: attribute lookup on Never type
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::Unknown => Type::Unknown.into(),
             Type::FunctionLiteral(_) => {
                 // TODO: attribute lookup on function type
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::ModuleLiteral(file) => {
                 // `__dict__` is a very special member that is never overridden by module globals;
@@ -1107,7 +1335,7 @@ impl<'db> Type<'db> {
                         Type::IntLiteral(Program::get(db).target_version(db).minor.into())
                     }
                     // TODO MRO? get_own_instance_member, get_instance_member
-                    _ => Type::Todo,
+                    _ => todo_type!("instance attributes"),
                 };
                 ty.into()
             }
@@ -1149,36 +1377,36 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
-                Type::Todo.into()
+                todo_type!().into()
             }
-            Type::BooleanLiteral(_) => Type::Todo.into(),
+            Type::BooleanLiteral(_) => todo_type!().into(),
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::LiteralString => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::BytesLiteral(_) => {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::SliceLiteral(_) => {
                 // TODO defer to `builtins.slice` methods
-                Type::Todo.into()
+                todo_type!().into()
             }
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
-                Type::Todo.into()
+                todo_type!().into()
             }
-            Type::Todo => Type::Todo.into(),
+            &todo @ Type::Todo(_) => todo.into(),
         }
     }
 
@@ -1188,7 +1416,7 @@ impl<'db> Type<'db> {
     /// when `bool(x)` is called on an object `x`.
     fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
-            Type::Any | Type::Todo | Type::Never | Type::Unknown => Truthiness::Ambiguous,
+            Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(_) => {
@@ -1266,21 +1494,76 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return the type of `len()` on a type if it is known more precisely than `int`,
+    /// or `None` otherwise.
+    ///
+    /// In the second case, the return type of `len()` in `typeshed` (`int`)
+    /// is used as a fallback.
+    fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+            match ty {
+                // TODO: Emit diagnostic for non-integers and negative integers
+                Type::IntLiteral(value) => (value >= 0).then_some(ty),
+                Type::BooleanLiteral(value) => Some(Type::IntLiteral(value.into())),
+                Type::Union(union) => {
+                    let mut builder = UnionBuilder::new(db);
+                    for element in union.elements(db) {
+                        builder = builder.add(non_negative_int_literal(db, *element)?);
+                    }
+                    Some(builder.build())
+                }
+                _ => None,
+            }
+        }
+
+        let usize_len = match self {
+            Type::BytesLiteral(bytes) => Some(bytes.python_len(db)),
+            Type::StringLiteral(string) => Some(string.python_len(db)),
+            Type::Tuple(tuple) => Some(tuple.len(db)),
+            _ => None,
+        };
+
+        if let Some(usize_len) = usize_len {
+            return usize_len.try_into().ok().map(Type::IntLiteral);
+        }
+
+        let return_ty = match self.call_dunder(db, "__len__", &[*self]) {
+            // TODO: emit a diagnostic
+            CallDunderResult::MethodNotAvailable => return None,
+
+            CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
+                outcome.return_ty(db)?
+            }
+        };
+
+        non_negative_int_literal(db, return_ty)
+    }
+
     /// Return the outcome of calling an object of this type.
     #[must_use]
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
-            Type::FunctionLiteral(function_type) => {
-                if function_type.is_known(db, KnownFunction::RevealType) {
-                    CallOutcome::revealed(
-                        function_type.signature(db).return_ty,
-                        *arg_types.first().unwrap_or(&Type::Unknown),
-                    )
-                } else {
-                    CallOutcome::callable(function_type.signature(db).return_ty)
+            Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                Some(KnownFunction::RevealType) => CallOutcome::revealed(
+                    function_type.signature(db).return_ty,
+                    *arg_types.first().unwrap_or(&Type::Unknown),
+                ),
+
+                Some(KnownFunction::Len) => {
+                    let normal_return_ty = function_type.signature(db).return_ty;
+
+                    let [only_arg] = arg_types else {
+                        // TODO: Emit a diagnostic
+                        return CallOutcome::callable(normal_return_ty);
+                    };
+                    let len_ty = only_arg.len(db);
+
+                    CallOutcome::callable(len_ty.unwrap_or(normal_return_ty))
                 }
-            }
+
+                _ => CallOutcome::callable(function_type.signature(db).return_ty),
+            },
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
@@ -1329,7 +1612,7 @@ impl<'db> Type<'db> {
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
 
-            Type::Todo => CallOutcome::callable(Type::Todo),
+            Type::Todo(_) => CallOutcome::callable(todo_type!("call todo")),
 
             Type::Unknown => CallOutcome::callable(Type::Unknown),
 
@@ -1342,7 +1625,7 @@ impl<'db> Type<'db> {
             ),
 
             // TODO: intersection types
-            Type::Intersection(_) => CallOutcome::callable(Type::Todo),
+            Type::Intersection(_) => CallOutcome::callable(todo_type!()),
 
             _ => CallOutcome::not_callable(self),
         }
@@ -1379,12 +1662,6 @@ impl<'db> Type<'db> {
             return IterationOutcome::Iterable {
                 element_ty: UnionType::from_elements(db, tuple_type.elements(db)),
             };
-        }
-
-        if matches!(self, Type::Unknown | Type::Any | Type::Todo) {
-            // Explicit handling of `Unknown` and `Any` necessary until `type[Unknown]` and
-            // `type[Any]` are not defined as `Todo` anymore.
-            return IterationOutcome::Iterable { element_ty: self };
         }
 
         let dunder_iter_result = self.call_dunder(db, "__iter__", &[self]);
@@ -1440,14 +1717,17 @@ impl<'db> Type<'db> {
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
-            Type::Todo => Type::Todo,
+            todo @ Type::Todo(_) => *todo,
             Type::Unknown => Type::Unknown,
             Type::Never => Type::Never,
             Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
-            Type::SubclassOf(SubclassOfType { class }) => Type::instance(*class),
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => Type::instance(*class),
+            Type::SubclassOf(_) => Type::Any,
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
-            Type::Intersection(_) => Type::Todo,
+            Type::Intersection(_) => todo_type!(),
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
@@ -1473,12 +1753,22 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn in_type_expression(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            // In a type expression, a bare `type` is interpreted as "instance of `type`", which is
+            // equivalent to `type[object]`.
             Type::ClassLiteral(_) | Type::SubclassOf(_) => self.to_instance(db),
+            // We treat `typing.Type` exactly the same as `builtins.type`:
+            Type::KnownInstance(KnownInstanceType::Type) => KnownClass::Type.to_instance(db),
             Type::Union(union) => union.map(db, |element| element.in_type_expression(db)),
             Type::Unknown => Type::Unknown,
             // TODO map this to a new `Type::TypeVar` variant
             Type::KnownInstance(KnownInstanceType::TypeVar(_)) => *self,
-            _ => Type::Todo,
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => alias.value_ty(db),
+            Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
+                Type::Never
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
+            Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
+            _ => todo_type!(),
         }
     }
 
@@ -1526,9 +1816,7 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            Type::Instance(InstanceType { class }) => {
-                Type::SubclassOf(SubclassOfType { class: *class })
-            }
+            Type::Instance(InstanceType { class }) => Type::subclass_of(*class),
             Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
@@ -1539,7 +1827,9 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
-            Type::SubclassOf(SubclassOfType { class }) => Type::subclass_of(
+            Type::SubclassOf(SubclassOfType {
+                base: ClassBase::Class(class),
+            }) => Type::subclass_of(
                 class
                     .try_metaclass(db)
                     .ok()
@@ -1547,14 +1837,13 @@ impl<'db> Type<'db> {
                     .unwrap_or_else(|| KnownClass::Type.to_class_literal(db).expect_class_literal())
                     .class,
             ),
+            Type::SubclassOf(_) => Type::Any,
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
-            // TODO: `type[Any]`?
             Type::Any => Type::Any,
-            // TODO: `type[Unknown]`?
             Type::Unknown => Type::Unknown,
             // TODO intersections
-            Type::Intersection(_) => Type::Todo,
-            Type::Todo => Type::Todo,
+            Type::Intersection(_) => todo_type!(),
+            todo @ Type::Todo(_) => *todo,
         }
     }
 
@@ -1633,6 +1922,8 @@ pub enum KnownClass {
     Set,
     Dict,
     Slice,
+    BaseException,
+    BaseExceptionGroup,
     // Types
     GenericAlias,
     ModuleType,
@@ -1642,6 +1933,7 @@ pub enum KnownClass {
     // Typing
     SpecialForm,
     TypeVar,
+    TypeAliasType,
     NoDefaultType,
     // sys
     VersionInfo,
@@ -1662,12 +1954,15 @@ impl<'db> KnownClass {
             Self::List => "list",
             Self::Type => "type",
             Self::Slice => "slice",
+            Self::BaseException => "BaseException",
+            Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
+            Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             // This is the name the type of `sys.version_info` has in typeshed,
             // which is different to what `type(sys.version_info).__name__` is at runtime.
@@ -1683,13 +1978,19 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        core_module_symbol(db, self.canonical_module(), self.as_str())
+        core_module_symbol(db, self.canonical_module(db), self.as_str())
             .ignore_possibly_unbound()
             .unwrap_or(Type::Unknown)
     }
 
+    pub fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.to_class_literal(db)
+            .into_class_literal()
+            .map(|ClassLiteralType { class }| Type::subclass_of(class))
+    }
+
     /// Return the module in which we should look up the definition for this class
-    pub(crate) const fn canonical_module(self) -> CoreStdlibModule {
+    pub(crate) fn canonical_module(self, db: &'db dyn Db) -> CoreStdlibModule {
         match self {
             Self::Bool
             | Self::Object
@@ -1702,15 +2003,25 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::Slice => CoreStdlibModule::Builtins,
             Self::VersionInfo => CoreStdlibModule::Sys,
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
             Self::NoneType => CoreStdlibModule::Typeshed,
-            Self::SpecialForm | Self::TypeVar => CoreStdlibModule::Typing,
-            // TODO when we understand sys.version_info, we will need an explicit fallback here,
-            // because typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
-            // singleton, but not for `typing._NoDefaultType`
-            Self::NoDefaultType => CoreStdlibModule::TypingExtensions,
+            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType => CoreStdlibModule::Typing,
+            Self::NoDefaultType => {
+                let python_version = Program::get(db).target_version(db);
+
+                // typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
+                // singleton, but not for `typing._NoDefaultType`. So we need to switch
+                // to `typing._NoDefaultType` for newer versions:
+                if python_version >= PythonVersion::PY313 {
+                    CoreStdlibModule::Typing
+                } else {
+                    CoreStdlibModule::TypingExtensions
+                }
+            }
         }
     }
 
@@ -1720,7 +2031,7 @@ impl<'db> KnownClass {
     const fn is_singleton(self) -> bool {
         // TODO there are other singleton types (EllipsisType, NotImplementedType)
         match self {
-            Self::NoneType | Self::NoDefaultType | Self::VersionInfo => true,
+            Self::NoneType | Self::NoDefaultType | Self::VersionInfo | Self::TypeAliasType => true,
             Self::Bool
             | Self::Object
             | Self::Bytes
@@ -1737,6 +2048,8 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::FunctionType
             | Self::SpecialForm
+            | Self::BaseException
+            | Self::BaseExceptionGroup
             | Self::TypeVar => false,
         }
     }
@@ -1758,10 +2071,13 @@ impl<'db> KnownClass {
             "dict" => Self::Dict,
             "list" => Self::List,
             "slice" => Self::Slice,
+            "BaseException" => Self::BaseException,
+            "BaseExceptionGroup" => Self::BaseExceptionGroup,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
             "FunctionType" => Self::FunctionType,
+            "TypeAliasType" => Self::TypeAliasType,
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "_version_info" => Self::VersionInfo,
@@ -1769,11 +2085,11 @@ impl<'db> KnownClass {
         };
 
         let module = file_to_module(db, file)?;
-        candidate.check_module(&module).then_some(candidate)
+        candidate.check_module(db, &module).then_some(candidate)
     }
 
     /// Return `true` if the module of `self` matches `module_name`
-    fn check_module(self, module: &Module) -> bool {
+    fn check_module(self, db: &'db dyn Db, module: &Module) -> bool {
         if !module.search_path().is_standard_library() {
             return false;
         }
@@ -1793,9 +2109,11 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::ModuleType
             | Self::VersionInfo
-            | Self::FunctionType => module.name() == self.canonical_module().as_str(),
+            | Self::BaseException
+            | Self::BaseExceptionGroup
+            | Self::FunctionType => module.name() == self.canonical_module(db).as_str(),
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
-            Self::SpecialForm | Self::TypeVar | Self::NoDefaultType => {
+            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
                 matches!(module.name().as_str(), "typing" | "typing_extensions")
             }
         }
@@ -1807,24 +2125,56 @@ impl<'db> KnownClass {
 pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
+    /// The symbol `typing.LiteralString` (which can also be found as `typing_extensions.LiteralString`)
+    LiteralString,
+    /// The symbol `typing.Optional` (which can also be found as `typing_extensions.Optional`)
+    Optional,
+    /// The symbol `typing.Union` (which can also be found as `typing_extensions.Union`)
+    Union,
+    /// The symbol `typing.NoReturn` (which can also be found as `typing_extensions.NoReturn`)
+    NoReturn,
+    /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
+    Never,
+    /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
+    Any,
+    /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
+    Type,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
+    /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
+    TypeAliasType(TypeAliasType<'db>),
     // TODO: fill this enum out with more special forms, etc.
 }
 
 impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
-            KnownInstanceType::Literal => "Literal",
-            KnownInstanceType::TypeVar(_) => "TypeVar",
+            Self::Literal => "Literal",
+            Self::LiteralString => "LiteralString",
+            Self::Optional => "Optional",
+            Self::Union => "Union",
+            Self::TypeVar(_) => "TypeVar",
+            Self::NoReturn => "NoReturn",
+            Self::Never => "Never",
+            Self::Any => "Any",
+            Self::Type => "Type",
+            Self::TypeAliasType(_) => "TypeAliasType",
         }
     }
 
     /// Evaluate the known instance in boolean context
     pub const fn bool(self) -> Truthiness {
         match self {
-            Self::Literal => Truthiness::AlwaysTrue,
-            Self::TypeVar(_) => Truthiness::AlwaysTrue,
+            Self::Literal
+            | Self::LiteralString
+            | Self::Optional
+            | Self::TypeVar(_)
+            | Self::Union
+            | Self::NoReturn
+            | Self::Never
+            | Self::Any
+            | Self::Type
+            | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
         }
     }
 
@@ -1832,7 +2182,15 @@ impl<'db> KnownInstanceType<'db> {
     pub fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
             Self::Literal => "typing.Literal",
+            Self::LiteralString => "typing.LiteralString",
+            Self::Optional => "typing.Optional",
+            Self::Union => "typing.Union",
+            Self::NoReturn => "typing.NoReturn",
+            Self::Never => "typing.Never",
+            Self::Any => "typing.Any",
+            Self::Type => "typing.Type",
             Self::TypeVar(typevar) => typevar.name(db),
+            Self::TypeAliasType(_) => "typing.TypeAliasType",
         }
     }
 
@@ -1840,7 +2198,15 @@ impl<'db> KnownInstanceType<'db> {
     pub const fn class(self) -> KnownClass {
         match self {
             Self::Literal => KnownClass::SpecialForm,
+            Self::LiteralString => KnownClass::SpecialForm,
+            Self::Optional => KnownClass::SpecialForm,
+            Self::Union => KnownClass::SpecialForm,
+            Self::NoReturn => KnownClass::SpecialForm,
+            Self::Never => KnownClass::SpecialForm,
+            Self::Any => KnownClass::Object,
+            Self::Type => KnownClass::Object,
             Self::TypeVar(_) => KnownClass::TypeVar,
+            Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
     }
 
@@ -1858,7 +2224,14 @@ impl<'db> KnownInstanceType<'db> {
             return None;
         }
         match (module.name().as_str(), instance_name) {
+            ("typing", "Any") => Some(Self::Any),
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
+            ("typing" | "typing_extensions", "LiteralString") => Some(Self::LiteralString),
+            ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
+            ("typing" | "typing_extensions", "Union") => Some(Self::Union),
+            ("typing" | "typing_extensions", "NoReturn") => Some(Self::NoReturn),
+            ("typing" | "typing_extensions", "Never") => Some(Self::Never),
+            ("typing" | "typing_extensions", "Type") => Some(Self::Type),
             _ => None,
         }
     }
@@ -1866,23 +2239,7 @@ impl<'db> KnownInstanceType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let ty = match (self, name) {
             (Self::TypeVar(typevar), "__name__") => Type::string_literal(db, typevar.name(db)),
-            (Self::TypeVar(typevar), "__bound__") => typevar
-                .upper_bound(db)
-                .map(|ty| ty.to_meta_type(db))
-                .unwrap_or_else(|| KnownClass::NoneType.to_instance(db)),
-            (Self::TypeVar(typevar), "__constraints__") => {
-                let tuple_elements: Vec<Type<'db>> = typevar
-                    .constraints(db)
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|ty| ty.to_meta_type(db))
-                    .collect();
-                Type::tuple(db, &tuple_elements)
-            }
-            (Self::TypeVar(typevar), "__default__") => typevar
-                .default_ty(db)
-                .map(|ty| ty.to_meta_type(db))
-                .unwrap_or_else(|| KnownClass::NoDefaultType.to_instance(db)),
+            (Self::TypeAliasType(alias), "__name__") => Type::string_literal(db, alias.name(db)),
             _ => return self.instance_fallback(db).member(db, name),
         };
         ty.into()
@@ -1914,6 +2271,7 @@ pub struct TypeVarInstance<'db> {
 }
 
 impl<'db> TypeVarInstance<'db> {
+    #[allow(unused)]
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
@@ -1922,7 +2280,8 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
-    pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
+    #[allow(unused)]
+    pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
         if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
             Some(tuple.elements(db))
         } else {
@@ -1935,312 +2294,6 @@ impl<'db> TypeVarInstance<'db> {
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(TupleType<'db>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum CallOutcome<'db> {
-    Callable {
-        return_ty: Type<'db>,
-    },
-    RevealType {
-        return_ty: Type<'db>,
-        revealed_ty: Type<'db>,
-    },
-    NotCallable {
-        not_callable_ty: Type<'db>,
-    },
-    Union {
-        called_ty: Type<'db>,
-        outcomes: Box<[CallOutcome<'db>]>,
-    },
-    PossiblyUnboundDunderCall {
-        called_ty: Type<'db>,
-        call_outcome: Box<CallOutcome<'db>>,
-    },
-}
-
-impl<'db> CallOutcome<'db> {
-    /// Create a new `CallOutcome::Callable` with given return type.
-    fn callable(return_ty: Type<'db>) -> CallOutcome<'db> {
-        CallOutcome::Callable { return_ty }
-    }
-
-    /// Create a new `CallOutcome::NotCallable` with given not-callable type.
-    fn not_callable(not_callable_ty: Type<'db>) -> CallOutcome<'db> {
-        CallOutcome::NotCallable { not_callable_ty }
-    }
-
-    /// Create a new `CallOutcome::RevealType` with given revealed and return types.
-    fn revealed(return_ty: Type<'db>, revealed_ty: Type<'db>) -> CallOutcome<'db> {
-        CallOutcome::RevealType {
-            return_ty,
-            revealed_ty,
-        }
-    }
-
-    /// Create a new `CallOutcome::Union` with given wrapped outcomes.
-    fn union(
-        called_ty: Type<'db>,
-        outcomes: impl IntoIterator<Item = CallOutcome<'db>>,
-    ) -> CallOutcome<'db> {
-        CallOutcome::Union {
-            called_ty,
-            outcomes: outcomes.into_iter().collect(),
-        }
-    }
-
-    /// Get the return type of the call, or `None` if not callable.
-    fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        match self {
-            Self::Callable { return_ty } => Some(*return_ty),
-            Self::RevealType {
-                return_ty,
-                revealed_ty: _,
-            } => Some(*return_ty),
-            Self::NotCallable { not_callable_ty: _ } => None,
-            Self::Union {
-                outcomes,
-                called_ty: _,
-            } => outcomes
-                .iter()
-                // If all outcomes are NotCallable, we return None; if some outcomes are callable
-                // and some are not, we return a union including Unknown.
-                .fold(None, |acc, outcome| {
-                    let ty = outcome.return_ty(db);
-                    match (acc, ty) {
-                        (None, None) => None,
-                        (None, Some(ty)) => Some(UnionBuilder::new(db).add(ty)),
-                        (Some(builder), ty) => Some(builder.add(ty.unwrap_or(Type::Unknown))),
-                    }
-                })
-                .map(UnionBuilder::build),
-            Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
-        }
-    }
-
-    /// Get the return type of the call, emitting default diagnostics if needed.
-    fn unwrap_with_diagnostic<'a>(
-        &self,
-        db: &'db dyn Db,
-        node: ast::AnyNodeRef,
-        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
-    ) -> Type<'db> {
-        match self.return_ty_result(db, node, diagnostics) {
-            Ok(return_ty) => return_ty,
-            Err(NotCallableError::Type {
-                not_callable_ty,
-                return_ty,
-            }) => {
-                diagnostics.add(
-                    node,
-                    "call-non-callable",
-                    format_args!(
-                        "Object of type `{}` is not callable",
-                        not_callable_ty.display(db)
-                    ),
-                );
-                return_ty
-            }
-            Err(NotCallableError::UnionElement {
-                not_callable_ty,
-                called_ty,
-                return_ty,
-            }) => {
-                diagnostics.add(
-                    node,
-                    "call-non-callable",
-                    format_args!(
-                        "Object of type `{}` is not callable (due to union element `{}`)",
-                        called_ty.display(db),
-                        not_callable_ty.display(db),
-                    ),
-                );
-                return_ty
-            }
-            Err(NotCallableError::UnionElements {
-                not_callable_tys,
-                called_ty,
-                return_ty,
-            }) => {
-                diagnostics.add(
-                    node,
-                    "call-non-callable",
-                    format_args!(
-                        "Object of type `{}` is not callable (due to union elements {})",
-                        called_ty.display(db),
-                        not_callable_tys.display(db),
-                    ),
-                );
-                return_ty
-            }
-            Err(NotCallableError::PossiblyUnboundDunderCall {
-                callable_ty: called_ty,
-                return_ty,
-            }) => {
-                diagnostics.add(
-                    node,
-                    "call-non-callable",
-                    format_args!(
-                        "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                        called_ty.display(db)
-                    ),
-                );
-                return_ty
-            }
-        }
-    }
-
-    /// Get the return type of the call as a result.
-    fn return_ty_result<'a>(
-        &self,
-        db: &'db dyn Db,
-        node: ast::AnyNodeRef,
-        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
-    ) -> Result<Type<'db>, NotCallableError<'db>> {
-        match self {
-            Self::Callable { return_ty } => Ok(*return_ty),
-            Self::RevealType {
-                return_ty,
-                revealed_ty,
-            } => {
-                diagnostics.add(
-                    node,
-                    "revealed-type",
-                    format_args!("Revealed type is `{}`", revealed_ty.display(db)),
-                );
-                Ok(*return_ty)
-            }
-            Self::NotCallable { not_callable_ty } => Err(NotCallableError::Type {
-                not_callable_ty: *not_callable_ty,
-                return_ty: Type::Unknown,
-            }),
-            Self::PossiblyUnboundDunderCall {
-                called_ty,
-                call_outcome,
-            } => Err(NotCallableError::PossiblyUnboundDunderCall {
-                callable_ty: *called_ty,
-                return_ty: call_outcome.return_ty(db).unwrap_or(Type::Unknown),
-            }),
-            Self::Union {
-                outcomes,
-                called_ty,
-            } => {
-                let mut not_callable = vec![];
-                let mut union_builder = UnionBuilder::new(db);
-                let mut revealed = false;
-                for outcome in outcomes {
-                    let return_ty = match outcome {
-                        Self::NotCallable { not_callable_ty } => {
-                            not_callable.push(*not_callable_ty);
-                            Type::Unknown
-                        }
-                        Self::RevealType {
-                            return_ty,
-                            revealed_ty: _,
-                        } => {
-                            if revealed {
-                                *return_ty
-                            } else {
-                                revealed = true;
-                                outcome.unwrap_with_diagnostic(db, node, diagnostics)
-                            }
-                        }
-                        _ => outcome.unwrap_with_diagnostic(db, node, diagnostics),
-                    };
-                    union_builder = union_builder.add(return_ty);
-                }
-                let return_ty = union_builder.build();
-                match not_callable[..] {
-                    [] => Ok(return_ty),
-                    [elem] => Err(NotCallableError::UnionElement {
-                        not_callable_ty: elem,
-                        called_ty: *called_ty,
-                        return_ty,
-                    }),
-                    _ if not_callable.len() == outcomes.len() => Err(NotCallableError::Type {
-                        not_callable_ty: *called_ty,
-                        return_ty,
-                    }),
-                    _ => Err(NotCallableError::UnionElements {
-                        not_callable_tys: not_callable.into_boxed_slice(),
-                        called_ty: *called_ty,
-                        return_ty,
-                    }),
-                }
-            }
-        }
-    }
-}
-
-enum CallDunderResult<'db> {
-    CallOutcome(CallOutcome<'db>),
-    PossiblyUnbound(CallOutcome<'db>),
-    MethodNotAvailable,
-}
-
-impl<'db> CallDunderResult<'db> {
-    fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        match self {
-            Self::CallOutcome(outcome) => outcome.return_ty(db),
-            Self::PossiblyUnbound { .. } => None,
-            Self::MethodNotAvailable => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum NotCallableError<'db> {
-    /// The type is not callable.
-    Type {
-        not_callable_ty: Type<'db>,
-        return_ty: Type<'db>,
-    },
-    /// A single union element is not callable.
-    UnionElement {
-        not_callable_ty: Type<'db>,
-        called_ty: Type<'db>,
-        return_ty: Type<'db>,
-    },
-    /// Multiple (but not all) union elements are not callable.
-    UnionElements {
-        not_callable_tys: Box<[Type<'db>]>,
-        called_ty: Type<'db>,
-        return_ty: Type<'db>,
-    },
-    PossiblyUnboundDunderCall {
-        callable_ty: Type<'db>,
-        return_ty: Type<'db>,
-    },
-}
-
-impl<'db> NotCallableError<'db> {
-    /// The return type that should be used when a call is not callable.
-    fn return_ty(&self) -> Type<'db> {
-        match self {
-            Self::Type { return_ty, .. } => *return_ty,
-            Self::UnionElement { return_ty, .. } => *return_ty,
-            Self::UnionElements { return_ty, .. } => *return_ty,
-            Self::PossiblyUnboundDunderCall { return_ty, .. } => *return_ty,
-        }
-    }
-
-    /// The resolved type that was not callable.
-    ///
-    /// For unions, returns the union type itself, which may contain a mix of callable and
-    /// non-callable types.
-    fn called_ty(&self) -> Type<'db> {
-        match self {
-            Self::Type {
-                not_callable_ty, ..
-            } => *not_callable_ty,
-            Self::UnionElement { called_ty, .. } => *called_ty,
-            Self::UnionElements { called_ty, .. } => *called_ty,
-            Self::PossiblyUnboundDunderCall {
-                callable_ty: called_ty,
-                ..
-            } => *called_ty,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2403,13 +2456,15 @@ pub enum KnownFunction {
     ConstraintFunction(KnownConstraintFunction),
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
+    /// `builtins.len`
+    Len,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType => None,
+            Self::RevealType | Self::Len => None,
         }
     }
 
@@ -2426,6 +2481,7 @@ impl KnownFunction {
             "issubclass" if definition.is_builtin_definition(db) => Some(
                 KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
             ),
+            "len" if definition.is_builtin_definition(db) => Some(KnownFunction::Len),
             _ => None,
         }
     }
@@ -2466,7 +2522,7 @@ impl<'db> Class<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    fn explicit_bases(self, db: &'db dyn Db) -> &[Type<'db>] {
+    fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         self.explicit_bases_query(db)
     }
 
@@ -2535,7 +2591,11 @@ impl<'db> Class<'db> {
     pub fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.iter_mro(db).contains(&ClassBase::Class(other))
+        self.is_subclass_of_base(db, other)
+    }
+
+    fn is_subclass_of_base(self, db: &'db dyn Db, other: impl Into<ClassBase<'db>>) -> bool {
+        self.iter_mro(db).contains(&other.into())
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -2594,7 +2654,7 @@ impl<'db> Class<'db> {
             // TODO: If the metaclass is not a class, we should verify that it's a callable
             // which accepts the same arguments as `type.__new__` (otherwise error), and return
             // the meta-type of its return type. (And validate that is a class type?)
-            return Ok(Type::Todo);
+            return Ok(todo_type!("metaclass not a class"));
         };
 
         // Reconcile all base classes' metaclasses with the candidate metaclass.
@@ -2641,15 +2701,11 @@ impl<'db> Class<'db> {
             return Type::tuple(db, &tuple_elements).into();
         }
 
-        if name == "__class__" {
-            return self.metaclass(db).into();
-        }
-
         for superclass in self.iter_mro(db) {
             match superclass {
                 // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
                 // the type found on the next "real" class.
-                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo => {
+                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => {
                     return Type::from(superclass).member(db, name)
                 }
                 ClassBase::Class(class) => {
@@ -2708,6 +2764,27 @@ impl<'db> Class<'db> {
     }
 }
 
+#[salsa::interned]
+pub struct TypeAliasType<'db> {
+    #[return_ref]
+    pub name: ast::name::Name,
+
+    rhs_scope: ScopeId<'db>,
+}
+
+#[salsa::tracked]
+impl<'db> TypeAliasType<'db> {
+    #[salsa::tracked]
+    pub fn value_ty(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.rhs_scope(db);
+
+        let type_alias_stmt_node = scope.node(db).expect_type_alias();
+        let definition = semantic_index(db, scope.file(db)).definition(type_alias_stmt_node);
+
+        definition_expression_ty(db, definition, &type_alias_stmt_node.value)
+    }
+}
+
 /// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct MetaclassCandidate<'db> {
@@ -2736,12 +2813,12 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
 /// A type that represents `type[C]`, i.e. the class literal `C` and class literals that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
-    class: Class<'db>,
+    base: ClassBase<'db>,
 }
 
 impl<'db> SubclassOfType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        self.class.class_member(db, name)
+        Type::from(self.base).member(db, name)
     }
 }
 
@@ -2855,8 +2932,9 @@ pub struct StringLiteralType<'db> {
 }
 
 impl<'db> StringLiteralType<'db> {
-    pub fn len(&self, db: &'db dyn Db) -> usize {
-        self.value(db).len()
+    /// The length of the string, as would be returned by Python's `len()`.
+    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).chars().count()
     }
 }
 
@@ -2866,6 +2944,12 @@ pub struct BytesLiteralType<'db> {
     value: Box<[u8]>,
 }
 
+impl<'db> BytesLiteralType<'db> {
+    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).len()
+    }
+}
+
 #[salsa::interned]
 pub struct SliceLiteralType<'db> {
     start: Option<i32>,
@@ -2873,7 +2957,7 @@ pub struct SliceLiteralType<'db> {
     step: Option<i32>,
 }
 
-impl<'db> SliceLiteralType<'db> {
+impl SliceLiteralType<'_> {
     fn as_tuple(self, db: &dyn Db) -> (Option<i32>, Option<i32>, Option<i32>) {
         (self.start(db), self.stop(db), self.step(db))
     }
@@ -2885,6 +2969,23 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> TupleType<'db> {
+    pub fn from_elements<T: Into<Type<'db>>>(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = T>,
+    ) -> Type<'db> {
+        let mut elements = vec![];
+
+        for ty in types {
+            let ty = ty.into();
+            if ty.is_never() {
+                return Type::Never;
+            }
+            elements.push(ty);
+        }
+
+        Type::Tuple(Self::new(db, elements.into_boxed_slice()))
+    }
+
     pub fn get(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
         self.elements(db).get(index).copied()
     }
@@ -2894,52 +2995,28 @@ impl<'db> TupleType<'db> {
     }
 }
 
+// Make sure that the `Type` enum does not grow unexpectedly.
+#[cfg(not(debug_assertions))]
+#[cfg(target_pointer_width = "64")]
+static_assertions::assert_eq_size!(Type, [u8; 16]);
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
+    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
     use crate::stdlib::typing_symbol;
-    use crate::ProgramSettings;
+    use crate::PythonVersion;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast as ast;
     use test_case::test_case;
 
-    #[cfg(target_pointer_width = "64")]
-    #[test]
-    fn no_bloat_enum_sizes() {
-        use std::mem::size_of;
-        assert_eq!(size_of::<Type>(), 16);
-    }
-
-    pub(crate) fn setup_db() -> TestDb {
-        let db = TestDb::new();
-
-        let src_root = SystemPathBuf::from("/src");
-        db.memory_file_system()
-            .create_directory_all(&src_root)
-            .unwrap();
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(src_root),
-            },
-        )
-        .expect("Valid search path settings");
-
-        db
-    }
-
     /// A test representation of a type that can be transformed unambiguously into a real Type,
     /// given a db.
-    #[derive(Debug, Clone)]
-    enum Ty {
+    #[derive(Debug, Clone, PartialEq)]
+    pub(crate) enum Ty {
         Never,
         Unknown,
         None,
@@ -2960,16 +3037,18 @@ pub(crate) mod tests {
         Union(Vec<Ty>),
         Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
+        SubclassOfAny,
+        SubclassOfBuiltinClass(&'static str),
     }
 
     impl Ty {
-        fn into_type(self, db: &TestDb) -> Type<'_> {
+        pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
             match self {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::Unknown,
                 Ty::None => Type::none(db),
                 Ty::Any => Type::Any,
-                Ty::Todo => Type::Todo,
+                Ty::Todo => todo_type!("Ty::Todo"),
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => Type::string_literal(db, s),
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
@@ -2994,11 +3073,26 @@ pub(crate) mod tests {
                     builder.build()
                 }
                 Ty::Tuple(tys) => {
-                    let elements: Vec<Type> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
-                    Type::tuple(db, &elements)
+                    let elements = tys.into_iter().map(|ty| ty.into_type(db));
+                    Type::tuple(db, elements)
                 }
+                Ty::SubclassOfAny => Type::subclass_of_base(ClassBase::Any),
+                Ty::SubclassOfBuiltinClass(s) => Type::subclass_of(
+                    builtins_symbol(db, s)
+                        .expect_type()
+                        .expect_class_literal()
+                        .class,
+                ),
             }
         }
+    }
+
+    #[test_case(Ty::Tuple(vec![Ty::Never]))]
+    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("str"), Ty::Never, Ty::BuiltinInstance("int")]))]
+    #[test_case(Ty::Tuple(vec![Ty::Tuple(vec![Ty::Never])]))]
+    fn tuple_containing_never_simplifies_to_never(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db), Type::Never);
     }
 
     #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
@@ -3026,6 +3120,26 @@ pub(crate) mod tests {
     )]
     #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
+    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfAny)]
+    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::SubclassOfAny, Ty::SubclassOfBuiltinClass("str"))]
+    #[test_case(Ty::SubclassOfAny, Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::SubclassOfAny)]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("object"),
+        Ty::SubclassOfBuiltinClass("object")
+    )]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfAny)]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("str"),
+        Ty::SubclassOfBuiltinClass("object")
+    )]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfBuiltinClass("str"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfAny)]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::BuiltinInstance("type"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -3043,6 +3157,11 @@ pub(crate) mod tests {
         Ty::Union(vec![Ty::IntLiteral(1), Ty::None]),
         Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::None])
     )]
+    #[test_case(
+        Ty::SubclassOfBuiltinClass("object"),
+        Ty::SubclassOfBuiltinClass("str")
+    )]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
     fn is_not_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -3093,7 +3212,9 @@ pub(crate) mod tests {
     }
 
     #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::Unknown, Ty::Unknown)]
     #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
+    #[test_case(Ty::Any, Ty::Any)]
     #[test_case(Ty::Any, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::Unknown)]
     #[test_case(Ty::IntLiteral(1), Ty::Any)]
@@ -3114,6 +3235,7 @@ pub(crate) mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::Intersection{pos: vec![Ty::BuiltinInstance("int")], neg: vec![Ty::IntLiteral(1)]})]
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinClassLiteral("int"))]
+    #[test_case(Ty::TypingInstance("_SpecialForm"), Ty::TypingLiteral)]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3194,10 +3316,27 @@ pub(crate) mod tests {
         Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
         Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)])
     )]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::BuiltinInstance("type"))]
     fn is_equivalent_to(from: Ty, to: Ty) {
         let db = setup_db();
+        let from = from.into_type(&db);
+        let to = to.into_type(&db);
+        assert!(from.is_equivalent_to(&db, to));
+        assert!(to.is_equivalent_to(&db, from));
+    }
 
-        assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    #[test_case(Ty::Any, Ty::Any)]
+    #[test_case(Ty::Any, Ty::None)]
+    #[test_case(Ty::Unknown, Ty::Unknown)]
+    #[test_case(Ty::Todo, Ty::Todo)]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
+    fn is_not_equivalent_to(from: Ty, to: Ty) {
+        let db = setup_db();
+        let from = from.into_type(&db);
+        let to = to.into_type(&db);
+        assert!(!from.is_equivalent_to(&db, to));
+        assert!(!to.is_equivalent_to(&db, from));
     }
 
     #[test_case(Ty::Never, Ty::Never)]
@@ -3383,11 +3522,26 @@ pub(crate) mod tests {
     #[test_case(Ty::None)]
     #[test_case(Ty::BooleanLiteral(true))]
     #[test_case(Ty::BooleanLiteral(false))]
-    #[test_case(Ty::KnownClassInstance(KnownClass::NoDefaultType))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_singleton(&db));
+    }
+
+    /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
+    /// the fallback to `typing_extensions` is working correctly.
+    /// See [`KnownClass::canonical_module`] for more information.
+    #[test_case(PythonVersion::PY312)]
+    #[test_case(PythonVersion::PY313)]
+    fn no_default_type_is_singleton(python_version: PythonVersion) {
+        let db = TestDbBuilder::new()
+            .with_python_version(python_version)
+            .build()
+            .unwrap();
+
+        let no_default = Ty::KnownClassInstance(KnownClass::NoDefaultType).into_type(&db);
+
+        assert!(no_default.is_singleton(&db));
     }
 
     #[test_case(Ty::None)]
@@ -3426,6 +3580,45 @@ pub(crate) mod tests {
         let db = setup_db();
 
         assert!(!from.into_type(&db).is_singleton(&db));
+    }
+
+    #[test_case(Ty::Never)]
+    #[test_case(Ty::None)]
+    #[test_case(Ty::IntLiteral(1))]
+    #[test_case(Ty::BooleanLiteral(true))]
+    #[test_case(Ty::StringLiteral("abc"))]
+    #[test_case(Ty::LiteralString)]
+    #[test_case(Ty::BytesLiteral("abc"))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Str))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Object))]
+    #[test_case(Ty::KnownClassInstance(KnownClass::Type))]
+    #[test_case(Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::TypingLiteral)]
+    #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::None]))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::KnownClassInstance(KnownClass::Str)], neg: vec![Ty::LiteralString]})]
+    #[test_case(Ty::Tuple(vec![]))]
+    #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::KnownClassInstance(KnownClass::Object)]))]
+    #[test_case(Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"))]
+    fn is_fully_static(from: Ty) {
+        let db = setup_db();
+
+        assert!(from.into_type(&db).is_fully_static(&db));
+    }
+
+    #[test_case(Ty::Any)]
+    #[test_case(Ty::Unknown)]
+    #[test_case(Ty::Todo)]
+    #[test_case(Ty::Union(vec![Ty::Any, Ty::KnownClassInstance(KnownClass::Str)]))]
+    #[test_case(Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Str), Ty::Unknown]))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::Any], neg: vec![Ty::LiteralString]})]
+    #[test_case(Ty::Tuple(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::Any]))]
+    #[test_case(Ty::SubclassOfAny)]
+    fn is_not_fully_static(from: Ty) {
+        let db = setup_db();
+
+        assert!(!from.into_type(&db).is_fully_static(&db));
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
@@ -3482,7 +3675,10 @@ pub(crate) mod tests {
 
     #[test]
     fn typing_vs_typeshed_no_default() {
-        let db = setup_db();
+        let db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY313)
+            .build()
+            .unwrap();
 
         let typing_no_default = typing_symbol(&db, "NoDefault").expect_type();
         let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault").expect_type();
@@ -3559,5 +3755,83 @@ pub(crate) mod tests {
         assert_function_query_was_not_run(&db, infer_expression_types, foo_call, &events);
 
         Ok(())
+    }
+
+    #[test]
+    fn type_alias_types() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/mod.py",
+            r#"
+            type Alias1 = int
+            type Alias2 = int
+        "#,
+        )?;
+
+        let mod_py = system_path_to_file(&db, "src/mod.py")?;
+        let ty_alias1 = global_symbol(&db, mod_py, "Alias1").expect_type();
+        let ty_alias2 = global_symbol(&db, mod_py, "Alias2").expect_type();
+
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias1)) = ty_alias1 else {
+            panic!("Expected TypeAliasType, got {ty_alias1:?}");
+        };
+        assert_eq!(alias1.name(&db), "Alias1");
+        assert_eq!(alias1.value_ty(&db), KnownClass::Int.to_instance(&db));
+
+        // Two type aliases are distinct and disjoint, even if they refer to the same type
+        assert!(!ty_alias1.is_equivalent_to(&db, ty_alias2));
+        assert!(ty_alias1.is_disjoint_from(&db, ty_alias2));
+
+        Ok(())
+    }
+
+    /// All other tests also make sure that `Type::Todo` works as expected. This particular
+    /// test makes sure that we handle `Todo` types correctly, even if they originate from
+    /// different sources.
+    #[test]
+    fn todo_types() {
+        let db = setup_db();
+
+        let todo1 = todo_type!("1");
+        let todo2 = todo_type!("2");
+        let todo3 = todo_type!();
+        let todo4 = todo_type!();
+
+        let int = KnownClass::Int.to_instance(&db);
+
+        assert!(int.is_assignable_to(&db, todo1));
+        assert!(int.is_assignable_to(&db, todo3));
+
+        assert!(todo1.is_assignable_to(&db, int));
+        assert!(todo3.is_assignable_to(&db, int));
+
+        // We lose information when combining several `Todo` types. This is an
+        // acknowledged limitation of the current implementation. We can not
+        // easily store the meta information of several `Todo`s in a single
+        // variant, as `TodoType` needs to implement `Copy`, meaning it can't
+        // contain `Vec`/`Box`/etc., and can't be boxed itself.
+        //
+        // Lifting this restriction would require us to intern `TodoType` in
+        // salsa, but that would mean we would have to pass in `db` everywhere.
+
+        // A union of several `Todo` types collapses to a single `Todo` type:
+        assert!(UnionType::from_elements(&db, vec![todo1, todo2, todo3, todo4]).is_todo());
+
+        // And similar for intersection types:
+        assert!(IntersectionBuilder::new(&db)
+            .add_positive(todo1)
+            .add_positive(todo2)
+            .add_positive(todo3)
+            .add_positive(todo4)
+            .build()
+            .is_todo());
+        assert!(IntersectionBuilder::new(&db)
+            .add_positive(todo1)
+            .add_negative(todo2)
+            .add_positive(todo3)
+            .add_negative(todo4)
+            .build()
+            .is_todo());
     }
 }

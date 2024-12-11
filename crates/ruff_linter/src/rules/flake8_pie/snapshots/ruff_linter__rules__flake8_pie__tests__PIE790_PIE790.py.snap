@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
+snapshot_kind: text
 ---
 PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
   |
@@ -675,4 +676,38 @@ PIE790.py:209:9: PIE790 [*] Unnecessary `...` literal
 211 210 | 
 212 211 | class Repro(Protocol[int]):
 
+PIE790.py:241:5: PIE790 [*] Unnecessary `pass` statement
+    |
+239 | # https://github.com/astral-sh/ruff/issues/12616
+240 | class PotentialDocstring1:
+241 |     pass
+    |     ^^^^ PIE790
+242 |     """
+243 |     Lorem ipsum dolor sit amet.
+    |
+    = help: Remove unnecessary `pass`
 
+ℹ Unsafe fix
+238 238 | 
+239 239 | # https://github.com/astral-sh/ruff/issues/12616
+240 240 | class PotentialDocstring1:
+241     |-    pass
+242 241 |     """
+243 242 |     Lorem ipsum dolor sit amet.
+244 243 |     """
+
+PIE790.py:248:5: PIE790 [*] Unnecessary `...` literal
+    |
+247 | class PotentialDocstring2:
+248 |     ...
+    |     ^^^ PIE790
+249 |     'Lorem ipsum dolor sit amet.'
+    |
+    = help: Remove unnecessary `...`
+
+ℹ Unsafe fix
+245 245 | 
+246 246 | 
+247 247 | class PotentialDocstring2:
+248     |-    ...
+249 248 |     'Lorem ipsum dolor sit amet.'

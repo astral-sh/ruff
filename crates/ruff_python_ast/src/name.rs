@@ -205,21 +205,6 @@ impl schemars::JsonSchema for Name {
     }
 }
 
-#[cfg(feature = "salsa")]
-impl salsa::plumbing::interned::Lookup<Name> for &str {
-    fn hash<H: Hasher>(&self, h: &mut H) {
-        std::hash::Hash::hash(self, h);
-    }
-
-    fn eq(&self, data: &Name) -> bool {
-        self == data
-    }
-
-    fn into_owned(self) -> Name {
-        Name::new(self)
-    }
-}
-
 /// A representation of a qualified name, like `typing.List`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct QualifiedName<'a>(SegmentsVec<'a>);
@@ -684,7 +669,7 @@ impl<'a> Deref for SegmentsVec<'a> {
     }
 }
 
-impl<'a, 'b> PartialEq<SegmentsVec<'b>> for SegmentsVec<'a> {
+impl<'b> PartialEq<SegmentsVec<'b>> for SegmentsVec<'_> {
     fn eq(&self, other: &SegmentsVec<'b>) -> bool {
         self.as_slice() == other.as_slice()
     }

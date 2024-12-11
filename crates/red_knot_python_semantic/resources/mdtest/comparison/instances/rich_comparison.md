@@ -312,17 +312,9 @@ reveal_type(1 <= 2j)  # revealed: bool
 reveal_type(1 > 2j)  # revealed: bool
 reveal_type(1 >= 2j)  # revealed: bool
 
-def bool_instance() -> bool:
-    return True
-
-def int_instance() -> int:
-    return 42
-
-x = bool_instance()
-y = int_instance()
-
-reveal_type(x < y)  # revealed: bool
-reveal_type(y < x)  # revealed: bool
-reveal_type(4.2 < x)  # revealed: bool
-reveal_type(x < 4.2)  # revealed: bool
+def f(x: bool, y: int):
+    reveal_type(x < y)  # revealed: bool
+    reveal_type(y < x)  # revealed: bool
+    reveal_type(4.2 < x)  # revealed: bool
+    reveal_type(x < 4.2)  # revealed: bool
 ```

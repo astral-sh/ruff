@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
@@ -35,10 +35,10 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// ## References
 /// - [`asyncio` events](https://docs.python.org/3/library/asyncio-sync.html#asyncio.Event)
-/// - [`anyio` events](https://trio.readthedocs.io/en/latest/reference-core.html#trio.Event)
-/// - [`trio` events](https://anyio.readthedocs.io/en/latest/api.html#anyio.Event)
-#[violation]
-pub struct AsyncBusyWait {
+/// - [`anyio` events](https://anyio.readthedocs.io/en/latest/api.html#anyio.Event)
+/// - [`trio` events](https://trio.readthedocs.io/en/latest/reference-core.html#trio.Event)
+#[derive(ViolationMetadata)]
+pub(crate) struct AsyncBusyWait {
     module: AsyncModule,
 }
 

@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
@@ -23,8 +23,8 @@ use crate::fix::edits::delete_stmt;
 /// class Foo:
 ///     def __repr__(self) -> str: ...
 /// ```
-#[violation]
-pub struct StrOrReprDefinedInStub {
+#[derive(ViolationMetadata)]
+pub(crate) struct StrOrReprDefinedInStub {
     name: String,
 }
 

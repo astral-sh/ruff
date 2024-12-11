@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 
 use crate::checkers::ast::Checker;
@@ -28,8 +28,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
-#[violation]
-pub struct PathConstructorCurrentDirectory;
+#[derive(ViolationMetadata)]
+pub(crate) struct PathConstructorCurrentDirectory;
 
 impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
     #[derive_message_formats]

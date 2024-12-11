@@ -340,7 +340,7 @@ impl<'a, T> IntoIterator for LeadingDanglingTrailing<'a, T> {
     }
 }
 
-impl<'a, T> Debug for LeadingDanglingTrailing<'a, T>
+impl<T> Debug for LeadingDanglingTrailing<'_, T>
 where
     T: Debug,
 {

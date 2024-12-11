@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_semantic::analyze::typing::is_immutable_func;
 use ruff_text_size::Ranged;
@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
     dataclass_kind, is_class_var_annotation, is_dataclass_field, is_descriptor_class,
+    AttrsAutoAttribs, DataclassKind,
 };
 
 /// ## What it does
@@ -53,8 +54,8 @@ use crate::rules::ruff::rules::helpers::{
 ///
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
-#[violation]
-pub struct FunctionCallInDataclassDefaultArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct FunctionCallInDataclassDefaultArgument {
     name: Option<String>,
 }
 
@@ -84,6 +85,28 @@ pub(crate) fn function_call_in_dataclass_default(
         return;
     }
 
+    let attrs_auto_attribs = match dataclass_kind {
+        DataclassKind::Stdlib => None,
+
+        DataclassKind::Attrs(attrs_auto_attribs) => match attrs_auto_attribs {
+            AttrsAutoAttribs::Unknown => return,
+
+            AttrsAutoAttribs::None => {
+                if any_annotated(&class_def.body) {
+                    Some(AttrsAutoAttribs::True)
+                } else {
+                    Some(AttrsAutoAttribs::False)
+                }
+            }
+
+            _ => Some(attrs_auto_attribs),
+        },
+    };
+    let dataclass_kind = match attrs_auto_attribs {
+        None => DataclassKind::Stdlib,
+        Some(attrs_auto_attribs) => DataclassKind::Attrs(attrs_auto_attribs),
+    };
+
     let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings
         .flake8_bugbear
@@ -101,13 +124,21 @@ pub(crate) fn function_call_in_dataclass_default(
         else {
             continue;
         };
-        let Expr::Call(ast::ExprCall { func, .. }) = &**expr else {
+        let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() else {
             continue;
         };
 
-        if is_class_var_annotation(annotation, checker.semantic())
+        let is_field = is_dataclass_field(func, checker.semantic(), dataclass_kind);
+
+        // Non-explicit fields in an `attrs` dataclass
+        // with `auto_attribs=False` are class variables.
+        if matches!(attrs_auto_attribs, Some(AttrsAutoAttribs::False)) && !is_field {
+            continue;
+        }
+
+        if is_field
+            || is_class_var_annotation(annotation, checker.semantic())
             || is_immutable_func(func, checker.semantic(), &extend_immutable_calls)
-            || is_dataclass_field(func, checker.semantic(), dataclass_kind)
             || is_descriptor_class(func, checker.semantic())
         {
             continue;
@@ -120,4 +151,11 @@ pub(crate) fn function_call_in_dataclass_default(
 
         checker.diagnostics.push(diagnostic);
     }
+}
+
+#[inline]
+fn any_annotated(class_body: &[Stmt]) -> bool {
+    class_body
+        .iter()
+        .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
 }

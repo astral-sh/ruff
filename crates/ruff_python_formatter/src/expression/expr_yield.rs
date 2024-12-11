@@ -14,7 +14,7 @@ pub(super) enum AnyExpressionYield<'a> {
     YieldFrom(&'a ExprYieldFrom),
 }
 
-impl<'a> AnyExpressionYield<'a> {
+impl AnyExpressionYield<'_> {
     const fn is_yield_from(&self) -> bool {
         matches!(self, AnyExpressionYield::YieldFrom(_))
     }

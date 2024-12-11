@@ -130,3 +130,23 @@ try:
     pass
 except (a, b) * (c, d):  # B030
     pass
+
+try:
+    pass
+except* 1:  # Error
+    pass
+
+try:
+    pass
+except* (1, ValueError):  # Error
+    pass
+
+try:
+    pass
+except* (ValueError, (RuntimeError, (KeyError, TypeError))):  # Error
+    pass
+
+try:
+    pass
+except* (a, b) * (c, d):  # B030
+    pass

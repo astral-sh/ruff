@@ -1,7 +1,7 @@
 use ruff_python_ast::{Arguments, Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 
@@ -39,8 +39,8 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 ///
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
-#[violation]
-pub struct NoSlotsInTupleSubclass;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSlotsInTupleSubclass;
 
 impl Violation for NoSlotsInTupleSubclass {
     #[derive_message_formats]
@@ -51,6 +51,10 @@ impl Violation for NoSlotsInTupleSubclass {
 
 /// SLOT001
 pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };

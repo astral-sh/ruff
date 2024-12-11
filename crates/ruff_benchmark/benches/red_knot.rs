@@ -2,7 +2,7 @@
 
 use rayon::ThreadPoolBuilder;
 use red_knot_python_semantic::PythonVersion;
-use red_knot_workspace::db::RootDatabase;
+use red_knot_workspace::db::{Db, RootDatabase};
 use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
 use red_knot_workspace::workspace::settings::Configuration;
 use red_knot_workspace::workspace::WorkspaceMetadata;
@@ -25,30 +25,30 @@ const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/
 
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
     // We don't support `*` imports yet:
-    "error[unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
+    "error[lint:unresolved-import] /src/tomllib/_parser.py:7:29 Module `collections.abc` has no member `Iterable`",
     // We don't support terminal statements in control flow yet:
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:66:18 Name `s` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:98:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:101:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:104:14 Name `char` used when possibly not defined",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:108:17 Conflicting declared types for `second_char`: Unknown, str | None",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:115:14 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:126:12 Name `char` used when possibly not defined",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:267:9 Conflicting declared types for `char`: Unknown, str | None",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:348:20 Name `nest` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:353:5 Name `nest` used when possibly not defined",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:364:9 Conflicting declared types for `char`: Unknown, str | None",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:381:13 Conflicting declared types for `char`: Unknown, str | None",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:395:9 Conflicting declared types for `char`: Unknown, str | None",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:453:24 Name `nest` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:455:9 Name `nest` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:482:16 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:566:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:573:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:579:12 Name `char` used when possibly not defined",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
-    "error[conflicting-declarations] /src/tomllib/_parser.py:590:9 Conflicting declared types for `char`: Unknown, str | None",
-    "error[possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:66:18 Name `s` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:98:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:101:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:104:14 Name `char` used when possibly not defined",
+    "error[lint:conflicting-declarations] /src/tomllib/_parser.py:108:17 Conflicting declared types for `second_char`: Unknown, str | None",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:115:14 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:126:12 Name `char` used when possibly not defined",
+    "error[lint:conflicting-declarations] /src/tomllib/_parser.py:267:9 Conflicting declared types for `char`: Unknown, str | None",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:348:20 Name `nest` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:353:5 Name `nest` used when possibly not defined",
+    "error[lint:conflicting-declarations] /src/tomllib/_parser.py:364:9 Conflicting declared types for `char`: Unknown, str | None",
+    "error[lint:conflicting-declarations] /src/tomllib/_parser.py:381:13 Conflicting declared types for `char`: Unknown, str | None",
+    "error[lint:conflicting-declarations] /src/tomllib/_parser.py:395:9 Conflicting declared types for `char`: Unknown, str | None",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:453:24 Name `nest` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:455:9 Name `nest` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:482:16 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:566:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:573:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:579:12 Name `char` used when possibly not defined",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
+    "error[lint:conflicting-declarations] /src/tomllib/_parser.py:590:9 Conflicting declared types for `char`: Unknown, str | None",
+    "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
 ];
 
 fn get_test_file(name: &str) -> TestFile {
@@ -75,10 +75,10 @@ fn setup_case() -> Case {
     .unwrap();
 
     let src_root = SystemPath::new("/src");
-    let metadata = WorkspaceMetadata::from_path(
+    let metadata = WorkspaceMetadata::discover(
         src_root,
         &system,
-        Some(Configuration {
+        Some(&Configuration {
             target_version: Some(PythonVersion::PY312),
             ..Configuration::default()
         }),
@@ -123,15 +123,9 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn setup() -> Case {
         let case = setup_case();
 
-        let result: Vec<_> = case
-            .db
-            .check()
-            .unwrap()
-            .into_iter()
-            .map(|diagnostic| diagnostic.display(&case.db).to_string())
-            .collect();
+        let result: Vec<_> = case.db.check().unwrap();
 
-        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+        assert_diagnostics(&case.db, result);
 
         case.fs
             .write_file(
@@ -174,18 +168,28 @@ fn benchmark_cold(criterion: &mut Criterion) {
             setup_case,
             |case| {
                 let Case { db, .. } = case;
-                let result: Vec<_> = db
-                    .check()
-                    .unwrap()
-                    .into_iter()
-                    .map(|diagnostic| diagnostic.display(db).to_string())
-                    .collect();
+                let result: Vec<_> = db.check().unwrap();
 
-                assert_eq!(result, EXPECTED_DIAGNOSTICS);
+                assert_diagnostics(db, result);
             },
             BatchSize::SmallInput,
         );
     });
+}
+
+#[track_caller]
+fn assert_diagnostics(db: &dyn Db, diagnostics: Vec<Box<dyn Diagnostic>>) {
+    let normalized: Vec<_> = diagnostics
+        .into_iter()
+        .map(|diagnostic| {
+            diagnostic
+                .display(db.upcast())
+                .to_string()
+                .replace('\\', "/")
+        })
+        .collect();
+
+    assert_eq!(&normalized, EXPECTED_DIAGNOSTICS);
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);

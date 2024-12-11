@@ -15,10 +15,10 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pylint;
 
-    use crate::assert_messages;
-    use crate::settings::types::PythonVersion;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
     #[test_case(
@@ -220,6 +220,7 @@ mod tests {
         Rule::BadStaticmethodArgument,
         Path::new("bad_staticmethod_argument.py")
     )]
+    #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -403,6 +404,28 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::RepeatedEqualityComparison,
+        Path::new("repeated_equality_comparison.py")
+    )]
+    #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pylint").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

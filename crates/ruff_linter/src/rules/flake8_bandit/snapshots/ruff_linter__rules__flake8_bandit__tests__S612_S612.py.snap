@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S612.py:3:5: S612 Use of insecure `logging.config.listen` detected
   |
@@ -10,5 +11,3 @@ S612.py:3:5: S612 Use of insecure `logging.config.listen` detected
 4 | 
 5 | def verify_func():
   |
-
-

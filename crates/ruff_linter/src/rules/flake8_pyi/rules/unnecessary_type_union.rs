@@ -1,6 +1,6 @@
 use ast::ExprContext;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
@@ -27,14 +27,12 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
+/// This rule's fix is marked as safe, unless the type annotation contains comments.
 ///
-/// This rule's fix is marked as safe in most cases; however, the fix will
-/// flatten nested unions type expressions into a single top-level union.
-///
-/// The fix is marked as unsafe when comments are present within the type
-/// expression.
-#[violation]
-pub struct UnnecessaryTypeUnion {
+/// Note that while the fix may flatten nested unions into a single top-level union,
+/// the semantics of the annotation will remain unchanged.
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryTypeUnion {
     members: Vec<Name>,
     union_kind: UnionKind,
 }
@@ -91,7 +89,12 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
         }
         match expr {
             Expr::Subscript(ast::ExprSubscript { slice, value, .. }) => {
-                if semantic.match_builtin_expr(value, "type") {
+                // The annotation `type[a, b]` is not valid since `type` accepts
+                // a single parameter. This likely is a confusion with `type[a | b]` or
+                // `type[Union[a, b]]`. Do not emit a diagnostic for invalid type
+                // annotations.
+                if !matches!(**slice, Expr::Tuple(_)) && semantic.match_builtin_expr(value, "type")
+                {
                     type_exprs.push(slice);
                 } else {
                     other_exprs.push(expr);
@@ -147,7 +150,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                 }
             }
             UnionKind::TypingUnion => {
-                // When subscript is None, it uses the pervious match case.
+                // When subscript is None, it uses the previous match case.
                 let subscript = subscript.unwrap();
                 let types = &Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {

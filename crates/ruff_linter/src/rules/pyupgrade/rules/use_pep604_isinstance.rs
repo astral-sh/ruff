@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
@@ -64,8 +64,8 @@ impl CallKind {
 /// - [Python documentation: `issubclass`](https://docs.python.org/3/library/functions.html#issubclass)
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
-#[violation]
-pub struct NonPEP604Isinstance {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonPEP604Isinstance {
     kind: CallKind,
 }
 

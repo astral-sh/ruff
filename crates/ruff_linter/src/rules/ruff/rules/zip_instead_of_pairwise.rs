@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Arguments, Expr, Int};
 use ruff_text_size::Ranged;
 
@@ -31,8 +31,8 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
-#[violation]
-pub struct ZipInsteadOfPairwise;
+#[derive(ViolationMetadata)]
+pub(crate) struct ZipInsteadOfPairwise;
 
 impl Violation for ZipInsteadOfPairwise {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -154,18 +154,16 @@ pub(crate) fn zip_instead_of_pairwise(checker: &mut Checker, call: &ast::ExprCal
 
     let mut diagnostic = Diagnostic::new(ZipInsteadOfPairwise, func.range());
 
-    if checker.settings.preview.is_enabled() {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("itertools", "pairwise"),
-                func.start(),
-                checker.semantic(),
-            )?;
-            let reference_edit =
-                Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
-            Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("itertools", "pairwise"),
+            func.start(),
+            checker.semantic(),
+        )?;
+        let reference_edit =
+            Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
+        Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+    });
 
     checker.diagnostics.push(diagnostic);
 }

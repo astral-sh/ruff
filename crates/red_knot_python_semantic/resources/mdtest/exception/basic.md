@@ -49,12 +49,44 @@ def foo(
     try:
         help()
     except x as e:
-        # TODO: should be `AttributeError`
-        reveal_type(e)  # revealed: @Todo
+        reveal_type(e)  # revealed: AttributeError
     except y as f:
-        # TODO: should be `OSError | RuntimeError`
-        reveal_type(f)  # revealed: @Todo
+        reveal_type(f)  # revealed: OSError | RuntimeError
     except z as g:
         # TODO: should be `BaseException`
-        reveal_type(g)  # revealed: @Todo
+        reveal_type(g)  # revealed: @Todo(full tuple[...] support)
+```
+
+## Invalid exception handlers
+
+```py
+try:
+    pass
+# error: [invalid-exception-caught] "Cannot catch object of type `Literal[3]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+except 3 as e:
+    reveal_type(e)  # revealed: Unknown
+
+try:
+    pass
+# error: [invalid-exception-caught] "Cannot catch object of type `Literal["foo"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+# error: [invalid-exception-caught] "Cannot catch object of type `Literal[b"bar"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+except (ValueError, OSError, "foo", b"bar") as e:
+    reveal_type(e)  # revealed: ValueError | OSError | Unknown
+
+def foo(
+    x: type[str],
+    y: tuple[type[OSError], type[RuntimeError], int],
+    z: tuple[type[str], ...],
+):
+    try:
+        help()
+    # error: [invalid-exception-caught]
+    except x as e:
+        reveal_type(e)  # revealed: Unknown
+    # error: [invalid-exception-caught]
+    except y as f:
+        reveal_type(f)  # revealed: OSError | RuntimeError | Unknown
+    except z as g:
+        # TODO: should emit a diagnostic here:
+        reveal_type(g)  # revealed: @Todo(full tuple[...] support)
 ```

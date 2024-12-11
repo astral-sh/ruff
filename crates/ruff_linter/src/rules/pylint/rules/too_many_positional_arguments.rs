@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, identifier::Identifier};
 use ruff_python_semantic::analyze::{function_type, visibility};
 
@@ -41,8 +41,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.pylint.max-positional-args`
-#[violation]
-pub struct TooManyPositionalArguments {
+#[derive(ViolationMetadata)]
+pub(crate) struct TooManyPositionalArguments {
     c_pos: usize,
     max_pos: usize,
 }
@@ -60,6 +60,10 @@ pub(crate) fn too_many_positional_arguments(
     checker: &mut Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     let semantic = checker.semantic();
 
     // Count the number of positional arguments.

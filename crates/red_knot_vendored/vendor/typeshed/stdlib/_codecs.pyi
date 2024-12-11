@@ -2,10 +2,13 @@ import codecs
 import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Callable
-from typing import Literal, overload
+from typing import Literal, final, overload, type_check_only
 from typing_extensions import TypeAlias
 
 # This type is not exposed; it is defined in unicodeobject.c
+# At runtime it calls itself builtins.EncodingMap
+@final
+@type_check_only
 class _EncodingMap:
     def size(self) -> int: ...
 

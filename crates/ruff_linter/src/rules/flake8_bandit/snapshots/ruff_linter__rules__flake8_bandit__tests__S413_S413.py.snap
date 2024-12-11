@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+snapshot_kind: text
 ---
 S413.py:1:8: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
   |
@@ -34,5 +35,3 @@ S413.py:4:6: S413 `pycrypto` library is known to have publicly disclosed buffer 
 4 | from Crypto.PublicKey import RSA  # S413
   |      ^^^^^^^^^^^^^^^^ S413
   |
-
-

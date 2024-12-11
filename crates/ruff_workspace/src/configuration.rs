@@ -775,6 +775,7 @@ impl LintConfiguration {
         let mut redirects = FxHashMap::default();
         let mut deprecated_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
+        let mut removed_ignored_rules = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
         // Track which docstring rules are specifically enabled
@@ -926,7 +927,11 @@ impl LintConfiguration {
                 // Removed rules
                 if selector.is_exact() {
                     if selector.all_rules().all(|rule| rule.is_removed()) {
-                        removed_selectors.insert(selector);
+                        if kind.is_disable() {
+                            removed_ignored_rules.insert(selector);
+                        } else {
+                            removed_selectors.insert(selector);
+                        }
                     }
                 }
 
@@ -968,6 +973,20 @@ impl LintConfiguration {
             }
         }
 
+        if !removed_ignored_rules.is_empty() {
+            let mut rules = String::new();
+            for selection in removed_ignored_rules.iter().sorted() {
+                let (prefix, code) = selection.prefix_and_code();
+                rules.push_str("\n    - ");
+                rules.push_str(prefix);
+                rules.push_str(code);
+            }
+            rules.push('\n');
+            warn_user_once_by_message!(
+                "The following rules have been removed and ignoring them has no effect:{rules}"
+            );
+        }
+
         for (from, target) in redirects.iter().sorted_by_key(|item| item.0) {
             // TODO(martin): This belongs into the ruff crate.
             warn_user_once_by_id!(
@@ -981,13 +1000,9 @@ impl LintConfiguration {
         if preview.mode.is_disabled() {
             for selection in deprecated_selectors.iter().sorted() {
                 let (prefix, code) = selection.prefix_and_code();
-                let rule = format!("{prefix}{code}");
-                let mut message =
-                    format!("Rule `{rule}` is deprecated and will be removed in a future release.");
-                if matches!(rule.as_str(), "E999") {
-                    message.push_str(" Syntax errors will always be shown regardless of whether this rule is selected or not.");
-                }
-                warn_user_once_by_message!("{message}");
+                warn_user_once_by_message!(
+                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release."
+                );
             }
         } else {
             let deprecated_selectors = deprecated_selectors.iter().sorted().collect::<Vec<_>>();
@@ -1613,7 +1628,6 @@ mod tests {
             Rule::AmbiguousClassName,
             Rule::AmbiguousFunctionName,
             Rule::IOError,
-            Rule::SyntaxError,
             Rule::TabIndentation,
             Rule::TrailingWhitespace,
             Rule::MissingNewlineAtEndOfFile,

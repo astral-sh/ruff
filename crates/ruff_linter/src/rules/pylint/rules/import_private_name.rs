@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_text_size::Ranged;
@@ -49,8 +49,8 @@ use crate::package::PackageRoot;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 /// [PEP 420]: https://peps.python.org/pep-0420/
-#[violation]
-pub struct ImportPrivateName {
+#[derive(ViolationMetadata)]
+pub(crate) struct ImportPrivateName {
     name: String,
     module: Option<String>,
 }

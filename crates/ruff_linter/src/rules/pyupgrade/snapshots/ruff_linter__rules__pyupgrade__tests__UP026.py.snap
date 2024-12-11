@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP026.py:3:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
   |
@@ -603,5 +604,3 @@ UP026.py:93:5: UP026 [*] `mock` is deprecated, use `unittest.mock`
 92 92 | # Error (`mock.Mock()`).
 93    |-x = mock.mock.Mock()
    93 |+x = mock.Mock()
-
-

@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
@@ -48,8 +48,8 @@ use crate::importer::ImportRequest;
 /// arr2 = [np.float64(1.5), np.float64(5.1)]
 /// np.round(arr2)
 /// ```
-#[violation]
-pub struct Numpy2Deprecation {
+#[derive(ViolationMetadata)]
+pub(crate) struct Numpy2Deprecation {
     existing: String,
     migration_guide: Option<String>,
     code_action: Option<String>,

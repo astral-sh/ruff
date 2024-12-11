@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use super::{definition_expression_ty, Type};
-use crate::semantic_index::definition::Definition;
 use crate::Db;
+use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// A typed callable signature.
@@ -18,7 +18,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn todo() -> Self {
         Self {
             parameters: Parameters::todo(),
-            return_ty: Type::Todo,
+            return_ty: todo_type!("return type"),
         }
     }
 
@@ -33,8 +33,7 @@ impl<'db> Signature<'db> {
             .as_ref()
             .map(|returns| {
                 if function_node.is_async {
-                    // TODO: generic `types.CoroutineType`!
-                    Type::Todo
+                    todo_type!("generic types.CoroutineType")
                 } else {
                     definition_expression_ty(db, definition, returns.as_ref())
                 }
@@ -81,11 +80,11 @@ impl<'db> Parameters<'db> {
         Self {
             variadic: Some(Parameter {
                 name: Some(Name::new_static("args")),
-                annotated_ty: Type::Todo,
+                annotated_ty: todo_type!(),
             }),
             keywords: Some(Parameter {
                 name: Some(Name::new_static("kwargs")),
-                annotated_ty: Type::Todo,
+                annotated_ty: todo_type!(),
             }),
             ..Default::default()
         }
@@ -190,32 +189,9 @@ impl<'db> Parameter<'db> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
+    use crate::db::tests::{setup_db, TestDb};
     use crate::types::{global_symbol, FunctionType};
-    use crate::ProgramSettings;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-
-    pub(crate) fn setup_db() -> TestDb {
-        let db = TestDb::new();
-
-        let src_root = SystemPathBuf::from("/src");
-        db.memory_file_system()
-            .create_directory_all(&src_root)
-            .unwrap();
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(src_root),
-            },
-        )
-        .expect("Valid search path settings");
-
-        db
-    }
+    use ruff_db::system::DbWithTestSystem;
 
     #[track_caller]
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {

@@ -102,3 +102,24 @@ pub fn is_matplotlib_activation(stmt: &Stmt, semantic: &SemanticModel) -> bool {
         .resolve_qualified_name(func.as_ref())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["matplotlib", "use"]))
 }
+
+/// Returns `true` if a [`Stmt`] is a `pytest.importorskip()` call, as in:
+/// ```python
+/// import pytest
+///
+/// pytest.importorskip("foo.bar")
+/// ```
+pub fn is_pytest_importorskip(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        return false;
+    };
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+        return false;
+    };
+
+    semantic
+        .resolve_qualified_name(func.as_ref())
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pytest", "importorskip"])
+        })
+}
