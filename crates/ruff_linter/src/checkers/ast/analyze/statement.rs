@@ -1235,6 +1235,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::IfKeyInDictDel) {
+                ruff::rules::if_key_in_dict_del(checker, if_);
+            }
         }
         Stmt::Assert(
             assert_stmt @ ast::StmtAssert {
