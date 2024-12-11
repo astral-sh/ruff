@@ -1,6 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Comprehension, Expr};
 use ruff_text_size::Ranged;
 
@@ -118,13 +117,35 @@ pub(crate) fn unnecessary_dict_comprehension(
     let [target_key, target_value] = elts.as_slice() else {
         return;
     };
-    if ComparableExpr::from(key) != ComparableExpr::from(target_key) {
+
+    let Expr::Name(ast::ExprName {
+        id: target_key_name,
+        ..
+    }) = &target_key
+    else {
+        return;
+    };
+    let Expr::Name(ast::ExprName { id: key_name, .. }) = &key else {
+        return;
+    };
+    if target_key_name != key_name {
         return;
     }
-    if ComparableExpr::from(value) != ComparableExpr::from(target_value) {
+
+    let Expr::Name(ast::ExprName {
+        id: target_value_name,
+        ..
+    }) = &target_value
+    else {
         return;
+    };
+    let Expr::Name(ast::ExprName { id: value_name, .. }) = &value else {
+        return;
+    };
+
+    if target_value_name == value_name {
+        add_diagnostic(checker, expr);
     }
-    add_diagnostic(checker, expr);
 }
 
 /// C416
@@ -140,10 +161,19 @@ pub(crate) fn unnecessary_list_set_comprehension(
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
-    if ComparableExpr::from(elt) != ComparableExpr::from(&generator.target) {
+
+    let Expr::Name(ast::ExprName {
+        id: target_name, ..
+    }) = &generator.target
+    else {
         return;
+    };
+    let Expr::Name(ast::ExprName { id: elt_name, .. }) = &elt else {
+        return;
+    };
+    if elt_name == target_name {
+        add_diagnostic(checker, expr);
     }
-    add_diagnostic(checker, expr);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
