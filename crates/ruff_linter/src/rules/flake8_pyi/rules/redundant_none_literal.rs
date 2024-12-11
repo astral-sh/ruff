@@ -239,12 +239,16 @@ fn create_fix_edit_2(
             value: Box::new(literal_subscript.clone()),
             range: TextRange::default(),
             ctx: ExprContext::Load,
-            slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                elts: literal_elements.into_iter().cloned().collect(),
-                range: TextRange::default(),
-                ctx: ExprContext::Load,
-                parenthesized: true,
-            })),
+            slice: Box::new(if literal_elements.len() > 1 {
+                Expr::Tuple(ast::ExprTuple {
+                    elts: literal_elements.clone().into_iter().cloned().collect(),
+                    range: TextRange::default(),
+                    ctx: ExprContext::Load,
+                    parenthesized: true,
+                })
+            } else {
+                literal_elements[0].clone()
+            }),
         })),
         op: ruff_python_ast::Operator::BitOr,
         right: Box::new(Expr::NoneLiteral(ExprNoneLiteral {
