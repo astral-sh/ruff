@@ -882,7 +882,7 @@ where
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(break_state, pre_loop_conditions.clone()); // TODO?
+                    self.flow_merge(break_state, pre_loop_conditions.clone());
                 }
             }
             ast::Stmt::With(ast::StmtWith {
