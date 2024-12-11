@@ -20,7 +20,7 @@ use crate::semantic_index::use_def::UseDefMap;
 use crate::Db;
 
 pub mod ast_ids;
-pub(crate) mod branching;
+pub(crate) mod branching_condition;
 mod builder;
 pub(crate) mod constraint;
 pub mod definition;

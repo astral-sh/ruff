@@ -226,7 +226,7 @@ use self::symbol_state::{
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedUseId};
-use crate::semantic_index::branching::BranchingCondition;
+use crate::semantic_index::branching_condition::BranchingCondition;
 use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
@@ -576,6 +576,7 @@ pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 }
 
+/// A snapshot of the active branching conditions at a particular point in control flow.
 #[derive(Clone, Debug)]
 pub(super) struct BranchingConditionsSnapshot(BranchingConditions);
 

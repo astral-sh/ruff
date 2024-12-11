@@ -57,7 +57,7 @@ pub(super) struct ScopedDefinitionId;
 #[newtype_index]
 pub(super) struct ScopedConstraintId;
 
-/// A newtype-index for a branching condition in a particular scope.
+/// A newtype-index for a [`crate::semantic_index::branching::BranchingCondition`] in a particular scope.
 #[newtype_index]
 pub(super) struct ScopedBranchingConditionId;
 
@@ -86,7 +86,7 @@ type Constraints = BitSet<INLINE_CONSTRAINT_BLOCKS>;
 
 type InlineConstraintArray = [Constraints; INLINE_BINDINGS_PER_SYMBOL];
 
-/// One [`BitSet`] of applicable [`ScopedConstraintId`] per live binding.
+/// One [`BitSet`] of applicable [`ScopedConstraintId`]s per live binding.
 type ConstraintsPerBinding = SmallVec<InlineConstraintArray>;
 
 /// Iterate over all constraints for a single binding.
@@ -98,6 +98,7 @@ const INLINE_BRANCHING_BLOCKS: usize = 2;
 const INLINE_BRANCHING_CONDITIONS: usize = 4;
 pub(super) type BranchingConditions = BitSet<INLINE_BRANCHING_BLOCKS>;
 type InlineBranchingConditionsArray = [BranchingConditions; INLINE_BRANCHING_CONDITIONS];
+/// One [`BitSet`] of active [`ScopedBranchingConditionId`]s per live binding.
 type BranchingConditionsPerBinding = SmallVec<InlineBranchingConditionsArray>;
 type BranchingConditionsIterator<'a> = std::slice::Iter<'a, BranchingConditions>;
 type BranchingConditionsIntoIterator = smallvec::IntoIter<InlineBranchingConditionsArray>;
