@@ -35,7 +35,7 @@ pub(crate) struct IfKeyInDictDel;
 impl AlwaysFixableViolation for IfKeyInDictDel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `pop` instead of `key in dict` followed by `delete dict[key]`".to_string()
+        "Use `pop` instead of `key in dict` followed by `del dict[key]`".to_string()
     }
 
     fn fix_title(&self) -> String {

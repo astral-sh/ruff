@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF051.py:8:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:8:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
  7 | if k in d:                          # Bare name
  8 |     del d[k]
@@ -23,7 +23,7 @@ RUF051.py:8:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete
 10 9 | if '' in d:                         # String
 11 10 |     del d[""]                       # Different quotes
 
-RUF051.py:11:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:11:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 10 | if '' in d:                         # String
 11 |     del d[""]                       # Different quotes
@@ -44,7 +44,7 @@ RUF051.py:11:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 13 12 | if b"" in d:                        # Bytes
 14 13 |     del d[                          # Multiline slice
 
-RUF051.py:14:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:14:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 13 |   if b"" in d:                        # Bytes
 14 |       del d[                          # Multiline slice
@@ -70,7 +70,7 @@ RUF051.py:14:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 18 15 | if 0 in d: del d[0]                 # Single-line statement
 19 16 | 
 
-RUF051.py:18:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:18:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 16 |     ]
 17 | 
@@ -91,7 +91,7 @@ RUF051.py:18:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `dele
 20 20 | if 3j in d:                         # Complex
 21 21 |     del d[3j]
 
-RUF051.py:21:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:21:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 20 | if 3j in d:                         # Complex
 21 |     del d[3j]
@@ -112,7 +112,7 @@ RUF051.py:21:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 23 22 | if 0.1234 in d:                     # Float
 24 23 |     del d[.1_2_3_4]                 # Number separators and shorthand syntax
 
-RUF051.py:24:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:24:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 23 | if 0.1234 in d:                     # Float
 24 |     del d[.1_2_3_4]                 # Number separators and shorthand syntax
@@ -133,7 +133,7 @@ RUF051.py:24:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 26 25 | if True in d:                       # True
 27 26 |     del d[True]
 
-RUF051.py:27:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:27:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 26 | if True in d:                       # True
 27 |     del d[True]
@@ -154,7 +154,7 @@ RUF051.py:27:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 29 28 | if False in d:                      # False
 30 29 |     del d[False]
 
-RUF051.py:30:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:30:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 29 | if False in d:                      # False
 30 |     del d[False]
@@ -175,7 +175,7 @@ RUF051.py:30:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 32 31 | if None in d:                       # None
 33 32 |     del d[
 
-RUF051.py:33:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:33:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 32 |   if None in d:                       # None
 33 |       del d[
@@ -203,7 +203,7 @@ RUF051.py:33:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 38 34 | if ... in d:                        # Ellipsis
 39 35 |     del d[
 
-RUF051.py:39:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:39:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 38 |   if ... in d:                        # Ellipsis
 39 |       del d[
@@ -229,7 +229,7 @@ RUF051.py:39:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 43 40 | if "a" "bc" in d:                   # String concatenation
 44 41 |     del d['abc']
 
-RUF051.py:44:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:44:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 43 | if "a" "bc" in d:                   # String concatenation
 44 |     del d['abc']
@@ -250,7 +250,7 @@ RUF051.py:44:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 46 45 | if r"\foo" in d:                    # Raw string
 47 46 |     del d['\\foo']
 
-RUF051.py:47:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:47:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 46 | if r"\foo" in d:                    # Raw string
 47 |     del d['\\foo']
@@ -271,7 +271,7 @@ RUF051.py:47:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 49 48 | if b'yt' b'es' in d:                # Bytes concatenation
 50 49 |     del d[rb"""ytes"""]             # Raw bytes
 
-RUF051.py:50:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:50:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 49 | if b'yt' b'es' in d:                # Bytes concatenation
 50 |     del d[rb"""ytes"""]             # Raw bytes
@@ -292,7 +292,7 @@ RUF051.py:50:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 52 51 | if k in d:
 53 52 |     # comment that gets dropped
 
-RUF051.py:54:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:54:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 52 | if k in d:
 53 |     # comment that gets dropped
@@ -315,7 +315,7 @@ RUF051.py:54:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 56 54 | ### Safely fixable
 57 55 | 
 
-RUF051.py:59:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:59:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 58 | if k in d:
 59 |     del d[k]
@@ -336,7 +336,7 @@ RUF051.py:59:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 61 60 | if '' in d:
 62 61 |     del d[""]
 
-RUF051.py:62:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:62:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 61 | if '' in d:
 62 |     del d[""]
@@ -357,7 +357,7 @@ RUF051.py:62:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 64 63 | if b"" in d:
 65 64 |     del d[
 
-RUF051.py:65:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:65:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 64 |   if b"" in d:
 65 |       del d[
@@ -383,7 +383,7 @@ RUF051.py:65:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 69 66 | if 0 in d: del d[0]
 70 67 | 
 
-RUF051.py:69:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:69:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 67 |     ]
 68 | 
@@ -404,7 +404,7 @@ RUF051.py:69:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `dele
 71 71 | if 3j in d:
 72 72 |     del d[3j]
 
-RUF051.py:72:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:72:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 71 | if 3j in d:
 72 |     del d[3j]
@@ -425,7 +425,7 @@ RUF051.py:72:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 74 73 | if 0.1234 in d:
 75 74 |     del d[.1_2_3_4]
 
-RUF051.py:75:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:75:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 74 | if 0.1234 in d:
 75 |     del d[.1_2_3_4]
@@ -446,7 +446,7 @@ RUF051.py:75:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 77 76 | if True in d:
 78 77 |     del d[True]
 
-RUF051.py:78:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:78:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 77 | if True in d:
 78 |     del d[True]
@@ -467,7 +467,7 @@ RUF051.py:78:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 80 79 | if False in d:
 81 80 |     del d[False]
 
-RUF051.py:81:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:81:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 80 | if False in d:
 81 |     del d[False]
@@ -488,7 +488,7 @@ RUF051.py:81:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 83 82 | if None in d:
 84 83 |     del d[
 
-RUF051.py:84:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:84:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 83 |   if None in d:
 84 |       del d[
@@ -514,7 +514,7 @@ RUF051.py:84:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 88 85 | if ... in d:
 89 86 |     del d[
 
-RUF051.py:89:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:89:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 88 |   if ... in d:
 89 |       del d[
@@ -538,7 +538,7 @@ RUF051.py:89:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 92 90 | if "a" "bc" in d:
 93 91 |     del d['abc']
 
-RUF051.py:93:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:93:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 92 | if "a" "bc" in d:
 93 |     del d['abc']
@@ -559,7 +559,7 @@ RUF051.py:93:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 95 94 | if r"\foo" in d:
 96 95 |     del d['\\foo']
 
-RUF051.py:96:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:96:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 95 | if r"\foo" in d:
 96 |     del d['\\foo']
@@ -580,7 +580,7 @@ RUF051.py:96:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delet
 98 97 | if b'yt' b'es' in d:
 99 98 |     del d[rb"""ytes"""]             # This should not make the fix unsafe
 
-RUF051.py:99:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `delete dict[key]`
+RUF051.py:99:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
    |
 98 | if b'yt' b'es' in d:
 99 |     del d[rb"""ytes"""]             # This should not make the fix unsafe
