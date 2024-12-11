@@ -1272,6 +1272,10 @@ impl<'db> Type<'db> {
     /// as accessed from instances of the `Bar` class.
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        if name == "__class__" {
+            return self.to_meta_type(db).into();
+        }
+
         match self {
             Type::Any => Type::Any.into(),
             Type::Never => {
@@ -2701,10 +2705,6 @@ impl<'db> Class<'db> {
         if name == "__mro__" {
             let tuple_elements: Vec<Type<'db>> = self.iter_mro(db).map(Type::from).collect();
             return Type::tuple(db, &tuple_elements).into();
-        }
-
-        if name == "__class__" {
-            return self.metaclass(db).into();
         }
 
         for superclass in self.iter_mro(db) {

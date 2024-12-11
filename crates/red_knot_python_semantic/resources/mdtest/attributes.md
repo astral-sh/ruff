@@ -115,3 +115,38 @@ def _(flag: bool):
     # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
     reveal_type(C.x)  # revealed: Unknown
 ```
+
+## Objects of all types have a `__class__` method
+
+```py
+import typing
+
+reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
+
+a = 42
+reveal_type(a.__class__)  # revealed: Literal[int]
+
+b = "42"
+reveal_type(b.__class__)  # revealed: Literal[str]
+
+c = b"42"
+reveal_type(c.__class__)  # revealed: Literal[bytes]
+
+d = True
+reveal_type(d.__class__)  # revealed: Literal[bool]
+
+e = (42, 42)
+reveal_type(e.__class__)  # revealed: Literal[tuple]
+
+def f(a: int, b: typing.LiteralString, c: type[str], d: int | str):
+    reveal_type(a.__class__)  # revealed: type[int]
+    reveal_type(b.__class__)  # revealed: Literal[str]
+    reveal_type(c.__class__)  # revealed: type[type]
+    reveal_type(d.__class__)  # revealed: type[int] | type[str]
+
+reveal_type(f.__class__)  # revealed: Literal[FunctionType]
+
+class Foo: ...
+
+reveal_type(Foo.__class__)  # revealed: Literal[type]
+```
