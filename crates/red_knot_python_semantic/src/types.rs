@@ -258,7 +258,6 @@ fn bindings_ty<'db>(
                 let result = branching_conditions.truthiness(db);
 
                 if result.any_always_false {
-                    // TODO: do we need to call binding_ty(…) even if we don't need the result?
                     (None, UnconditionallyVisible::No)
                 } else {
                     let unconditionally_visible =
@@ -2550,6 +2549,14 @@ pub enum Truthiness {
 }
 
 impl Truthiness {
+    pub(crate) const fn from_bool(value: bool) -> Self {
+        if value {
+            Self::AlwaysTrue
+        } else {
+            Self::AlwaysFalse
+        }
+    }
+
     const fn is_ambiguous(self) -> bool {
         matches!(self, Truthiness::Ambiguous)
     }

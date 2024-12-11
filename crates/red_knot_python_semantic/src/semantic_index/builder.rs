@@ -6,14 +6,15 @@ use rustc_hash::FxHashMap;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::{self as ast, Pattern};
 use ruff_python_ast::{BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
+use crate::semantic_index::constraint::PatternConstraintKind;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
     DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
@@ -341,22 +342,24 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn add_pattern_constraint(
         &mut self,
-        subject: &ast::Expr,
+        subject: Expression<'db>,
         pattern: &ast::Pattern,
     ) -> PatternConstraint<'db> {
-        #[allow(unsafe_code)]
-        let (subject, pattern) = unsafe {
-            (
-                AstNodeRef::new(self.module.clone(), subject),
-                AstNodeRef::new(self.module.clone(), pattern),
-            )
+        let kind = match pattern {
+            Pattern::MatchValue(pattern) => {
+                let value = self.add_standalone_expression(&pattern.value);
+                PatternConstraintKind::Value(value)
+            }
+            Pattern::MatchSingleton(singleton) => PatternConstraintKind::Singleton(singleton.value),
+            _ => PatternConstraintKind::Unsupported,
         };
+
         let pattern_constraint = PatternConstraint::new(
             self.db,
             self.file,
             self.current_scope(),
             subject,
-            pattern,
+            kind,
             countme::Count::default(),
         );
         self.current_use_def_map_mut()
@@ -963,7 +966,7 @@ where
                 cases,
                 range: _,
             }) => {
-                self.add_standalone_expression(subject);
+                let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
 
                 let after_subject = self.flow_snapshot();
@@ -971,14 +974,14 @@ where
                 let Some((first, remaining)) = cases.split_first() else {
                     return;
                 };
-                self.add_pattern_constraint(subject, &first.pattern);
+                self.add_pattern_constraint(subject_expr, &first.pattern);
                 self.visit_match_case(first);
 
                 let mut post_case_snapshots = vec![];
                 for case in remaining {
                     post_case_snapshots.push(self.flow_snapshot());
                     self.flow_restore(after_subject.clone(), after_subject_cs.clone());
-                    self.add_pattern_constraint(subject, &case.pattern);
+                    self.add_pattern_constraint(subject_expr, &case.pattern);
                     self.visit_match_case(case);
                 }
                 for post_clause_state in post_case_snapshots {

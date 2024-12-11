@@ -511,9 +511,35 @@ impl<'db> BranchingConditionsIterator<'_, 'db> {
                     ty.bool(db).negate_if(!is_positive)
                 }
                 BranchingCondition::ConditionalOn(Constraint {
-                    node: ConstraintNode::Pattern(..),
+                    node: ConstraintNode::Pattern(inner),
                     ..
-                }) => Truthiness::Ambiguous,
+                }) => match inner.kind(db) {
+                    super::constraint::PatternConstraintKind::Value(value) => {
+                        let subject_expression = inner.subject(db);
+                        let inference = infer_expression_types(db, *subject_expression);
+                        let scope = subject_expression.scope(db);
+                        let subject_ty = inference.expression_ty(
+                            subject_expression
+                                .node_ref(db)
+                                .scoped_expression_id(db, scope),
+                        );
+
+                        let inference = infer_expression_types(db, *value);
+                        let scope = value.scope(db);
+                        let value_ty = inference
+                            .expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
+
+                        if subject_ty.is_single_valued(db) {
+                            Truthiness::from_bool(subject_ty.is_equivalent_to(db, value_ty))
+                        } else {
+                            Truthiness::Ambiguous
+                        }
+                    }
+                    super::constraint::PatternConstraintKind::Singleton(_)
+                    | super::constraint::PatternConstraintKind::Unsupported => {
+                        Truthiness::Ambiguous
+                    }
+                },
                 BranchingCondition::Ambiguous => Truthiness::Ambiguous,
             };
 

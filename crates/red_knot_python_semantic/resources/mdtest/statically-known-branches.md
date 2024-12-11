@@ -499,6 +499,93 @@ else:
 reveal_type(x)  # revealed: Literal[1]
 ```
 
+## `match` statements
+
+### Single-valued types, always true
+
+```py
+x = 1
+
+match "a":
+    case "a":
+        x = 2
+    case "b":
+        x = 3
+
+reveal_type(x)  # revealed: Literal[2]
+```
+
+### Single-valued types, always false
+
+```py
+x = 1
+
+match "something else":
+    case "a":
+        x = 1
+    case "b":
+        x = 2
+
+reveal_type(x)  # revealed: Literal[1]
+```
+
+### Single-valued types, with wildcard pattern
+
+This is a case that we can not handle at the moment. Our reasoning about match patterns is too
+local. We can infer that the `x = 2` binding is unconditionally visible. But when we traverse all
+bindings backwards, we first see the `x = 3` binding which is also visible. At the moment, we do not
+mark it as *unconditionally* visible to avoid blocking off previous bindings (we would infer
+`Literal[3]` otherwise).
+
+```py
+x = 1
+
+match "a":
+    case "a":
+        x = 2
+    case _:
+        x = 3
+
+# TODO: ideally, this should be Literal[2]
+reveal_type(x)  # revealed: Literal[2, 3]
+```
+
+### Non-single-valued types
+
+```py
+def _(s: str):
+    match s:
+        case "a":
+            x = 1
+        case _:
+            x = 2
+
+    reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+### `sys.version_info`
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+import sys
+
+minor = "too old"
+
+match sys.version_info.minor:
+    case 12:
+        minor = 12
+    case 13:
+        minor = 13
+    case _:
+        pass
+
+reveal_type(minor)  # revealed: Literal[13]
+```
+
 ## Conditional declarations
 
 ### Always false

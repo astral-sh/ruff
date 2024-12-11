@@ -1,7 +1,6 @@
 use ruff_db::files::File;
-use ruff_python_ast as ast;
+use ruff_python_ast::Singleton;
 
-use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
@@ -18,6 +17,14 @@ pub(crate) enum ConstraintNode<'db> {
     Pattern(PatternConstraint<'db>),
 }
 
+/// Pattern kinds for which we do support type narrowing and/or static truthiness analysis.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum PatternConstraintKind<'db> {
+    Singleton(Singleton),
+    Value(Expression<'db>),
+    Unsupported,
+}
+
 #[salsa::tracked]
 pub(crate) struct PatternConstraint<'db> {
     #[id]
@@ -28,11 +35,11 @@ pub(crate) struct PatternConstraint<'db> {
 
     #[no_eq]
     #[return_ref]
-    pub(crate) subject: AstNodeRef<ast::Expr>,
+    pub(crate) subject: Expression<'db>,
 
     #[no_eq]
     #[return_ref]
-    pub(crate) pattern: AstNodeRef<ast::Pattern>,
+    pub(crate) kind: PatternConstraintKind<'db>,
 
     #[no_eq]
     count: countme::Count<PatternConstraint<'static>>,
