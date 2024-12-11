@@ -100,4 +100,37 @@ impl StaticTruthiness {
 
         result
     }
+
+    /// Merge two static truthiness results, as if they came from two different control-flow paths.
+    ///
+    /// Note that the logical operations are exactly opposite to what one would expect from the names
+    /// of the fields. The reason for this is that we want to draw conclusions like "this symbol can
+    /// not be bound because one of the branching conditions is always false". We can only draw this
+    /// conclusion if this is true in both control-flow paths. Similarly, we want to infer that the
+    /// binding of a symbol is unconditionally visible, if all branching conditions are known to be
+    /// statically true. It is enough if this is the case for *any* of the control-flow paths. Other
+    /// control flow paths will not be taken if this is the case.
+    pub(crate) fn merge(self, other: Self) -> Self {
+        Self {
+            any_always_false: self.any_always_false && other.any_always_false,
+            all_always_true: self.all_always_true || other.all_always_true,
+            at_least_one_condition: self.at_least_one_condition && other.at_least_one_condition,
+        }
+    }
+
+    /// A static truthiness result that states our knowledge before we have seen any bindings.
+    ///
+    /// This is used as a starting point for merging multiple results.
+    pub(crate) fn no_bindings() -> Self {
+        Self {
+            // Corresponds to "definitely unbound". Before we haven't seen any bindings, we
+            // can conclude that the symbol is not bound.
+            any_always_false: true,
+            // Corresponds to "definitely bound". Before we haven't seen any bindings, we
+            // can not conclude that the symbol is bound.
+            all_always_true: false,
+            // Irrelevant for this analysis.
+            at_least_one_condition: false,
+        }
+    }
 }
