@@ -69,7 +69,7 @@ PYI061.py:16:30: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[.
 14 14 | 
 15 15 | 
 16    |-def func4(arg1: Literal[int, None, float]):
-   16 |+def func4(arg1: Literal[int, float] | Literal[None]):
+   16 |+def func4(arg1: Literal[int, float] | None):
 17 17 |     ...
 18 18 | 
 19 19 | 
@@ -130,7 +130,7 @@ PYI061.py:26:5: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[..
 26    |-    None  # Comment 1
 27    |-    , "world"
 28    |-    ]):
-   24 |+def func6(arg1: Literal["hello", "world"] | Literal[None]):
+   24 |+def func6(arg1: Literal["hello", "world"] | None):
 29 25 |     ...
 30 26 | 
 31 27 | 
@@ -218,7 +218,7 @@ PYI061.py:53:15: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[.
 51 51 | # From flake8-pyi
 52 52 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
 53    |-Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
-   53 |+Literal[True,] | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   53 |+Literal[True] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
 54 54 | 
 55 55 | ###
 56 56 | # The following rules here are slightly subtle,
@@ -279,7 +279,7 @@ PYI061.py:63:12: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[.
 61 61 | # only emit Y061...
 62 62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
 63    |-Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
-   63 |+Literal[1, "foo"] | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   63 |+Literal[1, "foo"] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
 64 64 | 
 65 65 | # ... but if Y061 and Y062 both apply
 66 66 | # and there are no None members in the Literal[] slice,
@@ -300,7 +300,7 @@ PYI061.py:63:25: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[.
 61 61 | # only emit Y061...
 62 62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
 63    |-Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
-   63 |+Literal[1, "foo"] | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   63 |+Literal[1, "foo"] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
 64 64 | 
 65 65 | # ... but if Y061 and Y062 both apply
 66 66 | # and there are no None members in the Literal[] slice,
@@ -319,7 +319,7 @@ PYI061.py:68:9: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[..
 66 66 | # and there are no None members in the Literal[] slice,
 67 67 | # only emit Y062:
 68    |-Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
-   68 |+Literal[True, True] | Literal[None]  # Y062 Duplicate "Literal[]" member "True"
+   68 |+Literal[True, True] | None  # Y062 Duplicate "Literal[]" member "True"
 69 69 | 
 70 70 | 
 71 71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
@@ -338,7 +338,7 @@ PYI061.py:68:21: PYI061 [*] `Literal[None, ...]` can be replaced with `Literal[.
 66 66 | # and there are no None members in the Literal[] slice,
 67 67 | # only emit Y062:
 68    |-Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
-   68 |+Literal[True, True] | Literal[None]  # Y062 Duplicate "Literal[]" member "True"
+   68 |+Literal[True, True] | None  # Y062 Duplicate "Literal[]" member "True"
 69 69 | 
 70 70 | 
 71 71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
