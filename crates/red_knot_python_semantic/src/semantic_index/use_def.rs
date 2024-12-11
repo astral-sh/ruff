@@ -667,6 +667,43 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 }
 
+/// Analyze the boundness (or declaredness) of a symbol based on all the branching conditions
+/// that were active for each of its bindings (or declarations).
+///
+/// Returns `None` if the symbol is definitely unbound.
+///
+/// Consider this example:
+/// ```py
+/// if test:
+///     x = 1
+/// ```
+///
+/// Depending on the static truthiness of `test`, `x` could either be definitely bound (if `test`
+/// is always true), definitely unbound (if `test` is always false), or possibly unbound (if the
+/// truthiness of `test` is ambiguous).
+///
+/// If there are multiple bindings, the results need to be merged:
+/// ```py
+/// if test1:
+///    x = 1
+/// if test2:
+///    x = 2
+/// ```
+///
+/// Here, `x` is definitely bound if `test2` is always true OR if `test1` is always true. `x` is
+/// definitely unbound if `test1` is always false AND `test2` is always false. And `x` is possibly
+/// unbound in all other cases.
+///
+/// Finally, we also need to consider that a symbol could be definitely bound, even if we can not
+/// statically infer the truthiness of a test condition. On such example is:
+/// ```py
+/// if test:
+///     x = 1
+/// else:
+///     x = 2
+/// ```
+/// Here, `x` is definitely bound, no matter the value of `test`. The `may_be_unbound` flag from
+/// semantic index building is used to determine this (with a value of `false` for this case).
 fn analyze_boundness<'db, 'map, C>(
     db: &dyn crate::db::Db,
     conditions_per_binding: C,
