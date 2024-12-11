@@ -73,12 +73,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
-        pyupgrade::rules::unnecessary_coding_comment(
-            &mut diagnostics,
-            locator,
-            indexer,
-            comment_ranges,
-        );
+        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, comment_ranges);
     }
 
     if settings.rules.enabled(Rule::TabIndentation) {

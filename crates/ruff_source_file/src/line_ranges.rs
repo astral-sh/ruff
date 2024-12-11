@@ -295,6 +295,40 @@ pub trait LineRanges {
     /// ## Panics
     /// If the start or end of `range` is out of bounds.
     fn full_lines_str(&self, range: TextRange) -> &str;
+
+    /// The number of lines `range` spans.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{Ranged, TextRange};
+    /// # use ruff_source_file::LineRanges;
+    ///
+    /// let text = "First line\nsecond line\r\nthird line";
+    ///
+    /// assert_eq!(text.count_lines(TextRange::new(5.into(), 12.into())), 1);
+    ///
+    /// assert_eq!(text.count_lines(TextRange::up_to(5.into())), 0);
+    /// assert_eq!(text.count_lines(TextRange::up_to(23.into())), 1);
+    /// assert_eq!(text.count_lines(TextRange::up_to(24.into())), 2);
+    /// ```
+    ///
+    /// ## Panics
+    /// If the start or end of `range` is out of bounds.
+    fn count_lines(&self, range: TextRange) -> u32 {
+        let mut count = 0;
+        let mut last_line_start = self.line_start(range.start());
+
+        loop {
+            last_line_start = self.full_line_end(last_line_start);
+
+            if last_line_start > range.end() {
+                break count;
+            }
+
+            count += 1;
+        }
+    }
 }
 
 impl LineRanges for str {
