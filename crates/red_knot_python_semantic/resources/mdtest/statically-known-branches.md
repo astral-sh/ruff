@@ -236,12 +236,58 @@ if True:
     try:
         may_raise()
         x = 2
-    except:
+    except KeyError:
         x = 3
+    except ValueError:
+        x = 4
 else:
-    x = 4
+    x = 5
 
-reveal_type(x)  # revealed: Literal[2, 3]
+reveal_type(x)  # revealed: Literal[2, 3, 4]
+```
+
+##### `try` with `else` inside `if True`
+
+```py
+def may_raise() -> None: ...
+
+x = 1
+
+if True:
+    try:
+        may_raise()
+        x = 2
+    except KeyError:
+        x = 3
+    else:
+        x = 4
+else:
+    x = 5
+
+reveal_type(x)  # revealed: Literal[3, 4]
+```
+
+##### `try` with `finally` inside `if True`
+
+```py
+def may_raise() -> None: ...
+
+x = 1
+
+if True:
+    try:
+        may_raise()
+        x = 2
+    except KeyError:
+        x = 3
+    else:
+        x = 4
+    finally:
+        x = 5
+else:
+    x = 6
+
+reveal_type(x)  # revealed: Literal[5]
 ```
 
 #### `for` loops

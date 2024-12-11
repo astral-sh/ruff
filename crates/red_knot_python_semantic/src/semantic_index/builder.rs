@@ -1029,7 +1029,6 @@ where
                     // as there necessarily must have been 0 `except` blocks executed
                     // if we hit the `else` block.
                     let post_try_block_state = self.flow_snapshot();
-                    let post_try_block_conditions = self.branching_conditions_snapshot();
 
                     // Prepare for visiting the `except` block(s)
                     self.flow_restore(pre_try_block_state, pre_try_block_conditions.clone());
@@ -1038,10 +1037,7 @@ where
                     }
 
                     let pre_except_state = self.flow_snapshot();
-                    let pre_except_conditions = self.branching_conditions_snapshot();
                     let num_handlers = handlers.len();
-
-                    self.record_unconditional_branching();
 
                     for (i, except_handler) in handlers.iter().enumerate() {
                         let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
@@ -1051,6 +1047,8 @@ where
                             body: handler_body,
                             range: _,
                         } = except_handler;
+
+                        self.record_unconditional_branching();
 
                         if let Some(handled_exceptions) = handled_exceptions {
                             self.visit_expr(handled_exceptions);
@@ -1081,15 +1079,17 @@ where
                         if i < (num_handlers - 1) {
                             self.flow_restore(
                                 pre_except_state.clone(),
-                                pre_except_conditions.clone(),
+                                pre_try_block_conditions.clone(),
                             );
                         }
                     }
 
                     // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
                     // and the entire `try` block must have been executed:
-                    self.flow_restore(post_try_block_state, post_try_block_conditions);
+                    self.flow_restore(post_try_block_state, pre_try_block_conditions.clone());
                 }
+
+                self.record_unconditional_branching();
 
                 self.visit_body(orelse);
 
@@ -1107,7 +1107,12 @@ where
                 // For more details, see:
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
+                self.record_unconditional_branching();
+
                 self.visit_body(finalbody);
+
+                self.current_use_def_map_mut()
+                    .restore_branching_conditions(pre_try_block_conditions);
             }
             _ => {
                 walk_stmt(self, stmt);
