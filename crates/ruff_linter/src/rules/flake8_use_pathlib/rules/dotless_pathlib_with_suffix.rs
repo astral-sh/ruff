@@ -92,14 +92,10 @@ pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
 
     let mut diagnostic = Diagnostic::new(DotlessPathlibWithSuffix, call.range);
 
-    diagnostic.try_set_fix(|| {
-        if string_value == "." {
-            return Err(anyhow::anyhow!("Cannot fix the suffix `.`"));
-        }
-        let after_leading_quote = string.start() + first_part.flags.opener_len();
-        let fix = Fix::unsafe_edit(Edit::insertion(".".to_string(), after_leading_quote));
-        Ok(fix)
-    });
+		if string_value != "." {
+      let after_leading_quote = string.start() + first_part.flags.opener_len();
+	    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(".".to_string(), after_leading_quote)));
+    }
 
     checker.diagnostics.push(diagnostic);
 }
