@@ -654,14 +654,20 @@ impl<'db> Type<'db> {
                         },
                     )
             }
-            (Type::ClassLiteral(self_class), Type::SubclassOf(target_class)) => {
-                self_class.class.is_subclass_of_base(db, target_class.base)
-            }
+            (
+                Type::ClassLiteral(ClassLiteralType { class: self_class }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(target_class),
+                }),
+            ) => self_class.is_subclass_of(db, target_class),
             (
                 Type::Instance(InstanceType { class: self_class }),
-                Type::SubclassOf(target_class),
-            ) if self_class.is_known(db, KnownClass::Type) => {
-                self_class.is_subclass_of_base(db, target_class.base)
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(target_class),
+                }),
+            ) => {
+                self_class.is_known(db, KnownClass::Type)
+                    && target_class.is_known(db, KnownClass::Type)
             }
             (
                 Type::SubclassOf(SubclassOfType {
@@ -928,10 +934,18 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)),
             ) => left != right,
 
-            (Type::SubclassOf(type_class), Type::ClassLiteral(class_literal))
-            | (Type::ClassLiteral(class_literal), Type::SubclassOf(type_class)) => {
-                !class_literal.class.is_subclass_of_base(db, type_class.base)
-            }
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(class_a),
+                }),
+                Type::ClassLiteral(ClassLiteralType { class: class_b }),
+            )
+            | (
+                Type::ClassLiteral(ClassLiteralType { class: class_b }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(class_a),
+                }),
+            ) => !class_b.is_subclass_of(db, class_a),
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
             (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
                 false
@@ -2593,11 +2607,7 @@ impl<'db> Class<'db> {
     pub fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.is_subclass_of_base(db, other)
-    }
-
-    fn is_subclass_of_base(self, db: &'db dyn Db, other: impl Into<ClassBase<'db>>) -> bool {
-        self.iter_mro(db).contains(&other.into())
+        self.iter_mro(db).contains(&ClassBase::Class(other))
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -3146,6 +3156,7 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfAny)]
     #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
     #[test_case(Ty::BuiltinInstance("type"), Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -3242,6 +3253,8 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinClassLiteral("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinClassLiteral("int"))]
     #[test_case(Ty::TypingInstance("_SpecialForm"), Ty::TypingLiteral)]
+    #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
+    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3401,6 +3414,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(2)], neg: vec![]}, Ty::IntLiteral(2))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::BuiltinInstance("int")]))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
+    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
