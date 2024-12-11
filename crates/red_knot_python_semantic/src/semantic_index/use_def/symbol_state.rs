@@ -57,7 +57,7 @@ pub(super) struct ScopedDefinitionId;
 #[newtype_index]
 pub(super) struct ScopedConstraintId;
 
-/// A newtype-index for a [`crate::semantic_index::branching::BranchingCondition`] in a particular scope.
+/// A newtype-index for a [`crate::semantic_index::branching_condition::BranchingCondition`] in a particular scope.
 #[newtype_index]
 pub(super) struct ScopedBranchingConditionId;
 
