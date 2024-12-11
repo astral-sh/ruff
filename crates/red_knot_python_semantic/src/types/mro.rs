@@ -4,8 +4,8 @@ use std::ops::Deref;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
-use super::{Class, ClassLiteralType, KnownClass, KnownInstanceType, Type};
-use crate::{types::todo_type, Db};
+use super::{Class, ClassLiteralType, KnownClass, KnownInstanceType, TodoType, Type};
+use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
@@ -296,7 +296,7 @@ pub(super) enum MroErrorKind<'db> {
 pub enum ClassBase<'db> {
     Any,
     Unknown,
-    Todo,
+    Todo(TodoType),
     Class(Class<'db>),
 }
 
@@ -311,7 +311,7 @@ impl<'db> ClassBase<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Any => f.write_str("Any"),
-                    ClassBase::Todo => f.write_str("Todo"),
+                    ClassBase::Todo(todo) => todo.fmt(f),
                     ClassBase::Unknown => f.write_str("Unknown"),
                     ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
                 }
@@ -338,7 +338,7 @@ impl<'db> ClassBase<'db> {
         match ty {
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
-            Type::Todo(_) => Some(Self::Todo),
+            Type::Todo(todo) => Some(Self::Todo(todo)),
             Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
@@ -389,7 +389,9 @@ impl<'db> ClassBase<'db> {
             ClassBase::Unknown => {
                 Either::Left([ClassBase::Unknown, ClassBase::object(db)].into_iter())
             }
-            ClassBase::Todo => Either::Left([ClassBase::Todo, ClassBase::object(db)].into_iter()),
+            ClassBase::Todo(todo) => {
+                Either::Left([ClassBase::Todo(todo), ClassBase::object(db)].into_iter())
+            }
             ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
     }
@@ -405,7 +407,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
             ClassBase::Any => Type::Any,
-            ClassBase::Todo => todo_type!(),
+            ClassBase::Todo(todo) => Type::Todo(todo),
             ClassBase::Unknown => Type::Unknown,
             ClassBase::Class(class) => Type::class_literal(class),
         }
