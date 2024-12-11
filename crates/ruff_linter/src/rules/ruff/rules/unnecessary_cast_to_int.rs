@@ -358,10 +358,7 @@ fn replace_with_inner(checker: &mut Checker, call: &ExprCall, argument: &Expr) -
 /// a for a in b      # (a for a in b)
 /// a = b for b in c  # a = (b for b in c)
 /// ```
+#[inline]
 fn should_be_parenthesized_when_standalone(expr: &Expr) -> bool {
-    match expr {
-        Expr::Named(_) => true,
-        Expr::Generator(_) => true,
-        _ => false,
-    }
+    matches!(expr, Expr::Named(_) | Expr::Generator(_))
 }
