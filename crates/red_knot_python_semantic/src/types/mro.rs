@@ -4,8 +4,8 @@ use std::ops::Deref;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
-use super::{Class, ClassLiteralType, KnownClass, KnownInstanceType, Type};
-use crate::{types::todo_type, Db};
+use super::{Class, ClassLiteralType, KnownClass, KnownInstanceType, TodoType, Type};
+use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
@@ -76,21 +76,14 @@ impl<'db> Mro<'db> {
             // This *could* theoretically be handled by the final branch below,
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
-            [single_base] => {
-                let single_base = ClassBase::try_from_ty(*single_base).ok_or(*single_base);
-                single_base.map_or_else(
-                    |invalid_base_ty| {
-                        let bases_info = Box::from([(0, invalid_base_ty)]);
-                        Err(MroErrorKind::InvalidBases(bases_info))
-                    },
-                    |single_base| {
-                        let mro = std::iter::once(ClassBase::Class(class))
-                            .chain(single_base.mro(db))
-                            .collect();
-                        Ok(mro)
-                    },
-                )
-            }
+            [single_base] => ClassBase::try_from_ty(db, *single_base).map_or_else(
+                || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
+                |single_base| {
+                    Ok(std::iter::once(ClassBase::Class(class))
+                        .chain(single_base.mro(db))
+                        .collect())
+                },
+            ),
 
             // The class has multiple explicit bases.
             //
@@ -102,9 +95,9 @@ impl<'db> Mro<'db> {
                 let mut invalid_bases = vec![];
 
                 for (i, base) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_ty(*base).ok_or(*base) {
-                        Ok(valid_base) => valid_bases.push(valid_base),
-                        Err(invalid_base) => invalid_bases.push((i, invalid_base)),
+                    match ClassBase::try_from_ty(db, *base) {
+                        Some(valid_base) => valid_bases.push(valid_base),
+                        None => invalid_bases.push((i, *base)),
                     }
                 }
 
@@ -299,16 +292,16 @@ pub(super) enum MroErrorKind<'db> {
 /// This is much more limited than the [`Type`] enum:
 /// all types that would be invalid to have as a class base are
 /// transformed into [`ClassBase::Unknown`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum ClassBase<'db> {
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
+pub enum ClassBase<'db> {
     Any,
     Unknown,
-    Todo,
+    Todo(TodoType),
     Class(Class<'db>),
 }
 
 impl<'db> ClassBase<'db> {
-    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+    pub fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             base: ClassBase<'db>,
             db: &'db dyn Db,
@@ -318,7 +311,7 @@ impl<'db> ClassBase<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Any => f.write_str("Any"),
-                    ClassBase::Todo => f.write_str("Todo"),
+                    ClassBase::Todo(todo) => todo.fmt(f),
                     ClassBase::Unknown => f.write_str("Unknown"),
                     ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
                 }
@@ -326,15 +319,6 @@ impl<'db> ClassBase<'db> {
         }
 
         Display { base: self, db }
-    }
-
-    #[cfg(test)]
-    #[track_caller]
-    pub(super) fn expect_class_base(self) -> Class<'db> {
-        match self {
-            ClassBase::Class(class) => class,
-            _ => panic!("Expected a `ClassBase::Class()` variant"),
-        }
     }
 
     /// Return a `ClassBase` representing the class `builtins.object`
@@ -350,11 +334,11 @@ impl<'db> ClassBase<'db> {
     /// Attempt to resolve `ty` into a `ClassBase`.
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
-    fn try_from_ty(ty: Type<'db>) -> Option<Self> {
+    fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
-            Type::Todo(_) => Some(Self::Todo),
+            Type::Todo(todo) => Some(Self::Todo(todo)),
             Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
@@ -379,6 +363,11 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::NoReturn
                 | KnownInstanceType::Never
                 | KnownInstanceType::Optional => None,
+                KnownInstanceType::Any => Some(Self::Any),
+                // TODO: classes inheriting from `typing.Type` also have `Generic` in their MRO
+                KnownInstanceType::Type => {
+                    ClassBase::try_from_ty(db, KnownClass::Type.to_class_literal(db))
+                }
             },
         }
     }
@@ -400,9 +389,17 @@ impl<'db> ClassBase<'db> {
             ClassBase::Unknown => {
                 Either::Left([ClassBase::Unknown, ClassBase::object(db)].into_iter())
             }
-            ClassBase::Todo => Either::Left([ClassBase::Todo, ClassBase::object(db)].into_iter()),
+            ClassBase::Todo(todo) => {
+                Either::Left([ClassBase::Todo(todo), ClassBase::object(db)].into_iter())
+            }
             ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
+    }
+}
+
+impl<'db> From<Class<'db>> for ClassBase<'db> {
+    fn from(value: Class<'db>) -> Self {
+        ClassBase::Class(value)
     }
 }
 
@@ -410,7 +407,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
             ClassBase::Any => Type::Any,
-            ClassBase::Todo => todo_type!(),
+            ClassBase::Todo(todo) => Type::Todo(todo),
             ClassBase::Unknown => Type::Unknown,
             ClassBase::Class(class) => Type::class_literal(class),
         }

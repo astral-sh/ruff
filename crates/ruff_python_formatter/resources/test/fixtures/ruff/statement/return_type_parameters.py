@@ -54,7 +54,7 @@ def test_return_union_with_elements_exceeding_length(
 
 
 #########################################################################################
-# Multiline stirngs (NeedsParentheses::Never)
+# Multiline strings (NeedsParentheses::Never)
 #########################################################################################
 
 

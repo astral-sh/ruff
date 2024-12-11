@@ -33,6 +33,9 @@ use crate::rules::ruff::typing::type_hint_resolves_to_any;
 /// ```python
 /// def foo(x: int): ...
 /// ```
+///
+/// ## Options
+/// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingTypeFunctionArgument {
     name: String,
@@ -65,6 +68,9 @@ impl Violation for MissingTypeFunctionArgument {
 /// ```python
 /// def foo(*args: int): ...
 /// ```
+///
+/// ## Options
+/// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingTypeArgs {
     name: String,
@@ -97,6 +103,9 @@ impl Violation for MissingTypeArgs {
 /// ```python
 /// def foo(**kwargs: int): ...
 /// ```
+///
+/// ## Options
+/// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingTypeKwargs {
     name: String,

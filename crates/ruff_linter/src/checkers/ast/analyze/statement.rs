@@ -1235,6 +1235,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::IfKeyInDictDel) {
+                ruff::rules::if_key_in_dict_del(checker, if_);
+            }
             if checker.enabled(Rule::EmptyBranch) {
                 ruff::rules::empty_branch_if(checker, stmt);
             }
@@ -1563,11 +1566,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 .rules
                 .enabled(Rule::AirflowVariableNameTaskIdMismatch)
             {
-                if let Some(diagnostic) =
-                    airflow::rules::variable_name_task_id(checker, targets, value)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
+                airflow::rules::variable_name_task_id(checker, targets, value);
             }
             if checker.settings.rules.enabled(Rule::SelfAssigningVariable) {
                 pylint::rules::self_assignment(checker, assign);

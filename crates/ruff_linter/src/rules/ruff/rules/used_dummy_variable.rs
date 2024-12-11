@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingKind, ScopeId};
+use ruff_python_semantic::{Binding, ScopeId};
 use ruff_python_stdlib::{
     builtins::is_python_builtin, identifiers::is_identifier, keyword::is_keyword,
 };
@@ -16,8 +16,6 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// By default, "dummy variables" are any variables with names that start with leading
 /// underscores. However, this is customisable using the [`lint.dummy-variable-rgx`] setting).
 ///
-/// Dunder variables are ignored by this rule, as are variables named `_`.
-///
 /// ## Why is this bad?
 /// Marking a variable with a leading underscore conveys that it is intentionally unused within the function or method.
 /// When these variables are later referenced in the code, it causes confusion and potential misunderstandings about
@@ -27,18 +25,25 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// Sometimes leading underscores are used to avoid variables shadowing other variables, Python builtins, or Python
 /// keywords. However, [PEP 8] recommends to use trailing underscores for this rather than leading underscores.
 ///
+/// Dunder variables are ignored by this rule, as are variables named `_`.
+/// Only local variables in function scopes are flagged by the rule.
+///
 /// ## Example
 /// ```python
 /// def function():
 ///     _variable = 3
-///     return _variable + 1
+///     # important: avoid shadowing the builtin `id()` function!
+///     _id = 4
+///     return _variable + _id
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def function():
 ///     variable = 3
-///     return variable + 1
+///     # important: avoid shadowing the builtin `id()` function!
+///     id_ = 4
+///     return variable + id_
 /// ```
 ///
 /// ## Fix availability
@@ -46,6 +51,16 @@ use crate::{checkers::ast::Checker, renamer::Renamer};
 /// It will also only be available if the "obvious" new name for the variable
 /// would not shadow any other known variables already accessible from the scope
 /// in which the variable is defined.
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe.
+///
+/// For this rule's fix, Ruff renames the variable and fixes up all known references to
+/// it so they point to the renamed variable. However, some renamings also require other
+/// changes such as different arguments to constructor calls or alterations to comments.
+/// Ruff is aware of some of these cases: `_T = TypeVar("_T")` will be fixed to
+/// `T = TypeVar("T")` if the `_T` binding is flagged by this rule. However, in general,
+/// cases like these are hard to detect and hard to automatically fix.
 ///
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
@@ -93,13 +108,27 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding) -> Optio
     if binding.is_unused() {
         return None;
     }
-    // Only variables defined via function arguments or assignments.
-    if !matches!(
-        binding.kind,
-        BindingKind::Argument | BindingKind::Assignment
-    ) {
+
+    // We only emit the lint on variables defined via assignments.
+    //
+    // ## Why not also emit the lint on function parameters?
+    //
+    // There isn't universal agreement that leading underscores indicate "unused" parameters
+    // in Python (many people use them for "private" parameters), so this would be a lot more
+    // controversial than emitting the lint on assignments. Even if it's decided that it's
+    // desirable to emit a lint on function parameters with "dummy variable" names, it would
+    // possibly have to be a separate rule or we'd have to put it behind a configuration flag,
+    // as there's much less community consensus about the issue.
+    // See <https://github.com/astral-sh/ruff/issues/14796>.
+    //
+    // Moreover, autofixing the diagnostic for function parameters is much more troublesome than
+    // autofixing the diagnostic for assignments. See:
+    // - <https://github.com/astral-sh/ruff/issues/14790>
+    // - <https://github.com/astral-sh/ruff/issues/14799>
+    if !binding.kind.is_assignment() {
         return None;
     }
+
     // This excludes `global` and `nonlocal` variables.
     if binding.is_global() || binding.is_nonlocal() {
         return None;
@@ -132,7 +161,7 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding) -> Optio
         if let Some(fix) = get_possible_fix(name, shadowed_kind, binding.scope, checker) {
             diagnostic.try_set_fix(|| {
                 Renamer::rename(name, &fix, scope, semantic, checker.stylist())
-                    .map(|(edit, rest)| Fix::safe_edits(edit, rest))
+                    .map(|(edit, rest)| Fix::unsafe_edits(edit, rest))
             });
         }
     }

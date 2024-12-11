@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
@@ -10,6 +10,7 @@ use crate::checkers::ast::Checker;
 enum Replacement {
     None,
     Name(String),
+    Message(String),
 }
 
 /// ## What it does
@@ -42,6 +43,8 @@ pub(crate) struct Airflow3Removal {
 }
 
 impl Violation for Airflow3Removal {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Airflow3Removal {
@@ -50,9 +53,21 @@ impl Violation for Airflow3Removal {
         } = self;
         match replacement {
             Replacement::None => format!("`{deprecated}` is removed in Airflow 3.0"),
-            Replacement::Name(name) => {
-                format!("`{deprecated}` is removed in Airflow 3.0; use `{name}` instead")
+            Replacement::Name(_) => {
+                format!("`{deprecated}` is removed in Airflow 3.0")
             }
+            Replacement::Message(message) => {
+                format!("`{deprecated}` is removed in Airflow 3.0; {message}")
+            }
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Airflow3Removal { replacement, .. } = self;
+        if let Replacement::Name(name) = replacement {
+            Some(format!("Use `{name}` instead"))
+        } else {
+            None
         }
     }
 }
@@ -63,7 +78,7 @@ fn diagnostic_for_argument(
     replacement: Option<&str>,
 ) -> Option<Diagnostic> {
     let keyword = arguments.find_keyword(deprecated)?;
-    Some(Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: (*deprecated).to_string(),
             replacement: match replacement {
@@ -75,7 +90,16 @@ fn diagnostic_for_argument(
             .arg
             .as_ref()
             .map_or_else(|| keyword.range(), Ranged::range),
-    ))
+    );
+
+    if let Some(replacement) = replacement {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            replacement.to_string(),
+            diagnostic.range,
+        )));
+    }
+
+    Some(diagnostic)
 }
 
 fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {
@@ -92,6 +116,39 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 "timetable",
                 Some("schedule"),
             ));
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "sla_miss_callback",
+                None::<&str>,
+            ));
+        }
+        ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "execution_date",
+                Some("logical_date"),
+            ));
+        }
+        ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
+        }
+        ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
+        }
+        ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
+            checker.diagnostics.extend(diagnostic_for_argument(
+                arguments,
+                "use_task_execution_day",
+                Some("use_task_logical_date"),
+            ));
         }
         _ => {}
     };
@@ -106,16 +163,76 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "triggers", "external_task", "TaskStateTrigger"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
-                ["airflow", "www", "auth", "has_access"] => Some((
-                    qualname.to_string(),
-                    Replacement::Name("airflow.www.auth.has_access_*".to_string()),
-                )),
                 ["airflow", "api_connexion", "security", "requires_access"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
                         "airflow.api_connexion.security.requires_access_*".to_string(),
                     ),
                 )),
+                // airflow.PY\d{1,2}
+                ["airflow", "PY36"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY37"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY38"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY39"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY310"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY311"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                ["airflow", "PY312"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("sys.version_info".to_string()),
+                )),
+                // airflow.configuration
+                ["airflow", "configuration", "get"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.get".to_string()),
+                )),
+                ["airflow", "configuration", "getboolean"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.getboolean".to_string()),
+                )),
+                ["airflow", "configuration", "getfloat"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.getfloat".to_string()),
+                )),
+                ["airflow", "configuration", "getint"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.getint".to_string()),
+                )),
+                ["airflow", "configuration", "has_option"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.has_option".to_string()),
+                )),
+                ["airflow", "configuration", "remove_option"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.remove_option".to_string()),
+                )),
+                ["airflow", "configuration", "as_dict"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.as_dict".to_string()),
+                )),
+                ["airflow", "configuration", "set"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.configuration.conf.set".to_string()),
+                )),
+                // airflow.contrib.*
+                ["airflow", "contrib", ..] => Some((qualname.to_string(), Replacement::None)),
                 // airflow.metrics.validators
                 ["airflow", "metrics", "validators", "AllowListValidator"] => Some((
                     qualname.to_string(),
@@ -127,6 +244,85 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name(
                         "airflow.metrics.validators.PatternBlockListValidator".to_string(),
+                    ),
+                )),
+                // airflow.operators
+                ["airflow", "operators", "subdag", ..] => {
+                    Some((qualname.to_string(), Replacement::None))
+                }
+                ["airflow.sensors.external_task.ExternalTaskSensorLink"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.external_task.ExternalDagLin".to_string()),
+                )),
+                ["airflow", "operators", "bash_operator", "BashOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.bash.BashOperator".to_string()),
+                )),
+                ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.branch.BaseBranchOperator".to_string()),
+                )),
+                ["airflow", "operators", " dummy", "EmptyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                )),
+                ["airflow", "operators", "dummy", "DummyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                )),
+                ["airflow", "operators", "dummy_operator", "EmptyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                )),
+                ["airflow", "operators", "dummy_operator", "DummyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                )),
+                ["airflow", "operators", "email_operator", "EmailOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.operators.email.EmailOperator".to_string()),
+                )),
+                ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.base.BaseSensorOperator".to_string()),
+                )),
+                ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.date_time.DateTimeSensor".to_string()),
+                )),
+                ["airflow", "sensors", "external_task_sensor", "ExternalTaskMarker"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.sensors.external_task.ExternalTaskMarker".to_string(),
+                    ),
+                )),
+                ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.sensors.external_task.ExternalTaskSensor".to_string(),
+                    ),
+                )),
+                ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensorLink"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.sensors.external_task.ExternalTaskSensorLink".to_string(),
+                    ),
+                )),
+                ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor".to_string()),
+                )),
+                // airflow.secrets
+                ["airflow", "secrets", "local_filesystem", "load_connections"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.secrets.local_filesystem.load_connections_dict".to_string(),
+                    ),
+                )),
+                ["airflow", "secrets", "local_filesystem", "get_connection"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.secrets.local_filesystem.load_connections_dict".to_string(),
                     ),
                 )),
                 // airflow.utils.dates
@@ -158,6 +354,16 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name("pendulum.today('UTC').add(days=-N, ...)".to_string()),
                 )),
+
+                // airflow.utils.helpers
+                ["airflow", "utils", "helpers", "chain"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.models.baseoperator.chain".to_string()),
+                )),
+                ["airflow", "utils", "helpers", "cross_downstream"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.models.baseoperator.cross_downstream".to_string()),
+                )),
                 // airflow.utils.state
                 ["airflow", "utils", "state", "SHUTDOWN"] => {
                     Some((qualname.to_string(), Replacement::None))
@@ -165,13 +371,42 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "utils", "state", "terminating_states"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
+                // airflow.utils.trigger_rule
+                ["airflow", "utils", "trigger_rule", "TriggerRule", "DUMMY"] => {
+                    Some((qualname.to_string(), Replacement::None))
+                }
+                ["airflow", "utils", "trigger_rule", "TriggerRule", "NONE_FAILED_OR_SKIPPED"] => {
+                    Some((qualname.to_string(), Replacement::None))
+                }
                 // airflow.uilts
                 ["airflow", "utils", "dag_cycle_tester", "test_cycle"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
-                ["airflow", "utils", "decorators", "apply_defaults"] => {
-                    Some((qualname.to_string(), Replacement::None))
-                }
+                ["airflow", "utils", "decorators", "apply_defaults"] => Some((
+                    qualname.to_string(),
+                    Replacement::Message(
+                        "`apply_defaults` is now unconditionally done and can be safely removed."
+                            .to_string(),
+                    ),
+                )),
+                // airflow.www
+                ["airflow", "www", "auth", "has_access"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.www.auth.has_access_*".to_string()),
+                )),
+                ["airflow", "www", "utils", "get_sensitive_variables_fields"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.utils.log.secrets_masker.get_sensitive_variables_fields"
+                            .to_string(),
+                    ),
+                )),
+                ["airflow", "www", "utils", "should_hide_value_for_key"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.utils.log.secrets_masker.should_hide_value_for_key".to_string(),
+                    ),
+                )),
                 _ => None,
             });
     if let Some((deprecated, replacement)) = result {

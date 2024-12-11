@@ -35,13 +35,20 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
 #[derive(ViolationMetadata)]
-pub(crate) struct ExceptWithNonExceptionClasses;
+pub(crate) struct ExceptWithNonExceptionClasses {
+    is_star: bool,
+}
 
 impl Violation for ExceptWithNonExceptionClasses {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`except` handlers should only be exception classes or tuples of exception classes"
-            .to_string()
+        if self.is_star {
+            "`except*` handlers should only be exception classes or tuples of exception classes"
+                .to_string()
+        } else {
+            "`except` handlers should only be exception classes or tuples of exception classes"
+                .to_string()
+        }
     }
 }
 
@@ -60,9 +67,15 @@ pub(crate) fn except_with_non_exception_classes(
             expr,
             Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
         ) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ExceptWithNonExceptionClasses, expr.range()));
+            let is_star = checker
+                .semantic()
+                .current_statement()
+                .as_try_stmt()
+                .is_some_and(|try_stmt| try_stmt.is_star);
+            checker.diagnostics.push(Diagnostic::new(
+                ExceptWithNonExceptionClasses { is_star },
+                expr.range(),
+            ));
         }
     }
 }

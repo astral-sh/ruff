@@ -58,28 +58,23 @@ reveal_type(c >= d)  # revealed: Literal[True]
 #### Results with Ambiguity
 
 ```py
-def bool_instance() -> bool:
-    return True
+def _(x: bool, y: int):
+    a = (x,)
+    b = (y,)
 
-def int_instance() -> int:
-    return 42
+    reveal_type(a == a)  # revealed: bool
+    reveal_type(a != a)  # revealed: bool
+    reveal_type(a < a)  # revealed: bool
+    reveal_type(a <= a)  # revealed: bool
+    reveal_type(a > a)  # revealed: bool
+    reveal_type(a >= a)  # revealed: bool
 
-a = (bool_instance(),)
-b = (int_instance(),)
-
-reveal_type(a == a)  # revealed: bool
-reveal_type(a != a)  # revealed: bool
-reveal_type(a < a)  # revealed: bool
-reveal_type(a <= a)  # revealed: bool
-reveal_type(a > a)  # revealed: bool
-reveal_type(a >= a)  # revealed: bool
-
-reveal_type(a == b)  # revealed: bool
-reveal_type(a != b)  # revealed: bool
-reveal_type(a < b)  # revealed: bool
-reveal_type(a <= b)  # revealed: bool
-reveal_type(a > b)  # revealed: bool
-reveal_type(a >= b)  # revealed: bool
+    reveal_type(a == b)  # revealed: bool
+    reveal_type(a != b)  # revealed: bool
+    reveal_type(a < b)  # revealed: bool
+    reveal_type(a <= b)  # revealed: bool
+    reveal_type(a > b)  # revealed: bool
+    reveal_type(a >= b)  # revealed: bool
 ```
 
 #### Comparison Unsupported
@@ -197,7 +192,7 @@ reveal_type((A(), B()) < (A(), B()))  # revealed: float | set | Literal[False]
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons
 
-> Example: `(int_instance(), "foo") == (int_instance(), "bar")`
+> Example: `(<int instance>, "foo") == (<int instance>, "bar")`
 
 `Eq` and `NotEq` have unique behavior compared to other operators in lexicographic comparisons.
 Specifically, for `Eq`, if any non-equal pair exists within the tuples being compared, we can
@@ -208,42 +203,38 @@ In contrast, with operators like `<` and `>`, the comparison must consider each 
 sequentially, and the final outcome might remain ambiguous until all pairs are compared.
 
 ```py
-def str_instance() -> str:
-    return "hello"
+def _(x: str, y: int):
+    reveal_type("foo" == "bar")  # revealed: Literal[False]
+    reveal_type(("foo",) == ("bar",))  # revealed: Literal[False]
+    reveal_type((4, "foo") == (4, "bar"))  # revealed: Literal[False]
+    reveal_type((y, "foo") == (y, "bar"))  # revealed: Literal[False]
 
-def int_instance() -> int:
-    return 42
+    a = (x, y, "foo")
 
-reveal_type("foo" == "bar")  # revealed: Literal[False]
-reveal_type(("foo",) == ("bar",))  # revealed: Literal[False]
-reveal_type((4, "foo") == (4, "bar"))  # revealed: Literal[False]
-reveal_type((int_instance(), "foo") == (int_instance(), "bar"))  # revealed: Literal[False]
+    reveal_type(a == a)  # revealed: bool
+    reveal_type(a != a)  # revealed: bool
+    reveal_type(a < a)  # revealed: bool
+    reveal_type(a <= a)  # revealed: bool
+    reveal_type(a > a)  # revealed: bool
+    reveal_type(a >= a)  # revealed: bool
 
-a = (str_instance(), int_instance(), "foo")
+    b = (x, y, "bar")
 
-reveal_type(a == a)  # revealed: bool
-reveal_type(a != a)  # revealed: bool
-reveal_type(a < a)  # revealed: bool
-reveal_type(a <= a)  # revealed: bool
-reveal_type(a > a)  # revealed: bool
-reveal_type(a >= a)  # revealed: bool
+    reveal_type(a == b)  # revealed: Literal[False]
+    reveal_type(a != b)  # revealed: Literal[True]
+    reveal_type(a < b)  # revealed: bool
+    reveal_type(a <= b)  # revealed: bool
+    reveal_type(a > b)  # revealed: bool
+    reveal_type(a >= b)  # revealed: bool
 
-b = (str_instance(), int_instance(), "bar")
+    c = (x, y, "foo", "different_length")
 
-reveal_type(a == b)  # revealed: Literal[False]
-reveal_type(a != b)  # revealed: Literal[True]
-reveal_type(a < b)  # revealed: bool
-reveal_type(a <= b)  # revealed: bool
-reveal_type(a > b)  # revealed: bool
-reveal_type(a >= b)  # revealed: bool
-
-c = (str_instance(), int_instance(), "foo", "different_length")
-reveal_type(a == c)  # revealed: Literal[False]
-reveal_type(a != c)  # revealed: Literal[True]
-reveal_type(a < c)  # revealed: bool
-reveal_type(a <= c)  # revealed: bool
-reveal_type(a > c)  # revealed: bool
-reveal_type(a >= c)  # revealed: bool
+    reveal_type(a == c)  # revealed: Literal[False]
+    reveal_type(a != c)  # revealed: Literal[True]
+    reveal_type(a < c)  # revealed: bool
+    reveal_type(a <= c)  # revealed: bool
+    reveal_type(a > c)  # revealed: bool
+    reveal_type(a >= c)  # revealed: bool
 ```
 
 #### Error Propagation
@@ -252,42 +243,36 @@ Errors occurring within a tuple comparison should propagate outward. However, if
 comparison can clearly conclude before encountering an error, the error should not be raised.
 
 ```py
-def int_instance() -> int:
-    return 42
+def _(n: int, s: str):
+    class A: ...
+    # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`"
+    A() < A()
+    # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`"
+    A() <= A()
+    # error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`"
+    A() > A()
+    # error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`"
+    A() >= A()
 
-def str_instance() -> str:
-    return "hello"
+    a = (0, n, A())
 
-class A: ...
+    # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    reveal_type(a < a)  # revealed: Unknown
+    # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    reveal_type(a <= a)  # revealed: Unknown
+    # error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    reveal_type(a > a)  # revealed: Unknown
+    # error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    reveal_type(a >= a)  # revealed: Unknown
 
-# error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`"
-A() < A()
-# error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`"
-A() <= A()
-# error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`"
-A() > A()
-# error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`"
-A() >= A()
+    # Comparison between `a` and `b` should only involve the first elements, `Literal[0]` and `Literal[99999]`,
+    # and should terminate immediately.
+    b = (99999, n, A())
 
-a = (0, int_instance(), A())
-
-# error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
-reveal_type(a < a)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
-reveal_type(a <= a)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
-reveal_type(a > a)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
-reveal_type(a >= a)  # revealed: Unknown
-
-# Comparison between `a` and `b` should only involve the first elements, `Literal[0]` and `Literal[99999]`,
-# and should terminate immediately.
-b = (99999, int_instance(), A())
-
-reveal_type(a < b)  # revealed: Literal[True]
-reveal_type(a <= b)  # revealed: Literal[True]
-reveal_type(a > b)  # revealed: Literal[False]
-reveal_type(a >= b)  # revealed: Literal[False]
+    reveal_type(a < b)  # revealed: Literal[True]
+    reveal_type(a <= b)  # revealed: Literal[True]
+    reveal_type(a > b)  # revealed: Literal[False]
+    reveal_type(a >= b)  # revealed: Literal[False]
 ```
 
 ### Membership Test Comparisons
@@ -295,22 +280,20 @@ reveal_type(a >= b)  # revealed: Literal[False]
 "Membership Test Comparisons" refers to the operators `in` and `not in`.
 
 ```py
-def int_instance() -> int:
-    return 42
+def _(n: int):
+    a = (1, 2)
+    b = ((3, 4), (1, 2))
+    c = ((1, 2, 3), (4, 5, 6))
+    d = ((n, n), (n, n))
 
-a = (1, 2)
-b = ((3, 4), (1, 2))
-c = ((1, 2, 3), (4, 5, 6))
-d = ((int_instance(), int_instance()), (int_instance(), int_instance()))
+    reveal_type(a in b)  # revealed: Literal[True]
+    reveal_type(a not in b)  # revealed: Literal[False]
 
-reveal_type(a in b)  # revealed: Literal[True]
-reveal_type(a not in b)  # revealed: Literal[False]
+    reveal_type(a in c)  # revealed: Literal[False]
+    reveal_type(a not in c)  # revealed: Literal[True]
 
-reveal_type(a in c)  # revealed: Literal[False]
-reveal_type(a not in c)  # revealed: Literal[True]
-
-reveal_type(a in d)  # revealed: bool
-reveal_type(a not in d)  # revealed: bool
+    reveal_type(a in d)  # revealed: bool
+    reveal_type(a not in d)  # revealed: bool
 ```
 
 ### Identity Comparisons

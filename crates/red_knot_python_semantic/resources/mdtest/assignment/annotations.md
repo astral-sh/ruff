@@ -50,7 +50,7 @@ reveal_type(b)  # revealed: tuple[int]
 reveal_type(c)  # revealed: tuple[str, int]
 reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 
-# TODO: homogenous tuples, PEP-646 tuples
+# TODO: homogeneous tuples, PEP-646 tuples
 reveal_type(e)  # revealed: @Todo(full tuple[...] support)
 reveal_type(f)  # revealed: @Todo(full tuple[...] support)
 reveal_type(g)  # revealed: @Todo(full tuple[...] support)
@@ -78,20 +78,10 @@ c: tuple[str | int, str] = ([], "foo")
 ## PEP-604 annotations are supported
 
 ```py
-def foo() -> str | int | None:
-    return None
-
-reveal_type(foo())  # revealed: str | int | None
-
-def bar() -> str | str | None:
-    return None
-
-reveal_type(bar())  # revealed: str | None
-
-def baz() -> str | str:
-    return "Hello, world!"
-
-reveal_type(baz())  # revealed: str
+def foo(v: str | int | None, w: str | str | None, x: str | str):
+    reveal_type(v)  # revealed: str | int | None
+    reveal_type(w)  # revealed: str | None
+    reveal_type(x)  # revealed: str
 ```
 
 ## Attribute expressions in type annotations are understood
@@ -118,8 +108,7 @@ from __future__ import annotations
 
 x: Foo
 
-class Foo:
-    pass
+class Foo: ...
 
 x = Foo()
 reveal_type(x)  # revealed: Foo
@@ -130,8 +119,7 @@ reveal_type(x)  # revealed: Foo
 ```pyi path=main.pyi
 x: Foo
 
-class Foo:
-    pass
+class Foo: ...
 
 x = Foo()
 reveal_type(x)  # revealed: Foo

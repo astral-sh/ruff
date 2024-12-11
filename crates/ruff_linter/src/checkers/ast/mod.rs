@@ -222,7 +222,7 @@ pub(crate) struct Checker<'a> {
     analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
     pub(crate) diagnostics: Vec<Diagnostic>,
-    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
+    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
@@ -282,7 +282,7 @@ impl<'a> Checker<'a> {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
-        // unused members on a single import. We need to pre-emptively omit any
+        // unused members on a single import. We need to preemptively omit any
         // members from the fix that will eventually be excluded by a `noqa`.
         // Unfortunately, we _do_ want to register a `Diagnostic` for each
         // eventually-ignored import, so that our `noqa` counts are accurate.

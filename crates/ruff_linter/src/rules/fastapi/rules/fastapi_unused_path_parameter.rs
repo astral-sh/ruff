@@ -267,7 +267,7 @@ impl<'a> Iterator for PathParamIterator<'a> {
             if c == '{' {
                 if let Some((end, _)) = self.chars.by_ref().find(|&(_, ch)| ch == '}') {
                     let param_content = &self.input[start + 1..end];
-                    // We ignore text after a colon, since those are path convertors
+                    // We ignore text after a colon, since those are path converters
                     // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
                     let param_name_end = param_content.find(':').unwrap_or(param_content.len());
                     let param_name = &param_content[..param_name_end].trim();

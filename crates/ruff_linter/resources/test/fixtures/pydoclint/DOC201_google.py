@@ -178,7 +178,7 @@ def foo(x: int) -> int | None:
     """A very helpful docstring.
 
     Args:
-        x (int): An interger.
+        x (int): An integer.
     """
     if x < 0:
         return None
@@ -191,7 +191,7 @@ def foo(x):
     """A very helpful docstring.
 
     Args:
-        x (int): An interger.
+        x (int): An integer.
     """
     if x < 0:
         return None

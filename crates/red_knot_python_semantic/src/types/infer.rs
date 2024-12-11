@@ -31,7 +31,7 @@ use std::num::NonZeroU32;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, AnyNodeRef, Expr, ExprContext, UnaryOp};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
@@ -48,8 +48,16 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
-use crate::types::diagnostic::{TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
-use crate::types::mro::MroErrorKind;
+use crate::types::diagnostic::{
+    TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE,
+    CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE,
+    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_LITERAL_PARAMETER,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_PARAMETER,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+};
+use crate::types::mro::{ClassBase, MroErrorKind};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
@@ -63,7 +71,9 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::string_annotation::parse_string_annotation;
+use super::string_annotation::{
+    parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
+};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -406,11 +416,35 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Get the already-inferred type of an expression node.
     ///
-    /// PANIC if no type has been inferred for this node.
+    /// ## Panics
+    /// If the expression is not within this region, or if no type has yet been inferred for
+    /// this node.
     #[track_caller]
     fn expression_ty(&self, expr: &ast::Expr) -> Type<'db> {
         self.types
             .expression_ty(expr.scoped_expression_id(self.db, self.scope()))
+    }
+
+    /// Get the type of an expression from any scope in the same file.
+    ///
+    /// If the expression is in the current scope, and we are inferring the entire scope, just look
+    /// up the expression in our own results, otherwise call [`infer_scope_types()`] for the scope
+    /// of the expression.
+    ///
+    /// ## Panics
+    ///
+    /// If the expression is in the current scope but we haven't yet inferred a type for it.
+    ///
+    /// Can cause query cycles if the expression is from a different scope and type inference is
+    /// already in progress for that scope (further up the stack).
+    fn file_expression_ty(&self, expression: &ast::Expr) -> Type<'db> {
+        let file_scope = self.index.expression_scope_id(expression);
+        let expr_scope = file_scope.to_scope_id(self.db, self.file);
+        let expr_id = expression.scoped_expression_id(self.db, expr_scope);
+        match self.region {
+            InferenceRegion::Scope(scope) if scope == expr_scope => self.expression_ty(expression),
+            _ => infer_scope_types(self.db, expr_scope).expression_ty(expr_id),
+        }
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -501,9 +535,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         for (class, class_node) in class_definitions {
             // (1) Check that the class does not have a cyclic definition
             if class.is_cyclically_defined(self.db) {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &CYCLIC_CLASS_DEFINITION,
                     class_node.into(),
-                    "cyclic-class-def",
                     format_args!(
                         "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
                         class.name(self.db),
@@ -521,9 +555,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::DuplicateBases(duplicates) => {
                         let base_nodes = class_node.bases();
                         for (index, duplicate) in duplicates {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &DUPLICATE_BASE,
                                 (&base_nodes[*index]).into(),
-                                "duplicate-base",
                                 format_args!("Duplicate base class `{}`", duplicate.name(self.db)),
                             );
                         }
@@ -531,9 +565,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     MroErrorKind::InvalidBases(bases) => {
                         let base_nodes = class_node.bases();
                         for (index, base_ty) in bases {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &INVALID_BASE,
                                 (&base_nodes[*index]).into(),
-                                "invalid-base",
                                 format_args!(
                                     "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
                                     base_ty.display(self.db)
@@ -541,9 +575,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                         }
                     }
-                    MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add(
+                    MroErrorKind::UnresolvableMro { bases_list } => self.diagnostics.add_lint(
+                        &INCONSISTENT_MRO,
                         class_node.into(),
-                        "inconsistent-mro",
                         format_args!(
                             "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
                             class.name(self.db),
@@ -571,9 +605,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     } => {
                         let node = class_node.into();
                         if *candidate1_is_base_class {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &CONFLICTING_METACLASS,
                                 node,
-                                "conflicting-metaclass",
                                 format_args!(
                                     "The metaclass of a derived class (`{class}`) must be a subclass of the metaclasses of all its bases, \
                                     but `{metaclass1}` (metaclass of base class `{base1}`) and `{metaclass2}` (metaclass of base class `{base2}`) \
@@ -583,12 +617,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     base1 = class1.name(self.db),
                                     metaclass2 = metaclass2.name(self.db),
                                     base2 = class2.name(self.db),
-                                )
+                                ),
                             );
                         } else {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &CONFLICTING_METACLASS,
                                 node,
-                                "conflicting-metaclass",
                                 format_args!(
                                     "The metaclass of a derived class (`{class}`) must be a subclass of the metaclasses of all its bases, \
                                     but `{metaclass_of_class}` (metaclass of `{class}`) and `{metaclass_of_base}` (metaclass of base class `{base}`) \
@@ -597,7 +631,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     metaclass_of_class = metaclass1.name(self.db),
                                     metaclass_of_base = metaclass2.name(self.db),
                                     base = class2.name(self.db),
-                                )
+                                ),
                             );
                         }
                     }
@@ -654,11 +688,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
-            DefinitionKind::Parameter(parameter) => {
-                self.infer_parameter_definition(parameter, definition);
+            DefinitionKind::VariadicPositionalParameter(parameter) => {
+                self.infer_variadic_positional_parameter_definition(parameter, definition);
             }
-            DefinitionKind::ParameterWithDefault(parameter_with_default) => {
-                self.infer_parameter_with_default_definition(parameter_with_default, definition);
+            DefinitionKind::VariadicKeywordParameter(parameter) => {
+                self.infer_variadic_keyword_parameter_definition(parameter, definition);
+            }
+            DefinitionKind::Parameter(parameter_with_default) => {
+                self.infer_parameter_definition(parameter_with_default, definition);
             }
             DefinitionKind::WithItem(with_item) => {
                 self.infer_with_item_definition(
@@ -732,9 +769,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => return,
         };
 
-        self.diagnostics.add(
+        self.diagnostics.add_lint(
+            &DIVISION_BY_ZERO,
             expr.into(),
-            "division-by-zero",
             format_args!(
                 "Cannot {op} object of type `{}` {by_zero}",
                 left.display(self.db)
@@ -757,9 +794,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // TODO point out the conflicting declarations in the diagnostic?
                 let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
                 let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &CONFLICTING_DECLARATIONS,
                     node,
-                    "conflicting-declarations",
                     format_args!(
                         "Conflicting declared types for `{symbol_name}`: {}",
                         conflicting.display(self.db)
@@ -787,9 +824,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = if inferred_ty.is_assignable_to(self.db, ty) {
             ty
         } else {
-            self.diagnostics.add(
+            self.diagnostics.add_lint(
+                &INVALID_DECLARATION,
                 node,
-                "invalid-declaration",
                 format_args!(
                     "Cannot declare type `{}` for inferred type `{}`",
                     ty.display(self.db),
@@ -871,6 +908,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+        // Parameters are odd: they are Definitions in the function body scope, but have no
+        // constituent nodes that are part of the function body. In order to get diagnostics
+        // merged/emitted for them, we need to explicitly infer their definitions here.
+        for parameter in &function.parameters {
+            self.infer_definition(parameter);
+        }
         self.infer_body(&function.body);
     }
 
@@ -1033,33 +1076,126 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
-    fn infer_parameter_with_default_definition(
+    /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
+    /// in the function body scope.
+    ///
+    /// The declared type is the annotated type, if any, or `Unknown`.
+    ///
+    /// The inferred type is the annotated type, unioned with the type of the default value, if
+    /// any. If both types are fully static, this union is a no-op (it should simplify to just the
+    /// annotated type.) But in a case like `f(x=None)` with no annotated type, we want to infer
+    /// the type `Unknown | None` for `x`, not just `Unknown`, so that we can error on usage of `x`
+    /// that would not be valid for `None`.
+    ///
+    /// If the default-value type is not assignable to the declared (annotated) type, we ignore the
+    /// default-value type and just infer the annotated type; this is the same way we handle
+    /// assignments, and allows an explicit annotation to override a bad inference.
+    ///
+    /// Parameter definitions are odd in that they define a symbol in the function-body scope, so
+    /// the Definition belongs to the function body scope, but the expressions (annotation and
+    /// default value) both belong to outer scopes. (The default value always belongs to the outer
+    /// scope in which the function is defined, the annotation belongs either to the outer scope,
+    /// or maybe to an intervening type-params scope, if it's a generic function.) So we don't use
+    /// `self.infer_expression` or store any expression types here, we just use `expression_ty` to
+    /// get the types of the expressions from their respective scopes.
+    ///
+    /// It is safe (non-cycle-causing) to use `expression_ty` here, because an outer scope can't
+    /// depend on a definition from an inner scope, so we shouldn't be in-process of inferring the
+    /// outer scope here.
+    fn infer_parameter_definition(
         &mut self,
         parameter_with_default: &ast::ParameterWithDefault,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): Infer types from annotation or default expression
-        // TODO check that default is assignable to parameter type
-        self.infer_parameter_definition(&parameter_with_default.parameter, definition);
+        let ast::ParameterWithDefault {
+            parameter,
+            default,
+            range: _,
+        } = parameter_with_default;
+        let default_ty = default
+            .as_ref()
+            .map(|default| self.file_expression_ty(default));
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let declared_ty = self.file_expression_ty(annotation);
+            let inferred_ty = if let Some(default_ty) = default_ty {
+                if default_ty.is_assignable_to(self.db, declared_ty) {
+                    UnionType::from_elements(self.db, [declared_ty, default_ty])
+                } else {
+                    self.diagnostics.add_lint(
+                        &INVALID_PARAMETER_DEFAULT,
+                        parameter_with_default.into(),
+                        format_args!(
+                            "Default value of type `{}` is not assignable to annotated parameter type `{}`",
+                            default_ty.display(self.db), declared_ty.display(self.db)),
+                    );
+                    declared_ty
+                }
+            } else {
+                declared_ty
+            };
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                declared_ty,
+                inferred_ty,
+            );
+        } else {
+            let ty = if let Some(default_ty) = default_ty {
+                UnionType::from_elements(self.db, [Type::Unknown, default_ty])
+            } else {
+                Type::Unknown
+            };
+            self.add_binding(parameter.into(), definition, ty);
+        }
     }
 
-    fn infer_parameter_definition(
+    /// Set initial declared/inferred types for a `*args` variadic positional parameter.
+    ///
+    /// The annotated type is implicitly wrapped in a homogeneous tuple.
+    ///
+    /// See `infer_parameter_definition` doc comment for some relevant observations about scopes.
+    fn infer_variadic_positional_parameter_definition(
         &mut self,
         parameter: &ast::Parameter,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): Annotation expression is resolved at the enclosing scope, infer the
-        // parameter type from there
-        let annotated_ty = todo_type!("function parameter type");
-        if parameter.annotation.is_some() {
-            self.add_declaration_with_binding(
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let _annotated_ty = self.file_expression_ty(annotation);
+            // TODO `tuple[annotated_ty, ...]`
+            let ty = KnownClass::Tuple.to_instance(self.db);
+            self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
+        } else {
+            self.add_binding(
                 parameter.into(),
                 definition,
-                annotated_ty,
-                annotated_ty,
+                // TODO `tuple[Unknown, ...]`
+                KnownClass::Tuple.to_instance(self.db),
             );
+        }
+    }
+
+    /// Set initial declared/inferred types for a `*args` variadic positional parameter.
+    ///
+    /// The annotated type is implicitly wrapped in a string-keyed dictionary.
+    ///
+    /// See `infer_parameter_definition` doc comment for some relevant observations about scopes.
+    fn infer_variadic_keyword_parameter_definition(
+        &mut self,
+        parameter: &ast::Parameter,
+        definition: Definition<'db>,
+    ) {
+        if let Some(annotation) = parameter.annotation.as_ref() {
+            let _annotated_ty = self.file_expression_ty(annotation);
+            // TODO `dict[str, annotated_ty]`
+            let ty = KnownClass::Dict.to_instance(self.db);
+            self.add_declaration_with_binding(parameter.into(), definition, ty, ty);
         } else {
-            self.add_binding(parameter.into(), definition, annotated_ty);
+            self.add_binding(
+                parameter.into(),
+                definition,
+                // TODO `dict[str, Unknown]`
+                KnownClass::Dict.to_instance(self.db),
+            );
         }
     }
 
@@ -1297,9 +1433,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
             (Symbol::Unbound, Symbol::Unbound) => {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &INVALID_CONTEXT_MANAGER,
                     context_expression.into(),
-                    "invalid-context-manager",
                     format_args!(
                         "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`",
                         context_expression_ty.display(self.db)
@@ -1308,9 +1444,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Unknown
             }
             (Symbol::Unbound, _) => {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &INVALID_CONTEXT_MANAGER,
                     context_expression.into(),
-                    "invalid-context-manager",
                     format_args!(
                         "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__`",
                         context_expression_ty.display(self.db)
@@ -1320,9 +1456,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             (Symbol::Type(enter_ty, enter_boundness), exit) => {
                 if enter_boundness == Boundness::PossiblyUnbound {
-                    self.diagnostics.add(
+                    self.diagnostics.add_lint(
+                        &INVALID_CONTEXT_MANAGER,
                         context_expression.into(),
-                        "invalid-context-manager",
                         format_args!(
                             "Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` is possibly unbound",
                             context_expression = context_expression_ty.display(self.db),
@@ -1334,9 +1470,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .call(self.db, &[context_expression_ty])
                     .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
                     .unwrap_or_else(|err| {
-                        self.diagnostics.add(
+                        self.diagnostics.add_lint(
+                            &INVALID_CONTEXT_MANAGER,
                             context_expression.into(),
-                            "invalid-context-manager",
                             format_args!("
                                 Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` of type `{enter_ty}` is not callable", context_expression = context_expression_ty.display(self.db), enter_ty = enter_ty.display(self.db)
                             ),
@@ -1346,9 +1482,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 match exit {
                     Symbol::Unbound => {
-                        self.diagnostics.add(
+                        self.diagnostics.add_lint(
+                            &INVALID_CONTEXT_MANAGER,
                             context_expression.into(),
-                            "invalid-context-manager",
                             format_args!(
                                 "Object of type `{}` cannot be used with `with` because it doesn't implement `__exit__`",
                                 context_expression_ty.display(self.db)
@@ -1359,9 +1495,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
 
                         if exit_boundness == Boundness::PossiblyUnbound {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &INVALID_CONTEXT_MANAGER,
                                 context_expression.into(),
-                                "invalid-context-manager",
                                 format_args!(
                                     "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` is possibly unbound",
                                     context_expression = context_expression_ty.display(self.db),
@@ -1386,9 +1522,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             )
                             .is_err()
                         {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &INVALID_CONTEXT_MANAGER,
                                 context_expression.into(),
-                                "invalid-context-manager",
                                 format_args!(
                                     "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` of type `{exit_ty}` is not callable",
                                     context_expression = context_expression_ty.display(self.db),
@@ -1409,40 +1545,56 @@ impl<'db> TypeInferenceBuilder<'db> {
         except_handler_definition: &ExceptHandlerDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let node_ty = except_handler_definition
-            .handled_exceptions()
-            .map(|ty| self.infer_expression(ty))
-            // If there is no handled exception, it's invalid syntax;
-            // a diagnostic will have already been emitted
-            .unwrap_or(Type::Unknown);
+        let node = except_handler_definition.handled_exceptions();
+
+        // If there is no handled exception, it's invalid syntax;
+        // a diagnostic will have already been emitted
+        let node_ty = node.map_or(Type::Unknown, |ty| self.infer_expression(ty));
+
+        // If it's an `except*` handler, this won't actually be the type of the bound symbol;
+        // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
+        let symbol_ty = if let Type::Tuple(tuple) = node_ty {
+            let type_base_exception = KnownClass::BaseException
+                .to_subclass_of(self.db)
+                .unwrap_or(Type::Unknown);
+            let mut builder = UnionBuilder::new(self.db);
+            for element in tuple.elements(self.db).iter().copied() {
+                builder = builder.add(if element.is_assignable_to(self.db, type_base_exception) {
+                    element.to_instance(self.db)
+                } else {
+                    if let Some(node) = node {
+                        self.diagnostics
+                            .add_invalid_exception_caught(self.db, node, element);
+                    }
+                    Type::Unknown
+                });
+            }
+            builder.build()
+        } else if node_ty.is_subtype_of(self.db, KnownClass::Tuple.to_instance(self.db)) {
+            todo_type!("Homogeneous tuple in exception handler")
+        } else {
+            let type_base_exception = KnownClass::BaseException
+                .to_subclass_of(self.db)
+                .unwrap_or(Type::Unknown);
+            if node_ty.is_assignable_to(self.db, type_base_exception) {
+                node_ty.to_instance(self.db)
+            } else {
+                if let Some(node) = node {
+                    self.diagnostics
+                        .add_invalid_exception_caught(self.db, node, node_ty);
+                }
+                Type::Unknown
+            }
+        };
 
         let symbol_ty = if except_handler_definition.is_star() {
-            // TODO should be generic --Alex
+            // TODO: we should infer `ExceptionGroup` if `node_ty` is a subtype of `tuple[type[Exception], ...]`
+            // (needs support for homogeneous tuples).
             //
-            // TODO should infer `ExceptionGroup` if all caught exceptions
-            // are subclasses of `Exception` --Alex
-            builtins_symbol(self.db, "BaseExceptionGroup")
-                .ignore_possibly_unbound()
-                .unwrap_or(Type::Unknown)
-                .to_instance(self.db)
+            // TODO: should be generic with `symbol_ty` as the generic parameter
+            KnownClass::BaseExceptionGroup.to_instance(self.db)
         } else {
-            // TODO: anything that's a consistent subtype of
-            // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
-            // anything else is invalid and should lead to a diagnostic being reported --Alex
-            match node_ty {
-                Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(class),
-                Type::Tuple(tuple) => UnionType::from_elements(
-                    self.db,
-                    tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal()
-                            .map_or(todo_type!(), |ClassLiteralType { class }| {
-                                Type::instance(class)
-                            })
-                    }),
-                ),
-                _ => todo_type!("exception type"),
-            }
+            symbol_ty
         };
 
         self.add_binding(
@@ -1466,9 +1618,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
                 if elts.len() < 2 {
-                    self.diagnostics.add(
+                    self.diagnostics.add_lint(
+                        &INVALID_TYPE_VARIABLE_CONSTRAINTS,
                         expr.into(),
-                        "invalid-typevar-constraints",
                         format_args!("TypeVar must have at least two constrained types"),
                     );
                     self.infer_expression(expr);
@@ -1660,7 +1812,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.expression_ty(value);
         let name_ast_id = name.scoped_expression_id(self.db, self.scope());
 
-        let target_ty = match assignment.target() {
+        let mut target_ty = match assignment.target() {
             TargetKind::Sequence(unpack) => {
                 let unpacked = infer_unpack_types(self.db, unpack);
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
@@ -1673,6 +1825,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             TargetKind::Name => value_ty,
         };
+
+        if let Some(known_instance) = file_to_module(self.db, definition.file(self.db))
+            .as_ref()
+            .and_then(|module| KnownInstanceType::try_from_module_and_symbol(module, &name.id))
+        {
+            target_ty = Type::KnownInstance(known_instance);
+        }
 
         self.store_expression_type(name, target_ty);
         self.add_binding(name.into(), definition, target_ty);
@@ -1782,9 +1941,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ) {
                         Ok(t) => t,
                         Err(e) => {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &UNSUPPORTED_OPERATOR,
                                 assignment.into(),
-                                "unsupported-operator",
                                 format_args!(
                                     "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
                                     target_type.display(self.db),
@@ -1803,9 +1962,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             let binary_return_ty = self.infer_binary_expression_type(left_ty, right_ty, op)
                                 .unwrap_or_else(|| {
-                                    self.diagnostics.add(
+                                    self.diagnostics.add_lint(
+                                        &UNSUPPORTED_OPERATOR,
                                         assignment.into(),
-                                        "unsupported-operator",
                                         format_args!(
                                             "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
                                             left_ty.display(self.db),
@@ -1832,9 +1991,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_binary_expression_type(left_ty, right_ty, op)
             .unwrap_or_else(|| {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &UNSUPPORTED_OPERATOR,
                     assignment.into(),
-                    "unsupported-operator",
                     format_args!(
                         "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
                         left_ty.display(self.db),
@@ -1864,11 +2023,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Resolve the target type, assuming a load context.
         let target_type = match &**target {
-            Expr::Name(name) => {
+            ast::Expr::Name(name) => {
                 self.store_expression_type(target, Type::Never);
                 self.infer_name_load(name)
             }
-            Expr::Attribute(attr) => {
+            ast::Expr::Attribute(attr) => {
                 self.store_expression_type(target, Type::Never);
                 self.infer_attribute_load(attr)
             }
@@ -1893,12 +2052,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        self.infer_standalone_expression(iter);
-
         // TODO more complex assignment targets
         if let ast::Expr::Name(name) = &**target {
             self.infer_definition(name);
         } else {
+            self.infer_standalone_expression(iter);
             self.infer_expression(target);
         }
         self.infer_body(body);
@@ -2086,19 +2244,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match module_ty.member(self.db, &ast::name::Name::new(&name.id)) {
                         Symbol::Type(ty, boundness) => {
                             if boundness == Boundness::PossiblyUnbound {
-                                self.diagnostics.add(
+                                self.diagnostics.add_lint(
+                                    &POSSIBLY_UNBOUND_IMPORT,
                                     AnyNodeRef::Alias(alias),
-                                    "possibly-unbound-import",
-                                    format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
+                                    format_args!("Member `{name}` of module `{module_name}` is possibly unbound", ),
                                 );
                             }
 
                             ty
                         }
                         Symbol::Unbound => {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &UNRESOLVED_IMPORT,
                                 AnyNodeRef::Alias(alias),
-                                "unresolved-import",
                                 format_args!("Module `{module_name}` has no member `{name}`",),
                             );
                             Type::Unknown
@@ -2713,7 +2871,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(value.as_ref().into(), &mut self.diagnostics);
 
         // TODO
-        todo_type!()
+        todo_type!("starred expression")
     }
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
@@ -2803,9 +2961,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             {
                 let mut builtins_symbol = builtins_symbol(self.db, name);
                 if builtins_symbol.is_unbound() && name == "reveal_type" {
-                    self.diagnostics.add(
+                    self.diagnostics.add_lint(
+                        &UNDEFINED_REVEAL,
                         name_node.into(),
-                        "undefined-reveal",
                         format_args!(
                             "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime"),
                     );
@@ -2900,9 +3058,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         match value_ty.member(self.db, &attr.id) {
             Symbol::Type(member_ty, boundness) => {
                 if boundness == Boundness::PossiblyUnbound {
-                    self.diagnostics.add(
+                    self.diagnostics.add_lint(
+                        &POSSIBLY_UNBOUND_ATTRIBUTE,
                         attribute.into(),
-                        "possibly-unbound-attribute",
                         format_args!(
                             "Attribute `{}` on type `{}` is possibly unbound",
                             attr.id,
@@ -2914,9 +3072,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 member_ty
             }
             Symbol::Unbound => {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &UNRESOLVED_ATTRIBUTE,
                     attribute.into(),
-                    "unresolved-attribute",
                     format_args!(
                         "Type `{}` has no attribute `{}`",
                         value_ty.display(self.db),
@@ -2995,9 +3153,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ) {
                         Ok(t) => t,
                         Err(e) => {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &UNSUPPORTED_OPERATOR,
                                 unary.into(),
-                                "unsupported-operator",
                                 format_args!(
                                     "Unary operator `{op}` is unsupported for type `{}`",
                                     operand_type.display(self.db),
@@ -3007,9 +3165,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                 } else {
-                    self.diagnostics.add(
+                    self.diagnostics.add_lint(
+                        &UNSUPPORTED_OPERATOR,
                         unary.into(),
-                        "unsupported-operator",
                         format_args!(
                             "Unary operator `{op}` is unsupported for type `{}`",
                             operand_type.display(self.db),
@@ -3048,9 +3206,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_binary_expression_type(left_ty, right_ty, *op)
             .unwrap_or_else(|| {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &UNSUPPORTED_OPERATOR,
                     binary.into(),
-                    "unsupported-operator",
                     format_args!(
                         "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
                         left_ty.display(self.db),
@@ -3358,9 +3516,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_binary_type_comparison(left_ty, *op, right_ty)
                         .unwrap_or_else(|error| {
                             // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &UNSUPPORTED_OPERATOR,
                                 AnyNodeRef::ExprCompare(compare),
-                                "unsupported-operator",
                                 format_args!(
                                     "Operator `{}` is not supported for types `{}` and `{}`{}",
                                     error.op,
@@ -4015,9 +4173,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Symbol::Unbound => {}
                     Symbol::Type(dunder_getitem_method, boundness) => {
                         if boundness == Boundness::PossiblyUnbound {
-                            self.diagnostics.add(
+                            self.diagnostics.add_lint(
+                                &CALL_POSSIBLY_UNBOUND_METHOD,
                                 value_node.into(),
-                                "call-possibly-unbound-method",
                                 format_args!(
                                     "Method `__getitem__` of type `{}` is possibly unbound",
                                     value_ty.display(self.db),
@@ -4029,9 +4187,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .call(self.db, &[slice_ty])
                             .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
                             .unwrap_or_else(|err| {
-                                self.diagnostics.add(
+                                self.diagnostics.add_lint(
+                                    &CALL_NON_CALLABLE,
                                     value_node.into(),
-                                    "call-non-callable",
                                     format_args!(
                                         "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
                                         err.called_ty().display(self.db),
@@ -4059,9 +4217,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Symbol::Unbound => {}
                         Symbol::Type(ty, boundness) => {
                             if boundness == Boundness::PossiblyUnbound {
-                                self.diagnostics.add(
+                                self.diagnostics.add_lint(
+                                    &CALL_POSSIBLY_UNBOUND_METHOD,
                                     value_node.into(),
-                                    "call-possibly-unbound-method",
                                     format_args!(
                                         "Method `__class_getitem__` of type `{}` is possibly unbound",
                                         value_ty.display(self.db),
@@ -4073,9 +4231,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .call(self.db, &[slice_ty])
                                 .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
                                 .unwrap_or_else(|err| {
-                                    self.diagnostics.add(
+                                    self.diagnostics.add_lint(
+                                        &CALL_NON_CALLABLE,
                                         value_node.into(),
-                                        "call-non-callable",
                                         format_args!(
                                             "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
                                             err.called_ty().display(self.db),
@@ -4215,18 +4373,18 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
 
             ast::Expr::BytesLiteral(bytes) => {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &BYTE_STRING_TYPE_ANNOTATION,
                     bytes.into(),
-                    "annotation-byte-string",
                     format_args!("Type expressions cannot use bytes literal"),
                 );
                 Type::Unknown
             }
 
             ast::Expr::FString(fstring) => {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &FSTRING_TYPE_ANNOTATION,
                     fstring.into(),
-                    "annotation-f-string",
                     format_args!("Type expressions cannot use f-strings"),
                 );
                 self.infer_fstring_expression(fstring);
@@ -4546,18 +4704,68 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Given the slice of a `type[]` annotation, return the type that the annotation represents
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
         match slice {
-            ast::Expr::Name(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
-                if let Some(ClassLiteralType { class }) = name_ty.into_class_literal() {
-                    Type::subclass_of(class)
-                } else {
-                    todo_type!()
+                match name_ty {
+                    Type::ClassLiteral(ClassLiteralType { class }) => Type::subclass_of(class),
+                    Type::KnownInstance(KnownInstanceType::Any) => {
+                        Type::subclass_of_base(ClassBase::Any)
+                    }
+                    _ => todo_type!("unsupported type[X] special form"),
                 }
             }
-            // TODO: attributes, unions, subscripts, etc.
+            ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                let union_ty = UnionType::from_elements(
+                    self.db,
+                    [
+                        self.infer_subclass_of_type_expression(&binary.left),
+                        self.infer_subclass_of_type_expression(&binary.right),
+                    ],
+                );
+                self.store_expression_type(slice, union_ty);
+
+                union_ty
+            }
+            ast::Expr::Tuple(_) => {
+                self.infer_type_expression(slice);
+                self.diagnostics.add_lint(
+                    &INVALID_TYPE_FORM,
+                    slice.into(),
+                    format_args!("type[...] must have exactly one type argument"),
+                );
+                Type::Unknown
+            }
+            ast::Expr::Subscript(ast::ExprSubscript {
+                value,
+                slice: parameters,
+                ..
+            }) => {
+                let parameters_ty = match self.infer_expression(value) {
+                    Type::KnownInstance(KnownInstanceType::Union) => match &**parameters {
+                        ast::Expr::Tuple(tuple) => {
+                            let ty = UnionType::from_elements(
+                                self.db,
+                                tuple
+                                    .iter()
+                                    .map(|element| self.infer_subclass_of_type_expression(element)),
+                            );
+                            self.store_expression_type(parameters, ty);
+                            ty
+                        }
+                        _ => self.infer_subclass_of_type_expression(parameters),
+                    },
+                    _ => {
+                        self.infer_type_expression(parameters);
+                        todo_type!("unsupported nested subscript in type[X]")
+                    }
+                };
+                self.store_expression_type(slice, parameters_ty);
+                parameters_ty
+            }
+            // TODO: subscripts, etc.
             _ => {
                 self.infer_type_expression(slice);
-                todo_type!()
+                todo_type!("unsupported type[X] special form")
             }
         }
     }
@@ -4596,9 +4804,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Ok(ty) => ty,
                 Err(nodes) => {
                     for node in nodes {
-                        self.diagnostics.add(
+                        self.diagnostics.add_lint(
+                            &INVALID_LITERAL_PARAMETER,
                             node.into(),
-                            "invalid-literal-parameter",
                             format_args!(
                                 "Type arguments for `Literal` must be `None`, \
                                     a literal value (int, bool, str, or bytes), or an enum value"
@@ -4632,9 +4840,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("generic type alias")
             }
             KnownInstanceType::NoReturn | KnownInstanceType::Never => {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &INVALID_TYPE_PARAMETER,
                     subscript.into(),
-                    "invalid-type-parameter",
                     format_args!(
                         "Type `{}` expected no type parameter",
                         known_instance.repr(self.db)
@@ -4643,9 +4851,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Unknown
             }
             KnownInstanceType::LiteralString => {
-                self.diagnostics.add(
+                self.diagnostics.add_lint(
+                    &INVALID_TYPE_PARAMETER,
                     subscript.into(),
-                    "invalid-type-parameter",
                     format_args!(
                         "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
                         known_instance.repr(self.db)
@@ -4653,6 +4861,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
+            KnownInstanceType::Type => self.infer_subclass_of_type_expression(parameters),
+            KnownInstanceType::Any => Type::Any,
         }
     }
 
@@ -5038,67 +5248,18 @@ fn perform_membership_test_comparison<'db>(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
-
-    use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
+    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::check_types;
-    use crate::{HasTy, ProgramSettings, SemanticModel};
+    use crate::{HasTy, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
 
     use super::*;
-
-    fn setup_db() -> TestDb {
-        let db = TestDb::new();
-
-        let src_root = SystemPathBuf::from("/src");
-        db.memory_file_system()
-            .create_directory_all(&src_root)
-            .unwrap();
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(src_root),
-            },
-        )
-        .expect("Valid search path settings");
-
-        db
-    }
-
-    fn setup_db_with_custom_typeshed<'a>(
-        typeshed: &str,
-        files: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> anyhow::Result<TestDb> {
-        let mut db = TestDb::new();
-        let src_root = SystemPathBuf::from("/src");
-
-        db.write_files(files)
-            .context("Failed to write test files")?;
-
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    custom_typeshed: Some(SystemPathBuf::from(typeshed)),
-                    ..SearchPathSettings::new(src_root)
-                },
-            },
-        )
-        .context("Failed to create Program")?;
-
-        Ok(db)
-    }
 
     #[track_caller]
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
@@ -5163,16 +5324,6 @@ mod tests {
         let diagnostics = check_types(db, file);
 
         assert_diagnostic_messages(diagnostics, expected);
-    }
-
-    #[test]
-    fn from_import_with_no_module_name() -> anyhow::Result<()> {
-        // This test checks that invalid syntax in a `StmtImportFrom` node
-        // leads to the type being inferred as `Unknown`
-        let mut db = setup_db();
-        db.write_file("src/foo.py", "from import bar")?;
-        assert_public_ty(&db, "src/foo.py", "bar", "Unknown");
-        Ok(())
     }
 
     #[test]
@@ -5324,112 +5475,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn bytes_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            w = b'red' b'knot'
-            x = b'hello'
-            y = b'world' + b'!'
-            z = b'\\xff\\x00'
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "w", "Literal[b\"redknot\"]");
-        assert_public_ty(&db, "src/a.py", "x", "Literal[b\"hello\"]");
-        assert_public_ty(&db, "src/a.py", "y", "Literal[b\"world!\"]");
-        assert_public_ty(&db, "src/a.py", "z", "Literal[b\"\\xff\\x00\"]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn ellipsis_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = ...
-            ",
-        )?;
-
-        // TODO: sys.version_info
-        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | ellipsis");
-
-        Ok(())
-    }
-
-    #[test]
-    fn import_cycle() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            class A: pass
-            import b
-            class C(b.B): pass
-            ",
-        )?;
-        db.write_dedented(
-            "src/b.py",
-            "
-            from a import A
-            class B(A): pass
-            ",
-        )?;
-
-        let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let c_ty = global_symbol(&db, a, "C").expect_type();
-        let c_class = c_ty.expect_class_literal().class;
-        let mut c_mro = c_class.iter_mro(&db);
-        let b_ty = c_mro.nth(1).unwrap();
-        let b_class = b_ty.expect_class_base();
-        assert_eq!(b_class.name(&db), "B");
-        let mut b_mro = b_class.iter_mro(&db);
-        let a_ty = b_mro.nth(1).unwrap();
-        let a_class = a_ty.expect_class_base();
-        assert_eq!(a_class.name(&db), "A");
-
-        Ok(())
-    }
-
-    /// An unbound function local that has definitions in the scope does not fall back to globals.
-    #[test]
-    fn unbound_function_local() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = 1
-            def f():
-                y = x
-                x = 2
-            ",
-        )?;
-
-        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let index = semantic_index(&db, file);
-        let function_scope = index
-            .child_scopes(FileScopeId::global())
-            .next()
-            .unwrap()
-            .0
-            .to_scope_id(&db, file);
-        let y_ty = symbol(&db, function_scope, "y").expect_type();
-        let x_ty = symbol(&db, function_scope, "x").expect_type();
-
-        assert_eq!(y_ty.display(&db).to_string(), "Unknown");
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
-
-        Ok(())
-    }
-
     /// A name reference to a never-defined symbol in a function is implicitly a global lookup.
     #[test]
     fn implicit_global_in_function() -> anyhow::Result<()> {
@@ -5494,17 +5539,15 @@ mod tests {
 
     #[test]
     fn builtin_symbol_custom_stdlib() -> anyhow::Result<()> {
-        let db = setup_db_with_custom_typeshed(
-            "/typeshed",
-            [
-                ("/src/a.py", "c = copyright"),
-                (
-                    "/typeshed/stdlib/builtins.pyi",
-                    "def copyright() -> None: ...",
-                ),
-                ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
-            ],
-        )?;
+        let db = TestDbBuilder::new()
+            .with_custom_typeshed("/typeshed")
+            .with_file("/src/a.py", "c = copyright")
+            .with_file(
+                "/typeshed/stdlib/builtins.pyi",
+                "def copyright() -> None: ...",
+            )
+            .with_file("/typeshed/stdlib/VERSIONS", "builtins: 3.8-")
+            .build()?;
 
         assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
 
@@ -5513,14 +5556,12 @@ mod tests {
 
     #[test]
     fn unknown_builtin_later_defined() -> anyhow::Result<()> {
-        let db = setup_db_with_custom_typeshed(
-            "/typeshed",
-            [
-                ("/src/a.py", "x = foo"),
-                ("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1"),
-                ("/typeshed/stdlib/VERSIONS", "builtins: 3.8-"),
-            ],
-        )?;
+        let db = TestDbBuilder::new()
+            .with_custom_typeshed("/typeshed")
+            .with_file("/src/a.py", "x = foo")
+            .with_file("/typeshed/stdlib/builtins.pyi", "foo = bar; bar = 1")
+            .with_file("/typeshed/stdlib/VERSIONS", "builtins: 3.8-")
+            .build()?;
 
         assert_public_ty(&db, "/src/a.py", "x", "Unknown");
 
@@ -5604,89 +5645,6 @@ mod tests {
             ",
         )?;
         assert_public_ty(&db, "/src/source_with_future.py", "foo", "Foo");
-
-        Ok(())
-    }
-
-    #[test]
-    fn nonlocal_name_reference() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def f():
-                x = 1
-                def g():
-                    y = x
-            ",
-        )?;
-
-        assert_scope_ty(&db, "/src/a.py", &["f", "g"], "y", "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn nonlocal_name_reference_multi_level() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def f():
-                x = 1
-                def g():
-                    def h():
-                        y = x
-            ",
-        )?;
-
-        assert_scope_ty(&db, "/src/a.py", &["f", "g", "h"], "y", "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn nonlocal_name_reference_skips_class_scope() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def f():
-                x = 1
-                class C:
-                    x = 2
-                    def g():
-                        y = x
-            ",
-        )?;
-
-        assert_scope_ty(&db, "/src/a.py", &["f", "C", "g"], "y", "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn nonlocal_name_reference_skips_annotation_only_assignment() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def f():
-                x = 1
-                def g():
-                    // it's pretty weird to have an annotated assignment in a function where the
-                    // name is otherwise not defined; maybe should be an error?
-                    x: int
-                    def h():
-                        y = x
-            ",
-        )?;
-
-        assert_scope_ty(&db, "/src/a.py", &["f", "g", "h"], "y", "Literal[1]");
 
         Ok(())
     }

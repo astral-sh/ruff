@@ -665,6 +665,14 @@ impl BuiltinTypeChecker for IntChecker {
     const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Integer);
 }
 
+struct FloatChecker;
+
+impl BuiltinTypeChecker for FloatChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "float";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Float);
+}
+
 pub struct IoBaseChecker;
 
 impl TypeChecker for IoBaseChecker {
@@ -741,6 +749,77 @@ impl TypeChecker for IoBaseChecker {
     }
 }
 
+pub struct PathlibPathChecker;
+
+impl PathlibPathChecker {
+    fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            [
+                "pathlib",
+                "Path"
+                    | "PosixPath"
+                    | "PurePath"
+                    | "PurePosixPath"
+                    | "PureWindowsPath"
+                    | "WindowsPath"
+            ]
+        )
+    }
+}
+
+impl TypeChecker for PathlibPathChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_pathlib_path_constructor(semantic, annotation)
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_pathlib_path_constructor(semantic, func)
+    }
+}
+
+pub struct TypeVarLikeChecker;
+
+impl TypeVarLikeChecker {
+    /// Returns `true` if an [`Expr`] is a `TypeVar`, `TypeVarTuple`, or `ParamSpec` call.
+    ///
+    /// See also [`ruff_linter::rules::flake8_pyi::rules::simple_defaults::is_type_var_like_call`].
+    fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+            return false;
+        };
+        let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            [
+                "typing" | "typing_extensions",
+                "TypeVar" | "TypeVarTuple" | "ParamSpec"
+            ]
+        )
+    }
+}
+
+impl TypeChecker for TypeVarLikeChecker {
+    fn match_annotation(_annotation: &Expr, _semantic: &SemanticModel) -> bool {
+        false
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_type_var_like_call(initializer, semantic)
+    }
+}
+
 /// Test whether the given binding can be considered a list.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
@@ -777,6 +856,11 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// Test whether the given binding can be considered an integer.
 pub fn is_int(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<IntChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `float`.
+pub fn is_float(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<FloatChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered a set.
@@ -822,6 +906,17 @@ pub fn is_io_base(binding: &Binding, semantic: &SemanticModel) -> bool {
 /// implements `io.IOBase`).
 pub fn is_io_base_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     IoBaseChecker::match_initializer(expr, semantic)
+}
+
+/// Test whether the given binding can be considered a `pathlib.PurePath`
+/// or an instance of a subclass thereof.
+pub fn is_pathlib_path(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<PathlibPathChecker>(binding, semantic)
+}
+
+/// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.
+pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<TypeVarLikeChecker>(binding, semantic)
 }
 
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].

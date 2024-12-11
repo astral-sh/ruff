@@ -55,7 +55,7 @@ b"aaaaaaaaa" b"bbbbbbbbbbbbbbbbbbbb" # Join
 # F-strings
 ##############################################################################
 
-# Escape `{` and `}` when marging an f-string with a string
+# Escape `{` and `}` when merging an f-string with a string
 "a {not_a_variable}" f"b {10}" "c"
 
 # Join, and break expressions
@@ -96,7 +96,7 @@ f"{f'''test ' '''}" f'{f"""other " """}'
 f"{10 + len('bar')=}" f"{10 + len('bar')=}"
 f"{10 + len('bar')=}" f'no debug{10}' f"{10 + len('bar')=}"
 
-# We can't savely merge this pre Python 3.12 without altering the debug expression.
+# We can't safely merge this pre Python 3.12 without altering the debug expression.
 f"{10 + len('bar')=}" f'{10 + len("bar")=}'
 
 
@@ -259,7 +259,7 @@ def short_docstring():
     "Implicit" "concatenated" "docstring"
 
 def long_docstring():
-    "Loooooooooooooooooooooong" "doooooooooooooooooooocstriiiiiiiiiiiiiiiiiiiiiiiiiiiiiiing" "exceding the line width" "but it should be concatenated anyways because it is single line"
+    "Loooooooooooooooooooooong" "doooooooooooooooooooocstriiiiiiiiiiiiiiiiiiiiiiiiiiiiiiing" "exceeding the line width" "but it should be concatenated anyways because it is single line"
 
 def docstring_with_leading_whitespace():
     "    This is a " "implicit" "concatenated" "docstring"

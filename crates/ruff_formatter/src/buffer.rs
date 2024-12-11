@@ -299,7 +299,8 @@ where
 ///
 /// - Removes [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::Soft).
 /// - Replaces [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::SoftOrSpace) with a [`Space`](FormatElement::Space)
-/// - Removes [`if_group_breaks`](crate::builders::if_group_breaks) elements.
+/// - Removes [`if_group_breaks`](crate::builders::if_group_breaks) and all its content.
+/// - Unwraps the content of [`if_group_fits_on_line`](crate::builders::if_group_fits_on_line) elements (but retains it).
 ///
 /// # Examples
 ///
@@ -387,7 +388,7 @@ fn clean_interned(
             .iter()
             .enumerate()
             .find_map(|(index, element)| match element {
-                FormatElement::Line(LineMode::Soft | LineMode::SoftOrSpace) => {
+                FormatElement::Line(LineMode::SoftOrSpace) => {
                     let mut cleaned = Vec::new();
                     let (before, after) = interned.split_at(index);
                     cleaned.extend_from_slice(before);
@@ -427,7 +428,6 @@ fn clean_interned(
                     }
 
                     let element = match element {
-                        FormatElement::Line(LineMode::Soft) => continue,
                         FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
                         FormatElement::Interned(interned) => {
                             FormatElement::Interned(clean_interned(interned, interned_cache))
@@ -458,7 +458,6 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
         }
 
         let element = match element {
-            FormatElement::Line(LineMode::Soft) => return,
             FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
             FormatElement::Interned(interned) => {
                 FormatElement::Interned(self.clean_interned(&interned))
@@ -508,28 +507,34 @@ enum RemoveSoftLineBreaksState {
 impl RemoveSoftLineBreaksState {
     fn should_drop(&mut self, element: &FormatElement) -> bool {
         match self {
-            Self::Default => {
-                // Entered the start of an `if_group_breaks`
-                if let FormatElement::Tag(Tag::StartConditionalContent(condition)) = element {
+            Self::Default => match element {
+                FormatElement::Line(LineMode::Soft) => true,
+
+                // Entered the start of an `if_group_breaks` or `if_group_fits`
+                // For `if_group_breaks`: Remove the start and end tag and all content in between.
+                // For `if_group_fits_on_line`: Unwrap the content. This is important because the enclosing group
+                // might still *expand* if the content exceeds the line width limit, in which case the
+                // `if_group_fits_on_line` content would be removed.
+                FormatElement::Tag(Tag::StartConditionalContent(condition)) => {
                     if condition.mode.is_expanded() {
                         *self = Self::InIfGroupBreaks {
                             conditional_content_level: NonZeroUsize::new(1).unwrap(),
                         };
-                        return true;
                     }
+                    true
                 }
-
-                false
-            }
+                FormatElement::Tag(Tag::EndConditionalContent) => true,
+                _ => false,
+            },
             Self::InIfGroupBreaks {
                 conditional_content_level,
             } => {
                 match element {
-                    // A nested `if_group_breaks` or `if_group_fits`
+                    // A nested `if_group_breaks` or `if_group_fits_on_line`
                     FormatElement::Tag(Tag::StartConditionalContent(_)) => {
                         *conditional_content_level = conditional_content_level.saturating_add(1);
                     }
-                    // The end of an `if_group_breaks` or `if_group_fits`.
+                    // The end of an `if_group_breaks` or `if_group_fits_on_line`.
                     FormatElement::Tag(Tag::EndConditionalContent) => {
                         if let Some(level) = NonZeroUsize::new(conditional_content_level.get() - 1)
                         {
@@ -651,7 +656,7 @@ where
         let elements = buffer.elements();
 
         let recorded = if self.start > elements.len() {
-            // May happen if buffer was rewinded.
+            // May happen if buffer was rewound.
             &[]
         } else {
             &elements[self.start..]
