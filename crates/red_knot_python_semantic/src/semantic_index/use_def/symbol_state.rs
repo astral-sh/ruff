@@ -43,9 +43,7 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use crate::semantic_index::use_def::bitset::ReverseBitSetIterator;
-
-use super::bitset::{BitSet, BitSetIterator};
+use super::bitset::{BitSet, BitSetIterator, ReverseBitSetIterator};
 use ruff_index::newtype_index;
 use smallvec::SmallVec;
 
@@ -66,14 +64,14 @@ const INLINE_BINDING_BLOCKS: usize = 3;
 
 /// A [`BitSet`] of [`ScopedDefinitionId`], representing live bindings of a symbol in a scope.
 type Bindings = BitSet<INLINE_BINDING_BLOCKS>;
-type BindingsIterator<'a> = ReverseBitSetIterator<'a, INLINE_BINDING_BLOCKS>;
+type ReverseBindingsIterator<'a> = ReverseBitSetIterator<'a, INLINE_BINDING_BLOCKS>;
 
 /// Can reference this * 64 total declarations inline; more will fall back to the heap.
 const INLINE_DECLARATION_BLOCKS: usize = 3;
 
 /// A [`BitSet`] of [`ScopedDefinitionId`], representing live declarations of a symbol in a scope.
 type Declarations = BitSet<INLINE_DECLARATION_BLOCKS>;
-type DeclarationsIterator<'a> = ReverseBitSetIterator<'a, INLINE_DECLARATION_BLOCKS>;
+type ReverseDeclarationsIterator<'a> = ReverseBitSetIterator<'a, INLINE_DECLARATION_BLOCKS>;
 
 /// Can reference this * 64 total constraints inline; more will fall back to the heap.
 const INLINE_CONSTRAINT_BLOCKS: usize = 2;
@@ -369,8 +367,10 @@ impl SymbolState {
                         let a_constraints = a_constraints_iter
                             .next()
                             .expect("definitions and constraints length mismatch");
-                        // TODO: perform check that we see the same branching_conditions in both paths?
-
+                        // SAFETY: The same is true for branching_conditions.
+                        a_conditions_iter
+                            .next()
+                            .expect("branching_conditions length mismatch");
                         // If the same definition is visible through both paths, any constraint
                         // that applies on only one path is irrelevant to the resulting type from
                         // unioning the two paths, so we intersect the constraints.
@@ -418,27 +418,31 @@ impl SymbolState {
 
         loop {
             match (opt_a_decl, opt_b_decl) {
-                (Some(a_decl), Some(b_decl)) => match a_decl.cmp(&b_decl) {
-                    std::cmp::Ordering::Less => {
-                        push(a_decl, &mut a_conditions_iter, self);
-                        opt_a_decl = a_decls_iter.next();
-                    }
-                    std::cmp::Ordering::Greater => {
-                        push(b_decl, &mut b_conditions_iter, self);
-                        opt_b_decl = b_decls_iter.next();
-                    }
-                    std::cmp::Ordering::Equal => {
-                        push(a_decl, &mut b_conditions_iter, self);
-                        self.declarations
-                            .branching_conditions
-                            .last_mut()
-                            .unwrap()
-                            .intersect(&a_conditions_iter.next().unwrap());
+                (Some(a_decl), Some(b_decl)) => {
+                    match a_decl.cmp(&b_decl) {
+                        std::cmp::Ordering::Less => {
+                            push(a_decl, &mut a_conditions_iter, self);
+                            opt_a_decl = a_decls_iter.next();
+                        }
+                        std::cmp::Ordering::Greater => {
+                            push(b_decl, &mut b_conditions_iter, self);
+                            opt_b_decl = b_decls_iter.next();
+                        }
+                        std::cmp::Ordering::Equal => {
+                            push(a_decl, &mut b_conditions_iter, self);
+                            self.declarations
+                                .branching_conditions
+                                .last_mut()
+                                .expect("declarations and branching_conditions length mismatch")
+                                .intersect(&a_conditions_iter.next().expect(
+                                    "declarations and branching_conditions length mismatch",
+                                ));
 
-                        opt_a_decl = a_decls_iter.next();
-                        opt_b_decl = b_decls_iter.next();
+                            opt_a_decl = a_decls_iter.next();
+                            opt_b_decl = b_decls_iter.next();
+                        }
                     }
-                },
+                }
                 (Some(a_decl), None) => {
                     push(a_decl, &mut a_conditions_iter, self);
                     opt_a_decl = a_decls_iter.next();
@@ -459,12 +463,6 @@ impl SymbolState {
     pub(super) fn declarations(&self) -> &SymbolDeclarations {
         &self.declarations
     }
-
-    /// Could the symbol be unbound?
-    #[cfg(test)]
-    pub(super) fn may_be_unbound(&self) -> bool {
-        self.bindings.may_be_unbound()
-    }
 }
 
 /// The default state of a symbol, if we've seen no definitions of it, is undefined (that is,
@@ -484,9 +482,9 @@ pub(super) struct BindingIdWithConstraints<'a> {
     pub(super) branching_conditions_ids: BranchingConditionIdIterator<'a>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct BindingIdWithConstraintsIterator<'a> {
-    definitions: BindingsIterator<'a>,
+    definitions: ReverseBindingsIterator<'a>,
     constraints: std::iter::Rev<ConstraintsIterator<'a>>,
     branching_conditions: std::iter::Rev<BranchingConditionsIterator<'a>>,
 }
@@ -518,7 +516,9 @@ impl<'a> Iterator for BindingIdWithConstraintsIterator<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+impl std::iter::FusedIterator for BindingIdWithConstraintsIterator<'_> {}
+
+#[derive(Debug)]
 pub(super) struct ConstraintIdIterator<'a> {
     wrapped: BitSetIterator<'a, INLINE_CONSTRAINT_BLOCKS>,
 }
@@ -550,9 +550,9 @@ impl Iterator for BranchingConditionIdIterator<'_> {
 
 impl std::iter::FusedIterator for BranchingConditionIdIterator<'_> {}
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(super) struct DeclarationIdIterator<'a> {
-    inner: DeclarationsIterator<'a>,
+    inner: ReverseDeclarationsIterator<'a>,
     branching_conditions: std::iter::Rev<BranchingConditionsIterator<'a>>,
 }
 
@@ -582,7 +582,7 @@ mod tests {
 
     #[track_caller]
     fn assert_bindings(symbol: &SymbolState, may_be_unbound: bool, expected: &[&str]) {
-        assert_eq!(symbol.may_be_unbound(), may_be_unbound);
+        assert_eq!(symbol.bindings.may_be_unbound, may_be_unbound);
         let mut actual = symbol
             .bindings()
             .iter_rev()
