@@ -6,7 +6,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_parser::{parse, Mode, TokenKind};
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
 use ruff_python_trivia::{is_python_whitespace, PythonWhitespace};
 use ruff_source_file::LineRanges;
@@ -453,21 +452,28 @@ fn convert_to_list_extend(
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
-            // If the binding has multiple statements on its line, only remove the list assignment
+            // If the binding has multiple statements on its line, the fix would be substantially more complicated
             let binding_is_multiple_exprs = {
-                let binding_text = locator
-                    .slice(locator.full_lines_range(binding_stmt_range))
-                    .trim_whitespace_start();
-                let tokens = parse(binding_text, Mode::Module).map_err(|err| {
-                    anyhow!(
-                        "Failed to tokenize binding statement: {err} {}",
-                        binding_text
+                let full_range = locator.full_lines_range(binding_stmt_range);
+                let part_before = locator.slice(TextRange::new(
+                    full_range.start(),
+                    binding_stmt_range.start(),
+                ));
+                let part_after =
+                    locator.slice(TextRange::new(binding_stmt_range.end(), full_range.end()));
+                // determine whether there's a semicolon either before or after the binding statement.
+                // Since it's a binding statement, we can just check whether there's a semicolon immediately
+                // after the whitespace in front of or behind it
+                part_before
+                    .chars()
+                    .rev()
+                    .take_while(|c| is_python_whitespace(*c) || *c == ';')
+                    .chain(
+                        part_after
+                            .chars()
+                            .take_while(|c| is_python_whitespace(*c) || *c == ';'),
                     )
-                })?;
-                tokens
-                    .tokens()
-                    .iter()
-                    .any(|token| matches!(token.kind(), TokenKind::Semi))
+                    .any(|c| c == ';')
             };
             // If there are multiple binding statements in one line, we don't want to accidentally delete them
             // Instead, we just delete the binding statement and leave any comments where they are
@@ -513,7 +519,7 @@ fn convert_to_list_extend(
             Ok(Fix::unsafe_edits(
                 Edit::range_deletion(binding_stmt_range),
                 [Edit::range_replacement(comprehension_body, for_stmt.range)],
-                ))
+            ))
         }
     }
 }
