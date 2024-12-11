@@ -304,29 +304,33 @@ pub trait LineRanges {
     /// # use ruff_text_size::{Ranged, TextRange};
     /// # use ruff_source_file::LineRanges;
     ///
-    /// let text = "First line\nsecond line\r\nthird line";
-    ///
-    /// assert_eq!(text.count_lines(TextRange::new(5.into(), 12.into())), 1);
-    ///
-    /// assert_eq!(text.count_lines(TextRange::up_to(5.into())), 0);
-    /// assert_eq!(text.count_lines(TextRange::up_to(23.into())), 1);
-    /// assert_eq!(text.count_lines(TextRange::up_to(24.into())), 2);
+    /// assert_eq!("a\nb".count_lines(TextRange::up_to(1.into())), 0);
+    /// assert_eq!("a\nb\r\nc".count_lines(TextRange::up_to(3.into())), 1, "Up to the end of the second line");
+    /// assert_eq!("a\nb\r\nc".count_lines(TextRange::up_to(4.into())), 2, "In between the line break characters");
+    /// assert_eq!("a\nb\r\nc".count_lines(TextRange::up_to(5.into())), 2);
+    /// assert_eq!("Single line".count_lines(TextRange::up_to(13.into())), 0);
+    /// assert_eq!("out\nof\nbounds end".count_lines(TextRange::up_to(55.into())), 2);
     /// ```
-    ///
-    /// ## Panics
-    /// If the start or end of `range` is out of bounds.
     fn count_lines(&self, range: TextRange) -> u32 {
         let mut count = 0;
-        let mut last_line_start = self.line_start(range.start());
+        let mut line_end = self.line_end(range.start());
 
         loop {
-            last_line_start = self.full_line_end(last_line_start);
+            let next_line_start = self.full_line_end(line_end);
 
-            if last_line_start > range.end() {
+            // Reached the end of the string
+            if next_line_start == line_end {
+                break count;
+            }
+
+            // Range ends at the line boundary
+            if line_end >= range.end() {
                 break count;
             }
 
             count += 1;
+
+            line_end = self.line_end(next_line_start);
         }
     }
 }
