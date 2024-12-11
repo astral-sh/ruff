@@ -8,11 +8,13 @@ use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `pathlib.Path.with_suffix()` calls where
-/// the given suffix does not have a leading dot.
+/// the given suffix does not have a leading dot
+/// or the given suffix is a single dot `"."`.
 ///
 /// ## Why is this bad?
 /// `Path.with_suffix()` will raise an error at runtime
-/// if the given suffix is not prefixed with a dot.
+/// if the given suffix is not prefixed with a dot
+/// or it is a single dot `"."`.
 ///
 /// ## Examples
 ///
@@ -33,6 +35,9 @@ use ruff_text_size::Ranged;
 /// confident about this if it can see that the binding originates from a
 /// function parameter annotated with `Path` or from a direct assignment to a
 /// `Path()` constructor call.
+///
+/// ## Limitations
+/// The single dot `"."` suffix is invalid and cannot be fixed by Ruff.
 ///
 /// ## Fix safety
 /// The fix for this rule adds a leading period to the string passed
