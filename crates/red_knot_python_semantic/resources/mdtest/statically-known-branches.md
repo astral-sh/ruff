@@ -249,7 +249,7 @@ reveal_type(x)  # revealed: Literal[2, 3]
 ##### `if True` inside `for`
 
 ```py
-def iterable() -> list[()]: ...
+def iterable() -> list[object]: ...
 
 x = 1
 
@@ -265,7 +265,7 @@ reveal_type(x)  # revealed: Literal[1, 2]
 ##### `if True` inside `for` ... `else`
 
 ```py
-def iterable() -> list[()]: ...
+def iterable() -> list[object]: ...
 
 x = 1
 
@@ -283,7 +283,7 @@ reveal_type(x)  # revealed: Literal[3]
 ##### `for` inside `if True`
 
 ```py
-def iterable() -> list[()]: ...
+def iterable() -> list[object]: ...
 
 x = 1
 
@@ -299,7 +299,7 @@ reveal_type(x)  # revealed: Literal[1, 2]
 ##### `for` ... `else` inside `if True`
 
 ```py
-def iterable() -> list[()]: ...
+def iterable() -> list[object]: ...
 
 x = 1
 
@@ -317,8 +317,7 @@ reveal_type(x)  # revealed: Literal[3]
 ##### `for` loop with `break` inside `if True`
 
 ```py
-def iterable() -> list[()]: ...
-def flag() -> bool: ...
+def iterable() -> list[object]: ...
 
 x = 1
 
@@ -326,8 +325,7 @@ if True:
     x = 2
     for _ in iterable():
         x = 3
-        if flag():
-            break
+        break
     else:
         x = 4
 else:
