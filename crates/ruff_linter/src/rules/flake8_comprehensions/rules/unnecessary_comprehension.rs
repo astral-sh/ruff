@@ -125,13 +125,6 @@ pub(crate) fn unnecessary_dict_comprehension(
     else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: key_name, .. }) = &key else {
-        return;
-    };
-    if target_key_name != key_name {
-        return;
-    }
-
     let Expr::Name(ast::ExprName {
         id: target_value_name,
         ..
@@ -139,11 +132,15 @@ pub(crate) fn unnecessary_dict_comprehension(
     else {
         return;
     };
+
+    let Expr::Name(ast::ExprName { id: key_name, .. }) = &key else {
+        return;
+    };
     let Expr::Name(ast::ExprName { id: value_name, .. }) = &value else {
         return;
     };
 
-    if target_value_name == value_name {
+    if target_key_name == key_name && target_value_name == value_name {
         add_diagnostic(checker, expr);
     }
 }
