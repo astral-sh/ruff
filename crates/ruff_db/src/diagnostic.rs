@@ -91,10 +91,20 @@ impl DiagnosticId {
         matches!(self, DiagnosticId::Lint(self_name) if self_name == name)
     }
 
-    pub fn matches(&self, name: &str) -> bool {
+    /// Returns `true` if this `DiagnosticId` matches the given name.
+    ///
+    /// ## Examples
+    /// ```
+    /// use ruff_db::diagnostic::DiagnosticId;
+    ///
+    /// assert!(DiagnosticId::Io.matches("io"));
+    /// assert!(DiagnosticId::lint("test").matches("lint:test"));
+    /// assert!(!DiagnosticId::lint("test").matches("test"));
+    /// ```
+    pub fn matches(&self, expected_name: &str) -> bool {
         match self.as_str() {
-            Ok(id) => id == name,
-            Err(DiagnosticAsStrError::Category { category, name }) => name
+            Ok(id) => id == expected_name,
+            Err(DiagnosticAsStrError::Category { category, name }) => expected_name
                 .strip_prefix(category)
                 .and_then(|prefix| prefix.strip_prefix(":"))
                 .is_some_and(|rest| rest == name),
