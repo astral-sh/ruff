@@ -4,8 +4,7 @@ use crate::checkers::ast::Checker;
 use anyhow::{anyhow, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
-use ruff_macros::{derive_message_formats, violation, ViolationMetadata};
-use ruff_python_ast::comparable::ComparableExpr;
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_parser::{parse, Mode, TokenKind};
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
@@ -514,7 +513,7 @@ fn convert_to_list_extend(
             Ok(Fix::unsafe_edits(
                 Edit::range_deletion(binding_stmt_range),
                 [Edit::range_replacement(comprehension_body, for_stmt.range)],
-            ))
+                ))
         }
     }
 }
