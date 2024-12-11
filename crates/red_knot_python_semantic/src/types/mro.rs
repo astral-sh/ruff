@@ -371,15 +371,9 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Never
                 | KnownInstanceType::Optional => None,
                 KnownInstanceType::Any => Some(Self::Any),
+                // TODO: classes inheriting from `typing.Type` also have `Generic` in their MRO
                 KnownInstanceType::Type => {
-                    let Type::ClassLiteral(ClassLiteralType { class }) =
-                        KnownClass::Type.to_class_literal(db)
-                    else {
-                        return None;
-                    };
-
-                    // TODO: Also `typing.Generic`
-                    Some(ClassBase::Class(class))
+                    ClassBase::try_from_ty(KnownClass::Type.to_class_literal(db), db)
                 }
             },
         }

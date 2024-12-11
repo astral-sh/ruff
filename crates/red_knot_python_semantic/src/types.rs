@@ -1757,6 +1757,8 @@ impl<'db> Type<'db> {
             // In a type expression, a bare `type` is interpreted as "instance of `type`", which is
             // equivalent to `type[object]`.
             Type::ClassLiteral(_) | Type::SubclassOf(_) => self.to_instance(db),
+            // We treat `typing.Type` exactly the same as `builtins.type`:
+            Type::KnownInstance(KnownInstanceType::Type) => KnownClass::Type.to_instance(db),
             Type::Union(union) => union.map(db, |element| element.in_type_expression(db)),
             Type::Unknown => Type::Unknown,
             // TODO map this to a new `Type::TypeVar` variant
@@ -1767,15 +1769,6 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
-            Type::KnownInstance(KnownInstanceType::Type) => {
-                let Type::ClassLiteral(ClassLiteralType { class }) =
-                    KnownClass::Type.to_class_literal(db)
-                else {
-                    return Type::Unknown;
-                };
-
-                Type::instance(class)
-            }
             _ => todo_type!(),
         }
     }
