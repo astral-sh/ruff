@@ -76,21 +76,14 @@ impl<'db> Mro<'db> {
             // This *could* theoretically be handled by the final branch below,
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
-            [single_base] => {
-                let single_base = ClassBase::try_from_ty(*single_base, db).ok_or(*single_base);
-                single_base.map_or_else(
-                    |invalid_base_ty| {
-                        let bases_info = Box::from([(0, invalid_base_ty)]);
-                        Err(MroErrorKind::InvalidBases(bases_info))
-                    },
-                    |single_base| {
-                        let mro = std::iter::once(ClassBase::Class(class))
-                            .chain(single_base.mro(db))
-                            .collect();
-                        Ok(mro)
-                    },
-                )
-            }
+            [single_base] => ClassBase::try_from_ty(db, *single_base).map_or_else(
+                || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
+                |single_base| {
+                    Ok(std::iter::once(ClassBase::Class(class))
+                        .chain(single_base.mro(db))
+                        .collect())
+                },
+            ),
 
             // The class has multiple explicit bases.
             //
@@ -102,9 +95,9 @@ impl<'db> Mro<'db> {
                 let mut invalid_bases = vec![];
 
                 for (i, base) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_ty(*base, db).ok_or(*base) {
-                        Ok(valid_base) => valid_bases.push(valid_base),
-                        Err(invalid_base) => invalid_bases.push((i, invalid_base)),
+                    match ClassBase::try_from_ty(db, *base) {
+                        Some(valid_base) => valid_bases.push(valid_base),
+                        None => invalid_bases.push((i, *base)),
                     }
                 }
 
@@ -341,7 +334,7 @@ impl<'db> ClassBase<'db> {
     /// Attempt to resolve `ty` into a `ClassBase`.
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
-    fn try_from_ty(ty: Type<'db>, db: &'db dyn Db) -> Option<Self> {
+    fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
@@ -373,7 +366,7 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::Any => Some(Self::Any),
                 // TODO: classes inheriting from `typing.Type` also have `Generic` in their MRO
                 KnownInstanceType::Type => {
-                    ClassBase::try_from_ty(KnownClass::Type.to_class_literal(db), db)
+                    ClassBase::try_from_ty(db, KnownClass::Type.to_class_literal(db))
                 }
             },
         }
