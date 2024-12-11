@@ -49,18 +49,18 @@ use ruff_text_size::Ranged;
 /// for a given situation (it's possible that the string was correct
 /// but was being passed to the wrong method entirely, for example).
 #[derive(ViolationMetadata)]
-pub(crate) struct DotlessPathlibWithSuffix {
+pub(crate) struct InvalidPathlibWithSuffix {
     // TODO: Since "." is a correct suffix in Python 3.14,
     // the rule should revert to its original behavior.
     single_dot: bool,
 }
 
-impl Violation for DotlessPathlibWithSuffix {
+impl Violation for InvalidPathlibWithSuffix {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Dotless suffix passed to `.with_suffix()`".to_string()
+        "Invalid suffix passed to `.with_suffix()`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -74,7 +74,7 @@ impl Violation for DotlessPathlibWithSuffix {
 }
 
 /// PTH210
-pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::ExprCall) {
     let (func, arguments) = (&call.func, &call.arguments);
 
     if !is_path_with_suffix_call(checker.semantic(), func) {
@@ -104,7 +104,7 @@ pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
     };
 
     let single_dot = string_value == ".";
-    let mut diagnostic = Diagnostic::new(DotlessPathlibWithSuffix { single_dot }, call.range);
+    let mut diagnostic = Diagnostic::new(InvalidPathlibWithSuffix { single_dot }, call.range);
     if !single_dot {
         let after_leading_quote = string.start() + first_part.flags.opener_len();
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
