@@ -31,6 +31,7 @@ use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
+pub(crate) use static_truthiness::StaticTruthiness;
 
 mod builder;
 mod call;
@@ -40,6 +41,7 @@ mod infer;
 mod mro;
 mod narrow;
 mod signatures;
+mod static_truthiness;
 mod string_annotation;
 mod unpacker;
 
@@ -255,7 +257,7 @@ fn bindings_ty<'db>(
                  constraints,
                  branching_conditions,
              }| {
-                let result = branching_conditions.truthiness(db);
+                let result = StaticTruthiness::analyze(db, branching_conditions);
 
                 if result.any_always_false {
                     (None, UnconditionallyVisible::No)
@@ -335,7 +337,7 @@ fn declarations_ty<'db>(
 ) -> DeclaredTypeResult<'db> {
     let decl_types = declarations
         .map(|(declaration, branching_conditions)| {
-            let result = branching_conditions.truthiness(db);
+            let result = StaticTruthiness::analyze(db, branching_conditions);
 
             if result.any_always_false {
                 (Type::Never, UnconditionallyVisible::No)

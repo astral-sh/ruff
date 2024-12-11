@@ -225,17 +225,15 @@ use self::symbol_state::{
     BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
     ScopedConstraintId, ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
-use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedUseId};
+use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::branching_condition::BranchingCondition;
-use crate::semantic_index::constraint::ConstraintNode;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::symbol_state::{
     BranchingConditionIdIterator, BranchingConditions, ScopedBranchingConditionId,
 };
 use crate::symbol::Boundness;
-use crate::types::{infer_expression_types, Truthiness};
-use crate::Db;
+use crate::types::StaticTruthiness;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -246,7 +244,7 @@ mod symbol_state;
 
 fn compute_boundness<'db, 'map, C>(
     db: &dyn crate::db::Db,
-    conditions: C,
+    conditions_per_binding: C,
     may_be_undefined: bool,
 ) -> Option<Boundness>
 where
@@ -255,8 +253,8 @@ where
 {
     let mut definitely_bound = false;
     let mut definitely_unbound = true;
-    for condition in conditions {
-        let result = condition.truthiness(db);
+    for conditions in conditions_per_binding {
+        let result = StaticTruthiness::analyze(db, conditions);
 
         if !result.any_always_false {
             definitely_unbound = false;
@@ -480,75 +478,6 @@ impl<'db> Iterator for BranchingConditionsIterator<'_, 'db> {
         self.branching_condition_ids
             .next()
             .map(|branching_condition_id| self.all_branching_conditions[branching_condition_id])
-    }
-}
-
-pub(crate) struct BranchConditionTruthiness {
-    pub any_always_false: bool,
-    pub all_always_true: bool,
-    pub at_least_one_condition: bool,
-}
-
-impl<'db> BranchingConditionsIterator<'_, 'db> {
-    pub(crate) fn truthiness(self, db: &'db dyn Db) -> BranchConditionTruthiness {
-        let mut result = BranchConditionTruthiness {
-            any_always_false: false,
-            all_always_true: true,
-            at_least_one_condition: false,
-        };
-
-        for condition in self {
-            let truthiness = match condition {
-                BranchingCondition::ConditionalOn(Constraint {
-                    node: ConstraintNode::Expression(test_expr),
-                    is_positive,
-                }) => {
-                    let inference = infer_expression_types(db, test_expr);
-                    let scope = test_expr.scope(db);
-                    let ty = inference
-                        .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope));
-
-                    ty.bool(db).negate_if(!is_positive)
-                }
-                BranchingCondition::ConditionalOn(Constraint {
-                    node: ConstraintNode::Pattern(inner),
-                    ..
-                }) => match inner.kind(db) {
-                    super::constraint::PatternConstraintKind::Value(value) => {
-                        let subject_expression = inner.subject(db);
-                        let inference = infer_expression_types(db, *subject_expression);
-                        let scope = subject_expression.scope(db);
-                        let subject_ty = inference.expression_ty(
-                            subject_expression
-                                .node_ref(db)
-                                .scoped_expression_id(db, scope),
-                        );
-
-                        let inference = infer_expression_types(db, *value);
-                        let scope = value.scope(db);
-                        let value_ty = inference
-                            .expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
-
-                        if subject_ty.is_single_valued(db) {
-                            Truthiness::from_bool(subject_ty.is_equivalent_to(db, value_ty))
-                        } else {
-                            Truthiness::Ambiguous
-                        }
-                    }
-                    super::constraint::PatternConstraintKind::Singleton(_)
-                    | super::constraint::PatternConstraintKind::Unsupported => {
-                        Truthiness::Ambiguous
-                    }
-                },
-                BranchingCondition::Ambiguous => Truthiness::Ambiguous,
-            };
-
-            result.any_always_false |= truthiness.is_always_false();
-            result.all_always_true &= truthiness.is_always_true();
-            result.at_least_one_condition = true;
-        }
-
-        result
     }
 }
 
