@@ -9,7 +9,8 @@ use libfuzzer_sys::{fuzz_target, Corpus};
 
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{
-    Db as SemanticDb, Program, ProgramSettings, PythonVersion, SearchPathSettings,
+    default_lint_registry, lint::RuleSelection, Db as SemanticDb, Program, ProgramSettings,
+    PythonVersion, SearchPathSettings,
 };
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
@@ -27,6 +28,7 @@ struct TestDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+    rule_selection: std::sync::Arc<RuleSelection>,
 }
 
 impl TestDb {
@@ -37,6 +39,7 @@ impl TestDb {
             vendored: red_knot_vendored::file_system().clone(),
             events: std::sync::Arc::default(),
             files: Files::default(),
+            rule_selection: RuleSelection::from_registry(&default_lint_registry()).into(),
         }
     }
 }
@@ -79,6 +82,10 @@ impl Upcast<dyn SourceDb> for TestDb {
 impl SemanticDb for TestDb {
     fn is_file_open(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
+    }
+
+    fn rule_selection(&self) -> &RuleSelection {
+        &self.rule_selection
     }
 }
 
