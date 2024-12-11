@@ -1,5 +1,6 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use anyhow;
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, StringFlags};
 use ruff_python_semantic::analyze::typing;
@@ -46,14 +47,16 @@ use ruff_text_size::Ranged;
 #[derive(ViolationMetadata)]
 pub(crate) struct DotlessPathlibWithSuffix;
 
-impl AlwaysFixableViolation for DotlessPathlibWithSuffix {
+impl Violation for DotlessPathlibWithSuffix {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Dotless suffix passed to `.with_suffix()`".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Add a leading dot".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Add a leading dot".to_string())
     }
 }
 
@@ -75,7 +78,11 @@ pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
 
     let string_value = string.value.to_str();
 
-    if string_value.is_empty() || string_value.starts_with('.') {
+    if string_value.is_empty() {
+        return;
+    }
+
+    if string_value.starts_with('.') && string_value.len() > 1 {
         return;
     }
 
@@ -83,10 +90,18 @@ pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
         return;
     };
 
-    let diagnostic = Diagnostic::new(DotlessPathlibWithSuffix, call.range);
-    let after_leading_quote = string.start() + first_part.flags.opener_len();
-    let fix = Fix::unsafe_edit(Edit::insertion(".".to_string(), after_leading_quote));
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    let mut diagnostic = Diagnostic::new(DotlessPathlibWithSuffix, call.range);
+
+    diagnostic.try_set_fix(|| {
+        if string_value == "." {
+            return Err(anyhow::anyhow!("Cannot fix the suffix `.`"));
+        }
+        let after_leading_quote = string.start() + first_part.flags.opener_len();
+        let fix = Fix::unsafe_edit(Edit::insertion(".".to_string(), after_leading_quote));
+        Ok(fix)
+    });
+
+    checker.diagnostics.push(diagnostic);
 }
 
 fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool {
