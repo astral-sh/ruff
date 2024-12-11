@@ -355,7 +355,7 @@ impl<'db> UseDefMap<'db> {
             all_definitions: &self.all_definitions,
             all_constraints: &self.all_constraints,
             all_branching_conditions: &self.all_branching_conditions,
-            inner: bindings.iter(),
+            inner: bindings.iter_rev(),
         }
     }
 
@@ -366,7 +366,7 @@ impl<'db> UseDefMap<'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
             all_branching_conditions: &self.all_branching_conditions,
-            inner: declarations.iter(),
+            inner: declarations.iter_rev(),
             may_be_undeclared: declarations.may_be_undeclared(),
         }
     }

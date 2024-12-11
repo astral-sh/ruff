@@ -109,6 +109,7 @@ pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
     live_declarations: Declarations,
 
+    /// For each live declaration, which [`BranchingConditions`] were active at that declaration?
     branching_conditions: BranchingConditionsPerBinding,
 
     /// Could the symbol be un-declared at this point?
@@ -133,9 +134,9 @@ impl SymbolDeclarations {
         self.live_declarations = Declarations::with(declaration_id.into());
         self.may_be_undeclared = false;
 
-        // TODO: unify code with below
         self.branching_conditions = BranchingConditionsPerBinding::with_capacity(1);
-        self.branching_conditions.push(BitSet::default());
+        self.branching_conditions
+            .push(BranchingConditions::default());
         for active_constraint_id in branching_conditions.iter() {
             self.branching_conditions[0].insert(active_constraint_id);
         }
@@ -147,7 +148,7 @@ impl SymbolDeclarations {
     }
 
     /// Return an iterator over live declarations for this symbol.
-    pub(super) fn iter(&self) -> DeclarationIdIterator {
+    pub(super) fn iter_rev(&self) -> DeclarationIdIterator {
         DeclarationIdIterator {
             inner: self.live_declarations.iter_rev(),
             branching_conditions: self.branching_conditions.iter().rev(),
@@ -171,7 +172,7 @@ pub(super) struct SymbolBindings {
     /// binding in `live_bindings`.
     constraints: ConstraintsPerBinding,
 
-    /// For each live binding, which [`BranchingConditions`] were active *at the time of the binding*?
+    /// For each live binding, which [`BranchingConditions`] were active at that binding?
     branching_conditions: BranchingConditionsPerBinding,
 
     /// Could the symbol be unbound at this point?
@@ -203,10 +204,11 @@ impl SymbolBindings {
         // constraints.
         self.live_bindings = Bindings::with(binding_id.into());
         self.constraints = ConstraintsPerBinding::with_capacity(1);
-        self.constraints.push(BitSet::default());
+        self.constraints.push(Constraints::default());
 
         self.branching_conditions = BranchingConditionsPerBinding::with_capacity(1);
-        self.branching_conditions.push(BitSet::default());
+        self.branching_conditions
+            .push(BranchingConditions::default());
         for id in branching_conditions.iter() {
             self.branching_conditions[0].insert(id);
         }
@@ -220,8 +222,8 @@ impl SymbolBindings {
         }
     }
 
-    /// Iterate over currently live bindings for this symbol.
-    pub(super) fn iter(&self) -> BindingIdWithConstraintsIterator {
+    /// Iterate over currently live bindings for this symbol, in reverse order.
+    pub(super) fn iter_rev(&self) -> BindingIdWithConstraintsIterator {
         BindingIdWithConstraintsIterator {
             definitions: self.live_bindings.iter_rev(),
             constraints: self.constraints.iter().rev(),
@@ -303,70 +305,12 @@ impl SymbolState {
 
         std::mem::swap(&mut a, self);
 
-        let mut a_decls_iter = a.declarations.live_declarations.iter();
-        let mut b_decls_iter = b.declarations.live_declarations.iter();
-        let mut a_declaration_branching_conditions_iter =
-            a.declarations.branching_conditions.into_iter();
-        let mut b_cdeclaration_branching_conditions_iter =
-            b.declarations.branching_conditions.into_iter();
-
-        let mut opt_a_decl: Option<u32> = a_decls_iter.next();
-        let mut opt_b_decl: Option<u32> = b_decls_iter.next();
-
-        let push = |decl,
-                    declaration_branching_conditions_iter: &mut BranchingConditionsIntoIterator,
-                    merged: &mut Self| {
-            merged.declarations.live_declarations.insert(decl);
-            let branching_conditions = declaration_branching_conditions_iter
-                .next()
-                .expect("declarations and branching_conditions length mismatch");
-            merged
-                .declarations
-                .branching_conditions
-                .push(branching_conditions);
-        };
-
-        loop {
-            match (opt_a_decl, opt_b_decl) {
-                (Some(a_decl), Some(b_decl)) => match a_decl.cmp(&b_decl) {
-                    std::cmp::Ordering::Less => {
-                        push(a_decl, &mut a_declaration_branching_conditions_iter, self);
-                        opt_a_decl = a_decls_iter.next();
-                    }
-                    std::cmp::Ordering::Greater => {
-                        push(b_decl, &mut b_cdeclaration_branching_conditions_iter, self);
-                        opt_b_decl = b_decls_iter.next();
-                    }
-                    std::cmp::Ordering::Equal => {
-                        push(a_decl, &mut b_cdeclaration_branching_conditions_iter, self);
-                        self.declarations
-                            .branching_conditions
-                            .last_mut()
-                            .unwrap()
-                            .intersect(&a_declaration_branching_conditions_iter.next().unwrap());
-
-                        opt_a_decl = a_decls_iter.next();
-                        opt_b_decl = b_decls_iter.next();
-                    }
-                },
-                (Some(a_decl), None) => {
-                    push(a_decl, &mut a_declaration_branching_conditions_iter, self);
-                    opt_a_decl = a_decls_iter.next();
-                }
-                (None, Some(b_decl)) => {
-                    push(b_decl, &mut b_cdeclaration_branching_conditions_iter, self);
-                    opt_b_decl = b_decls_iter.next();
-                }
-                (None, None) => break,
-            }
-        }
-
         let mut a_defs_iter = a.bindings.live_bindings.iter();
         let mut b_defs_iter = b.bindings.live_bindings.iter();
         let mut a_constraints_iter = a.bindings.constraints.into_iter();
         let mut b_constraints_iter = b.bindings.constraints.into_iter();
-        let mut a_binding_branching_conditions_iter = a.bindings.branching_conditions.into_iter();
-        let mut b_binding_branching_conditions_iter = b.bindings.branching_conditions.into_iter();
+        let mut a_conditions_iter = a.bindings.branching_conditions.into_iter();
+        let mut b_conditions_iter = b.bindings.branching_conditions.into_iter();
 
         let mut opt_a_def: Option<u32> = a_defs_iter.next();
         let mut opt_b_def: Option<u32> = b_defs_iter.next();
@@ -406,32 +350,17 @@ impl SymbolState {
                 (Some(a_def), Some(b_def)) => match a_def.cmp(&b_def) {
                     std::cmp::Ordering::Less => {
                         // Next definition ID is only in `a`, push it to `self` and advance `a`.
-                        push(
-                            a_def,
-                            &mut a_constraints_iter,
-                            &mut a_binding_branching_conditions_iter,
-                            self,
-                        );
+                        push(a_def, &mut a_constraints_iter, &mut a_conditions_iter, self);
                         opt_a_def = a_defs_iter.next();
                     }
                     std::cmp::Ordering::Greater => {
                         // Next definition ID is only in `b`, push it to `self` and advance `b`.
-                        push(
-                            b_def,
-                            &mut b_constraints_iter,
-                            &mut b_binding_branching_conditions_iter,
-                            self,
-                        );
+                        push(b_def, &mut b_constraints_iter, &mut b_conditions_iter, self);
                         opt_b_def = b_defs_iter.next();
                     }
                     std::cmp::Ordering::Equal => {
                         // Next definition is in both; push to `self` and intersect constraints.
-                        push(
-                            a_def,
-                            &mut b_constraints_iter,
-                            &mut b_binding_branching_conditions_iter,
-                            self,
-                        );
+                        push(a_def, &mut b_constraints_iter, &mut b_conditions_iter, self);
                         // SAFETY: we only ever create SymbolState with either no definitions and
                         // no constraint bitsets (`::unbound`) or one definition and one constraint
                         // bitset (`::with`), and `::merge` always pushes one definition and one
@@ -457,23 +386,66 @@ impl SymbolState {
                 },
                 (Some(a_def), None) => {
                     // We've exhausted `b`, just push the def from `a` and move on to the next.
-                    push(
-                        a_def,
-                        &mut a_constraints_iter,
-                        &mut a_binding_branching_conditions_iter,
-                        self,
-                    );
+                    push(a_def, &mut a_constraints_iter, &mut a_conditions_iter, self);
                     opt_a_def = a_defs_iter.next();
                 }
                 (None, Some(b_def)) => {
                     // We've exhausted `a`, just push the def from `b` and move on to the next.
-                    push(
-                        b_def,
-                        &mut b_constraints_iter,
-                        &mut b_binding_branching_conditions_iter,
-                        self,
-                    );
+                    push(b_def, &mut b_constraints_iter, &mut b_conditions_iter, self);
                     opt_b_def = b_defs_iter.next();
+                }
+                (None, None) => break,
+            }
+        }
+
+        // Same as above, but for declarations.
+        let mut a_decls_iter = a.declarations.live_declarations.iter();
+        let mut b_decls_iter = b.declarations.live_declarations.iter();
+        let mut a_conditions_iter = a.declarations.branching_conditions.into_iter();
+        let mut b_conditions_iter = b.declarations.branching_conditions.into_iter();
+
+        let mut opt_a_decl: Option<u32> = a_decls_iter.next();
+        let mut opt_b_decl: Option<u32> = b_decls_iter.next();
+
+        let push =
+            |decl, conditions_iter: &mut BranchingConditionsIntoIterator, merged: &mut Self| {
+                merged.declarations.live_declarations.insert(decl);
+                let conditions = conditions_iter
+                    .next()
+                    .expect("declarations and branching_conditions length mismatch");
+                merged.declarations.branching_conditions.push(conditions);
+            };
+
+        loop {
+            match (opt_a_decl, opt_b_decl) {
+                (Some(a_decl), Some(b_decl)) => match a_decl.cmp(&b_decl) {
+                    std::cmp::Ordering::Less => {
+                        push(a_decl, &mut a_conditions_iter, self);
+                        opt_a_decl = a_decls_iter.next();
+                    }
+                    std::cmp::Ordering::Greater => {
+                        push(b_decl, &mut b_conditions_iter, self);
+                        opt_b_decl = b_decls_iter.next();
+                    }
+                    std::cmp::Ordering::Equal => {
+                        push(a_decl, &mut b_conditions_iter, self);
+                        self.declarations
+                            .branching_conditions
+                            .last_mut()
+                            .unwrap()
+                            .intersect(&a_conditions_iter.next().unwrap());
+
+                        opt_a_decl = a_decls_iter.next();
+                        opt_b_decl = b_decls_iter.next();
+                    }
+                },
+                (Some(a_decl), None) => {
+                    push(a_decl, &mut a_conditions_iter, self);
+                    opt_a_decl = a_decls_iter.next();
+                }
+                (None, Some(b_decl)) => {
+                    push(b_decl, &mut b_conditions_iter, self);
+                    opt_b_decl = b_decls_iter.next();
                 }
                 (None, None) => break,
             }
@@ -606,13 +578,14 @@ impl std::iter::FusedIterator for DeclarationIdIterator<'_> {}
 
 #[cfg(test)]
 mod tests {
-    use super::{ScopedConstraintId, SymbolState};
+    use super::*;
 
+    #[track_caller]
     fn assert_bindings(symbol: &SymbolState, may_be_unbound: bool, expected: &[&str]) {
         assert_eq!(symbol.may_be_unbound(), may_be_unbound);
-        let actual = symbol
+        let mut actual = symbol
             .bindings()
-            .iter()
+            .iter_rev()
             .map(|def_id_with_constraints| {
                 format!(
                     "{}<{}>",
@@ -626,20 +599,23 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
+        actual.reverse();
         assert_eq!(actual, expected);
     }
 
+    #[track_caller]
     pub(crate) fn assert_declarations(
         symbol: &SymbolState,
         may_be_undeclared: bool,
         expected: &[u32],
     ) {
         assert_eq!(symbol.declarations.may_be_undeclared(), may_be_undeclared);
-        let actual = symbol
+        let mut actual = symbol
             .declarations()
-            .iter()
-            .map(|(d, _)| d.as_u32()) // TODO: constraints
+            .iter_rev()
+            .map(|(d, _)| d.as_u32())
             .collect::<Vec<_>>();
+        actual.reverse();
         assert_eq!(actual, expected);
     }
 
@@ -650,76 +626,100 @@ mod tests {
         assert_bindings(&sym, true, &[]);
     }
 
-    // #[test]
-    // fn with() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_binding(ScopedDefinitionId::from_u32(0));
+    #[test]
+    fn with() {
+        let mut sym = SymbolState::undefined();
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(0),
+            &BranchingConditions::default(),
+        );
 
-    //     assert_bindings(&sym, false, &["0<>"]);
-    // }
+        assert_bindings(&sym, false, &["0<>"]);
+    }
 
-    // #[test]
-    // fn set_may_be_unbound() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_binding(ScopedDefinitionId::from_u32(0));
-    //     sym.set_may_be_unbound();
+    #[test]
+    fn set_may_be_unbound() {
+        let mut sym = SymbolState::undefined();
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(0),
+            &BranchingConditions::default(),
+        );
+        sym.set_may_be_unbound();
 
-    //     assert_bindings(&sym, true, &["0<>"]);
-    // }
+        assert_bindings(&sym, true, &["0<>"]);
+    }
 
-    // #[test]
-    // fn record_constraint() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_binding(ScopedDefinitionId::from_u32(0));
-    //     sym.record_constraint(ScopedConstraintId::from_u32(0));
+    #[test]
+    fn record_constraint() {
+        let mut sym = SymbolState::undefined();
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(0),
+            &BranchingConditions::default(),
+        );
+        sym.record_constraint(ScopedConstraintId::from_u32(0));
 
-    //     assert_bindings(&sym, false, &["0<0>"]);
-    // }
+        assert_bindings(&sym, false, &["0<0>"]);
+    }
 
-    // #[test]
-    // fn merge() {
-    //     // merging the same definition with the same constraint keeps the constraint
-    //     let mut sym0a = SymbolState::undefined();
-    //     sym0a.record_binding(ScopedDefinitionId::from_u32(0));
-    //     sym0a.record_constraint(ScopedConstraintId::from_u32(0));
+    #[test]
+    fn merge() {
+        // merging the same definition with the same constraint keeps the constraint
+        let mut sym0a = SymbolState::undefined();
+        sym0a.record_binding(
+            ScopedDefinitionId::from_u32(0),
+            &BranchingConditions::default(),
+        );
+        sym0a.record_constraint(ScopedConstraintId::from_u32(0));
 
-    //     let mut sym0b = SymbolState::undefined();
-    //     sym0b.record_binding(ScopedDefinitionId::from_u32(0));
-    //     sym0b.record_constraint(ScopedConstraintId::from_u32(0));
+        let mut sym0b = SymbolState::undefined();
+        sym0b.record_binding(
+            ScopedDefinitionId::from_u32(0),
+            &BranchingConditions::default(),
+        );
+        sym0b.record_constraint(ScopedConstraintId::from_u32(0));
 
-    //     sym0a.merge(sym0b);
-    //     let mut sym0 = sym0a;
-    //     assert_bindings(&sym0, false, &["0<0>"]);
+        sym0a.merge(sym0b);
+        let mut sym0 = sym0a;
+        assert_bindings(&sym0, false, &["0<0>"]);
 
-    //     // merging the same definition with differing constraints drops all constraints
-    //     let mut sym1a = SymbolState::undefined();
-    //     sym1a.record_binding(ScopedDefinitionId::from_u32(1));
-    //     sym1a.record_constraint(ScopedConstraintId::from_u32(1));
+        // merging the same definition with differing constraints drops all constraints
+        let mut sym1a = SymbolState::undefined();
+        sym1a.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            &BranchingConditions::default(),
+        );
+        sym1a.record_constraint(ScopedConstraintId::from_u32(1));
 
-    //     let mut sym1b = SymbolState::undefined();
-    //     sym1b.record_binding(ScopedDefinitionId::from_u32(1));
-    //     sym1b.record_constraint(ScopedConstraintId::from_u32(2));
+        let mut sym1b = SymbolState::undefined();
+        sym1b.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            &BranchingConditions::default(),
+        );
+        sym1b.record_constraint(ScopedConstraintId::from_u32(2));
 
-    //     sym1a.merge(sym1b);
-    //     let sym1 = sym1a;
-    //     assert_bindings(&sym1, false, &["1<>"]);
+        sym1a.merge(sym1b);
+        let sym1 = sym1a;
+        assert_bindings(&sym1, false, &["1<>"]);
 
-    //     // merging a constrained definition with unbound keeps both
-    //     let mut sym2a = SymbolState::undefined();
-    //     sym2a.record_binding(ScopedDefinitionId::from_u32(2));
-    //     sym2a.record_constraint(ScopedConstraintId::from_u32(3));
+        // merging a constrained definition with unbound keeps both
+        let mut sym2a = SymbolState::undefined();
+        sym2a.record_binding(
+            ScopedDefinitionId::from_u32(2),
+            &BranchingConditions::default(),
+        );
+        sym2a.record_constraint(ScopedConstraintId::from_u32(3));
 
-    //     let sym2b = SymbolState::undefined();
+        let sym2b = SymbolState::undefined();
 
-    //     sym2a.merge(sym2b);
-    //     let sym2 = sym2a;
-    //     assert_bindings(&sym2, true, &["2<3>"]);
+        sym2a.merge(sym2b);
+        let sym2 = sym2a;
+        assert_bindings(&sym2, true, &["2<3>"]);
 
-    //     // merging different definitions keeps them each with their existing constraints
-    //     sym0.merge(sym2);
-    //     let sym = sym0;
-    //     assert_bindings(&sym, true, &["0<0>", "2<3>"]);
-    // }
+        // merging different definitions keeps them each with their existing constraints
+        sym0.merge(sym2);
+        let sym = sym0;
+        assert_bindings(&sym, true, &["0<0>", "2<3>"]);
+    }
 
     #[test]
     fn no_declaration() {
@@ -728,54 +728,75 @@ mod tests {
         assert_declarations(&sym, true, &[]);
     }
 
-    // #[test]
-    // fn record_declaration() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(1));
+    #[test]
+    fn record_declaration() {
+        let mut sym = SymbolState::undefined();
+        sym.record_declaration(
+            ScopedDefinitionId::from_u32(1),
+            &BranchingConditions::default(),
+        );
 
-    //     assert_declarations(&sym, false, &[1]);
-    // }
+        assert_declarations(&sym, false, &[1]);
+    }
 
-    // #[test]
-    // fn record_declaration_override() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(1));
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(2));
+    #[test]
+    fn record_declaration_override() {
+        let mut sym = SymbolState::undefined();
+        sym.record_declaration(
+            ScopedDefinitionId::from_u32(1),
+            &BranchingConditions::default(),
+        );
+        sym.record_declaration(
+            ScopedDefinitionId::from_u32(2),
+            &BranchingConditions::default(),
+        );
 
-    //     assert_declarations(&sym, false, &[2]);
-    // }
+        assert_declarations(&sym, false, &[2]);
+    }
 
-    // #[test]
-    // fn record_declaration_merge() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(1));
+    #[test]
+    fn record_declaration_merge() {
+        let mut sym = SymbolState::undefined();
+        sym.record_declaration(
+            ScopedDefinitionId::from_u32(1),
+            &BranchingConditions::default(),
+        );
 
-    //     let mut sym2 = SymbolState::undefined();
-    //     sym2.record_declaration(ScopedDefinitionId::from_u32(2));
+        let mut sym2 = SymbolState::undefined();
+        sym2.record_declaration(
+            ScopedDefinitionId::from_u32(2),
+            &BranchingConditions::default(),
+        );
 
-    //     sym.merge(sym2);
+        sym.merge(sym2);
 
-    //     assert_declarations(&sym, false, &[1, 2]);
-    // }
+        assert_declarations(&sym, false, &[1, 2]);
+    }
 
-    // #[test]
-    // fn record_declaration_merge_partial_undeclared() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(1));
+    #[test]
+    fn record_declaration_merge_partial_undeclared() {
+        let mut sym = SymbolState::undefined();
+        sym.record_declaration(
+            ScopedDefinitionId::from_u32(1),
+            &BranchingConditions::default(),
+        );
 
-    //     let sym2 = SymbolState::undefined();
+        let sym2 = SymbolState::undefined();
 
-    //     sym.merge(sym2);
+        sym.merge(sym2);
 
-    //     assert_declarations(&sym, true, &[1]);
-    // }
+        assert_declarations(&sym, true, &[1]);
+    }
 
-    // #[test]
-    // fn set_may_be_undeclared() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(0));
-    //     sym.set_may_be_undeclared();
+    #[test]
+    fn set_may_be_undeclared() {
+        let mut sym = SymbolState::undefined();
+        sym.record_declaration(
+            ScopedDefinitionId::from_u32(0),
+            &BranchingConditions::default(),
+        );
+        sym.set_may_be_undeclared();
 
-    //     assert_declarations(&sym, true, &[0]);
-    // }
+        assert_declarations(&sym, true, &[0]);
+    }
 }
