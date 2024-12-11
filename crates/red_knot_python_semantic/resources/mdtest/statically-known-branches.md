@@ -1,5 +1,46 @@
 # Statically-known branches
 
+## Introduction
+
+We have the ability to infer precise types and boundness information for symbols that are
+defined/declared in branches whose conditions we can statically determine to be always true or
+always false. This is useful is for `sys.version_info` branches, which are often used to
+conditionally make new features available:
+
+```py path=module1.py
+if sys.version_info >= (3, 9):
+    SomeFeature = "available"
+```
+
+If we can statically determine that the condition is always true, we can determine that
+`SomeFeature` is always bound, without raising any errors:
+
+```py path=test1.py
+from module1 import SomeFeature
+
+# SomeFeature is unconditionally available here:
+reveal_type(SomeFeature)  # revealed: Literal["available"]
+```
+
+Another scenario where this is useful is for `typing.TYPE_CHECKING` branches, which are often used
+for conditional imports:
+
+```py path=module2.py
+class SomeType: ...
+```
+
+```py path=test2.py
+import typing
+
+if typing.TYPE_CHECKING:
+    from module2 import SomeType
+
+# `SomeType` is unconditionally available here for type checkers:
+def f(s: SomeType) -> None: ...
+```
+
+The rest of this document contains tests for various cases where this feature can be used.
+
 ## If statements
 
 ### Always false
