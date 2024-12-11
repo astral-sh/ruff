@@ -21,7 +21,7 @@ use crate::Db;
 /// ```
 ///
 /// Given an iterator over the branching conditions for each of these bindings, we would get:
-/// ```
+/// ```txt
 /// - a: {any_always_false: false, all_always_true: true,  at_least_one_condition: false}
 /// - b: {any_always_false: false, all_always_true: true,  at_least_one_condition: true}
 /// - c: {any_always_false: false, all_always_true: false, at_least_one_condition: true}
