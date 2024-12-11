@@ -222,7 +222,7 @@ pub(crate) struct Checker<'a> {
     analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
     pub(crate) diagnostics: Vec<Diagnostic>,
-    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
+    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
