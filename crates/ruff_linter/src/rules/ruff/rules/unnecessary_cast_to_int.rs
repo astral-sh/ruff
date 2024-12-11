@@ -1,10 +1,13 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::{
+    Arguments, CmpOp, Expr, ExprBinOp, ExprCall, ExprCompare, ExprIf, ExprNamed, ExprNumberLiteral,
+    ExprUnaryOp, Number, Operator, UnaryOp,
+};
 use ruff_python_semantic::analyze::typing;
-use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
+use ruff_python_semantic::{BindingKind, SemanticModel};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -50,44 +53,35 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, is_macro::Is)]
+pub(crate) enum IsStrictlyInt {
+    /// The value is known with absolute certainty to be a strict instance of `int`.
+    True,
+    /// The value is known with absolute certainty to *not* be a strict instance of `int`.
+    False,
+    /// The evaluation context has a high chance of producing a strict instance of `int`.
+    Likely,
+    /// It is not possible to statically determine that the value
+    /// is or is not a strict instance of `int`.
+    Maybe,
+}
+
 /// RUF046
 pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
-    let Some(Expr::Call(inner_call)) = single_argument_to_int_call(semantic, call) else {
+    let Some(argument) = single_argument_to_int_call(semantic, call) else {
         return;
     };
 
-    let (func, arguments) = (&inner_call.func, &inner_call.arguments);
-    let (outer_range, inner_range) = (call.range, inner_call.range);
-
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
-        return;
-    };
-
-    let fix = match qualified_name.segments() {
-        // Always returns a strict instance of `int`
-        ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
-        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => {
-            Fix::safe_edit(replace_with_inner(checker, outer_range, inner_range))
-        }
-
-        // Depends on `ndigits` and `number.__round__`
-        ["" | "builtins", "round"] => {
-            if let Some(fix) = replace_with_round(checker, outer_range, inner_range, arguments) {
-                fix
-            } else {
-                return;
-            }
-        }
-
-        // Depends on `__ceil__`/`__floor__`/`__trunc__`
-        ["math", "ceil" | "floor" | "trunc"] => {
-            Fix::unsafe_edit(replace_with_inner(checker, outer_range, inner_range))
-        }
-
+    let applicability = match expr_is_strictly_int(semantic, argument) {
+        IsStrictlyInt::True => Applicability::Safe,
+        IsStrictlyInt::Likely => Applicability::Unsafe,
         _ => return,
     };
+
+    let edit = replace_with_inner(checker, call, argument);
+    let fix = Fix::applicable_edit(edit, applicability);
 
     let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
 
@@ -117,6 +111,150 @@ fn single_argument_to_int_call<'a>(
     Some(argument)
 }
 
+pub(crate) fn expr_is_strictly_int(semantic: &SemanticModel, expr: &Expr) -> IsStrictlyInt {
+    match expr {
+        Expr::BoolOp(_) => IsStrictlyInt::Maybe,
+        Expr::Await(_) => IsStrictlyInt::Maybe,
+        Expr::Attribute(_) => IsStrictlyInt::Maybe,
+        Expr::Subscript(_) => IsStrictlyInt::Maybe,
+
+        Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
+            Number::Int(_) => IsStrictlyInt::True,
+            Number::Float(_) => IsStrictlyInt::False,
+            Number::Complex { .. } => IsStrictlyInt::False,
+        },
+
+        Expr::Compare(ExprCompare {
+            left,
+            ops,
+            comparators,
+            ..
+        }) => {
+            let ([only_op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
+                return IsStrictlyInt::Maybe;
+            };
+
+            match only_op {
+                CmpOp::Is => return IsStrictlyInt::False,
+                CmpOp::IsNot => return IsStrictlyInt::False,
+                _ => {}
+            };
+
+            let left_is_strictly_int = expr_is_strictly_int(semantic, left);
+            let right_is_strictly_int = expr_is_strictly_int(semantic, right);
+
+            match [left_is_strictly_int, right_is_strictly_int] {
+                [IsStrictlyInt::True, IsStrictlyInt::True] => IsStrictlyInt::False,
+                [_, IsStrictlyInt::True] => match only_op {
+                    CmpOp::In => IsStrictlyInt::False,
+                    CmpOp::NotIn => IsStrictlyInt::False,
+                    _ => IsStrictlyInt::Maybe,
+                },
+                _ => IsStrictlyInt::Maybe,
+            }
+        }
+
+        Expr::Named(ExprNamed { value, .. }) => expr_is_strictly_int(semantic, value),
+
+        Expr::UnaryOp(ExprUnaryOp { op, operand, .. }) => {
+            if matches!(op, UnaryOp::Not) {
+                return IsStrictlyInt::False;
+            }
+
+            expr_is_strictly_int(semantic, operand)
+        }
+
+        Expr::BinOp(ExprBinOp {
+            left, op, right, ..
+        }) => {
+            let left_is_strictly_int = expr_is_strictly_int(semantic, left);
+            let right_is_strictly_int = expr_is_strictly_int(semantic, right);
+
+            match [left_is_strictly_int, right_is_strictly_int] {
+                [IsStrictlyInt::True, IsStrictlyInt::True] => match op {
+                    Operator::Div => IsStrictlyInt::False,
+                    Operator::MatMult => IsStrictlyInt::False,
+                    _ => IsStrictlyInt::True,
+                },
+                [IsStrictlyInt::Likely, IsStrictlyInt::Likely] => match op {
+                    Operator::Div => IsStrictlyInt::Maybe,
+                    Operator::MatMult => IsStrictlyInt::Maybe,
+                    _ => IsStrictlyInt::Likely,
+                },
+                _ => IsStrictlyInt::Maybe,
+            }
+        }
+
+        Expr::If(ExprIf { body, orelse, .. }) => {
+            let body_is_strictly_int = expr_is_strictly_int(semantic, body);
+            let else_is_strictly_int = expr_is_strictly_int(semantic, orelse);
+
+            match [body_is_strictly_int, else_is_strictly_int] {
+                [IsStrictlyInt::True, IsStrictlyInt::True] => IsStrictlyInt::True,
+                [IsStrictlyInt::Likely, IsStrictlyInt::Likely] => IsStrictlyInt::Likely,
+                [IsStrictlyInt::False, IsStrictlyInt::False] => IsStrictlyInt::False,
+                _ => IsStrictlyInt::Maybe,
+            }
+        }
+
+        Expr::Name(name) => {
+            let Some(binding_id) = semantic.only_binding(name) else {
+                return IsStrictlyInt::Maybe;
+            };
+            let binding = semantic.binding(binding_id);
+
+            if typing::is_int(binding, semantic) {
+                return IsStrictlyInt::Maybe;
+            }
+
+            match binding.kind {
+                // Already handled by typing::is_int/typing::check_type
+                BindingKind::Assignment => IsStrictlyInt::Maybe,
+                BindingKind::NamedExprAssignment => IsStrictlyInt::Maybe,
+                BindingKind::WithItemVar => IsStrictlyInt::Maybe,
+                BindingKind::Argument => IsStrictlyInt::Maybe,
+                BindingKind::Annotation => IsStrictlyInt::Maybe,
+
+                BindingKind::Import(_) => IsStrictlyInt::Maybe,
+                BindingKind::FromImport(_) => IsStrictlyInt::Maybe,
+                BindingKind::SubmoduleImport(_) => IsStrictlyInt::Maybe,
+                BindingKind::Deletion => IsStrictlyInt::Maybe,
+                BindingKind::ConditionalDeletion(_) => IsStrictlyInt::Maybe,
+                BindingKind::LoopVar => IsStrictlyInt::Maybe,
+                BindingKind::Global(_) => IsStrictlyInt::Maybe,
+                BindingKind::Nonlocal(_, _) => IsStrictlyInt::Maybe,
+
+                _ => IsStrictlyInt::False,
+            }
+        }
+
+        Expr::Call(call) => call_strictly_returns_int(semantic, call),
+
+        _ => IsStrictlyInt::False,
+    }
+}
+
+fn call_strictly_returns_int(semantic: &SemanticModel, call: &ExprCall) -> IsStrictlyInt {
+    let (func, arguments) = (&call.func, &call.arguments);
+
+    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+        return IsStrictlyInt::Maybe;
+    };
+
+    match qualified_name.segments() {
+        ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
+        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => IsStrictlyInt::True,
+
+        // Depends on `__ceil__`/`__floor__`/`__trunc__`
+        ["math", "ceil" | "floor" | "trunc"] => IsStrictlyInt::Likely,
+
+        // Depends on `ndigits` and `number.__round__`
+        ["" | "builtins", "round"] => round_call_strictly_returns_int(semantic, arguments),
+
+        _ => IsStrictlyInt::Maybe,
+    }
+}
+
 /// The type of the first argument to `round()`
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Rounded {
@@ -136,29 +274,20 @@ enum Ndigits {
     Other,
 }
 
-fn replace_with_round(
-    checker: &Checker,
-    outer_range: TextRange,
-    inner_range: TextRange,
+fn round_call_strictly_returns_int(
+    semantic: &SemanticModel,
     arguments: &Arguments,
-) -> Option<Fix> {
-    if arguments.len() > 2 {
-        return None;
-    }
-
-    let number = arguments.find_argument("number", 0)?;
-    let ndigits = arguments.find_argument("ndigits", 1);
+) -> IsStrictlyInt {
+    let Some((number, ndigits)) = round_number_and_ndigits(arguments) else {
+        return IsStrictlyInt::Maybe;
+    };
 
     let number_kind = match number {
-        Expr::Name(name) => {
-            let semantic = checker.semantic();
-
-            match semantic.only_binding(name).map(|id| semantic.binding(id)) {
-                Some(binding) if typing::is_int(binding, semantic) => Rounded::InferredInt,
-                Some(binding) if typing::is_float(binding, semantic) => Rounded::InferredFloat,
-                _ => Rounded::Other,
-            }
-        }
+        Expr::Name(name) => match semantic.only_binding(name).map(|id| semantic.binding(id)) {
+            Some(binding) if typing::is_int(binding, semantic) => Rounded::InferredInt,
+            Some(binding) if typing::is_float(binding, semantic) => Rounded::InferredFloat,
+            _ => Rounded::Other,
+        },
 
         Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
             Number::Int(..) => Rounded::LiteralInt,
@@ -181,28 +310,58 @@ fn replace_with_round(
         _ => Ndigits::Other,
     };
 
-    let applicability = match (number_kind, ndigits_kind) {
+    match (number_kind, ndigits_kind) {
         (Rounded::LiteralInt, Ndigits::LiteralInt)
         | (Rounded::LiteralInt | Rounded::LiteralFloat, Ndigits::NotGiven | Ndigits::LiteralNone) => {
-            Applicability::Safe
+            IsStrictlyInt::True
         }
 
         (Rounded::InferredInt, Ndigits::LiteralInt)
         | (
             Rounded::InferredInt | Rounded::InferredFloat | Rounded::Other,
             Ndigits::NotGiven | Ndigits::LiteralNone,
-        ) => Applicability::Unsafe,
+        ) => IsStrictlyInt::Likely,
 
-        _ => return None,
-    };
-
-    let edit = replace_with_inner(checker, outer_range, inner_range);
-
-    Some(Fix::applicable_edit(edit, applicability))
+        _ => IsStrictlyInt::Maybe,
+    }
 }
 
-fn replace_with_inner(checker: &Checker, outer_range: TextRange, inner_range: TextRange) -> Edit {
-    let inner_expr = checker.locator().slice(inner_range);
+fn round_number_and_ndigits(arguments: &Arguments) -> Option<(&Expr, Option<&Expr>)> {
+    if arguments.len() > 2 {
+        return None;
+    }
 
-    Edit::range_replacement(inner_expr.to_string(), outer_range)
+    let number = arguments.find_argument("number", 0)?;
+    let ndigits = arguments.find_argument("ndigits", 1);
+
+    Some((number, ndigits))
+}
+
+fn replace_with_inner(checker: &mut Checker, call: &ExprCall, argument: &Expr) -> Edit {
+    let has_parent_expr = checker.semantic().current_expression_parent().is_some();
+    let argument_expr = checker.locator().slice(argument.range());
+
+    let new_content = if has_parent_expr || should_be_parenthesized_when_standalone(argument) {
+        format!("({argument_expr})")
+    } else {
+        argument_expr.to_string()
+    };
+
+    Edit::range_replacement(new_content, call.range)
+}
+
+/// Whether `expr` should be parenthesized when used on its own.
+///
+/// ```python
+/// a := 0            # (a := 0)
+/// a = b := 0        # a = (b := 0)
+/// a for a in b      # (a for a in b)
+/// a = b for b in c  # a = (b for b in c)
+/// ```
+fn should_be_parenthesized_when_standalone(expr: &Expr) -> bool {
+    match expr {
+        Expr::Named(_) => true,
+        Expr::Generator(_) => true,
+        _ => false,
+    }
 }
