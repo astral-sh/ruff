@@ -123,6 +123,101 @@ else:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
+### `elif` branches
+
+#### Always false
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    x = 2
+elif False:
+    x = 3
+else:
+    x = 4
+
+reveal_type(x)  # revealed: Literal[2, 4]
+```
+
+#### Always true
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    x = 2
+elif True:
+    x = 3
+else:
+    x = 4
+
+reveal_type(x)  # revealed: Literal[2, 3]
+```
+
+#### Ambiguous
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    x = 2
+elif flag():
+    x = 3
+else:
+    x = 4
+
+reveal_type(x)  # revealed: Literal[2, 3, 4]
+```
+
+#### Multiple `elif` branches, always false
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    x = 2
+elif flag():
+    x = 3
+elif False:
+    x = 4
+elif flag():
+    x = 5
+else:
+    x = 6
+
+reveal_type(x)  # revealed: Literal[2, 3, 5, 6]
+```
+
+#### Multiple `elif` branches, always true
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    x = 2
+elif flag():
+    x = 3
+elif True:
+    x = 4
+elif flag():
+    x = 5
+else:
+    x = 6
+
+reveal_type(x)  # revealed: Literal[2, 3, 4]
+```
+
 ### Nested conditionals
 
 #### `if True` inside `if True`
