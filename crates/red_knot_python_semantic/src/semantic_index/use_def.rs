@@ -714,7 +714,7 @@ where
     C: Iterator<Item = BranchingConditionsIterator<'map, 'db>>,
 {
     let result = conditions_per_binding.fold(StaticTruthiness::no_bindings(), |r, conditions| {
-        r.merge(StaticTruthiness::analyze(db, conditions))
+        r.merge(&StaticTruthiness::analyze(db, conditions))
     });
 
     let definitely_unbound = result.any_always_false;

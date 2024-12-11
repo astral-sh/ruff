@@ -110,7 +110,7 @@ impl StaticTruthiness {
     /// binding of a symbol is unconditionally visible, if all branching conditions are known to be
     /// statically true. It is enough if this is the case for *any* of the control-flow paths. Other
     /// control flow paths will not be taken if this is the case.
-    pub(crate) fn merge(self, other: Self) -> Self {
+    pub(crate) fn merge(self, other: &Self) -> Self {
         Self {
             any_always_false: self.any_always_false && other.any_always_false,
             all_always_true: self.all_always_true || other.all_always_true,
