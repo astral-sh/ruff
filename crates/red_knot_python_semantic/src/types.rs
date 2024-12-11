@@ -403,7 +403,7 @@ fn declarations_ty<'db>(
             }
         })
         .take_while_inclusive(Visibility::is_not_opaque)
-        .map(|v| v.unwrap_or_never());
+        .map(Visibility::unwrap_or_never);
 
     // TODO: try to get rid of the `collect` here (see above)
     let types: Vec<_> = types.collect();
