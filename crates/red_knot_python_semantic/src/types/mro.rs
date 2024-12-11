@@ -77,7 +77,7 @@ impl<'db> Mro<'db> {
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
             [single_base] => {
-                let single_base = ClassBase::try_from_ty(*single_base).ok_or(*single_base);
+                let single_base = ClassBase::try_from_ty(*single_base, db).ok_or(*single_base);
                 single_base.map_or_else(
                     |invalid_base_ty| {
                         let bases_info = Box::from([(0, invalid_base_ty)]);
@@ -102,7 +102,7 @@ impl<'db> Mro<'db> {
                 let mut invalid_bases = vec![];
 
                 for (i, base) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_ty(*base).ok_or(*base) {
+                    match ClassBase::try_from_ty(*base, db).ok_or(*base) {
                         Ok(valid_base) => valid_bases.push(valid_base),
                         Err(invalid_base) => invalid_bases.push((i, invalid_base)),
                     }
@@ -341,7 +341,7 @@ impl<'db> ClassBase<'db> {
     /// Attempt to resolve `ty` into a `ClassBase`.
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
-    fn try_from_ty(ty: Type<'db>) -> Option<Self> {
+    fn try_from_ty(ty: Type<'db>, db: &'db dyn Db) -> Option<Self> {
         match ty {
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
@@ -371,6 +371,10 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Never
                 | KnownInstanceType::Optional => None,
                 KnownInstanceType::Any => Some(Self::Any),
+                // TODO: classes inheriting from `typing.Type` also have `Generic` in their MRO
+                KnownInstanceType::Type => {
+                    ClassBase::try_from_ty(KnownClass::Type.to_class_literal(db), db)
+                }
             },
         }
     }
