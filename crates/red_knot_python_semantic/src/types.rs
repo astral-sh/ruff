@@ -2711,7 +2711,7 @@ impl<'db> Class<'db> {
             match superclass {
                 // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
                 // the type found on the next "real" class.
-                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo => {
+                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => {
                     return Type::from(superclass).member(db, name)
                 }
                 ClassBase::Class(class) => {
