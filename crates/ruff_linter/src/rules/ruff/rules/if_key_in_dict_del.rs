@@ -4,7 +4,6 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtDelete, StmtIf};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
 
 type Key = Expr;
 type Dict = ExprName;
@@ -145,7 +144,7 @@ fn replace_with_dict_pop_fix(checker: &Checker, stmt: &StmtIf, dict: &Dict, key:
     let edit = Edit::range_replacement(replacement, stmt.range);
 
     let comment_ranges = checker.comment_ranges();
-    let applicability = if comment_ranges.comments_in_range(stmt.range()) {
+    let applicability = if comment_ranges.intersects(stmt.range) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
