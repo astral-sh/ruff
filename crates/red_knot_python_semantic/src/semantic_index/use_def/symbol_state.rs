@@ -532,7 +532,7 @@ impl Iterator for ConstraintIdIterator<'_> {
 
 impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct BranchingConditionIdIterator<'a> {
     wrapped: BitSetIterator<'a, INLINE_BRANCHING_BLOCKS>,
 }
