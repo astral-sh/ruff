@@ -289,10 +289,10 @@ impl<'db> UseDefMap<'db> {
         use_id: ScopedUseId,
     ) -> Option<Boundness> {
         let bindings = &self.bindings_by_use[use_id];
-        let conditions = self
+        let conditions_per_binding = self
             .bindings_iterator(bindings)
             .map(|binding| binding.branching_conditions);
-        analyze_boundness(db, conditions, bindings.may_be_unbound())
+        analyze_boundness(db, conditions_per_binding, bindings.may_be_unbound())
     }
 
     pub(crate) fn public_bindings(
@@ -413,7 +413,6 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) branching_conditions: BranchingConditionsIterator<'map, 'db>,
 }
 
-#[derive(Debug, Clone)]
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     constraint_ids: ConstraintIdIterator<'map>,
@@ -431,7 +430,6 @@ impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
-#[derive(Debug, Clone)]
 pub(crate) struct BranchingConditionsIterator<'map, 'db> {
     all_branching_conditions: &'map IndexVec<ScopedBranchingConditionId, BranchingCondition<'db>>,
     branching_condition_ids: BranchingConditionIdIterator<'map>,
@@ -460,8 +458,8 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
 impl DeclarationsIterator<'_, '_> {
     pub(crate) fn declaredness(self, db: &dyn crate::db::Db) -> Option<Boundness> {
         let may_be_undeclared = self.may_be_undeclared;
-        let conditions = self.map(|(_, conditions)| conditions);
-        analyze_boundness(db, conditions, may_be_undeclared)
+        let conditions_per_binding = self.map(|(_, conditions)| conditions);
+        analyze_boundness(db, conditions_per_binding, may_be_undeclared)
     }
 
     pub(crate) fn may_be_undeclared(self, db: &dyn crate::db::Db) -> bool {
@@ -550,6 +548,8 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_branching_condition(BranchingCondition::ConditionalOn(constraint));
     }
 
+    /// Marks a point in control-flow where we branch unconditionally, that is: without any
+    /// conditions that could be statically analyzed. Examples are `for` loops or `try` blocks.
     pub(super) fn record_unconditional_branching(&mut self) {
         self.record_branching_condition(BranchingCondition::Ambiguous);
     }
