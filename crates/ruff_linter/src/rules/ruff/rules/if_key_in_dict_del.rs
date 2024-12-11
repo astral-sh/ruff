@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtDelete, StmtIf};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 type Key = Expr;
 type Dict = ExprName;
@@ -13,8 +13,7 @@ type Dict = ExprName;
 /// Checks for `if key in dictionary: del dictionary[key]`.
 ///
 /// ## Why is this bad?
-/// When removing a key from a dictionary, it is unnecessary to check for its existence.
-/// `.pop(..., None)` is simpler and has the same semantic.
+/// To remove a key-value pair from a dictionary, it's more concise to use `.pop(..., None)`.
 ///
 /// ## Example
 ///
@@ -28,6 +27,9 @@ type Dict = ExprName;
 /// ```python
 /// dictionary.pop(key, None)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the if statement contains comments.
 #[derive(ViolationMetadata)]
 pub(crate) struct IfKeyInDictDel;
 
@@ -63,8 +65,7 @@ pub(crate) fn if_key_in_dict_del(checker: &mut Checker, stmt: &StmtIf) {
         return;
     }
 
-    let test_to_del = TextRange::new(test_dict.end(), del_dict.start());
-    let fix = replace_with_dict_pop_fix(checker, stmt, test_to_del, test_dict, test_key);
+    let fix = replace_with_dict_pop_fix(checker, stmt, test_dict, test_key);
 
     let diagnostic = Diagnostic::new(IfKeyInDictDel, stmt.range);
 
@@ -135,13 +136,7 @@ fn is_known_to_be_of_type_dict(semantic: &SemanticModel, dict: &Dict) -> bool {
     typing::is_dict(binding, semantic)
 }
 
-fn replace_with_dict_pop_fix(
-    checker: &Checker,
-    stmt: &StmtIf,
-    test_to_del: TextRange,
-    dict: &Dict,
-    key: &Key,
-) -> Fix {
+fn replace_with_dict_pop_fix(checker: &Checker, stmt: &StmtIf, dict: &Dict, key: &Key) -> Fix {
     let locator = checker.locator();
     let dict_expr = locator.slice(dict);
     let key_expr = locator.slice(key);
@@ -150,7 +145,7 @@ fn replace_with_dict_pop_fix(
     let edit = Edit::range_replacement(replacement, stmt.range);
 
     let comment_ranges = checker.comment_ranges();
-    let applicability = if comment_ranges.has_comments(&test_to_del, checker.source()) {
+    let applicability = if comment_ranges.comments_in_range(stmt.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
