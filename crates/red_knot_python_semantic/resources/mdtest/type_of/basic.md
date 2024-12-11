@@ -133,3 +133,14 @@ class B: ...
 # error: [invalid-type-form]
 _: type[A, B]
 ```
+
+## As a base class
+
+```py
+# TODO: this is a false positive
+# error: [invalid-base] "Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+class Foo(type[int]): ...
+
+# TODO: should be `tuple[Literal[Foo], Literal[type], Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+```
