@@ -1,10 +1,9 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 
 use crate::checkers::ast::Checker;
 use anyhow::{anyhow, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_parser::{parse, Mode, TokenKind};
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
@@ -92,10 +91,13 @@ impl Violation for ManualListComprehension {
 
 /// PERF401
 pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::StmtFor) {
-    let Expr::Name(ast::ExprName { id, .. }) = &*for_stmt.target else {
+    let Expr::Name(ast::ExprName {
+        id: for_stmt_target_id,
+        ..
+    }) = &*for_stmt.target
+    else {
         return;
     };
-    let for_stmt_target_id = id;
 
     let (stmt, if_test) = match &*for_stmt.body {
         // ```python
@@ -103,7 +105,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         //     if z:
         //         filtered.append(x)
         // ```
-        [Stmt::If(ast::StmtIf {
+        [ast::Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             test,
@@ -125,7 +127,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         _ => return,
     };
 
-    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+    let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
         return;
     };
 
@@ -151,53 +153,53 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         return;
     };
 
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = &**func else {
         return;
     };
 
     if attr.as_str() != "append" {
         return;
     }
+
+    // Avoid non-list values.
+    let Some(list_name) = value.as_name_expr() else {
+        return;
+    };
+
     // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
     // `manual-list-copy` doesn't cover.
     if !for_stmt.is_async {
         if if_test.is_none() {
-            if arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
+            if arg
+                .as_name_expr()
+                .is_some_and(|arg| arg.id == *for_stmt_target_id)
+            {
                 return;
             }
         }
     }
 
-    // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
-    if any_over_expr(value, &|expr| {
-        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
-    }) {
-        return;
-    }
-
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
     if any_over_expr(arg, &|expr| {
-        ComparableExpr::from(expr) == ComparableExpr::from(value)
+        expr.as_name_expr()
+            .is_some_and(|expr| expr.id == list_name.id)
     }) {
         return;
     }
 
-    // Avoid non-list values.
-    let Some(name) = value.as_name_expr() else {
-        return;
-    };
-    let Some(binding) = checker
+    let Some(list_binding) = checker
         .semantic()
-        .only_binding(name)
+        .only_binding(list_name)
         .map(|id| checker.semantic().binding(id))
     else {
         return;
     };
-    if !is_list(binding, checker.semantic()) {
+
+    if !is_list(list_binding, checker.semantic()) {
         return;
     }
 
-    // Avoid if the value is used in the conditional test, e.g.,
+    // Avoid if the list is used in the conditional test, e.g.,
     //
     // ```python
     // for x in y:
@@ -213,13 +215,14 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     // ```
     if if_test.is_some_and(|test| {
         any_over_expr(test, &|expr| {
-            expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
+            expr.as_name_expr()
+                .is_some_and(|expr| expr.id == list_name.id)
         })
     }) {
         return;
     }
 
-    // Avoid if the for-loop target is used outside of the for loop, e.g.,
+    // Avoid if the for-loop target is used outside the for loop, e.g.,
     //
     // ```python
     // for x in y:
@@ -238,25 +241,25 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         .lookup_symbol(for_stmt_target_id)
         .expect("for loop target must exist");
 
-    let mut bindings = [last_target_binding].into_iter().chain(
-        checker
-            .semantic()
-            .shadowed_bindings(checker.semantic().scope_id, last_target_binding)
-            .filter_map(|shadowed| shadowed.same_scope().then_some(shadowed.shadowed_id())),
-    );
+    let target_binding = {
+        let mut bindings = [last_target_binding].into_iter().chain(
+            checker
+                .semantic()
+                .shadowed_bindings(checker.semantic().scope_id, last_target_binding)
+                .filter_map(|shadowed| shadowed.same_scope().then_some(shadowed.shadowed_id())),
+        );
 
-    let target_binding_id = bindings
-        .find(|binding_id| {
-            let binding = checker.semantic().binding(*binding_id);
-            binding
-                .statement(checker.semantic())
-                .and_then(Stmt::as_for_stmt)
-                .is_some_and(|stmt| stmt.range == for_stmt.range)
-        })
-        .expect("for target binding must exist");
-    let target_binding = checker.semantic().binding(target_binding_id);
-
-    drop(bindings);
+        bindings
+            .find_map(|binding_id| {
+                let binding = checker.semantic().binding(binding_id);
+                binding
+                    .statement(checker.semantic())
+                    .and_then(ast::Stmt::as_for_stmt)
+                    .is_some_and(|stmt| stmt.range == for_stmt.range)
+                    .then_some(binding)
+            })
+            .expect("for target binding must exist")
+    };
 
     // If any references to the loop target variable are after the loop,
     // then converting it into a comprehension would cause a NameError
@@ -268,24 +271,24 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         return;
     }
 
-    let binding_stmt = binding.statement(checker.semantic());
-    let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
-        ast::Stmt::AnnAssign(assign) => assign.value.as_ref(),
+    let list_binding_stmt = list_binding.statement(checker.semantic());
+    let list_binding_value = list_binding_stmt.and_then(|binding_stmt| match binding_stmt {
+        ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
         ast::Stmt::Assign(assign) => Some(&assign.value),
         _ => None,
     });
     // If the variable is an empty list literal, then we might be able to replace it with a full list comprehension
     // otherwise, it has to be replaced with a `list.extend`
     let binding_is_empty_list =
-        binding_value.is_some_and(|binding_value| match binding_value.as_list_expr() {
+        list_binding_value.is_some_and(|binding_value| match binding_value.as_list_expr() {
             Some(list_expr) => list_expr.elts.is_empty(),
             None => false,
         });
 
     // If the for loop does not have the same parent element as the binding, then it cannot always be
-    // deleted and replaced with a list comprehension. This does not apply when using an extend.
+    // deleted and replaced with a list comprehension. This does not apply when using `extend`.
     let assignment_in_same_statement = {
-        binding.source.is_some_and(|binding_source| {
+        list_binding.source.is_some_and(|binding_source| {
             let for_loop_parent = checker.semantic().current_statement_parent_id();
             let binding_parent = checker.semantic().parent_statement_id(binding_source);
             for_loop_parent == binding_parent
@@ -294,29 +297,21 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
 
     // If the binding is not a single name expression, it could be replaced with a list comprehension,
     // but not necessarily, so this needs to be manually fixed. This does not apply when using an extend.
-    let binding_target = binding_stmt.and_then(|binding_stmt| match binding_stmt {
-        ast::Stmt::AnnAssign(assign) => Some(std::slice::from_ref(assign.target.as_ref())),
-        ast::Stmt::Assign(assign) => Some(assign.targets.as_slice()),
-        _ => None,
+    let binding_has_one_target = list_binding_stmt.is_some_and(|binding_stmt| match binding_stmt {
+        ast::Stmt::AnnAssign(_) => true,
+        ast::Stmt::Assign(assign) => assign.targets.len() == 1,
+        _ => false,
     });
-    let binding_has_one_target = {
-        match binding_target {
-            Some([only_target]) => only_target.is_name_expr(),
-            _ => false,
-        }
-    };
 
     // If the binding gets used in between the assignment and the for loop, a list comprehension is no longer safe
-    let binding_unused_between = binding_stmt.is_some_and(|binding_stmt| {
-        let from_assign_to_loop = binding_stmt.range().cover(for_stmt.range);
-        // count the number of references between the assignment and the for loop
-        let count = binding
+    let binding_unused_between = list_binding_stmt.is_some_and(|binding_stmt| {
+        let from_assign_to_loop = TextRange::new(binding_stmt.end(), for_stmt.start());
+        // Test if there's any reference to the list symbol between its definition and the for loop.
+        // if there's at least one, then it's been accessed in the middle somewhere, so it's not safe to change into a list comprehension
+        !list_binding
             .references()
             .map(|ref_id| checker.semantic().reference(ref_id).range())
-            .filter(|text_range| from_assign_to_loop.contains_range(*text_range))
-            .count();
-        // if there's more than one, then it's been accessed in the middle somewhere, so it's not safe to change into a list comprehension
-        count < 2
+            .any(|text_range| from_assign_to_loop.contains_range(text_range))
     });
 
     // A list extend works in every context, while a list comprehension only works when all the criteria are true
@@ -343,7 +338,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,
-                binding,
+                list_binding,
                 for_stmt,
                 if_test.map(std::convert::AsRef::as_ref),
                 arg,
