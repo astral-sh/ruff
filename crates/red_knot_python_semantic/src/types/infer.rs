@@ -3022,7 +3022,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 use_def.use_boundness(self.db, use_id),
             )
         };
-        if boundness == Some(Boundness::PossiblyUnbound) || boundness.is_none() {
+        if boundness == Some(Boundness::Bound) {
+            bindings_ty.unwrap_or(Type::Unknown)
+        } else {
             match self.lookup_name(name) {
                 Symbol::Type(looked_up_ty, looked_up_boundness) => {
                     if looked_up_boundness == Boundness::PossiblyUnbound {
@@ -3046,10 +3048,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     bindings_ty.unwrap_or(Type::Unknown)
                 }
             }
-        } else
-        /*if boundness == Some(Boundness::Bound) */
-        {
-            bindings_ty.unwrap_or(Type::Unknown)
         }
     }
 
