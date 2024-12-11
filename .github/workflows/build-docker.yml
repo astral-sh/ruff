@@ -87,9 +87,10 @@ jobs:
           outputs: type=image,name=${{ env.RUFF_BASE_IMG }},push-by-digest=true,name-canonical=true,push=${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
 
       - name: Export digests
+        env:
+          digest: ${{ steps.build.outputs.digest }}
         run: |
           mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digests
@@ -143,7 +144,7 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.RUFF_BASE_IMG }}@sha256:%s ' *)
+            $(printf '${RUFF_BASE_IMG}@sha256:%s ' *)
 
   docker-publish-extra:
     name: Publish additional Docker image based on ${{ matrix.image-mapping }}
@@ -182,7 +183,7 @@ jobs:
           # Generate Dockerfile content
           cat <<EOF > Dockerfile
           FROM ${BASE_IMAGE}
-          COPY --from=${{ env.RUFF_BASE_IMG }}:latest /ruff /usr/local/bin/ruff
+          COPY --from=${RUFF_BASE_IMG}:latest /ruff /usr/local/bin/ruff
           ENTRYPOINT []
           CMD ["/usr/local/bin/ruff"]
           EOF
@@ -288,4 +289,4 @@ jobs:
           docker buildx imagetools create \
             "${annotations[@]}" \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.RUFF_BASE_IMG }}@sha256:%s ' *)
+            $(printf '${RUFF_BASE_IMG}@sha256:%s ' *)
