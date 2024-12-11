@@ -22,11 +22,10 @@ def _(c: type[A], d: Type[A]) -> None:
     d = c  # fine
 ```
 
-
 ## Inheritance
 
-Inheriting from `Type` results in a MRO with `builtins.type` and `typing.Generic`.
-`Type` itself is not a class.
+Inheriting from `Type` results in a MRO with `builtins.type` and `typing.Generic`. `Type` itself is
+not a class.
 
 ```py
 from typing import Type
