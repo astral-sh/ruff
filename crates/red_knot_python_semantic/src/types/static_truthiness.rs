@@ -107,10 +107,10 @@ impl StaticTruthiness {
     /// of the fields. The reason for this is that we want to draw conclusions like "this symbol can
     /// not be bound because one of the branching conditions is always false". We can only draw this
     /// conclusion if this is true in both control-flow paths. Similarly, we want to infer that the
-    /// binding of a symbol is unconditionally visible, if all branching conditions are known to be
-    /// statically true. It is enough if this is the case for *any* of the control-flow paths. Other
-    /// control flow paths will not be taken if this is the case.
-    pub(crate) fn merge(self, other: &Self) -> Self {
+    /// binding of a symbol is unconditionally visible if all branching conditions are known to be
+    /// statically true. It is enough if this is the case for either of the two control-flow paths.
+    /// The other paths can not be taken if this is the case.
+    pub(crate) fn flow_merge(self, other: &Self) -> Self {
         Self {
             any_always_false: self.any_always_false && other.any_always_false,
             all_always_true: self.all_always_true || other.all_always_true,

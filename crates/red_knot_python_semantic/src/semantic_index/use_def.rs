@@ -690,9 +690,9 @@ impl<'db> UseDefMapBuilder<'db> {
 ///    x = 2
 /// ```
 ///
-/// Here, `x` is definitely bound if `test2` is always true OR if `test1` is always true. `x` is
-/// definitely unbound if `test1` is always false AND `test2` is always false. And `x` is possibly
-/// unbound in all other cases.
+/// Here, `x` is definitely bound if `test1` is always true OR if `test2` is always true. `x` is
+/// definitely unbound if `test1` is always false AND `test2` is always false. `x` is possibly
+/// unbound in all other cases. This logic is handled in [`StaticTruthiness::flow_merge`].
 ///
 /// Finally, we also need to consider that a symbol could be definitely bound, even if we can not
 /// statically infer the truthiness of a test condition. On such example is:
@@ -714,7 +714,7 @@ where
     C: Iterator<Item = BranchingConditionsIterator<'map, 'db>>,
 {
     let result = conditions_per_binding.fold(StaticTruthiness::no_bindings(), |r, conditions| {
-        r.merge(&StaticTruthiness::analyze(db, conditions))
+        r.flow_merge(&StaticTruthiness::analyze(db, conditions))
     });
 
     let definitely_unbound = result.any_always_false;
