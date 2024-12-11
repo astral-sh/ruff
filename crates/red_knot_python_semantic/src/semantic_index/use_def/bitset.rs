@@ -93,20 +93,6 @@ impl<const B: usize> BitSet<B> {
         }
     }
 
-    /// Union in-place with another [`BitSet`].
-    #[allow(dead_code)]
-    pub(super) fn union(&mut self, other: &BitSet<B>) {
-        let mut max_len = self.blocks().len();
-        let other_len = other.blocks().len();
-        if other_len > max_len {
-            max_len = other_len;
-            self.resize_blocks(max_len);
-        }
-        for (my_block, other_block) in self.blocks_mut().iter_mut().zip(other.blocks()) {
-            *my_block |= other_block;
-        }
-    }
-
     /// Return an iterator over the values (in ascending order) in this [`BitSet`].
     pub(super) fn iter(&self) -> BitSetIterator<'_, B> {
         let blocks = self.blocks();
@@ -118,11 +104,15 @@ impl<const B: usize> BitSet<B> {
     }
 
     pub(super) fn iter_rev(&self) -> ReverseBitSetIterator<'_, B> {
+        let num_blocks = self.blocks().len();
+
+        debug_assert!(num_blocks > 0);
+
         let blocks = self.blocks();
         ReverseBitSetIterator {
             blocks,
-            current_block_index: self.blocks().len() - 1,
-            current_block: blocks[self.blocks().len() - 1],
+            current_block_index: num_blocks - 1,
+            current_block: blocks[num_blocks - 1],
         }
     }
 }
@@ -164,7 +154,7 @@ impl<const B: usize> Iterator for BitSetIterator<'_, B> {
 
 impl<const B: usize> std::iter::FusedIterator for BitSetIterator<'_, B> {}
 
-/// Iterator over values in a [`BitSet`].
+/// Iterates over values in a [`BitSet`], in reverse order (highest bit first).
 #[derive(Debug, Clone)]
 pub(super) struct ReverseBitSetIterator<'a, const B: usize> {
     /// The blocks we are iterating over.
@@ -188,12 +178,14 @@ impl<const B: usize> Iterator for ReverseBitSetIterator<'_, B> {
             self.current_block_index -= 1;
             self.current_block = self.blocks[self.current_block_index];
         }
-
-        let highest_bit_set = 63 - u64::from(self.current_block.leading_zeros());
-        // TODO: efficiency, safety comment, etc.
+        // SAFETY: current_block is non-zero, so leading_zeros must be
+        // strictly less than 64.
+        let highest_bit_set = 63 - self.current_block.leading_zeros();
+        // reset the highest bit
         self.current_block &= !(1u64 << highest_bit_set);
+        // SAFETY: see above
         #[allow(clippy::cast_possible_truncation)]
-        Some(highest_bit_set as u32 + (64 * self.current_block_index) as u32)
+        Some(highest_bit_set + (64 * self.current_block_index) as u32)
     }
 }
 
@@ -280,63 +272,37 @@ mod tests {
     }
 
     #[test]
-    fn union() {
-        let mut b1 = BitSet::<1>::with(2);
-        let b2 = BitSet::<1>::with(4);
-
-        b1.union(&b2);
-        assert_bitset(&b1, &[2, 4]);
-    }
-
-    #[test]
-    fn union_mixed_1() {
-        let mut b1 = BitSet::<1>::with(4);
-        let mut b2 = BitSet::<1>::with(4);
-        b1.insert(89);
-        b2.insert(5);
-
-        b1.union(&b2);
-        assert_bitset(&b1, &[4, 5, 89]);
-    }
-
-    #[test]
-    fn union_mixed_2() {
-        let mut b1 = BitSet::<1>::with(4);
-        let mut b2 = BitSet::<1>::with(4);
-        b1.insert(23);
-        b2.insert(89);
-
-        b1.union(&b2);
-        assert_bitset(&b1, &[4, 23, 89]);
-    }
-
-    #[test]
-    fn union_heap() {
-        let mut b1 = BitSet::<1>::with(4);
-        let mut b2 = BitSet::<1>::with(4);
-        b1.insert(89);
-        b2.insert(90);
-
-        b1.union(&b2);
-        assert_bitset(&b1, &[4, 89, 90]);
-    }
-
-    #[test]
-    fn union_heap_2() {
-        let mut b1 = BitSet::<1>::with(89);
-        let mut b2 = BitSet::<1>::with(89);
-        b1.insert(91);
-        b2.insert(90);
-
-        b1.union(&b2);
-        assert_bitset(&b1, &[89, 90, 91]);
-    }
-
-    #[test]
     fn multiple_blocks() {
         let mut b = BitSet::<2>::with(120);
         b.insert(45);
         assert!(matches!(b, BitSet::Inline(_)));
         assert_bitset(&b, &[45, 120]);
+    }
+
+    #[test]
+    fn reverse_iterator() {
+        let empty = BitSet::<1>::default();
+        assert!(empty.iter_rev().next().is_none());
+
+        let single_element = BitSet::<1>::with(10);
+        assert_eq!(single_element.iter_rev().collect::<Vec<_>>(), vec![10]);
+
+        let mut single_block = BitSet::<1>::with(1);
+        single_block.insert(2);
+        single_block.insert(10);
+        assert_eq!(single_block.iter_rev().collect::<Vec<_>>(), vec![10, 2, 1]);
+
+        let mut multiple_blocks = BitSet::<1>::default();
+        multiple_blocks.insert(1);
+        multiple_blocks.insert(2);
+        multiple_blocks.insert(3);
+        multiple_blocks.insert(70);
+        multiple_blocks.insert(71);
+        multiple_blocks.insert(1000);
+        assert!(matches!(multiple_blocks, BitSet::Heap(_)));
+        assert_eq!(
+            multiple_blocks.iter_rev().collect::<Vec<_>>(),
+            vec![1000, 71, 70, 3, 2, 1]
+        );
     }
 }
