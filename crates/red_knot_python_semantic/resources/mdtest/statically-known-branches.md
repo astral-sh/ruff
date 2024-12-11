@@ -2,23 +2,23 @@
 
 ## Introduction
 
-We have the ability to infer precise types and boundness information for symbols that are
-defined/declared in branches whose conditions we can statically determine to be always true or
-always false. This is useful is for `sys.version_info` branches, which are often used to
-conditionally make new features available:
+We have the ability to infer precise types and boundness information for symbols that are defined in
+branches whose conditions we can statically determine to be always true or always false. This is
+useful for `sys.version_info` branches, which can make new features available based on the Python
+version:
 
 ```py path=module1.py
 if sys.version_info >= (3, 9):
     SomeFeature = "available"
 ```
 
-If we can statically determine that the condition is always true, we can determine that
+If we can statically determine that the condition is always true, then we can also understand that
 `SomeFeature` is always bound, without raising any errors:
 
 ```py path=test1.py
 from module1 import SomeFeature
 
-# SomeFeature is unconditionally available here:
+# SomeFeature is unconditionally available here, because we are on Python 3.9 or newer:
 reveal_type(SomeFeature)  # revealed: Literal["available"]
 ```
 
