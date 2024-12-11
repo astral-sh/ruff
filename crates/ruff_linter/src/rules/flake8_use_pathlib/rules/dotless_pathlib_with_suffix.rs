@@ -1,5 +1,4 @@
 use crate::checkers::ast::Checker;
-use anyhow;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, StringFlags};
@@ -45,7 +44,11 @@ use ruff_text_size::Ranged;
 /// for a given situation (it's possible that the string was correct
 /// but was being passed to the wrong method entirely, for example).
 #[derive(ViolationMetadata)]
-pub(crate) struct DotlessPathlibWithSuffix;
+pub(crate) struct DotlessPathlibWithSuffix {
+    // TODO: Since "." is a correct suffix in Python 3.14,
+    // the rule should revert to its original behavior.
+    single_dot: bool,
+}
 
 impl Violation for DotlessPathlibWithSuffix {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -56,7 +59,12 @@ impl Violation for DotlessPathlibWithSuffix {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Add a leading dot".to_string())
+        let title = if self.single_dot {
+            "The \".\" suffix is not valid"
+        } else {
+            "Add a leading dot"
+        };
+        Some(title.to_string())
     }
 }
 
@@ -90,9 +98,9 @@ pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(DotlessPathlibWithSuffix, call.range);
-
-    if string_value != "." {
+    let single_dot = string_value == ".";
+    let mut diagnostic = Diagnostic::new(DotlessPathlibWithSuffix { single_dot }, call.range);
+    if !single_dot {
         let after_leading_quote = string.start() + first_part.flags.opener_len();
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             ".".to_string(),
