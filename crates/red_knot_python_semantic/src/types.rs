@@ -1767,6 +1767,15 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
+            Type::KnownInstance(KnownInstanceType::Type) => {
+                let Type::ClassLiteral(ClassLiteralType { class }) =
+                    KnownClass::Type.to_class_literal(db)
+                else {
+                    return Type::Unknown;
+                };
+
+                Type::instance(class)
+            }
             _ => todo_type!(),
         }
     }
@@ -2136,6 +2145,8 @@ pub enum KnownInstanceType<'db> {
     Never,
     /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
     Any,
+    /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
+    Type,
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
@@ -2154,6 +2165,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NoReturn => "NoReturn",
             Self::Never => "Never",
             Self::Any => "Any",
+            Self::Type => "Type",
             Self::TypeAliasType(_) => "TypeAliasType",
         }
     }
@@ -2169,6 +2181,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NoReturn
             | Self::Never
             | Self::Any
+            | Self::Type
             | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
         }
     }
@@ -2183,6 +2196,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NoReturn => "typing.NoReturn",
             Self::Never => "typing.Never",
             Self::Any => "typing.Any",
+            Self::Type => "typing.Type",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
         }
@@ -2198,6 +2212,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NoReturn => KnownClass::SpecialForm,
             Self::Never => KnownClass::SpecialForm,
             Self::Any => KnownClass::Object,
+            Self::Type => KnownClass::Object,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
@@ -2224,6 +2239,7 @@ impl<'db> KnownInstanceType<'db> {
             ("typing" | "typing_extensions", "Union") => Some(Self::Union),
             ("typing" | "typing_extensions", "NoReturn") => Some(Self::NoReturn),
             ("typing" | "typing_extensions", "Never") => Some(Self::Never),
+            ("typing" | "typing_extensions", "Type") => Some(Self::Type),
             _ => None,
         }
     }

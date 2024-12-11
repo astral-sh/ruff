@@ -4861,6 +4861,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
+            KnownInstanceType::Type => self.infer_subclass_of_type_expression(parameters),
             KnownInstanceType::Any => Type::Any,
         }
     }
