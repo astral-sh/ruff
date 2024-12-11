@@ -81,17 +81,26 @@ const INLINE_CONSTRAINT_BLOCKS: usize = 2;
 /// Can keep inline this many live bindings per symbol at a given time; more will go to heap.
 const INLINE_BINDINGS_PER_SYMBOL: usize = 4;
 
+/// Which constraints apply to a given binding?
+type Constraints = BitSet<INLINE_CONSTRAINT_BLOCKS>;
+
+type InlineConstraintArray = [Constraints; INLINE_BINDINGS_PER_SYMBOL];
+
 /// One [`BitSet`] of applicable [`ScopedConstraintId`] per live binding.
-type InlineConstraintArray = [BitSet<INLINE_CONSTRAINT_BLOCKS>; INLINE_BINDINGS_PER_SYMBOL];
-type Constraints = SmallVec<InlineConstraintArray>;
-type ConstraintsIterator<'a> = std::slice::Iter<'a, BitSet<INLINE_CONSTRAINT_BLOCKS>>;
+type ConstraintsPerBinding = SmallVec<InlineConstraintArray>;
+
+/// Iterate over all constraints for a single binding.
+type ConstraintsIterator<'a> = std::slice::Iter<'a, Constraints>;
 type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
 
-const INLINE_BRANCHING_CONDITIONS: usize = 2;
-pub(super) type BranchingConditions = BitSet<INLINE_BRANCHING_CONDITIONS>;
-type BranchingConditionsPerBinding = SmallVec<[BranchingConditions; INLINE_BINDINGS_PER_SYMBOL]>;
-
-type BranchingConditionsIterator<'a> = std::slice::Iter<'a, BitSet<INLINE_CONSTRAINT_BLOCKS>>;
+/// Similar to what we have for constraints, but for active branching conditions.
+const INLINE_BRANCHING_BLOCKS: usize = 2;
+const INLINE_BRANCHING_CONDITIONS: usize = 4;
+pub(super) type BranchingConditions = BitSet<INLINE_BRANCHING_BLOCKS>;
+type InlineBranchingConditionsArray = [BranchingConditions; INLINE_BRANCHING_CONDITIONS];
+type BranchingConditionsPerBinding = SmallVec<InlineBranchingConditionsArray>;
+type BranchingConditionsIterator<'a> = std::slice::Iter<'a, BranchingConditions>;
+type BranchingConditionsIntoIterator = smallvec::IntoIter<InlineBranchingConditionsArray>;
 
 /// Live declarations for a single symbol at some point in control flow.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -159,10 +168,10 @@ pub(super) struct SymbolBindings {
     ///
     /// This is a [`smallvec::SmallVec`] which should always have one [`BitSet`] of constraints per
     /// binding in `live_bindings`.
-    constraints: Constraints,
+    constraints: ConstraintsPerBinding,
 
     /// For each live binding, which [`BranchingConditions`] were active *at the time of the binding*?
-    pub(crate) branching_conditions: BranchingConditionsPerBinding,
+    branching_conditions: BranchingConditionsPerBinding,
 
     /// Could the symbol be unbound at this point?
     may_be_unbound: bool,
@@ -172,7 +181,7 @@ impl SymbolBindings {
     fn unbound() -> Self {
         Self {
             live_bindings: Bindings::default(),
-            constraints: Constraints::default(),
+            constraints: ConstraintsPerBinding::default(),
             branching_conditions: BranchingConditionsPerBinding::default(),
             may_be_unbound: true,
         }
@@ -192,7 +201,7 @@ impl SymbolBindings {
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
         self.live_bindings = Bindings::with(binding_id.into());
-        self.constraints = Constraints::with_capacity(1);
+        self.constraints = ConstraintsPerBinding::with_capacity(1);
         self.constraints.push(BitSet::default());
 
         self.branching_conditions = BranchingConditionsPerBinding::with_capacity(1);
@@ -279,13 +288,13 @@ impl SymbolState {
         let mut a = Self {
             bindings: SymbolBindings {
                 live_bindings: Bindings::default(),
-                constraints: Constraints::default(),
-                branching_conditions: Constraints::default(), // TODO
+                constraints: ConstraintsPerBinding::default(),
+                branching_conditions: BranchingConditionsPerBinding::default(),
                 may_be_unbound: self.bindings.may_be_unbound || b.bindings.may_be_unbound,
             },
             declarations: SymbolDeclarations {
                 live_declarations: self.declarations.live_declarations.clone(),
-                branching_conditions: Constraints::default(), // TODO
+                branching_conditions: BranchingConditionsPerBinding::default(),
                 may_be_undeclared: self.declarations.may_be_undeclared
                     || b.declarations.may_be_undeclared,
             },
@@ -304,7 +313,7 @@ impl SymbolState {
         let mut opt_b_decl: Option<u32> = b_decls_iter.next();
 
         let push = |decl,
-                    declaration_branching_conditions_iter: &mut ConstraintsIntoIterator,
+                    declaration_branching_conditions_iter: &mut BranchingConditionsIntoIterator,
                     merged: &mut Self| {
             merged.declarations.live_declarations.insert(decl);
             let branching_conditions = declaration_branching_conditions_iter
@@ -370,7 +379,7 @@ impl SymbolState {
         // Helper to push `def`, with constraints in `constraints_iter`, onto `self`.
         let push = |def,
                     constraints_iter: &mut ConstraintsIntoIterator,
-                    branching_conditions_iter: &mut ConstraintsIntoIterator,
+                    branching_conditions_iter: &mut BranchingConditionsIntoIterator,
                     merged: &mut Self| {
             merged.bindings.live_bindings.insert(def);
             // SAFETY: we only ever create SymbolState with either no definitions and no constraint
@@ -553,7 +562,7 @@ impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
 #[derive(Debug, Clone)]
 pub(super) struct BranchingConditionIdIterator<'a> {
-    wrapped: BitSetIterator<'a, INLINE_CONSTRAINT_BLOCKS>,
+    wrapped: BitSetIterator<'a, INLINE_BRANCHING_BLOCKS>,
 }
 
 impl Iterator for BranchingConditionIdIterator<'_> {
@@ -578,7 +587,6 @@ impl<'a> Iterator for DeclarationIdIterator<'a> {
     type Item = (ScopedDefinitionId, BranchingConditionIdIterator<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        // self.inner.next().map(ScopedDefinitionId::from_u32)
         match (self.inner.next(), self.branching_conditions.next()) {
             (None, None) => None,
             (Some(declaration), Some(branching_conditions)) => Some((
