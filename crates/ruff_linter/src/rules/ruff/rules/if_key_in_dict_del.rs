@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtDelete, StmtIf};
+use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
 
@@ -39,20 +39,20 @@ impl AlwaysFixableViolation for IfKeyInDictDel {
     }
 
     fn fix_title(&self) -> String {
-        "Replace with `.pop(..., None)`".to_string()
+        "Replace `if` statement with `.pop(..., None)`".to_string()
     }
 }
 
 /// RUF051
 pub(crate) fn if_key_in_dict_del(checker: &mut Checker, stmt: &StmtIf) {
-    let [Stmt::Delete(StmtDelete { targets, .. })] = &stmt.body[..] else {
+    let [Stmt::Delete(delete)] = &stmt.body[..] else {
         return;
     };
 
     let Some((test_dict, test_key)) = extract_dict_and_key_from_test(&stmt.test) else {
         return;
     };
-    let Some((del_dict, del_key)) = extract_dict_and_key_from_del(targets) else {
+    let Some((del_dict, del_key)) = extract_dict_and_key_from_del(&delete.targets) else {
         return;
     };
 
@@ -66,7 +66,7 @@ pub(crate) fn if_key_in_dict_del(checker: &mut Checker, stmt: &StmtIf) {
 
     let fix = replace_with_dict_pop_fix(checker, stmt, test_dict, test_key);
 
-    let diagnostic = Diagnostic::new(IfKeyInDictDel, stmt.range);
+    let diagnostic = Diagnostic::new(IfKeyInDictDel, delete.range);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }

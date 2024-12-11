@@ -49,6 +49,9 @@ if r"\foo" in d:                    # Raw string
 if b'yt' b'es' in d:                # Bytes concatenation
     del d[rb"""ytes"""]             # Raw bytes
 
+if k in d:
+    # comment that gets dropped
+    del d[k]
 
 ### Safely fixable
 
@@ -94,6 +97,7 @@ if r"\foo" in d:
 
 if b'yt' b'es' in d:
     del d[rb"""ytes"""]             # This should not make the fix unsafe
+
 
 
 ### No errors
