@@ -661,13 +661,12 @@ impl<'db> Type<'db> {
                 }),
             ) => self_class.is_subclass_of(db, target_class),
             (
-                Type::Instance(InstanceType { class: self_class }),
+                Type::Instance(_),
                 Type::SubclassOf(SubclassOfType {
                     base: ClassBase::Class(target_class),
                 }),
-            ) => {
-                self_class.is_known(db, KnownClass::Type)
-                    && target_class.is_known(db, KnownClass::Type)
+            ) if target_class.is_known(db, KnownClass::Object) => {
+                self.is_subtype_of(db, KnownClass::Type.to_instance(db))
             }
             (
                 Type::SubclassOf(SubclassOfType {
@@ -3046,12 +3045,18 @@ pub(crate) mod tests {
         // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
         BuiltinInstance(&'static str),
         TypingInstance(&'static str),
+        /// Members of the `abc` stdlib module
+        AbcInstance(&'static str),
+        AbcClassLiteral(&'static str),
         TypingLiteral,
         // BuiltinClassLiteral("str") corresponds to the builtin `str` class object itself
         BuiltinClassLiteral(&'static str),
         KnownClassInstance(KnownClass),
         Union(Vec<Ty>),
-        Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
+        Intersection {
+            pos: Vec<Ty>,
+            neg: Vec<Ty>,
+        },
         Tuple(Vec<Ty>),
         SubclassOfAny,
         SubclassOfBuiltinClass(&'static str),
@@ -3071,6 +3076,12 @@ pub(crate) mod tests {
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
                 Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
+                Ty::AbcInstance(s) => core_module_symbol(db, CoreStdlibModule::Abc, s)
+                    .expect_type()
+                    .to_instance(db),
+                Ty::AbcClassLiteral(s) => {
+                    core_module_symbol(db, CoreStdlibModule::Abc, s).expect_type()
+                }
                 Ty::TypingInstance(s) => typing_symbol(db, s).expect_type().to_instance(db),
                 Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
                 Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
@@ -3223,6 +3234,8 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinClassLiteral("int"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::TypingLiteral, Ty::TypingInstance("_SpecialForm"))]
     #[test_case(Ty::TypingLiteral, Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::AbcClassLiteral("ABC"), Ty::AbcInstance("ABCMeta"))]
+    #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3255,6 +3268,7 @@ pub(crate) mod tests {
     #[test_case(Ty::TypingInstance("_SpecialForm"), Ty::TypingLiteral)]
     #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
+    #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("type"))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
