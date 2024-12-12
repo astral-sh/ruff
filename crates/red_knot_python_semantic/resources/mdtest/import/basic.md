@@ -30,6 +30,7 @@ class C: ...
 
 ```py
 import a.b
+
 reveal_type(a.b.C)  # revealed: Literal[C]
 ```
 
@@ -44,6 +45,7 @@ class C: ...
 
 ```py
 import a.b.c
+
 reveal_type(a.b.c.C)  # revealed: Literal[C]
 ```
 
