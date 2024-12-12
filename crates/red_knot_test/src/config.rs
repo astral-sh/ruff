@@ -16,6 +16,7 @@ use serde::Deserialize;
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
+
     pub(crate) log: Option<Log>,
 }
 
@@ -32,12 +33,15 @@ impl MarkdownTestConfig {
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Environment {
+    /// Python version to assume when resolving types.
     pub(crate) python_version: Option<PythonVersion>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub(crate) enum Log {
+    /// Enable logging with tracing when `true`.
     Bool(bool),
+    /// Enable logging and only show filters that match the given [env-filter](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)
     Filter(String),
 }
