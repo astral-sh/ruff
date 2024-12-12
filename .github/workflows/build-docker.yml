@@ -143,8 +143,8 @@ jobs:
         # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
         run: |
           docker buildx imagetools create \
-            "$(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")" \
-            "$(printf "${RUFF_BASE_IMG}@sha256:%s " *)"
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
 
   docker-publish-extra:
     name: Publish additional Docker image based on ${{ matrix.image-mapping }}
@@ -288,5 +288,5 @@ jobs:
           readarray -t lines <<< "$DOCKER_METADATA_OUTPUT_ANNOTATIONS"; annotations=(); for line in "${lines[@]}"; do annotations+=(--annotation "$line"); done
           docker buildx imagetools create \
             "${annotations[@]}" \
-            "$(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")" \
-            "$(printf "${RUFF_BASE_IMG}@sha256:%s " *)"
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
