@@ -104,7 +104,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &mut Checker, literal_expr: &'
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.
     let fix = if other_literal_elements_seen {
-        create_fix_edit_2(checker, literal_expr, literal_elements, literal_subscript).map(|edit| {
+        create_fix_edit_2(checker, literal_expr, &literal_elements, literal_subscript).map(|edit| {
             Fix::applicable_edit(
                 edit,
                 if checker.comment_ranges().intersects(literal_expr.range()) {
@@ -193,7 +193,7 @@ fn create_fix_edit(semantic: &SemanticModel, literal_expr: &Expr) -> Option<Edit
 fn create_fix_edit_2(
     checker: &mut Checker,
     literal_expr: &Expr,
-    literal_elements: Vec<&Expr>,
+    literal_elements: &[&Expr],
     literal_subscript: &Expr,
 ) -> Option<Edit> {
     let enclosing_pep604_union = checker
@@ -241,7 +241,7 @@ fn create_fix_edit_2(
             ctx: ExprContext::Load,
             slice: Box::new(if literal_elements.len() > 1 {
                 Expr::Tuple(ast::ExprTuple {
-                    elts: literal_elements.clone().into_iter().cloned().collect(),
+                    elts: literal_elements.iter().copied().cloned().collect(),
                     range: TextRange::default(),
                     ctx: ExprContext::Load,
                     parenthesized: true,
