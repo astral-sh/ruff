@@ -1096,8 +1096,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);
             }
-            if checker.enabled(Rule::DotlessPathlibWithSuffix) {
-                flake8_use_pathlib::rules::dotless_pathlib_with_suffix(checker, call);
+            if checker.enabled(Rule::InvalidPathlibWithSuffix) {
+                flake8_use_pathlib::rules::invalid_pathlib_with_suffix(checker, call);
             }
             if checker.enabled(Rule::BatchedWithoutExplicitStrict) {
                 flake8_bugbear::rules::batched_without_explicit_strict(checker, call);
