@@ -666,8 +666,12 @@ where
             }
             ast::Stmt::Import(node) => {
                 for alias in &node.names {
+                    // Mark the imported module, and all of its parents, as being imported in this
+                    // file.
                     if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
-                        self.imported_modules.insert(module_name);
+                        for name in module_name.parents() {
+                            self.imported_modules.insert(ModuleName::new(name).unwrap());
+                        }
                     }
 
                     let symbol_name = if let Some(asname) = &alias.asname {

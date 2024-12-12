@@ -204,6 +204,28 @@ impl ModuleName {
         self.0.push('.');
         self.0.push_str(name);
     }
+
+    /// Returns an iterator of this module name and all of its parent modules.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use red_knot_python_semantic::ModuleName;
+    ///
+    /// assert_eq!(
+    ///     ModuleName::new_static("foo.bar.baz").unwrap().parents().collect::<Vec<_>>(),
+    ///     vec!["foo.bar.baz", "foo.bar", "foo"],
+    /// );
+    /// ```
+    #[must_use]
+    pub fn parents(&self) -> impl Iterator<Item = &str> {
+        let mut name = Some(self.as_str());
+        std::iter::from_fn(move || {
+            let result = name;
+            name = name.and_then(|n| n.rsplit_once('.').map(|(p, _)| p));
+            result
+        })
+    }
 }
 
 impl Deref for ModuleName {
