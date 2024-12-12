@@ -7,9 +7,10 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
-use ruff_python_trivia::{is_python_whitespace, PythonWhitespace};
+use ruff_python_trivia::{BackwardsTokenizer, PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
+
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a list comprehension.
 ///
@@ -442,8 +443,8 @@ fn convert_to_list_extend(
             )))
         }
         ComprehensionType::ListComprehension => {
-            let binding_stmt_range = binding
-                .statement(semantic)
+            let binding_stmt = binding.statement(semantic);
+            let binding_stmt_range = binding_stmt
                 .and_then(|stmt| match stmt {
                     ast::Stmt::AnnAssign(assign) => Some(assign.range),
                     ast::Stmt::Assign(assign) => Some(assign.range),
@@ -453,57 +454,72 @@ fn convert_to_list_extend(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
             // If the binding has multiple statements on its line, the fix would be substantially more complicated
-            let binding_is_multiple_exprs = {
-                let full_range = locator.full_lines_range(binding_stmt_range);
-                let part_before = locator.slice(TextRange::new(
-                    full_range.start(),
-                    binding_stmt_range.start(),
-                ));
-                let part_after =
-                    locator.slice(TextRange::new(binding_stmt_range.end(), full_range.end()));
+            let (semicolon_before, after_semicolon) = {
                 // determine whether there's a semicolon either before or after the binding statement.
                 // Since it's a binding statement, we can just check whether there's a semicolon immediately
                 // after the whitespace in front of or behind it
-                part_before
-                    .chars()
-                    .rev()
-                    .take_while(|c| is_python_whitespace(*c) || *c == ';')
-                    .chain(
-                        part_after
-                            .chars()
-                            .take_while(|c| is_python_whitespace(*c) || *c == ';'),
-                    )
-                    .any(|c| c == ';')
+                let mut after_tokenizer =
+                    SimpleTokenizer::starts_at(binding_stmt_range.end(), locator.contents())
+                        .skip_trivia();
+
+                let after_semicolon = if after_tokenizer
+                    .next()
+                    .is_some_and(|token| token.kind() == SimpleTokenKind::Semi)
+                {
+                    after_tokenizer.next()
+                } else {
+                    None
+                };
+
+                let semicolon_before = BackwardsTokenizer::up_to(
+                    binding_stmt_range.start(),
+                    locator.contents(),
+                    checker.comment_ranges(),
+                )
+                .skip_trivia()
+                .next()
+                .filter(|token| token.kind() == SimpleTokenKind::Semi);
+
+                (semicolon_before, after_semicolon)
             };
             // If there are multiple binding statements in one line, we don't want to accidentally delete them
             // Instead, we just delete the binding statement and leave any comments where they are
-            let binding_stmt_range = if binding_is_multiple_exprs {
-                let end_of_line = locator.slice(TextRange::new(
-                    binding_stmt_range.end(),
-                    locator.full_line_end(binding_stmt_range.end()),
-                ));
-                let first_safe: u32 = end_of_line
-                    .chars()
-                    .position(|c| !is_python_whitespace(c) && c != ';')
-                    .expect("end of line must always include a newline, since for loop is after binding")
-                    .try_into()
-                    .expect("semicolon/whitespace should be at most a few characters");
-                binding_stmt_range.add_end(TextSize::new(first_safe))
-            } else {
-                locator.full_lines_range(binding_stmt_range)
-            };
+            let (binding_stmt_deletion_range, binding_is_multiple_stmts) =
+                match (semicolon_before, after_semicolon) {
+                    // ```python
+                    // a = []
+                    // ```
+                    (None, None) => (locator.full_lines_range(binding_stmt_range), false),
 
-            let annotations = match binding
-                .statement(semantic)
-                .and_then(|stmt| stmt.as_ann_assign_stmt())
-            {
+                    // ```python
+                    // a = 1; b = []
+                    //      ^^^^^^^^
+                    // a = 1; b = []; c = 3
+                    //      ^^^^^^^^
+                    // ```
+                    (Some(semicolon_before), Some(_) | None) => (
+                        TextRange::new(semicolon_before.start(), binding_stmt_range.end()),
+                        true,
+                    ),
+
+                    // ```python
+                    // a = []; b = 3
+                    // ^^^^^^^
+                    // ```
+                    (None, Some(after_semicolon)) => (
+                        TextRange::new(binding_stmt_range.start(), after_semicolon.start()),
+                        true,
+                    ),
+                };
+
+            let annotations = match binding_stmt.and_then(|stmt| stmt.as_ann_assign_stmt()) {
                 Some(assign) => format!(": {}", locator.slice(assign.annotation.range())),
                 None => String::new(),
             };
 
             let mut comments_to_move = for_loop_inline_comments;
-            if !binding_is_multiple_exprs {
-                comments_to_move.extend(comment_strings_in_range(binding_stmt_range));
+            if !binding_is_multiple_stmts {
+                comments_to_move.extend(comment_strings_in_range(binding_stmt_deletion_range));
             }
 
             let indentation = if comments_to_move.is_empty() {
@@ -517,7 +533,7 @@ fn convert_to_list_extend(
                 format!("{leading_comments}{variable_name}{annotations} = [{generator_str}]");
 
             Ok(Fix::unsafe_edits(
-                Edit::range_deletion(binding_stmt_range),
+                Edit::range_deletion(binding_stmt_deletion_range),
                 [Edit::range_replacement(comprehension_body, for_stmt.range)],
             ))
         }

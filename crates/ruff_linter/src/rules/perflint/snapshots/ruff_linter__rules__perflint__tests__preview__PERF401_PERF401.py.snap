@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
+snapshot_kind: text
 ---
 PERF401.py:6:13: PERF401 [*] Use a list comprehension to create a transformed list
   |
@@ -237,7 +238,7 @@ PERF401.py:149:9: PERF401 [*] Use a list comprehension to create a transformed l
 147     |-    tmp = 1; result = []  # commment should be protected
 148     |-    for i in range(10):
 149     |-        result.append(i + 1)  # PERF401
-    147 |+    tmp = 1; # commment should be protected
+    147 |+    tmp = 1  # commment should be protected
     148 |+    result = [i + 1 for i in range(10)]  # PERF401
 150 149 | 
 151 150 | 
