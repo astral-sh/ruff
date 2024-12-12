@@ -2210,8 +2210,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::NoReturn => KnownClass::SpecialForm,
             Self::Never => KnownClass::SpecialForm,
             Self::Any => KnownClass::Object,
-            Self::Tuple => KnownClass::Object,
-            Self::Type => KnownClass::Object,
+            Self::Tuple => KnownClass::SpecialForm,
+            Self::Type => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
