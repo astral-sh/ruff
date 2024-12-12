@@ -61,7 +61,9 @@ impl Violation for InvalidPathlibWithSuffix {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Invalid suffix passed to `.with_suffix()`".to_string()
+        if !self.single_dot {"Dotless suffix passed to `.with_suffix()`".to_string()} else {
+            "Invalid suffix passed to `.with_suffix()`".to_string()
+         }
     }
 
     fn fix_title(&self) -> Option<String> {
