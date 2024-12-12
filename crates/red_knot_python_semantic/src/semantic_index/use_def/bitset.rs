@@ -106,7 +106,7 @@ impl<const B: usize> BitSet<B> {
     pub(super) fn iter_rev(&self) -> ReverseBitSetIterator<'_, B> {
         let num_blocks = self.blocks().len();
 
-        debug_assert!(num_blocks > 0);
+        assert!(num_blocks > 0);
 
         let blocks = self.blocks();
         ReverseBitSetIterator {
