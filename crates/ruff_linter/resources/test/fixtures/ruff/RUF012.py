@@ -79,3 +79,16 @@ class H(BaseModel):
         without_annotation = []
         class_variable: ClassVar[list[int]] = []
         final_variable: Final[list[int]] = []
+
+
+from sqlmodel import SQLModel
+
+
+class I(SQLModel):
+    id: int
+    name: str
+
+
+class J(SQLModel):
+    id: int
+    i_s: list[I] = []
