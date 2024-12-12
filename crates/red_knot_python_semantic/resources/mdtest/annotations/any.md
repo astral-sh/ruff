@@ -69,3 +69,15 @@ y: int = Subclass()  # error: [invalid-assignment]
 def _(s: Subclass):
     reveal_type(s)  # revealed: Subclass
 ```
+
+## Invalid
+
+`Any` cannot be parameterized:
+
+```py
+from typing import Any
+
+# error: [invalid-type-parameter] "Type `typing.Any` expected no type parameter"
+def f(x: Any[int]):
+    reveal_type(x)  # revealed: Unknown
+```

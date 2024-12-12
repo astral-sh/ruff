@@ -4863,7 +4863,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::Type => self.infer_subclass_of_type_expression(parameters),
             KnownInstanceType::Tuple => self.infer_tuple_type_expression(parameters),
-            KnownInstanceType::Any => Type::Any,
+            KnownInstanceType::Any => {
+                self.diagnostics.add_lint(
+                    &INVALID_TYPE_PARAMETER,
+                    subscript.into(),
+                    format_args!(
+                        "Type `{}` expected no type parameter",
+                        known_instance.repr(self.db)
+                    ),
+                );
+                Type::Unknown
+            }
         }
     }
 
