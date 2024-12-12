@@ -48,10 +48,7 @@ WorkspaceMetadata(
   ],
   settings: WorkspaceSettings(
     program: ProgramSettings(
-      python_version: PythonVersion(
-        major: 3,
-        minor: 9,
-      ),
+      python_version: "3.9",
       search_paths: SearchPathSettings(
         extra_paths: [],
         src_root: "/app",
