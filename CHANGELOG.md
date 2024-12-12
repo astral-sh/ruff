@@ -10,7 +10,7 @@
 - \[`flake8-bugbear`\] Improve error messages for `except*` (`B025`, `B029`, `B030`, `B904`) ([#14815](https://github.com/astral-sh/ruff/pull/14815))
 - \[`flake8-bugbear`\] `itertools.batched()` without explicit `strict` (`B911`) ([#14408](https://github.com/astral-sh/ruff/pull/14408))
 - \[`flake8-use-pathlib`\] Dotless suffix passed to `Path.with_suffix()` (`PTH210`) ([#14779](https://github.com/astral-sh/ruff/pull/14779))
-- \[`pylint`\] Include parentheses and multiple comparators in check for `boolean-chained-comparison (PLR1716)` ([#14781](https://github.com/astral-sh/ruff/pull/14781))
+- \[`pylint`\] Include parentheses and multiple comparators in check for `boolean-chained-comparison` (`PLR1716`) ([#14781](https://github.com/astral-sh/ruff/pull/14781))
 - \[`ruff`\] Do not simplify `round()` calls (`RUF046`) ([#14832](https://github.com/astral-sh/ruff/pull/14832))
 - \[`ruff`\] Don't emit `used-dummy-variable` on function parameters (`RUF052`) ([#14818](https://github.com/astral-sh/ruff/pull/14818))
 - \[`ruff`\] Implement `if-key-in-dict-del` (`RUF051`) ([#14553](https://github.com/astral-sh/ruff/pull/14553))
