@@ -1255,6 +1255,7 @@ impl<'db> Type<'db> {
                     | KnownClass::List
                     | KnownClass::Tuple
                     | KnownClass::Set
+                    | KnownClass::FrozenSet
                     | KnownClass::Dict
                     | KnownClass::Slice
                     | KnownClass::BaseException
@@ -1936,6 +1937,7 @@ pub enum KnownClass {
     List,
     Tuple,
     Set,
+    FrozenSet,
     Dict,
     Slice,
     BaseException,
@@ -1965,6 +1967,7 @@ impl<'db> KnownClass {
             Self::Tuple => "tuple",
             Self::Int => "int",
             Self::Float => "float",
+            Self::FrozenSet => "frozenset",
             Self::Str => "str",
             Self::Set => "set",
             Self::Dict => "dict",
@@ -2021,6 +2024,7 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Tuple
             | Self::Set
+            | Self::FrozenSet
             | Self::Dict
             | Self::BaseException
             | Self::BaseExceptionGroup
@@ -2061,6 +2065,7 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Str
             | Self::Set
+            | Self::FrozenSet
             | Self::Dict
             | Self::List
             | Self::Type
@@ -2090,6 +2095,7 @@ impl<'db> KnownClass {
             "float" => Self::Float,
             "str" => Self::Str,
             "set" => Self::Set,
+            "frozenset" => Self::FrozenSet,
             "dict" => Self::Dict,
             "list" => Self::List,
             "slice" => Self::Slice,
@@ -2127,6 +2133,7 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Tuple
             | Self::Set
+            | Self::FrozenSet
             | Self::Dict
             | Self::Slice
             | Self::GenericAlias
