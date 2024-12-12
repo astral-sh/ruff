@@ -143,9 +143,9 @@ pub(crate) fn expr_is_strictly_int(semantic: &SemanticModel, expr: &Expr) -> IsS
             let left_is_strictly_int = expr_is_strictly_int(semantic, left);
             let right_is_strictly_int = expr_is_strictly_int(semantic, right);
 
-            match [left_is_strictly_int, right_is_strictly_int] {
-                [IsStrictlyInt::True, IsStrictlyInt::True] => IsStrictlyInt::False,
-                [_, IsStrictlyInt::True] => match only_op {
+            match (left_is_strictly_int, right_is_strictly_int) {
+                (IsStrictlyInt::True, IsStrictlyInt::True) => IsStrictlyInt::False,
+                (_, IsStrictlyInt::True) => match only_op {
                     CmpOp::In => IsStrictlyInt::False,
                     CmpOp::NotIn => IsStrictlyInt::False,
                     _ => IsStrictlyInt::Maybe,
@@ -170,13 +170,13 @@ pub(crate) fn expr_is_strictly_int(semantic: &SemanticModel, expr: &Expr) -> IsS
             let left_is_strictly_int = expr_is_strictly_int(semantic, left);
             let right_is_strictly_int = expr_is_strictly_int(semantic, right);
 
-            match [left_is_strictly_int, right_is_strictly_int] {
-                [IsStrictlyInt::True, IsStrictlyInt::True] => match op {
+            match (left_is_strictly_int, right_is_strictly_int) {
+                (IsStrictlyInt::True, IsStrictlyInt::True) => match op {
                     Operator::Div => IsStrictlyInt::False,
                     Operator::MatMult => IsStrictlyInt::False,
                     _ => IsStrictlyInt::True,
                 },
-                [IsStrictlyInt::Likely, IsStrictlyInt::Likely] => match op {
+                (IsStrictlyInt::Likely, IsStrictlyInt::Likely) => match op {
                     Operator::Div => IsStrictlyInt::Maybe,
                     Operator::MatMult => IsStrictlyInt::Maybe,
                     _ => IsStrictlyInt::Likely,
@@ -189,10 +189,10 @@ pub(crate) fn expr_is_strictly_int(semantic: &SemanticModel, expr: &Expr) -> IsS
             let body_is_strictly_int = expr_is_strictly_int(semantic, body);
             let else_is_strictly_int = expr_is_strictly_int(semantic, orelse);
 
-            match [body_is_strictly_int, else_is_strictly_int] {
-                [IsStrictlyInt::True, IsStrictlyInt::True] => IsStrictlyInt::True,
-                [IsStrictlyInt::Likely, IsStrictlyInt::Likely] => IsStrictlyInt::Likely,
-                [IsStrictlyInt::False, IsStrictlyInt::False] => IsStrictlyInt::False,
+            match (body_is_strictly_int, else_is_strictly_int) {
+                (IsStrictlyInt::True, IsStrictlyInt::True) => IsStrictlyInt::True,
+                (IsStrictlyInt::Likely, IsStrictlyInt::Likely) => IsStrictlyInt::Likely,
+                (IsStrictlyInt::False, IsStrictlyInt::False) => IsStrictlyInt::False,
                 _ => IsStrictlyInt::Maybe,
             }
         }
