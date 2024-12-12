@@ -660,9 +660,9 @@ x = 1
 
 match "something else":
     case "a":
-        x = 1
-    case "b":
         x = 2
+    case "b":
+        x = 3
 
 reveal_type(x)  # revealed: Literal[1]
 ```
