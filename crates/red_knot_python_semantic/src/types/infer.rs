@@ -4786,6 +4786,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::KnownInstance(known_instance) => {
                 self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
             }
+            Type::Todo(_) => {
+                self.infer_type_expression(slice);
+                value_ty
+            }
             _ => {
                 self.infer_type_expression(slice);
                 todo_type!("generics")
@@ -4833,18 +4837,105 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             KnownInstanceType::TypeVar(_) => {
                 self.infer_type_expression(parameters);
-                todo_type!()
+                todo_type!("TypeVar annotations")
             }
             KnownInstanceType::TypeAliasType(_) => {
                 self.infer_type_expression(parameters);
-                todo_type!("generic type alias")
+                todo_type!("Generic PEP-695 type alias")
             }
-            KnownInstanceType::NoReturn | KnownInstanceType::Never => {
+            KnownInstanceType::Callable => {
+                self.infer_type_expression(parameters);
+                todo_type!("Callable types")
+            }
+            KnownInstanceType::ChainMap => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.ChainMap alias")
+            }
+            KnownInstanceType::OrderedDict => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.OrderedDict alias")
+            }
+            KnownInstanceType::Dict => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.Dict alias")
+            }
+            KnownInstanceType::List => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.List alias")
+            }
+            KnownInstanceType::DefaultDict => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.DefaultDict[] alias")
+            }
+            KnownInstanceType::Counter => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.Counter[] alias")
+            }
+            KnownInstanceType::Set => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.Set alias")
+            }
+            KnownInstanceType::FrozenSet => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.FrozenSet alias")
+            }
+            KnownInstanceType::Deque => {
+                self.infer_type_expression(parameters);
+                todo_type!("typing.Deque alias")
+            }
+            KnownInstanceType::ReadOnly => {
+                self.infer_type_expression(parameters);
+                todo_type!("Required[] type qualifier")
+            }
+            KnownInstanceType::NotRequired => {
+                self.infer_type_expression(parameters);
+                todo_type!("NotRequired[] type qualifier")
+            }
+            KnownInstanceType::ClassVar => {
+                self.infer_type_expression(parameters);
+                todo_type!("ClassVar[] type qualifier")
+            }
+            KnownInstanceType::Final => {
+                self.infer_type_expression(parameters);
+                todo_type!("Final[] type qualifier")
+            }
+            KnownInstanceType::Required => {
+                self.infer_type_expression(parameters);
+                todo_type!("Required[] type qualifier")
+            }
+            KnownInstanceType::TypeIs => {
+                self.infer_type_expression(parameters);
+                todo_type!("TypeIs[] special form")
+            }
+            KnownInstanceType::TypeGuard => {
+                self.infer_type_expression(parameters);
+                todo_type!("TypeGuard[] special form")
+            }
+            KnownInstanceType::Concatenate => {
+                self.infer_type_expression(parameters);
+                todo_type!("Concatenate[] special form")
+            }
+            KnownInstanceType::Unpack => {
+                self.infer_type_expression(parameters);
+                todo_type!("Unpack[] special form")
+            }
+            KnownInstanceType::NoReturn | KnownInstanceType::Never | KnownInstanceType::Any => {
                 self.diagnostics.add_lint(
                     &INVALID_TYPE_PARAMETER,
                     subscript.into(),
                     format_args!(
                         "Type `{}` expected no type parameter",
+                        known_instance.repr(self.db)
+                    ),
+                );
+                Type::Unknown
+            }
+            KnownInstanceType::TypingSelf | KnownInstanceType::TypeAlias => {
+                self.diagnostics.add_lint(
+                    &INVALID_TYPE_PARAMETER,
+                    subscript.into(),
+                    format_args!(
+                        "Special form `{}` expected no type parameter",
                         known_instance.repr(self.db)
                     ),
                 );
@@ -4863,17 +4954,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::Type => self.infer_subclass_of_type_expression(parameters),
             KnownInstanceType::Tuple => self.infer_tuple_type_expression(parameters),
-            KnownInstanceType::Any => {
-                self.diagnostics.add_lint(
-                    &INVALID_TYPE_PARAMETER,
-                    subscript.into(),
-                    format_args!(
-                        "Type `{}` expected no type parameter",
-                        known_instance.repr(self.db)
-                    ),
-                );
-                Type::Unknown
-            }
         }
     }
 
