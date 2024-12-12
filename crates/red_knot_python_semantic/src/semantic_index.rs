@@ -1,13 +1,14 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
+use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::builder::SemanticIndexBuilder;
@@ -115,6 +116,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
     ast_ids: IndexVec<FileScopeId, AstIds>,
+
+    /// The set of modules that are imported anywhere within this file.
+    imported_modules: FxHashSet<ModuleName>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
@@ -242,6 +246,11 @@ impl<'db> SemanticIndex<'db> {
     /// the logic for type inference.
     pub(super) fn has_future_annotations(&self) -> bool {
         self.has_future_annotations
+    }
+
+    /// Checks if this file imports a particular module.
+    pub(crate) fn imports_module(&self, module_name: &ModuleName) -> bool {
+        self.imported_modules.contains(module_name)
     }
 }
 

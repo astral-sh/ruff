@@ -3,6 +3,7 @@ use std::ops::Deref;
 
 use compact_str::{CompactString, ToCompactString};
 
+use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 /// A module name, e.g. `foo.bar`.
@@ -185,6 +186,23 @@ impl ModuleName {
     pub fn extend(&mut self, other: &ModuleName) {
         self.0.push('.');
         self.0.push_str(other);
+    }
+
+    /// Appends a name to `self`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_python_ast::name::Name;
+    /// use red_knot_python_semantic::ModuleName;
+    ///
+    /// let mut module_name = ModuleName::new_static("foo").unwrap();
+    /// module_name.append(&Name::new("bar"));
+    /// assert_eq!(&module_name, "foo.bar");
+    /// ```
+    pub fn append(&mut self, name: &Name) {
+        self.0.push('.');
+        self.0.push_str(name);
     }
 }
 
