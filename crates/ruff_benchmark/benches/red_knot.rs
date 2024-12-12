@@ -79,7 +79,7 @@ fn setup_case() -> Case {
         src_root,
         &system,
         Some(&Configuration {
-            target_version: Some(PythonVersion::PY312),
+            python_version: Some(PythonVersion::PY312),
             ..Configuration::default()
         }),
     )

@@ -10,7 +10,7 @@ use crate::Db;
 
 #[salsa::input(singleton)]
 pub struct Program {
-    pub target_version: PythonVersion,
+    pub python_version: PythonVersion,
 
     #[return_ref]
     pub(crate) search_paths: SearchPaths,
@@ -19,16 +19,16 @@ pub struct Program {
 impl Program {
     pub fn from_settings(db: &dyn Db, settings: &ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
-            target_version,
+            python_version,
             search_paths,
         } = settings;
 
-        tracing::info!("Target version: Python {target_version}");
+        tracing::info!("Python version: Python {python_version}");
 
         let search_paths = SearchPaths::from_settings(db, search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        Ok(Program::builder(settings.target_version, search_paths)
+        Ok(Program::builder(settings.python_version, search_paths)
             .durability(Durability::HIGH)
             .new(db))
     }
@@ -56,7 +56,7 @@ impl Program {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
-    pub target_version: PythonVersion,
+    pub python_version: PythonVersion,
     pub search_paths: SearchPathSettings,
 }
 

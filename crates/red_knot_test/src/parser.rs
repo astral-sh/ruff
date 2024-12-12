@@ -74,8 +74,8 @@ impl<'m, 's> MarkdownTest<'m, 's> {
         self.files.iter()
     }
 
-    pub(crate) fn target_version(&self) -> PythonVersion {
-        self.section.target_version
+    pub(crate) fn python_version(&self) -> PythonVersion {
+        self.section.python_version
     }
 }
 
@@ -125,7 +125,7 @@ struct Section<'s> {
     title: &'s str,
     level: u8,
     parent_id: Option<SectionId>,
-    target_version: PythonVersion,
+    python_version: PythonVersion,
 }
 
 #[newtype_index]
@@ -222,7 +222,7 @@ impl<'s> Parser<'s> {
             title,
             level: 0,
             parent_id: None,
-            target_version: PythonVersion::default(),
+            python_version: PythonVersion::default(),
         });
         Self {
             sections,
@@ -305,7 +305,7 @@ impl<'s> Parser<'s> {
             title,
             level: header_level.try_into()?,
             parent_id: Some(parent),
-            target_version: self.sections[parent].target_version,
+            python_version: self.sections[parent].python_version,
         };
 
         if self.current_section_files.is_some() {
@@ -399,22 +399,22 @@ impl<'s> Parser<'s> {
         }
 
         let config = MarkdownTestConfig::from_str(code)?;
-        let target_version = config.environment.target_version;
+        let python_version = config.environment.python_version;
 
-        let parts = target_version
+        let parts = python_version
             .split('.')
             .map(str::parse)
             .collect::<Result<Vec<_>, _>>()
             .context(format!(
-                "Invalid 'target-version' component: '{target_version}'"
+                "Invalid 'python-version' component: '{python_version}'"
             ))?;
 
         if parts.len() != 2 {
-            bail!("Invalid 'target-version': expected MAJOR.MINOR, got '{target_version}'.",);
+            bail!("Invalid 'python-version': expected MAJOR.MINOR, got '{python_version}'.",);
         }
 
         let current_section = &mut self.sections[self.stack.top()];
-        current_section.target_version = PythonVersion::from((parts[0], parts[1]));
+        current_section.python_version = PythonVersion::from((parts[0], parts[1]));
 
         self.current_section_has_config = true;
 

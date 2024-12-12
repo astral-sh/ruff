@@ -171,7 +171,7 @@ pub(crate) mod tests {
             Program::from_settings(
                 &db,
                 &ProgramSettings {
-                    target_version: self.python_version,
+                    python_version: self.python_version,
                     search_paths,
                 },
             )

@@ -135,7 +135,7 @@ if "" < lorem == "ipsum":
 
 ```toml
 [environment]
-target-version = "3.11"
+python-version = "3.11"
 ```
 
 ```py

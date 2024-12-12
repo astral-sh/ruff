@@ -28,7 +28,7 @@ impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
     pub fn from_src_roots(
         mut src_roots: impl Iterator<Item = SystemPathBuf>,
-        target_version: PythonVersion,
+        python_version: PythonVersion,
     ) -> Result<Self> {
         let search_paths = {
             // Use the first source root.
@@ -48,7 +48,7 @@ impl ModuleDb {
         Program::from_settings(
             &db,
             &ProgramSettings {
-                target_version,
+                python_version,
                 search_paths,
             },
         )?;

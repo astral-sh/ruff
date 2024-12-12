@@ -296,7 +296,7 @@ where
     }
 
     let configuration = Configuration {
-        target_version: Some(PythonVersion::PY312),
+        python_version: Some(PythonVersion::PY312),
         search_paths,
     };
 

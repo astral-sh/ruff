@@ -4,7 +4,7 @@
 //!
 //! ```toml
 //! [environment]
-//! target-version = "3.10"
+//! python-version = "3.10"
 //! ```
 
 use anyhow::Context;
@@ -22,7 +22,7 @@ impl MarkdownTestConfig {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct Environment {
-    #[serde(rename = "target-version")]
-    pub(crate) target_version: String,
+    pub(crate) python_version: String,
 }

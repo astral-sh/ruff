@@ -21,14 +21,14 @@ impl WorkspaceSettings {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct Configuration {
-    pub target_version: Option<PythonVersion>,
+    pub python_version: Option<PythonVersion>,
     pub search_paths: SearchPathConfiguration,
 }
 
 impl Configuration {
     /// Extends this configuration by using the values from `with` for all values that are absent in `self`.
     pub fn extend(&mut self, with: Configuration) {
-        self.target_version = self.target_version.or(with.target_version);
+        self.python_version = self.python_version.or(with.python_version);
         self.search_paths.extend(with.search_paths);
     }
 
@@ -39,7 +39,7 @@ impl Configuration {
     ) -> WorkspaceSettings {
         WorkspaceSettings {
             program: ProgramSettings {
-                target_version: self.target_version.unwrap_or_default(),
+                python_version: self.python_version.unwrap_or_default(),
                 search_paths: self.search_paths.to_settings(workspace_root),
             },
         }
