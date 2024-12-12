@@ -180,6 +180,8 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 
 #### Multiple `elif` branches, always false
 
+Make sure that we include bindings from all non-`False` branches:
+
 ```py
 def flag() -> bool: ...
 
@@ -191,15 +193,21 @@ elif flag():
     x = 3
 elif False:
     x = 4
-elif flag():
+elif False:
     x = 5
-else:
+elif flag():
     x = 6
+elif flag():
+    x = 7
+else:
+    x = 8
 
-reveal_type(x)  # revealed: Literal[2, 3, 5, 6]
+reveal_type(x)  # revealed: Literal[2, 3, 6, 7, 8]
 ```
 
 #### Multiple `elif` branches, always true
+
+Make sure that we only include the binding from the first `elif True` branch:
 
 ```py
 def flag() -> bool: ...
@@ -212,10 +220,12 @@ elif flag():
     x = 3
 elif True:
     x = 4
-elif flag():
+elif True:
     x = 5
-else:
+elif flag():
     x = 6
+else:
+    x = 7
 
 reveal_type(x)  # revealed: Literal[2, 3, 4]
 ```
