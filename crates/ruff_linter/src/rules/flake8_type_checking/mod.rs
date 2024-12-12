@@ -13,6 +13,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::QuoteTypeExpressions;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
@@ -80,6 +81,28 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
+    fn quote_casts(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "quote_casts_{}_{}",
+            rule_code.as_ref(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    quote_type_expressions: QuoteTypeExpressions::Safe,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]
@@ -98,51 +121,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    quote_annotations: true,
-                    ..Default::default()
-                },
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
-    fn quote_casts(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "quote_casts_{}_{}",
-            rule_code.as_ref(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    quote_cast_type_expressions: true,
-                    ..Default::default()
-                },
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
-    fn quote_type_aliases(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "quote_type_aliases_{}_{}",
-            rule_code.as_ref(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    quote_annotated_type_alias_values: true,
+                    quote_type_expressions: QuoteTypeExpressions::Balanced,
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)
@@ -166,9 +145,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    quote_annotations: true,
-                    quote_cast_type_expressions: true,
-                    quote_annotated_type_alias_values: true,
+                    quote_type_expressions: QuoteTypeExpressions::Eager,
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

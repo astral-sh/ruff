@@ -15,6 +15,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::rules::flake8_type_checking::settings::Settings;
 use crate::Locator;
 
+use super::settings::QuoteTypeExpressions;
+
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
 /// context (with quoting enabled).
 pub(crate) fn is_typing_reference(
@@ -28,9 +30,9 @@ pub(crate) fn is_typing_reference(
         || (reference.in_type_definition()
             && (reference.in_typing_only_annotation()
                 || reference.in_string_type_definition()
-                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())
-                || (settings.quote_cast_type_expressions && reference.in_cast_type_expression())
-                || (settings.quote_annotated_type_alias_values && reference.in_annotated_type_alias_value() && !parent_type_alias_has_runtime_references(semantic, reference))))
+                || (settings.quote_type_expressions >= QuoteTypeExpressions::Safe && reference.in_cast_type_expression())
+                || (settings.quote_type_expressions >= QuoteTypeExpressions::Balanced && reference.in_runtime_evaluated_annotation())
+                || (settings.quote_type_expressions >= QuoteTypeExpressions::Eager && reference.in_annotated_type_alias_value() && !parent_type_alias_has_runtime_references(semantic, reference))))
 }
 
 /// Find the [`Binding`] defined by the [PEP 613] type alias from a [`Reference`]

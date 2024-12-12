@@ -46,7 +46,7 @@ quote4.py:22:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking b
 24 25 |     x: TypeAlias = DataFrame | None
 25 26 | 
 
-quote4.py:41:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
+quote4.py:41:28: TC004 [*] Quote references to `pandas.DataFrame`. Import is in a type-checking block.
    |
 40 |     if TYPE_CHECKING:
 41 |         from pandas import DataFrame
@@ -54,22 +54,17 @@ quote4.py:41:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking b
 42 | 
 43 |     foo = cast(DataFrame, get_foo())
    |
-   = help: Move out of type-checking block
+   = help: Quote references
 
 ℹ Unsafe fix
-   1  |+from pandas import DataFrame
-1  2  | def f():
-2  3  |     from pandas import DataFrame
-3  4  | 
---------------------------------------------------------------------------------
-38 39 |     from .foo import get_foo
-39 40 | 
-40 41 |     if TYPE_CHECKING:
-41    |-        from pandas import DataFrame
-   42 |+        pass
-42 43 | 
-43 44 |     foo = cast(DataFrame, get_foo())
-44 45 | 
+40 40 |     if TYPE_CHECKING:
+41 41 |         from pandas import DataFrame
+42 42 | 
+43    |-    foo = cast(DataFrame, get_foo())
+   43 |+    foo = cast("DataFrame", get_foo())
+44 44 | 
+45 45 | 
+46 46 | def f():
 
 quote4.py:60:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
    |

@@ -28,8 +28,8 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
-/// annotations will be wrapped in quotes if doing so would enable the
+/// Changing [`lint.flake8-type-checking.quote-type-expressions`] allows some
+/// type expressions to be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
@@ -64,7 +64,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-type-expressions`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
@@ -103,8 +103,8 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
-/// annotations will be wrapped in quotes if doing so would enable the
+/// Changing [`lint.flake8-type-checking.quote-type-expressions`] allows some
+/// type expressions to be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
@@ -139,7 +139,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-type-expressions`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
@@ -178,8 +178,8 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
-/// annotations will be wrapped in quotes if doing so would enable the
+/// Changing [`lint.flake8-type-checking.quote-type-expressions`] allows some
+/// type expressions to be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
@@ -214,7 +214,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-type-expressions`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`

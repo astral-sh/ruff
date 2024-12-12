@@ -16,6 +16,7 @@ use crate::rules::flake8_type_checking::helpers::{
     filter_contained, parent_type_alias_has_runtime_references, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
+use crate::rules::flake8_type_checking::settings::QuoteTypeExpressions;
 
 /// ## What it does
 /// Checks for runtime imports defined in a type-checking block.
@@ -24,9 +25,9 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// The type-checking block is not executed at runtime, so the import will not
 /// be available at runtime.
 ///
-/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
-/// annotations will be wrapped in quotes if doing so would enable the
-/// corresponding import to remain in the type-checking block.
+/// Changing [`lint.flake8-type-checking.quote-type-expressions`] allows some
+/// type expressions to be wrapped in quotes if doing so would enable the
+/// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// ## Example
 /// ```python
@@ -50,7 +51,7 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-type-expressions`
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -162,17 +163,15 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 // Determine whether the member should be fixed by moving the import out of the
                 // type-checking block, or by quoting its references.
                 let settings = &checker.settings.flake8_type_checking;
-                if (settings.quote_annotations
-                    || settings.quote_cast_type_expressions
-                    || settings.quote_annotated_type_alias_values)
+                if settings.quote_type_expressions > QuoteTypeExpressions::None
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
                         reference.in_typing_context()
-                            || (settings.quote_annotations
-                                && reference.in_runtime_evaluated_annotation())
-                            || (settings.quote_cast_type_expressions
+                            || (settings.quote_type_expressions >= QuoteTypeExpressions::Safe
                                 && reference.in_cast_type_expression())
-                            || (settings.quote_annotated_type_alias_values
+                            || (settings.quote_type_expressions >= QuoteTypeExpressions::Balanced
+                                && reference.in_runtime_evaluated_annotation())
+                            || (settings.quote_type_expressions >= QuoteTypeExpressions::Eager
                                 && reference.in_annotated_type_alias_value()
                                 && !parent_type_alias_has_runtime_references(
                                     checker.semantic(),
