@@ -4061,7 +4061,7 @@ impl Ranged for Identifier {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Singleton {
     None,
     True,
