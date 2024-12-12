@@ -1844,23 +1844,22 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
-            Type::SubclassOf(SubclassOfType {
-                base: ClassBase::Class(class),
-            }) => Type::subclass_of(
-                class
-                    .try_metaclass(db)
-                    .ok()
-                    .and_then(Type::into_class_literal)
-                    .unwrap_or_else(|| KnownClass::Type.to_class_literal(db).expect_class_literal())
-                    .class,
-            ),
-            Type::SubclassOf(_) => Type::Any,
+            Type::SubclassOf(SubclassOfType { base }) => match base {
+                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => *self,
+                ClassBase::Class(class) => Type::subclass_of_base(
+                    ClassBase::try_from_ty(db, class.metaclass(db)).unwrap_or(ClassBase::Unknown),
+                ),
+            },
+
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
-            Type::Any => Type::Any,
-            Type::Unknown => Type::Unknown,
+            Type::Any => Type::subclass_of_base(ClassBase::Any),
+            Type::Unknown => Type::subclass_of_base(ClassBase::Unknown),
             // TODO intersections
-            Type::Intersection(_) => todo_type!(),
-            todo @ Type::Todo(_) => *todo,
+            Type::Intersection(_) => Type::subclass_of_base(
+                ClassBase::try_from_ty(db, todo_type!("Intersection meta-type"))
+                    .expect("Type::Todo should be a valid ClassBase"),
+            ),
+            Type::Todo(todo) => Type::subclass_of_base(ClassBase::Todo(*todo)),
         }
     }
 

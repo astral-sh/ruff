@@ -1,4 +1,4 @@
-# type[Any]
+# `type[Any]`
 
 ## Simple
 
@@ -50,4 +50,23 @@ x: type[object] = object
 x: type[object] = type
 x: type[object] = A
 x: type[object] = A()  # error: [invalid-assignment]
+```
+
+## The type of `Any` is `type[Any]`
+
+`Any` represents an unknown set of possible runtime values. If `x` is of type `Any`, the type of
+`x.__class__` is also unknown and remains dynamic, *except* that we know it must be a class object
+of some kind. As such, the type of `x.__class__` is `type[Any]` rather than `Any`:
+
+```py
+from typing import Any
+from does_not_exist import SomethingUnknown  # error: [unresolved-import]
+
+reveal_type(SomethingUnknown)  # revealed: Unknown
+
+def test(x: Any, y: SomethingUnknown):
+    reveal_type(x.__class__)  # revealed: type[Any]
+    reveal_type(x.__class__.__class__.__class__.__class__)  # revealed: type[Any]
+    reveal_type(y.__class__)  # revealed: type[Unknown]
+    reveal_type(y.__class__.__class__.__class__.__class__)  # revealed: type[Unknown]
 ```
