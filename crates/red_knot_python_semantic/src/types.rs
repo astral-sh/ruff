@@ -14,6 +14,7 @@ pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
 };
 pub(crate) use self::signatures::Signature;
+use crate::module_name::ModuleName;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
@@ -403,7 +404,7 @@ pub enum Type<'db> {
     /// A specific function object
     FunctionLiteral(FunctionType<'db>),
     /// A specific module object
-    ModuleLiteral(File),
+    ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object
     ClassLiteral(ClassLiteralType<'db>),
     // The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
@@ -465,15 +466,15 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub const fn into_module_literal(self) -> Option<File> {
+    pub const fn into_module_literal(self) -> Option<ModuleLiteralType<'db>> {
         match self {
-            Type::ModuleLiteral(file) => Some(file),
+            Type::ModuleLiteral(module) => Some(module),
             _ => None,
         }
     }
 
     #[track_caller]
-    pub fn expect_module_literal(self) -> File {
+    pub fn expect_module_literal(self) -> ModuleLiteralType<'db> {
         self.into_module_literal()
             .expect("Expected a Type::ModuleLiteral variant")
     }
@@ -1302,7 +1303,7 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on function type
                 todo_type!().into()
             }
-            Type::ModuleLiteral(file) => {
+            Type::ModuleLiteral(module_ref) => {
                 // `__dict__` is a very special member that is never overridden by module globals;
                 // we should always look it up directly as an attribute on `types.ModuleType`,
                 // never in the global scope of the module.
@@ -1312,7 +1313,7 @@ impl<'db> Type<'db> {
                         .member(db, "__dict__");
                 }
 
-                let global_lookup = symbol(db, global_scope(db, *file), name);
+                let global_lookup = symbol(db, global_scope(db, module_ref.module(db)), name);
 
                 // If it's unbound, check if it's present as an instance on `types.ModuleType`
                 // or `builtins.object`.
@@ -2651,6 +2652,14 @@ impl KnownFunction {
             _ => None,
         }
     }
+}
+
+#[salsa::interned]
+pub struct ModuleLiteralType<'db> {
+    /// The name of the module being referenced
+    pub name: ModuleName,
+    /// The definition of the module being referenced
+    pub module: File,
 }
 
 /// Representation of a runtime class object.
