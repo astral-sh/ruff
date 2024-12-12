@@ -75,7 +75,7 @@ pub struct SearchPathSettings {
     /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
     /// bundled as a zip file in the binary
-    pub custom_typeshed: Option<SystemPathBuf>,
+    pub typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
     pub site_packages: SitePackages,
@@ -86,7 +86,7 @@ impl SearchPathSettings {
         Self {
             src_root,
             extra_paths: vec![],
-            custom_typeshed: None,
+            typeshed: None,
             site_packages: SitePackages::Known(vec![]),
         }
     }

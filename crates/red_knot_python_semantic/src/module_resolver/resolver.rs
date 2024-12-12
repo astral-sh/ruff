@@ -160,7 +160,7 @@ impl SearchPaths {
         let SearchPathSettings {
             extra_paths,
             src_root,
-            custom_typeshed,
+            typeshed,
             site_packages: site_packages_paths,
         } = settings;
 
@@ -180,17 +180,13 @@ impl SearchPaths {
         tracing::debug!("Adding first-party search path '{src_root}'");
         static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
 
-        let (typeshed_versions, stdlib_path) = if let Some(custom_typeshed) = custom_typeshed {
-            let custom_typeshed = canonicalize(custom_typeshed, system);
-            tracing::debug!("Adding custom-stdlib search path '{custom_typeshed}'");
+        let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
+            let typeshed = canonicalize(typeshed, system);
+            tracing::debug!("Adding custom-stdlib search path '{typeshed}'");
 
-            files.try_add_root(
-                db.upcast(),
-                &custom_typeshed,
-                FileRootKind::LibrarySearchPath,
-            );
+            files.try_add_root(db.upcast(), &typeshed, FileRootKind::LibrarySearchPath);
 
-            let versions_path = custom_typeshed.join("stdlib/VERSIONS");
+            let versions_path = typeshed.join("stdlib/VERSIONS");
 
             let versions_content = system.read_to_string(&versions_path).map_err(|error| {
                 SearchPathValidationError::FailedToReadVersionsFile {
@@ -201,7 +197,7 @@ impl SearchPaths {
 
             let parsed: TypeshedVersions = versions_content.parse()?;
 
-            let search_path = SearchPath::custom_stdlib(db, &custom_typeshed)?;
+            let search_path = SearchPath::custom_stdlib(db, &typeshed)?;
 
             (parsed, search_path)
         } else {
@@ -771,7 +767,7 @@ mod tests {
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_src_files(SRC)
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -789,7 +785,7 @@ mod tests {
         };
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -842,7 +838,7 @@ mod tests {
         };
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -887,7 +883,7 @@ mod tests {
         };
 
         let TestCase { db, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -931,7 +927,7 @@ mod tests {
         };
 
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY39)
             .build();
 
@@ -973,7 +969,7 @@ mod tests {
         };
 
         let TestCase { db, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY39)
             .build();
 
@@ -997,7 +993,7 @@ mod tests {
 
         let TestCase { db, src, .. } = TestCaseBuilder::new()
             .with_src_files(SRC)
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -1294,7 +1290,7 @@ mod tests {
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_root: src.clone(),
-                    custom_typeshed: Some(custom_typeshed),
+                    typeshed: Some(custom_typeshed),
                     site_packages: SitePackages::Known(vec![site_packages]),
                 },
             },
@@ -1420,7 +1416,7 @@ mod tests {
             site_packages,
             ..
         } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -1468,7 +1464,7 @@ mod tests {
             src,
             ..
         } = TestCaseBuilder::new()
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -1508,7 +1504,7 @@ mod tests {
             ..
         } = TestCaseBuilder::new()
             .with_src_files(SRC)
-            .with_custom_typeshed(TYPESHED)
+            .with_mocked_typeshed(TYPESHED)
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -1799,7 +1795,7 @@ not_a_directory
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_root: SystemPathBuf::from("/src"),
-                    custom_typeshed: None,
+                    typeshed: None,
                     site_packages: SitePackages::Known(vec![
                         venv_site_packages,
                         system_site_packages,

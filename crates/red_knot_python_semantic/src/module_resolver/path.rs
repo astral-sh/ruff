@@ -658,7 +658,7 @@ mod tests {
         let TestCase {
             db, src, stdlib, ..
         } = TestCaseBuilder::new()
-            .with_custom_typeshed(MockedTypeshed::default())
+            .with_mocked_typeshed(MockedTypeshed::default())
             .build();
 
         assert_eq!(
@@ -779,7 +779,7 @@ mod tests {
     #[should_panic(expected = "Extension must be `pyi`; got `py`")]
     fn stdlib_path_invalid_join_py() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(MockedTypeshed::default())
+            .with_mocked_typeshed(MockedTypeshed::default())
             .build();
         SearchPath::custom_stdlib(&db, stdlib.parent().unwrap())
             .unwrap()
@@ -791,7 +791,7 @@ mod tests {
     #[should_panic(expected = "Extension must be `pyi`; got `rs`")]
     fn stdlib_path_invalid_join_rs() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(MockedTypeshed::default())
+            .with_mocked_typeshed(MockedTypeshed::default())
             .build();
         SearchPath::custom_stdlib(&db, stdlib.parent().unwrap())
             .unwrap()
@@ -822,7 +822,7 @@ mod tests {
     #[test]
     fn relativize_stdlib_path_errors() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(MockedTypeshed::default())
+            .with_mocked_typeshed(MockedTypeshed::default())
             .build();
 
         let root = SearchPath::custom_stdlib(&db, stdlib.parent().unwrap()).unwrap();
@@ -870,7 +870,7 @@ mod tests {
         python_version: PythonVersion,
     ) -> (TestDb, SearchPath) {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(typeshed)
+            .with_mocked_typeshed(typeshed)
             .with_python_version(python_version)
             .build();
         let stdlib = SearchPath::custom_stdlib(&db, stdlib.parent().unwrap()).unwrap();

@@ -14,7 +14,7 @@ WorkspaceMetadata(
         search_paths: SearchPathConfiguration(
           extra_paths: None,
           src_root: None,
-          custom_typeshed: None,
+          typeshed: None,
           site_packages: None,
         ),
       ),
@@ -27,7 +27,7 @@ WorkspaceMetadata(
         search_paths: SearchPathConfiguration(
           extra_paths: None,
           src_root: None,
-          custom_typeshed: None,
+          typeshed: None,
           site_packages: None,
         ),
       ),
@@ -42,7 +42,7 @@ WorkspaceMetadata(
       search_paths: SearchPathSettings(
         extra_paths: [],
         src_root: "/app",
-        custom_typeshed: None,
+        typeshed: None,
         site_packages: Known([]),
       ),
     ),

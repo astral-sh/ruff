@@ -85,7 +85,7 @@ pub(crate) struct UnspecifiedTypeshed;
 /// const TYPESHED = MockedTypeshed { ... };
 ///
 /// let test_case = resolver_test_case()
-///     .with_custom_typeshed(TYPESHED)
+///     .with_mocked_typeshed(TYPESHED)
 ///     .with_python_version(...)
 ///     .build();
 ///
@@ -169,7 +169,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
     }
 
     /// Use a mock typeshed directory for this test case
-    pub(crate) fn with_custom_typeshed(
+    pub(crate) fn with_mocked_typeshed(
         self,
         typeshed: MockedTypeshed,
     ) -> TestCaseBuilder<MockedTypeshed> {
@@ -195,7 +195,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             stdlib: _,
             site_packages,
             python_version,
-        } = self.with_custom_typeshed(MockedTypeshed::default()).build();
+        } = self.with_mocked_typeshed(MockedTypeshed::default()).build();
 
         TestCase {
             db,
@@ -230,7 +230,7 @@ impl TestCaseBuilder<MockedTypeshed> {
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_root: src.clone(),
-                    custom_typeshed: Some(typeshed.clone()),
+                    typeshed: Some(typeshed.clone()),
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
                 },
             },

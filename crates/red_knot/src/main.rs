@@ -52,7 +52,7 @@ struct Args {
 
     /// Custom directory to use for stdlib typeshed stubs.
     #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
-    typeshed_path: Option<SystemPathBuf>,
+    typeshed: Option<SystemPathBuf>,
 
     /// Additional path to use as a module-resolution source (can be passed multiple times).
     #[arg(long, value_name = "PATH")]
@@ -84,9 +84,8 @@ impl Args {
             });
         }
 
-        if let Some(typeshed_path) = &self.typeshed_path {
-            configuration.search_paths.custom_typeshed =
-                Some(SystemPath::absolute(typeshed_path, cli_cwd));
+        if let Some(typeshed) = &self.typeshed {
+            configuration.search_paths.typeshed = Some(SystemPath::absolute(typeshed, cli_cwd));
         }
 
         if let Some(extra_search_paths) = &self.extra_search_path {
