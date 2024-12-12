@@ -36,9 +36,6 @@ use ruff_text_size::Ranged;
 /// function parameter annotated with `Path` or from a direct assignment to a
 /// `Path()` constructor call.
 ///
-/// ## Limitations
-/// The single dot `"."` suffix is invalid and cannot be fixed by Ruff.
-///
 /// ## Fix safety
 /// The fix for this rule adds a leading period to the string passed
 /// to the `with_suffix()` call. This fix is marked as unsafe, as it
@@ -48,6 +45,8 @@ use ruff_text_size::Ranged;
 /// Moreover, it's impossible to determine if this is the correct fix
 /// for a given situation (it's possible that the string was correct
 /// but was being passed to the wrong method entirely, for example).
+///
+/// No fix is offered if the suffix `"."` is given, since the intent is unclear.
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidPathlibWithSuffix {
     // TODO: Since "." is a correct suffix in Python 3.14,
