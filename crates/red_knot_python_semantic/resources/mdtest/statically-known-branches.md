@@ -230,7 +230,130 @@ else:
 reveal_type(x)  # revealed: Literal[2, 3, 4]
 ```
 
+#### `elif` without `else` branch
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    x = 2
+elif True:
+    x = 3
+
+# TODO: This should be Literal[2, 3]
+reveal_type(x)  # revealed: Literal[1, 2, 3]
+```
+
 ### Nested conditionals
+
+#### `if True` inside `if True`
+
+```py
+x = 1
+
+if True:
+    if True:
+        x = 2
+else:
+    x = 3
+
+reveal_type(x)  # revealed: Literal[2]
+```
+
+#### `if False` inside `if True`
+
+```py
+x = 1
+
+if True:
+    if False:
+        x = 2
+else:
+    x = 3
+
+reveal_type(x)  # revealed: Literal[1]
+```
+
+#### `if <bool>` inside `if True`
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if True:
+    if flag():
+        x = 2
+else:
+    x = 3
+
+reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+#### `if True` inside `if <bool>`
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    if True:
+        x = 2
+else:
+    x = 3
+
+# TODO: This should be Literal[2, 3]
+reveal_type(x)  # revealed: Literal[1, 2, 3]
+```
+
+#### `if True` inside `if False` ... `else`
+
+```py
+x = 1
+
+if False:
+    x = 2
+else:
+    if True:
+        x = 3
+
+reveal_type(x)  # revealed: Literal[3]
+```
+
+#### `if False` inside `if False` ... `else`
+
+```py
+x = 1
+
+if False:
+    x = 2
+else:
+    if False:
+        x = 3
+
+reveal_type(x)  # revealed: Literal[1]
+```
+
+#### `if <bool>` inside `if False` ... `else`
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if False:
+    x = 2
+else:
+    if flag():
+        x = 3
+
+reveal_type(x)  # revealed: Literal[1, 3]
+```
+
+### Nested conditionals (with inner `else`)
 
 #### `if True` inside `if True`
 
@@ -448,12 +571,12 @@ def iterable() -> list[object]: ...
 x = 1
 
 for _ in iterable():
+    x = 2
     if True:
-        x = 2
-    else:
         x = 3
 
-reveal_type(x)  # revealed: Literal[1, 2]
+# TODO: This should be Literal[1, 3]
+reveal_type(x)  # revealed: Literal[1, 2, 3]
 ```
 
 ##### `if True` inside `for` ... `else`
