@@ -8,6 +8,8 @@ useful for `sys.version_info` branches, which can make new features available ba
 version:
 
 ```py path=module1.py
+import sys
+
 if sys.version_info >= (3, 9):
     SomeFeature = "available"
 ```
