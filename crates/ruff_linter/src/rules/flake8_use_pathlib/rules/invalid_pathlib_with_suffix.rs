@@ -51,7 +51,8 @@ use ruff_text_size::Ranged;
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidPathlibWithSuffix {
     // TODO: Since "." is a correct suffix in Python 3.14,
-    // the rule should revert to its original behavior.
+    // we will need to update this rule and documentation
+    // once Ruff supports Python 3.14.
     single_dot: bool,
 }
 
