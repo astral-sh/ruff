@@ -23,13 +23,13 @@ pub enum PythonVersion {
 impl PythonVersion {
     const fn as_str(self) -> &'static str {
         match self {
-            Self::Py37 => "37",
-            Self::Py38 => "38",
-            Self::Py39 => "39",
-            Self::Py310 => "310",
-            Self::Py311 => "311",
-            Self::Py312 => "312",
-            Self::Py313 => "313",
+            Self::Py37 => "3.7",
+            Self::Py38 => "3.8",
+            Self::Py39 => "3.9",
+            Self::Py310 => "3.10",
+            Self::Py311 => "3.11",
+            Self::Py312 => "3.12",
+            Self::Py313 => "3.13",
         }
     }
 }
