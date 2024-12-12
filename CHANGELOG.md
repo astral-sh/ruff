@@ -20,7 +20,7 @@
 ### Rule changes
 
 - \[`flake8-bugbear`\] Offer unsafe autofix for `no-explicit-stacklevel` (`B028`) ([#14829](https://github.com/astral-sh/ruff/pull/14829))
-- \[`flake8-pyi`\] Skip all type definitions in `string-or-bytes-too-long (PYI053)` ([#14797](https://github.com/astral-sh/ruff/pull/14797))
+- \[`flake8-pyi`\] Skip all type definitions in `string-or-bytes-too-long` (`PYI053`) ([#14797](https://github.com/astral-sh/ruff/pull/14797))
 - \[`pyupgrade`\] Do not report when a UTF-8 comment is followed by a non-UTF-8 one (`UP009`) ([#14728](https://github.com/astral-sh/ruff/pull/14728))
 - \[`pyupgrade`\] Mark fixes for `convert-typed-dict-functional-to-class` and `convert-named-tuple-functional-to-class` as unsafe if they will remove comments (`UP013`, `UP014`) ([#14842](https://github.com/astral-sh/ruff/pull/14842))
 
