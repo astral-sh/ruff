@@ -68,7 +68,7 @@ impl Violation for InvalidPathlibWithSuffix {
 
     fn fix_title(&self) -> Option<String> {
         let title = if self.single_dot {
-            "The \".\" suffix is not valid"
+            "Remove \".\" or extend to valid suffix"
         } else {
             "Add a leading dot"
         };
