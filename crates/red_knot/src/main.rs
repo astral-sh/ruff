@@ -39,7 +39,7 @@ struct Args {
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the project root,
     /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
     ///
-    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory."#,
+    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
     #[arg(long, value_name = "PROJECT")]
     project: Option<SystemPathBuf>,
 
