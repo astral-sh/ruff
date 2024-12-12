@@ -1255,6 +1255,7 @@ impl<'db> Type<'db> {
                     | KnownClass::List
                     | KnownClass::Tuple
                     | KnownClass::Set
+                    | KnownClass::FrozenSet
                     | KnownClass::Dict
                     | KnownClass::Slice
                     | KnownClass::BaseException
@@ -1263,6 +1264,7 @@ impl<'db> Type<'db> {
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
                     | KnownClass::SpecialForm
+                    | KnownClass::StdlibAlias
                     | KnownClass::TypeVar,
                 ) => false,
                 None => false,
@@ -1782,7 +1784,8 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
-            _ => todo_type!(),
+            Type::Todo(_) => *self,
+            _ => todo_type!("Unsupported or invalid type in a type expression"),
         }
     }
 
@@ -1934,6 +1937,7 @@ pub enum KnownClass {
     List,
     Tuple,
     Set,
+    FrozenSet,
     Dict,
     Slice,
     BaseException,
@@ -1945,6 +1949,7 @@ pub enum KnownClass {
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
+    StdlibAlias,
     SpecialForm,
     TypeVar,
     TypeAliasType,
@@ -1962,6 +1967,7 @@ impl<'db> KnownClass {
             Self::Tuple => "tuple",
             Self::Int => "int",
             Self::Float => "float",
+            Self::FrozenSet => "frozenset",
             Self::Str => "str",
             Self::Set => "set",
             Self::Dict => "dict",
@@ -1978,6 +1984,8 @@ impl<'db> KnownClass {
             Self::TypeVar => "TypeVar",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
+            // For example, `typing.List` is defined as `List = _Alias()` in typeshed
+            Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
             // which is different to what `type(sys.version_info).__name__` is at runtime.
             // (At runtime, `type(sys.version_info).__name__ == "version_info"`,
@@ -2016,6 +2024,7 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Tuple
             | Self::Set
+            | Self::FrozenSet
             | Self::Dict
             | Self::BaseException
             | Self::BaseExceptionGroup
@@ -2023,7 +2032,9 @@ impl<'db> KnownClass {
             Self::VersionInfo => CoreStdlibModule::Sys,
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
             Self::NoneType => CoreStdlibModule::Typeshed,
-            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType => CoreStdlibModule::Typing,
+            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::StdlibAlias => {
+                CoreStdlibModule::Typing
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).target_version(db);
 
@@ -2054,6 +2065,7 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Str
             | Self::Set
+            | Self::FrozenSet
             | Self::Dict
             | Self::List
             | Self::Type
@@ -2062,6 +2074,7 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::FunctionType
             | Self::SpecialForm
+            | Self::StdlibAlias
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::TypeVar => false,
@@ -2082,6 +2095,7 @@ impl<'db> KnownClass {
             "float" => Self::Float,
             "str" => Self::Str,
             "set" => Self::Set,
+            "frozenset" => Self::FrozenSet,
             "dict" => Self::Dict,
             "list" => Self::List,
             "slice" => Self::Slice,
@@ -2092,6 +2106,7 @@ impl<'db> KnownClass {
             "ModuleType" => Self::ModuleType,
             "FunctionType" => Self::FunctionType,
             "TypeAliasType" => Self::TypeAliasType,
+            "_Alias" => Self::StdlibAlias,
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "_version_info" => Self::VersionInfo,
@@ -2118,9 +2133,11 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Tuple
             | Self::Set
+            | Self::FrozenSet
             | Self::Dict
             | Self::Slice
             | Self::GenericAlias
+            | Self::StdlibAlias  // no equivalent class exists in typing_extensions, nor ever will
             | Self::ModuleType
             | Self::VersionInfo
             | Self::BaseException
@@ -2159,6 +2176,30 @@ pub enum KnownInstanceType<'db> {
     TypeVar(TypeVarInstance<'db>),
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
+
+    // Various special forms, special aliases and type qualifiers that we don't yet understand
+    // (all currently inferred as TODO in most contexts):
+    TypingSelf,
+    Final,
+    ClassVar,
+    Callable,
+    Concatenate,
+    Unpack,
+    Required,
+    NotRequired,
+    TypeAlias,
+    TypeGuard,
+    TypeIs,
+    List,
+    Dict,
+    DefaultDict,
+    Set,
+    FrozenSet,
+    Counter,
+    Deque,
+    ChainMap,
+    OrderedDict,
+    ReadOnly,
     // TODO: fill this enum out with more special forms, etc.
 }
 
@@ -2176,6 +2217,27 @@ impl<'db> KnownInstanceType<'db> {
             Self::Tuple => "Tuple",
             Self::Type => "Type",
             Self::TypeAliasType(_) => "TypeAliasType",
+            Self::TypingSelf => "Self",
+            Self::Final => "Final",
+            Self::ClassVar => "ClassVar",
+            Self::Callable => "Callable",
+            Self::Concatenate => "Concatenate",
+            Self::Unpack => "Unpack",
+            Self::Required => "Required",
+            Self::NotRequired => "NotRequired",
+            Self::TypeAlias => "TypeAlias",
+            Self::TypeGuard => "TypeGuard",
+            Self::TypeIs => "TypeIs",
+            Self::List => "List",
+            Self::Dict => "Dict",
+            Self::DefaultDict => "DefaultDict",
+            Self::Set => "Set",
+            Self::FrozenSet => "FrozenSet",
+            Self::Counter => "Counter",
+            Self::Deque => "Deque",
+            Self::ChainMap => "ChainMap",
+            Self::OrderedDict => "OrderedDict",
+            Self::ReadOnly => "ReadOnly",
         }
     }
 
@@ -2192,6 +2254,27 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Any
             | Self::Tuple
             | Self::Type
+            | Self::TypingSelf
+            | Self::Final
+            | Self::ClassVar
+            | Self::Callable
+            | Self::Concatenate
+            | Self::Unpack
+            | Self::Required
+            | Self::NotRequired
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::TypeIs
+            | Self::List
+            | Self::Dict
+            | Self::DefaultDict
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Counter
+            | Self::Deque
+            | Self::ChainMap
+            | Self::OrderedDict
+            | Self::ReadOnly
             | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
         }
     }
@@ -2208,6 +2291,27 @@ impl<'db> KnownInstanceType<'db> {
             Self::Any => "typing.Any",
             Self::Tuple => "typing.Tuple",
             Self::Type => "typing.Type",
+            Self::TypingSelf => "typing.Self",
+            Self::Final => "typing.Final",
+            Self::ClassVar => "typing.ClassVar",
+            Self::Callable => "typing.Callable",
+            Self::Concatenate => "typing.Concatenate",
+            Self::Unpack => "typing.Unpack",
+            Self::Required => "typing.Required",
+            Self::NotRequired => "typing.NotRequired",
+            Self::TypeAlias => "typing.TypeAlias",
+            Self::TypeGuard => "typing.TypeGuard",
+            Self::TypeIs => "typing.TypeIs",
+            Self::List => "typing.List",
+            Self::Dict => "typing.Dict",
+            Self::DefaultDict => "typing.DefaultDict",
+            Self::Set => "typing.Set",
+            Self::FrozenSet => "typing.FrozenSet",
+            Self::Counter => "typing.Counter",
+            Self::Deque => "typing.Deque",
+            Self::ChainMap => "typing.ChainMap",
+            Self::OrderedDict => "typing.OrderedDict",
+            Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
         }
@@ -2225,6 +2329,27 @@ impl<'db> KnownInstanceType<'db> {
             Self::Any => KnownClass::Object,
             Self::Tuple => KnownClass::SpecialForm,
             Self::Type => KnownClass::SpecialForm,
+            Self::TypingSelf => KnownClass::SpecialForm,
+            Self::Final => KnownClass::SpecialForm,
+            Self::ClassVar => KnownClass::SpecialForm,
+            Self::Callable => KnownClass::SpecialForm,
+            Self::Concatenate => KnownClass::SpecialForm,
+            Self::Unpack => KnownClass::SpecialForm,
+            Self::Required => KnownClass::SpecialForm,
+            Self::NotRequired => KnownClass::SpecialForm,
+            Self::TypeAlias => KnownClass::SpecialForm,
+            Self::TypeGuard => KnownClass::SpecialForm,
+            Self::TypeIs => KnownClass::SpecialForm,
+            Self::ReadOnly => KnownClass::SpecialForm,
+            Self::List => KnownClass::StdlibAlias,
+            Self::Dict => KnownClass::StdlibAlias,
+            Self::DefaultDict => KnownClass::StdlibAlias,
+            Self::Set => KnownClass::StdlibAlias,
+            Self::FrozenSet => KnownClass::StdlibAlias,
+            Self::Counter => KnownClass::StdlibAlias,
+            Self::Deque => KnownClass::StdlibAlias,
+            Self::ChainMap => KnownClass::StdlibAlias,
+            Self::OrderedDict => KnownClass::StdlibAlias,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
         }
@@ -2245,14 +2370,35 @@ impl<'db> KnownInstanceType<'db> {
         }
         match (module.name().as_str(), instance_name) {
             ("typing", "Any") => Some(Self::Any),
+            ("typing", "ClassVar") => Some(Self::ClassVar),
+            ("typing", "Deque") => Some(Self::Deque),
+            ("typing", "List") => Some(Self::List),
+            ("typing", "Dict") => Some(Self::Dict),
+            ("typing", "DefaultDict") => Some(Self::DefaultDict),
+            ("typing", "Set") => Some(Self::Set),
+            ("typing", "FrozenSet") => Some(Self::FrozenSet),
+            ("typing", "Counter") => Some(Self::Counter),
+            ("typing", "ChainMap") => Some(Self::ChainMap),
+            ("typing", "OrderedDict") => Some(Self::OrderedDict),
+            ("typing", "Optional") => Some(Self::Optional),
+            ("typing", "Union") => Some(Self::Union),
+            ("typing", "NoReturn") => Some(Self::NoReturn),
+            ("typing", "Tuple") => Some(Self::Tuple),
+            ("typing", "Type") => Some(Self::Type),
+            ("typing", "Callable") => Some(Self::Callable),
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
             ("typing" | "typing_extensions", "LiteralString") => Some(Self::LiteralString),
-            ("typing" | "typing_extensions", "Optional") => Some(Self::Optional),
-            ("typing" | "typing_extensions", "Union") => Some(Self::Union),
-            ("typing" | "typing_extensions", "NoReturn") => Some(Self::NoReturn),
             ("typing" | "typing_extensions", "Never") => Some(Self::Never),
-            ("typing" | "typing_extensions", "Tuple") => Some(Self::Tuple),
-            ("typing" | "typing_extensions", "Type") => Some(Self::Type),
+            ("typing" | "typing_extensions", "Self") => Some(Self::TypingSelf),
+            ("typing" | "typing_extensions", "Final") => Some(Self::Final),
+            ("typing" | "typing_extensions", "Concatenate") => Some(Self::Concatenate),
+            ("typing" | "typing_extensions", "Unpack") => Some(Self::Unpack),
+            ("typing" | "typing_extensions", "Required") => Some(Self::Required),
+            ("typing" | "typing_extensions", "NotRequired") => Some(Self::NotRequired),
+            ("typing" | "typing_extensions", "TypeAlias") => Some(Self::TypeAlias),
+            ("typing" | "typing_extensions", "TypeGuard") => Some(Self::TypeGuard),
+            ("typing" | "typing_extensions", "TypeIs") => Some(Self::TypeIs),
+            ("typing" | "typing_extensions", "ReadOnly") => Some(Self::ReadOnly),
             _ => None,
         }
     }

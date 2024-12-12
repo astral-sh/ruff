@@ -4,7 +4,7 @@ use std::ops::Deref;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
-use super::{Class, ClassLiteralType, KnownClass, KnownInstanceType, TodoType, Type};
+use super::{todo_type, Class, ClassLiteralType, KnownClass, KnownInstanceType, TodoType, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
@@ -362,15 +362,47 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Union
                 | KnownInstanceType::NoReturn
                 | KnownInstanceType::Never
+                | KnownInstanceType::Final
+                | KnownInstanceType::NotRequired
+                | KnownInstanceType::TypeGuard
+                | KnownInstanceType::TypeIs
+                | KnownInstanceType::TypingSelf
+                | KnownInstanceType::Unpack
+                | KnownInstanceType::ClassVar
+                | KnownInstanceType::Concatenate
+                | KnownInstanceType::Required
+                | KnownInstanceType::TypeAlias
+                | KnownInstanceType::ReadOnly
                 | KnownInstanceType::Optional => None,
                 KnownInstanceType::Any => Some(Self::Any),
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
+                KnownInstanceType::Dict => {
+                    ClassBase::try_from_ty(db, KnownClass::Dict.to_class_literal(db))
+                }
+                KnownInstanceType::List => {
+                    ClassBase::try_from_ty(db, KnownClass::List.to_class_literal(db))
+                }
                 KnownInstanceType::Type => {
                     ClassBase::try_from_ty(db, KnownClass::Type.to_class_literal(db))
                 }
                 KnownInstanceType::Tuple => {
                     ClassBase::try_from_ty(db, KnownClass::Tuple.to_class_literal(db))
                 }
+                KnownInstanceType::Set => {
+                    ClassBase::try_from_ty(db, KnownClass::Set.to_class_literal(db))
+                }
+                KnownInstanceType::FrozenSet => {
+                    ClassBase::try_from_ty(db, KnownClass::FrozenSet.to_class_literal(db))
+                }
+                KnownInstanceType::Callable
+                | KnownInstanceType::ChainMap
+                | KnownInstanceType::Counter
+                | KnownInstanceType::DefaultDict
+                | KnownInstanceType::Deque
+                | KnownInstanceType::OrderedDict => Self::try_from_ty(
+                    db,
+                    todo_type!("Support for more typing aliases as base classes"),
+                ),
             },
         }
     }
