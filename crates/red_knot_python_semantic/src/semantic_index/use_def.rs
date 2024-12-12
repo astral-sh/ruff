@@ -548,9 +548,9 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_branching_condition(BranchingCondition::ConditionalOn(constraint));
     }
 
-    /// Marks a point in control-flow where we branch unconditionally, that is: without any
-    /// conditions that could be statically analyzed. Examples are `for` loops or `try` blocks.
-    pub(super) fn record_unconditional_branching(&mut self) {
+    /// Marks a point in control-flow where we branch on a condition that we can not (or choose
+    /// not to) analyze statically. Examples are `try` blocks or `for` loops.
+    pub(super) fn record_ambiguous_branching(&mut self) {
         self.record_branching_condition(BranchingCondition::Ambiguous);
     }
 

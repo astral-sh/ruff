@@ -302,9 +302,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().record_constraint(constraint);
     }
 
-    fn record_unconditional_branching(&mut self) {
-        self.current_use_def_map_mut()
-            .record_unconditional_branching();
+    fn record_ambiguous_branching(&mut self) {
+        self.current_use_def_map_mut().record_ambiguous_branching();
     }
 
     fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
@@ -931,7 +930,7 @@ where
                 let pre_loop_conditions = self.branching_conditions_snapshot();
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
 
-                self.record_unconditional_branching();
+                self.record_ambiguous_branching();
 
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.push_assignment(for_stmt.into());
@@ -952,7 +951,7 @@ where
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop, pre_loop_conditions.clone());
-                self.record_unconditional_branching();
+                self.record_ambiguous_branching();
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
@@ -1011,7 +1010,7 @@ where
                 let pre_try_block_state = self.flow_snapshot();
                 let pre_try_block_conditions = self.branching_conditions_snapshot();
 
-                self.record_unconditional_branching();
+                self.record_ambiguous_branching();
 
                 self.try_node_context_stack_manager.push_context();
 
@@ -1051,7 +1050,7 @@ where
                             range: _,
                         } = except_handler;
 
-                        self.record_unconditional_branching();
+                        self.record_ambiguous_branching();
 
                         if let Some(handled_exceptions) = handled_exceptions {
                             self.visit_expr(handled_exceptions);
@@ -1092,7 +1091,7 @@ where
                     self.flow_restore(post_try_block_state, pre_try_block_conditions.clone());
                 }
 
-                self.record_unconditional_branching();
+                self.record_ambiguous_branching();
 
                 self.visit_body(orelse);
 
@@ -1110,7 +1109,7 @@ where
                 // For more details, see:
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
-                self.record_unconditional_branching();
+                self.record_ambiguous_branching();
 
                 self.visit_body(finalbody);
 
