@@ -334,7 +334,7 @@ impl<'db> ClassBase<'db> {
     /// Attempt to resolve `ty` into a `ClassBase`.
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
-    fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    pub(super) fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Any => Some(Self::Any),
             Type::Unknown => Some(Self::Unknown),
@@ -446,6 +446,12 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
             ClassBase::Unknown => Type::Unknown,
             ClassBase::Class(class) => Type::class_literal(class),
         }
+    }
+}
+
+impl<'db> From<&ClassBase<'db>> for Type<'db> {
+    fn from(value: &ClassBase<'db>) -> Self {
+        Self::from(*value)
     }
 }
 

@@ -194,3 +194,26 @@ class A[T: str](metaclass=M): ...
 
 reveal_type(A.__class__)  # revealed: Literal[M]
 ```
+
+## Metaclasses of metaclasses
+
+```py
+class Foo(type): ...
+class Bar(type, metaclass=Foo): ...
+class Baz(type, metaclass=Bar): ...
+class Spam(metaclass=Baz): ...
+
+reveal_type(Spam.__class__)  # revealed: Literal[Baz]
+reveal_type(Spam.__class__.__class__)  # revealed: Literal[Bar]
+reveal_type(Spam.__class__.__class__.__class__)  # revealed: Literal[Foo]
+
+def test(x: Spam):
+    reveal_type(x.__class__)  # revealed: type[Spam]
+    reveal_type(x.__class__.__class__)  # revealed: type[Baz]
+    reveal_type(x.__class__.__class__.__class__)  # revealed: type[Bar]
+    reveal_type(x.__class__.__class__.__class__.__class__)  # revealed: type[Foo]
+    reveal_type(x.__class__.__class__.__class__.__class__.__class__)  # revealed: type[type]
+
+    # revealed: type[type]
+    reveal_type(x.__class__.__class__.__class__.__class__.__class__.__class__.__class__.__class__)
+```
