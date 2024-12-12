@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.8.3
+
+### Preview features
+
+- Fix fstring formatting removing overlong implicit concatenated string in expression part ([#14811](https://github.com/astral-sh/ruff/pull/14811))
+- \[`airflow`\] Add fix to remove deprecated keyword arguments (`AIR302`) ([#14887](https://github.com/astral-sh/ruff/pull/14887))
+- \[`airflow`\]: Extend rule to include deprecated names for Airflow 3.0 (`AIR302`) ([#14765](https://github.com/astral-sh/ruff/pull/14765) and [#14804](https://github.com/astral-sh/ruff/pull/14804))
+- \[`flake8-bugbear`\] Improve error messages for except\* (`B025`, `B029`, `B030`, `B904`) ([#14815](https://github.com/astral-sh/ruff/pull/14815))
+- \[`flake8-bugbear`\] `itertools.batched()` without explicit `strict` (`B911`) ([#14408](https://github.com/astral-sh/ruff/pull/14408))
+- \[`flake8-use-pathlib`\] Dotless suffix passed to `Path.with_suffix()` (`PTH210`) ([#14779](https://github.com/astral-sh/ruff/pull/14779))
+- \[`pylint`\] Include parentheses and multiple comparators in check for `boolean-chained-comparison (PLR1716)` ([#14781](https://github.com/astral-sh/ruff/pull/14781))
+- \[`ruff`\] Do not simplify `round()` calls (`RUF046`) ([#14832](https://github.com/astral-sh/ruff/pull/14832))
+- \[`ruff`\] Don't emit `used-dummy-variable` on function parameters (`RUF052`) ([#14818](https://github.com/astral-sh/ruff/pull/14818))
+- \[`ruff`\] Implement `if-key-in-dict-del` (`RUF051`) ([#14553](https://github.com/astral-sh/ruff/pull/14553))
+- \[`ruff`\] Mark autofix for `RUF052` as always unsafe ([#14824](https://github.com/astral-sh/ruff/pull/14824))
+- \[`ruff`\] Teach autofix for `used-dummy-variable` about TypeVars etc. (`RUF052`) ([#14819](https://github.com/astral-sh/ruff/pull/14819))
+
+### Rule changes
+
+- \[`flake8-bugbear`\] Offer unsafe autofix for `no-explicit-stacklevel` (`B028`) ([#14829](https://github.com/astral-sh/ruff/pull/14829))
+- \[`flake8-pyi`\] Skip all type definitions in `string-or-bytes-too-long (PYI053)` ([#14797](https://github.com/astral-sh/ruff/pull/14797))
+- \[`pyupgrade`\] Do not report when a UTF-8 comment is followed by a non-UTF-8 one (`UP009`) ([#14728](https://github.com/astral-sh/ruff/pull/14728))
+- \[`pyupgrade`\] Mark fixes for `convert-typed-dict-functional-to-class` and `convert-named-tuple-functional-to-class` as unsafe if they will remove comments (`UP013`, `UP014`) ([#14842](https://github.com/astral-sh/ruff/pull/14842))
+
+### Bug fixes
+
+- Raise syntax error for mixing `except` and `except*` ([#14895](https://github.com/astral-sh/ruff/pull/14895))
+- \[`flake8-bugbear`\] Fix `B028` to allow `stacklevel` to be explicitly assigned as a positional argument ([#14868](https://github.com/astral-sh/ruff/pull/14868))
+- \[`flake8-bugbear`\] Skip `B028` if `warnings.warn` is called with `*args` or `**kwargs` ([#14870](https://github.com/astral-sh/ruff/pull/14870))
+- \[`flake8-comprehensions`\] Skip iterables with named expressions in `unnecessary-map` (`C417`) ([#14827](https://github.com/astral-sh/ruff/pull/14827))
+- \[`flake8-pyi`\] Also remove `self` and `cls`'s annotation (`PYI034`) ([#14801](https://github.com/astral-sh/ruff/pull/14801))
+- \[`flake8-pytest-style`\] Fix `pytest-parametrize-names-wrong-type (PT006)` to edit both `argnames` and `argvalues` if both of them are single-element tuples/lists ([#14699](https://github.com/astral-sh/ruff/pull/14699))
+- \[`perflint`\] Improve autofix for `PERF401` ([#14369](https://github.com/astral-sh/ruff/pull/14369))
+- \[`pylint`\] Fix `PLW1508` false positive for default string created via a mult operation ([#14841](https://github.com/astral-sh/ruff/pull/14841))## 0.8.2
+
 ## 0.8.2
 
 ### Preview features
