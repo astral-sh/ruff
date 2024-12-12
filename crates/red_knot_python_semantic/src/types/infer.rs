@@ -2112,11 +2112,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
+        // When importing a nested module a.b.c, we create a binding for (and need to infer the
+        // type of) the top-most parent module.  We also try to resolve the full nested module now,
+        // so that if we run into problems, any diagnostics are correctly associated with the
+        // import statement.
         let module_ty = if let Some(module_name) = ModuleName::new(name) {
-            if let Some(module) = self.module_ty_from_name(&module_name) {
+            if self.module_ty_from_name(&module_name).is_none() {
+                self.diagnostics.add_unresolved_module(alias, 0, Some(name));
+            }
+
+            let bound_module_name =
+                ModuleName::new(module_name.components().next().unwrap()).unwrap();
+            if let Some(module) = self.module_ty_from_name(&bound_module_name) {
                 module
             } else {
-                self.diagnostics.add_unresolved_module(alias, 0, Some(name));
                 Type::Unknown
             }
         } else {

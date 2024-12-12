@@ -25,3 +25,17 @@ reveal_type(D)  # revealed: Literal[C]
 ```py path=b.py
 class C: ...
 ```
+
+## Nested
+
+```py
+import a.b
+reveal_type(a.b.C)  # revealed: Literal[C]
+```
+
+```py path=a/__init__.py
+```
+
+```py path=a/b.py
+class C: ...
+```
