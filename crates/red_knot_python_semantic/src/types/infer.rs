@@ -48,6 +48,7 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
+use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{
     TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -57,7 +58,7 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
-use crate::types::mro::{ClassBase, MroErrorKind};
+use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,

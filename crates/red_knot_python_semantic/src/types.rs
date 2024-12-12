@@ -27,13 +27,15 @@ use crate::stdlib::{
 };
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{CallDunderResult, CallOutcome};
+use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
-use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
+use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 
 mod builder;
 mod call;
+mod class_base;
 mod diagnostic;
 mod display;
 mod infer;
