@@ -64,8 +64,8 @@ use crate::types::{
     typing_extensions_symbol, Boundness, Class, ClassLiteralType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
     KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol,
-    Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionBuilder, UnionType,
+    Truthiness, TupleType, Type, TypeAliasType, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -799,7 +799,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     node,
                     format_args!(
                         "Conflicting declared types for `{symbol_name}`: {}",
-                        conflicting.display(self.db)
+                        Type::display_slice(self.db, &conflicting)
                     ),
                 );
                 ty

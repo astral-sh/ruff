@@ -1,5 +1,5 @@
 use super::diagnostic::{TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE};
-use super::{Severity, Type, TypeArrayDisplay, UnionBuilder};
+use super::{Severity, Type, UnionBuilder};
 use crate::Db;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_python_ast as ast;
@@ -135,7 +135,7 @@ impl<'db> CallOutcome<'db> {
                     format_args!(
                         "Object of type `{}` is not callable (due to union elements {})",
                         called_ty.display(db),
-                        not_callable_tys.display(db),
+                        Type::display_slice(db, &not_callable_tys),
                     ),
                 );
                 return_ty
