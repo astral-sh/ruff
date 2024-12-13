@@ -1794,7 +1794,7 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
-            # TODO should emit a diagnostic
+            // TODO: Should emit a diagnostic
             Type::KnownInstance(KnownInstanceType::Annotated) => Type::Unknown,
             Type::Todo(_) => *self,
             _ => todo_type!("Unsupported or invalid type in a type expression"),
