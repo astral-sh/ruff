@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -92,22 +92,14 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
 
     let capitalized_word = uppercase_first_char.to_string() + first_word_chars.as_str();
 
-    let leading_whitespace_len = body.text_len()
-        - TextSize::try_from(trim_start_body.len())
-            // The whole document is <=4GB, so this snippet is too.
-            .unwrap();
+    let leading_whitespace_len = body.text_len() - trim_start_body.text_len();
 
     let mut diagnostic = Diagnostic::new(
         FirstWordUncapitalized {
             first_word: first_word.to_string(),
             capitalized_word: capitalized_word.to_string(),
         },
-        TextRange::at(
-            body.start() + leading_whitespace_len,
-            // Again, the whole document is <=4GB
-            // whence so is this word.
-            first_word.len().try_into().unwrap(),
-        ),
+        TextRange::at(body.start() + leading_whitespace_len, first_word.text_len()),
     );
 
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
