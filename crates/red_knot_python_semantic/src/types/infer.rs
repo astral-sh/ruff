@@ -4831,10 +4831,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     report_invalid_parameters();
                 }
 
-                let [first, ..] = &elts[..] else {
+                let [first, rest @ ..] = &elts[..] else {
                     self.infer_type_expression(parameters);
                     return Type::Unknown;
                 };
+
+                rest.iter().for_each(|expr| {
+                    self.infer_expression(expr);
+                });
 
                 let ty = self.infer_type_expression(first);
                 self.store_expression_type(parameters, ty);

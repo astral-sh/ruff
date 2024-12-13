@@ -1,6 +1,6 @@
 # `Annotated`
 
-`Annotated` attachs arbitrary metadata to a given type.
+`Annotated` attaches arbitrary metadata to a given type.
 
 ## Usages
 
@@ -12,8 +12,18 @@ from typing_extensions import Annotated
 def _(x: Annotated[int, "foo"]):
     reveal_type(x)  # revealed: int
 
-def _(x: Annotated[int, lambda: 0 + 1 * 2 // 3, _(1)]):
+def _(x: Annotated[int, lambda: 0 + 1 * 2 // 3, _(4)]):
     reveal_type(x)  # revealed: int
+
+def _(
+    x: Annotated[
+        tuple[str, int, tuple[bytes]],
+        # TODO: This error is reporting the wrong thing
+        # error: [invalid-assignment]
+        (_ := b'SyntaxError: named expression cannot be used within an annotation')
+    ]
+):
+    reveal_type(x)  # revealed: tuple[str, int, tuple[bytes]]
 ```
 
 ## Parametrization
@@ -29,6 +39,10 @@ def _(x: Annotated):
 # error: [invalid-type-parameter]
 def _(x: Annotated[()]):
     reveal_type(x)  # revealed: Unknown
+
+# error: [invalid-type-parameter]
+def _(x: Annotated[(int,)]):
+    reveal_type(x)  # revealed: int
 
 # `Annotated[T]` is invalid and will raise an error at runtime,
 # but we treat it the same as `T` to provide better diagnostics later on.
@@ -60,6 +74,7 @@ reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Unknown, Literal[object]]
 ```py
 from typing_extensions import Annotated
 
+# At runtime, this is an error.
 # error: [invalid-base]
 class C(Annotated): ...
 
