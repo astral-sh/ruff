@@ -33,19 +33,20 @@ from typing_extensions import Annotated
 def _(x: Annotated):
     reveal_type(x)  # revealed: Unknown
 
-# error: [invalid-annotated-arguments]
+# error: [invalid-type-form]
 def _(x: Annotated[()]):
     reveal_type(x)  # revealed: Unknown
 
-# error: [invalid-annotated-arguments]
-def _(x: Annotated[(int,)]):
-    reveal_type(x)  # revealed: int
-
-# error: [invalid-annotated-arguments]
+# error: [invalid-type-form]
 def _(x: Annotated[int]):
     # `Annotated[T]` is invalid and will raise an error at runtime,
     # but we treat it the same as `T` to provide better diagnostics later on.
     # The subscription itself is still reported, regardless.
+    # Same for the `(int,)` form below.
+    reveal_type(x)  # revealed: int
+
+# error: [invalid-type-form]
+def _(x: Annotated[(int,)]):
     reveal_type(x)  # revealed: int
 ```
 

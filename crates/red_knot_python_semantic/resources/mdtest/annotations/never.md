@@ -21,7 +21,7 @@ reveal_type(stop())
 ```py
 from typing_extensions import NoReturn, Never, Any
 
-# error: [invalid-type-parameter] "Type `typing.Never` expected no type parameter"
+# error: [invalid-type-form] "Type `typing.Never` expected no type parameter"
 x: Never[int]
 a1: NoReturn
 a2: Never
