@@ -760,13 +760,35 @@ impl<'db> Type<'db> {
             // as that type is equivalent to `type[Any, ...]` (and therefore not a fully static type).
             (Type::Tuple(_), _) => KnownClass::Tuple.to_instance(db).is_subtype_of(db, target),
 
-            // `Type::ClassLiteral(T)` expresses "the set of size one with only the class `T` in it;
-            // `Type::SubclassOf(S)` expresses "the set that contains all subclasses of the class `S`".
-            // The first is only a subtype of the second if `T` is a subclass of `S`.
-            //
-            // For example, `Literal[int]` and `Literal[bool]` are both subtypes of `type[int]`.
+            // `Type::ClassLiteral` always delegates to `Type::SubclassOf`:
+            (Type::ClassLiteral(ClassLiteralType { class }), _) => {
+                Type::subclass_of(class).is_subtype_of(db, target)
+            }
+
+            // As the `unreachable!()` message says, non-fully-static `SubclassOf` types such as
+            // `type[Any]`,` type[Unknown]` and `type[Todo]` should all be handled right at the top of this function.
             (
-                Type::ClassLiteral(ClassLiteralType { class: self_class }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_),
+                }),
+                _,
+            )
+            | (
+                _,
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_),
+                }),
+            ) => unreachable!(
+                "Non-fully-static types should be handled at the top of this function!"
+            ),
+
+            // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
+            // and `type[int]` describes all possible runtime subclasses of the class `int`.
+            // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
                 Type::SubclassOf(SubclassOfType {
                     base: ClassBase::Class(target_class),
                 }),
@@ -776,36 +798,16 @@ impl<'db> Type<'db> {
             // `Literal[enum.Enum]` is a subtype of `enum.EnumMeta` because `enum.Enum`
             // is an instance of `enum.EnumMeta`.
             (
-                Type::ClassLiteral(self_class_ty),
-                Type::Instance(InstanceType {
-                    class: target_class,
-                }),
-            ) => self_class_ty.is_instance_of(db, target_class),
-
-            // Other than the cases enumerated above,
-            // class literals aren't subtypes of any other types.
-            (Type::ClassLiteral(_), _) => false,
-
-            // `type[T]` delegates to `Literal[T]`
-            // when deciding if `type[T]` is a subtype of another type
-            // (but only if `T` is a fully static type)
-            (
                 Type::SubclassOf(SubclassOfType {
                     base: ClassBase::Class(self_class),
                 }),
-                _,
-            ) => Type::class_literal(self_class).is_subtype_of(db, target),
-
-            // As the `unreachable!()` message says, these should all be handled
-            // right at the top of this function.
-            (
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_),
+                Type::Instance(InstanceType {
+                    class: target_class,
                 }),
-                _,
-            ) => unreachable!(
-                "Non-fully-static types should be handled at the top of this function!"
-            ),
+            ) => ClassLiteralType { class: self_class }.is_instance_of(db, target_class),
+
+            // Other than the cases enumerated above, `type[]` just delegates to `Instance("type")`
+            (Type::SubclassOf(_), _) => KnownClass::Type.to_instance(db).is_subtype_of(db, target),
 
             // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::Instance(_SpecialForm)`,
             // because the symbol `typing.Type` is an instance of `typing._SpecialForm` at runtime
@@ -3537,6 +3539,7 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinClassLiteral("str"))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
