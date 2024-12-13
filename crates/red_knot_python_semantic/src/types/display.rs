@@ -6,7 +6,7 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::mro::ClassBase;
+use crate::types::class_base::ClassBase;
 use crate::types::{
     ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
     SubclassOfType, Type, UnionType,
