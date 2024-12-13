@@ -227,24 +227,32 @@ impl SymbolState {
     }
 
     /// Merge another [`SymbolState`] into this one.
-    pub(super) fn merge(&mut self, b: SymbolState) {
+    pub(super) fn merge(&mut self, b: SymbolState, exclude_declarations: bool) {
         let mut a = Self {
             bindings: SymbolBindings {
                 live_bindings: Bindings::default(),
                 constraints: Constraints::default(),
                 may_be_unbound: self.bindings.may_be_unbound || b.bindings.may_be_unbound,
             },
-            declarations: SymbolDeclarations {
-                live_declarations: self.declarations.live_declarations.clone(),
-                may_be_undeclared: self.declarations.may_be_undeclared
-                    || b.declarations.may_be_undeclared,
+            declarations: {
+                if exclude_declarations {
+                    self.declarations.clone()
+                } else {
+                    SymbolDeclarations {
+                        live_declarations: self.declarations.live_declarations.clone(),
+                        may_be_undeclared: self.declarations.may_be_undeclared
+                            || b.declarations.may_be_undeclared,
+                    }
+                }
             },
         };
 
         std::mem::swap(&mut a, self);
-        self.declarations
-            .live_declarations
-            .union(&b.declarations.live_declarations);
+        if !exclude_declarations {
+            self.declarations
+                .live_declarations
+                .union(&b.declarations.live_declarations);
+        }
 
         let mut a_defs_iter = a.bindings.live_bindings.iter();
         let mut b_defs_iter = b.bindings.live_bindings.iter();
@@ -494,7 +502,7 @@ mod tests {
         sym0b.record_binding(ScopedDefinitionId::from_u32(0));
         sym0b.record_constraint(ScopedConstraintId::from_u32(0));
 
-        sym0a.merge(sym0b);
+        sym0a.merge(sym0b, false);
         let mut sym0 = sym0a;
         assert_bindings(&sym0, false, &["0<0>"]);
 
@@ -507,7 +515,7 @@ mod tests {
         sym1b.record_binding(ScopedDefinitionId::from_u32(1));
         sym1b.record_constraint(ScopedConstraintId::from_u32(2));
 
-        sym1a.merge(sym1b);
+        sym1a.merge(sym1b, false);
         let sym1 = sym1a;
         assert_bindings(&sym1, false, &["1<>"]);
 
@@ -518,12 +526,12 @@ mod tests {
 
         let sym2b = SymbolState::undefined();
 
-        sym2a.merge(sym2b);
+        sym2a.merge(sym2b, false);
         let sym2 = sym2a;
         assert_bindings(&sym2, true, &["2<3>"]);
 
         // merging different definitions keeps them each with their existing constraints
-        sym0.merge(sym2);
+        sym0.merge(sym2, false);
         let sym = sym0;
         assert_bindings(&sym, true, &["0<0>", "2<3>"]);
     }
@@ -560,7 +568,7 @@ mod tests {
         let mut sym2 = SymbolState::undefined();
         sym2.record_declaration(ScopedDefinitionId::from_u32(2));
 
-        sym.merge(sym2);
+        sym.merge(sym2, false);
 
         assert_declarations(&sym, false, &[1, 2]);
     }
@@ -572,7 +580,7 @@ mod tests {
 
         let sym2 = SymbolState::undefined();
 
-        sym.merge(sym2);
+        sym.merge(sym2, false);
 
         assert_declarations(&sym, true, &[1]);
     }

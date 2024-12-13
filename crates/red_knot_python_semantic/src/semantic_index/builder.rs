@@ -205,7 +205,11 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn flow_merge(&mut self, state: FlowSnapshot) {
-        self.current_use_def_map_mut().merge(state);
+        self.current_use_def_map_mut().merge(state, false);
+    }
+
+    fn flow_merge_no_declarations(&mut self, state: FlowSnapshot) {
+        self.current_use_def_map_mut().merge(state, true);
     }
 
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
@@ -1002,7 +1006,7 @@ where
                     // Prepare for visiting the `except` block(s)
                     self.flow_restore(pre_try_block_state);
                     for state in try_block_snapshots {
-                        self.flow_merge(state);
+                        self.flow_merge_no_declarations(state);
                     }
 
                     let pre_except_state = self.flow_snapshot();

@@ -544,7 +544,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new state for each symbol should include definitions from both the
     /// prior state and the snapshot.
-    pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
+    pub(super) fn merge(&mut self, snapshot: FlowSnapshot, exclude_declarations: bool) {
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
         // IDs must line up), so the current number of known symbols must always be equal to or
         // greater than the number of known symbols in a previously-taken snapshot.
@@ -553,7 +553,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.merge(snapshot);
+                current.merge(snapshot, exclude_declarations);
             } else {
                 // Symbol not present in snapshot, so it's unbound/undeclared from that path.
                 current.set_may_be_unbound();
