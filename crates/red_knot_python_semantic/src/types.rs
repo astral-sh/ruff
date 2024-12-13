@@ -794,8 +794,11 @@ impl<'db> Type<'db> {
                 }),
             ) => self_class.is_subclass_of(db, target_class),
 
-            // `Literal[str]` is a subtype of `type` because `str` is an instance of `type`.
-            // `Literal[enum.Enum]` is a subtype of `enum.EnumMeta` because `enum.Enum`
+            // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
+            // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
+            // is an instance of `type`, and so all possible subclasses of `str` will also be instances of `type`.
+            //
+            // Similarly `type[enum.Enum]`  is a subtype of `enum.EnumMeta` because `enum.Enum`
             // is an instance of `enum.EnumMeta`.
             (
                 Type::SubclassOf(SubclassOfType {
@@ -810,14 +813,16 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(_), _) => KnownClass::Type.to_instance(db).is_subtype_of(db, target),
 
             // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::Instance(_SpecialForm)`,
-            // because the symbol `typing.Type` is an instance of `typing._SpecialForm` at runtime
+            // because `Type::KnownInstance(KnownInstanceType::Type)` is a set with exactly one runtime value in it
+            // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_subtype_of(db, right)
             }
 
-            // For example, `Instance(ABCMeta)` is a subtype of `type[object]`,
-            // because (since `ABCMeta` subclasses `type`) all instances of `ABCMeta` are instances of `type`,
-            // and all instances of `type` are members of the type `type[object]`
+            // For example, `abc.ABCMeta` (== `Instance("abc.ABCMeta")`) is a subtype of `type[object]`
+            // (== `SubclassOf("object")`) because (since `abc.ABCMeta` subclasses `type`) all instances of `ABCMeta`
+            // are instances of `type`, and `type[object]` represents the set of all subclasses of `object`,
+            // which is exactly equal to the set of all instances of `type`.
             (
                 Type::Instance(_),
                 Type::SubclassOf(SubclassOfType {
@@ -827,7 +832,8 @@ impl<'db> Type<'db> {
                 self.is_subtype_of(db, KnownClass::Type.to_instance(db))
             }
 
-            // `bool` is a subtype of `int`, because all instances of `bool` are also instances of `int`.
+            // `bool` is a subtype of `int`, because `bool` subclasses `int`,
+            // which means that all instances of `bool` are also instances of `int`
             (Type::Instance(self_instance), Type::Instance(target_instance)) => {
                 self_instance.is_subtype_of(db, target_instance)
             }
