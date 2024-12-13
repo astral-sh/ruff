@@ -104,7 +104,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
 
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         capitalized_word,
-        TextRange::at(body.start(), first_word.text_len()),
+        TextRange::at(body.start() + leading_whitespace_len, first_word.text_len()),
     )));
 
     checker.diagnostics.push(diagnostic);
