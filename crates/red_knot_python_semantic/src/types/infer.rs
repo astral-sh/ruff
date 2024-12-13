@@ -32,6 +32,7 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
+use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
@@ -125,6 +126,7 @@ pub(crate) fn infer_definition_types<'db>(
     let _span = tracing::trace_span!(
         "infer_definition_types",
         definition = ?definition.as_id(),
+        range = ?definition.kind(db).range(),
         file = %file.path(db)
     )
     .entered();
@@ -147,6 +149,7 @@ pub(crate) fn infer_deferred_types<'db>(
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
+        range = ?definition.kind(db).range(),
         file = %file.path(db)
     )
     .entered();
@@ -167,9 +170,13 @@ pub(crate) fn infer_expression_types<'db>(
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
     let file = expression.file(db);
-    let _span =
-        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=%file.path(db))
-            .entered();
+    let _span = tracing::trace_span!(
+        "infer_expression_types",
+        expression = ?expression.as_id(),
+        range = ?expression.node_ref(db).range(),
+        file = %file.path(db)
+    )
+    .entered();
 
     let index = semantic_index(db, file);
 
