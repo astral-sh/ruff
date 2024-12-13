@@ -1201,19 +1201,17 @@ impl<'db> Type<'db> {
             }
 
             (Type::Tuple(tuple), Type::Tuple(other_tuple)) => {
-                if tuple.len(db) == other_tuple.len(db) {
-                    tuple
-                        .elements(db)
+                let self_elements = tuple.elements(db);
+                let other_elements = other_tuple.elements(db);
+                self_elements.len() != other_elements.len()
+                    || self_elements
                         .iter()
-                        .zip(other_tuple.elements(db))
+                        .zip(other_elements)
                         .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
-                } else {
-                    true
-                }
             }
 
             (Type::Tuple(..), Type::Instance(..)) | (Type::Instance(..), Type::Tuple(..)) => {
-                // We can not be sure if the tuple is disjoint from the instance because:
+                // We cannot be sure if the tuple is disjoint from the instance because:
                 //   - 'other' might be the homogeneous arbitrary-length tuple type
                 //     tuple[T, ...] (which we don't have support for yet); if all of
                 //     our element types are not disjoint with T, this is not disjoint
