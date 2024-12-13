@@ -81,14 +81,25 @@ class H(BaseModel):
         final_variable: Final[list[int]] = []
 
 
+def sqlmodel_import_checker():
+    from sqlmodel.main import SQLModel
+
+    class I(SQLModel):
+        id: int
+        mutable_default: list[int] = []
+
 from sqlmodel import SQLModel
 
-
-class I(SQLModel):
+class J(SQLModel):
     id: int
     name: str
 
 
-class J(SQLModel):
+class K(SQLModel):
     id: int
-    i_s: list[I] = []
+    i_s: list[J] = []
+
+
+class L(SQLModel):
+    id: int
+    i_j: list[K] = list()
