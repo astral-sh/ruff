@@ -4832,6 +4832,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let [first, ..] = &elts[..] else {
+                    self.infer_type_expression(parameters);
                     return Type::Unknown;
                 };
 
