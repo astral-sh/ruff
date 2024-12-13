@@ -18,14 +18,8 @@ def _(x: Annotated[int, lambda: 0 + 1 * 2 // 3, _(4)]):
 def _(x: Annotated[int, "arbitrary", "metadata", "elements", "are", "fine"]):
     reveal_type(x)  # revealed: int
 
-def _(
-    x: Annotated[
-        tuple[str, int, tuple[bytes]],
-        # TODO: Emit an error here
-        (foo := b"SyntaxError: named expression cannot be used within an annotation"),
-    ]
-):
-    reveal_type(x)  # revealed: tuple[str, int, tuple[bytes]]
+def _(x: Annotated[tuple[str, int], tuple[bytes]]):
+    reveal_type(x)  # revealed: tuple[str, int]
 ```
 
 ## Parametrization
