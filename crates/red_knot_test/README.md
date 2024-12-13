@@ -234,7 +234,7 @@ language tag:
 ````markdown
 ```toml
 [environment]
-target-version = "3.10"
+python-version = "3.10"
 ```
 ````
 

@@ -43,8 +43,8 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
         }
 
         Program::get(&db)
-            .set_target_version(&mut db)
-            .to(test.target_version());
+            .set_python_version(&mut db)
+            .to(test.python_version());
 
         // Remove all files so that the db is in a "fresh" state.
         db.memory_file_system().remove_all();

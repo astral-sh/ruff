@@ -18,7 +18,7 @@ pub(crate) struct TestCase<T> {
     // so this is a single directory instead of a `Vec` of directories,
     // like it is in `ruff_db::Program`.
     pub(crate) site_packages: SystemPathBuf,
-    pub(crate) target_version: PythonVersion,
+    pub(crate) python_version: PythonVersion,
 }
 
 /// A `(file_name, file_contents)` tuple
@@ -67,7 +67,7 @@ pub(crate) struct UnspecifiedTypeshed;
 /// ```rs
 /// let test_case = TestCaseBuilder::new()
 ///     .with_src_files(...)
-///     .with_target_version(...)
+///     .with_python_version(...)
 ///     .build();
 /// ```
 ///
@@ -85,13 +85,13 @@ pub(crate) struct UnspecifiedTypeshed;
 /// const TYPESHED = MockedTypeshed { ... };
 ///
 /// let test_case = resolver_test_case()
-///     .with_custom_typeshed(TYPESHED)
-///     .with_target_version(...)
+///     .with_mocked_typeshed(TYPESHED)
+///     .with_python_version(...)
 ///     .build();
 ///
 /// let test_case2 = resolver_test_case()
 ///     .with_vendored_typeshed()
-///     .with_target_version(...)
+///     .with_python_version(...)
 ///     .build();
 /// ```
 ///
@@ -100,7 +100,7 @@ pub(crate) struct UnspecifiedTypeshed;
 /// to `()`.
 pub(crate) struct TestCaseBuilder<T> {
     typeshed_option: T,
-    target_version: PythonVersion,
+    python_version: PythonVersion,
     first_party_files: Vec<FileSpec>,
     site_packages_files: Vec<FileSpec>,
 }
@@ -118,9 +118,9 @@ impl<T> TestCaseBuilder<T> {
         self
     }
 
-    /// Specify the target Python version the module resolver should assume
-    pub(crate) fn with_target_version(mut self, target_version: PythonVersion) -> Self {
-        self.target_version = target_version;
+    /// Specify the Python version the module resolver should assume
+    pub(crate) fn with_python_version(mut self, python_version: PythonVersion) -> Self {
+        self.python_version = python_version;
         self
     }
 
@@ -146,7 +146,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
     pub(crate) fn new() -> TestCaseBuilder<UnspecifiedTypeshed> {
         Self {
             typeshed_option: UnspecifiedTypeshed,
-            target_version: PythonVersion::default(),
+            python_version: PythonVersion::default(),
             first_party_files: vec![],
             site_packages_files: vec![],
         }
@@ -156,33 +156,33 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
     pub(crate) fn with_vendored_typeshed(self) -> TestCaseBuilder<VendoredTypeshed> {
         let TestCaseBuilder {
             typeshed_option: _,
-            target_version,
+            python_version,
             first_party_files,
             site_packages_files,
         } = self;
         TestCaseBuilder {
             typeshed_option: VendoredTypeshed,
-            target_version,
+            python_version,
             first_party_files,
             site_packages_files,
         }
     }
 
     /// Use a mock typeshed directory for this test case
-    pub(crate) fn with_custom_typeshed(
+    pub(crate) fn with_mocked_typeshed(
         self,
         typeshed: MockedTypeshed,
     ) -> TestCaseBuilder<MockedTypeshed> {
         let TestCaseBuilder {
             typeshed_option: _,
-            target_version,
+            python_version,
             first_party_files,
             site_packages_files,
         } = self;
 
         TestCaseBuilder {
             typeshed_option: typeshed,
-            target_version,
+            python_version,
             first_party_files,
             site_packages_files,
         }
@@ -194,15 +194,15 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
             src,
             stdlib: _,
             site_packages,
-            target_version,
-        } = self.with_custom_typeshed(MockedTypeshed::default()).build();
+            python_version,
+        } = self.with_mocked_typeshed(MockedTypeshed::default()).build();
 
         TestCase {
             db,
             src,
             stdlib: (),
             site_packages,
-            target_version,
+            python_version,
         }
     }
 }
@@ -211,7 +211,7 @@ impl TestCaseBuilder<MockedTypeshed> {
     pub(crate) fn build(self) -> TestCase<SystemPathBuf> {
         let TestCaseBuilder {
             typeshed_option,
-            target_version,
+            python_version,
             first_party_files,
             site_packages_files,
         } = self;
@@ -226,11 +226,11 @@ impl TestCaseBuilder<MockedTypeshed> {
         Program::from_settings(
             &db,
             &ProgramSettings {
-                target_version,
+                python_version,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_root: src.clone(),
-                    custom_typeshed: Some(typeshed.clone()),
+                    typeshed: Some(typeshed.clone()),
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
                 },
             },
@@ -242,7 +242,7 @@ impl TestCaseBuilder<MockedTypeshed> {
             src,
             stdlib: typeshed.join("stdlib"),
             site_packages,
-            target_version,
+            python_version,
         }
     }
 
@@ -268,7 +268,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
     pub(crate) fn build(self) -> TestCase<VendoredPathBuf> {
         let TestCaseBuilder {
             typeshed_option: VendoredTypeshed,
-            target_version,
+            python_version,
             first_party_files,
             site_packages_files,
         } = self;
@@ -282,7 +282,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
         Program::from_settings(
             &db,
             &ProgramSettings {
-                target_version,
+                python_version,
                 search_paths: SearchPathSettings {
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
                     ..SearchPathSettings::new(src.clone())
@@ -296,7 +296,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             src,
             stdlib: VendoredPathBuf::from("stdlib"),
             site_packages,
-            target_version,
+            python_version,
         }
     }
 }

@@ -77,7 +77,7 @@ def _(m: int, n: int):
 
 ```toml
 [environment]
-target-version = "3.9"
+python-version = "3.9"
 ```
 
 ```py
