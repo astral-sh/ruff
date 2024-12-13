@@ -15,12 +15,14 @@ def _(x: Annotated[int, "foo"]):
 def _(x: Annotated[int, lambda: 0 + 1 * 2 // 3, _(4)]):
     reveal_type(x)  # revealed: int
 
+def _(x: Annotated[int, "arbitrary", "metadata", "elements", "are", "fine"]):
+    reveal_type(x)  # revealed: int
+
 def _(
     x: Annotated[
         tuple[str, int, tuple[bytes]],
-        # TODO: This error is reporting the wrong thing
-        # error: [invalid-assignment]
-        (_ := b"SyntaxError: named expression cannot be used within an annotation"),
+        # TODO: Emit an error here
+        (foo := b"SyntaxError: named expression cannot be used within an annotation"),
     ]
 ):
     reveal_type(x)  # revealed: tuple[str, int, tuple[bytes]]
