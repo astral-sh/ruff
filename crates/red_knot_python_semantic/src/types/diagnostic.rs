@@ -322,6 +322,18 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for invalid parameters to `typing.Annotated`.
+    ///
+    /// TODO #14889
+    pub(crate) static INVALID_ANNOTATED_PARAMETER = {
+        summary: "detects invalid parameters to Annotated",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for calls to possibly unbound methods.
     ///
     /// TODO #14889

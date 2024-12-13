@@ -52,11 +52,12 @@ use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{
     TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE,
-    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_LITERAL_PARAMETER,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_PARAMETER,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
+    INVALID_ANNOTATED_PARAMETER, INVALID_BASE, INVALID_CONTEXT_MANAGER, INVALID_DECLARATION,
+    INVALID_LITERAL_PARAMETER, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    INVALID_TYPE_PARAMETER, INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE,
+    POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
+    UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
@@ -4808,10 +4809,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             KnownInstanceType::Annotated => {
                 let mut report_invalid_parameters = || {
                     self.diagnostics.add_lint(
-                        &INVALID_TYPE_PARAMETER,
+                        &INVALID_ANNOTATED_PARAMETER,
                         subscript.into(),
                         format_args!(
-                            "Type `{}` expected at least 2 parameters (one type and one annotation)",
+                            "Special form `{}` expected at least 2 parameters (one type and one annotation)",
                             known_instance.repr(self.db)
                         ),
                     );
