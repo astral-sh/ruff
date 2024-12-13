@@ -4836,7 +4836,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     return Type::Unknown;
                 };
 
-                self.infer_type_expression(first)
+                let ty = self.infer_type_expression(first);
+                self.store_expression_type(parameters, ty);
+                ty
             }
             KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
                 Ok(ty) => ty,
