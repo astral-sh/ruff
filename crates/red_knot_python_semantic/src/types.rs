@@ -2791,7 +2791,7 @@ impl KnownFunction {
     }
 }
 
-#[salsa::tracked]
+#[salsa::interned]
 pub struct ModuleLiteralType<'db> {
     pub module: Module,
 }
