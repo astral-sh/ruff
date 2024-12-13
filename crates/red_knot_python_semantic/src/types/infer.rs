@@ -2349,13 +2349,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn module_ty_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
-        resolve_module(self.db, module_name).map(|module| {
-            Type::ModuleLiteral(ModuleLiteralType::new(
-                self.db,
-                module_name.clone(),
-                module.file(),
-            ))
-        })
+        resolve_module(self.db, module_name)
+            .map(|module| Type::ModuleLiteral(ModuleLiteralType::new(self.db, module)))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -3105,7 +3100,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // that name.
         let value_ty = self.infer_expression(value);
         if let Type::ModuleLiteral(module) = &value_ty {
-            let mut submodule_name = module.name(self.db).clone();
+            let mut submodule_name = module.module(self.db).name().clone();
             submodule_name.push(&attr.id);
             if self.index.imports_module(&submodule_name) {
                 if let Some(submodule_ty) = self.module_ty_from_name(&submodule_name) {

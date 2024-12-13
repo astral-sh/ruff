@@ -80,7 +80,7 @@ impl Display for DisplayRepresentation<'_> {
             // any other type
             Type::Todo(todo) => write!(f, "@Todo{todo}"),
             Type::ModuleLiteral(module) => {
-                write!(f, "<module '{}'>", module.name(self.db))
+                write!(f, "<module '{}'>", module.module(self.db).name())
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),

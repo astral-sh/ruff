@@ -14,7 +14,6 @@ pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
 };
 pub(crate) use self::signatures::Signature;
-use crate::module_name::ModuleName;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
@@ -1441,7 +1440,8 @@ impl<'db> Type<'db> {
                         .member(db, "__dict__");
                 }
 
-                let global_lookup = symbol(db, global_scope(db, module_ref.file(db)), name);
+                let global_lookup =
+                    symbol(db, global_scope(db, module_ref.module(db).file()), name);
 
                 // If it's unbound, check if it's present as an instance on `types.ModuleType`
                 // or `builtins.object`.
@@ -2791,12 +2791,9 @@ impl KnownFunction {
     }
 }
 
-#[salsa::interned]
+#[salsa::tracked]
 pub struct ModuleLiteralType<'db> {
-    /// The name of the module being referenced
-    pub name: ModuleName,
-    /// The definition of the module being referenced
-    pub file: File,
+    pub module: Module,
 }
 
 /// Representation of a runtime class object.
@@ -3414,9 +3411,8 @@ pub(crate) mod tests {
                         .class,
                 ),
                 Ty::StdlibModule(module) => {
-                    let name = module.name();
-                    let module = resolve_module(db, &name).unwrap();
-                    Type::ModuleLiteral(ModuleLiteralType::new(db, name, module.file()))
+                    let module = resolve_module(db, &module.name()).unwrap();
+                    Type::ModuleLiteral(ModuleLiteralType::new(db, module))
                 }
                 Ty::SliceLiteral(start, stop, step) => Type::SliceLiteral(SliceLiteralType::new(
                     db,
