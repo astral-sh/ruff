@@ -1794,6 +1794,8 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
+            // TODO: Should emit a diagnostic
+            Type::KnownInstance(KnownInstanceType::Annotated) => Type::Unknown,
             Type::Todo(_) => *self,
             _ => todo_type!("Unsupported or invalid type in a type expression"),
         }
@@ -2163,6 +2165,8 @@ impl<'db> KnownClass {
 /// Enumeration of specific runtime that are special enough to be considered their own type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub enum KnownInstanceType<'db> {
+    /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
+    Annotated,
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
     /// The symbol `typing.LiteralString` (which can also be found as `typing_extensions.LiteralString`)
@@ -2215,6 +2219,7 @@ pub enum KnownInstanceType<'db> {
 impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Annotated => "Annotated",
             Self::Literal => "Literal",
             Self::LiteralString => "LiteralString",
             Self::Optional => "Optional",
@@ -2253,7 +2258,8 @@ impl<'db> KnownInstanceType<'db> {
     /// Evaluate the known instance in boolean context
     pub const fn bool(self) -> Truthiness {
         match self {
-            Self::Literal
+            Self::Annotated
+            | Self::Literal
             | Self::LiteralString
             | Self::Optional
             | Self::TypeVar(_)
@@ -2291,6 +2297,7 @@ impl<'db> KnownInstanceType<'db> {
     /// Return the repr of the symbol at runtime
     pub fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
+            Self::Annotated => "typing.Annotated",
             Self::Literal => "typing.Literal",
             Self::LiteralString => "typing.LiteralString",
             Self::Optional => "typing.Optional",
@@ -2329,6 +2336,7 @@ impl<'db> KnownInstanceType<'db> {
     /// Return the [`KnownClass`] which this symbol is an instance of
     pub const fn class(self) -> KnownClass {
         match self {
+            Self::Annotated => KnownClass::SpecialForm,
             Self::Literal => KnownClass::SpecialForm,
             Self::LiteralString => KnownClass::SpecialForm,
             Self::Optional => KnownClass::SpecialForm,
@@ -2395,6 +2403,7 @@ impl<'db> KnownInstanceType<'db> {
             ("typing", "Tuple") => Some(Self::Tuple),
             ("typing", "Type") => Some(Self::Type),
             ("typing", "Callable") => Some(Self::Callable),
+            ("typing" | "typing_extensions", "Annotated") => Some(Self::Annotated),
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
             ("typing" | "typing_extensions", "LiteralString") => Some(Self::LiteralString),
             ("typing" | "typing_extensions", "Never") => Some(Self::Never),
