@@ -4824,7 +4824,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // `Annotated[]` with less than two parameters is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
                     // giving better diagnostics later on.
-                    // Pyright also does this. Mypy doesn't and fallback to `Any` instead.
+                    // Pyright also does this. Mypy doesn't; it falls back to `Any` instead.
                     return self.infer_type_expression(parameters);
                 };
 
@@ -4837,9 +4837,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     return Type::Unknown;
                 };
 
-                rest.iter().for_each(|expr| {
+                for expr in rest {
                     self.infer_expression(expr);
-                });
+                }
 
                 let ty = self.infer_type_expression(first);
                 self.store_expression_type(parameters, ty);

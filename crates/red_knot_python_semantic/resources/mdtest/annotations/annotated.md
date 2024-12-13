@@ -20,7 +20,7 @@ def _(
         tuple[str, int, tuple[bytes]],
         # TODO: This error is reporting the wrong thing
         # error: [invalid-assignment]
-        (_ := b'SyntaxError: named expression cannot be used within an annotation')
+        (_ := b"SyntaxError: named expression cannot be used within an annotation")
     ]
 ):
     reveal_type(x)  # revealed: tuple[str, int, tuple[bytes]]
