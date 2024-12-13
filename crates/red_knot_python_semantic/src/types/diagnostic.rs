@@ -37,7 +37,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INVALID_LITERAL_PARAMETER);
-    registry.register_lint(&INVALID_ANNOTATED_PARAMETER);
+    registry.register_lint(&INVALID_ANNOTATED_ARGUMENTS);
     registry.register_lint(&CALL_POSSIBLY_UNBOUND_METHOD);
     registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
