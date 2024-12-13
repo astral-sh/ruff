@@ -59,7 +59,8 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     }
 
     let body = docstring.body();
-    let first_word = body.split_once(' ').map_or_else(
+    let trim_start_body = body.trim_start();
+    let first_word = trim_start_body.split_once(' ').map_or_else(
         || {
             // If the docstring is a single word, trim the punctuation marks because
             // it makes the ASCII test below fail.
