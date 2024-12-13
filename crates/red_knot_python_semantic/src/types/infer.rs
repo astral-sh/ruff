@@ -3106,7 +3106,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         if let Type::ModuleLiteral(module) = &value_ty {
             let mut submodule_name = module.name(self.db).clone();
-            submodule_name.append(&attr.id);
+            submodule_name.push(&attr.id);
             if self.index.imports_module(&submodule_name) {
                 if let Some(submodule_ty) = self.module_ty_from_name(&submodule_name) {
                     return submodule_ty;

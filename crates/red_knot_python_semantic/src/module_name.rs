@@ -197,10 +197,10 @@ impl ModuleName {
     /// use red_knot_python_semantic::ModuleName;
     ///
     /// let mut module_name = ModuleName::new_static("foo").unwrap();
-    /// module_name.append(&Name::new("bar"));
+    /// module_name.push(&Name::new("bar"));
     /// assert_eq!(&module_name, "foo.bar");
     /// ```
-    pub fn append(&mut self, name: &Name) {
+    pub fn push(&mut self, name: &Name) {
         self.0.push('.');
         self.0.push_str(name);
     }
@@ -213,18 +213,17 @@ impl ModuleName {
     /// use red_knot_python_semantic::ModuleName;
     ///
     /// assert_eq!(
-    ///     ModuleName::new_static("foo.bar.baz").unwrap().parents().collect::<Vec<_>>(),
-    ///     vec!["foo.bar.baz", "foo.bar", "foo"],
+    ///     ModuleName::new_static("foo.bar.baz").unwrap().ancestors().collect::<Vec<_>>(),
+    ///     vec![
+    ///         ModuleName::new_static("foo.bar.baz").unwrap(),
+    ///         ModuleName::new_static("foo.bar").unwrap(),
+    ///         ModuleName::new_static("foo").unwrap(),
+    ///     ],
     /// );
     /// ```
     #[must_use]
-    pub fn parents(&self) -> impl Iterator<Item = &str> {
-        let mut name = Some(self.as_str());
-        std::iter::from_fn(move || {
-            let result = name;
-            name = name.and_then(|n| n.rsplit_once('.').map(|(p, _)| p));
-            result
-        })
+    pub fn ancestors(&self) -> impl Iterator<Item = Self> {
+        std::iter::successors(Some(self.clone()), Self::parent)
     }
 }
 

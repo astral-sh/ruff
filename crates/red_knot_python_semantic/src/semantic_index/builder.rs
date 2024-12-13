@@ -669,8 +669,8 @@ where
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
                     if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
-                        for name in module_name.parents() {
-                            self.imported_modules.insert(ModuleName::new(name).unwrap());
+                        for name in module_name.ancestors() {
+                            self.imported_modules.insert(name.clone());
                         }
                     }
 
