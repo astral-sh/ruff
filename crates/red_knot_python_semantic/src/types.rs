@@ -3414,7 +3414,9 @@ pub(crate) mod tests {
                         .class,
                 ),
                 Ty::StdlibModule(module) => {
-                    Type::ModuleLiteral(resolve_module(db, &module.name()).unwrap().file())
+                    let name = module.name();
+                    let module = resolve_module(db, &name).unwrap();
+                    Type::ModuleLiteral(ModuleLiteralType::new(db, name, module.file()))
                 }
                 Ty::SliceLiteral(start, stop, step) => Type::SliceLiteral(SliceLiteralType::new(
                     db,
