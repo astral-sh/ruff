@@ -58,3 +58,36 @@ reveal_type(a.b.c.C)  # revealed: Literal[C]
 ```py path=a/b/c.py
 class C: ...
 ```
+
+## Nested with rename
+
+```py
+import a.b as b
+
+reveal_type(b.C)  # revealed: Literal[C]
+```
+
+```py path=a/__init__.py
+```
+
+```py path=a/b.py
+class C: ...
+```
+
+## Deeply nested with rename
+
+```py
+import a.b.c as c
+
+reveal_type(c.C)  # revealed: Literal[C]
+```
+
+```py path=a/__init__.py
+```
+
+```py path=a/b/__init__.py
+```
+
+```py path=a/b/c.py
+class C: ...
+```

@@ -66,7 +66,5 @@ class C: ...
 
 ```py path=q.py
 import a as a
-import a.b
-# XXX: fix as
-b = a.b
+import a.b as b
 ```
