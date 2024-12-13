@@ -30,16 +30,16 @@ use crate::docstrings::Docstring;
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-pub(crate) struct FirstLineCapitalized {
+pub(crate) struct FirstWordUncapitalized {
     first_word: String,
     capitalized_word: String,
 }
 
-impl AlwaysFixableViolation for FirstLineCapitalized {
+impl AlwaysFixableViolation for FirstWordUncapitalized {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "First word of the first line should be capitalized: `{}` -> `{}`",
+            "First word of the docstring should be capitalized: `{}` -> `{}`",
             self.first_word, self.capitalized_word
         )
     }
@@ -98,7 +98,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
             .unwrap();
 
     let mut diagnostic = Diagnostic::new(
-        FirstLineCapitalized {
+        FirstWordUncapitalized {
             first_word: first_word.to_string(),
             capitalized_word: capitalized_word.to_string(),
         },
