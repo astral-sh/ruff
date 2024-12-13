@@ -466,8 +466,8 @@ pub enum DefinitionKind<'db> {
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
 }
 
-impl DefinitionKind<'_> {
-    pub(crate) fn range(&self) -> TextRange {
+impl Ranged for DefinitionKind<'_> {
+    fn range(&self) -> TextRange {
         match self {
             DefinitionKind::Import(alias) => alias.range(),
             DefinitionKind::ImportFrom(import) => import.alias().range(),
@@ -491,7 +491,9 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.name.range(),
         }
     }
+}
 
+impl DefinitionKind<'_> {
     pub(crate) fn category(&self) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
