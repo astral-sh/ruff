@@ -37,6 +37,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INVALID_LITERAL_PARAMETER);
+    registry.register_lint(&INVALID_ANNOTATED_PARAMETER);
     registry.register_lint(&CALL_POSSIBLY_UNBOUND_METHOD);
     registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
@@ -324,7 +325,21 @@ declare_lint! {
     /// ## What it does
     /// Checks for invalid parameters to `typing.Annotated`.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// `Annotated` expects at least two parameters.
+    /// Otherwise, it will raise a runtime error.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// x: Annotated[int]
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```python
+    /// x: Annotated[int, GreaterThan(42)]
+    /// ```
     pub(crate) static INVALID_ANNOTATED_PARAMETER = {
         summary: "detects invalid parameters to Annotated",
         status: LintStatus::preview("1.0.0"),

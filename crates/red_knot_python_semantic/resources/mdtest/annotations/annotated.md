@@ -20,7 +20,7 @@ def _(
         tuple[str, int, tuple[bytes]],
         # TODO: This error is reporting the wrong thing
         # error: [invalid-assignment]
-        (_ := b"SyntaxError: named expression cannot be used within an annotation")
+        (_ := b"SyntaxError: named expression cannot be used within an annotation"),
     ]
 ):
     reveal_type(x)  # revealed: tuple[str, int, tuple[bytes]]
@@ -33,21 +33,22 @@ It is invalid to parametrize `Annotated` with less than two arguments.
 ```py
 from typing_extensions import Annotated
 
+# TODO: This should be an error
 def _(x: Annotated):
     reveal_type(x)  # revealed: Unknown
 
-# error: [invalid-type-parameter]
+# error: [invalid-annotated-parameter]
 def _(x: Annotated[()]):
     reveal_type(x)  # revealed: Unknown
 
-# error: [invalid-type-parameter]
+# error: [invalid-annotated-parameter]
 def _(x: Annotated[(int,)]):
     reveal_type(x)  # revealed: int
 
 # `Annotated[T]` is invalid and will raise an error at runtime,
 # but we treat it the same as `T` to provide better diagnostics later on.
 # The subscription itself is still reported, regardless.
-# error: [invalid-type-parameter]
+# error: [invalid-annotated-parameter]
 def _(x: Annotated[int]):
     reveal_type(x)  # revealed: int
 ```
