@@ -769,34 +769,10 @@ impl<'db> Type<'db> {
                 Type::subclass_of(class).is_subtype_of(db, target)
             }
 
-            // As the `unreachable!()` message says, non-fully-static `SubclassOf` types such as
-            // `type[Any]`,` type[Unknown]` and `type[Todo]` should all be handled right at the top of this function.
-            (
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_),
-                }),
-                _,
-            )
-            | (
-                _,
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_),
-                }),
-            ) => unreachable!(
-                "Non-fully-static types should be handled at the top of this function!"
-            ),
-
-            // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
-            // and `type[int]` describes all possible runtime subclasses of the class `int`.
-            // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
-            (
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(self_class),
-                }),
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(target_class),
-                }),
-            ) => self_class.is_subclass_of(db, target_class),
+            // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
+            (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
+                self_subclass_ty.is_subtype_of(db, target_subclass_ty)
+            }
 
             // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
             // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
@@ -1046,9 +1022,8 @@ impl<'db> Type<'db> {
                 | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::LiteralString,
-            ) => true,
-
-            (
+            )
+            | (
                 Type::ClassLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::BooleanLiteral(..)
@@ -3128,6 +3103,22 @@ impl<'db> SubclassOfType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         Type::from(self.base).member(db, name)
     }
+
+    fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
+        match (self.base, other.base) {
+            // Non-fully-static types do not participate in subtyping
+            (ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_), _)
+            | (_, ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_)) => false,
+
+            // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
+            // and `type[int]` describes all possible runtime subclasses of the class `int`.
+            // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
+            (ClassBase::Class(self_class), ClassBase::Class(other_class)) => {
+                // N.B. The subclass relation is fully static
+                self_class.is_subclass_of(db, other_class)
+            }
+        }
+    }
 }
 
 /// A type representing the set of runtime objects which are instances of a certain class.
@@ -3138,6 +3129,7 @@ pub struct InstanceType<'db> {
 
 impl<'db> InstanceType<'db> {
     fn is_subtype_of(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
+        // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)
     }
 }

@@ -125,7 +125,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(super) fn into_class_literal_type(self) -> Option<Class<'db>> {
+    pub(super) fn into_class(self) -> Option<Class<'db>> {
         match self {
             Self::Class(class) => Some(class),
             _ => None,

@@ -117,7 +117,7 @@ impl<'db> Mro<'db> {
                     for (index, base) in valid_bases
                         .iter()
                         .enumerate()
-                        .filter_map(|(index, base)| Some((index, base.into_class_literal_type()?)))
+                        .filter_map(|(index, base)| Some((index, base.into_class()?)))
                     {
                         if !seen_bases.insert(base) {
                             duplicate_bases.push((index, base));
