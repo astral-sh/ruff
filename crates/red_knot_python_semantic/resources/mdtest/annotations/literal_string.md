@@ -31,9 +31,9 @@ bad_union: Literal["hello", LiteralString]  # error: [invalid-literal-parameter]
 bad_nesting: Literal[LiteralString]  # error: [invalid-literal-parameter]
 ```
 
-### Parametrized
+### Parameterized
 
-`LiteralString` cannot be parametrized.
+`LiteralString` cannot be parameterized.
 
 ```py
 from typing_extensions import LiteralString

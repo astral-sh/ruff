@@ -327,18 +327,22 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// `Annotated` expects at least two arguments.
-    /// Otherwise, it will raise a runtime error.
+    /// Otherwise, it will raise `TypeError` at runtime.
     ///
     /// ## Example
     ///
     /// ```python
+    /// from typing import Annotated
+    ///
     /// x: Annotated[int]
     /// ```
     ///
     /// Use instead:
     ///
     /// ```python
-    /// x: Annotated[int, GreaterThan(42)]
+    /// from typing import Annotated
+    ///
+    /// x: Annotated[int, "important metadata"]
     /// ```
     pub(crate) static INVALID_ANNOTATED_ARGUMENTS = {
         summary: "detects invalid arguments to Annotated",

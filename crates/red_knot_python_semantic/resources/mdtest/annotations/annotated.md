@@ -22,9 +22,9 @@ def _(x: Annotated[tuple[str, int], bytes]):
     reveal_type(x)  # revealed: tuple[str, int]
 ```
 
-## Parametrization
+## Parameterization
 
-It is invalid to parametrize `Annotated` with less than two arguments.
+It is invalid to parameterize `Annotated` with less than two arguments.
 
 ```py
 from typing_extensions import Annotated
@@ -41,17 +41,17 @@ def _(x: Annotated[()]):
 def _(x: Annotated[(int,)]):
     reveal_type(x)  # revealed: int
 
-# `Annotated[T]` is invalid and will raise an error at runtime,
-# but we treat it the same as `T` to provide better diagnostics later on.
-# The subscription itself is still reported, regardless.
 # error: [invalid-annotated-arguments]
 def _(x: Annotated[int]):
+    # `Annotated[T]` is invalid and will raise an error at runtime,
+    # but we treat it the same as `T` to provide better diagnostics later on.
+    # The subscription itself is still reported, regardless.
     reveal_type(x)  # revealed: int
 ```
 
 ## Inheritance
 
-### Correctly parametrized
+### Correctly parameterized
 
 Inheriting from `Annotated[T, ...]` is equivalent to inheriting from `T` itself.
 
@@ -66,7 +66,7 @@ class C(Annotated[int, "foo"]): ...
 reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Unknown, Literal[object]]
 ```
 
-### Not parametrized
+### Not parameterized
 
 ```py
 from typing_extensions import Annotated
