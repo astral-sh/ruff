@@ -30,14 +30,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&CALL_NON_CALLABLE);
-    registry.register_lint(&INVALID_TYPE_PARAMETER);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INCONSISTENT_MRO);
-    registry.register_lint(&INVALID_LITERAL_PARAMETER);
-    registry.register_lint(&INVALID_ANNOTATED_ARGUMENTS);
     registry.register_lint(&CALL_POSSIBLY_UNBOUND_METHOD);
     registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
@@ -251,16 +248,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// TODO #14889
-    pub(crate) static INVALID_TYPE_PARAMETER = {
-        summary: "detects invalid type parameters",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_TYPE_VARIABLE_CONSTRAINTS = {
         summary: "detects invalid type variable constraints",
@@ -304,48 +291,6 @@ declare_lint! {
     /// TODO #14889
     pub(crate) static INCONSISTENT_MRO = {
         summary: "detects class definitions with an inconsistent MRO",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for invalid parameters to `typing.Literal`.
-    ///
-    /// TODO #14889
-    pub(crate) static INVALID_LITERAL_PARAMETER = {
-        summary: "detects invalid literal parameters",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for invalid arguments to `typing.Annotated`.
-    ///
-    /// ## Why is this bad?
-    /// `Annotated` expects at least two arguments.
-    /// Otherwise, it will raise `TypeError` at runtime.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from typing import Annotated
-    ///
-    /// x: Annotated[int]
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```python
-    /// from typing import Annotated
-    ///
-    /// x: Annotated[int, "important metadata"]
-    /// ```
-    pub(crate) static INVALID_ANNOTATED_ARGUMENTS = {
-        summary: "detects invalid arguments to Annotated",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
