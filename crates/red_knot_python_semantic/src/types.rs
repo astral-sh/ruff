@@ -618,7 +618,7 @@ impl<'db> Type<'db> {
         // Two equivalent types are always subtypes of each other.
         //
         // "Equivalent to" here means that the two types are both fully static
-        // and point to exactly the same set of possible runtime objects.
+        // and describe exactly the same set of possible runtime objects.
         // For example, `int` is a subtype of `int` because `int` and `int` are equivalent to each other.
         // Equally, `type[object]` is a subtype of `type`,
         // because the former type expresses "all subclasses of `object`"
