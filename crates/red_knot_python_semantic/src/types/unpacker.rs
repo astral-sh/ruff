@@ -6,30 +6,34 @@ use rustc_hash::FxHashMap;
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{todo_type, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
+use crate::types::{todo_type, Type, TypeCheckDiagnostics};
 use crate::Db;
+
+use super::context::{InferContext, WithDiagnostics};
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db> {
-    db: &'db dyn Db,
+    context: InferContext<'db>,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
-    diagnostics: TypeCheckDiagnosticsBuilder<'db>,
 }
 
 impl<'db> Unpacker<'db> {
     pub(crate) fn new(db: &'db dyn Db, file: File) -> Self {
         Self {
-            db,
+            context: InferContext::new(db, file),
             targets: FxHashMap::default(),
-            diagnostics: TypeCheckDiagnosticsBuilder::new(db, file),
         }
+    }
+
+    fn db(&self) -> &'db dyn Db {
+        self.context.db()
     }
 
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value_ty: Type<'db>, scope: ScopeId<'db>) {
         match target {
             ast::Expr::Name(target_name) => {
                 self.targets
-                    .insert(target_name.scoped_expression_id(self.db, scope), value_ty);
+                    .insert(target_name.scoped_expression_id(self.db(), scope), value_ty);
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.unpack(value, value_ty, scope);
@@ -40,11 +44,11 @@ impl<'db> Unpacker<'db> {
                     let starred_index = elts.iter().position(ast::Expr::is_starred_expr);
 
                     let element_types = if let Some(starred_index) = starred_index {
-                        if tuple_ty.len(self.db) >= elts.len() - 1 {
+                        if tuple_ty.len(self.db()) >= elts.len() - 1 {
                             let mut element_types = Vec::with_capacity(elts.len());
                             element_types.extend_from_slice(
                                 // SAFETY: Safe because of the length check above.
-                                &tuple_ty.elements(self.db)[..starred_index],
+                                &tuple_ty.elements(self.db())[..starred_index],
                             );
 
                             // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
@@ -52,10 +56,10 @@ impl<'db> Unpacker<'db> {
                             let remaining = elts.len() - (starred_index + 1);
                             // This index represents the type of the last element that belongs
                             // to the starred expression, in an exclusive manner.
-                            let starred_end_index = tuple_ty.len(self.db) - remaining;
+                            let starred_end_index = tuple_ty.len(self.db()) - remaining;
                             // SAFETY: Safe because of the length check above.
                             let _starred_element_types =
-                                &tuple_ty.elements(self.db)[starred_index..starred_end_index];
+                                &tuple_ty.elements(self.db())[starred_index..starred_end_index];
                             // TODO: Combine the types into a list type. If the
                             // starred_element_types is empty, then it should be `List[Any]`.
                             // combine_types(starred_element_types);
@@ -63,11 +67,11 @@ impl<'db> Unpacker<'db> {
 
                             element_types.extend_from_slice(
                                 // SAFETY: Safe because of the length check above.
-                                &tuple_ty.elements(self.db)[starred_end_index..],
+                                &tuple_ty.elements(self.db())[starred_end_index..],
                             );
                             Cow::Owned(element_types)
                         } else {
-                            let mut element_types = tuple_ty.elements(self.db).to_vec();
+                            let mut element_types = tuple_ty.elements(self.db()).to_vec();
                             // Subtract 1 to insert the starred expression type at the correct
                             // index.
                             element_types.resize(elts.len() - 1, Type::Unknown);
@@ -76,7 +80,7 @@ impl<'db> Unpacker<'db> {
                             Cow::Owned(element_types)
                         }
                     } else {
-                        Cow::Borrowed(tuple_ty.elements(self.db).as_ref())
+                        Cow::Borrowed(tuple_ty.elements(self.db()).as_ref())
                     };
 
                     for (index, element) in elts.iter().enumerate() {
@@ -94,9 +98,9 @@ impl<'db> Unpacker<'db> {
                     // individual character, instead of just an array of `LiteralString`, but
                     // there would be a cost and it's not clear that it's worth it.
                     let value_ty = Type::tuple(
-                        self.db,
+                        self.db(),
                         std::iter::repeat(Type::LiteralString)
-                            .take(string_literal_ty.python_len(self.db)),
+                            .take(string_literal_ty.python_len(self.db())),
                     );
                     self.unpack(target, value_ty, scope);
                 }
@@ -105,8 +109,8 @@ impl<'db> Unpacker<'db> {
                         Type::LiteralString
                     } else {
                         value_ty
-                            .iterate(self.db)
-                            .unwrap_with_diagnostic(AnyNodeRef::from(target), &mut self.diagnostics)
+                            .iterate(self.db())
+                            .unwrap_with_diagnostic(&self.context, AnyNodeRef::from(target))
                     };
                     for element in elts {
                         self.unpack(element, value_ty, scope);
@@ -120,7 +124,7 @@ impl<'db> Unpacker<'db> {
     pub(crate) fn finish(mut self) -> UnpackResult<'db> {
         self.targets.shrink_to_fit();
         UnpackResult {
-            diagnostics: self.diagnostics.finish(),
+            diagnostics: self.context.finish(),
             targets: self.targets,
         }
     }
@@ -136,8 +140,10 @@ impl<'db> UnpackResult<'db> {
     pub(crate) fn get(&self, expr_id: ScopedExpressionId) -> Option<Type<'db>> {
         self.targets.get(&expr_id).copied()
     }
+}
 
-    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
+impl WithDiagnostics for UnpackResult<'_> {
+    fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
     }
 }

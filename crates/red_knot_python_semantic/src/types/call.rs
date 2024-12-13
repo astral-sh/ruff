@@ -1,4 +1,5 @@
-use super::diagnostic::{TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE};
+use super::context::InferContext;
+use super::diagnostic::CALL_NON_CALLABLE;
 use super::{Severity, Type, TypeArrayDisplay, UnionBuilder};
 use crate::Db;
 use ruff_db::diagnostic::DiagnosticId;
@@ -86,24 +87,23 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call, emitting default diagnostics if needed.
-    pub(super) fn unwrap_with_diagnostic<'a>(
+    pub(super) fn unwrap_with_diagnostic(
         &self,
-        db: &'db dyn Db,
+        context: &InferContext<'db>,
         node: ast::AnyNodeRef,
-        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Type<'db> {
-        match self.return_ty_result(db, node, diagnostics) {
+        match self.return_ty_result(context, node) {
             Ok(return_ty) => return_ty,
             Err(NotCallableError::Type {
                 not_callable_ty,
                 return_ty,
             }) => {
-                diagnostics.add_lint(
+                context.report_lint(
                     &CALL_NON_CALLABLE,
                     node,
                     format_args!(
                         "Object of type `{}` is not callable",
-                        not_callable_ty.display(db)
+                        not_callable_ty.display(context.db())
                     ),
                 );
                 return_ty
@@ -113,13 +113,13 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add_lint(
+                context.report_lint(
                     &CALL_NON_CALLABLE,
                     node,
                     format_args!(
                         "Object of type `{}` is not callable (due to union element `{}`)",
-                        called_ty.display(db),
-                        not_callable_ty.display(db),
+                        called_ty.display(context.db()),
+                        not_callable_ty.display(context.db()),
                     ),
                 );
                 return_ty
@@ -129,13 +129,13 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                diagnostics.add_lint(
+                context.report_lint(
                     &CALL_NON_CALLABLE,
                     node,
                     format_args!(
                         "Object of type `{}` is not callable (due to union elements {})",
-                        called_ty.display(db),
-                        not_callable_tys.display(db),
+                        called_ty.display(context.db()),
+                        not_callable_tys.display(context.db()),
                     ),
                 );
                 return_ty
@@ -144,12 +144,12 @@ impl<'db> CallOutcome<'db> {
                 callable_ty: called_ty,
                 return_ty,
             }) => {
-                diagnostics.add_lint(
+                context.report_lint(
                     &CALL_NON_CALLABLE,
                     node,
                     format_args!(
                         "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                        called_ty.display(db)
+                        called_ty.display(context.db())
                     ),
                 );
                 return_ty
@@ -158,11 +158,10 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Get the return type of the call as a result.
-    pub(super) fn return_ty_result<'a>(
+    pub(super) fn return_ty_result(
         &self,
-        db: &'db dyn Db,
+        context: &InferContext<'db>,
         node: ast::AnyNodeRef,
-        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Result<Type<'db>, NotCallableError<'db>> {
         match self {
             Self::Callable { return_ty } => Ok(*return_ty),
@@ -170,11 +169,11 @@ impl<'db> CallOutcome<'db> {
                 return_ty,
                 revealed_ty,
             } => {
-                diagnostics.add(
+                context.report_diagnostic(
                     node,
                     DiagnosticId::RevealedType,
                     Severity::Info,
-                    format_args!("Revealed type is `{}`", revealed_ty.display(db)),
+                    format_args!("Revealed type is `{}`", revealed_ty.display(context.db())),
                 );
                 Ok(*return_ty)
             }
@@ -187,14 +186,16 @@ impl<'db> CallOutcome<'db> {
                 call_outcome,
             } => Err(NotCallableError::PossiblyUnboundDunderCall {
                 callable_ty: *called_ty,
-                return_ty: call_outcome.return_ty(db).unwrap_or(Type::Unknown),
+                return_ty: call_outcome
+                    .return_ty(context.db())
+                    .unwrap_or(Type::Unknown),
             }),
             Self::Union {
                 outcomes,
                 called_ty,
             } => {
                 let mut not_callable = vec![];
-                let mut union_builder = UnionBuilder::new(db);
+                let mut union_builder = UnionBuilder::new(context.db());
                 let mut revealed = false;
                 for outcome in outcomes {
                     let return_ty = match outcome {
@@ -210,10 +211,10 @@ impl<'db> CallOutcome<'db> {
                                 *return_ty
                             } else {
                                 revealed = true;
-                                outcome.unwrap_with_diagnostic(db, node, diagnostics)
+                                outcome.unwrap_with_diagnostic(context, node)
                             }
                         }
-                        _ => outcome.unwrap_with_diagnostic(db, node, diagnostics),
+                        _ => outcome.unwrap_with_diagnostic(context, node),
                     };
                     union_builder = union_builder.add(return_ty);
                 }
