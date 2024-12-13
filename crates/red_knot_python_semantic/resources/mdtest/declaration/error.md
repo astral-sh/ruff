@@ -49,7 +49,7 @@ def _(flag: bool):
 
 ### Partial declarations in try-except
 
-Refer to https://github.com/astral-sh/ruff/issues/13966
+Refer to <https://github.com/astral-sh/ruff/issues/13966>
 
 ```py
 def _():
