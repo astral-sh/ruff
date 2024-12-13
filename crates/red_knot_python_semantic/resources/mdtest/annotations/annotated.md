@@ -9,7 +9,10 @@
 ```py
 from typing_extensions import Annotated
 
-def f(x: Annotated[int, "foo"]):
+def _(x: Annotated[int, "foo"]):
+    reveal_type(x)  # revealed: int
+
+def _(x: Annotated[int, lambda: 0 + 1 * 2 // 3, _(1)]):
     reveal_type(x)  # revealed: int
 ```
 

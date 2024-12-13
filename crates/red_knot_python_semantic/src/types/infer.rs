@@ -4817,16 +4817,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     );
                 };
 
-                // `Annotated[]` with less than two parameters is an error at runtime.
-                // However, we still treat `Annotated[T]` as `T` here for the purpose of
-                // giving better diagnostics later on.
-                // Pyright also does this. Mypy doesn't and fallback to `Any` instead.
                 let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = parameters else {
                     report_invalid_parameters();
 
-                    let ty = self.infer_type_expression(parameters);
-                    self.store_expression_type(subscript, ty);
-                    return ty;
+                    // `Annotated[]` with less than two parameters is an error at runtime.
+                    // However, we still treat `Annotated[T]` as `T` here for the purpose of
+                    // giving better diagnostics later on.
+                    // Pyright also does this. Mypy doesn't and fallback to `Any` instead.
+                    return self.infer_type_expression(parameters);
                 };
 
                 if elts.len() < 2 {
@@ -4834,14 +4832,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let [first, ..] = &elts[..] else {
-                    let ty = Type::Unknown;
-                    self.store_expression_type(subscript, ty);
-                    return ty;
+                    return Type::Unknown;
                 };
 
-                let ty = self.infer_type_expression(first);
-                self.store_expression_type(subscript, ty);
-                ty
+                self.infer_type_expression(first)
             }
             KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
                 Ok(ty) => ty,
