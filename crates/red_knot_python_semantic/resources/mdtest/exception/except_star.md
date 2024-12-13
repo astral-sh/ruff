@@ -1,5 +1,12 @@
 # `except*`
 
+`except*` is only available in Python 3.11 and later:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ## `except*` with `BaseException`
 
 ```py
