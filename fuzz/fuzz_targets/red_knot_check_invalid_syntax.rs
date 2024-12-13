@@ -110,7 +110,7 @@ fn setup_db() -> TestDb {
     Program::from_settings(
         &db,
         &ProgramSettings {
-            target_version: PythonVersion::default(),
+            python_version: PythonVersion::default(),
             search_paths: SearchPathSettings::new(src_root),
         },
     )
