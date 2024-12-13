@@ -655,10 +655,12 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|&elem_ty| elem_ty.is_subtype_of(db, target)),
+
             (_, Type::Union(union)) => union
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
+
             (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
                 // Check that all target positive values are covered in self positive values
                 target_intersection
@@ -685,10 +687,12 @@ impl<'db> Type<'db> {
                             })
                         })
             }
+
             (Type::Intersection(intersection), _) => intersection
                 .positive(db)
                 .iter()
                 .any(|&elem_ty| elem_ty.is_subtype_of(db, target)),
+
             (_, Type::Intersection(intersection)) => {
                 intersection
                     .positive(db)
@@ -1006,6 +1010,8 @@ impl<'db> Type<'db> {
                 }
             }
 
+            // any single-valued type is disjoint from another single-valued type
+            // iff the two types are nonequal
             (
                 left @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
@@ -1014,7 +1020,8 @@ impl<'db> Type<'db> {
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::ClassLiteral(..)),
+                | Type::ClassLiteral(..)
+                | Type::KnownInstance(..)),
                 right @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
@@ -1022,8 +1029,37 @@ impl<'db> Type<'db> {
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::ClassLiteral(..)),
+                | Type::ClassLiteral(..)
+                | Type::KnownInstance(..)),
             ) => left != right,
+
+            // One tuple type can be a subtype of another tuple type,
+            // but we know for sure that any given tuple type is disjoint from all single-valued types
+            (
+                Type::Tuple(..),
+                Type::ClassLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::LiteralString,
+            ) => true,
+
+            (
+                Type::ClassLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::LiteralString,
+                Type::Tuple(..),
+            ) => true,
 
             (
                 Type::SubclassOf(SubclassOfType {
@@ -1037,10 +1073,13 @@ impl<'db> Type<'db> {
                     base: ClassBase::Class(class_a),
                 }),
             ) => !class_b.is_subclass_of(db, class_a),
+
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
+
             (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
                 false
             }
+
             (
                 Type::SubclassOf(_),
                 Type::BooleanLiteral(..)
@@ -1061,6 +1100,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..),
                 Type::SubclassOf(_),
             ) => true,
+
             (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
                 // TODO: Once we have support for final classes, we can determine disjointness in some cases
                 // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
@@ -1068,13 +1108,14 @@ impl<'db> Type<'db> {
                 // final classes inside `Type::SubclassOf` everywhere.
                 false
             }
-            (Type::KnownInstance(left), Type::KnownInstance(right)) => left != right,
+
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_disjoint_from(db, right)
             }
             (left, Type::KnownInstance(right)) => {
                 left.is_disjoint_from(db, right.instance_fallback(db))
             }
+
             (
                 Type::Instance(InstanceType { class: class_none }),
                 Type::Instance(InstanceType { class: class_other }),
@@ -1086,6 +1127,7 @@ impl<'db> Type<'db> {
                 class_other.known(db),
                 Some(KnownClass::NoneType | KnownClass::Object)
             ),
+
             (Type::Instance(InstanceType { class: class_none }), _)
             | (_, Type::Instance(InstanceType { class: class_none }))
                 if class_none.is_known(db, KnownClass::NoneType) =>
@@ -1112,7 +1154,6 @@ impl<'db> Type<'db> {
             | (Type::Instance(InstanceType { class }), Type::StringLiteral(..)) => {
                 !matches!(class.known(db), Some(KnownClass::Str | KnownClass::Object))
             }
-            (Type::StringLiteral(..), _) | (_, Type::StringLiteral(..)) => true,
 
             (Type::LiteralString, Type::LiteralString) => false,
             (Type::LiteralString, Type::Instance(InstanceType { class }))
@@ -1126,14 +1167,12 @@ impl<'db> Type<'db> {
                 class.known(db),
                 Some(KnownClass::Bytes | KnownClass::Object)
             ),
-            (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
 
             (Type::SliceLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::SliceLiteral(..)) => !matches!(
                 class.known(db),
                 Some(KnownClass::Slice | KnownClass::Object)
             ),
-            (Type::SliceLiteral(..), _) | (_, Type::SliceLiteral(..)) => true,
 
             (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::ClassLiteral(..)) => {
@@ -1161,29 +1200,28 @@ impl<'db> Type<'db> {
                 false
             }
 
-            (Type::Tuple(tuple), other) | (other, Type::Tuple(tuple)) => {
-                if let Type::Tuple(other_tuple) = other {
-                    if tuple.len(db) == other_tuple.len(db) {
-                        tuple
-                            .elements(db)
-                            .iter()
-                            .zip(other_tuple.elements(db))
-                            .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
-                    } else {
-                        true
-                    }
+            (Type::Tuple(tuple), Type::Tuple(other_tuple)) => {
+                if tuple.len(db) == other_tuple.len(db) {
+                    tuple
+                        .elements(db)
+                        .iter()
+                        .zip(other_tuple.elements(db))
+                        .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
                 } else {
-                    // We can not be sure if the tuple is disjoint from 'other' because:
-                    //   - 'other' might be the homogeneous arbitrary-length tuple type
-                    //     tuple[T, ...] (which we don't have support for yet); if all of
-                    //     our element types are not disjoint with T, this is not disjoint
-                    //   - 'other' might be a user subtype of tuple, which, if generic
-                    //     over the same or compatible *Ts, would overlap with tuple.
-                    //
-                    // TODO: add checks for the above cases once we support them
-
-                    false
+                    true
                 }
+            }
+
+            (Type::Tuple(..), Type::Instance(..)) | (Type::Instance(..), Type::Tuple(..)) => {
+                // We can not be sure if the tuple is disjoint from the instance because:
+                //   - 'other' might be the homogeneous arbitrary-length tuple type
+                //     tuple[T, ...] (which we don't have support for yet); if all of
+                //     our element types are not disjoint with T, this is not disjoint
+                //   - 'other' might be a user subtype of tuple, which, if generic
+                //     over the same or compatible *Ts, would overlap with tuple.
+                //
+                // TODO: add checks for the above cases once we support them
+                false
             }
         }
     }
@@ -3677,6 +3715,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1)]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
+    #[test_case(Ty::Tuple(vec![]), Ty::BuiltinClassLiteral("object"))]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
