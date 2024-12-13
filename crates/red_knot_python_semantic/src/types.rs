@@ -2925,10 +2925,10 @@ impl<'db> Class<'db> {
         Some(metaclass_ty)
     }
 
-    /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
+    /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: `type[Unknown]` would be a more precise fallback
-        self.try_metaclass(db).unwrap_or(Type::Unknown)
+        self.try_metaclass(db)
+            .unwrap_or_else(|_| Type::subclass_of_base(ClassBase::Unknown))
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
@@ -2941,9 +2941,7 @@ impl<'db> Class<'db> {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
-            //
-            // TODO: `type[Unknown]` might be better here?
-            return Ok(Type::Unknown);
+            return Ok(Type::subclass_of_base(ClassBase::Unknown));
         }
 
         let explicit_metaclass = self.explicit_metaclass(db);

@@ -68,7 +68,7 @@ class B(metaclass=M2): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`C`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class C(A, B): ...
 
-reveal_type(C.__class__)  # revealed: Unknown
+reveal_type(C.__class__)  # revealed: type[Unknown]
 ```
 
 ## Conflict (2)
@@ -85,7 +85,7 @@ class A(metaclass=M1): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`B`) must be a subclass of the metaclasses of all its bases, but `M2` (metaclass of `B`) and `M1` (metaclass of base class `A`) have no subclass relationship"
 class B(A, metaclass=M2): ...
 
-reveal_type(B.__class__)  # revealed: Unknown
+reveal_type(B.__class__)  # revealed: type[Unknown]
 ```
 
 ## Common metaclass
@@ -129,7 +129,7 @@ class C(metaclass=M12): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`D`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class D(A, B, C): ...
 
-reveal_type(D.__class__)  # revealed: Unknown
+reveal_type(D.__class__)  # revealed: type[Unknown]
 ```
 
 ## Unknown
@@ -183,7 +183,7 @@ class A(B): ...  # error: [cyclic-class-definition]
 class B(C): ...  # error: [cyclic-class-definition]
 class C(A): ...  # error: [cyclic-class-definition]
 
-reveal_type(A.__class__)  # revealed: Unknown
+reveal_type(A.__class__)  # revealed: type[Unknown]
 ```
 
 ## PEP 695 generic
