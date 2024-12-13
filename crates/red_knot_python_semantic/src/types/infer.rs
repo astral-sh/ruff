@@ -3375,8 +3375,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (left_ty @ Type::Instance(left), right_ty @ Type::Instance(right), op) => {
-                if left != right && right.is_instance_of(self.db, left.class) {
+            (Type::Instance(left), Type::Instance(right), op) => {
+                if left != right && right.is_subtype_of(self.db, left) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right.class.class_member(self.db, reflected_dunder);
                     if !rhs_reflected.is_unbound()
@@ -5320,7 +5320,7 @@ fn perform_rich_comparison<'db>(
     };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-    if left != right && right.is_instance_of(db, left.class) {
+    if left != right && right.is_subtype_of(db, left) {
         call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
     } else {
         call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))

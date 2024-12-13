@@ -681,7 +681,7 @@ impl<'db> Type<'db> {
                                 target_neg_elem.is_subtype_of(db, self_neg_elem)
                             // Is target negative value is disjoint from a self positive value?
                             }) || self_intersection.positive(db).iter().any(|&self_pos_elem| {
-                                target_neg_elem.is_disjoint_from(db, self_pos_elem)
+                                self_pos_elem.is_disjoint_from(db, target_neg_elem)
                             })
                         })
             }
@@ -697,7 +697,7 @@ impl<'db> Type<'db> {
                     && intersection
                         .negative(db)
                         .iter()
-                        .all(|&neg_ty| neg_ty.is_disjoint_from(db, self))
+                        .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
             }
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
@@ -804,7 +804,7 @@ impl<'db> Type<'db> {
                 Type::Instance(InstanceType {
                     class: target_class,
                 }),
-            ) => ClassLiteralType { class: self_class }.is_instance_of(db, target_class),
+            ) => self_class.is_instance_of(db, target_class),
 
             // Other than the cases enumerated above, `type[]` just delegates to `Instance("type")`
             (Type::SubclassOf(_), _) => KnownClass::Type.to_instance(db).is_subtype_of(db, target),
@@ -828,7 +828,9 @@ impl<'db> Type<'db> {
             }
 
             // `bool` is a subtype of `int`, because all instances of `bool` are also instances of `int`.
-            (Type::Instance(left), Type::Instance(right)) => left.is_instance_of(db, right.class),
+            (Type::Instance(self_instance), Type::Instance(target_instance)) => {
+                self_instance.is_subtype_of(db, target_instance)
+            }
 
             // Other than the special cases enumerated above,
             // `Instance` types are never subtypes of any other variants
@@ -2853,6 +2855,17 @@ impl<'db> Class<'db> {
         self.iter_mro(db).contains(&ClassBase::Class(other))
     }
 
+    /// Return `true` if this class object is an instance of the class `other`.
+    ///
+    /// A class is an instance of its metaclass; consequently,
+    /// a class will only ever be an instance of another class
+    /// if its metaclass is a subclass of that other class.
+    fn is_instance_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
+        self.metaclass(db).into_class_literal().is_some_and(
+            |ClassLiteralType { class: metaclass }| metaclass.is_subclass_of(db, other),
+        )
+    }
+
     /// Return the explicit `metaclass` of this class, if one is defined.
     ///
     /// ## Note
@@ -3057,18 +3070,6 @@ impl<'db> ClassLiteralType<'db> {
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         self.class.class_member(db, name)
     }
-
-    /// Return `true` if the singleton class object represented by this type
-    /// is an instance of the class `other`.
-    ///
-    /// A class is an instance of its metaclass; consequently,
-    /// a class will only ever be an instance of another class
-    /// if its metaclass is a subclass of that other class.
-    fn is_instance_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
-        self.class.metaclass(db).into_class_literal().is_some_and(
-            |ClassLiteralType { class: metaclass }| metaclass.is_subclass_of(db, other),
-        )
-    }
 }
 
 impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
@@ -3096,9 +3097,8 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    /// Return `true` if members of this type are instances of the class `class` at runtime.
-    pub fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
-        self.class.is_subclass_of(db, class)
+    fn is_subtype_of(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
+        self.class.is_subclass_of(db, other.class)
     }
 }
 
