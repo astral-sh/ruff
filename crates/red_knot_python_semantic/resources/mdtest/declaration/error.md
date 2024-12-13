@@ -19,16 +19,6 @@ def _(flag: bool):
     x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: str, int"
 ```
 
-## Partial declarations
-
-```py
-def _(flag: bool):
-    if flag:
-        x: int
-
-    x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: Unknown, int"
-```
-
 ## Incompatible declarations with bad assignment
 
 ```py
@@ -41,4 +31,32 @@ def _(flag: bool):
     # error: [conflicting-declarations]
     # error: [invalid-assignment]
     x = b"foo"
+```
+
+## No errors
+
+Currently, we avoid raising the conflicting-declarations for the following cases:
+
+### Partial declarations
+
+```py
+def _(flag: bool):
+    if flag:
+        x: int
+
+    x = 1
+```
+
+### Partial declarations in try-except
+
+Refer to https://github.com/astral-sh/ruff/issues/13966
+
+```py
+def _():
+    try:
+        x: int = 1
+    except:
+        x = 2
+
+    x = 3
 ```

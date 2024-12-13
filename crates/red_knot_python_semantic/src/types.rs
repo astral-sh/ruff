@@ -444,6 +444,10 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Type::Unknown)
+    }
+
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
