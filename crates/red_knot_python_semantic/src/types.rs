@@ -1441,7 +1441,7 @@ impl<'db> Type<'db> {
                         .member(db, "__dict__");
                 }
 
-                let global_lookup = symbol(db, global_scope(db, module_ref.module(db)), name);
+                let global_lookup = symbol(db, global_scope(db, module_ref.file(db)), name);
 
                 // If it's unbound, check if it's present as an instance on `types.ModuleType`
                 // or `builtins.object`.
@@ -2796,7 +2796,7 @@ pub struct ModuleLiteralType<'db> {
     /// The name of the module being referenced
     pub name: ModuleName,
     /// The definition of the module being referenced
-    pub module: File,
+    pub file: File,
 }
 
 /// Representation of a runtime class object.
