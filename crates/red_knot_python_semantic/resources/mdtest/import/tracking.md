@@ -42,7 +42,7 @@ class C: ...
 ## Rename a re-export
 
 This test highlights how import tracking is local to each file, but specifically to the file where a
-containing module is first reference. This allows the main module to see that `q.a` contains a
+containing module is first referenced. This allows the main module to see that `q.a` contains a
 submodule `b`, even though `a.b` is never imported in the main module.
 
 ```py
