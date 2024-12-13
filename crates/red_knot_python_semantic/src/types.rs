@@ -14,7 +14,7 @@ pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
 };
 pub(crate) use self::signatures::Signature;
-use crate::module_resolver::file_to_module;
+use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
@@ -1440,6 +1440,24 @@ impl<'db> Type<'db> {
                         .member(db, "__dict__");
                 }
 
+                // If the file containing the original module reference has imported a submodule of
+                // this module named [name], then the result is that submodule, even if the module
+                // also defines a (non-module) symbol with that name.
+                let containing_file = module_ref.containing_file(db);
+                let containing_index = semantic_index(db, containing_file);
+                let mut submodule_name = module_ref.module(db).name().clone();
+                submodule_name.push(&ast::name::Name::from(name));
+                if containing_index.imports_module(&submodule_name) {
+                    if let Some(submodule) = resolve_module(db, &submodule_name) {
+                        let submodule_ty = Type::ModuleLiteral(ModuleLiteralType::new(
+                            db,
+                            containing_file,
+                            submodule,
+                        ));
+                        return Symbol::Type(submodule_ty, Boundness::Bound);
+                    }
+                }
+
                 let global_lookup =
                     symbol(db, global_scope(db, module_ref.module(db).file()), name);
 
@@ -2793,6 +2811,7 @@ impl KnownFunction {
 
 #[salsa::interned]
 pub struct ModuleLiteralType<'db> {
+    pub containing_file: File,
     pub module: Module,
 }
 
@@ -3412,7 +3431,7 @@ pub(crate) mod tests {
                 ),
                 Ty::StdlibModule(module) => {
                     let module = resolve_module(db, &module.name()).unwrap();
-                    Type::ModuleLiteral(ModuleLiteralType::new(db, module))
+                    Type::ModuleLiteral(ModuleLiteralType::new(db, module.file(), module))
                 }
                 Ty::SliceLiteral(start, stop, step) => Type::SliceLiteral(SliceLiteralType::new(
                     db,

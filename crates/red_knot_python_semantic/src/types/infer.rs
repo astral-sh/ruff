@@ -2143,7 +2143,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             return;
         };
 
-        let binding_ty = if let Some(_) = asname {
+        let binding_ty = if asname.is_some() {
             // If we are renaming the imported module via an `as` clause, then we bind the resolved
             // module's type to that name, even if that module is nested.
             full_module_ty
@@ -2350,7 +2350,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn module_ty_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
         resolve_module(self.db, module_name)
-            .map(|module| Type::ModuleLiteral(ModuleLiteralType::new(self.db, module)))
+            .map(|module| Type::ModuleLiteral(ModuleLiteralType::new(self.db, self.file, module)))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -3095,20 +3095,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = attribute;
 
-        // If value is a module, and we have imported a submodule of that module named [attr], then
-        // the result is that submodule, even if the module also defines a (non-module) symbol with
-        // that name.
         let value_ty = self.infer_expression(value);
-        if let Type::ModuleLiteral(module) = &value_ty {
-            let mut submodule_name = module.module(self.db).name().clone();
-            submodule_name.push(&attr.id);
-            if self.index.imports_module(&submodule_name) {
-                if let Some(submodule_ty) = self.module_ty_from_name(&submodule_name) {
-                    return submodule_ty;
-                }
-            }
-        }
-
         match value_ty.member(self.db, &attr.id) {
             Symbol::Type(member_ty, boundness) => {
                 if boundness == Boundness::PossiblyUnbound {

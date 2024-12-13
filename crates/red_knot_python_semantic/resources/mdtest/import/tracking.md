@@ -41,9 +41,9 @@ class C: ...
 
 ## Rename a re-export
 
-This test highlights how import tracking is local to each file. The `q` module re-exports the `a`
-module as `q.a`, and the `a.b` module as `q.b`. Importantly, it is _not_ possible to access `q.a.b`,
-since in the main module, we cannot see that `a.b` was imported.
+This test highlights how import tracking is local to each file, but specifically to the file where a
+containing module is first reference. This allows the main module to see that `q.a` contains a
+submodule `b`, even though `a.b` is never imported in the main module.
 
 ```py
 from q import a, b
@@ -51,10 +51,8 @@ from q import a, b
 reveal_type(b)  # revealed: <module 'a.b'>
 reveal_type(b.C)  # revealed: Literal[C]
 
-# error: "Type `<module 'a'>` has no attribute `b`"
-reveal_type(a.b)  # revealed: Unknown
-# error: "Type `<module 'a'>` has no attribute `b`"
-reveal_type(a.b.C)  # revealed: Unknown
+reveal_type(a.b)  # revealed: <module 'a.b'>
+reveal_type(a.b.C)  # revealed: Literal[C]
 ```
 
 ```py path=a/__init__.py
