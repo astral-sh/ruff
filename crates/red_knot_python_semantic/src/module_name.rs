@@ -221,7 +221,6 @@ impl ModuleName {
     ///     ],
     /// );
     /// ```
-    #[must_use]
     pub fn ancestors(&self) -> impl Iterator<Item = Self> {
         std::iter::successors(Some(self.clone()), Self::parent)
     }
