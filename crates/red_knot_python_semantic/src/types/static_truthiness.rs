@@ -81,7 +81,7 @@ impl StaticTruthiness {
                             .expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
 
                         if subject_ty.is_single_valued(db) {
-                            Truthiness::from_bool(subject_ty.is_equivalent_to(db, value_ty))
+                            Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
                         } else {
                             Truthiness::Ambiguous
                         }
