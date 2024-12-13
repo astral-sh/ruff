@@ -120,6 +120,14 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
 /// Shorthand for `symbol_by_id` that takes a symbol name instead of an ID.
 fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
+    // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
+    // is just a re-export of `typing.TYPE_CHECKING`.
+    if name == "TYPE_CHECKING"
+        && file_to_module(db, scope.file(db)).is_some_and(|module| module.name() == "typing")
+    {
+        return Symbol::Type(Type::BooleanLiteral(true), Boundness::Bound);
+    }
+
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
