@@ -323,10 +323,10 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for invalid parameters to `typing.Annotated`.
+    /// Checks for invalid arguments to `typing.Annotated`.
     ///
     /// ## Why is this bad?
-    /// `Annotated` expects at least two parameters.
+    /// `Annotated` expects at least two arguments.
     /// Otherwise, it will raise a runtime error.
     ///
     /// ## Example
@@ -340,8 +340,8 @@ declare_lint! {
     /// ```python
     /// x: Annotated[int, GreaterThan(42)]
     /// ```
-    pub(crate) static INVALID_ANNOTATED_PARAMETER = {
-        summary: "detects invalid parameters to Annotated",
+    pub(crate) static INVALID_ANNOTATED_ARGUMENTS = {
+        summary: "detects invalid arguments to Annotated",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
