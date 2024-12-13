@@ -10,8 +10,8 @@ use crate::docstrings::Docstring;
 /// Checks for docstrings that do not start with a capital letter.
 ///
 /// ## Why is this bad?
-/// The first character in a docstring should be capitalized for, grammatical
-/// correctness and consistency.
+/// The first non-whitespace character in a docstring should be
+/// capitalized for grammatical correctness and consistency.
 ///
 /// ## Example
 /// ```python
