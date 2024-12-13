@@ -1,8 +1,7 @@
 use std::sync::LazyLock;
 
-use anyhow::{bail, Context};
+use anyhow::bail;
 use memchr::memchr2;
-use red_knot_python_semantic::PythonVersion;
 use regex::{Captures, Match, Regex};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -74,8 +73,8 @@ impl<'m, 's> MarkdownTest<'m, 's> {
         self.files.iter()
     }
 
-    pub(crate) fn python_version(&self) -> PythonVersion {
-        self.section.python_version
+    pub(crate) fn configuration(&self) -> &MarkdownTestConfig {
+        &self.section.config
     }
 }
 
@@ -125,7 +124,7 @@ struct Section<'s> {
     title: &'s str,
     level: u8,
     parent_id: Option<SectionId>,
-    python_version: PythonVersion,
+    config: MarkdownTestConfig,
 }
 
 #[newtype_index]
@@ -222,7 +221,7 @@ impl<'s> Parser<'s> {
             title,
             level: 0,
             parent_id: None,
-            python_version: PythonVersion::default(),
+            config: MarkdownTestConfig::default(),
         });
         Self {
             sections,
@@ -305,7 +304,7 @@ impl<'s> Parser<'s> {
             title,
             level: header_level.try_into()?,
             parent_id: Some(parent),
-            python_version: self.sections[parent].python_version,
+            config: self.sections[parent].config.clone(),
         };
 
         if self.current_section_files.is_some() {
@@ -398,23 +397,8 @@ impl<'s> Parser<'s> {
             bail!("Multiple TOML configuration blocks in the same section are not allowed.");
         }
 
-        let config = MarkdownTestConfig::from_str(code)?;
-        let python_version = config.environment.python_version;
-
-        let parts = python_version
-            .split('.')
-            .map(str::parse)
-            .collect::<Result<Vec<_>, _>>()
-            .context(format!(
-                "Invalid 'python-version' component: '{python_version}'"
-            ))?;
-
-        if parts.len() != 2 {
-            bail!("Invalid 'python-version': expected MAJOR.MINOR, got '{python_version}'.",);
-        }
-
         let current_section = &mut self.sections[self.stack.top()];
-        current_section.python_version = PythonVersion::from((parts[0], parts[1]));
+        current_section.config = MarkdownTestConfig::from_str(code)?;
 
         self.current_section_has_config = true;
 
