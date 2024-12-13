@@ -4807,12 +4807,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         let parameters = &*subscript.slice;
         match known_instance {
             KnownInstanceType::Annotated => {
-                let mut report_invalid_parameters = || {
+                let mut report_invalid_arguments = || {
                     self.diagnostics.add_lint(
-                        &INVALID_ANNOTATED_PARAMETER,
+                        &INVALID_ANNOTATED_ARGUMENTS,
                         subscript.into(),
                         format_args!(
-                            "Special form `{}` expected at least 2 parameters (one type and one annotation)",
+                            "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
                             known_instance.repr(self.db)
                         ),
                     );
@@ -4821,7 +4821,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = parameters else {
                     report_invalid_parameters();
 
-                    // `Annotated[]` with less than two parameters is an error at runtime.
+                    // `Annotated[]` with less than two arguments is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
                     // giving better diagnostics later on.
                     // Pyright also does this. Mypy doesn't; it falls back to `Any` instead.
@@ -4832,16 +4832,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                     report_invalid_parameters();
                 }
 
-                let [first, rest @ ..] = &elts[..] else {
+                let [type_expr, metadata @ ..] = &elts[..] else {
                     self.infer_type_expression(parameters);
                     return Type::Unknown;
                 };
 
-                for expr in rest {
-                    self.infer_expression(expr);
+                for element in metadata {
+                    self.infer_expression(element);
                 }
 
-                let ty = self.infer_type_expression(first);
+                let ty = self.infer_type_expression(type_expr);
                 self.store_expression_type(parameters, ty);
                 ty
             }
