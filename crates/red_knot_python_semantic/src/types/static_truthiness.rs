@@ -27,6 +27,7 @@ use crate::Db;
 /// - c: {any_always_false: false, all_always_true: false, at_least_one_condition: true}
 /// - d: {any_always_false: true,  all_always_true: false, at_least_one_condition: true}
 /// ```
+#[derive(Debug)]
 pub(crate) struct StaticTruthiness {
     /// Is any of the branching conditions always false? (false if there are no conditions)
     pub(crate) any_always_false: bool,
