@@ -4819,7 +4819,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = parameters else {
-                    report_invalid_parameters();
+                    report_invalid_arguments();
 
                     // `Annotated[]` with less than two arguments is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
@@ -4829,7 +4829,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if elts.len() < 2 {
-                    report_invalid_parameters();
+                    report_invalid_arguments();
                 }
 
                 let [type_expr, metadata @ ..] = &elts[..] else {
