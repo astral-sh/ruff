@@ -61,11 +61,11 @@ Some of these are not subscriptable:
 ```py
 from typing_extensions import Self, TypeAlias
 
-X: TypeAlias[T] = int  # error: [invalid-type-parameter]
+X: TypeAlias[T] = int  # error: [invalid-type-form]
 
 class Foo[T]:
-    # error: [invalid-type-parameter] "Special form `typing.Self` expected no type parameter"
-    # error: [invalid-type-parameter] "Special form `typing.Self` expected no type parameter"
+    # error: [invalid-type-form] "Special form `typing.Self` expected no type parameter"
+    # error: [invalid-type-form] "Special form `typing.Self` expected no type parameter"
     def method(self: Self[int]) -> Self[int]:
         reveal_type(self)  # revealed: Unknown
 ```

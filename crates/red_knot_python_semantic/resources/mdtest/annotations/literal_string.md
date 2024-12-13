@@ -27,19 +27,19 @@ def f():
 ```py
 from typing_extensions import Literal, LiteralString
 
-bad_union: Literal["hello", LiteralString]  # error: [invalid-literal-parameter]
-bad_nesting: Literal[LiteralString]  # error: [invalid-literal-parameter]
+bad_union: Literal["hello", LiteralString]  # error: [invalid-type-form]
+bad_nesting: Literal[LiteralString]  # error: [invalid-type-form]
 ```
 
-### Parametrized
+### Parameterized
 
-`LiteralString` cannot be parametrized.
+`LiteralString` cannot be parameterized.
 
 ```py
 from typing_extensions import LiteralString
 
-a: LiteralString[str]  # error: [invalid-type-parameter]
-b: LiteralString["foo"]  # error: [invalid-type-parameter]
+a: LiteralString[str]  # error: [invalid-type-form]
+b: LiteralString["foo"]  # error: [invalid-type-form]
 ```
 
 ### As a base class

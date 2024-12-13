@@ -616,104 +616,52 @@ impl<'db> Type<'db> {
     ///
     /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        // Two equivalent types are always subtypes of each other.
+        //
+        // "Equivalent to" here means that the two types are both fully static
+        // and describe exactly the same set of possible runtime objects.
+        // For example, `int` is a subtype of `int` because `int` and `int` are equivalent to each other.
+        // Equally, `type[object]` is a subtype of `type`,
+        // because the former type expresses "all subclasses of `object`"
+        // while the latter expresses "all instances of `type`",
+        // and these are exactly the same set of objects at runtime.
         if self.is_equivalent_to(db, target) {
             return true;
         }
+
+        // Non-fully-static types do not participate in subtyping.
+        //
+        // Type `A` can only be a subtype of type `B` if the set of possible runtime objects
+        // that `A` represents is a subset of the set of possible runtime objects that `B` represents.
+        // But the set of objects described by a non-fully-static type is (either partially or wholly) unknown,
+        // so the question is simply unanswerable for non-fully-static types.
         if !self.is_fully_static(db) || !target.is_fully_static(db) {
             return false;
         }
+
         match (self, target) {
+            // We should have handled these immediately above.
+            (Type::Any | Type::Unknown | Type::Todo(_), _)
+            | (_, Type::Any | Type::Unknown | Type::Todo(_)) => {
+                unreachable!("Non-fully-static types do not participate in subtyping!")
+            }
+
+            // `Never` is the bottom type, the empty set.
+            // It is a subtype of all other fully static types.
+            // No other fully static type is a subtype of `Never`.
             (Type::Never, _) => true,
             (_, Type::Never) => false,
-            (_, Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Object) =>
-            {
-                true
-            }
-            (Type::Instance(InstanceType { class }), _)
-                if class.is_known(db, KnownClass::Object) =>
-            {
-                false
-            }
-            (Type::BooleanLiteral(_), Type::Instance(InstanceType { class }))
-                if matches!(class.known(db), Some(KnownClass::Bool | KnownClass::Int)) =>
-            {
-                true
-            }
-            (Type::IntLiteral(_), Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Int) =>
-            {
-                true
-            }
-            (Type::StringLiteral(_), Type::LiteralString) => true,
-            (
-                Type::StringLiteral(_) | Type::LiteralString,
-                Type::Instance(InstanceType { class }),
-            ) if class.is_known(db, KnownClass::Str) => true,
-            (Type::BytesLiteral(_), Type::Instance(InstanceType { class }))
-                if class.is_known(db, KnownClass::Bytes) =>
-            {
-                true
-            }
-            (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
-                let self_elements = self_tuple.elements(db);
-                let target_elements = target_tuple.elements(db);
-                self_elements.len() == target_elements.len()
-                    && self_elements.iter().zip(target_elements).all(
-                        |(self_element, target_element)| {
-                            self_element.is_subtype_of(db, *target_element)
-                        },
-                    )
-            }
-            (
-                Type::ClassLiteral(ClassLiteralType { class: self_class }),
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(target_class),
-                }),
-            ) => self_class.is_subclass_of(db, target_class),
-            (
-                Type::Instance(_),
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(target_class),
-                }),
-            ) if target_class.is_known(db, KnownClass::Object) => {
-                self.is_subtype_of(db, KnownClass::Type.to_instance(db))
-            }
-            (
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(self_class),
-                }),
-                Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(target_class),
-                }),
-            ) => self_class.is_subclass_of(db, target_class),
-            // C ⊆ type
-            // type[C] ⊆ type
-            // Though note that this works regardless of which metaclass C has, not just for type.
-            (
-                Type::ClassLiteral(ClassLiteralType { class: self_class })
-                | Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Class(self_class),
-                }),
-                Type::Instance(InstanceType {
-                    class: target_class,
-                }),
-            ) if self_class
-                .metaclass(db)
-                .into_class_literal()
-                .map(|meta| meta.class.is_subclass_of(db, target_class))
-                .unwrap_or(false) =>
-            {
-                true
-            }
-            (Type::Union(union), ty) => union
+
+            (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
-                .all(|&elem_ty| elem_ty.is_subtype_of(db, ty)),
-            (ty, Type::Union(union)) => union
+                .all(|&elem_ty| elem_ty.is_subtype_of(db, target)),
+
+            (_, Type::Union(union)) => union
                 .elements(db)
                 .iter()
-                .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
+                .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
+
             (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
                 // Check that all target positive values are covered in self positive values
                 target_intersection
@@ -736,30 +684,168 @@ impl<'db> Type<'db> {
                                 target_neg_elem.is_subtype_of(db, self_neg_elem)
                             // Is target negative value is disjoint from a self positive value?
                             }) || self_intersection.positive(db).iter().any(|&self_pos_elem| {
-                                target_neg_elem.is_disjoint_from(db, self_pos_elem)
+                                self_pos_elem.is_disjoint_from(db, target_neg_elem)
                             })
                         })
             }
-            (Type::Intersection(intersection), ty) => intersection
+
+            (Type::Intersection(intersection), _) => intersection
                 .positive(db)
                 .iter()
-                .any(|&elem_ty| elem_ty.is_subtype_of(db, ty)),
-            (ty, Type::Intersection(intersection)) => {
+                .any(|&elem_ty| elem_ty.is_subtype_of(db, target)),
+
+            (_, Type::Intersection(intersection)) => {
                 intersection
                     .positive(db)
                     .iter()
-                    .all(|&pos_ty| ty.is_subtype_of(db, pos_ty))
+                    .all(|&pos_ty| self.is_subtype_of(db, pos_ty))
                     && intersection
                         .negative(db)
                         .iter()
-                        .all(|&neg_ty| neg_ty.is_disjoint_from(db, ty))
+                        .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
             }
+
+            // All `StringLiteral` types are a subtype of `LiteralString`.
+            (Type::StringLiteral(_), Type::LiteralString) => true,
+
+            // Except for the special `LiteralString` case above,
+            // most `Literal` types delegate to their instance fallbacks
+            // unless `self` is exactly equivalent to `target` (handled above)
+            (Type::StringLiteral(_) | Type::LiteralString, _) => {
+                KnownClass::Str.to_instance(db).is_subtype_of(db, target)
+            }
+            (Type::BooleanLiteral(_), _) => {
+                KnownClass::Bool.to_instance(db).is_subtype_of(db, target)
+            }
+            (Type::IntLiteral(_), _) => KnownClass::Int.to_instance(db).is_subtype_of(db, target),
+            (Type::BytesLiteral(_), _) => {
+                KnownClass::Bytes.to_instance(db).is_subtype_of(db, target)
+            }
+            (Type::ModuleLiteral(_), _) => KnownClass::ModuleType
+                .to_instance(db)
+                .is_subtype_of(db, target),
+            (Type::SliceLiteral(_), _) => {
+                KnownClass::Slice.to_instance(db).is_subtype_of(db, target)
+            }
+
+            // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
+            // so it also, for now, just delegates to its instance fallback.
+            // This will change in a way similar to the `LiteralString`/`StringLiteral()` case above
+            // when we add support for `typing.Callable`.
+            (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
+                .to_instance(db)
+                .is_subtype_of(db, target),
+
+            // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
+            // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
+            // of the element-type at the same index in `B`. (Now say that 5 times fast.)
+            //
+            // For example: `tuple[bool, bool]` is a subtype of `tuple[int, int]`,
+            // but `tuple[bool, bool, bool]` is not a subtype of `tuple[int, int]`
+            (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
+                let self_elements = self_tuple.elements(db);
+                let target_elements = target_tuple.elements(db);
+                self_elements.len() == target_elements.len()
+                    && self_elements.iter().zip(target_elements).all(
+                        |(self_element, target_element)| {
+                            self_element.is_subtype_of(db, *target_element)
+                        },
+                    )
+            }
+
+            // Other than the special tuple-to-tuple case handled, above,
+            // tuple subtyping delegates to `Instance(tuple)` in the same way as the literal types.
+            //
+            // All heterogenous tuple types are subtypes of `Instance(<tuple>)`:
+            // `Instance(<some class T>)` expresses "the set of all possible instances of the class `T`";
+            // consequently, `Instance(<tuple>)` expresses "the set of all possible instances of the class `tuple`".
+            // This type can be spelled in type annotations as `tuple[object, ...]` (since `tuple` is covariant).
+            //
+            // Note that this is not the same type as the type spelled in type annotations as `tuple`;
+            // as that type is equivalent to `type[Any, ...]` (and therefore not a fully static type).
+            (Type::Tuple(_), _) => KnownClass::Tuple.to_instance(db).is_subtype_of(db, target),
+
+            // `Type::ClassLiteral` always delegates to `Type::SubclassOf`:
+            (Type::ClassLiteral(ClassLiteralType { class }), _) => {
+                Type::subclass_of(class).is_subtype_of(db, target)
+            }
+
+            // As the `unreachable!()` message says, non-fully-static `SubclassOf` types such as
+            // `type[Any]`,` type[Unknown]` and `type[Todo]` should all be handled right at the top of this function.
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_),
+                }),
+                _,
+            )
+            | (
+                _,
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_),
+                }),
+            ) => unreachable!(
+                "Non-fully-static types should be handled at the top of this function!"
+            ),
+
+            // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
+            // and `type[int]` describes all possible runtime subclasses of the class `int`.
+            // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(target_class),
+                }),
+            ) => self_class.is_subclass_of(db, target_class),
+
+            // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
+            // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
+            // is an instance of `type`, and so all possible subclasses of `str` will also be instances of `type`.
+            //
+            // Similarly `type[enum.Enum]`  is a subtype of `enum.EnumMeta` because `enum.Enum`
+            // is an instance of `enum.EnumMeta`.
+            (
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(self_class),
+                }),
+                Type::Instance(InstanceType {
+                    class: target_class,
+                }),
+            ) => self_class.is_instance_of(db, target_class),
+
+            // Other than the cases enumerated above, `type[]` just delegates to `Instance("type")`
+            (Type::SubclassOf(_), _) => KnownClass::Type.to_instance(db).is_subtype_of(db, target),
+
+            // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::Instance(_SpecialForm)`,
+            // because `Type::KnownInstance(KnownInstanceType::Type)` is a set with exactly one runtime value in it
+            // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_subtype_of(db, right)
             }
-            (Type::Instance(left), Type::Instance(right)) => left.is_instance_of(db, right.class),
-            // TODO
-            _ => false,
+
+            // For example, `abc.ABCMeta` (== `Instance("abc.ABCMeta")`) is a subtype of `type[object]`
+            // (== `SubclassOf("object")`) because (since `abc.ABCMeta` subclasses `type`) all instances of `ABCMeta`
+            // are instances of `type`, and `type[object]` represents the set of all subclasses of `object`,
+            // which is exactly equal to the set of all instances of `type`.
+            (
+                Type::Instance(_),
+                Type::SubclassOf(SubclassOfType {
+                    base: ClassBase::Class(target_class),
+                }),
+            ) if target_class.is_known(db, KnownClass::Object) => {
+                self.is_subtype_of(db, KnownClass::Type.to_instance(db))
+            }
+
+            // `bool` is a subtype of `int`, because `bool` subclasses `int`,
+            // which means that all instances of `bool` are also instances of `int`
+            (Type::Instance(self_instance), Type::Instance(target_instance)) => {
+                self_instance.is_subtype_of(db, target_instance)
+            }
+
+            // Other than the special cases enumerated above,
+            // `Instance` types are never subtypes of any other variants
+            (Type::Instance(_), _) => false,
         }
     }
 
@@ -925,6 +1011,8 @@ impl<'db> Type<'db> {
                 }
             }
 
+            // any single-valued type is disjoint from another single-valued type
+            // iff the two types are nonequal
             (
                 left @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
@@ -933,7 +1021,8 @@ impl<'db> Type<'db> {
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::ClassLiteral(..)),
+                | Type::ClassLiteral(..)
+                | Type::KnownInstance(..)),
                 right @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
@@ -941,8 +1030,37 @@ impl<'db> Type<'db> {
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::ClassLiteral(..)),
+                | Type::ClassLiteral(..)
+                | Type::KnownInstance(..)),
             ) => left != right,
+
+            // One tuple type can be a subtype of another tuple type,
+            // but we know for sure that any given tuple type is disjoint from all single-valued types
+            (
+                Type::Tuple(..),
+                Type::ClassLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::LiteralString,
+            ) => true,
+
+            (
+                Type::ClassLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::LiteralString,
+                Type::Tuple(..),
+            ) => true,
 
             (
                 Type::SubclassOf(SubclassOfType {
@@ -956,10 +1074,13 @@ impl<'db> Type<'db> {
                     base: ClassBase::Class(class_a),
                 }),
             ) => !class_b.is_subclass_of(db, class_a),
+
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
+
             (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
                 false
             }
+
             (
                 Type::SubclassOf(_),
                 Type::BooleanLiteral(..)
@@ -980,6 +1101,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..),
                 Type::SubclassOf(_),
             ) => true,
+
             (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
                 // TODO: Once we have support for final classes, we can determine disjointness in some cases
                 // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
@@ -987,13 +1109,14 @@ impl<'db> Type<'db> {
                 // final classes inside `Type::SubclassOf` everywhere.
                 false
             }
-            (Type::KnownInstance(left), Type::KnownInstance(right)) => left != right,
+
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_disjoint_from(db, right)
             }
             (left, Type::KnownInstance(right)) => {
                 left.is_disjoint_from(db, right.instance_fallback(db))
             }
+
             (
                 Type::Instance(InstanceType { class: class_none }),
                 Type::Instance(InstanceType { class: class_other }),
@@ -1005,6 +1128,7 @@ impl<'db> Type<'db> {
                 class_other.known(db),
                 Some(KnownClass::NoneType | KnownClass::Object)
             ),
+
             (Type::Instance(InstanceType { class: class_none }), _)
             | (_, Type::Instance(InstanceType { class: class_none }))
                 if class_none.is_known(db, KnownClass::NoneType) =>
@@ -1031,7 +1155,6 @@ impl<'db> Type<'db> {
             | (Type::Instance(InstanceType { class }), Type::StringLiteral(..)) => {
                 !matches!(class.known(db), Some(KnownClass::Str | KnownClass::Object))
             }
-            (Type::StringLiteral(..), _) | (_, Type::StringLiteral(..)) => true,
 
             (Type::LiteralString, Type::LiteralString) => false,
             (Type::LiteralString, Type::Instance(InstanceType { class }))
@@ -1045,14 +1168,12 @@ impl<'db> Type<'db> {
                 class.known(db),
                 Some(KnownClass::Bytes | KnownClass::Object)
             ),
-            (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
 
             (Type::SliceLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::SliceLiteral(..)) => !matches!(
                 class.known(db),
                 Some(KnownClass::Slice | KnownClass::Object)
             ),
-            (Type::SliceLiteral(..), _) | (_, Type::SliceLiteral(..)) => true,
 
             (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::ClassLiteral(..)) => {
@@ -1080,29 +1201,26 @@ impl<'db> Type<'db> {
                 false
             }
 
-            (Type::Tuple(tuple), other) | (other, Type::Tuple(tuple)) => {
-                if let Type::Tuple(other_tuple) = other {
-                    if tuple.len(db) == other_tuple.len(db) {
-                        tuple
-                            .elements(db)
-                            .iter()
-                            .zip(other_tuple.elements(db))
-                            .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
-                    } else {
-                        true
-                    }
-                } else {
-                    // We can not be sure if the tuple is disjoint from 'other' because:
-                    //   - 'other' might be the homogeneous arbitrary-length tuple type
-                    //     tuple[T, ...] (which we don't have support for yet); if all of
-                    //     our element types are not disjoint with T, this is not disjoint
-                    //   - 'other' might be a user subtype of tuple, which, if generic
-                    //     over the same or compatible *Ts, would overlap with tuple.
-                    //
-                    // TODO: add checks for the above cases once we support them
+            (Type::Tuple(tuple), Type::Tuple(other_tuple)) => {
+                let self_elements = tuple.elements(db);
+                let other_elements = other_tuple.elements(db);
+                self_elements.len() != other_elements.len()
+                    || self_elements
+                        .iter()
+                        .zip(other_elements)
+                        .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
+            }
 
-                    false
-                }
+            (Type::Tuple(..), Type::Instance(..)) | (Type::Instance(..), Type::Tuple(..)) => {
+                // We cannot be sure if the tuple is disjoint from the instance because:
+                //   - 'other' might be the homogeneous arbitrary-length tuple type
+                //     tuple[T, ...] (which we don't have support for yet); if all of
+                //     our element types are not disjoint with T, this is not disjoint
+                //   - 'other' might be a user subtype of tuple, which, if generic
+                //     over the same or compatible *Ts, would overlap with tuple.
+                //
+                // TODO: add checks for the above cases once we support them
+                false
             }
         }
     }
@@ -1795,6 +1913,8 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
+            // TODO: Should emit a diagnostic
+            Type::KnownInstance(KnownInstanceType::Annotated) => Type::Unknown,
             Type::Todo(_) => *self,
             _ => todo_type!("Unsupported or invalid type in a type expression"),
         }
@@ -2164,6 +2284,8 @@ impl<'db> KnownClass {
 /// Enumeration of specific runtime that are special enough to be considered their own type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub enum KnownInstanceType<'db> {
+    /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
+    Annotated,
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
     Literal,
     /// The symbol `typing.LiteralString` (which can also be found as `typing_extensions.LiteralString`)
@@ -2216,6 +2338,7 @@ pub enum KnownInstanceType<'db> {
 impl<'db> KnownInstanceType<'db> {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Annotated => "Annotated",
             Self::Literal => "Literal",
             Self::LiteralString => "LiteralString",
             Self::Optional => "Optional",
@@ -2254,7 +2377,8 @@ impl<'db> KnownInstanceType<'db> {
     /// Evaluate the known instance in boolean context
     pub const fn bool(self) -> Truthiness {
         match self {
-            Self::Literal
+            Self::Annotated
+            | Self::Literal
             | Self::LiteralString
             | Self::Optional
             | Self::TypeVar(_)
@@ -2292,6 +2416,7 @@ impl<'db> KnownInstanceType<'db> {
     /// Return the repr of the symbol at runtime
     pub fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
+            Self::Annotated => "typing.Annotated",
             Self::Literal => "typing.Literal",
             Self::LiteralString => "typing.LiteralString",
             Self::Optional => "typing.Optional",
@@ -2330,6 +2455,7 @@ impl<'db> KnownInstanceType<'db> {
     /// Return the [`KnownClass`] which this symbol is an instance of
     pub const fn class(self) -> KnownClass {
         match self {
+            Self::Annotated => KnownClass::SpecialForm,
             Self::Literal => KnownClass::SpecialForm,
             Self::LiteralString => KnownClass::SpecialForm,
             Self::Optional => KnownClass::SpecialForm,
@@ -2396,6 +2522,7 @@ impl<'db> KnownInstanceType<'db> {
             ("typing", "Tuple") => Some(Self::Tuple),
             ("typing", "Type") => Some(Self::Type),
             ("typing", "Callable") => Some(Self::Callable),
+            ("typing" | "typing_extensions", "Annotated") => Some(Self::Annotated),
             ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
             ("typing" | "typing_extensions", "LiteralString") => Some(Self::LiteralString),
             ("typing" | "typing_extensions", "Never") => Some(Self::Never),
@@ -2779,6 +2906,17 @@ impl<'db> Class<'db> {
         self.iter_mro(db).contains(&ClassBase::Class(other))
     }
 
+    /// Return `true` if this class object is an instance of the class `other`.
+    ///
+    /// A class is an instance of its metaclass; consequently,
+    /// a class will only ever be an instance of another class
+    /// if its metaclass is a subclass of that other class.
+    fn is_instance_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
+        self.metaclass(db).into_class_literal().is_some_and(
+            |ClassLiteralType { class: metaclass }| metaclass.is_subclass_of(db, other),
+        )
+    }
+
     /// Return the explicit `metaclass` of this class, if one is defined.
     ///
     /// ## Note
@@ -2796,10 +2934,10 @@ impl<'db> Class<'db> {
         Some(metaclass_ty)
     }
 
-    /// Return the metaclass of this class, or `Unknown` if the metaclass cannot be inferred.
+    /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: `type[Unknown]` would be a more precise fallback
-        self.try_metaclass(db).unwrap_or(Type::Unknown)
+        self.try_metaclass(db)
+            .unwrap_or_else(|_| Type::subclass_of_base(ClassBase::Unknown))
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
@@ -2812,9 +2950,7 @@ impl<'db> Class<'db> {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
-            //
-            // TODO: `type[Unknown]` might be better here?
-            return Ok(Type::Unknown);
+            return Ok(Type::subclass_of_base(ClassBase::Unknown));
         }
 
         let explicit_metaclass = self.explicit_metaclass(db);
@@ -3010,9 +3146,8 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    /// Return `true` if members of this type are instances of the class `class` at runtime.
-    pub fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
-        self.class.is_subclass_of(db, class)
+    fn is_subtype_of(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
+        self.class.is_subclass_of(db, other.class)
     }
 }
 
@@ -3186,7 +3321,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
     use crate::stdlib::typing_symbol;
-    use crate::PythonVersion;
+    use crate::{resolve_module, PythonVersion};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
@@ -3226,6 +3361,8 @@ pub(crate) mod tests {
         Tuple(Vec<Ty>),
         SubclassOfAny,
         SubclassOfBuiltinClass(&'static str),
+        StdlibModule(CoreStdlibModule),
+        SliceLiteral(i32, i32, i32),
     }
 
     impl Ty {
@@ -3276,6 +3413,15 @@ pub(crate) mod tests {
                         .expect_class_literal()
                         .class,
                 ),
+                Ty::StdlibModule(module) => {
+                    Type::ModuleLiteral(resolve_module(db, &module.name()).unwrap().file())
+                }
+                Ty::SliceLiteral(start, stop, step) => Type::SliceLiteral(SliceLiteralType::new(
+                    db,
+                    Some(start),
+                    Some(stop),
+                    Some(step),
+                )),
             }
         }
     }
@@ -3402,6 +3548,13 @@ pub(crate) mod tests {
     #[test_case(Ty::TypingLiteral, Ty::BuiltinInstance("object"))]
     #[test_case(Ty::AbcClassLiteral("ABC"), Ty::AbcInstance("ABCMeta"))]
     #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("object"))]
+    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("tuple"))]
+    #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
+    #[test_case(
+        Ty::StdlibModule(CoreStdlibModule::Typing),
+        Ty::KnownClassInstance(KnownClass::ModuleType)
+    )]
+    #[test_case(Ty::SliceLiteral(1, 2, 3), Ty::BuiltinInstance("slice"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3435,6 +3588,7 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("str"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("type"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinClassLiteral("str"))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3566,6 +3720,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1)]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
+    #[test_case(Ty::Tuple(vec![]), Ty::BuiltinClassLiteral("object"))]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);

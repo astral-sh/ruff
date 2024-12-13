@@ -54,8 +54,7 @@ use crate::types::diagnostic::{
     TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE,
-    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_LITERAL_PARAMETER,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_PARAMETER,
+    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
@@ -3428,8 +3427,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (left_ty @ Type::Instance(left), right_ty @ Type::Instance(right), op) => {
-                if left != right && right.is_instance_of(self.db, left.class) {
+            (Type::Instance(left), Type::Instance(right), op) => {
+                if left != right && right.is_subtype_of(self.db, left) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right.class.class_member(self.db, reflected_dunder);
                     if !rhs_reflected.is_unbound()
@@ -4862,126 +4861,170 @@ impl<'db> TypeInferenceBuilder<'db> {
         subscript: &ast::ExprSubscript,
         known_instance: KnownInstanceType,
     ) -> Type<'db> {
-        let parameters = &*subscript.slice;
+        let arguments_slice = &*subscript.slice;
         match known_instance {
-            KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
-                Ok(ty) => ty,
-                Err(nodes) => {
-                    for node in nodes {
-                        self.diagnostics.add_lint(
-                            &INVALID_LITERAL_PARAMETER,
-                            node.into(),
-                            format_args!(
-                                "Type arguments for `Literal` must be `None`, \
-                                    a literal value (int, bool, str, or bytes), or an enum value"
-                            ),
-                        );
-                    }
-                    Type::Unknown
+            KnownInstanceType::Annotated => {
+                let mut report_invalid_arguments = || {
+                    self.diagnostics.add_lint(
+                        &INVALID_TYPE_FORM,
+                        subscript.into(),
+                        format_args!(
+                            "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
+                            known_instance.repr(self.db)
+                        ),
+                    );
+                };
+
+                let ast::Expr::Tuple(ast::ExprTuple {
+                    elts: arguments, ..
+                }) = arguments_slice
+                else {
+                    report_invalid_arguments();
+
+                    // `Annotated[]` with less than two arguments is an error at runtime.
+                    // However, we still treat `Annotated[T]` as `T` here for the purpose of
+                    // giving better diagnostics later on.
+                    // Pyright also does this. Mypy doesn't; it falls back to `Any` instead.
+                    return self.infer_type_expression(arguments_slice);
+                };
+
+                if arguments.len() < 2 {
+                    report_invalid_arguments();
                 }
-            },
+
+                let [type_expr, metadata @ ..] = &arguments[..] else {
+                    self.infer_type_expression(arguments_slice);
+                    return Type::Unknown;
+                };
+
+                for element in metadata {
+                    self.infer_expression(element);
+                }
+
+                let ty = self.infer_type_expression(type_expr);
+                self.store_expression_type(arguments_slice, ty);
+                ty
+            }
+            KnownInstanceType::Literal => {
+                match self.infer_literal_parameter_type(arguments_slice) {
+                    Ok(ty) => ty,
+                    Err(nodes) => {
+                        for node in nodes {
+                            self.diagnostics.add_lint(
+                                &INVALID_TYPE_FORM,
+                                node.into(),
+                                format_args!(
+                                    "Type arguments for `Literal` must be `None`, \
+                                    a literal value (int, bool, str, or bytes), or an enum value"
+                                ),
+                            );
+                        }
+                        Type::Unknown
+                    }
+                }
+            }
             KnownInstanceType::Optional => {
-                let param_type = self.infer_type_expression(parameters);
+                let param_type = self.infer_type_expression(arguments_slice);
                 UnionType::from_elements(self.db, [param_type, Type::none(self.db)])
             }
-            KnownInstanceType::Union => match parameters {
+            KnownInstanceType::Union => match arguments_slice {
                 ast::Expr::Tuple(t) => {
                     let union_ty = UnionType::from_elements(
                         self.db,
                         t.iter().map(|elt| self.infer_type_expression(elt)),
                     );
-                    self.store_expression_type(parameters, union_ty);
+                    self.store_expression_type(arguments_slice, union_ty);
                     union_ty
                 }
-                _ => self.infer_type_expression(parameters),
+                _ => self.infer_type_expression(arguments_slice),
             },
             KnownInstanceType::TypeVar(_) => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("TypeVar annotations")
             }
             KnownInstanceType::TypeAliasType(_) => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Generic PEP-695 type alias")
             }
             KnownInstanceType::Callable => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Callable types")
             }
             KnownInstanceType::ChainMap => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.ChainMap alias")
             }
             KnownInstanceType::OrderedDict => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.OrderedDict alias")
             }
             KnownInstanceType::Dict => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.Dict alias")
             }
             KnownInstanceType::List => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.List alias")
             }
             KnownInstanceType::DefaultDict => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.DefaultDict[] alias")
             }
             KnownInstanceType::Counter => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.Counter[] alias")
             }
             KnownInstanceType::Set => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.Set alias")
             }
             KnownInstanceType::FrozenSet => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.FrozenSet alias")
             }
             KnownInstanceType::Deque => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("typing.Deque alias")
             }
             KnownInstanceType::ReadOnly => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Required[] type qualifier")
             }
             KnownInstanceType::NotRequired => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("NotRequired[] type qualifier")
             }
             KnownInstanceType::ClassVar => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("ClassVar[] type qualifier")
             }
             KnownInstanceType::Final => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Final[] type qualifier")
             }
             KnownInstanceType::Required => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Required[] type qualifier")
             }
             KnownInstanceType::TypeIs => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("TypeIs[] special form")
             }
             KnownInstanceType::TypeGuard => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("TypeGuard[] special form")
             }
             KnownInstanceType::Concatenate => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Concatenate[] special form")
             }
             KnownInstanceType::Unpack => {
-                self.infer_type_expression(parameters);
+                self.infer_type_expression(arguments_slice);
                 todo_type!("Unpack[] special form")
             }
             KnownInstanceType::NoReturn | KnownInstanceType::Never | KnownInstanceType::Any => {
                 self.diagnostics.add_lint(
-                    &INVALID_TYPE_PARAMETER,
+                    &INVALID_TYPE_FORM,
                     subscript.into(),
                     format_args!(
                         "Type `{}` expected no type parameter",
@@ -4992,7 +5035,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::TypingSelf | KnownInstanceType::TypeAlias => {
                 self.diagnostics.add_lint(
-                    &INVALID_TYPE_PARAMETER,
+                    &INVALID_TYPE_FORM,
                     subscript.into(),
                     format_args!(
                         "Special form `{}` expected no type parameter",
@@ -5003,7 +5046,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::LiteralString => {
                 self.diagnostics.add_lint(
-                    &INVALID_TYPE_PARAMETER,
+                    &INVALID_TYPE_FORM,
                     subscript.into(),
                     format_args!(
                         "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
@@ -5012,8 +5055,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
-            KnownInstanceType::Type => self.infer_subclass_of_type_expression(parameters),
-            KnownInstanceType::Tuple => self.infer_tuple_type_expression(parameters),
+            KnownInstanceType::Type => self.infer_subclass_of_type_expression(arguments_slice),
+            KnownInstanceType::Tuple => self.infer_tuple_type_expression(arguments_slice),
         }
     }
 
@@ -5329,7 +5372,7 @@ fn perform_rich_comparison<'db>(
     };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-    if left != right && right.is_instance_of(db, left.class) {
+    if left != right && right.is_subtype_of(db, left) {
         call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
     } else {
         call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))

@@ -74,6 +74,7 @@ impl<'db> ClassBase<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::Annotated
                 | KnownInstanceType::Literal
                 | KnownInstanceType::LiteralString
                 | KnownInstanceType::Union
