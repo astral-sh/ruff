@@ -4806,11 +4806,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let parameters = &*subscript.slice;
         match known_instance {
             KnownInstanceType::Annotated => {
-                let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = parameters else {
-                    // `Annotated[]` with less than two parameters is an error at runtime.
-                    // However, we still treat `Annotated[T]` as `T` here for the purpose of
-                    // giving better diagnostics later on.
-                    // Pyright also does this. Mypy doesn't and fallback to `Any` instead.
+                let mut report_invalid_parameters = || {
                     self.diagnostics.add_lint(
                         &INVALID_TYPE_PARAMETER,
                         subscript.into(),
@@ -4819,26 +4815,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                             known_instance.repr(self.db)
                         ),
                     );
+                };
 
-                    return self.infer_type_expression(parameters);
+                // `Annotated[]` with less than two parameters is an error at runtime.
+                // However, we still treat `Annotated[T]` as `T` here for the purpose of
+                // giving better diagnostics later on.
+                // Pyright also does this. Mypy doesn't and fallback to `Any` instead.
+                let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = parameters else {
+                    report_invalid_parameters();
+
+                    let ty = self.infer_type_expression(parameters);
+                    self.store_expression_type(subscript, ty);
+                    return ty;
                 };
 
                 if elts.len() < 2 {
-                    self.diagnostics.add_lint(
-                        &INVALID_TYPE_PARAMETER,
-                        subscript.into(),
-                        format_args!(
-                            "Type `{}` expected at least 2 parameters (one type and one annotation)",
-                            known_instance.repr(self.db)
-                        ),
-                    );
+                    report_invalid_parameters();
                 }
 
                 let [first, ..] = &elts[..] else {
-                    return Type::Unknown;
+                    let ty = Type::Unknown;
+                    self.store_expression_type(subscript, ty);
+                    return ty;
                 };
 
-                self.infer_type_expression(first)
+                let ty = self.infer_type_expression(first);
+                self.store_expression_type(subscript, ty);
+                ty
             }
             KnownInstanceType::Literal => match self.infer_literal_parameter_type(parameters) {
                 Ok(ty) => ty,

@@ -1794,7 +1794,6 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
             Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
-            // `Annotated` on its own does not mean anything
             Type::KnownInstance(KnownInstanceType::Annotated) => Type::Unknown,
             Type::Todo(_) => *self,
             _ => todo_type!("Unsupported or invalid type in a type expression"),
