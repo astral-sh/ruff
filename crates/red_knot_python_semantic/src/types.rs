@@ -28,13 +28,15 @@ use crate::stdlib::{
 };
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{CallDunderResult, CallOutcome};
+use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
-use crate::types::mro::{ClassBase, Mro, MroError, MroIterator};
+use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 
 mod builder;
 mod call;
+mod class_base;
 mod diagnostic;
 mod display;
 mod infer;
@@ -121,6 +123,14 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
 /// Shorthand for `symbol_by_id` that takes a symbol name instead of an ID.
 fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
+    // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
+    // is just a re-export of `typing.TYPE_CHECKING`.
+    if name == "TYPE_CHECKING"
+        && file_to_module(db, scope.file(db)).is_some_and(|module| module.name() == "typing")
+    {
+        return Symbol::Type(Type::BooleanLiteral(true), Boundness::Bound);
+    }
+
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
@@ -1345,10 +1355,10 @@ impl<'db> Type<'db> {
             Type::Instance(InstanceType { class }) => {
                 let ty = match (class.known(db), name) {
                     (Some(KnownClass::VersionInfo), "major") => {
-                        Type::IntLiteral(Program::get(db).target_version(db).major.into())
+                        Type::IntLiteral(Program::get(db).python_version(db).major.into())
                     }
                     (Some(KnownClass::VersionInfo), "minor") => {
-                        Type::IntLiteral(Program::get(db).target_version(db).minor.into())
+                        Type::IntLiteral(Program::get(db).python_version(db).minor.into())
                     }
                     // TODO MRO? get_own_instance_member, get_instance_member
                     _ => todo_type!("instance attributes"),
@@ -1800,7 +1810,7 @@ impl<'db> Type<'db> {
     /// This is not exactly the type that `sys.version_info` has at runtime,
     /// but it's a useful fallback for us in order to infer `Literal` types from `sys.version_info` comparisons.
     fn version_info_tuple(db: &'db dyn Db) -> Self {
-        let target_version = Program::get(db).target_version(db);
+        let python_version = Program::get(db).python_version(db);
         let int_instance_ty = KnownClass::Int.to_instance(db);
 
         // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
@@ -1818,8 +1828,8 @@ impl<'db> Type<'db> {
         };
 
         let version_info_elements = &[
-            Type::IntLiteral(target_version.major.into()),
-            Type::IntLiteral(target_version.minor.into()),
+            Type::IntLiteral(python_version.major.into()),
+            Type::IntLiteral(python_version.minor.into()),
             int_instance_ty,
             release_level_ty,
             int_instance_ty,
@@ -2036,7 +2046,7 @@ impl<'db> KnownClass {
                 CoreStdlibModule::Typing
             }
             Self::NoDefaultType => {
-                let python_version = Program::get(db).target_version(db);
+                let python_version = Program::get(db).python_version(db);
 
                 // typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
                 // singleton, but not for `typing._NoDefaultType`. So we need to switch

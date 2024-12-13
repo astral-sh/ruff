@@ -234,12 +234,14 @@ language tag:
 ````markdown
 ```toml
 [environment]
-target-version = "3.10"
+python-version = "3.10"
 ```
 ````
 
 This configuration will apply to all tests in the same section, and all nested sections within that
 section. Nested sections can override configurations from their parent sections.
+
+See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/red_knot_test/src/config.rs) for the full list of supported configuration options.
 
 ## Documentation of tests
 

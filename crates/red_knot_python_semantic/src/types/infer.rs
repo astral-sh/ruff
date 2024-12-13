@@ -32,6 +32,7 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
+use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
@@ -48,6 +49,7 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
+use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{
     TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -57,7 +59,7 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
-use crate::types::mro::{ClassBase, MroErrorKind};
+use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
@@ -124,6 +126,7 @@ pub(crate) fn infer_definition_types<'db>(
     let _span = tracing::trace_span!(
         "infer_definition_types",
         definition = ?definition.as_id(),
+        range = ?definition.kind(db).range(),
         file = %file.path(db)
     )
     .entered();
@@ -146,6 +149,7 @@ pub(crate) fn infer_deferred_types<'db>(
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
+        range = ?definition.kind(db).range(),
         file = %file.path(db)
     )
     .entered();
@@ -166,9 +170,13 @@ pub(crate) fn infer_expression_types<'db>(
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
     let file = expression.file(db);
-    let _span =
-        tracing::trace_span!("infer_expression_types", expression=?expression.as_id(), file=%file.path(db))
-            .entered();
+    let _span = tracing::trace_span!(
+        "infer_expression_types",
+        expression = ?expression.as_id(),
+        range = ?expression.node_ref(db).range(),
+        file = %file.path(db)
+    )
+    .entered();
 
     let index = semantic_index(db, file);
 
@@ -2092,7 +2100,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             orelse,
         } = while_statement;
 
-        self.infer_expression(test);
+        self.infer_standalone_expression(test);
         self.infer_body(body);
         self.infer_body(orelse);
     }

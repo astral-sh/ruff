@@ -21,14 +21,14 @@ impl WorkspaceSettings {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct Configuration {
-    pub target_version: Option<PythonVersion>,
+    pub python_version: Option<PythonVersion>,
     pub search_paths: SearchPathConfiguration,
 }
 
 impl Configuration {
     /// Extends this configuration by using the values from `with` for all values that are absent in `self`.
     pub fn extend(&mut self, with: Configuration) {
-        self.target_version = self.target_version.or(with.target_version);
+        self.python_version = self.python_version.or(with.python_version);
         self.search_paths.extend(with.search_paths);
     }
 
@@ -39,7 +39,7 @@ impl Configuration {
     ) -> WorkspaceSettings {
         WorkspaceSettings {
             program: ProgramSettings {
-                target_version: self.target_version.unwrap_or_default(),
+                python_version: self.python_version.unwrap_or_default(),
                 search_paths: self.search_paths.to_settings(workspace_root),
             },
         }
@@ -57,10 +57,10 @@ pub struct SearchPathConfiguration {
     /// The root of the workspace, used for finding first-party modules.
     pub src_root: Option<SystemPathBuf>,
 
-    /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
+    /// Optional path to a "typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
     /// bundled as a zip file in the binary
-    pub custom_typeshed: Option<SystemPathBuf>,
+    pub typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
     pub site_packages: Option<SitePackages>,
@@ -79,7 +79,7 @@ impl SearchPathConfiguration {
                 .clone()
                 .src_root
                 .unwrap_or_else(|| workspace_root.to_path_buf()),
-            custom_typeshed: self.custom_typeshed.clone(),
+            typeshed: self.typeshed.clone(),
             site_packages,
         }
     }
@@ -91,8 +91,8 @@ impl SearchPathConfiguration {
         if let Some(src_root) = with.src_root {
             self.src_root.get_or_insert(src_root);
         }
-        if let Some(custom_typeshed) = with.custom_typeshed {
-            self.custom_typeshed.get_or_insert(custom_typeshed);
+        if let Some(typeshed) = with.typeshed {
+            self.typeshed.get_or_insert(typeshed);
         }
         if let Some(site_packages) = with.site_packages {
             self.site_packages.get_or_insert(site_packages);
