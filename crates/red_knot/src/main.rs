@@ -36,7 +36,7 @@ struct Args {
 
     /// Run the command within the given project directory.
     ///
-    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the project root,
+    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
     /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
     ///
     /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
