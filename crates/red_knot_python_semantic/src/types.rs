@@ -2604,7 +2604,7 @@ pub enum Truthiness {
 }
 
 impl Truthiness {
-    const fn is_ambiguous(self) -> bool {
+    pub(crate) const fn is_ambiguous(self) -> bool {
         matches!(self, Truthiness::Ambiguous)
     }
 
