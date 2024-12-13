@@ -17,128 +17,57 @@ use std::sync::Arc;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
-    registry.register_lint(&UNRESOLVED_REFERENCE);
-    registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
-    registry.register_lint(&NOT_ITERABLE);
-    registry.register_lint(&INDEX_OUT_OF_BOUNDS);
-    registry.register_lint(&NON_SUBSCRIPTABLE);
-    registry.register_lint(&UNRESOLVED_IMPORT);
-    registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
-    registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
-    registry.register_lint(&INVALID_ASSIGNMENT);
-    registry.register_lint(&INVALID_DECLARATION);
-    registry.register_lint(&CONFLICTING_DECLARATIONS);
-    registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&CALL_NON_CALLABLE);
-    registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
-    registry.register_lint(&CYCLIC_CLASS_DEFINITION);
-    registry.register_lint(&DUPLICATE_BASE);
-    registry.register_lint(&INVALID_BASE);
-    registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&CALL_POSSIBLY_UNBOUND_METHOD);
-    registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
-    registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
-    registry.register_lint(&UNSUPPORTED_OPERATOR);
+    registry.register_lint(&CYCLIC_CLASS_DEFINITION);
+    registry.register_lint(&DIVISION_BY_ZERO);
+    registry.register_lint(&DUPLICATE_BASE);
+    registry.register_lint(&INCONSISTENT_MRO);
+    registry.register_lint(&INDEX_OUT_OF_BOUNDS);
+    registry.register_lint(&INVALID_ASSIGNMENT);
+    registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
-    registry.register_lint(&UNDEFINED_REVEAL);
+    registry.register_lint(&INVALID_DECLARATION);
+    registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_TYPE_FORM);
-    registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
+    registry.register_lint(&NON_SUBSCRIPTABLE);
+    registry.register_lint(&NOT_ITERABLE);
+    registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
+    registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
+    registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
+    registry.register_lint(&UNDEFINED_REVEAL);
+    registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    registry.register_lint(&UNRESOLVED_IMPORT);
+    registry.register_lint(&UNRESOLVED_REFERENCE);
+    registry.register_lint(&UNSUPPORTED_OPERATOR);
+    registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
 
     // String annotations
-    registry.register_lint(&FSTRING_TYPE_ANNOTATION);
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
-    registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
+    registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
+    registry.register_lint(&FSTRING_TYPE_ANNOTATION);
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
-    registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
+    registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
 }
 
 declare_lint! {
     /// ## What it does
-    /// Checks for references to names that are not defined.
+    /// Checks for calls to non-callable objects.
     ///
     /// ## Why is this bad?
-    /// Using an undefined variable will raise a `NameError` at runtime.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// print(x)  # NameError: name 'x' is not defined
-    /// ```
-    pub(crate) static UNRESOLVED_REFERENCE = {
-        summary: "detects references to names that are not defined",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for references to names that are possibly not defined.
-    ///
-    /// ## Why is this bad?
-    /// Using an undefined variable will raise a `NameError` at runtime.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// for i in range(0):
-    ///     x = i
-    ///
-    /// print(x)  # NameError: name 'x' is not defined
-    /// ```
-    pub(crate) static POSSIBLY_UNRESOLVED_REFERENCE = {
-        summary: "detects references to possibly undefined names",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for objects that are not iterable but are used in a context that requires them to be.
-    ///
-    /// ## Why is this bad?
-    /// Iterating over an object that is not iterable will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    ///
-    /// ```python
-    /// for i in 34:  # TypeError: 'int' object is not iterable
-    ///     pass
-    /// ```
-    pub(crate) static NOT_ITERABLE = {
-        summary: "detects iteration over an object that is not iterable",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// TODO #14889
-    pub(crate) static INDEX_OUT_OF_BOUNDS = {
-        summary: "detects index out of bounds errors",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for subscripting objects that do not support subscripting.
-    ///
-    /// ## Why is this bad?
-    /// Subscripting an object that does not support it will raise a `TypeError` at runtime.
+    /// Calling a non-callable object will raise a `TypeError` at runtime.
     ///
     /// ## Examples
     /// ```python
-    /// 4[1]  # TypeError: 'int' object is not subscriptable
+    /// 4()  # TypeError: 'int' object is not callable
     /// ```
-    pub(crate) static NON_SUBSCRIPTABLE = {
-        summary: "detects subscripting objects that do not support subscripting",
+    pub(crate) static CALL_NON_CALLABLE = {
+        summary: "detects calls to non-callable objects",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -146,59 +75,13 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for import statements for which the module cannot be resolved.
+    /// Checks for calls to possibly unbound methods.
     ///
-    /// ## Why is this bad?
-    /// Importing a module that cannot be resolved will raise an `ImportError` at runtime.
-    pub(crate) static UNRESOLVED_IMPORT = {
-        summary: "detects unresolved imports",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
     /// TODO #14889
-    pub(crate) static POSSIBLY_UNBOUND_IMPORT = {
-        summary: "detects possibly unbound imports",
+    pub(crate) static CALL_POSSIBLY_UNBOUND_METHOD = {
+        summary: "detects calls to possibly unbound methods",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for step size 0 in slices.
-    ///
-    /// ## Why is this bad?
-    /// A slice with a step size of zero will raise a `ValueError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    ///  l = list(range(10))
-    /// l[1:10:0]  # ValueError: slice step cannot be zero
-    pub(crate) static ZERO_STEPSIZE_IN_SLICE = {
-        summary: "detects a slice step size of zero",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// TODO #14889
-    pub(crate) static INVALID_ASSIGNMENT = {
-        summary: "detects invalid assignments",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// TODO #14889
-    pub(crate) static INVALID_DECLARATION = {
-        summary: "detects invalid declarations",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
     }
 }
 
@@ -206,6 +89,28 @@ declare_lint! {
     /// TODO #14889
     pub(crate) static CONFLICTING_DECLARATIONS = {
         summary: "detects conflicting declarations",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// TODO #14889
+    pub(crate) static CONFLICTING_METACLASS = {
+        summary: "detects conflicting metaclasses",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for class definitions with a cyclic inheritance chain.
+    ///
+    /// ## Why is it bad?
+    /// TODO #14889
+    pub(crate) static CYCLIC_CLASS_DEFINITION = {
+        summary: "detects cyclic class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -230,58 +135,9 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to non-callable objects.
-    ///
-    /// ## Why is this bad?
-    /// Calling a non-callable object will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// 4()  # TypeError: 'int' object is not callable
-    /// ```
-    pub(crate) static CALL_NON_CALLABLE = {
-        summary: "detects calls to non-callable objects",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// TODO #14889
-    pub(crate) static INVALID_TYPE_VARIABLE_CONSTRAINTS = {
-        summary: "detects invalid type variable constraints",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for class definitions with a cyclic inheritance chain.
-    ///
-    /// ## Why is it bad?
-    /// TODO #14889
-    pub(crate) static CYCLIC_CLASS_DEFINITION = {
-        summary: "detects cyclic class definitions",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
     /// TODO #14889
     pub(crate) static DUPLICATE_BASE = {
         summary: "detects class definitions with duplicate bases",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// TODO #14889
-    pub(crate) static INVALID_BASE = {
-        summary: "detects class definitions with an invalid base",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -298,35 +154,9 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for calls to possibly unbound methods.
-    ///
     /// TODO #14889
-    pub(crate) static CALL_POSSIBLY_UNBOUND_METHOD = {
-        summary: "detects calls to possibly unbound methods",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for possibly unbound attributes.
-    ///
-    /// TODO #14889
-    pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
-        summary: "detects references to possibly unbound attributes",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for unresolved attributes.
-    ///
-    /// TODO #14889
-    pub(crate) static UNRESOLVED_ATTRIBUTE = {
-        summary: "detects references to unresolved attributes",
+    pub(crate) static INDEX_OUT_OF_BOUNDS = {
+        summary: "detects index out of bounds errors",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -334,20 +164,17 @@ declare_lint! {
 
 declare_lint! {
     /// TODO #14889
-    pub(crate) static CONFLICTING_METACLASS = {
-        summary: "detects conflicting metaclasses",
+    pub(crate) static INVALID_ASSIGNMENT = {
+        summary: "detects invalid assignments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.
-    ///
     /// TODO #14889
-    pub(crate) static UNSUPPORTED_OPERATOR = {
-        summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
+    pub(crate) static INVALID_BASE = {
+        summary: "detects class definitions with an invalid base",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -363,42 +190,9 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to `reveal_type` without importing it.
-    ///
-    /// ## Why is this bad?
-    /// Using `reveal_type` without importing it will raise a `NameError` at runtime.
-    ///
-    /// ## Examples
     /// TODO #14889
-    pub(crate) static UNDEFINED_REVEAL = {
-        summary: "detects usages of `reveal_type` without importing it",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for default values that can't be assigned to the parameter's annotated type.
-    ///
-    /// ## Why is this bad?
-    /// TODO #14889
-    pub(crate) static INVALID_PARAMETER_DEFAULT = {
-        summary: "detects default values that can't be assigned to the parameter's annotated type",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for invalid type expressions.
-    ///
-    /// ## Why is this bad?
-    /// TODO #14889
-    pub(crate) static INVALID_TYPE_FORM = {
-        summary: "detects invalid type forms",
+    pub(crate) static INVALID_DECLARATION = {
+        summary: "detects invalid declarations",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -434,6 +228,213 @@ declare_lint! {
     ///  This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for default values that can't be assigned to the parameter's annotated type.
+    ///
+    /// ## Why is this bad?
+    /// TODO #14889
+    pub(crate) static INVALID_PARAMETER_DEFAULT = {
+        summary: "detects default values that can't be assigned to the parameter's annotated type",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid type expressions.
+    ///
+    /// ## Why is this bad?
+    /// TODO #14889
+    pub(crate) static INVALID_TYPE_FORM = {
+        summary: "detects invalid type forms",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// TODO #14889
+    pub(crate) static INVALID_TYPE_VARIABLE_CONSTRAINTS = {
+        summary: "detects invalid type variable constraints",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for subscripting objects that do not support subscripting.
+    ///
+    /// ## Why is this bad?
+    /// Subscripting an object that does not support it will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// 4[1]  # TypeError: 'int' object is not subscriptable
+    /// ```
+    pub(crate) static NON_SUBSCRIPTABLE = {
+        summary: "detects subscripting objects that do not support subscripting",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for objects that are not iterable but are used in a context that requires them to be.
+    ///
+    /// ## Why is this bad?
+    /// Iterating over an object that is not iterable will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// for i in 34:  # TypeError: 'int' object is not iterable
+    ///     pass
+    /// ```
+    pub(crate) static NOT_ITERABLE = {
+        summary: "detects iteration over an object that is not iterable",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for possibly unbound attributes.
+    ///
+    /// TODO #14889
+    pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
+        summary: "detects references to possibly unbound attributes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// TODO #14889
+    pub(crate) static POSSIBLY_UNBOUND_IMPORT = {
+        summary: "detects possibly unbound imports",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for references to names that are possibly not defined.
+    ///
+    /// ## Why is this bad?
+    /// Using an undefined variable will raise a `NameError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// for i in range(0):
+    ///     x = i
+    ///
+    /// print(x)  # NameError: name 'x' is not defined
+    /// ```
+    pub(crate) static POSSIBLY_UNRESOLVED_REFERENCE = {
+        summary: "detects references to possibly undefined names",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to `reveal_type` without importing it.
+    ///
+    /// ## Why is this bad?
+    /// Using `reveal_type` without importing it will raise a `NameError` at runtime.
+    ///
+    /// ## Examples
+    /// TODO #14889
+    pub(crate) static UNDEFINED_REVEAL = {
+        summary: "detects usages of `reveal_type` without importing it",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for unresolved attributes.
+    ///
+    /// TODO #14889
+    pub(crate) static UNRESOLVED_ATTRIBUTE = {
+        summary: "detects references to unresolved attributes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for import statements for which the module cannot be resolved.
+    ///
+    /// ## Why is this bad?
+    /// Importing a module that cannot be resolved will raise an `ImportError` at runtime.
+    pub(crate) static UNRESOLVED_IMPORT = {
+        summary: "detects unresolved imports",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for references to names that are not defined.
+    ///
+    /// ## Why is this bad?
+    /// Using an undefined variable will raise a `NameError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// print(x)  # NameError: name 'x' is not defined
+    /// ```
+    pub(crate) static UNRESOLVED_REFERENCE = {
+        summary: "detects references to names that are not defined",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.
+    ///
+    /// TODO #14889
+    pub(crate) static UNSUPPORTED_OPERATOR = {
+        summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for step size 0 in slices.
+    ///
+    /// ## Why is this bad?
+    /// A slice with a step size of zero will raise a `ValueError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// l = list(range(10))
+    /// l[1:10:0]  # ValueError: slice step cannot be zero
+    /// ```
+    pub(crate) static ZERO_STEPSIZE_IN_SLICE = {
+        summary: "detects a slice step size of zero",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
