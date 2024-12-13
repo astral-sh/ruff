@@ -615,10 +615,10 @@ impl<'db> Type<'db> {
     ///
     /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        // Two equivalent types are always equal to each other.
+        // Two equivalent types are always subtypes of each other.
         //
         // "Equivalent to" here means that the two types are both fully static
-        // and can be determined to point to exactly the same set of possible runtime objects.
+        // and point to exactly the same set of possible runtime objects.
         // For example, `int` is a subtype of `int` because `int` and `int` are equivalent to each other.
         // Equally, `type[object]` is a subtype of `type`,
         // because the former type expresses "all subclasses of `object`"
@@ -632,8 +632,8 @@ impl<'db> Type<'db> {
         //
         // Type `A` can only be a subtype of type `B` if the set of possible runtime objects
         // that `A` represents is a subset of the set of possible runtime objects that `B` represents.
-        // But the set of objects that a fully static type represents is (either partially or wholly) unknown,
-        // so the question is simply unanswerable for fully static types.
+        // But the set of objects described by a non-fully-static type is (either partially or wholly) unknown,
+        // so the question is simply unanswerable for non-fully-static types.
         if !self.is_fully_static(db) || !target.is_fully_static(db) {
             return false;
         }
