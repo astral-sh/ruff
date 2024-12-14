@@ -156,8 +156,14 @@ static HEADER_RE: LazyLock<Regex> =
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^```(?<lang>(?-u:\w)+)?(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n?")
-        .unwrap()
+    Regex::new(
+        r"(?x)
+        ^```(?<lang>(?-u:\w)+)?(?<config>(?:\x20+\S+)*)\s*\n
+        (?<code>(?:.|\n)*?)\n?
+        (?<end>```|\z)
+        ",
+    )
+    .unwrap()
 });
 
 #[derive(Debug)]
@@ -327,6 +333,13 @@ impl<'s> Parser<'s> {
     fn parse_code_block(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
         // We never pop the implicit root section.
         let section = self.stack.top();
+
+        if captures.name("end").unwrap().is_empty() {
+            return Err(anyhow::anyhow!(
+                "Unterminated code block at index {}.",
+                captures.get(0).unwrap().start()
+            ));
+        }
 
         let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
 
@@ -662,6 +675,18 @@ mod tests {
         };
 
         assert_eq!(file.code, "x = 10");
+    }
+
+    #[test]
+    fn unterminated_code_block() {
+        let source = dedent(
+            "
+            ```
+            x = 1
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Unterminated code block at index 0.");
     }
 
     #[test]
