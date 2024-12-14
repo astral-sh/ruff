@@ -3352,6 +3352,7 @@ pub(crate) mod tests {
         Tuple(Vec<Ty>),
         SubclassOfAny,
         SubclassOfBuiltinClass(&'static str),
+        SubclassOfAbcClass(&'static str),
         StdlibModule(CoreStdlibModule),
         SliceLiteral(i32, i32, i32),
     }
@@ -3400,6 +3401,12 @@ pub(crate) mod tests {
                 Ty::SubclassOfAny => Type::subclass_of_base(ClassBase::Any),
                 Ty::SubclassOfBuiltinClass(s) => Type::subclass_of(
                     builtins_symbol(db, s)
+                        .expect_type()
+                        .expect_class_literal()
+                        .class,
+                ),
+                Ty::SubclassOfAbcClass(s) => Type::subclass_of(
+                    core_module_symbol(db, CoreStdlibModule::Abc, s)
                         .expect_type()
                         .expect_class_literal()
                         .class,
