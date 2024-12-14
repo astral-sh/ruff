@@ -28,7 +28,7 @@ const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 #[allow(clippy::print_stdout)]
 pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str) {
     let source = std::fs::read_to_string(path).unwrap();
-    let suite = match test_parser::parse(short_title, &source, path) {
+    let suite = match test_parser::parse(short_title, &source) {
         Ok(suite) => suite,
         Err(err) => {
             panic!("Error parsing `{path}`: {err:?}")

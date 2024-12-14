@@ -1,7 +1,6 @@
 use std::sync::LazyLock;
 
 use anyhow::bail;
-use camino::Utf8Path;
 use memchr::memchr2;
 use regex::{Captures, Match, Regex};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -14,12 +13,8 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use crate::config::MarkdownTestConfig;
 
 /// Parse the Markdown `source` as a test suite with given `title`.
-pub(crate) fn parse<'s>(
-    title: &'s str,
-    source: &'s str,
-    path: &'s Utf8Path,
-) -> anyhow::Result<MarkdownTestSuite<'s>> {
-    let parser = Parser::new(title, source, path);
+pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
+    let parser = Parser::new(title, source);
     parser.parse()
 }
 
@@ -216,7 +211,6 @@ struct Parser<'s> {
 
     source: &'s str,
     source_len: TextSize,
-    source_path: &'s Utf8Path,
 
     /// Stack of ancestor sections.
     stack: SectionStack,
@@ -229,7 +223,7 @@ struct Parser<'s> {
 }
 
 impl<'s> Parser<'s> {
-    fn new(title: &'s str, source: &'s str, path: &'s Utf8Path) -> Self {
+    fn new(title: &'s str, source: &'s str) -> Self {
         let mut sections = IndexVec::default();
         let root_section_id = sections.push(Section {
             title,
@@ -239,11 +233,10 @@ impl<'s> Parser<'s> {
         });
         Self {
             sections,
+            source,
             files: IndexVec::default(),
             cursor: Cursor::new(source),
-            source,
             source_len: source.text_len(),
-            source_path: path,
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
             current_section_has_config: false,
@@ -348,10 +341,7 @@ impl<'s> Parser<'s> {
             let code_block_start = self.cursor.token_len();
             let row = self.source.count_lines(TextRange::up_to(code_block_start)) + 1;
 
-            return Err(anyhow::anyhow!(
-                "Unterminated code block at: {}:{row}:0",
-                self.source_path
-            ));
+            return Err(anyhow::anyhow!("Unterminated code block at row {row}."));
         }
 
         let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
@@ -448,18 +438,11 @@ impl<'s> Parser<'s> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::MarkdownTestSuite;
-    use camino::Utf8Path;
     use ruff_python_trivia::textwrap::dedent;
-
-    fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
-        let path = Utf8Path::new("/home/project/file.md");
-        super::parse(title, source, path)
-    }
 
     #[test]
     fn empty() {
-        let mf = parse("file.md", "").unwrap();
+        let mf = super::parse("file.md", "").unwrap();
 
         assert!(mf.tests().next().is_none());
     }
@@ -473,7 +456,7 @@ mod tests {
             ```
             ",
         );
-        let mf = parse("file.md", &source).unwrap();
+        let mf = super::parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -498,7 +481,7 @@ mod tests {
             x = 1
             ```",
         );
-        let mf = parse("file.md", &source).unwrap();
+        let mf = super::parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -532,7 +515,7 @@ mod tests {
             ```
             ",
         );
-        let mf = parse("file.md", &source).unwrap();
+        let mf = super::parse("file.md", &source).unwrap();
 
         let [test1, test2] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected two tests");
@@ -579,7 +562,7 @@ mod tests {
             ```
             ",
         );
-        let mf = parse("file.md", &source).unwrap();
+        let mf = super::parse("file.md", &source).unwrap();
 
         let [test1, test2] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected two tests");
@@ -618,7 +601,7 @@ mod tests {
             ```
             ",
         );
-        let mf = parse("file.md", &source).unwrap();
+        let mf = super::parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -642,7 +625,7 @@ mod tests {
             ```
             ",
         );
-        let mf = parse("file.md", &source).unwrap();
+        let mf = super::parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -663,7 +646,7 @@ mod tests {
             ",
         );
 
-        let mf = parse("file.md", &source).unwrap();
+        let mf = super::parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -685,7 +668,7 @@ mod tests {
             ",
         );
 
-        let mf = parse("file.md", &source).unwrap();
+        let mf = super::parse("file.md", &source).unwrap();
 
         let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
             panic!("expected one test");
@@ -705,11 +688,8 @@ mod tests {
             x = 1
             ",
         );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(
-            err.to_string(),
-            "Unterminated code block at: /home/project/file.md:2:0"
-        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Unterminated code block at row 2.");
     }
 
     #[test]
@@ -728,11 +708,8 @@ mod tests {
             x = 1
             ",
         );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(
-            err.to_string(),
-            "Unterminated code block at: /home/project/file.md:10:0"
-        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Unterminated code block at row 10.");
     }
 
     #[test]
@@ -748,7 +725,7 @@ mod tests {
             ## Two
             ",
         );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Header 'Two' not valid inside a test case; parent 'One' has code files."
@@ -764,7 +741,7 @@ mod tests {
             ```
             ",
         );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Invalid config item `foo`.");
     }
 
@@ -777,7 +754,7 @@ mod tests {
             ```
             ",
         );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Invalid config item `foo=bar=baz`.");
     }
 
@@ -790,7 +767,7 @@ mod tests {
             ```
             ",
         );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Duplicate config item `foo=baz`.");
     }
 
@@ -807,7 +784,7 @@ mod tests {
             ```
             ",
         );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Test `file.md` has duplicate files named `test.py`. \
@@ -829,7 +806,7 @@ mod tests {
             ```
             ",
         );
-        let err = parse("file.md", &source).expect_err("Should fail to parse");
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
             "Test `file.md` has duplicate files named `foo.py`."
