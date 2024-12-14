@@ -2406,7 +2406,8 @@
         "pylint",
         "rdjson",
         "azure",
-        "sarif"
+        "sarif",
+        "full-path"
       ]
     },
     "ParametrizeNameType": {

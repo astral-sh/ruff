@@ -526,6 +526,7 @@ pub enum OutputFormat {
     Rdjson,
     Azure,
     Sarif,
+    FullPath,
 }
 
 impl Display for OutputFormat {
@@ -543,6 +544,7 @@ impl Display for OutputFormat {
             Self::Rdjson => write!(f, "rdjson"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
+            Self::FullPath => write!(f, "full_path"),
         }
     }
 }

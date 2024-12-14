@@ -249,7 +249,11 @@ impl Printer {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
+                        print_fix_summary(
+                            writer,
+                            &diagnostics.fixed,
+                            self.format == OutputFormat::FullPath,
+                        )?;
                         writeln!(writer)?;
                     }
                 }
@@ -275,17 +279,25 @@ impl Printer {
                 JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             OutputFormat::Concise | OutputFormat::Full => {
-                TextEmitter::default()
+                let emitter = TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.format == OutputFormat::Full)
-                    .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_unsafe_fixes(self.unsafe_fixes);
+
+                // Key modification: pass the output format to the emitter
+                emitter
+                    .with_full_path(self.format == OutputFormat::FullPath)
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
+                        print_fix_summary(
+                            writer,
+                            &diagnostics.fixed,
+                            self.format == OutputFormat::FullPath,
+                        )?;
                         writeln!(writer)?;
                     }
                 }
@@ -301,7 +313,11 @@ impl Printer {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
+                        print_fix_summary(
+                            writer,
+                            &diagnostics.fixed,
+                            self.format == OutputFormat::FullPath,
+                        )?;
                         writeln!(writer)?;
                     }
                 }
@@ -321,6 +337,16 @@ impl Printer {
             }
             OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
+            }
+            OutputFormat::FullPath => {
+                let mut emitter = TextEmitter::default()
+                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
+                    .with_show_source(true)
+                    .with_full_path(true)
+                    .with_unsafe_fixes(self.unsafe_fixes);
+
+                emitter.emit(writer, &diagnostics.messages, &context)?;
             }
         }
 
@@ -468,6 +494,18 @@ impl Printer {
                 .with_show_source(preview)
                 .with_unsafe_fixes(self.unsafe_fixes)
                 .emit(writer, &diagnostics.messages, &context)?;
+
+            if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
+                if !diagnostics.fixed.is_empty() {
+                    writeln!(writer)?;
+                    print_fix_summary(
+                        writer,
+                        &diagnostics.fixed,
+                        self.format == OutputFormat::FullPath,
+                    )?;
+                    writeln!(writer)?;
+                }
+            }
         }
         writer.flush()?;
 
@@ -498,7 +536,7 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
     (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
 }
 
-fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
+fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap, full_paths: bool) -> Result<()> {
     let total = fixed
         .values()
         .map(|table| table.values().sum::<usize>())
@@ -520,13 +558,20 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
         .iter()
         .sorted_by_key(|(filename, ..)| filename.as_str())
     {
+        let display_path = if full_paths {
+            filename.to_string()
+        } else {
+            relativize_path(filename).to_string()
+        };
+
         writeln!(
             writer,
             "{} {}{}",
             "-".cyan(),
-            relativize_path(filename).bold(),
+            display_path.bold(),
             ":".cyan()
         )?;
+
         for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
             writeln!(
                 writer,

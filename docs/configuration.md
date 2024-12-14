@@ -591,7 +591,7 @@ Options:
           Output serialization format for violations. The default serialization
           format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values:
           concise, full, json, json-lines, junit, grouped, github, gitlab,
-          pylint, rdjson, azure, sarif]
+          pylint, rdjson, azure, sarif, full-path]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout) [env:
           RUFF_OUTPUT_FILE=]

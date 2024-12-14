@@ -34,6 +34,7 @@ bitflags! {
 pub struct TextEmitter {
     flags: EmitterFlags,
     unsafe_fixes: UnsafeFixes,
+    full_path: bool,
 }
 
 impl TextEmitter {
@@ -61,6 +62,12 @@ impl TextEmitter {
         self.unsafe_fixes = unsafe_fixes;
         self
     }
+
+    #[must_use]
+    pub fn with_full_path(mut self, full_path: bool) -> Self {
+        self.full_path = full_path;
+        self
+    }
 }
 
 impl Emitter for TextEmitter {
@@ -71,12 +78,21 @@ impl Emitter for TextEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
-            write!(
-                writer,
-                "{path}{sep}",
-                path = relativize_path(message.filename()).bold(),
-                sep = ":".cyan(),
-            )?;
+            if self.full_path {
+                write!(
+                    writer,
+                    "{path}{sep}",
+                    path = message.filename(),
+                    sep = ":".cyan(),
+                )?;
+            } else {
+                write!(
+                    writer,
+                    "{path}{sep}",
+                    path = relativize_path(message.filename()).bold(),
+                    sep = ":".cyan(),
+                )?;
+            }
 
             let start_location = message.compute_start_location();
             let notebook_index = context.notebook_index(message.filename());
