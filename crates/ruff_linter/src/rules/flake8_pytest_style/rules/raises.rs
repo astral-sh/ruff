@@ -224,14 +224,16 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
 
         if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
             if let Some(Keyword { value, .. }) = call.arguments.find_keyword("match") {
-                value.as_string_literal_expr().map(|it| {
-                    let any_part_is_raw = it.value.iter().any(|part| part.flags.prefix().is_raw());
+                if let Some(string) = value.as_string_literal_expr() {
+                    let any_part_is_raw =
+                        string.value.iter().any(|part| part.flags.prefix().is_raw());
 
-                    if !any_part_is_raw && !string_has_metacharacters(&it.value) {
-                        let diagnostic = Diagnostic::new(PytestRaisesAmbiguousPattern, it.range);
+                    if !any_part_is_raw && !string_has_metacharacters(&string.value) {
+                        let diagnostic =
+                            Diagnostic::new(PytestRaisesAmbiguousPattern, string.range);
                         checker.diagnostics.push(diagnostic);
                     }
-                });
+                }
             }
         }
 
