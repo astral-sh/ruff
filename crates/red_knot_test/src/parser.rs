@@ -339,9 +339,9 @@ impl<'s> Parser<'s> {
 
         if captures.name("end").unwrap().is_empty() {
             let code_block_start = self.cursor.token_len();
-            let row = self.source.count_lines(TextRange::up_to(code_block_start)) + 1;
+            let line = self.source.count_lines(TextRange::up_to(code_block_start)) + 1;
 
-            return Err(anyhow::anyhow!("Unterminated code block at row {row}."));
+            return Err(anyhow::anyhow!("Unterminated code block at line {line}."));
         }
 
         let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
@@ -689,7 +689,7 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Unterminated code block at row 2.");
+        assert_eq!(err.to_string(), "Unterminated code block at line 2.");
     }
 
     #[test]
@@ -709,7 +709,7 @@ mod tests {
             ",
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
-        assert_eq!(err.to_string(), "Unterminated code block at row 10.");
+        assert_eq!(err.to_string(), "Unterminated code block at line 10.");
     }
 
     #[test]
