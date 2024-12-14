@@ -1,14 +1,14 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
+use ruff_python_ast::{self as ast, Expr, Keyword, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use super::helpers::is_empty_or_null_string;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-
-use super::helpers::is_empty_or_null_string;
+use crate::rules::ruff::rules::string_has_metacharacters;
 
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
@@ -151,6 +151,52 @@ impl Violation for PytestRaisesWithoutException {
     }
 }
 
+/// ## What it does
+/// Checks for non-raw literal string arguments passed to the `match` parameter
+/// of `pytest.raises()` that does not contain any regex metacharacters.
+///
+/// ## Why is this bad?
+/// The `match` argument is implicitly converted to a regex under the hood.
+/// It should be made explicit whether the string is meant to be a regex or a "plain" pattern
+/// by either prefixing the string with the `r` suffix or wrapping it in `re.escape()`.
+///
+/// ## Example
+///
+/// ```python
+/// with pytest.raises(SomeException, match="foobar"):
+///     ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// with pytest.raises(SomeException, match=r"foobar"):
+///     ...
+/// ```
+///
+/// Alternatively:
+///
+/// ```python
+/// import re
+///
+///
+/// with pytest.raises(SomeException, match=re.escape("foobar")):
+///     ...
+/// ```
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestRaisesAmbiguousPattern;
+
+impl Violation for PytestRaisesAmbiguousPattern {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Pattern passed to `match=` is neither escaped nor raw".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use a raw string or `re.escape()` to make the intention explicit".to_string())
+    }
+}
+
 fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
@@ -173,6 +219,19 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
                     PytestRaisesWithoutException,
                     call.func.range(),
                 ));
+            }
+        }
+
+        if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
+            if let Some(Keyword { value, .. }) = call.arguments.find_keyword("match") {
+                value.as_string_literal_expr().map(|it| {
+                    let any_part_is_raw = it.value.iter().any(|part| part.flags.prefix().is_raw());
+
+                    if !any_part_is_raw && !string_has_metacharacters(&it.value) {
+                        let diagnostic = Diagnostic::new(PytestRaisesAmbiguousPattern, it.range);
+                        checker.diagnostics.push(diagnostic);
+                    }
+                });
             }
         }
 

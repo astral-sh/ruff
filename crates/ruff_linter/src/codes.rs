@@ -826,6 +826,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "025") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestErroneousUseFixturesOnFixture),
         (Flake8PytestStyle, "026") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestUseFixturesWithoutParameters),
         (Flake8PytestStyle, "027") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestUnittestRaisesAssertion),
+        (Flake8PytestStyle, "201") => (RuleGroup::Preview, rules::flake8_pytest_style::rules::PytestRaisesAmbiguousPattern),
 
         // flake8-pie
         (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPlaceholder),

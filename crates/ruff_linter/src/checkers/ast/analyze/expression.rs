@@ -907,6 +907,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
                 Rule::PytestRaisesTooBroad,
+                Rule::PytestRaisesAmbiguousPattern,
             ]) {
                 flake8_pytest_style::rules::raises_call(checker, call);
             }

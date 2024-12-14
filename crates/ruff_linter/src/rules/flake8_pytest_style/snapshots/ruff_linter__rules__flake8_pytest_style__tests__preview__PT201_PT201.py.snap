@@ -1,0 +1,25 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+snapshot_kind: text
+---
+PT201.py:7:42: PT201 Pattern passed to `match=` is neither escaped nor raw
+  |
+5 |     ### Errors
+6 | 
+7 |     with pytest.raises(BareString, match="foobar"): ...
+  |                                          ^^^^^^^^ PT201
+8 | 
+9 |     with pytest.raises(MultipleParts, match="foo"
+  |
+  = help: Use a raw string or `re.escape()` to make the intention explicit
+
+PT201.py:9:45: PT201 Pattern passed to `match=` is neither escaped nor raw
+   |
+ 7 |       with pytest.raises(BareString, match="foobar"): ...
+ 8 |   
+ 9 |       with pytest.raises(MultipleParts, match="foo"
+   |  _____________________________________________^
+10 | |                                             "bar"): ...
+   | |_________________________________________________^ PT201
+   |
+   = help: Use a raw string or `re.escape()` to make the intention explicit
