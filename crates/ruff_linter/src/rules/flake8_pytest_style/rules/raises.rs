@@ -153,7 +153,7 @@ impl Violation for PytestRaisesWithoutException {
 
 /// ## What it does
 /// Checks for non-raw literal string arguments passed to the `match` parameter
-/// of `pytest.raises()` that does not contain any regex metacharacters.
+/// of `pytest.raises()` that contains at least one regex metacharacters.
 ///
 /// ## Why is this bad?
 /// The `match` argument is implicitly converted to a regex under the hood.
@@ -163,14 +163,14 @@ impl Violation for PytestRaisesWithoutException {
 /// ## Example
 ///
 /// ```python
-/// with pytest.raises(SomeException, match="foobar"):
+/// with pytest.raises(SomeException, match="foo\bar"):
 ///     ...
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
-/// with pytest.raises(SomeException, match=r"foobar"):
+/// with pytest.raises(SomeException, match=r"foo\bar"):
 ///     ...
 /// ```
 ///
@@ -180,7 +180,7 @@ impl Violation for PytestRaisesWithoutException {
 /// import re
 ///
 ///
-/// with pytest.raises(SomeException, match=re.escape("foobar")):
+/// with pytest.raises(SomeException, match=re.escape("foo\bar")):
 ///     ...
 /// ```
 #[derive(ViolationMetadata)]
@@ -189,7 +189,8 @@ pub(crate) struct PytestRaisesAmbiguousPattern;
 impl Violation for PytestRaisesAmbiguousPattern {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Pattern passed to `match=` is neither escaped nor raw".to_string()
+        "Pattern passed to `match=` contains metacharacters but is neither escaped nor raw"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -228,7 +229,7 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
                     let any_part_is_raw =
                         string.value.iter().any(|part| part.flags.prefix().is_raw());
 
-                    if !any_part_is_raw && !string_has_metacharacters(&string.value) {
+                    if !any_part_is_raw && string_has_metacharacters(&string.value) {
                         let diagnostic =
                             Diagnostic::new(PytestRaisesAmbiguousPattern, string.range);
                         checker.diagnostics.push(diagnostic);

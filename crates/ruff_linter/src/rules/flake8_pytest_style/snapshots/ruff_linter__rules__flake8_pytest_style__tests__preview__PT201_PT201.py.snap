@@ -2,24 +2,33 @@
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 snapshot_kind: text
 ---
-PT201.py:7:42: PT201 Pattern passed to `match=` is neither escaped nor raw
+PT201.py:7:43: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
   |
 5 |     ### Errors
 6 | 
-7 |     with pytest.raises(BareString, match="foobar"): ...
-  |                                          ^^^^^^^^ PT201
+7 |     with pytest.raises(FooAtTheEnd, match="foo."): ...
+  |                                           ^^^^^^ PT201
 8 | 
-9 |     with pytest.raises(MultipleParts, match="foo"
+9 |     with pytest.raises(PackageExtraSpecifier, match="Install `foo[bar]` instead"): ...
   |
   = help: Use a raw string or `re.escape()` to make the intention explicit
 
-PT201.py:9:45: PT201 Pattern passed to `match=` is neither escaped nor raw
+PT201.py:9:53: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
    |
- 7 |       with pytest.raises(BareString, match="foobar"): ...
- 8 |   
- 9 |       with pytest.raises(MultipleParts, match="foo"
-   |  _____________________________________________^
-10 | |                                             "bar"): ...
-   | |_________________________________________________^ PT201
+ 7 |     with pytest.raises(FooAtTheEnd, match="foo."): ...
+ 8 | 
+ 9 |     with pytest.raises(PackageExtraSpecifier, match="Install `foo[bar]` instead"): ...
+   |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT201
+10 | 
+11 |     with pytest.raises(InnocentQuestion, match="This is a simple sentence (or is it?)"): ...
+   |
+   = help: Use a raw string or `re.escape()` to make the intention explicit
+
+PT201.py:11:48: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+   |
+ 9 |     with pytest.raises(PackageExtraSpecifier, match="Install `foo[bar]` instead"): ...
+10 | 
+11 |     with pytest.raises(InnocentQuestion, match="This is a simple sentence (or is it?)"): ...
+   |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT201
    |
    = help: Use a raw string or `re.escape()` to make the intention explicit
