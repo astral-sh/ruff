@@ -163,15 +163,15 @@ impl Violation for PytestRaisesWithoutException {
 /// ## Example
 ///
 /// ```python
-/// with pytest.raises(SomeException, match="foo\bar"):
-///     ...
+/// with pytest.raises(Exception, match="foo."):
+///     do_thing_that_raises()
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
-/// with pytest.raises(SomeException, match=r"foo\bar"):
-///     ...
+/// with pytest.raises(Exception, match=r"foo."):
+///     do_thing_that_raises()
 /// ```
 ///
 /// Alternatively:
@@ -180,8 +180,8 @@ impl Violation for PytestRaisesWithoutException {
 /// import re
 ///
 ///
-/// with pytest.raises(SomeException, match=re.escape("foo\bar")):
-///     ...
+/// with pytest.raises(Exception, match=re.escape("foo.")):
+///     do_thing_that_raises()
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct PytestRaisesAmbiguousPattern;
