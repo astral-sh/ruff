@@ -1876,29 +1876,63 @@ impl<'db> Type<'db> {
     /// `Type::ClassLiteral(builtins.int)`, that is, it is the `int` class itself. As a type
     /// expression, it names the type `Type::Instance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
-    #[must_use]
-    pub fn in_type_expression(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn in_type_expression(
+        &self,
+        db: &'db dyn Db,
+    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // In a type expression, a bare `type` is interpreted as "instance of `type`", which is
             // equivalent to `type[object]`.
-            Type::ClassLiteral(_) | Type::SubclassOf(_) => self.to_instance(db),
+            Type::ClassLiteral(_) | Type::SubclassOf(_) => Ok(self.to_instance(db)),
             // We treat `typing.Type` exactly the same as `builtins.type`:
-            Type::KnownInstance(KnownInstanceType::Type) => KnownClass::Type.to_instance(db),
-            Type::KnownInstance(KnownInstanceType::Tuple) => KnownClass::Tuple.to_instance(db),
-            Type::Union(union) => union.map(db, |element| element.in_type_expression(db)),
-            Type::Unknown => Type::Unknown,
-            // TODO map this to a new `Type::TypeVar` variant
-            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => *self,
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => alias.value_ty(db),
-            Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
-                Type::Never
+            Type::KnownInstance(KnownInstanceType::Type) => Ok(KnownClass::Type.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::Tuple) => Ok(KnownClass::Tuple.to_instance(db)),
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+                let mut invalid_expressions = vec![];
+                for element in union.elements(db) {
+                    match element.in_type_expression(db) {
+                        Ok(type_expr) => builder = builder.add(type_expr),
+                        Err(InvalidTypeExpressionError {
+                            fallback_type,
+                            invalid_expressions: new_invalid_expressions,
+                        }) => {
+                            invalid_expressions.extend(new_invalid_expressions);
+                            builder = builder.add(fallback_type);
+                        }
+                    }
+                }
+                if invalid_expressions.is_empty() {
+                    Ok(builder.build())
+                } else {
+                    Err(InvalidTypeExpressionError {
+                        fallback_type: builder.build(),
+                        invalid_expressions,
+                    })
+                }
             }
-            Type::KnownInstance(KnownInstanceType::LiteralString) => Type::LiteralString,
-            Type::KnownInstance(KnownInstanceType::Any) => Type::Any,
+            Type::Unknown => Ok(Type::Unknown),
+            // TODO map this to a new `Type::TypeVar` variant
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => Ok(*self),
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => Ok(alias.value_ty(db)),
+            Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
+                Ok(Type::Never)
+            }
+            Type::KnownInstance(KnownInstanceType::LiteralString) => Ok(Type::LiteralString),
+            Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::Any),
             // TODO: Should emit a diagnostic
-            Type::KnownInstance(KnownInstanceType::Annotated) => Type::Unknown,
-            Type::Todo(_) => *self,
-            _ => todo_type!("Unsupported or invalid type in a type expression"),
+            Type::KnownInstance(KnownInstanceType::Annotated) => Err(InvalidTypeExpressionError {
+                invalid_expressions: vec![InvalidTypeExpression::BareAnnotated],
+                fallback_type: Type::Unknown,
+            }),
+            Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
+                invalid_expressions: vec![InvalidTypeExpression::BareLiteral],
+                fallback_type: Type::Unknown,
+            }),
+            Type::Todo(_) => Ok(*self),
+            _ => Ok(todo_type!(
+                "Unsupported or invalid type in a type expression"
+            )),
         }
     }
 
@@ -2024,6 +2058,33 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 impl<'db> From<Type<'db>> for Symbol<'db> {
     fn from(value: Type<'db>) -> Self {
         Symbol::Type(value, Boundness::Bound)
+    }
+}
+
+/// Error struct providing information on type(s) that were deemed to be invalid
+/// in a type expression context, and the type we should therefore fallback to
+/// for the problematic type expression.
+#[derive(Debug, PartialEq, Eq)]
+pub struct InvalidTypeExpressionError<'db> {
+    fallback_type: Type<'db>,
+    invalid_expressions: Vec<InvalidTypeExpression>,
+}
+
+/// Enumeration of various types that are invalid in type-expression contexts
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum InvalidTypeExpression {
+    /// `x: Annotated` is invalid as an annotation
+    BareAnnotated,
+    /// `x: Literal` is invalid as an annotation
+    BareLiteral,
+}
+
+impl InvalidTypeExpression {
+    const fn reason(self) -> &'static str {
+        match self {
+            Self::BareAnnotated => "`Annotated` requires at least two arguments when used in an annotation or type expression",
+            Self::BareLiteral => "`Literal` requires at least one argument when used in a type expression",
+        }
     }
 }
 

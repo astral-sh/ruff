@@ -63,10 +63,10 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
     typing_extensions_symbol, Boundness, Class, ClassLiteralType, FunctionType, InstanceType,
-    IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol,
-    Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionBuilder, UnionType,
+    IntersectionBuilder, IntersectionType, InvalidTypeExpressionError, IterationOutcome,
+    KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind,
+    SliceLiteralType, Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -4465,9 +4465,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => {
-                    self.infer_name_expression(name).in_type_expression(self.db)
-                }
+                ast::ExprContext::Load => self
+                    .infer_name_expression(name)
+                    .in_type_expression(self.db)
+                    .unwrap_or_else(|error| self.infer_invalid_type_expression(expression, error)),
                 ast::ExprContext::Invalid => Type::Unknown,
                 ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
             },
@@ -4475,7 +4476,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(self.db),
+                    .in_type_expression(self.db)
+                    .unwrap_or_else(|error| self.infer_invalid_type_expression(expression, error)),
                 ast::ExprContext::Invalid => Type::Unknown,
                 ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
             },
@@ -4629,6 +4631,25 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         }
+    }
+
+    fn infer_invalid_type_expression(
+        &mut self,
+        expression: &ast::Expr,
+        error: InvalidTypeExpressionError<'db>,
+    ) -> Type<'db> {
+        let InvalidTypeExpressionError {
+            fallback_type,
+            invalid_expressions,
+        } = error;
+        for error in invalid_expressions {
+            self.diagnostics.add_lint(
+                &INVALID_TYPE_FORM,
+                expression.into(),
+                format_args!("{}", error.reason()),
+            );
+        }
+        fallback_type
     }
 
     /// Infer the type of a string type expression.
