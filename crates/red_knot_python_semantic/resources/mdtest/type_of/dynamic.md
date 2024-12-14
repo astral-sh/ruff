@@ -1,6 +1,7 @@
 # `type[Any]`
 
-This file contains tests for non-fully-static `type[]` types, such as `type[Any]` and `type[Unknown]`.
+This file contains tests for non-fully-static `type[]` types, such as `type[Any]` and
+`type[Unknown]`.
 
 ## Simple
 
@@ -80,6 +81,7 @@ def test(x: Any, y: SomethingUnknown):
 ## `type[Unknown]` has similar properties to `type[Any]`
 
 ```py
+import abc
 from typing import Any
 from does_not_exist import SomethingUnknown  # error: [unresolved-import]
 
@@ -92,4 +94,9 @@ def test(a: type[Any], b: type[str], c: type[Any], d: type[str]):
     b = c
     c = has_unknown_type
     d = has_unknown_type
+
+def test2(a: type[Any], b: abc.ABCMeta):
+    """Instances of `type` subclasses are also assignable to `type[Any]` or `type[Unknown]`"""
+    b = a
+    b = has_unknown_type
 ```
