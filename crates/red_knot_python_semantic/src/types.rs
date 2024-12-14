@@ -1157,10 +1157,15 @@ impl<'db> Type<'db> {
                 Some(KnownClass::Slice | KnownClass::Object)
             ),
 
-            (Type::ClassLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::ClassLiteral(..)) => {
-                !matches!(class.known(db), Some(KnownClass::Type | KnownClass::Object))
-            }
+            (
+                Type::ClassLiteral(ClassLiteralType { class: class_a }),
+                Type::Instance(InstanceType { class: class_b }),
+            )
+            | (
+                Type::Instance(InstanceType { class: class_b }),
+                Type::ClassLiteral(ClassLiteralType { class: class_a }),
+            ) => !class_a.is_instance_of(db, class_b),
+
             (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => !matches!(
                 class.known(db),
@@ -3751,6 +3756,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::BuiltinInstance("int")]))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
+    #[test_case(Ty::AbcClassLiteral("ABC"), Ty::AbcInstance("ABCMeta"))]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
