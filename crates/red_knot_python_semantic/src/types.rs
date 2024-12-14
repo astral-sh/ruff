@@ -1051,8 +1051,14 @@ impl<'db> Type<'db> {
 
             (Type::SubclassOf(_), Type::SubclassOf(_)) => false,
 
-            (Type::SubclassOf(_), Type::Instance(_)) | (Type::Instance(_), Type::SubclassOf(_)) => {
-                false
+            (Type::SubclassOf(_), Type::Instance(instance))
+            | (Type::Instance(instance), Type::SubclassOf(_)) => {
+                // TODO this should be `true` if the instance is of a final type which is not a
+                // subclass of type. (With non-final types, we never know whether a subclass might
+                // multiply-inherit `type` or a subclass of it, and thus not be disjoint with
+                // `type[...]`.) Until we support finality, hardcode None, which is known to be
+                // final.
+                matches!(instance.class.known(db), Some(KnownClass::NoneType))
             }
 
             (
@@ -1060,6 +1066,7 @@ impl<'db> Type<'db> {
                 Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
+                | Type::LiteralString
                 | Type::BytesLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
@@ -1069,6 +1076,7 @@ impl<'db> Type<'db> {
                 Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
+                | Type::LiteralString
                 | Type::BytesLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
@@ -3538,6 +3546,7 @@ pub(crate) mod tests {
         Ty::KnownClassInstance(KnownClass::ModuleType)
     )]
     #[test_case(Ty::SliceLiteral(1, 2, 3), Ty::BuiltinInstance("slice"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::Intersection{pos: vec![], neg: vec![Ty::None]})]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3704,6 +3713,8 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
     #[test_case(Ty::Tuple(vec![]), Ty::BuiltinClassLiteral("object"))]
+    #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::None)]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::LiteralString)]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
