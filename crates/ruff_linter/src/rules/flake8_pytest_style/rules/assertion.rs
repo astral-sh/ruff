@@ -144,7 +144,7 @@ impl Violation for PytestAssertInExcept {
 ///     ...
 /// ```
 ///
-/// References
+/// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[derive(ViolationMetadata)]
 pub(crate) struct PytestAssertAlwaysFalse;

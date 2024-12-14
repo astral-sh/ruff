@@ -1,14 +1,14 @@
+use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, Expr, Keyword, Stmt, WithItem};
+use ruff_python_ast::{self as ast, Expr, Keyword, Stmt, StringLiteralValue, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use super::helpers::is_empty_or_null_string;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::ruff::rules::string_has_metacharacters;
 
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
@@ -153,36 +153,61 @@ impl Violation for PytestRaisesWithoutException {
 
 /// ## What it does
 /// Checks for non-raw literal string arguments passed to the `match` parameter
-/// of `pytest.raises()` that contains at least one regex metacharacters.
+/// of `pytest.raises()` where the string contains at least one unescaped
+/// regex metacharacter.
 ///
 /// ## Why is this bad?
 /// The `match` argument is implicitly converted to a regex under the hood.
 /// It should be made explicit whether the string is meant to be a regex or a "plain" pattern
-/// by either prefixing the string with the `r` suffix or wrapping it in `re.escape()`.
+/// by prefixing the string with the `r` suffix, escaping the metacharacter(s)
+/// in the string using backslashes, or wrapping the entire string in a call to
+/// `re.escape()`.
 ///
 /// ## Example
 ///
 /// ```python
-/// with pytest.raises(Exception, match="foo."):
+/// import pytest
+///
+///
+/// with pytest.raises(Exception, match="A full sentence."):
 ///     do_thing_that_raises()
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
-/// with pytest.raises(Exception, match=r"foo."):
+/// import pytest
+///
+///
+/// with pytest.raises(Exception, match=r"A full sentence."):
 ///     do_thing_that_raises()
 /// ```
 ///
 /// Alternatively:
 ///
 /// ```python
+/// import pytest
 /// import re
 ///
 ///
-/// with pytest.raises(Exception, match=re.escape("foo.")):
+/// with pytest.raises(Exception, match=re.escape("A full sentence.")):
 ///     do_thing_that_raises()
 /// ```
+///
+/// or:
+///
+/// ```python
+/// import pytest
+/// import re
+///
+///
+/// with pytest.raises(Exception, "A full sentence\\."):
+///     do_thing_that_raises()
+/// ```
+///
+/// ## References
+/// - [Python documentation: `re.escape`](https://docs.python.org/3/library/re.html#re.escape)
+/// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
 pub(crate) struct PytestRaisesAmbiguousPattern;
 
@@ -212,6 +237,38 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
+fn string_has_unescaped_metacharacters(value: &StringLiteralValue) -> bool {
+    let mut skip = false;
+    let mut last = '\0';
+
+    for (current, next) in value.chars().tuple_windows() {
+        if skip {
+            skip = false;
+            continue;
+        }
+
+        if current == '\\' {
+            skip = true;
+            continue;
+        }
+
+        if char_is_regex_metacharacter(current) {
+            return true;
+        }
+
+        last = next;
+    }
+
+    !skip && char_is_regex_metacharacter(last)
+}
+
+const fn char_is_regex_metacharacter(c: char) -> bool {
+    matches!(
+        c,
+        '.' | '^' | '$' | '*' | '+' | '?' | '{' | '[' | '\\' | '|' | '('
+    )
+}
+
 pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
@@ -229,7 +286,7 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
                     let any_part_is_raw =
                         string.value.iter().any(|part| part.flags.prefix().is_raw());
 
-                    if !any_part_is_raw && string_has_metacharacters(&string.value) {
+                    if !any_part_is_raw && string_has_unescaped_metacharacters(&string.value) {
                         let diagnostic =
                             Diagnostic::new(PytestRaisesAmbiguousPattern, string.range);
                         checker.diagnostics.push(diagnostic);

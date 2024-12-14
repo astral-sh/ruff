@@ -2,33 +2,73 @@
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 snapshot_kind: text
 ---
-PT201.py:7:43: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
-  |
-5 |     ### Errors
-6 | 
-7 |     with pytest.raises(FooAtTheEnd, match="foo."): ...
-  |                                           ^^^^^^ PT201
-8 | 
-9 |     with pytest.raises(PackageExtraSpecifier, match="Install `foo[bar]` instead"): ...
-  |
-  = help: Use a raw string or `re.escape()` to make the intention explicit
-
-PT201.py:9:53: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+PT201.py:8:43: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
    |
- 7 |     with pytest.raises(FooAtTheEnd, match="foo."): ...
- 8 | 
+ 6 |     ### Errors
+ 7 | 
+ 8 |     with pytest.raises(FooAtTheEnd, match="foo."): ...
+   |                                           ^^^^^^ PT201
  9 |     with pytest.raises(PackageExtraSpecifier, match="Install `foo[bar]` instead"): ...
-   |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT201
-10 | 
-11 |     with pytest.raises(InnocentQuestion, match="This is a simple sentence (or is it?)"): ...
+10 |     with pytest.raises(InnocentQuestion, match="This is a simple sentence (or is it?)"): ...
    |
    = help: Use a raw string or `re.escape()` to make the intention explicit
 
-PT201.py:11:48: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+PT201.py:9:53: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
    |
+ 8 |     with pytest.raises(FooAtTheEnd, match="foo."): ...
  9 |     with pytest.raises(PackageExtraSpecifier, match="Install `foo[bar]` instead"): ...
-10 | 
-11 |     with pytest.raises(InnocentQuestion, match="This is a simple sentence (or is it?)"): ...
+   |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT201
+10 |     with pytest.raises(InnocentQuestion, match="This is a simple sentence (or is it?)"): ...
+   |
+   = help: Use a raw string or `re.escape()` to make the intention explicit
+
+PT201.py:10:48: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+   |
+ 8 |     with pytest.raises(FooAtTheEnd, match="foo."): ...
+ 9 |     with pytest.raises(PackageExtraSpecifier, match="Install `foo[bar]` instead"): ...
+10 |     with pytest.raises(InnocentQuestion, match="This is a simple sentence (or is it?)"): ...
    |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT201
+11 | 
+12 |     with pytest.raises(ManuallyEscapedWindowsPathToDotFile, match="C:\\\\Users\\\\Foo\\\\.config"): ...
+   |
+   = help: Use a raw string or `re.escape()` to make the intention explicit
+
+PT201.py:12:67: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+   |
+10 |     with pytest.raises(InnocentQuestion, match="This is a simple sentence (or is it?)"): ...
+11 | 
+12 |     with pytest.raises(ManuallyEscapedWindowsPathToDotFile, match="C:\\\\Users\\\\Foo\\\\.config"): ...
+   |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT201
+13 | 
+14 |     with pytest.raises(MiddleDot, match="foo.bar"): ...
+   |
+   = help: Use a raw string or `re.escape()` to make the intention explicit
+
+PT201.py:14:41: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+   |
+12 |     with pytest.raises(ManuallyEscapedWindowsPathToDotFile, match="C:\\\\Users\\\\Foo\\\\.config"): ...
+13 | 
+14 |     with pytest.raises(MiddleDot, match="foo.bar"): ...
+   |                                         ^^^^^^^^^ PT201
+15 |     with pytest.raises(EndDot, match="foobar."): ...
+16 |     with pytest.raises(EndBackslash, match="foobar\\"): ...
+   |
+   = help: Use a raw string or `re.escape()` to make the intention explicit
+
+PT201.py:15:38: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+   |
+14 |     with pytest.raises(MiddleDot, match="foo.bar"): ...
+15 |     with pytest.raises(EndDot, match="foobar."): ...
+   |                                      ^^^^^^^^^ PT201
+16 |     with pytest.raises(EndBackslash, match="foobar\\"): ...
+   |
+   = help: Use a raw string or `re.escape()` to make the intention explicit
+
+PT201.py:16:44: PT201 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+   |
+14 |     with pytest.raises(MiddleDot, match="foo.bar"): ...
+15 |     with pytest.raises(EndDot, match="foobar."): ...
+16 |     with pytest.raises(EndBackslash, match="foobar\\"): ...
+   |                                            ^^^^^^^^^^ PT201
    |
    = help: Use a raw string or `re.escape()` to make the intention explicit
