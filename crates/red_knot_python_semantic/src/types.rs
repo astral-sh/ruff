@@ -1053,9 +1053,11 @@ impl<'db> Type<'db> {
 
             (Type::SubclassOf(_), Type::Instance(instance))
             | (Type::Instance(instance), Type::SubclassOf(_)) => {
-                // TODO this should be based on whether the instance is of a final type which is
-                // not an instance of type, but until we support finality, hardcode None, which is
-                // known to be final.
+                // TODO this should be `true` if the instance is of a final type which is not a
+                // subclass of type, but until we support finality, hardcode None, which is known
+                // to be final. (With non-final types, we never know whether a subclass might
+                // multiply-inherit `type` or a subclass of it, and thus not be disjoint with
+                // `type[...]`.)
                 match instance.class.known(db) {
                     Some(KnownClass::NoneType) => true,
                     _ => false,
