@@ -7,7 +7,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_trivia::Cursor;
-use ruff_text_size::{TextLen, TextSize};
+use ruff_source_file::LineRanges;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::config::MarkdownTestConfig;
 
@@ -156,8 +157,14 @@ static HEADER_RE: LazyLock<Regex> =
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^```(?<lang>(?-u:\w)+)?(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n?")
-        .unwrap()
+    Regex::new(
+        r"(?x)
+        ^```(?<lang>(?-u:\w)+)?(?<config>(?:\x20+\S+)*)\s*\n
+        (?<code>(?:.|\n)*?)\n?
+        (?<end>```|\z)
+        ",
+    )
+    .unwrap()
 });
 
 #[derive(Debug)]
@@ -202,6 +209,7 @@ struct Parser<'s> {
     /// The unparsed remainder of the Markdown source.
     cursor: Cursor<'s>,
 
+    source: &'s str,
     source_len: TextSize,
 
     /// Stack of ancestor sections.
@@ -225,6 +233,7 @@ impl<'s> Parser<'s> {
         });
         Self {
             sections,
+            source,
             files: IndexVec::default(),
             cursor: Cursor::new(source),
             source_len: source.text_len(),
@@ -327,6 +336,13 @@ impl<'s> Parser<'s> {
     fn parse_code_block(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
         // We never pop the implicit root section.
         let section = self.stack.top();
+
+        if captures.name("end").unwrap().is_empty() {
+            let code_block_start = self.cursor.token_len();
+            let line = self.source.count_lines(TextRange::up_to(code_block_start)) + 1;
+
+            return Err(anyhow::anyhow!("Unterminated code block at line {line}."));
+        }
 
         let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
 
@@ -662,6 +678,38 @@ mod tests {
         };
 
         assert_eq!(file.code, "x = 10");
+    }
+
+    #[test]
+    fn unterminated_code_block_1() {
+        let source = dedent(
+            "
+            ```
+            x = 1
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Unterminated code block at line 2.");
+    }
+
+    #[test]
+    fn unterminated_code_block_2() {
+        let source = dedent(
+            "
+            ## A well-fenced block
+
+            ```
+            y = 2
+            ```
+
+            ## A not-so-well-fenced block
+
+            ```
+            x = 1
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Unterminated code block at line 10.");
     }
 
     #[test]
