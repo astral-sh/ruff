@@ -1058,10 +1058,7 @@ impl<'db> Type<'db> {
                 // multiply-inherit `type` or a subclass of it, and thus not be disjoint with
                 // `type[...]`.) Until we support finality, hardcode None, which is known to be
                 // final.
-                match instance.class.known(db) {
-                    Some(KnownClass::NoneType) => true,
-                    _ => false,
-                }
+                matches!(instance.class.known(db), Some(KnownClass::NoneType))
             }
 
             (
