@@ -70,7 +70,9 @@ impl<'db> ClassBase<'db> {
             | Type::Tuple(_)
             | Type::SliceLiteral(_)
             | Type::ModuleLiteral(_)
-            | Type::SubclassOf(_) => None,
+            | Type::SubclassOf(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy => None,
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::TypeAliasType(_)
