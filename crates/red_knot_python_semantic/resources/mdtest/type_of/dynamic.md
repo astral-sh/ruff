@@ -1,12 +1,18 @@
 # `type[Any]`
 
+This file contains tests for non-fully-static `type[]` types, such as `type[Any]` and `type[Unknown]`.
+
 ## Simple
 
 ```py
-def f(x: type[Any]):
+def f(x: type[Any], y: type[str]):
     reveal_type(x)  # revealed: type[Any]
     # TODO: could be `<object.__repr__ type> & Any`
     reveal_type(x.__repr__)  # revealed: Any
+
+    z = x
+    x = y
+    y = z
 
 class A: ...
 
@@ -69,4 +75,21 @@ def test(x: Any, y: SomethingUnknown):
     reveal_type(x.__class__.__class__.__class__.__class__)  # revealed: type[Any]
     reveal_type(y.__class__)  # revealed: type[Unknown]
     reveal_type(y.__class__.__class__.__class__.__class__)  # revealed: type[Unknown]
+```
+
+## `type[Unknown]` has similar properties to `type[Any]`
+
+```py
+from typing import Any
+from does_not_exist import SomethingUnknown  # error: [unresolved-import]
+
+has_unknown_type = SomethingUnknown.__class__
+reveal_type(has_unknown_type)  # revealed: type[Unknown]
+
+def test(a: type[Any], b: type[str], c: type[Any], d: type[str]):
+    """Both `type[Any]` and `type[Unknown]` are assignable to all `type[]` types"""
+    a = b
+    b = c
+    c = has_unknown_type
+    d = has_unknown_type
 ```

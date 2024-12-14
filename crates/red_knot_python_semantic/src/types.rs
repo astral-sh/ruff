@@ -3351,6 +3351,7 @@ pub(crate) mod tests {
         },
         Tuple(Vec<Ty>),
         SubclassOfAny,
+        SubclassOfUnknown,
         SubclassOfBuiltinClass(&'static str),
         StdlibModule(CoreStdlibModule),
         SliceLiteral(i32, i32, i32),
@@ -3398,6 +3399,7 @@ pub(crate) mod tests {
                     Type::tuple(db, elements)
                 }
                 Ty::SubclassOfAny => Type::subclass_of_base(ClassBase::Any),
+                Ty::SubclassOfUnknown => Type::subclass_of_base(ClassBase::Unknown),
                 Ty::SubclassOfBuiltinClass(s) => Type::subclass_of(
                     builtins_symbol(db, s)
                         .expect_type()
@@ -3471,6 +3473,8 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
     #[test_case(Ty::BuiltinInstance("type"), Ty::BuiltinInstance("type"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfUnknown)]
+    #[test_case(Ty::SubclassOfUnknown, Ty::SubclassOfBuiltinClass("str"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
