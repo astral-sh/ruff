@@ -1,7 +1,7 @@
-from abc import abstractmethod, abstractproperty, abstractstaticmethod, abstractclassmethod
+from abc import ABC, abstractmethod, abstractproperty, abstractstaticmethod, abstractclassmethod
 
 
-class NoBase:
+class A(ABC):
     @abstractmethod
     def abstract_instance_method(self): ...
 
@@ -15,21 +15,10 @@ class NoBase:
     def abstract_property(self): ...
 
 
-class HasBase(NoBase):
-    @abstractmethod
-    def abstract_instance_method(self): ...
-
-    @abstractclassmethod
-    def abstract_class_method(cls): ...
-
-    @abstractstaticmethod
-    def abstract_static_method(): ...
-
-    @abstractproperty
-    def abstract_property(self): ...
+class B: ...
 
 
-class HasMetaclass(metaclass=HasBase):
+class C(B, A):
     @abstractmethod
     def abstract_instance_method(self): ...
 
