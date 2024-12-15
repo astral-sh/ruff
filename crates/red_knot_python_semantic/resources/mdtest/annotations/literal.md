@@ -91,3 +91,13 @@ a1: Literal[26]
 def f():
     reveal_type(a1)  # revealed: Literal[26]
 ```
+
+## Invalid
+
+```py
+from typing import Literal
+
+# error: [invalid-type-form] "`Literal` requires at least one argument when used in a type expression"
+def _(x: Literal):
+    reveal_type(x)  # revealed: Unknown
+```
