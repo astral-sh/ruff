@@ -187,6 +187,7 @@ pub(super) fn has_default_copy_semantics(
             ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
                 | ["pydantic_settings", "BaseSettings"]
                 | ["msgspec", "Struct"]
+                | ["sqlmodel", "SQLModel"]
         )
     })
 }

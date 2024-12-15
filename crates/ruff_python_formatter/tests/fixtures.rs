@@ -177,12 +177,9 @@ fn format() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let options = PyFormatOptions::from_extension(input_path);
-        let formatted_code = format_file(&content, &options, input_path);
-
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
-
         let options_path = input_path.with_extension("options.json");
+
         if let Ok(options_file) = fs::File::open(options_path) {
             let reader = BufReader::new(options_file);
             let options: Vec<PyFormatOptions> =
@@ -228,6 +225,9 @@ fn format() {
             }
         } else {
             // We want to capture the differences in the preview style in our fixtures
+            let options = PyFormatOptions::from_extension(input_path);
+            let formatted_code = format_file(&content, &options, input_path);
+
             let options_preview = options.with_preview(PreviewMode::Enabled);
             let formatted_preview = format_file(&content, &options_preview, input_path);
 

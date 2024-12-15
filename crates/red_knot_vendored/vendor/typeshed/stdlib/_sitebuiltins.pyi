@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Iterable
 from typing import ClassVar, Literal, NoReturn
 
@@ -5,7 +6,7 @@ class Quitter:
     name: str
     eof: str
     def __init__(self, name: str, eof: str) -> None: ...
-    def __call__(self, code: int | None = None) -> NoReturn: ...
+    def __call__(self, code: sys._ExitCode = None) -> NoReturn: ...
 
 class _Printer:
     MAXLINES: ClassVar[Literal[23]]
@@ -13,4 +14,4 @@ class _Printer:
     def __call__(self) -> None: ...
 
 class _Helper:
-    def __call__(self, request: object) -> None: ...
+    def __call__(self, request: object = ...) -> None: ...

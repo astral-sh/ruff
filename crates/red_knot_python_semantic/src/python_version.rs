@@ -5,7 +5,6 @@ use std::fmt;
 /// Unlike the `TargetVersion` enums in the CLI crates,
 /// this does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,
@@ -66,5 +65,44 @@ impl fmt::Display for PythonVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let PythonVersion { major, minor } = self;
         write!(f, "{major}.{minor}")
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for PythonVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let as_str = String::deserialize(deserializer)?;
+
+        if let Some((major, minor)) = as_str.split_once('.') {
+            let major = major
+                .parse()
+                .map_err(|err| serde::de::Error::custom(format!("invalid major version: {err}")))?;
+            let minor = minor
+                .parse()
+                .map_err(|err| serde::de::Error::custom(format!("invalid minor version: {err}")))?;
+
+            Ok((major, minor).into())
+        } else {
+            let major = as_str.parse().map_err(|err| {
+                serde::de::Error::custom(format!(
+                    "invalid python-version: {err}, expected: `major.minor`"
+                ))
+            })?;
+
+            Ok((major, 0).into())
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for PythonVersion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }

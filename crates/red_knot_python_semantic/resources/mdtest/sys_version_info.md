@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-target-version = "3.9"
+python-version = "3.9"
 ```
 
 ## The type of `sys.version_info`

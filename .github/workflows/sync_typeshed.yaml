@@ -31,7 +31,7 @@ jobs:
         with:
           repository: python/typeshed
           path: typeshed
-          persist-credentials: true
+          persist-credentials: false
       - name: Setup git
         run: |
           git config --global user.name typeshedbot

@@ -9,7 +9,7 @@ from typing import Type
 
 class A: ...
 
-def _(c: Type, d: Type[A], e: Type[A]):
+def _(c: Type, d: Type[A]):
     reveal_type(c)  # revealed: type
     reveal_type(d)  # revealed: type[A]
     c = d  # fine

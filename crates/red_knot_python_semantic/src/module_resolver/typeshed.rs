@@ -112,10 +112,10 @@ impl TypeshedVersions {
     pub(in crate::module_resolver) fn query_module(
         &self,
         module: &ModuleName,
-        target_version: PythonVersion,
+        python_version: PythonVersion,
     ) -> TypeshedVersionsQueryResult {
         if let Some(range) = self.exact(module) {
-            if range.contains(target_version) {
+            if range.contains(python_version) {
                 TypeshedVersionsQueryResult::Exists
             } else {
                 TypeshedVersionsQueryResult::DoesNotExist
@@ -125,7 +125,7 @@ impl TypeshedVersions {
             while let Some(module_to_try) = module {
                 if let Some(range) = self.exact(&module_to_try) {
                     return {
-                        if range.contains(target_version) {
+                        if range.contains(python_version) {
                             TypeshedVersionsQueryResult::MaybeExists
                         } else {
                             TypeshedVersionsQueryResult::DoesNotExist

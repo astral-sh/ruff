@@ -1,6 +1,7 @@
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_resolver::file_to_module;
@@ -463,6 +464,33 @@ pub enum DefinitionKind<'db> {
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
+}
+
+impl Ranged for DefinitionKind<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            DefinitionKind::Import(alias) => alias.range(),
+            DefinitionKind::ImportFrom(import) => import.alias().range(),
+            DefinitionKind::Function(function) => function.name.range(),
+            DefinitionKind::Class(class) => class.name.range(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.name.range(),
+            DefinitionKind::NamedExpression(named) => named.target.range(),
+            DefinitionKind::Assignment(assignment) => assignment.name().range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
+            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.target.range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target().range(),
+            DefinitionKind::Comprehension(comp) => comp.target().range(),
+            DefinitionKind::VariadicPositionalParameter(parameter) => parameter.name.range(),
+            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.name.range(),
+            DefinitionKind::Parameter(parameter) => parameter.parameter.name.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target().range(),
+            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
+            DefinitionKind::ExceptHandler(handler) => handler.node().range(),
+            DefinitionKind::TypeVar(type_var) => type_var.name.range(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.name.range(),
+            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.name.range(),
+        }
+    }
 }
 
 impl DefinitionKind<'_> {

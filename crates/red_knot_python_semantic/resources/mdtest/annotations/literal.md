@@ -45,19 +45,19 @@ def f():
     # TODO: This should be Color.RED
     reveal_type(b1)  # revealed: Literal[0]
 
-# error: [invalid-literal-parameter]
+# error: [invalid-type-form]
 invalid1: Literal[3 + 4]
-# error: [invalid-literal-parameter]
+# error: [invalid-type-form]
 invalid2: Literal[4 + 3j]
-# error: [invalid-literal-parameter]
+# error: [invalid-type-form]
 invalid3: Literal[(3, 4)]
 
 hello = "hello"
 invalid4: Literal[
-    1 + 2,  # error: [invalid-literal-parameter]
+    1 + 2,  # error: [invalid-type-form]
     "foo",
-    hello,  # error: [invalid-literal-parameter]
-    (1, 2, 3),  # error: [invalid-literal-parameter]
+    hello,  # error: [invalid-type-form]
+    (1, 2, 3),  # error: [invalid-type-form]
 ]
 ```
 
@@ -90,4 +90,14 @@ a1: Literal[26]
 
 def f():
     reveal_type(a1)  # revealed: Literal[26]
+```
+
+## Invalid
+
+```py
+from typing import Literal
+
+# error: [invalid-type-form] "`Literal` requires at least one argument when used in a type expression"
+def _(x: Literal):
+    reveal_type(x)  # revealed: Unknown
 ```

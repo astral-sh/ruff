@@ -1,3 +1,4 @@
+use crate::config::Log;
 use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
@@ -7,6 +8,7 @@ use ruff_db::diagnostic::{Diagnostic, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
 use salsa::Setter;
@@ -42,9 +44,14 @@ pub fn run(path: &Utf8Path, long_title: &str, short_title: &str, test_name: &str
             continue;
         }
 
+        let _tracing = test.configuration().log.as_ref().and_then(|log| match log {
+            Log::Bool(enabled) => enabled.then(setup_logging),
+            Log::Filter(filter) => setup_logging_with_filter(filter),
+        });
+
         Program::get(&db)
-            .set_target_version(&mut db)
-            .to(test.target_version());
+            .set_python_version(&mut db)
+            .to(test.configuration().python_version().unwrap_or_default());
 
         // Remove all files so that the db is in a "fresh" state.
         db.memory_file_system().remove_all();

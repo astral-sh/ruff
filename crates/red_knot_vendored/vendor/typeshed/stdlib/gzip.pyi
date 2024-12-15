@@ -2,8 +2,8 @@ import _compression
 import sys
 import zlib
 from _typeshed import ReadableBuffer, SizedBuffer, StrOrBytesPath
-from io import FileIO
-from typing import Final, Literal, Protocol, TextIO, overload
+from io import FileIO, TextIOWrapper
+from typing import Final, Literal, Protocol, overload
 from typing_extensions import TypeAlias
 
 __all__ = ["BadGzipFile", "GzipFile", "open", "compress", "decompress"]
@@ -57,13 +57,13 @@ def open(
 ) -> GzipFile: ...
 @overload
 def open(
-    filename: StrOrBytesPath,
+    filename: StrOrBytesPath | _ReadableFileobj | _WritableFileobj,
     mode: _OpenTextMode,
     compresslevel: int = 9,
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
-) -> TextIO: ...
+) -> TextIOWrapper: ...
 @overload
 def open(
     filename: StrOrBytesPath | _ReadableFileobj | _WritableFileobj,
@@ -72,7 +72,7 @@ def open(
     encoding: str | None = None,
     errors: str | None = None,
     newline: str | None = None,
-) -> GzipFile | TextIO: ...
+) -> GzipFile | TextIOWrapper: ...
 
 class _PaddedFile:
     file: _ReadableFileobj

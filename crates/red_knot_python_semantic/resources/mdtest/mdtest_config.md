@@ -5,7 +5,7 @@ The following configuration will be attached to the *root* section (without any 
 
 ```toml
 [environment]
-target-version = "3.10"
+python-version = "3.10"
 ```
 
 # Basic
@@ -34,7 +34,7 @@ Here, we make sure that we can overwrite the global configuration in a child sec
 
 ```toml
 [environment]
-target-version = "3.11"
+python-version = "3.11"
 ```
 
 ```py
@@ -55,7 +55,7 @@ Children in this section should all use the section configuration:
 
 ```toml
 [environment]
-target-version = "3.12"
+python-version = "3.12"
 ```
 
 ## Child

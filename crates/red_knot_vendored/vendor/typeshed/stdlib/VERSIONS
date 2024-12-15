@@ -57,6 +57,7 @@ _msi: 3.0-3.12
 _multibytecodec: 3.0-
 _operator: 3.4-
 _osx_support: 3.0-
+_pickle: 3.0-
 _posixsubprocess: 3.2-
 _py_abc: 3.7-
 _pydecimal: 3.5-

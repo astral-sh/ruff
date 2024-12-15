@@ -5,6 +5,7 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
+use python_version::PythonVersion;
 use red_knot_python_semantic::SitePackages;
 use red_knot_server::run_server;
 use red_knot_workspace::db::RootDatabase;
@@ -15,12 +16,11 @@ use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
-use target_version::TargetVersion;
 
 use crate::logging::{setup_tracing, Verbosity};
 
 mod logging;
-mod target_version;
+mod python_version;
 mod verbosity;
 
 #[derive(Debug, Parser)]
@@ -34,54 +34,39 @@ struct Args {
     #[command(subcommand)]
     pub(crate) command: Option<Command>,
 
-    #[arg(
-        long,
-        help = "Changes the current working directory.",
-        long_help = "Changes the current working directory before any specified operations. This affects the workspace and configuration discovery.",
-        value_name = "PATH"
-    )]
-    current_directory: Option<SystemPathBuf>,
+    /// Run the command within the given project directory.
+    ///
+    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
+    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
+    ///
+    /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
+    #[arg(long, value_name = "PROJECT")]
+    project: Option<SystemPathBuf>,
 
-    #[arg(
-        long,
-        help = "Path to the virtual environment the project uses",
-        long_help = "\
-Path to the virtual environment the project uses. \
-If provided, red-knot will use the `site-packages` directory of this virtual environment \
-to resolve type information for the project's third-party dependencies.",
-        value_name = "PATH"
-    )]
+    /// Path to the virtual environment the project uses.
+    ///
+    /// If provided, red-knot will use the `site-packages` directory of this virtual environment
+    /// to resolve type information for the project's third-party dependencies.
+    #[arg(long, value_name = "PATH")]
     venv_path: Option<SystemPathBuf>,
 
-    #[arg(
-        long,
-        value_name = "DIRECTORY",
-        help = "Custom directory to use for stdlib typeshed stubs"
-    )]
-    custom_typeshed_dir: Option<SystemPathBuf>,
+    /// Custom directory to use for stdlib typeshed stubs.
+    #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
+    typeshed: Option<SystemPathBuf>,
 
-    #[arg(
-        long,
-        value_name = "PATH",
-        help = "Additional path to use as a module-resolution source (can be passed multiple times)"
-    )]
+    /// Additional path to use as a module-resolution source (can be passed multiple times).
+    #[arg(long, value_name = "PATH")]
     extra_search_path: Option<Vec<SystemPathBuf>>,
 
-    #[arg(
-        long,
-        help = "Python version to assume when resolving types",
-        value_name = "VERSION"
-    )]
-    target_version: Option<TargetVersion>,
+    /// Python version to assume when resolving types.
+    #[arg(long, value_name = "VERSION", alias = "target-version")]
+    python_version: Option<PythonVersion>,
 
     #[clap(flatten)]
     verbosity: Verbosity,
 
-    #[arg(
-        long,
-        help = "Run in watch mode by re-running whenever files change",
-        short = 'W'
-    )]
+    /// Run in watch mode by re-running whenever files change.
+    #[arg(long, short = 'W')]
     watch: bool,
 }
 
@@ -89,8 +74,8 @@ impl Args {
     fn to_configuration(&self, cli_cwd: &SystemPath) -> Configuration {
         let mut configuration = Configuration::default();
 
-        if let Some(target_version) = self.target_version {
-            configuration.target_version = Some(target_version.into());
+        if let Some(python_version) = self.python_version {
+            configuration.python_version = Some(python_version.into());
         }
 
         if let Some(venv_path) = &self.venv_path {
@@ -99,9 +84,8 @@ impl Args {
             });
         }
 
-        if let Some(custom_typeshed_dir) = &self.custom_typeshed_dir {
-            configuration.search_paths.custom_typeshed =
-                Some(SystemPath::absolute(custom_typeshed_dir, cli_cwd));
+        if let Some(typeshed) = &self.typeshed {
+            configuration.search_paths.typeshed = Some(SystemPath::absolute(typeshed, cli_cwd));
         }
 
         if let Some(extra_search_paths) = &self.extra_search_path {
@@ -167,15 +151,13 @@ fn run() -> anyhow::Result<ExitStatus> {
     };
 
     let cwd = args
-        .current_directory
+        .project
         .as_ref()
         .map(|cwd| {
             if cwd.as_std_path().is_dir() {
                 Ok(SystemPath::absolute(cwd, &cli_base_path))
             } else {
-                Err(anyhow!(
-                    "Provided current-directory path `{cwd}` is not a directory"
-                ))
+                Err(anyhow!("Provided project path `{cwd}` is not a directory"))
             }
         })
         .transpose()?

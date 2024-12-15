@@ -669,7 +669,7 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(value, precedence::MAX);
             }
             Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range: _ }) => {
-                self.unparse_singleton(value);
+                self.unparse_singleton(*value);
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
                 self.p("[");
@@ -1211,7 +1211,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_singleton(&mut self, singleton: &Singleton) {
+    pub(crate) fn unparse_singleton(&mut self, singleton: Singleton) {
         match singleton {
             Singleton::None => self.p("None"),
             Singleton::True => self.p("True"),

@@ -10,6 +10,7 @@ from pathlib import (
 
 def test_path(p: Path) -> None:
     ## Errors
+    p.with_suffix(".")
     p.with_suffix("py")
     p.with_suffix(r"s")
     p.with_suffix(u'' "json")
@@ -27,6 +28,7 @@ def test_path(p: Path) -> None:
 
 def test_posix_path(p: PosixPath) -> None:
     ## Errors
+    p.with_suffix(".")
     p.with_suffix("py")
     p.with_suffix(r"s")
     p.with_suffix(u'' "json")
@@ -44,6 +46,7 @@ def test_posix_path(p: PosixPath) -> None:
 
 def test_pure_path(p: PurePath) -> None:
     ## Errors
+    p.with_suffix(".")
     p.with_suffix("py")
     p.with_suffix(r"s")
     p.with_suffix(u'' "json")
@@ -61,6 +64,7 @@ def test_pure_path(p: PurePath) -> None:
 
 def test_pure_posix_path(p: PurePosixPath) -> None:
     ## Errors
+    p.with_suffix(".")
     p.with_suffix("py")
     p.with_suffix(r"s")
     p.with_suffix(u'' "json")
@@ -78,6 +82,7 @@ def test_pure_posix_path(p: PurePosixPath) -> None:
 
 def test_pure_windows_path(p: PureWindowsPath) -> None:
     ## Errors
+    p.with_suffix(".")
     p.with_suffix("py")
     p.with_suffix(r"s")
     p.with_suffix(u'' "json")
@@ -95,6 +100,7 @@ def test_pure_windows_path(p: PureWindowsPath) -> None:
 
 def test_windows_path(p: WindowsPath) -> None:
     ## Errors
+    p.with_suffix(".")
     p.with_suffix("py")
     p.with_suffix(r"s")
     p.with_suffix(u'' "json")

@@ -1,5 +1,5 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, StringFlags};
 use ruff_python_semantic::analyze::typing;
@@ -8,11 +8,13 @@ use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `pathlib.Path.with_suffix()` calls where
-/// the given suffix does not have a leading dot.
+/// the given suffix does not have a leading dot
+/// or the given suffix is a single dot `"."`.
 ///
 /// ## Why is this bad?
 /// `Path.with_suffix()` will raise an error at runtime
-/// if the given suffix is not prefixed with a dot.
+/// if the given suffix is not prefixed with a dot
+/// or it is a single dot `"."`.
 ///
 /// ## Examples
 ///
@@ -43,22 +45,40 @@ use ruff_text_size::Ranged;
 /// Moreover, it's impossible to determine if this is the correct fix
 /// for a given situation (it's possible that the string was correct
 /// but was being passed to the wrong method entirely, for example).
+///
+/// No fix is offered if the suffix `"."` is given, since the intent is unclear.
 #[derive(ViolationMetadata)]
-pub(crate) struct DotlessPathlibWithSuffix;
+pub(crate) struct InvalidPathlibWithSuffix {
+    // TODO: Since "." is a correct suffix in Python 3.14,
+    // we will need to update this rule and documentation
+    // once Ruff supports Python 3.14.
+    single_dot: bool,
+}
 
-impl AlwaysFixableViolation for DotlessPathlibWithSuffix {
+impl Violation for InvalidPathlibWithSuffix {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Dotless suffix passed to `.with_suffix()`".to_string()
+        if self.single_dot {
+            "Invalid suffix passed to `.with_suffix()`".to_string()
+        } else {
+            "Dotless suffix passed to `.with_suffix()`".to_string()
+        }
     }
 
-    fn fix_title(&self) -> String {
-        "Add a leading dot".to_string()
+    fn fix_title(&self) -> Option<String> {
+        let title = if self.single_dot {
+            "Remove \".\" or extend to valid suffix"
+        } else {
+            "Add a leading dot"
+        };
+        Some(title.to_string())
     }
 }
 
 /// PTH210
-pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::ExprCall) {
     let (func, arguments) = (&call.func, &call.arguments);
 
     if !is_path_with_suffix_call(checker.semantic(), func) {
@@ -75,7 +95,11 @@ pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
 
     let string_value = string.value.to_str();
 
-    if string_value.is_empty() || string_value.starts_with('.') {
+    if string_value.is_empty() {
+        return;
+    }
+
+    if string_value.starts_with('.') && string_value.len() > 1 {
         return;
     }
 
@@ -83,10 +107,17 @@ pub(crate) fn dotless_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
         return;
     };
 
-    let diagnostic = Diagnostic::new(DotlessPathlibWithSuffix, call.range);
-    let after_leading_quote = string.start() + first_part.flags.opener_len();
-    let fix = Fix::unsafe_edit(Edit::insertion(".".to_string(), after_leading_quote));
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    let single_dot = string_value == ".";
+    let mut diagnostic = Diagnostic::new(InvalidPathlibWithSuffix { single_dot }, call.range);
+    if !single_dot {
+        let after_leading_quote = string.start() + first_part.flags.opener_len();
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+            ".".to_string(),
+            after_leading_quote,
+        )));
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
 
 fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool {

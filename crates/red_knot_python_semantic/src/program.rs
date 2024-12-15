@@ -10,7 +10,7 @@ use crate::Db;
 
 #[salsa::input(singleton)]
 pub struct Program {
-    pub target_version: PythonVersion,
+    pub python_version: PythonVersion,
 
     #[return_ref]
     pub(crate) search_paths: SearchPaths,
@@ -19,16 +19,16 @@ pub struct Program {
 impl Program {
     pub fn from_settings(db: &dyn Db, settings: &ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
-            target_version,
+            python_version,
             search_paths,
         } = settings;
 
-        tracing::info!("Target version: Python {target_version}");
+        tracing::info!("Python version: Python {python_version}");
 
         let search_paths = SearchPaths::from_settings(db, search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        Ok(Program::builder(settings.target_version, search_paths)
+        Ok(Program::builder(settings.python_version, search_paths)
             .durability(Durability::HIGH)
             .new(db))
     }
@@ -56,7 +56,7 @@ impl Program {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
-    pub target_version: PythonVersion,
+    pub python_version: PythonVersion,
     pub search_paths: SearchPathSettings,
 }
 
@@ -75,7 +75,7 @@ pub struct SearchPathSettings {
     /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
     /// bundled as a zip file in the binary
-    pub custom_typeshed: Option<SystemPathBuf>,
+    pub typeshed: Option<SystemPathBuf>,
 
     /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
     pub site_packages: SitePackages,
@@ -86,7 +86,7 @@ impl SearchPathSettings {
         Self {
             src_root,
             extra_paths: vec![],
-            custom_typeshed: None,
+            typeshed: None,
             site_packages: SitePackages::Known(vec![]),
         }
     }

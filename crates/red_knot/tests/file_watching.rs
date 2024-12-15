@@ -282,7 +282,7 @@ where
         .extra_paths
         .iter()
         .flatten()
-        .chain(search_paths.custom_typeshed.iter())
+        .chain(search_paths.typeshed.iter())
         .chain(search_paths.site_packages.iter().flat_map(|site_packages| {
             if let SitePackages::Known(path) = site_packages {
                 path.as_slice()
@@ -296,7 +296,7 @@ where
     }
 
     let configuration = Configuration {
-        target_version: Some(PythonVersion::PY312),
+        python_version: Some(PythonVersion::PY312),
         search_paths,
     };
 
@@ -888,7 +888,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
             Ok(())
         },
         |root_path, _workspace_path| SearchPathConfiguration {
-            custom_typeshed: Some(root_path.join("typeshed")),
+            typeshed: Some(root_path.join("typeshed")),
             ..SearchPathConfiguration::default()
         },
     )?;

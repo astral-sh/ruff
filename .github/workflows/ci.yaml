@@ -312,7 +312,7 @@ jobs:
     name: "cargo fuzz build"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ github.ref == 'refs/heads/main' || needs.determine_changes.outputs.fuzz == 'true' }}
+    if: ${{ github.ref == 'refs/heads/main' || needs.determine_changes.outputs.fuzz == 'true' || needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

@@ -46,7 +46,7 @@ impl Workspace {
             SystemPath::new(root),
             &system,
             Some(&Configuration {
-                target_version: Some(settings.target_version.into()),
+                python_version: Some(settings.python_version.into()),
                 ..Configuration::default()
             }),
         )
@@ -170,19 +170,19 @@ impl FileHandle {
 
 #[wasm_bindgen]
 pub struct Settings {
-    pub target_version: TargetVersion,
+    pub python_version: PythonVersion,
 }
 #[wasm_bindgen]
 impl Settings {
     #[wasm_bindgen(constructor)]
-    pub fn new(target_version: TargetVersion) -> Self {
-        Self { target_version }
+    pub fn new(python_version: PythonVersion) -> Self {
+        Self { python_version }
     }
 }
 
 #[wasm_bindgen]
 #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum TargetVersion {
+pub enum PythonVersion {
     Py37,
     Py38,
     #[default]
@@ -193,16 +193,16 @@ pub enum TargetVersion {
     Py313,
 }
 
-impl From<TargetVersion> for red_knot_python_semantic::PythonVersion {
-    fn from(value: TargetVersion) -> Self {
+impl From<PythonVersion> for red_knot_python_semantic::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
         match value {
-            TargetVersion::Py37 => Self::PY37,
-            TargetVersion::Py38 => Self::PY38,
-            TargetVersion::Py39 => Self::PY39,
-            TargetVersion::Py310 => Self::PY310,
-            TargetVersion::Py311 => Self::PY311,
-            TargetVersion::Py312 => Self::PY312,
-            TargetVersion::Py313 => Self::PY313,
+            PythonVersion::Py37 => Self::PY37,
+            PythonVersion::Py38 => Self::PY38,
+            PythonVersion::Py39 => Self::PY39,
+            PythonVersion::Py310 => Self::PY310,
+            PythonVersion::Py311 => Self::PY311,
+            PythonVersion::Py312 => Self::PY312,
+            PythonVersion::Py313 => Self::PY313,
         }
     }
 }
@@ -251,7 +251,7 @@ impl System for WasmSystem {
     fn read_virtual_path_to_notebook(
         &self,
         _path: &SystemVirtualPath,
-    ) -> Result<ruff_notebook::Notebook, ruff_notebook::NotebookError> {
+    ) -> Result<Notebook, ruff_notebook::NotebookError> {
         Err(ruff_notebook::NotebookError::Io(not_found()))
     }
 
@@ -283,7 +283,7 @@ impl System for WasmSystem {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
@@ -294,14 +294,13 @@ fn not_found() -> std::io::Error {
 
 #[cfg(test)]
 mod tests {
-    use crate::TargetVersion;
-    use red_knot_python_semantic::PythonVersion;
+    use crate::PythonVersion;
 
     #[test]
     fn same_default_as_python_version() {
         assert_eq!(
-            PythonVersion::from(TargetVersion::default()),
-            PythonVersion::default()
+            red_knot_python_semantic::PythonVersion::from(PythonVersion::default()),
+            red_knot_python_semantic::PythonVersion::default()
         );
     }
 }

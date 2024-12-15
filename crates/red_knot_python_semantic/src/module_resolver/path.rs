@@ -283,9 +283,9 @@ fn query_stdlib_version(
     let Some(module_name) = stdlib_path_to_module_name(relative_path) else {
         return TypeshedVersionsQueryResult::DoesNotExist;
     };
-    let ResolverContext { db, target_version } = context;
+    let ResolverContext { db, python_version } = context;
 
-    typeshed_versions(*db).query_module(&module_name, *target_version)
+    typeshed_versions(*db).query_module(&module_name, *python_version)
 }
 
 /// Enumeration describing the various ways in which validation of a search path might fail.
@@ -658,7 +658,7 @@ mod tests {
         let TestCase {
             db, src, stdlib, ..
         } = TestCaseBuilder::new()
-            .with_custom_typeshed(MockedTypeshed::default())
+            .with_mocked_typeshed(MockedTypeshed::default())
             .build();
 
         assert_eq!(
@@ -779,7 +779,7 @@ mod tests {
     #[should_panic(expected = "Extension must be `pyi`; got `py`")]
     fn stdlib_path_invalid_join_py() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(MockedTypeshed::default())
+            .with_mocked_typeshed(MockedTypeshed::default())
             .build();
         SearchPath::custom_stdlib(&db, stdlib.parent().unwrap())
             .unwrap()
@@ -791,7 +791,7 @@ mod tests {
     #[should_panic(expected = "Extension must be `pyi`; got `rs`")]
     fn stdlib_path_invalid_join_rs() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(MockedTypeshed::default())
+            .with_mocked_typeshed(MockedTypeshed::default())
             .build();
         SearchPath::custom_stdlib(&db, stdlib.parent().unwrap())
             .unwrap()
@@ -822,7 +822,7 @@ mod tests {
     #[test]
     fn relativize_stdlib_path_errors() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(MockedTypeshed::default())
+            .with_mocked_typeshed(MockedTypeshed::default())
             .build();
 
         let root = SearchPath::custom_stdlib(&db, stdlib.parent().unwrap()).unwrap();
@@ -867,11 +867,11 @@ mod tests {
 
     fn typeshed_test_case(
         typeshed: MockedTypeshed,
-        target_version: PythonVersion,
+        python_version: PythonVersion,
     ) -> (TestDb, SearchPath) {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
-            .with_custom_typeshed(typeshed)
-            .with_target_version(target_version)
+            .with_mocked_typeshed(typeshed)
+            .with_python_version(python_version)
             .build();
         let stdlib = SearchPath::custom_stdlib(&db, stdlib.parent().unwrap()).unwrap();
         (db, stdlib)

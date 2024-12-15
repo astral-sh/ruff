@@ -119,9 +119,9 @@ def _(flag: bool):
 ## Objects of all types have a `__class__` method
 
 ```py
-import typing
+import typing_extensions
 
-reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
+reveal_type(typing_extensions.__class__)  # revealed: Literal[ModuleType]
 
 a = 42
 reveal_type(a.__class__)  # revealed: Literal[int]
@@ -138,7 +138,7 @@ reveal_type(d.__class__)  # revealed: Literal[bool]
 e = (42, 42)
 reveal_type(e.__class__)  # revealed: Literal[tuple]
 
-def f(a: int, b: typing.LiteralString, c: int | str, d: type[str]):
+def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]
     reveal_type(b.__class__)  # revealed: Literal[str]
     reveal_type(c.__class__)  # revealed: type[int] | type[str]
