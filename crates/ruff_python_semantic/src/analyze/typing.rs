@@ -16,7 +16,6 @@ use ruff_python_stdlib::typing::{
 use ruff_text_size::Ranged;
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
-use crate::analyze::typing;
 use crate::model::SemanticModel;
 use crate::{Binding, BindingKind, Modules};
 
