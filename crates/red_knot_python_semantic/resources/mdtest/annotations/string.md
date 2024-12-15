@@ -105,7 +105,7 @@ def f1(
 from typing import Literal
 
 def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]):
-    reveal_type(v)  # revealed: Literal["a", "b", "de", "f", "g", "h"] | Literal[b"c"]
+    reveal_type(v)  # revealed: Literal["a", "b", b"c", "de", "f", "g", "h"]
 ```
 
 ## Class variables
