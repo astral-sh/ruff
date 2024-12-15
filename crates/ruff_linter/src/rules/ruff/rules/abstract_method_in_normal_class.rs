@@ -154,13 +154,13 @@ fn might_be_abstract(class: &StmtClassDef, semantic: &SemanticModel) -> bool {
         };
         let metaclass = &metaclass.value;
 
-        if is_abcmeta(&metaclass, semantic) {
+        if is_abcmeta(metaclass, semantic) {
             // Metaclass is `abc.ABCMeta`
             // -> Might be abstract
             return true;
         }
 
-        let Some(metaclass_def) = find_class_def(&metaclass, semantic) else {
+        let Some(metaclass_def) = find_class_def(metaclass, semantic) else {
             // Has metaclass but its definition is not found
             // -> Might be abstract
             return true;
