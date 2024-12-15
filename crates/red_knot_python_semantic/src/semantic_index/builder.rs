@@ -1,10 +1,13 @@
+use std::num::NonZeroUsize;
+use std::ops::Div;
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
+use ruff_db::source::source_text;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -83,6 +86,10 @@ pub(super) struct SemanticIndexBuilder<'db> {
 
 impl<'db> SemanticIndexBuilder<'db> {
     pub(super) fn new(db: &'db dyn Db, file: File, parsed: &'db ParsedModule) -> Self {
+        let source = source_text(db.upcast(), file);
+        let approximated_expressions = (source.len() as f64 * 0.05) as usize;
+        let approximated_definitions = (source.len() as f64 * 0.015) as usize;
+
         let mut builder = Self {
             db,
             file,
@@ -101,10 +108,19 @@ impl<'db> SemanticIndexBuilder<'db> {
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
-            scopes_by_expression: FxHashMap::default(),
+            scopes_by_expression: FxHashMap::with_capacity_and_hasher(
+                approximated_expressions,
+                FxBuildHasher::default(),
+            ),
             scopes_by_node: FxHashMap::default(),
-            definitions_by_node: FxHashMap::default(),
-            expressions_by_node: FxHashMap::default(),
+            definitions_by_node: FxHashMap::with_capacity_and_hasher(
+                approximated_definitions,
+                FxBuildHasher::default(),
+            ),
+            expressions_by_node: FxHashMap::with_capacity_and_hasher(
+                approximated_expressions,
+                FxBuildHasher::default(),
+            ),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -547,6 +563,19 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
+
+        // let source_len = source_text(self.db.upcast(), self.file).len();
+        // let expressions = self.scopes_by_expression.len();
+        // let definitions = self.definitions_by_node.len();
+        //
+        // let expression_rel = NonZeroUsize::new(source_len)
+        //     .map(|size| (expressions as f64).div(size.get() as f64))
+        //     .unwrap_or_default();
+        // let definitions_rel = NonZeroUsize::new(source_len)
+        //     .map(|size| (definitions as f64).div(size.get() as f64))
+        //     .unwrap_or_default();
+        //
+        // println!("{source_len},{expressions},{expression_rel},{definitions},{definitions_rel}");
 
         SemanticIndex {
             symbol_tables,
