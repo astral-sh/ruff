@@ -47,7 +47,7 @@ class ArgumentError(Exception): ...
 
 class CDLL:
     _func_flags_: ClassVar[int]
-    _func_restype_: ClassVar[_CDataType]
+    _func_restype_: ClassVar[type[_CDataType]]
     _name: str
     _handle: int
     _FuncPtr: type[_FuncPointer]
@@ -202,7 +202,10 @@ if sys.platform == "win32":
     class HRESULT(_SimpleCData[int]): ...  # TODO undocumented
 
 if sys.version_info >= (3, 12):
-    c_time_t: type[c_int32 | c_int64]  # alias for one or the other at runtime
+    # At runtime, this is an alias for either c_int32 or c_int64,
+    # which are themselves an alias for one of c_short, c_int, c_long, or c_longlong
+    # This covers all our bases.
+    c_time_t: type[c_int32 | c_int64 | c_short | c_int | c_long | c_longlong]
 
 class py_object(_CanCastTo, _SimpleCData[_T]): ...
 

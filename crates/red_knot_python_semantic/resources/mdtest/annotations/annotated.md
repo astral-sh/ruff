@@ -29,9 +29,23 @@ It is invalid to parameterize `Annotated` with less than two arguments.
 ```py
 from typing_extensions import Annotated
 
-# TODO: This should be an error
+# error: [invalid-type-form] "`Annotated` requires at least two arguments when used in an annotation or type expression"
 def _(x: Annotated):
     reveal_type(x)  # revealed: Unknown
+
+def _(flag: bool):
+    if flag:
+        X = Annotated
+    else:
+        X = bool
+
+    # error: [invalid-type-form] "`Annotated` requires at least two arguments when used in an annotation or type expression"
+    def f(y: X):
+        reveal_type(y)  # revealed: Unknown | bool
+
+# error: [invalid-type-form] "`Annotated` requires at least two arguments when used in an annotation or type expression"
+def _(x: Annotated | bool):
+    reveal_type(x)  # revealed: Unknown | bool
 
 # error: [invalid-type-form]
 def _(x: Annotated[()]):
