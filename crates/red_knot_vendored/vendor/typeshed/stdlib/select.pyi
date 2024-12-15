@@ -10,7 +10,8 @@ if sys.platform != "win32":
     POLLERR: int
     POLLHUP: int
     POLLIN: int
-    POLLMSG: int
+    if sys.platform == "linux":
+        POLLMSG: int
     POLLNVAL: int
     POLLOUT: int
     POLLPRI: int
@@ -77,7 +78,8 @@ if sys.platform != "linux" and sys.platform != "win32":
     KQ_EV_ONESHOT: int
     KQ_EV_SYSFLAGS: int
     KQ_FILTER_AIO: int
-    KQ_FILTER_NETDEV: int
+    if sys.platform != "darwin":
+        KQ_FILTER_NETDEV: int
     KQ_FILTER_PROC: int
     KQ_FILTER_READ: int
     KQ_FILTER_SIGNAL: int
