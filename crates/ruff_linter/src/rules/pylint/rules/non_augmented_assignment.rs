@@ -155,7 +155,6 @@ fn augmented_assignment(
 
     Edit::range_replacement(new_content, range)
 }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AugmentedOperator {
