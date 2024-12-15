@@ -28,7 +28,7 @@ use crate::stdlib::{
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{CallDunderResult, CallOutcome};
 use crate::types::class_base::ClassBase;
-use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
+use crate::types::diagnostic::{TypeCheckDiagnosticsBuilder, INVALID_TYPE_FORM};
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -1889,7 +1889,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Tuple) => Ok(KnownClass::Tuple.to_instance(db)),
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
-                let mut invalid_expressions = vec![];
+                let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
                     match element.in_type_expression(db) {
                         Ok(type_expr) => builder = builder.add(type_expr),
@@ -1922,11 +1922,11 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::Any),
             // TODO: Should emit a diagnostic
             Type::KnownInstance(KnownInstanceType::Annotated) => Err(InvalidTypeExpressionError {
-                invalid_expressions: vec![InvalidTypeExpression::BareAnnotated],
+                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
                 fallback_type: Type::Unknown,
             }),
             Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
-                invalid_expressions: vec![InvalidTypeExpression::BareLiteral],
+                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::Unknown,
             }),
             Type::Todo(_) => Ok(*self),
@@ -2067,7 +2067,28 @@ impl<'db> From<Type<'db>> for Symbol<'db> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct InvalidTypeExpressionError<'db> {
     fallback_type: Type<'db>,
-    invalid_expressions: Vec<InvalidTypeExpression>,
+    invalid_expressions: smallvec::SmallVec<[InvalidTypeExpression; 1]>,
+}
+
+impl<'db> InvalidTypeExpressionError<'db> {
+    fn into_fallback_type(
+        self,
+        diagnostics: &mut TypeCheckDiagnosticsBuilder,
+        node: &ast::Expr,
+    ) -> Type<'db> {
+        let InvalidTypeExpressionError {
+            fallback_type,
+            invalid_expressions,
+        } = self;
+        for error in invalid_expressions {
+            diagnostics.add_lint(
+                &INVALID_TYPE_FORM,
+                node.into(),
+                format_args!("{}", error.reason()),
+            );
+        }
+        fallback_type
+    }
 }
 
 /// Enumeration of various types that are invalid in type-expression contexts
