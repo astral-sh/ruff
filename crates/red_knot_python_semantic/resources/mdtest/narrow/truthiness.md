@@ -6,7 +6,7 @@
 def bool_instance() -> bool:
     return True
 
-def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar"] | None:
+def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar"] | tuple[()] | None:
     return 0
 
 x = foo()
@@ -14,37 +14,37 @@ x = foo()
 if x:
     reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"] | Literal[b"bar"]
 else:
-    reveal_type(x)  # revealed: Literal[0] | Literal[False] | Literal[""] | Literal[b""] | None
+    reveal_type(x)  # revealed: Literal[0] | Literal[False] | Literal[""] | Literal[b""] | tuple[()] | None
 
 if not x:
-    reveal_type(x)  # revealed: Literal[0] | Literal[False] | Literal[""] | Literal[b""] | None
+    reveal_type(x)  # revealed: Literal[0] | Literal[False] | Literal[""] | Literal[b""] | tuple[()] | None
 else:
     reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"] | Literal[b"bar"]
 
 if x and not x:
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["", "foo"] | Literal[b"", b"bar"] | None
+    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["", "foo"] | Literal[b"", b"bar"] | tuple[()] | None
 
 if not (x and not x):
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["", "foo"] | Literal[b"", b"bar"] | None
+    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["", "foo"] | Literal[b"", b"bar"] | tuple[()] | None
 else:
     reveal_type(x)  # revealed: Never
 
 if x or not x:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["foo", ""] | Literal[b"bar", b""] | None
+    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["foo", ""] | Literal[b"bar", b""] | tuple[()] | None
 else:
     reveal_type(x)  # revealed: Never
 
 if not (x or not x):
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["foo", ""] | Literal[b"bar", b""] | None
+    reveal_type(x)  # revealed: Literal[-1, 0] | bool | Literal["foo", ""] | Literal[b"bar", b""] | tuple[()] | None
 
 if (isinstance(x, int) or isinstance(x, str)) and x:
     reveal_type(x)  # revealed: Literal[-1] | Literal[True] | Literal["foo"]
 else:
-    reveal_type(x)  # revealed: Literal[b"", b"bar"] | None | Literal[0] | Literal[False] | Literal[""]
+    reveal_type(x)  # revealed: Literal[b"", b"bar"] | tuple[()] | None | Literal[0] | Literal[False] | Literal[""]
 ```
 
 ## Function Literals
