@@ -854,26 +854,26 @@ impl<'db> Type<'db> {
             }
             (
                 Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Any,
+                    base: ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown,
                 }),
                 Type::SubclassOf(_),
             ) => true,
             (
                 Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Any,
+                    base: ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown,
                 }),
-                Type::Instance(target),
-            ) if target.class.is_known(db, KnownClass::Type) => true,
+                Type::Instance(_),
+            ) if target.is_assignable_to(db, KnownClass::Type.to_instance(db)) => true,
             (
-                Type::Instance(class),
+                Type::Instance(_),
                 Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Any,
+                    base: ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown,
                 }),
-            ) if class.class.is_known(db, KnownClass::Type) => true,
+            ) if self.is_assignable_to(db, KnownClass::Type.to_instance(db)) => true,
             (
                 Type::ClassLiteral(_) | Type::SubclassOf(_),
                 Type::SubclassOf(SubclassOfType {
-                    base: ClassBase::Any,
+                    base: ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown,
                 }),
             ) => true,
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
@@ -3356,6 +3356,7 @@ pub(crate) mod tests {
         },
         Tuple(Vec<Ty>),
         SubclassOfAny,
+        SubclassOfUnknown,
         SubclassOfBuiltinClass(&'static str),
         SubclassOfAbcClass(&'static str),
         StdlibModule(CoreStdlibModule),
@@ -3404,6 +3405,7 @@ pub(crate) mod tests {
                     Type::tuple(db, elements)
                 }
                 Ty::SubclassOfAny => Type::subclass_of_base(ClassBase::Any),
+                Ty::SubclassOfUnknown => Type::subclass_of_base(ClassBase::Unknown),
                 Ty::SubclassOfBuiltinClass(s) => Type::subclass_of(
                     builtins_symbol(db, s)
                         .expect_type()
@@ -3483,6 +3485,10 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinInstance("type"), Ty::SubclassOfBuiltinClass("object"))]
     #[test_case(Ty::BuiltinInstance("type"), Ty::BuiltinInstance("type"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
+    #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::SubclassOfUnknown)]
+    #[test_case(Ty::SubclassOfUnknown, Ty::SubclassOfBuiltinClass("str"))]
+    #[test_case(Ty::SubclassOfAny, Ty::AbcInstance("ABCMeta"))]
+    #[test_case(Ty::SubclassOfUnknown, Ty::AbcInstance("ABCMeta"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
