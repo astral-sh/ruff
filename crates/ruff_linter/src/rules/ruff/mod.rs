@@ -437,6 +437,8 @@ mod tests {
     #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::AbstractMethodInNormalClass, Path::new("RUF044.py"))]
+    #[test_case(Rule::AbstractMethodInNormalClass, Path::new("RUF044_abc.py"))]
+    #[test_case(Rule::AbstractMethodInNormalClass, Path::new("RUF044_abcmeta.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

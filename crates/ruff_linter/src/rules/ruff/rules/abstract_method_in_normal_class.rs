@@ -121,54 +121,52 @@ pub(crate) fn abstract_method_in_normal_class(checker: &mut Checker, class: &Stm
     }
 }
 
-/// Returns true if a class is definitely not an abstract class.
+/// Returns false if a class is definitely not an abstract class.
 ///
 /// A class is considered abstract when it inherits from a class
 /// created by `abc.ABCMeta` without implementing all abstract methods.
 ///
-/// Thus, a class is *not* abstract when all of its bases are inspectable
-/// and none of them inherits from `abc.ABC` or has `abc.ABCMeta` as the metaclass.
-fn might_be_abstract(class: &StmtClassDef, semantic: &SemanticModel) -> bool {
-    any_base_class(class, semantic, &mut |base| {
+/// Thus, a class is *not* abstract when all of its bases are:
+/// * Inspectable
+/// * Does not have a metaclass that inherits from `abc.ABCMeta`
+fn might_be_abstract(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
+    if metaclass_might_be_abcmeta(class_def, semantic) {
+        return true;
+    }
+
+    any_base_class(class_def, semantic, &mut |base| {
         if is_abc(base, semantic) {
-            // `abc.ABC` is an explicit base
-            // -> Might be abstract
             return true;
         }
 
         let Some(base_def) = find_class_def(base, semantic) else {
-            // Class definition is dynamic or not presented in the same file
-            // -> Might be abstract
             return true;
         };
 
-        let Some(arguments) = base_def.arguments.as_ref() else {
-            // No extra arguments
-            // -> Continue processing
-            return false;
-        };
-        let Some(metaclass) = arguments.find_keyword("metaclass") else {
-            // No metaclass
-            // -> Continue processing
-            return false;
-        };
-        let metaclass = &metaclass.value;
+        metaclass_might_be_abcmeta(base_def, semantic)
+    })
+}
 
-        if is_abcmeta(metaclass, semantic) {
-            // Metaclass is `abc.ABCMeta`
-            // -> Might be abstract
-            return true;
-        }
+fn metaclass_might_be_abcmeta(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
+    let Some(arguments) = class_def.arguments.as_ref() else {
+        return false;
+    };
 
-        let Some(metaclass_def) = find_class_def(metaclass, semantic) else {
-            // Has metaclass but its definition is not found
-            // -> Might be abstract
-            return true;
-        };
+    let Some(metaclass) = arguments.find_keyword("metaclass") else {
+        return false;
+    };
+    let metaclass = &metaclass.value;
 
-        any_base_class(metaclass_def, semantic, &mut |base| {
-            is_abcmeta(base, semantic)
-        })
+    if is_abcmeta(metaclass, semantic) {
+        return true;
+    }
+
+    let Some(metaclass_def) = find_class_def(metaclass, semantic) else {
+        return true;
+    };
+
+    any_base_class(metaclass_def, semantic, &mut |base| {
+        is_abcmeta(base, semantic) || find_class_def(base, semantic).is_none()
     })
 }
 
