@@ -26,9 +26,9 @@ repos:
     hooks:
       - id: mdformat
         additional_dependencies:
-          - mdformat-mkdocs
-          - mdformat-admon
-          - mdformat-footnote
+          - mdformat-mkdocs<4.0.0
+          - mdformat-admon==2.0.6
+          - mdformat-footnote==0.1.1
         exclude: |
           (?x)^(
             docs/formatter/black\.md
