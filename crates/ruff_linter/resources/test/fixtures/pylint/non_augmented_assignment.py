@@ -56,3 +56,20 @@ index = a_number = a_number + 1
 a_number = index = a_number + 1
 index = index * index + 10
 some_string = "a very long start to the string" + some_string
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/11672
+test = 0x5
+test = test + 0xBA
+
+test2 = b""
+test2 = test2 + b"\000"
+
+test3 = ""
+test3 = test3 + (   a := R""
+                      f"oo"   )
+
+test4 = []
+test4 = test4 + ( e
+                 for e in
+                 range(10)
+                  )

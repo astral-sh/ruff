@@ -269,7 +269,7 @@ non_augmented_assignment.py:29:1: PLR6104 [*] Use `&=` to perform an augmented a
 27 27 | to_cube = to_cube**to_cube
 28 28 | timeDiffSeconds = timeDiffSeconds % 60
 29    |-flags = flags & 0x1
-   29 |+flags &= 1
+   29 |+flags &= 0x1
 30 30 | flags = flags | 0x1
 31 31 | flags = flags ^ 0x1
 32 32 | flags = flags << 1
@@ -290,7 +290,7 @@ non_augmented_assignment.py:30:1: PLR6104 [*] Use `|=` to perform an augmented a
 28 28 | timeDiffSeconds = timeDiffSeconds % 60
 29 29 | flags = flags & 0x1
 30    |-flags = flags | 0x1
-   30 |+flags |= 1
+   30 |+flags |= 0x1
 31 31 | flags = flags ^ 0x1
 32 32 | flags = flags << 1
 33 33 | flags = flags >> 1
@@ -311,7 +311,7 @@ non_augmented_assignment.py:31:1: PLR6104 [*] Use `^=` to perform an augmented a
 29 29 | flags = flags & 0x1
 30 30 | flags = flags | 0x1
 31    |-flags = flags ^ 0x1
-   31 |+flags ^= 1
+   31 |+flags ^= 0x1
 32 32 | flags = flags << 1
 33 33 | flags = flags >> 1
 34 34 | mat1 = mat1 @ mat2
@@ -538,3 +538,88 @@ non_augmented_assignment.py:51:1: PLR6104 [*] Use `+=` to perform an augmented a
 52 52 | 
 53 53 | # OK
 54 54 | a_list[0] = a_list[:] * 3
+
+non_augmented_assignment.py:62:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+60 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+61 | test = 0x5
+62 | test = test + 0xBA
+   | ^^^^^^^^^^^^^^^^^^ PLR6104
+63 | 
+64 | test2 = b""
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+59 59 | 
+60 60 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+61 61 | test = 0x5
+62    |-test = test + 0xBA
+   62 |+test += 0xBA
+63 63 | 
+64 64 | test2 = b""
+65 65 | test2 = test2 + b"\000"
+
+non_augmented_assignment.py:65:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+64 | test2 = b""
+65 | test2 = test2 + b"\000"
+   | ^^^^^^^^^^^^^^^^^^^^^^^ PLR6104
+66 | 
+67 | test3 = ""
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+62 62 | test = test + 0xBA
+63 63 | 
+64 64 | test2 = b""
+65    |-test2 = test2 + b"\000"
+   65 |+test2 += b"\000"
+66 66 | 
+67 67 | test3 = ""
+68 68 | test3 = test3 + (   a := R""
+
+non_augmented_assignment.py:68:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+67 |   test3 = ""
+68 | / test3 = test3 + (   a := R""
+69 | |                       f"oo"   )
+   | |_______________________________^ PLR6104
+70 |   
+71 |   test4 = []
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+65 65 | test2 = test2 + b"\000"
+66 66 | 
+67 67 | test3 = ""
+68    |-test3 = test3 + (   a := R""
+69    |-                      f"oo"   )
+   68 |+test3 += (a := R""
+   69 |+                      f"oo")
+70 70 | 
+71 71 | test4 = []
+72 72 | test4 = test4 + ( e
+
+non_augmented_assignment.py:72:1: PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   |
+71 |   test4 = []
+72 | / test4 = test4 + ( e
+73 | |                  for e in
+74 | |                  range(10)
+75 | |                   )
+   | |___________________^ PLR6104
+   |
+   = help: Replace with augmented assignment
+
+ℹ Unsafe fix
+69 69 |                       f"oo"   )
+70 70 | 
+71 71 | test4 = []
+72    |-test4 = test4 + ( e
+   72 |+test4 += ( e
+73 73 |                  for e in
+74 74 |                  range(10)
+75 75 |                   )
