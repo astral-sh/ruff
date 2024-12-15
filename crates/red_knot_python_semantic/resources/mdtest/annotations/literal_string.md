@@ -107,7 +107,7 @@ def _(flag: bool):
     qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]
 
     baz_3 = "foo" if flag else 1
-    reveal_type(baz_3)  # revealed: Literal["foo"] | Literal[1]
+    reveal_type(baz_3)  # revealed: Literal["foo", 1]
     qux_3: LiteralString = baz_3  # error: [invalid-assignment]
 ```
 

@@ -37,7 +37,7 @@ class C:
     # error: [possibly-unresolved-reference]
     y = x
 
-reveal_type(C.y)  # revealed: Literal[1] | Literal["abc"]
+reveal_type(C.y)  # revealed: Literal[1, "abc"]
 ```
 
 ## Unbound function local

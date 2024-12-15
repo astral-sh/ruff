@@ -31,9 +31,9 @@ The test inside an if expression should not affect code outside of the expressio
 def _(flag: bool):
     x: Literal[42, "hello"] = 42 if flag else "hello"
 
-    reveal_type(x)  # revealed: Literal[42] | Literal["hello"]
+    reveal_type(x)  # revealed: Literal[42, "hello"]
 
     _ = ... if isinstance(x, str) else ...
 
-    reveal_type(x)  # revealed: Literal[42] | Literal["hello"]
+    reveal_type(x)  # revealed: Literal[42, "hello"]
 ```
