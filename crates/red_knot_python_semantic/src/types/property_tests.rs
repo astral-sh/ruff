@@ -68,6 +68,8 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::SubclassOfAny,
         Ty::SubclassOfBuiltinClass("object"),
         Ty::SubclassOfBuiltinClass("str"),
+        Ty::AlwaysTruthy,
+        Ty::AlwaysFalsy,
     ])
     .unwrap()
     .clone()

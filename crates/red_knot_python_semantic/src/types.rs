@@ -3385,6 +3385,8 @@ pub(crate) mod tests {
         SubclassOfBuiltinClass(&'static str),
         StdlibModule(CoreStdlibModule),
         SliceLiteral(i32, i32, i32),
+        AlwaysTruthy,
+        AlwaysFalsy,
     }
 
     impl Ty {
@@ -3444,6 +3446,8 @@ pub(crate) mod tests {
                     Some(stop),
                     Some(step),
                 )),
+                Ty::AlwaysTruthy => Type::AlwaysTruthy,
+                Ty::AlwaysFalsy => Type::AlwaysFalsy,
             }
         }
     }
@@ -3577,6 +3581,9 @@ pub(crate) mod tests {
         Ty::KnownClassInstance(KnownClass::ModuleType)
     )]
     #[test_case(Ty::SliceLiteral(1, 2, 3), Ty::BuiltinInstance("slice"))]
+    #[test_case(Ty::IntLiteral(1), Ty::AlwaysTruthy)]
+    #[test_case(Ty::IntLiteral(0), Ty::AlwaysFalsy)]
+    #[test_case(Ty::AlwaysTruthy, Ty::BuiltinInstance("object"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3611,6 +3618,8 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("type"))]
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::IntLiteral(1), Ty::AlwaysFalsy)]
+    #[test_case(Ty::IntLiteral(0), Ty::AlwaysTruthy)]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3743,6 +3752,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
     #[test_case(Ty::Tuple(vec![]), Ty::BuiltinClassLiteral("object"))]
+    #[test_case(Ty::AlwaysFalsy, Ty::AlwaysTruthy)]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
