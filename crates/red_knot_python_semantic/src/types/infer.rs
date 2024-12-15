@@ -5672,9 +5672,9 @@ mod tests {
     fn builtin_symbol_vendored_stdlib() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_file("/src/a.py", "c = copyright")?;
+        db.write_file("/src/a.py", "c = chr")?;
 
-        assert_public_ty(&db, "/src/a.py", "c", "Literal[copyright]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[chr]");
 
         Ok(())
     }
