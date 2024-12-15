@@ -40,3 +40,81 @@ RUF044.py:15:9: RUF044 Abstract method defined in non-abstract class
    |         ^^^^^^^^^^^^^^^^^ RUF044
    |
    = help: Remove `@abstractproperty` or make `NoBase` inherit from `abc.ABC`
+
+RUF044.py:20:9: RUF044 Abstract method defined in non-abstract class
+   |
+18 | class HasBase(NoBase):
+19 |     @abstractmethod
+20 |     def abstract_instance_method(self): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^ RUF044
+21 | 
+22 |     @abstractclassmethod
+   |
+   = help: Remove `@abstractmethod` or make `HasBase` inherit from `abc.ABC`
+
+RUF044.py:23:9: RUF044 Abstract method defined in non-abstract class
+   |
+22 |     @abstractclassmethod
+23 |     def abstract_class_method(cls): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^ RUF044
+24 | 
+25 |     @abstractstaticmethod
+   |
+   = help: Remove `@abstractclassmethod` or make `HasBase` inherit from `abc.ABC`
+
+RUF044.py:26:9: RUF044 Abstract method defined in non-abstract class
+   |
+25 |     @abstractstaticmethod
+26 |     def abstract_static_method(): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^ RUF044
+27 | 
+28 |     @abstractproperty
+   |
+   = help: Remove `@abstractstaticmethod` or make `HasBase` inherit from `abc.ABC`
+
+RUF044.py:29:9: RUF044 Abstract method defined in non-abstract class
+   |
+28 |     @abstractproperty
+29 |     def abstract_property(self): ...
+   |         ^^^^^^^^^^^^^^^^^ RUF044
+   |
+   = help: Remove `@abstractproperty` or make `HasBase` inherit from `abc.ABC`
+
+RUF044.py:34:9: RUF044 Abstract method defined in non-abstract class
+   |
+32 | class HasMetaclass(metaclass=HasBase):
+33 |     @abstractmethod
+34 |     def abstract_instance_method(self): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^ RUF044
+35 | 
+36 |     @abstractclassmethod
+   |
+   = help: Remove `@abstractmethod` or make `HasMetaclass` inherit from `abc.ABC`
+
+RUF044.py:37:9: RUF044 Abstract method defined in non-abstract class
+   |
+36 |     @abstractclassmethod
+37 |     def abstract_class_method(cls): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^ RUF044
+38 | 
+39 |     @abstractstaticmethod
+   |
+   = help: Remove `@abstractclassmethod` or make `HasMetaclass` inherit from `abc.ABC`
+
+RUF044.py:40:9: RUF044 Abstract method defined in non-abstract class
+   |
+39 |     @abstractstaticmethod
+40 |     def abstract_static_method(): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^ RUF044
+41 | 
+42 |     @abstractproperty
+   |
+   = help: Remove `@abstractstaticmethod` or make `HasMetaclass` inherit from `abc.ABC`
+
+RUF044.py:43:9: RUF044 Abstract method defined in non-abstract class
+   |
+42 |     @abstractproperty
+43 |     def abstract_property(self): ...
+   |         ^^^^^^^^^^^^^^^^^ RUF044
+   |
+   = help: Remove `@abstractproperty` or make `HasMetaclass` inherit from `abc.ABC`
