@@ -11,9 +11,9 @@ def f(x: type[Any], y: type[str]):
     # TODO: could be `<object.__repr__ type> & Any`
     reveal_type(x.__repr__)  # revealed: Any
 
-    z = x
-    x = y
-    y = z
+    # type[str] and type[Any] are assignable to each other
+    a: type[str] = x
+    b: type[Any] = y
 
 class A: ...
 
@@ -88,15 +88,15 @@ from does_not_exist import SomethingUnknown  # error: [unresolved-import]
 has_unknown_type = SomethingUnknown.__class__
 reveal_type(has_unknown_type)  # revealed: type[Unknown]
 
-def test(a: type[Any], b: type[str], c: type[Any], d: type[str]):
+def test(x: type[str], y: type[Any]):
     """Both `type[Any]` and `type[Unknown]` are assignable to all `type[]` types"""
-    a = b
-    b = c
-    c = has_unknown_type
-    d = has_unknown_type
+    a: type[Any] = x
+    b: type[str] = y
+    c: type[Any] = has_unknown_type
+    d: type[str] = has_unknown_type
 
-def test2(a: type[Any], b: abc.ABCMeta):
-    """Instances of `type` subclasses are also assignable to `type[Any]` or `type[Unknown]`"""
-    b = a
-    b = has_unknown_type
+def test2(a: type[Any]):
+    """`type[Any]` and `type[Unknown]` are also assignable to all instances of `type` subclasses"""
+    b: abc.ABCMeta = a
+    b: abc.ABCMeta = has_unknown_type
 ```

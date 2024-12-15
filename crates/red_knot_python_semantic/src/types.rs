@@ -863,13 +863,13 @@ impl<'db> Type<'db> {
                     base: ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown,
                 }),
                 Type::Instance(_),
-            ) if target.is_subtype_of(db, KnownClass::Type.to_instance(db)) => true,
+            ) if target.is_assignable_to(db, KnownClass::Type.to_instance(db)) => true,
             (
                 Type::Instance(_),
                 Type::SubclassOf(SubclassOfType {
                     base: ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown,
                 }),
-            ) if self.is_subtype_of(db, KnownClass::Type.to_instance(db)) => true,
+            ) if self.is_assignable_to(db, KnownClass::Type.to_instance(db)) => true,
             (
                 Type::ClassLiteral(_) | Type::SubclassOf(_),
                 Type::SubclassOf(SubclassOfType {
