@@ -1,7 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
+use ruff_python_ast::{Expr, Stmt, StmtClassDef, StmtFunctionDef};
+use ruff_python_semantic::analyze::class::any_base_class;
 use ruff_python_semantic::analyze::visibility::{abstract_decorator_kind, AbstractDecoratorKind};
+use ruff_python_semantic::{BindingKind, NodeRef, SemanticModel};
 
 use crate::checkers::ast::Checker;
 
@@ -61,6 +63,9 @@ use crate::checkers::ast::Checker;
 /// ## Example
 ///
 /// ```python
+/// from abc import abstractmethod
+///
+///
 /// class C:
 ///     @abstractmethod
 ///     def m(self) -> None:
@@ -70,7 +75,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 ///
 /// ```python
-/// from abc import ABC
+/// from abc import ABC, abstractmethod
 ///
 ///
 /// class C(ABC):
@@ -105,14 +110,8 @@ pub(crate) fn abstract_method_in_normal_class(checker: &mut Checker, class: &Stm
         return;
     }
 
-    if !class.bases().is_empty() {
+    if might_be_abstract(class, checker.semantic()) {
         return;
-    }
-
-    if let Some(arguments) = &class.arguments {
-        if arguments.find_keyword("metaclass").is_some() {
-            return;
-        }
     }
 
     let class_name = class.name.as_str();
@@ -120,6 +119,93 @@ pub(crate) fn abstract_method_in_normal_class(checker: &mut Checker, class: &Stm
     for stmt in &class.body {
         check_class_stmt(checker, class_name, stmt);
     }
+}
+
+/// Returns true if a class is definitely not an abstract class.
+///
+/// A class is considered abstract when it inherits from a class
+/// created by `abc.ABCMeta` without implementing all abstract methods.
+///
+/// Thus, a class is *not* abstract when all of its bases are inspectable
+/// and none of them inherits from `abc.ABC` or has `abc.ABCMeta` as the metaclass.
+fn might_be_abstract(class: &StmtClassDef, semantic: &SemanticModel) -> bool {
+    any_base_class(class, semantic, &mut |base| {
+        if is_abc(base, semantic) {
+            // `abc.ABC` is an explicit base
+            // -> Might be abstract
+            return true;
+        }
+
+        let Some(base_def) = find_class_def(base, semantic) else {
+            // Class definition is dynamic or not presented in the same file
+            // -> Might be abstract
+            return true;
+        };
+
+        let Some(arguments) = base_def.arguments.as_ref() else {
+            // No extra arguments
+            // -> Continue processing
+            return false;
+        };
+        let Some(metaclass) = arguments.find_keyword("metaclass") else {
+            // No metaclass
+            // -> Continue processing
+            return false;
+        };
+        let metaclass = &metaclass.value;
+
+        if is_abcmeta(&metaclass, semantic) {
+            // Metaclass is `abc.ABCMeta`
+            // -> Might be abstract
+            return true;
+        }
+
+        let Some(metaclass_def) = find_class_def(&metaclass, semantic) else {
+            // Has metaclass but its definition is not found
+            // -> Might be abstract
+            return true;
+        };
+
+        any_base_class(metaclass_def, semantic, &mut |base| {
+            is_abcmeta(base, semantic)
+        })
+    })
+}
+
+fn is_abc(base: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(qualified_name) = semantic.resolve_qualified_name(base) else {
+        return false;
+    };
+
+    matches!(qualified_name.segments(), ["abc", "ABC"])
+}
+
+fn is_abcmeta(base: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(qualified_name) = semantic.resolve_qualified_name(base) else {
+        return false;
+    };
+
+    matches!(qualified_name.segments(), ["abc", "ABCMeta"])
+}
+
+fn find_class_def<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a StmtClassDef> {
+    let name = expr.as_name_expr()?;
+    let binding_id = semantic.only_binding(name)?;
+
+    let binding = semantic.binding(binding_id);
+
+    if !matches!(binding.kind, BindingKind::ClassDefinition(_)) {
+        return None;
+    }
+
+    let node_id = binding.source?;
+    let node = semantic.node(node_id);
+
+    let NodeRef::Stmt(Stmt::ClassDef(base_def)) = node else {
+        return None;
+    };
+
+    Some(base_def)
 }
 
 fn check_class_stmt(checker: &mut Checker, class_name: &str, stmt: &Stmt) {

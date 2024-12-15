@@ -28,10 +28,10 @@ pub enum AbstractDecoratorKind {
 impl AbstractDecoratorKind {
     fn from(name: &str) -> Option<Self> {
         match name {
-            "abstractmethod" => Some(AbstractDecoratorKind::AbstractMethod),
-            "abstractclassmethod" => Some(AbstractDecoratorKind::AbstractClassMethod),
-            "abstractstaticmethod" => Some(AbstractDecoratorKind::AbstractStaticMethod),
-            "abstractproperty" => Some(AbstractDecoratorKind::AbstractProperty),
+            "abstractmethod" => Some(Self::AbstractMethod),
+            "abstractclassmethod" => Some(Self::AbstractClassMethod),
+            "abstractstaticmethod" => Some(Self::AbstractStaticMethod),
+            "abstractproperty" => Some(Self::AbstractProperty),
             _ => None,
         }
     }
@@ -40,10 +40,10 @@ impl AbstractDecoratorKind {
 impl Display for AbstractDecoratorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            AbstractDecoratorKind::AbstractMethod => "abstractmethod",
-            AbstractDecoratorKind::AbstractClassMethod => "abstractclassmethod",
-            AbstractDecoratorKind::AbstractStaticMethod => "abstractstaticmethod",
-            AbstractDecoratorKind::AbstractProperty => "abstractproperty",
+            Self::AbstractMethod => "abstractmethod",
+            Self::AbstractClassMethod => "abstractclassmethod",
+            Self::AbstractStaticMethod => "abstractstaticmethod",
+            Self::AbstractProperty => "abstractproperty",
         })
     }
 }
