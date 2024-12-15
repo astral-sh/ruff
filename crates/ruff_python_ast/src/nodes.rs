@@ -3387,7 +3387,7 @@ pub enum TypeParam {
 }
 
 impl TypeParam {
-    pub fn name(&self) -> &Identifier {
+    pub const fn name(&self) -> &Identifier {
         match self {
             Self::TypeVar(x) => &x.name,
             Self::ParamSpec(x) => &x.name,
