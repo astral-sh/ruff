@@ -157,7 +157,8 @@ def generate_rule_metadata(rule_doc: Path) -> None:
             "\n".join(
                 [
                     "---",
-                    f"description: {description}",
+                    "description: |-",
+                    f"  {description}",
                     "tags:",
                     f"- {rule_code}",
                     "---",

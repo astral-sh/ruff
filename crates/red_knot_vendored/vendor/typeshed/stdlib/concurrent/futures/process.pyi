@@ -72,9 +72,19 @@ class _CallItem:
 
 class _SafeQueue(Queue[Future[Any]]):
     pending_work_items: dict[int, _WorkItem[Any]]
-    shutdown_lock: Lock
+    if sys.version_info < (3, 12):
+        shutdown_lock: Lock
     thread_wakeup: _ThreadWakeup
-    if sys.version_info >= (3, 9):
+    if sys.version_info >= (3, 12):
+        def __init__(
+            self,
+            max_size: int | None = 0,
+            *,
+            ctx: BaseContext,
+            pending_work_items: dict[int, _WorkItem[Any]],
+            thread_wakeup: _ThreadWakeup,
+        ) -> None: ...
+    elif sys.version_info >= (3, 9):
         def __init__(
             self,
             max_size: int | None = 0,
