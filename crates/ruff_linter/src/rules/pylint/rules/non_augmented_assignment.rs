@@ -144,7 +144,9 @@ fn augmented_assignment(
     let target_expr = locator.slice(target);
     let right_operand_expr = locator.slice(right_operand);
 
-    let new_value_expr = if should_be_parenthesized_when_standalone(right_operand) {
+    // expressions using the walrus operator (`:=`) must be parenthesized
+    // when they're used as standalone expressions:
+    let new_value_expr = if right_operand.is_named_expr() {
         format!("({right_operand_expr})")
     } else {
         right_operand_expr.to_string()
@@ -153,15 +155,6 @@ fn augmented_assignment(
 
     Edit::range_replacement(new_content, range)
 }
-
-/// Whether `expr` should be parenthesized when used on its own.
-///
-/// ```python
-/// a := 0            # (a := 0)
-/// a = b := 0        # a = (b := 0)
-/// ```
-const fn should_be_parenthesized_when_standalone(expr: &Expr) -> bool {
-    matches!(expr, Expr::Named(_))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
