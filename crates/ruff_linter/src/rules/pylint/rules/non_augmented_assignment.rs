@@ -98,13 +98,13 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
     let (left, op, right) = (&expr.left, &expr.op, &expr.right);
 
     let op_repr = op.to_string();
-    let Some(value) = augmentable_assignment_value(target, left, op, right) else {
+    let Some(value) = augmentable_assignment_value(target, left, *op, right) else {
         return;
     };
 
     let locator = checker.locator();
     let range = assign.range;
-    let fix = replace_with_augmented_assignment_fix(locator, range, target, &*op_repr, value);
+    let fix = replace_with_augmented_assignment_fix(locator, range, target, &op_repr, value);
 
     let diagnostic = Diagnostic::new(NonAugmentedAssignment { op_repr }, range);
 
@@ -114,7 +114,7 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
 fn augmentable_assignment_value<'a>(
     target: &'a Expr,
     left: &'a Expr,
-    op: &'a Operator,
+    op: Operator,
     right: &'a Expr,
 ) -> Option<&'a Expr> {
     let comp_target = ComparableExpr::from(target);
@@ -140,7 +140,7 @@ fn augmentable_assignment_value<'a>(
     }
 }
 
-fn operator_is_commutative(op: &Operator) -> bool {
+fn operator_is_commutative(op: Operator) -> bool {
     matches!(
         op,
         Operator::Add | Operator::BitAnd | Operator::BitOr | Operator::BitXor | Operator::Mult
@@ -158,11 +158,11 @@ fn replace_with_augmented_assignment_fix(
     let value_expr = locator.slice(value);
 
     let new_value_expr = if should_be_parenthesized_when_standalone(value) {
-        format!("({})", value_expr)
+        format!("({value_expr})")
     } else {
         value_expr.to_string()
     };
-    let new_content = format!("{} {}= {}", target_expr, op, new_value_expr);
+    let new_content = format!("{target_expr} {op}= {new_value_expr}");
     let edit = Edit::range_replacement(new_content, range);
 
     Fix::unsafe_edit(edit)
@@ -174,7 +174,6 @@ fn replace_with_augmented_assignment_fix(
 /// a := 0            # (a := 0)
 /// a = b := 0        # a = (b := 0)
 /// ```
-#[inline]
-fn should_be_parenthesized_when_standalone(expr: &Expr) -> bool {
+const fn should_be_parenthesized_when_standalone(expr: &Expr) -> bool {
     matches!(expr, Expr::Named(_))
 }
