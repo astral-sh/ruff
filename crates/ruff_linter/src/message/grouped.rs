@@ -19,6 +19,7 @@ use crate::settings::types::UnsafeFixes;
 pub struct GroupedEmitter {
     show_fix_status: bool,
     show_source: bool,
+    show_full_path: bool,
     unsafe_fixes: UnsafeFixes,
 }
 
@@ -32,6 +33,12 @@ impl GroupedEmitter {
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.show_source = show_source;
+        self
+    }
+
+    #[must_use]
+    pub fn with_show_full_path(mut self, show_full_path: bool) -> Self {
+        self.show_full_path = show_full_path; // Set flag
         self
     }
 
@@ -64,8 +71,13 @@ impl Emitter for GroupedEmitter {
             let row_length = calculate_print_width(max_row_length);
             let column_length = calculate_print_width(max_column_length);
 
-            // Print the filename.
-            writeln!(writer, "{}:", relativize_path(filename).underline())?;
+            // Print the filename, checking the `show_full_path` flag
+            if self.show_full_path {
+                writeln!(writer, "{}:", filename.cyan())?; // Print full path
+            } else {
+                writeln!(writer, "{}:", relativize_path(filename).underline())?;
+                // Print relative path
+            }
 
             // Print each message.
             for message in messages {

@@ -308,6 +308,10 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
     }
 
+    // TODO: Discuss with ruff owner what'd be the proper way to expose this
+    // flag to the user from the cli args
+    printer_flags |= PrinterFlags::SHOW_FULL_PATH;
+
     #[cfg(debug_assertions)]
     if cache {
         // `--no-cache` doesn't respect code changes, and so is often confusing during

@@ -27,6 +27,8 @@ bitflags! {
         const SHOW_FIX_DIFF     = 1 << 1;
         /// Whether to show the source code of a diagnostic.
         const SHOW_SOURCE       = 1 << 2;
+        /// Whether to show the full path in diagnostics.
+        const SHOW_FULL_PATH    = 1 << 3;
     }
 }
 
@@ -61,6 +63,12 @@ impl TextEmitter {
         self.unsafe_fixes = unsafe_fixes;
         self
     }
+
+    #[must_use]
+    pub fn with_show_full_path(mut self, full_path: bool) -> Self {
+        self.flags.set(EmitterFlags::SHOW_FULL_PATH, full_path);
+        self
+    }
 }
 
 impl Emitter for TextEmitter {
@@ -71,12 +79,23 @@ impl Emitter for TextEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
-            write!(
-                writer,
-                "{path}{sep}",
-                path = relativize_path(message.filename()).bold(),
-                sep = ":".cyan(),
-            )?;
+            let full_path = self.flags.contains(EmitterFlags::SHOW_FULL_PATH);
+
+            if full_path {
+                write!(
+                    writer,
+                    "{path}{sep}",
+                    path = message.filename(),
+                    sep = ":".cyan(),
+                )?;
+            } else {
+                write!(
+                    writer,
+                    "{path}{sep}",
+                    path = relativize_path(message.filename()).bold(),
+                    sep = ":".cyan(),
+                )?;
+            }
 
             let start_location = message.compute_start_location();
             let notebook_index = context.notebook_index(message.filename());
