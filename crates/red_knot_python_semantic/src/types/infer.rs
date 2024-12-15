@@ -1174,6 +1174,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             let inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db(), declared_ty) {
                     UnionType::from_elements(self.db(), [declared_ty, default_ty])
+                } else if default
+                    .as_ref()
+                    .is_some_and(|d| d.is_ellipsis_literal_expr())
+                {
+                    declared_ty
                 } else {
                     self.context.report_lint(
                         &INVALID_PARAMETER_DEFAULT,
