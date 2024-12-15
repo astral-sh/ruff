@@ -182,30 +182,30 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def add_subparsers(
         self: _ArgumentParserT,
         *,
-        title: str = ...,
-        description: str | None = ...,
-        prog: str = ...,
+        title: str = "subcommands",
+        description: str | None = None,
+        prog: str | None = None,
         action: type[Action] = ...,
         option_string: str = ...,
-        dest: str | None = ...,
-        required: bool = ...,
-        help: str | None = ...,
-        metavar: str | None = ...,
+        dest: str | None = None,
+        required: bool = False,
+        help: str | None = None,
+        metavar: str | None = None,
     ) -> _SubParsersAction[_ArgumentParserT]: ...
     @overload
     def add_subparsers(
         self,
         *,
-        title: str = ...,
-        description: str | None = ...,
-        prog: str = ...,
+        title: str = "subcommands",
+        description: str | None = None,
+        prog: str | None = None,
         parser_class: type[_ArgumentParserT],
         action: type[Action] = ...,
         option_string: str = ...,
-        dest: str | None = ...,
-        required: bool = ...,
-        help: str | None = ...,
-        metavar: str | None = ...,
+        dest: str | None = None,
+        required: bool = False,
+        help: str | None = None,
+        metavar: str | None = None,
     ) -> _SubParsersAction[_ArgumentParserT]: ...
     def print_usage(self, file: IO[str] | None = None) -> None: ...
     def print_help(self, file: IO[str] | None = None) -> None: ...
@@ -237,7 +237,13 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     # undocumented
     def _get_optional_actions(self) -> list[Action]: ...
     def _get_positional_actions(self) -> list[Action]: ...
-    def _parse_known_args(self, arg_strings: list[str], namespace: Namespace) -> tuple[Namespace, list[str]]: ...
+    if sys.version_info >= (3, 12):
+        def _parse_known_args(
+            self, arg_strings: list[str], namespace: Namespace, intermixed: bool
+        ) -> tuple[Namespace, list[str]]: ...
+    else:
+        def _parse_known_args(self, arg_strings: list[str], namespace: Namespace) -> tuple[Namespace, list[str]]: ...
+
     def _read_args_from_files(self, arg_strings: list[str]) -> list[str]: ...
     def _match_argument(self, action: Action, arg_strings_pattern: str) -> int: ...
     def _match_arguments_partial(self, actions: Sequence[Action], arg_strings_pattern: str) -> list[int]: ...
