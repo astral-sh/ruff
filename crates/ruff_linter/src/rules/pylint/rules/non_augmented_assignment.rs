@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::Operator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::Locator;
@@ -70,14 +70,14 @@ use crate::Locator;
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct NonAugmentedAssignment {
-    op_repr: String,
+    operator: AugmentedOperator,
 }
 
 impl AlwaysFixableViolation for NonAugmentedAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let op_repr = &self.op_repr;
-        format!("Use `{op_repr}=` to perform an augmented assignment directly")
+        let NonAugmentedAssignment { operator } = self;
+        format!("Use `{operator}` to perform an augmented assignment directly")
     }
 
     fn fix_title(&self) -> String {
@@ -92,80 +92,66 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
         return;
     };
 
-    let Expr::BinOp(expr) = &*assign.value else {
-        return;
-    };
-    let (left, op, right) = (&expr.left, &expr.op, &expr.right);
-
-    let op_repr = op.to_string();
-    let Some(value) = augmentable_assignment_value(target, left, *op, right) else {
+    // Match, e.g., `x = x + 1`.
+    let Expr::BinOp(value) = &*assign.value else {
         return;
     };
 
-    let locator = checker.locator();
-    let range = assign.range;
-    let fix = replace_with_augmented_assignment_fix(locator, range, target, &op_repr, value);
+    let operator = AugmentedOperator::from(value.op);
 
-    let diagnostic = Diagnostic::new(NonAugmentedAssignment { op_repr }, range);
-
-    checker.diagnostics.push(diagnostic.with_fix(fix));
-}
-
-fn augmentable_assignment_value<'a>(
-    target: &'a Expr,
-    left: &'a Expr,
-    op: Operator,
-    right: &'a Expr,
-) -> Option<&'a Expr> {
-    let comp_target = ComparableExpr::from(target);
-    let comp_left = ComparableExpr::from(left);
-    let comp_right = ComparableExpr::from(right);
-
-    if comp_target == comp_left {
-        return Some(right);
+    // Match, e.g., `x = x + 1`.
+    if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
+        let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
+        diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
+            checker.locator(),
+            target,
+            operator,
+            &value.right,
+            assign.range(),
+        )));
+        checker.diagnostics.push(diagnostic);
+        return;
     }
 
-    if !operator_is_commutative(op) {
-        return None;
-    }
-
-    if comp_target != comp_right {
-        return None;
-    }
-
-    if left.is_number_literal_expr() || left.is_boolean_literal_expr() {
-        Some(left)
-    } else {
-        None
+    // If the operator is commutative, match, e.g., `x = 1 + x`, but limit such matches to primitive
+    // types.
+    if operator.is_commutative()
+        && (value.left.is_number_literal_expr() || value.left.is_boolean_literal_expr())
+        && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
+    {
+        let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
+        diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
+            checker.locator(),
+            target,
+            operator,
+            &value.left,
+            assign.range(),
+        )));
+        checker.diagnostics.push(diagnostic);
     }
 }
 
-fn operator_is_commutative(op: Operator) -> bool {
-    matches!(
-        op,
-        Operator::Add | Operator::BitAnd | Operator::BitOr | Operator::BitXor | Operator::Mult
-    )
-}
-
-fn replace_with_augmented_assignment_fix(
+/// Generate a fix to convert an assignment statement to an augmented assignment.
+///
+/// For example, given `x = x + 1`, the fix would be `x += 1`.
+fn augmented_assignment(
     locator: &Locator,
-    range: TextRange,
     target: &Expr,
-    op: &str,
-    value: &Expr,
-) -> Fix {
+    operator: AugmentedOperator,
+    right_operand: &Expr,
+    range: TextRange,
+) -> Edit {
     let target_expr = locator.slice(target);
-    let value_expr = locator.slice(value);
+    let right_operand_expr = locator.slice(right_operand);
 
-    let new_value_expr = if should_be_parenthesized_when_standalone(value) {
-        format!("({value_expr})")
+    let new_value_expr = if should_be_parenthesized_when_standalone(right_operand) {
+        format!("({right_operand_expr})")
     } else {
-        value_expr.to_string()
+        right_operand_expr.to_string()
     };
-    let new_content = format!("{target_expr} {op}= {new_value_expr}");
-    let edit = Edit::range_replacement(new_content, range);
+    let new_content = format!("{target_expr} {operator} {new_value_expr}");
 
-    Fix::unsafe_edit(edit)
+    Edit::range_replacement(new_content, range)
 }
 
 /// Whether `expr` should be parenthesized when used on its own.
@@ -176,4 +162,71 @@ fn replace_with_augmented_assignment_fix(
 /// ```
 const fn should_be_parenthesized_when_standalone(expr: &Expr) -> bool {
     matches!(expr, Expr::Named(_))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AugmentedOperator {
+    Add,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Div,
+    FloorDiv,
+    LShift,
+    MatMult,
+    Mod,
+    Mult,
+    Pow,
+    RShift,
+    Sub,
+}
+
+impl AugmentedOperator {
+    /// Returns `true` if the operator is commutative.
+    fn is_commutative(self) -> bool {
+        matches!(
+            self,
+            Self::Add | Self::BitAnd | Self::BitOr | Self::BitXor | Self::Mult
+        )
+    }
+}
+
+impl From<Operator> for AugmentedOperator {
+    fn from(value: Operator) -> Self {
+        match value {
+            Operator::Add => Self::Add,
+            Operator::BitAnd => Self::BitAnd,
+            Operator::BitOr => Self::BitOr,
+            Operator::BitXor => Self::BitXor,
+            Operator::Div => Self::Div,
+            Operator::FloorDiv => Self::FloorDiv,
+            Operator::LShift => Self::LShift,
+            Operator::MatMult => Self::MatMult,
+            Operator::Mod => Self::Mod,
+            Operator::Mult => Self::Mult,
+            Operator::Pow => Self::Pow,
+            Operator::RShift => Self::RShift,
+            Operator::Sub => Self::Sub,
+        }
+    }
+}
+
+impl std::fmt::Display for AugmentedOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Add => f.write_str("+="),
+            Self::BitAnd => f.write_str("&="),
+            Self::BitOr => f.write_str("|="),
+            Self::BitXor => f.write_str("^="),
+            Self::Div => f.write_str("/="),
+            Self::FloorDiv => f.write_str("//="),
+            Self::LShift => f.write_str("<<="),
+            Self::MatMult => f.write_str("@="),
+            Self::Mod => f.write_str("%="),
+            Self::Mult => f.write_str("*="),
+            Self::Pow => f.write_str("**="),
+            Self::RShift => f.write_str(">>="),
+            Self::Sub => f.write_str("-="),
+        }
+    }
 }
