@@ -28,7 +28,7 @@ error.
 
 - <https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#module-level-attributes>
 
-```py
+```py path=test.pyi
 # error: [invalid-assignment] "Object of type `EllipsisType | ellipsis` is not assignable to `float`"
 y: float = ...
 
