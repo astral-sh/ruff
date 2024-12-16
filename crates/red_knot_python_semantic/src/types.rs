@@ -1440,18 +1440,18 @@ impl<'db> Type<'db> {
                         .member(db, "__dict__");
                 }
 
-                // If the file containing the original module reference has imported a submodule of
-                // this module named [name], then the result is that submodule, even if the module
-                // also defines a (non-module) symbol with that name.
-                let containing_file = module_ref.containing_file(db);
-                let containing_index = semantic_index(db, containing_file);
+                // If the file that originally imported the module has also imported a submodule
+                // named [name], then the result is that submodule, even if the module also defines
+                // a (non-module) symbol with that name.
+                let importing_file = module_ref.importing_file(db);
+                let importing_index = semantic_index(db, importing_file);
                 let mut submodule_name = module_ref.module(db).name().clone();
                 submodule_name.push(&ast::name::Name::from(name));
-                if containing_index.imports_module(&submodule_name) {
+                if importing_index.imports_module(&submodule_name) {
                     if let Some(submodule) = resolve_module(db, &submodule_name) {
                         let submodule_ty = Type::ModuleLiteral(ModuleLiteralType::new(
                             db,
-                            containing_file,
+                            importing_file,
                             submodule,
                         ));
                         return Symbol::Type(submodule_ty, Boundness::Bound);
@@ -2816,7 +2816,7 @@ pub struct ModuleLiteralType<'db> {
     /// We need this in order to know which submodules should be attached to it as attributes
     /// (because the submodules were also imported in this file).
     pub importing_file: File,
-    
+
     /// The imported module.
     pub module: Module,
 }
