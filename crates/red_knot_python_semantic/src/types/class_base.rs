@@ -112,12 +112,22 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::FrozenSet => {
                     Self::try_from_ty(db, KnownClass::FrozenSet.to_class_literal(db))
                 }
-                KnownInstanceType::Callable
-                | KnownInstanceType::ChainMap
-                | KnownInstanceType::Counter
-                | KnownInstanceType::DefaultDict
-                | KnownInstanceType::Deque
-                | KnownInstanceType::OrderedDict => Self::try_from_ty(
+                KnownInstanceType::ChainMap => {
+                    Self::try_from_ty(db, KnownClass::ChainMap.to_class_literal(db))
+                }
+                KnownInstanceType::Counter => {
+                    Self::try_from_ty(db, KnownClass::Counter.to_class_literal(db))
+                }
+                KnownInstanceType::DefaultDict => {
+                    Self::try_from_ty(db, KnownClass::DefaultDict.to_class_literal(db))
+                }
+                KnownInstanceType::Deque => {
+                    Self::try_from_ty(db, KnownClass::Deque.to_class_literal(db))
+                }
+                KnownInstanceType::OrderedDict => {
+                    Self::try_from_ty(db, KnownClass::OrderedDict.to_class_literal(db))
+                }
+                KnownInstanceType::Callable => Self::try_from_ty(
                     db,
                     todo_type!("Support for more typing aliases as base classes"),
                 ),
