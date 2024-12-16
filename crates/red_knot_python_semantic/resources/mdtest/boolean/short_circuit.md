@@ -32,13 +32,10 @@ def _(flag: bool):
 
 ```py
 if True or (x := 1):
-    # TODO: infer that the second arm is never executed, and raise `unresolved-reference`.
-    # error: [possibly-unresolved-reference]
-    reveal_type(x)  # revealed: Literal[1]
+    # error: [unresolved-reference]
+    reveal_type(x)  # revealed: Unknown
 
 if True and (x := 1):
-    # TODO: infer that the second arm is always executed, do not raise a diagnostic
-    # error: [possibly-unresolved-reference]
     reveal_type(x)  # revealed: Literal[1]
 ```
 

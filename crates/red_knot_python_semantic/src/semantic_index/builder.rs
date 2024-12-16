@@ -6,15 +6,16 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::{self as ast, Pattern};
 use ruff_python_ast::{BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
+use crate::semantic_index::constraint::PatternConstraintKind;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
     DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
@@ -24,7 +25,7 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
+use crate::semantic_index::use_def::{BranchingConditionsSnapshot, FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::Unpack;
 use crate::Db;
@@ -204,12 +205,28 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map().snapshot()
     }
 
-    fn flow_restore(&mut self, state: FlowSnapshot) {
-        self.current_use_def_map_mut().restore(state);
+    fn branching_conditions_snapshot(&self) -> BranchingConditionsSnapshot {
+        self.current_use_def_map().branching_conditions_snapshot()
     }
 
-    fn flow_merge(&mut self, state: FlowSnapshot) {
+    fn flow_restore(
+        &mut self,
+        state: FlowSnapshot,
+        branching_conditions: BranchingConditionsSnapshot,
+    ) {
+        self.current_use_def_map_mut().restore(state);
+        self.current_use_def_map_mut()
+            .restore_branching_conditions(branching_conditions);
+    }
+
+    fn flow_merge(
+        &mut self,
+        state: FlowSnapshot,
+        branching_conditions: BranchingConditionsSnapshot,
+    ) {
         self.current_use_def_map_mut().merge(state);
+        self.current_use_def_map_mut()
+            .restore_branching_conditions(branching_conditions);
     }
 
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
@@ -289,6 +306,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().record_constraint(constraint);
     }
 
+    fn record_ambiguous_branching(&mut self) {
+        self.current_use_def_map_mut().record_ambiguous_branching();
+    }
+
     fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
         let expression = self.add_standalone_expression(constraint_node);
         Constraint {
@@ -324,22 +345,24 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn add_pattern_constraint(
         &mut self,
-        subject: &ast::Expr,
+        subject: Expression<'db>,
         pattern: &ast::Pattern,
     ) -> PatternConstraint<'db> {
-        #[allow(unsafe_code)]
-        let (subject, pattern) = unsafe {
-            (
-                AstNodeRef::new(self.module.clone(), subject),
-                AstNodeRef::new(self.module.clone(), pattern),
-            )
+        let kind = match pattern {
+            Pattern::MatchValue(pattern) => {
+                let value = self.add_standalone_expression(&pattern.value);
+                PatternConstraintKind::Value(value)
+            }
+            Pattern::MatchSingleton(singleton) => PatternConstraintKind::Singleton(singleton.value),
+            _ => PatternConstraintKind::Unsupported,
         };
+
         let pattern_constraint = PatternConstraint::new(
             self.db,
             self.file,
             self.current_scope(),
             subject,
-            pattern,
+            kind,
             countme::Count::default(),
         );
         self.current_use_def_map_mut()
@@ -796,6 +819,7 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
+                let pre_if_conditions = self.branching_conditions_snapshot();
                 let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
@@ -821,7 +845,7 @@ where
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
-                    self.flow_restore(pre_if.clone());
+                    self.flow_restore(pre_if.clone(), pre_if_conditions.clone());
                     for constraint in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
@@ -832,7 +856,7 @@ where
                     self.visit_body(clause_body);
                 }
                 for post_clause_state in post_clauses {
-                    self.flow_merge(post_clause_state);
+                    self.flow_merge(post_clause_state, pre_if_conditions.clone());
                 }
             }
             ast::Stmt::While(ast::StmtWhile {
@@ -844,6 +868,7 @@ where
                 self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
+                let pre_loop_conditions = self.branching_conditions_snapshot();
                 let constraint = self.record_expression_constraint(test);
 
                 // Save aside any break states from an outer loop
@@ -863,14 +888,14 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop);
+                self.flow_merge(pre_loop, pre_loop_conditions.clone());
                 self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(break_state);
+                    self.flow_merge(break_state, pre_loop_conditions.clone());
                 }
             }
             ast::Stmt::With(ast::StmtWith {
@@ -913,7 +938,10 @@ where
                 self.visit_expr(iter);
 
                 let pre_loop = self.flow_snapshot();
+                let pre_loop_conditions = self.branching_conditions_snapshot();
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
+
+                self.record_ambiguous_branching();
 
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.push_assignment(for_stmt.into());
@@ -933,13 +961,14 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop);
+                self.flow_merge(pre_loop, pre_loop_conditions.clone());
+                self.record_ambiguous_branching();
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(break_state);
+                    self.flow_merge(break_state, pre_loop_conditions.clone());
                 }
             }
             ast::Stmt::Match(ast::StmtMatch {
@@ -947,31 +976,32 @@ where
                 cases,
                 range: _,
             }) => {
-                self.add_standalone_expression(subject);
+                let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
 
                 let after_subject = self.flow_snapshot();
+                let after_subject_cs = self.branching_conditions_snapshot();
                 let Some((first, remaining)) = cases.split_first() else {
                     return;
                 };
-                self.add_pattern_constraint(subject, &first.pattern);
+                self.add_pattern_constraint(subject_expr, &first.pattern);
                 self.visit_match_case(first);
 
                 let mut post_case_snapshots = vec![];
                 for case in remaining {
                     post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
-                    self.add_pattern_constraint(subject, &case.pattern);
+                    self.flow_restore(after_subject.clone(), after_subject_cs.clone());
+                    self.add_pattern_constraint(subject_expr, &case.pattern);
                     self.visit_match_case(case);
                 }
                 for post_clause_state in post_case_snapshots {
-                    self.flow_merge(post_clause_state);
+                    self.flow_merge(post_clause_state, after_subject_cs.clone());
                 }
                 if !cases
                     .last()
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
-                    self.flow_merge(after_subject);
+                    self.flow_merge(after_subject, after_subject_cs);
                 }
             }
             ast::Stmt::Try(ast::StmtTry {
@@ -989,6 +1019,9 @@ where
                 // We will merge this state with all of the intermediate
                 // states during the `try` block before visiting those suites.
                 let pre_try_block_state = self.flow_snapshot();
+                let pre_try_block_conditions = self.branching_conditions_snapshot();
+
+                self.record_ambiguous_branching();
 
                 self.try_node_context_stack_manager.push_context();
 
@@ -1011,9 +1044,9 @@ where
                     let post_try_block_state = self.flow_snapshot();
 
                     // Prepare for visiting the `except` block(s)
-                    self.flow_restore(pre_try_block_state);
+                    self.flow_restore(pre_try_block_state, pre_try_block_conditions.clone());
                     for state in try_block_snapshots {
-                        self.flow_merge(state);
+                        self.flow_merge(state, pre_try_block_conditions.clone());
                     }
 
                     let pre_except_state = self.flow_snapshot();
@@ -1027,6 +1060,8 @@ where
                             body: handler_body,
                             range: _,
                         } = except_handler;
+
+                        self.record_ambiguous_branching();
 
                         if let Some(handled_exceptions) = handled_exceptions {
                             self.visit_expr(handled_exceptions);
@@ -1055,19 +1090,24 @@ where
                         // as we'll immediately call `self.flow_restore()` to a different state
                         // as soon as this loop over the handlers terminates.
                         if i < (num_handlers - 1) {
-                            self.flow_restore(pre_except_state.clone());
+                            self.flow_restore(
+                                pre_except_state.clone(),
+                                pre_try_block_conditions.clone(),
+                            );
                         }
                     }
 
                     // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
                     // and the entire `try` block must have been executed:
-                    self.flow_restore(post_try_block_state);
+                    self.flow_restore(post_try_block_state, pre_try_block_conditions.clone());
                 }
+
+                self.record_ambiguous_branching();
 
                 self.visit_body(orelse);
 
                 for post_except_state in post_except_states {
-                    self.flow_merge(post_except_state);
+                    self.flow_merge(post_except_state, pre_try_block_conditions.clone());
                 }
 
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
@@ -1080,7 +1120,12 @@ where
                 // For more details, see:
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
+                self.record_ambiguous_branching();
+
                 self.visit_body(finalbody);
+
+                self.current_use_def_map_mut()
+                    .restore_branching_conditions(pre_try_block_conditions);
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -1222,19 +1267,17 @@ where
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
             }) => {
-                // TODO detect statically known truthy or falsy test (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
+                let pre_if_conditions = self.branching_conditions_snapshot();
                 let constraint = self.record_expression_constraint(test);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if);
+                self.flow_restore(pre_if, pre_if_conditions.clone());
 
                 self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
-                self.flow_merge(post_body);
+                self.flow_merge(post_body, pre_if_conditions);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -1291,11 +1334,8 @@ where
                 range: _,
                 op,
             }) => {
-                // TODO detect statically known truthy or falsy values (via type inference, not naive
-                // AST inspection, so we can't simplify here, need to record test expression for
-                // later checking)
                 let mut snapshots = vec![];
-
+                let pre_op_conditions = self.branching_conditions_snapshot();
                 for (index, value) in values.iter().enumerate() {
                     self.visit_expr(value);
                     // In the last value we don't need to take a snapshot nor add a constraint
@@ -1310,7 +1350,7 @@ where
                     }
                 }
                 for snapshot in snapshots {
-                    self.flow_merge(snapshot);
+                    self.flow_merge(snapshot, pre_op_conditions.clone());
                 }
             }
             _ => {

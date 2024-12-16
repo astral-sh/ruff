@@ -33,6 +33,7 @@ use crate::types::diagnostic::{TypeCheckDiagnosticsBuilder, INVALID_TYPE_FORM};
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
+pub(crate) use static_truthiness::StaticTruthiness;
 
 mod builder;
 mod call;
@@ -43,6 +44,7 @@ mod infer;
 mod mro;
 mod narrow;
 mod signatures;
+mod static_truthiness;
 mod string_annotation;
 mod unpacker;
 
@@ -74,50 +76,63 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
-    if use_def.has_public_declarations(symbol) {
-        let declarations = use_def.public_declarations(symbol);
-        // If the symbol is undeclared in some paths, include the inferred type in the public type.
-        let undeclared_ty = if declarations.may_be_undeclared() {
+    let declaredness = use_def.public_declarations(symbol).declaredness(db);
+
+    // TODO (ticket: https://github.com/astral-sh/ruff/issues/14297) Our handling of boundness
+    // currently only depends on bindings, and ignores declarations. This is inconsistent, since
+    // we only look at bindings if the symbol may be undeclared. Consider the following example:
+    // ```py
+    // x: int
+    //
+    // if flag:
+    //     y: int
+    // else
+    //     y = 3
+    // ```
+    // If we import from this module, we will currently report `x` as a definitely-bound symbol
+    // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
+    // every path has either a binding or a declaration for it.)
+    let undeclared_ty = match declaredness {
+        None => {
+            return bindings_ty(db, use_def.public_bindings(symbol))
+                .map(|bindings_ty| {
+                    if let Some(boundness) = use_def.public_boundness(db, symbol) {
+                        Symbol::Type(bindings_ty, boundness)
+                    } else {
+                        Symbol::Unbound
+                    }
+                })
+                .unwrap_or(Symbol::Unbound);
+        }
+        Some(Boundness::PossiblyUnbound) => {
+            // If the symbol is undeclared in some paths, include the inferred type in the public type.
             Some(
                 bindings_ty(db, use_def.public_bindings(symbol))
-                    .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
+                    .map(|bindings_ty| {
+                        if let Some(boundness) = use_def.public_boundness(db, symbol) {
+                            Symbol::Type(bindings_ty, boundness)
+                        } else {
+                            Symbol::Unbound
+                        }
+                    })
                     .unwrap_or(Symbol::Unbound),
             )
-        } else {
-            None
-        };
-        // Intentionally ignore conflicting declared types; that's not our problem, it's the
-        // problem of the module we are importing from.
-
-        // TODO: Our handling of boundness currently only depends on bindings, and ignores
-        // declarations. This is inconsistent, since we only look at bindings if the symbol
-        // may be undeclared. Consider the following example:
-        // ```py
-        // x: int
-        //
-        // if flag:
-        //     y: int
-        // else
-        //     y = 3
-        // ```
-        // If we import from this module, we will currently report `x` as a definitely-bound
-        // symbol (even though it has no bindings at all!) but report `y` as possibly-unbound
-        // (even though every path has either a binding or a declaration for it.)
-
-        match undeclared_ty {
-            Some(Symbol::Type(ty, boundness)) => Symbol::Type(
-                declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
-                boundness,
-            ),
-            None | Some(Symbol::Unbound) => Symbol::Type(
-                declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
-                Boundness::Bound,
-            ),
         }
-    } else {
-        bindings_ty(db, use_def.public_bindings(symbol))
-            .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
-            .unwrap_or(Symbol::Unbound)
+        Some(Boundness::Bound) => None,
+    };
+
+    // Intentionally ignore conflicting declared types; that's not our problem, it's the
+    // problem of the module we are importing from.
+    let declarations = use_def.public_declarations(symbol);
+    match undeclared_ty {
+        Some(Symbol::Type(ty, boundness)) => Symbol::Type(
+            declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
+            boundness,
+        ),
+        None | Some(Symbol::Unbound) => Symbol::Type(
+            declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
+            Boundness::Bound,
+        ),
     }
 }
 
@@ -239,6 +254,52 @@ fn definition_expression_ty<'db>(
     }
 }
 
+/// The 'visibility' of a binding or declaration.
+///
+/// Consider the following example:
+/// ```py
+/// x = 1
+///
+/// if True:
+///     x = 2
+///
+/// if False:
+///     x = 3
+///
+/// if flag():
+///    x = 4
+/// ```
+/// When we infer the type of `x`, we look back "through" the bindings in reverse order.
+/// The first binding is `x = 4`. It is "transparent" because we could have either taken
+/// the `if flag()` branch or not. The second binding `x = 3` is "invisible" because we
+/// can statically determine that the `if False` branch is never taken. The third binding
+/// `x = 2` is "opaque" because we can statically determine that the `if True` branch is
+/// always taken. If the visibility of a binding is "opaque", bindings behind it are not
+/// visible.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Visibility<'db> {
+    Invisible,
+    Transparent(Type<'db>),
+    Opaque(Type<'db>),
+}
+
+impl<'db> Visibility<'db> {
+    fn is_not_opaque(&self) -> bool {
+        !matches!(self, Visibility::Opaque(_))
+    }
+
+    fn is_invisible(&self) -> bool {
+        matches!(self, Visibility::Invisible)
+    }
+
+    fn unwrap_or_never(self) -> Type<'db> {
+        match self {
+            Visibility::Invisible => Type::Never,
+            Visibility::Transparent(ty) | Visibility::Opaque(ty) => ty,
+        }
+    }
+}
+
 /// Infer the combined type of an iterator of bindings.
 ///
 /// Will return a union if there is more than one binding.
@@ -246,34 +307,60 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Option<Type<'db>> {
-    let mut def_types = bindings_with_constraints.map(
-        |BindingWithConstraints {
-             binding,
-             constraints,
-         }| {
-            let mut constraint_tys = constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
-                .peekable();
+    let types = bindings_with_constraints
+        .map(
+            |BindingWithConstraints {
+                 binding,
+                 constraints,
+                 branching_conditions,
+             }| {
+                let result = StaticTruthiness::analyze(db, branching_conditions);
 
-            let binding_ty = binding_ty(db, binding);
-            if constraint_tys.peek().is_some() {
-                constraint_tys
-                    .fold(
-                        IntersectionBuilder::new(db).add_positive(binding_ty),
-                        IntersectionBuilder::add_positive,
-                    )
-                    .build()
-            } else {
-                binding_ty
-            }
-        },
-    );
+                if result.any_always_false {
+                    Visibility::Invisible
+                } else {
+                    let mut constraint_tys = constraints
+                        .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+                        .peekable();
 
-    if let Some(first) = def_types.next() {
-        if let Some(second) = def_types.next() {
+                    let binding_ty = binding_ty(db, binding);
+                    let ty = if constraint_tys.peek().is_some() {
+                        let intersection_ty = constraint_tys
+                            .fold(
+                                IntersectionBuilder::new(db).add_positive(binding_ty),
+                                IntersectionBuilder::add_positive,
+                            )
+                            .build();
+                        intersection_ty
+                    } else {
+                        binding_ty
+                    };
+
+                    if result.at_least_one_condition && result.all_always_true {
+                        Visibility::Opaque(ty)
+                    } else {
+                        Visibility::Transparent(ty)
+                    }
+                }
+            },
+        )
+        .take_while_inclusive(Visibility::is_not_opaque);
+
+    // TODO: try to get rid of the `collect` here
+    let types: Vec<_> = types.collect();
+
+    if !types.is_empty() && types.iter().all(Visibility::is_invisible) {
+        // If all bindings are invisible, the symbol is unbound.
+        return Some(Type::Unknown);
+    }
+
+    let mut types = types.iter().map(|v| v.unwrap_or_never()).rev();
+
+    if let Some(first) = types.next() {
+        if let Some(second) = types.next() {
             Some(UnionType::from_elements(
                 db,
-                [first, second].into_iter().chain(def_types),
+                [first, second].into_iter().chain(types),
             ))
         } else {
             Some(first)
@@ -304,9 +391,28 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+    let types = declarations
+        .map(|(declaration, branching_conditions)| {
+            let result = StaticTruthiness::analyze(db, branching_conditions);
 
-    let mut all_types = undeclared_ty.into_iter().chain(decl_types);
+            if result.any_always_false {
+                Visibility::Invisible
+            } else {
+                if result.at_least_one_condition && result.all_always_true {
+                    Visibility::Opaque(declaration_ty(db, declaration))
+                } else {
+                    Visibility::Transparent(declaration_ty(db, declaration))
+                }
+            }
+        })
+        .take_while_inclusive(Visibility::is_not_opaque)
+        .map(Visibility::unwrap_or_never);
+
+    // TODO: try to get rid of the `collect` here (see above)
+    let types: Vec<_> = types.collect();
+    let types = types.into_iter().rev();
+
+    let mut all_types = undeclared_ty.into_iter().chain(types);
 
     let first = all_types.next().expect(
         "declarations_ty must not be called with zero declarations and no may-be-undeclared",
@@ -894,26 +1000,6 @@ impl<'db> Type<'db> {
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         if !(self.is_fully_static(db) && other.is_fully_static(db)) {
             return false;
-        }
-
-        // TODO: The following is a workaround that is required to unify the two different versions
-        // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
-        // we understand `sys.version_info` branches.
-        if let (
-            Type::Instance(InstanceType { class: self_class }),
-            Type::Instance(InstanceType {
-                class: target_class,
-            }),
-        ) = (self, other)
-        {
-            let self_known = self_class.known(db);
-            if matches!(
-                self_known,
-                Some(KnownClass::NoneType | KnownClass::NoDefaultType)
-            ) && self_known == target_class.known(db)
-            {
-                return true;
-            }
         }
 
         // type[object] ≡ type
@@ -1573,7 +1659,7 @@ impl<'db> Type<'db> {
     ///
     /// This is used to determine the value that would be returned
     /// when `bool(x)` is called on an object `x`.
-    fn bool(&self, db: &'db dyn Db) -> Truthiness {
+    pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
             Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
@@ -2745,15 +2831,31 @@ pub enum Truthiness {
 }
 
 impl Truthiness {
-    const fn is_ambiguous(self) -> bool {
+    pub(crate) const fn is_ambiguous(self) -> bool {
         matches!(self, Truthiness::Ambiguous)
     }
 
-    const fn negate(self) -> Self {
+    pub(crate) const fn is_always_false(self) -> bool {
+        matches!(self, Truthiness::AlwaysFalse)
+    }
+
+    pub(crate) const fn is_always_true(self) -> bool {
+        matches!(self, Truthiness::AlwaysTrue)
+    }
+
+    pub(crate) const fn negate(self) -> Self {
         match self {
             Self::AlwaysTrue => Self::AlwaysFalse,
             Self::AlwaysFalse => Self::AlwaysTrue,
             Self::Ambiguous => Self::Ambiguous,
+        }
+    }
+
+    pub(crate) const fn negate_if(self, condition: bool) -> Self {
+        if condition {
+            self.negate()
+        } else {
+            self
         }
     }
 

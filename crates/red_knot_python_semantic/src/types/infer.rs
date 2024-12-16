@@ -790,7 +790,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(binding.is_binding(self.db));
         let use_def = self.index.use_def_map(binding.file_scope(self.db));
         let declarations = use_def.declarations_at_binding(binding);
-        let undeclared_ty = if declarations.may_be_undeclared() {
+        let undeclared_ty = if declarations.clone().may_be_undeclared(self.db) {
             Some(Type::Unknown)
         } else {
             None
@@ -1727,11 +1727,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
+                self.infer_standalone_expression(&match_value.value);
+            }
+            _ => {
+                self.infer_match_pattern_impl(pattern);
+            }
+        }
+    }
+
+    fn infer_match_pattern_impl(&mut self, pattern: &ast::Pattern) {
+        match pattern {
+            ast::Pattern::MatchValue(match_value) => {
                 self.infer_expression(&match_value.value);
             }
             ast::Pattern::MatchSequence(match_sequence) => {
                 for pattern in &match_sequence.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
             }
             ast::Pattern::MatchMapping(match_mapping) => {
@@ -1745,7 +1756,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(key);
                 }
                 for pattern in patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -1755,21 +1766,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                     arguments,
                 } = match_class;
                 for pattern in &arguments.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.infer_match_pattern(&keyword.pattern);
+                    self.infer_match_pattern_impl(&keyword.pattern);
                 }
                 self.infer_expression(cls);
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
             }
             ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
@@ -3036,24 +3047,25 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_id_by_name(id) {
                 (
                     bindings_ty(self.db, use_def.public_bindings(symbol)),
-                    use_def.public_boundness(symbol),
+                    use_def.public_boundness(self.db, symbol),
                 )
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
                     "Expected the symbol table to create a symbol for every Name node"
                 );
-                (None, Boundness::PossiblyUnbound)
+                (None, Some(Boundness::PossiblyUnbound))
             }
         } else {
             let use_id = name.scoped_use_id(self.db, self.scope());
             (
                 bindings_ty(self.db, use_def.bindings_at_use(use_id)),
-                use_def.use_boundness(use_id),
+                use_def.use_boundness(self.db, use_id),
             )
         };
-
-        if boundness == Boundness::PossiblyUnbound {
+        if boundness == Some(Boundness::Bound) {
+            bindings_ty.unwrap_or(Type::Unknown)
+        } else {
             match self.lookup_name(name) {
                 Symbol::Type(looked_up_ty, looked_up_boundness) => {
                     if looked_up_boundness == Boundness::PossiblyUnbound {
@@ -3066,15 +3078,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 Symbol::Unbound => {
                     if bindings_ty.is_some() {
-                        self.diagnostics.add_possibly_unresolved_reference(name);
+                        if boundness == Some(Boundness::PossiblyUnbound) {
+                            self.diagnostics.add_possibly_unresolved_reference(name);
+                        } else {
+                            self.diagnostics.add_unresolved_reference(name);
+                        }
                     } else {
                         self.diagnostics.add_unresolved_reference(name);
                     }
                     bindings_ty.unwrap_or(Type::Unknown)
                 }
             }
-        } else {
-            bindings_ty.unwrap_or(Type::Unknown)
         }
     }
 
