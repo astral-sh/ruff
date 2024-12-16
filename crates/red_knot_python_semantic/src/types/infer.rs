@@ -866,6 +866,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.bindings.insert(definition, inferred_ty);
     }
 
+    fn add_unknown_declaration_with_binding(
+        &mut self,
+        node: AnyNodeRef,
+        definition: Definition<'db>,
+    ) {
+        self.add_declaration_with_binding(node, definition, Type::Unknown, Type::Unknown);
+    }
+
     fn infer_module(&mut self, module: &ast::ModModule) {
         self.infer_body(&module.body);
     }
@@ -2122,24 +2130,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         // The name of the module being imported
         let Some(full_module_name) = ModuleName::new(name) else {
             tracing::debug!("Failed to resolve import due to invalid syntax");
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                Type::Unknown,
-                Type::Unknown,
-            );
+            self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_ty_from_name(&full_module_name) else {
             self.diagnostics.add_unresolved_module(alias, 0, Some(name));
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                Type::Unknown,
-                Type::Unknown,
-            );
+            self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
 
@@ -2153,11 +2151,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             // parent package of that module.
             let topmost_parent_name =
                 ModuleName::new(full_module_name.components().next().unwrap()).unwrap();
-            if let Some(topmost_parent_ty) = self.module_ty_from_name(&topmost_parent_name) {
-                topmost_parent_ty
-            } else {
-                Type::Unknown
-            }
+            let Some(topmost_parent_ty) = self.module_ty_from_name(&topmost_parent_name) else {
+                self.add_unknown_declaration_with_binding(alias.into(), definition);
+                return;
+            };
+            topmost_parent_ty
         } else {
             // If there's no `as` clause and the imported module isn't nested, then the imported
             // module _is_ what we bind into the current scope.
@@ -2272,46 +2270,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .ok_or(ModuleNameResolutionError::InvalidSyntax)
         };
 
-        let ty = match module_name {
-            Ok(module_name) => {
-                if let Some(module_ty) = self.module_ty_from_name(&module_name) {
-                    let ast::Alias {
-                        range: _,
-                        name,
-                        asname: _,
-                    } = alias;
-
-                    match module_ty.member(self.db, &ast::name::Name::new(&name.id)) {
-                        Symbol::Type(ty, boundness) => {
-                            if boundness == Boundness::PossiblyUnbound {
-                                self.diagnostics.add_lint(
-                                    &POSSIBLY_UNBOUND_IMPORT,
-                                    AnyNodeRef::Alias(alias),
-                                    format_args!("Member `{name}` of module `{module_name}` is possibly unbound", ),
-                                );
-                            }
-
-                            ty
-                        }
-                        Symbol::Unbound => {
-                            self.diagnostics.add_lint(
-                                &UNRESOLVED_IMPORT,
-                                AnyNodeRef::Alias(alias),
-                                format_args!("Module `{module_name}` has no member `{name}`",),
-                            );
-                            Type::Unknown
-                        }
-                    }
-                } else {
-                    self.diagnostics
-                        .add_unresolved_module(import_from, *level, module);
-                    Type::Unknown
-                }
-            }
+        let module_name = match module_name {
+            Ok(module_name) => module_name,
             Err(ModuleNameResolutionError::InvalidSyntax) => {
                 tracing::debug!("Failed to resolve import due to invalid syntax");
                 // Invalid syntax diagnostics are emitted elsewhere.
-                Type::Unknown
+                self.add_unknown_declaration_with_binding(alias.into(), definition);
+                return;
             }
             Err(ModuleNameResolutionError::TooManyDots) => {
                 tracing::debug!(
@@ -2320,7 +2285,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 self.diagnostics
                     .add_unresolved_module(import_from, *level, module);
-                Type::Unknown
+                self.add_unknown_declaration_with_binding(alias.into(), definition);
+                return;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
@@ -2330,9 +2296,43 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 self.diagnostics
                     .add_unresolved_module(import_from, *level, module);
-                Type::Unknown
+                self.add_unknown_declaration_with_binding(alias.into(), definition);
+                return;
             }
         };
+
+        let Some(module_ty) = self.module_ty_from_name(&module_name) else {
+            self.diagnostics
+                .add_unresolved_module(import_from, *level, module);
+            self.add_unknown_declaration_with_binding(alias.into(), definition);
+            return;
+        };
+
+        let ast::Alias {
+            range: _,
+            name,
+            asname: _,
+        } = alias;
+
+        let Symbol::Type(ty, boundness) =
+            module_ty.member(self.db, &ast::name::Name::new(&name.id))
+        else {
+            self.diagnostics.add_lint(
+                &UNRESOLVED_IMPORT,
+                AnyNodeRef::Alias(alias),
+                format_args!("Module `{module_name}` has no member `{name}`",),
+            );
+            self.add_unknown_declaration_with_binding(alias.into(), definition);
+            return;
+        };
+
+        if boundness == Boundness::PossiblyUnbound {
+            self.diagnostics.add_lint(
+                &POSSIBLY_UNBOUND_IMPORT,
+                AnyNodeRef::Alias(alias),
+                format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
+            );
+        }
 
         self.add_declaration_with_binding(alias.into(), definition, ty, ty);
     }
