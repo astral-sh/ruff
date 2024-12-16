@@ -7,9 +7,6 @@ For default values the ellipsis literal `...` can be used, in a stub file only.
 ```py path=test.pyi
 def f(x: int = ...) -> None: ...
 def f2(x: dict = ...) -> None: ...
-
-# error: [invalid-assignment] "Object of type `EllipsisType | ellipsis` is not assignable to `int`"
-y: int = ...
 ```
 
 ## Use of Ellipsis Symbol
