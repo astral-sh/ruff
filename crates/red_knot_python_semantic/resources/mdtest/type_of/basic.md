@@ -61,10 +61,8 @@ class B: ...
 ```py path=a/test.py
 import a.b
 
-# TODO: no diagnostic
-# error: [unresolved-attribute]
 def f(c: type[a.b.C]):
-    reveal_type(c)  # revealed: @Todo(unsupported type[X] special form)
+    reveal_type(c)  # revealed: type[C]
 ```
 
 ```py path=a/__init__.py

@@ -7,7 +7,7 @@ use super::path::SearchPath;
 use crate::module_name::ModuleName;
 
 /// Representation of a Python module.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Module {
     inner: Arc<ModuleInner>,
 }
@@ -61,7 +61,7 @@ impl std::fmt::Debug for Module {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Hash)]
 struct ModuleInner {
     name: ModuleName,
     kind: ModuleKind,

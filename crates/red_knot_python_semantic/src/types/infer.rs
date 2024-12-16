@@ -2116,22 +2116,55 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::Alias {
             range: _,
             name,
-            asname: _,
+            asname,
         } = alias;
 
-        let module_ty = if let Some(module_name) = ModuleName::new(name) {
-            if let Some(module) = self.module_ty_from_name(&module_name) {
-                module
+        // The name of the module being imported
+        let Some(full_module_name) = ModuleName::new(name) else {
+            tracing::debug!("Failed to resolve import due to invalid syntax");
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                Type::Unknown,
+                Type::Unknown,
+            );
+            return;
+        };
+
+        // Resolve the module being imported.
+        let Some(full_module_ty) = self.module_ty_from_name(&full_module_name) else {
+            self.diagnostics.add_unresolved_module(alias, 0, Some(name));
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                Type::Unknown,
+                Type::Unknown,
+            );
+            return;
+        };
+
+        let binding_ty = if asname.is_some() {
+            // If we are renaming the imported module via an `as` clause, then we bind the resolved
+            // module's type to that name, even if that module is nested.
+            full_module_ty
+        } else if full_module_name.contains('.') {
+            // If there's no `as` clause and the imported module is nested, we're not going to bind
+            // the resolved module itself into the current scope; we're going to bind the top-most
+            // parent package of that module.
+            let topmost_parent_name =
+                ModuleName::new(full_module_name.components().next().unwrap()).unwrap();
+            if let Some(topmost_parent_ty) = self.module_ty_from_name(&topmost_parent_name) {
+                topmost_parent_ty
             } else {
-                self.diagnostics.add_unresolved_module(alias, 0, Some(name));
                 Type::Unknown
             }
         } else {
-            tracing::debug!("Failed to resolve import due to invalid syntax");
-            Type::Unknown
+            // If there's no `as` clause and the imported module isn't nested, then the imported
+            // module _is_ what we bind into the current scope.
+            full_module_ty
         };
 
-        self.add_declaration_with_binding(alias.into(), definition, module_ty, module_ty);
+        self.add_declaration_with_binding(alias.into(), definition, binding_ty, binding_ty);
     }
 
     fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
@@ -2316,7 +2349,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn module_ty_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
-        resolve_module(self.db, module_name).map(|module| Type::ModuleLiteral(module.file()))
+        resolve_module(self.db, module_name)
+            .map(|module| Type::module_literal(self.db, self.file, module))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
