@@ -4906,15 +4906,42 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // TODO: Generics
-            KnownInstanceType::ChainMap => KnownClass::ChainMap.to_instance(self.db),
-            KnownInstanceType::OrderedDict => KnownClass::OrderedDict.to_instance(self.db),
-            KnownInstanceType::Dict => KnownClass::Dict.to_instance(self.db),
-            KnownInstanceType::List => KnownClass::List.to_instance(self.db),
-            KnownInstanceType::DefaultDict => KnownClass::DefaultDict.to_instance(self.db),
-            KnownInstanceType::Counter => KnownClass::Counter.to_instance(self.db),
-            KnownInstanceType::Set => KnownClass::Set.to_instance(self.db),
-            KnownInstanceType::FrozenSet => KnownClass::FrozenSet.to_instance(self.db),
-            KnownInstanceType::Deque => KnownClass::Deque.to_instance(self.db),
+            KnownInstanceType::ChainMap => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::ChainMap.to_instance(self.db)
+            }
+            KnownInstanceType::OrderedDict => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::OrderedDict.to_instance(self.db)
+            }
+            KnownInstanceType::Dict => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::Dict.to_instance(self.db)
+            }
+            KnownInstanceType::List => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::List.to_instance(self.db)
+            }
+            KnownInstanceType::DefaultDict => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::DefaultDict.to_instance(self.db)
+            }
+            KnownInstanceType::Counter => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::Counter.to_instance(self.db)
+            }
+            KnownInstanceType::Set => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::Set.to_instance(self.db)
+            }
+            KnownInstanceType::FrozenSet => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::FrozenSet.to_instance(self.db)
+            }
+            KnownInstanceType::Deque => {
+                self.infer_type_expression(arguments_slice);
+                KnownClass::Deque.to_instance(self.db)
+            }
 
             KnownInstanceType::ReadOnly => {
                 self.infer_type_expression(arguments_slice);
