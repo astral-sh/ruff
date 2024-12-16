@@ -668,7 +668,7 @@ where
                 for alias in &node.names {
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
-                    if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
+                    if let Some(module_name) = ModuleName::new(&alias.name) {
                         self.imported_modules.extend(module_name.ancestors());
                     }
 
