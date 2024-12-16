@@ -10,12 +10,11 @@ on:
         description: The ecosystem workflow that triggers the workflow run
         required: true
 
-permissions:
-  pull-requests: write
-
 jobs:
   comment:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - uses: dawidd6/action-download-artifact@v7
         name: Download pull request number
@@ -30,7 +29,7 @@ jobs:
         run: |
           if [[ -f pr-number ]]
           then
-            echo "pr-number=$(<pr-number)" >> $GITHUB_OUTPUT
+            echo "pr-number=$(<pr-number)" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: dawidd6/action-download-artifact@v7
@@ -66,9 +65,9 @@ jobs:
           cat pr/ecosystem/ecosystem-result >> comment.txt
           echo "" >> comment.txt
 
-          echo 'comment<<EOF' >> $GITHUB_OUTPUT
-          cat comment.txt >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
+          echo 'comment<<EOF' >> "$GITHUB_OUTPUT"
+          cat comment.txt >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
 
       - name: Find existing comment
         uses: peter-evans/find-comment@v3
