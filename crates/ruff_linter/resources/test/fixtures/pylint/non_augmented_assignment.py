@@ -50,12 +50,8 @@ class T:
 obj = T()
 obj.a = obj.a + 1
 
-# OK
-a_list[0] = a_list[:] * 3
-index = a_number = a_number + 1
-a_number = index = a_number + 1
-index = index * index + 10
-some_string = "a very long start to the string" + some_string
+
+a = a+-1
 
 # Regression tests for https://github.com/astral-sh/ruff/issues/11672
 test = 0x5
@@ -66,10 +62,41 @@ test2 = test2 + b"\000"
 
 test3 = ""
 test3 = test3 + (   a := R""
-                      f"oo"   )
+                         f"oo"   )
 
 test4 = []
 test4 = test4 + ( e
-                 for e in
-                 range(10)
+                  for e in
+                  range(10)
                   )
+
+test5 = test5 + (
+    4
+    *
+    10
+)
+
+test6 = test6 + \
+        (
+            4
+            *
+            10
+        )
+
+test7 = \
+        100 \
+    + test7
+
+test8 = \
+    886 \
+    + \
+ \
+    test8
+
+
+# OK
+a_list[0] = a_list[:] * 3
+index = a_number = a_number + 1
+a_number = index = a_number + 1
+index = index * index + 10
+some_string = "a very long start to the string" + some_string

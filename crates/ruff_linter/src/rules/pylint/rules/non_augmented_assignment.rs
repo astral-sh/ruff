@@ -4,6 +4,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::Operator;
+use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -97,16 +98,20 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
         return;
     };
 
+    let locator = checker.locator();
     let operator = AugmentedOperator::from(value.op);
 
     // Match, e.g., `x = x + 1`.
     if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
         let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
+        let half_expr = locator.slice(TextRange::new(value.left.end(), value.end()));
+        let right_operand_expr = trim_left_operator(half_expr);
+
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker.locator(),
             target,
             operator,
-            &value.right,
+            right_operand_expr,
             assign.range(),
         )));
         checker.diagnostics.push(diagnostic);
@@ -120,15 +125,82 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
     {
         let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
+        let half_expr = locator.slice(TextRange::new(value.left.start(), value.right.start()));
+        let right_operand_expr = trim_right_operator(half_expr);
+
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker.locator(),
             target,
             operator,
-            &value.left,
+            right_operand_expr,
             assign.range(),
         )));
         checker.diagnostics.push(diagnostic);
     }
+}
+
+const OPERATORS: [&str; 15] = [
+    "+", "&", "|", "^", "//", "/", "<<", "<", "@", "%", "**", "*", ">>", ">", "-",
+];
+
+macro_rules! trim_operator {
+    ($half_expr:ident, $eat:ident, $bump:ident, $check:ident) => {{
+        let mut cursor = Cursor::new($half_expr);
+
+        cursor.$eat(is_whitespace_or_line_continuation);
+
+        let op = OPERATORS
+            .iter()
+            .find(|&op| cursor.as_str().$check(op))
+            .unwrap();
+
+        cursor.$bump();
+
+        if op.len() == 2 {
+            cursor.$bump();
+        }
+
+        cursor.$eat(is_whitespace_or_line_continuation);
+
+        cursor.as_str()
+    }};
+}
+
+/// Input:
+/// ```python
+///   \
+///    + (a -\
+/// b)
+/// ```
+///
+/// Output:
+/// ```python
+/// (a -\
+/// b)
+/// ```
+fn trim_left_operator(half_expr: &str) -> &str {
+    trim_operator!(half_expr, eat_while, bump, starts_with)
+}
+
+/// Input:
+/// ```python
+/// (a -\
+/// b) \
+///     +  \
+///
+/// ```
+///
+/// Output:
+/// ```python
+/// (a -\
+/// b)
+/// ```
+fn trim_right_operator(half_expr: &str) -> &str {
+    trim_operator!(half_expr, eat_back_while, bump_back, ends_with)
+}
+
+fn is_whitespace_or_line_continuation(c: char) -> bool {
+    c == '\\' || c.is_whitespace()
 }
 
 /// Generate a fix to convert an assignment statement to an augmented assignment.
@@ -138,20 +210,11 @@ fn augmented_assignment(
     locator: &Locator,
     target: &Expr,
     operator: AugmentedOperator,
-    right_operand: &Expr,
+    right_operand_expr: &str,
     range: TextRange,
 ) -> Edit {
     let target_expr = locator.slice(target);
-    let right_operand_expr = locator.slice(right_operand);
-
-    // expressions using the walrus operator (`:=`) must be parenthesized
-    // when they're used as standalone expressions:
-    let new_value_expr = if right_operand.is_named_expr() {
-        format!("({right_operand_expr})")
-    } else {
-        right_operand_expr.to_string()
-    };
-    let new_content = format!("{target_expr} {operator} {new_value_expr}");
+    let new_content = format!("{target_expr} {operator} {right_operand_expr}");
 
     Edit::range_replacement(new_content, range)
 }
