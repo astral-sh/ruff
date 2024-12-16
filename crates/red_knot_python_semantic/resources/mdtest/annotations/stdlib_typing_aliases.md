@@ -93,31 +93,26 @@ reveal_type(_FrozenSet.__mro__)  # revealed: tuple[Literal[_FrozenSet], Literal[
 
 class _ChainMap(typing.ChainMap): ...
 
-reveal_type(
-    _ChainMap.__mro__
-)  # revealed: tuple[Literal[_ChainMap], @Todo(Support for more typing aliases as base classes), Literal[object]]
+# revealed: tuple[Literal[_ChainMap], @Todo(Support for more typing aliases as base classes), Literal[object]]
+reveal_type(_ChainMap.__mro__)
 
 class _Counter(typing.Counter): ...
 
-reveal_type(
-    _Counter.__mro__
-)  # revealed: tuple[Literal[_Counter], @Todo(Support for more typing aliases as base classes), Literal[object]]
+# revealed: tuple[Literal[_Counter], @Todo(Support for more typing aliases as base classes), Literal[object]]
+reveal_type(_Counter.__mro__)
 
 class _DefaultDict(typing.DefaultDict): ...
 
-reveal_type(
-    _DefaultDict.__mro__
-)  # revealed: tuple[Literal[_DefaultDict], @Todo(Support for more typing aliases as base classes), Literal[object]]
+# revealed: tuple[Literal[_DefaultDict], @Todo(Support for more typing aliases as base classes), Literal[object]]
+reveal_type(_DefaultDict.__mro__)
 
 class _Deque(typing.Deque): ...
 
-reveal_type(
-    _Deque.__mro__
-)  # revealed: tuple[Literal[_Deque], @Todo(Support for more typing aliases as base classes), Literal[object]]
+# revealed: tuple[Literal[_Deque], @Todo(Support for more typing aliases as base classes), Literal[object]]
+reveal_type(_Deque.__mro__)
 
 class _OrderedDict(typing.OrderedDict): ...
 
-reveal_type(
-    _OrderedDict.__mro__
-)  # revealed: tuple[Literal[_OrderedDict], @Todo(Support for more typing aliases as base classes), Literal[object]]
+# revealed: tuple[Literal[_OrderedDict], @Todo(Support for more typing aliases as base classes), Literal[object]]
+reveal_type(_OrderedDict.__mro__)
 ```
