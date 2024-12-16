@@ -61,6 +61,12 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
     index.symbol_table(scope.file_scope_id(db))
 }
 
+/// Returns the set of modules that are imported anywhere in `file`.
+#[salsa::tracked]
+pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
+    semantic_index(db, file).imported_modules.clone()
+}
+
 /// Returns the use-def map for a specific `scope`.
 ///
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
@@ -118,7 +124,7 @@ pub(crate) struct SemanticIndex<'db> {
     ast_ids: IndexVec<FileScopeId, AstIds>,
 
     /// The set of modules that are imported anywhere within this file.
-    imported_modules: FxHashSet<ModuleName>,
+    imported_modules: Arc<FxHashSet<ModuleName>>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
@@ -246,11 +252,6 @@ impl<'db> SemanticIndex<'db> {
     /// the logic for type inference.
     pub(super) fn has_future_annotations(&self) -> bool {
         self.has_future_annotations
-    }
-
-    /// Checks if this file imports a particular module.
-    pub(crate) fn imports_module(&self, module_name: &ModuleName) -> bool {
-        self.imported_modules.contains(module_name)
     }
 }
 

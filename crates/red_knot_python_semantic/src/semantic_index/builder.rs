@@ -562,7 +562,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
-            imported_modules: self.imported_modules,
+            imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
         }
     }

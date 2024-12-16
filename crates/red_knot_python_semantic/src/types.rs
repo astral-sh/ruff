@@ -20,8 +20,8 @@ use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
-    global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
-    BindingWithConstraintsIterator, DeclarationsIterator,
+    global_scope, imported_modules, semantic_index, symbol_table, use_def_map,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::stdlib::{
     builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
@@ -1444,10 +1444,10 @@ impl<'db> Type<'db> {
                 // current behavior, and opposite of mypy's current behavior.)
                 if let Some(submodule_name) = ModuleName::new(name) {
                     let importing_file = module_ref.importing_file(db);
-                    let importing_index = semantic_index(db, importing_file);
+                    let imported_submodules = imported_modules(db, importing_file);
                     let mut full_submodule_name = module_ref.module(db).name().clone();
                     full_submodule_name.extend(&submodule_name);
-                    if importing_index.imports_module(&full_submodule_name) {
+                    if imported_submodules.contains(&full_submodule_name) {
                         if let Some(submodule) = resolve_module(db, &full_submodule_name) {
                             let submodule_ty = Type::module_literal(db, importing_file, submodule);
                             return Symbol::Type(submodule_ty, Boundness::Bound);
