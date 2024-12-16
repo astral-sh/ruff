@@ -1,0 +1,9 @@
+# Configuration for the actionlint tool, which we run via pre-commit
+# to verify the correctness of the syntax in our GitHub Actions workflows.
+
+self-hosted-runner:
+  # Various runners we use that aren't recognized out-of-the-box by actionlint:
+  labels:
+    - depot-ubuntu-latest-8
+    - depot-ubuntu-22.04-16
+    - windows-latest-xlarge
