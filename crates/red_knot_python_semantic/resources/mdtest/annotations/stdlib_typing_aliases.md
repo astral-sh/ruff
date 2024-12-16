@@ -71,22 +71,26 @@ import typing
 class ListSubclass(typing.List): ...
 
 # TODO: should have `Generic`, should not have `Unknown`
-reveal_type(ListSubclass.__mro__)  # revealed: tuple[Literal[ListSubclass], Literal[list], Unknown, Literal[object]]
+# revealed: tuple[Literal[ListSubclass], Literal[list], Unknown, Literal[object]]
+reveal_type(ListSubclass.__mro__)
 
 class DictSubclass(typing.Dict): ...
 
 # TODO: should have `Generic`, should not have `Unknown`
-reveal_type(DictSubclass.__mro__)  # revealed: tuple[Literal[DictSubclass], Literal[dict], Unknown, Literal[object]]
+# revealed: tuple[Literal[DictSubclass], Literal[dict], Unknown, Literal[object]]
+reveal_type(DictSubclass.__mro__)
 
 class SetSubclass(typing.Set): ...
 
 # TODO: should have `Generic`, should not have `Unknown`
-reveal_type(SetSubclass.__mro__)  # revealed: tuple[Literal[SetSubclass], Literal[set], Unknown, Literal[object]]
+# revealed: tuple[Literal[SetSubclass], Literal[set], Unknown, Literal[object]]
+reveal_type(SetSubclass.__mro__)
 
 class FrozenSetSubclass(typing.FrozenSet): ...
 
 # TODO: should have `Generic`, should not have `Unknown`
-reveal_type(FrozenSetSubclass.__mro__)  # revealed: tuple[Literal[FrozenSetSubclass], Literal[frozenset], Unknown, Literal[object]]
+# revealed: tuple[Literal[FrozenSetSubclass], Literal[frozenset], Unknown, Literal[object]]
+reveal_type(FrozenSetSubclass.__mro__)
 
 ####################
 ### `collections`
