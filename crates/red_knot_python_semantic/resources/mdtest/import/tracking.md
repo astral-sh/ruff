@@ -66,3 +66,34 @@ class C: ...
 import a as a
 import a.b as b
 ```
+
+## Attribute overrides submodule
+
+Technically, either a submodule or a non-module attribute could shadow the other, depending on the
+ordering of when the submodule is loaded relative to the parent module's `__init__.py` file being
+evaluated.  We have chosen to always have the submodule take priority.  (This matches pyright's
+current behavior, and opposite of mypy's current behavior.)
+
+```py
+import sub.b
+import attr.b
+
+# In the Python interpreter, `attr.b` is Literal[1]
+reveal_type(sub.b)  # revealed: <module 'sub.b'>
+reveal_type(attr.b)  # revealed: <module 'attr.b'>
+```
+
+```py path=sub/__init__.py
+b = 1
+```
+
+```py path=sub/b.py
+```
+
+```py path=attr/__init__.py
+from . import b as _
+b = 1
+```
+
+```py path=attr/b.py
+```
