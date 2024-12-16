@@ -17,8 +17,6 @@ y: int = ...
 When the ellipsis symbol is used as default value the assignment is checked.
 
 ```py
-from typing import Dict
-
 # error: [invalid-parameter-default] "Default value of type `EllipsisType | ellipsis` is not assignable to annotated parameter type `int`"
 def f(x: int = Ellipsis) -> None: ...
 ```
