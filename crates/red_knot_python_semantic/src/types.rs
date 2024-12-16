@@ -476,6 +476,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module) -> Self {
+        Self::ModuleLiteral(ModuleLiteralType::new(db, importing_file, submodule))
+    }
+
     pub const fn into_module_literal(self) -> Option<ModuleLiteralType<'db>> {
         match self {
             Type::ModuleLiteral(module) => Some(module),
@@ -1439,11 +1443,7 @@ impl<'db> Type<'db> {
                     full_submodule_name.extend(&submodule_name);
                     if importing_index.imports_module(&full_submodule_name) {
                         if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                            let submodule_ty = Type::ModuleLiteral(ModuleLiteralType::new(
-                                db,
-                                importing_file,
-                                submodule,
-                            ));
+                            let submodule_ty = Type::module_literal(db, importing_file, submodule);
                             return Symbol::Type(submodule_ty, Boundness::Bound);
                         }
                     }
@@ -3536,7 +3536,7 @@ pub(crate) mod tests {
                 ),
                 Ty::StdlibModule(module) => {
                     let module = resolve_module(db, &module.name()).unwrap();
-                    Type::ModuleLiteral(ModuleLiteralType::new(db, module.file(), module))
+                    Type::module_literal(db, module.file(), module)
                 }
                 Ty::SliceLiteral(start, stop, step) => Type::SliceLiteral(SliceLiteralType::new(
                     db,

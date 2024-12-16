@@ -64,9 +64,9 @@ use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
     typing_extensions_symbol, Boundness, Class, ClassLiteralType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, ModuleLiteralType, SliceLiteralType,
-    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol,
+    Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -2350,7 +2350,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn module_ty_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
         resolve_module(self.db, module_name)
-            .map(|module| Type::ModuleLiteral(ModuleLiteralType::new(self.db, self.file, module)))
+            .map(|module| Type::module_literal(self.db, self.file, module))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
