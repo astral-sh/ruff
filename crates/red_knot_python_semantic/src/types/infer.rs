@@ -4904,42 +4904,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("Callable types")
             }
-            KnownInstanceType::ChainMap => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.ChainMap alias")
-            }
-            KnownInstanceType::OrderedDict => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.OrderedDict alias")
-            }
-            KnownInstanceType::Dict => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.Dict alias")
-            }
-            KnownInstanceType::List => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.List alias")
-            }
-            KnownInstanceType::DefaultDict => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.DefaultDict[] alias")
-            }
-            KnownInstanceType::Counter => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.Counter[] alias")
-            }
-            KnownInstanceType::Set => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.Set alias")
-            }
-            KnownInstanceType::FrozenSet => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.FrozenSet alias")
-            }
-            KnownInstanceType::Deque => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("typing.Deque alias")
-            }
+
+            // TODO: Generics
+            KnownInstanceType::ChainMap => KnownClass::ChainMap.to_instance(self.db),
+            KnownInstanceType::OrderedDict => KnownClass::OrderedDict.to_instance(self.db),
+            KnownInstanceType::Dict => KnownClass::Dict.to_instance(self.db),
+            KnownInstanceType::List => KnownClass::List.to_instance(self.db),
+            KnownInstanceType::DefaultDict => KnownClass::DefaultDict.to_instance(self.db),
+            KnownInstanceType::Counter => KnownClass::Counter.to_instance(self.db),
+            KnownInstanceType::Set => KnownClass::Set.to_instance(self.db),
+            KnownInstanceType::FrozenSet => KnownClass::FrozenSet.to_instance(self.db),
+            KnownInstanceType::Deque => KnownClass::Deque.to_instance(self.db),
+
             KnownInstanceType::ReadOnly => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("Required[] type qualifier")
