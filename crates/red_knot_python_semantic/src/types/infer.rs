@@ -791,11 +791,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         let mut bound_ty = ty;
         let declared_ty = declarations_ty(self.db, declarations, undeclared_ty).unwrap_or_else(
             |(ty, conflicting)| {
-                if let Some(undeclared_ty) = undeclared_ty {
-                    if conflicting.iter().any(|ty| ty == &undeclared_ty) {
-                        return ty;
-                    }
-                }
                 // TODO point out the conflicting declarations in the diagnostic?
                 let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
                 let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();

@@ -19,6 +19,19 @@ def _(flag: bool):
     x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: str, int"
 ```
 
+## Incompatible declarations for 2 (out of 3) types
+
+```py
+def _(flag1: bool, flag2: bool):
+    if flag1:
+        x: str
+    elif flag2:
+        x: int
+
+    # Here, the declared type for `x` is `int | str | Unknown`.
+    x = 1  # error: [conflicting-declarations] "Conflicting declared types for `x`: str, int"
+```
+
 ## Incompatible declarations with bad assignment
 
 ```py
