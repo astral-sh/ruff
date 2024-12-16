@@ -14,8 +14,6 @@ from typing import NamedTuple
 import mdformat
 import yaml
 
-from _mdformat_utils import add_no_escape_text_plugin
-
 
 class Section(NamedTuple):
     """A section to include in the MkDocs documentation."""
@@ -229,12 +227,11 @@ def main() -> None:
 
             f.write(clean_file_content(file_content, title))
 
-    add_no_escape_text_plugin()
     for rule_doc in Path("docs/rules").glob("*.md"):
         # Format rules docs. This has to be completed before adding the meta description
         # otherwise the meta description will be formatted in a way that mkdocs does not
         # support.
-        mdformat.file(rule_doc, extensions=["mkdocs", "admon", "no-escape-text"])
+        mdformat.file(rule_doc, extensions=["mkdocs"])
 
         generate_rule_metadata(rule_doc)
 
