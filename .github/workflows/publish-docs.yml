@@ -112,7 +112,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ASTRAL_DOCS_PAT }}
         run: |
           # set the PR title
-          pull_request_title='Update ruff documentation for "${display_name}"'
+          pull_request_title="Update ruff documentation for ${display_name}"
 
           # Delete any existing pull requests that are open for this version
           # by checking against pull_request_title because the new PR will
@@ -127,8 +127,8 @@ jobs:
           gh pr create \
             --base=main \
             --head="${branch_name}" \
-            --title="$pull_request_title" \
-            --body='Automated documentation update for "${display_name}"' \
+            --title="${pull_request_title}" \
+            --body="Automated documentation update for ${display_name}" \
             --label="documentation"
 
       - name: "Merge Pull Request"
