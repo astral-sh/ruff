@@ -73,7 +73,7 @@ if sys.version_info >= (3, 10):
 __stdin__: Final[TextIOWrapper | None]  # Contains the original value of stdin
 __stdout__: Final[TextIOWrapper | None]  # Contains the original value of stdout
 __stderr__: Final[TextIOWrapper | None]  # Contains the original value of stderr
-tracebacklimit: int
+tracebacklimit: int | None
 version: str
 api_version: int
 warnoptions: Any

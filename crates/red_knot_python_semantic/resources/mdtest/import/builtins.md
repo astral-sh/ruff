@@ -3,6 +3,6 @@
 ```py
 import builtins
 
-x = builtins.copyright
-reveal_type(x)  # revealed: Literal[copyright]
+x = builtins.chr
+reveal_type(x)  # revealed: Literal[chr]
 ```

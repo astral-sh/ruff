@@ -3386,6 +3386,24 @@ pub enum TypeParam {
     TypeVarTuple(TypeParamTypeVarTuple),
 }
 
+impl TypeParam {
+    pub const fn name(&self) -> &Identifier {
+        match self {
+            Self::TypeVar(x) => &x.name,
+            Self::ParamSpec(x) => &x.name,
+            Self::TypeVarTuple(x) => &x.name,
+        }
+    }
+
+    pub fn default(&self) -> Option<&Expr> {
+        match self {
+            Self::TypeVar(x) => x.default.as_deref(),
+            Self::ParamSpec(x) => x.default.as_deref(),
+            Self::TypeVarTuple(x) => x.default.as_deref(),
+        }
+    }
+}
+
 /// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeParamTypeVar {

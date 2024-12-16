@@ -1,12 +1,12 @@
 import pickle
 import sys
+from _pickle import _ReducedType
 from _typeshed import HasFileno, SupportsWrite, Unused
 from abc import ABCMeta
 from builtins import type as Type  # alias to avoid name clash
 from collections.abc import Callable
 from copyreg import _DispatchTableType
 from multiprocessing import connection
-from pickle import _ReducedType
 from socket import socket
 from typing import Any, Final
 

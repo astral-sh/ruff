@@ -78,8 +78,10 @@ if sys.platform == "win32":
     SO_EXCLUSIVEADDRUSE: int
 if sys.platform != "win32":
     SO_REUSEPORT: int
+    if sys.platform != "darwin" or sys.version_info >= (3, 13):
+        SO_BINDTODEVICE: int
+
 if sys.platform != "win32" and sys.platform != "darwin":
-    SO_BINDTODEVICE: int
     SO_DOMAIN: int
     SO_MARK: int
     SO_PASSCRED: int

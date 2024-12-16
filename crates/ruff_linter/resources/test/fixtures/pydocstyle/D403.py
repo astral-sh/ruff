@@ -31,3 +31,13 @@ def single_word():
 
 def single_word_no_dot():
     """singleword"""
+
+def first_word_lots_of_whitespace():
+    """
+
+
+
+    here is the start of my docstring!
+
+    What do you think?    
+    """
