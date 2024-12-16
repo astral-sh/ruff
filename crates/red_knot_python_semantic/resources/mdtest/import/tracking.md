@@ -71,7 +71,7 @@ import a.b as b
 
 Technically, either a submodule or a non-module attribute could shadow the other, depending on the
 ordering of when the submodule is loaded relative to the parent module's `__init__.py` file being
-evaluated.  We have chosen to always have the submodule take priority.  (This matches pyright's
+evaluated. We have chosen to always have the submodule take priority. (This matches pyright's
 current behavior, and opposite of mypy's current behavior.)
 
 ```py
@@ -92,6 +92,7 @@ b = 1
 
 ```py path=attr/__init__.py
 from . import b as _
+
 b = 1
 ```
 
