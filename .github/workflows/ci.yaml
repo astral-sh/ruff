@@ -438,7 +438,7 @@ jobs:
 
           ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
 
-          cat ecosystem-result-check-stable > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-check-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (stable)"  > ecosystem-result
           cat ecosystem-result-check-stable >> ecosystem-result
           echo "" >> ecosystem-result
@@ -454,7 +454,7 @@ jobs:
 
           ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
 
-          cat ecosystem-result-check-preview > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-check-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (preview)" >> ecosystem-result
           cat ecosystem-result-check-preview >> ecosystem-result
           echo "" >> ecosystem-result
@@ -470,7 +470,7 @@ jobs:
 
           ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
 
-          cat ecosystem-result-format-stable > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-format-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (stable)" >> ecosystem-result
           cat ecosystem-result-format-stable >> ecosystem-result
           echo "" >> ecosystem-result
@@ -486,7 +486,7 @@ jobs:
 
           ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
 
-          cat ecosystem-result-format-preview > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-format-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (preview)" >> ecosystem-result
           cat ecosystem-result-format-preview >> ecosystem-result
           echo "" >> ecosystem-result
@@ -570,13 +570,13 @@ jobs:
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
       - name: "Run pre-commit"
         run: |
-          echo '```console' > $GITHUB_STEP_SUMMARY
+          echo '```console' > "$GITHUB_STEP_SUMMARY"
           # Enable color output for pre-commit and remove it for the summary
           SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always | \
-            tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> $GITHUB_STEP_SUMMARY) >&1
-          exit_code=${PIPESTATUS[0]}
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          exit $exit_code
+            tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> "$GITHUB_STEP_SUMMARY") >&1
+          exit_code="${PIPESTATUS[0]}"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$exit_code"
 
   docs:
     name: "mkdocs"
@@ -637,7 +637,7 @@ jobs:
       - name: "Run checks"
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
-        run: cat target/formatter-ecosystem/stats.txt > $GITHUB_STEP_SUMMARY
+        run: cat target/formatter-ecosystem/stats.txt > "$GITHUB_STEP_SUMMARY"
       - name: "Remove checkouts from cache"
         run: rm -r target/formatter-ecosystem
 
