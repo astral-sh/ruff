@@ -2811,7 +2811,13 @@ impl KnownFunction {
 
 #[salsa::interned]
 pub struct ModuleLiteralType<'db> {
-    pub containing_file: File,
+    /// The file in which this module was imported.
+    ///
+    /// We need this in order to know which submodules should be attached to it as attributes
+    /// (because the submodules were also imported in this file).
+    pub importing_file: File,
+    
+    /// The imported module.
     pub module: Module,
 }
 

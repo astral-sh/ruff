@@ -15,7 +15,7 @@ characteristics of our module tracking that can lead to inaccuracies:
 - Imports are tracked flow-insensitively: submodule accesses are allowed and resolved if that
     submodule is imported _anywhere in the file_. This handles the common case where all imports are
     grouped at the top of the file, and is easiest to implement. We might revisit this decision and
-    track imports flow-sensitively, in which case we will have to update the assertions in some of
+    track submodule imports flow-sensitively, in which case we will have to update the assertions in some of
     these tests.
 
 ## Import submodule later in file
