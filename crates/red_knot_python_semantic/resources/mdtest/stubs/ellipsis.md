@@ -2,9 +2,9 @@
 
 ## Function and Methods
 
-For default values the ellipsis literal `...` can be used.
+For default values the ellipsis literal `...` can be used, in a stub file only.
 
-```py
+```py path=test.pyi
 from typing import Dict
 
 def f(x: int = ...) -> None: ...
