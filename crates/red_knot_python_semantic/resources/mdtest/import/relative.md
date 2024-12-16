@@ -121,13 +121,11 @@ X = 42
 ```
 
 ```py path=package/bar.py
-# TODO: support submodule imports
-from . import foo  # error: [unresolved-import]
+from . import foo
 
 y = foo.X
 
-# TODO: should be `Literal[42]`
-reveal_type(y)  # revealed: Unknown
+reveal_type(y)  # revealed: Literal[42]
 ```
 
 ## Non-existent + bare to module
