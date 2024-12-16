@@ -14,6 +14,7 @@ pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
 };
 pub(crate) use self::signatures::Signature;
+use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
@@ -1431,18 +1432,20 @@ impl<'db> Type<'db> {
                 // If the file that originally imported the module has also imported a submodule
                 // named [name], then the result is that submodule, even if the module also defines
                 // a (non-module) symbol with that name.
-                let importing_file = module_ref.importing_file(db);
-                let importing_index = semantic_index(db, importing_file);
-                let mut submodule_name = module_ref.module(db).name().clone();
-                submodule_name.push(&ast::name::Name::from(name));
-                if importing_index.imports_module(&submodule_name) {
-                    if let Some(submodule) = resolve_module(db, &submodule_name) {
-                        let submodule_ty = Type::ModuleLiteral(ModuleLiteralType::new(
-                            db,
-                            importing_file,
-                            submodule,
-                        ));
-                        return Symbol::Type(submodule_ty, Boundness::Bound);
+                if let Some(submodule_name) = ModuleName::new(name) {
+                    let importing_file = module_ref.importing_file(db);
+                    let importing_index = semantic_index(db, importing_file);
+                    let mut full_submodule_name = module_ref.module(db).name().clone();
+                    full_submodule_name.extend(&submodule_name);
+                    if importing_index.imports_module(&full_submodule_name) {
+                        if let Some(submodule) = resolve_module(db, &full_submodule_name) {
+                            let submodule_ty = Type::ModuleLiteral(ModuleLiteralType::new(
+                                db,
+                                importing_file,
+                                submodule,
+                            ));
+                            return Symbol::Type(submodule_ty, Boundness::Bound);
+                        }
                     }
                 }
 
