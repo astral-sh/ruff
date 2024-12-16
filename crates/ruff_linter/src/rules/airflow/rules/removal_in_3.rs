@@ -504,6 +504,10 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name("airflow.providers.amazon.aws.assets.s3.convert_asset_to_openlineage".to_string()),
                 )),
+                ["airflow", "providers", "amazon", "aws", "datasets", "s3", "sanitize_uri"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.amazon.aws.assets.s3.sanitize_uri".to_string()),
+                )),
                 ["airflow", "providers", "amazon", "auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => Some((
                     qualname.to_string(),
                     Replacement::Name("airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.ASSET".to_string()),
@@ -517,10 +521,41 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name("airflow.providers.common.io.assets.file.convert_asset_to_openlineage".to_string()),
                 )),
+                ["airflow", "providers", "common", "io", "datasets", "file", "sanitize_uri"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.common.io.assets.file.sanitize_uri".to_string()),
+                )),
                 // airflow.providers.fab
                 ["airflow", "providers", "fab", "auth_manager", "fab_auth_manager", "is_authorized_dataset"] => Some((
                     qualname.to_string(),
                     Replacement::Name("airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_asset".to_string()),
+                )),
+                // airflow.providers.google
+                ["airflow", "providers", "google", "datasets", "bigquery", "create_dataset"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.google.assets.bigquery.create_asset".to_string()),
+                )),
+                ["airflow", "providers", "google", "datasets", "gcs", "create_dataset"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.google.assets.gcs.create_asset".to_string()),
+                )),
+                ["airflow", "providers", "google", "datasets", "gcs", "convert_dataset_to_openlineage"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.google.assets.gcs.convert_asset_to_openlineage".to_string()),
+                )),
+                ["airflow", "providers", "google", "datasets", "gcs", "sanitize_uri"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.google.assets.gcs.sanitize_uri".to_string()),
+                )),
+                // airflow.providers.mysql
+                ["airflow", "providers", "mysql", "datasets", "mysql", "sanitize_uri"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.mysql.assets.mysql.sanitize_uri".to_string()),
+                )),
+                // airflow.providers.postgres
+                ["airflow", "providers", "postgres", "datasets", "postgres", "sanitize_uri"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.postgres.assets.postgres.sanitize_uri".to_string()),
                 )),
                 // airflow.providers.openlineage
                 ["airflow", "providers", "openlineage", "utils", "utils", "DatasetInfo"] => Some((
@@ -530,6 +565,11 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "providers", "openlineage", "utils", "utils", "translate_airflow_dataset"] => Some((
                     qualname.to_string(),
                     Replacement::Name("airflow.providers.openlineage.utils.utils.translate_airflow_asset".to_string()),
+                )),
+                // airflow.providers.trino
+                ["airflow", "providers", "trino", "datasets", "trino", "sanitize_uri"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.providers.trino.assets.trino.sanitize_uri".to_string()),
                 )),
                 _ => None,
             });
