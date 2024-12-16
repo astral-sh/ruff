@@ -127,10 +127,9 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::OrderedDict => {
                     Self::try_from_ty(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
-                KnownInstanceType::Callable => Self::try_from_ty(
-                    db,
-                    todo_type!("Support for more typing aliases as base classes"),
-                ),
+                KnownInstanceType::Callable => {
+                    Self::try_from_ty(db, todo_type!("Support for Callable as a base class"))
+                }
             },
         }
     }
