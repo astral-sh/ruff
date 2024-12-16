@@ -28,14 +28,18 @@ reveal_type(X)  # revealed: Literal[42]
 
 ## Dotted
 
-```py path=package/__init__.py
+TODO: We currently have to artificially name this package to be unique within this mdtest file for
+tests to pass. Once we fix that issue, we should revert this back to `package` to be consistent with
+the rest of the file.
+
+```py path=package_unique/__init__.py
 ```
 
-```py path=package/foo/bar/baz.py
+```py path=package_unique/foo/bar/baz.py
 X = 42
 ```
 
-```py path=package/bar.py
+```py path=package_unique/bar.py
 from .foo.bar.baz import X
 
 reveal_type(X)  # revealed: Literal[42]
