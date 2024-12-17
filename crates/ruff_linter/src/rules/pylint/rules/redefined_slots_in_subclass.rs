@@ -90,7 +90,7 @@ fn redefined_slots(body: &[Stmt]) -> Vec<Slot> {
 
         if let Some(arguments) = arguments {
             let mut bases = FxHashSet::default();
-            for base in arguments.args.iter() {
+            for base in &arguments.args {
                 let Expr::Name(ast::ExprName { id, .. }) = base else {
                     continue;
                 };
