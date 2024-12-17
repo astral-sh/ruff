@@ -304,6 +304,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             .record_visibility_constraint(&VisibilityConstraintRef::Single(constraint))
     }
 
+    fn reset_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
+        self.current_use_def_map_mut()
+            .reset_visibility_constraints(snapshot);
+    }
+
     fn record_negated_visibility_constraint(&mut self, constraint: ScopedVisibilityConstraintId) {
         self.current_use_def_map_mut()
             .record_visibility_constraint(&VisibilityConstraintRef::Negated(constraint));
@@ -875,6 +880,8 @@ where
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
+
+                self.reset_visibility_constraints(pre_if);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
