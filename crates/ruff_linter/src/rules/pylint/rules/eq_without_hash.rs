@@ -59,12 +59,9 @@ impl Violation for EqWithoutHash {
 pub(crate) fn object_without_hash_method(checker: &mut Checker, name: &Identifier, body: &[Stmt]) {
     let (has_eq, has_hash) = has_eq_hash(body, false);
 
-    match (has_eq, has_hash) {
-        (HasMethod::Yes | HasMethod::Maybe, HasMethod::No) => {
-            let diagnostic = Diagnostic::new(EqWithoutHash, name.range());
-            checker.diagnostics.push(diagnostic);
-        }
-        _ => {}
+    if let (HasMethod::Yes | HasMethod::Maybe, HasMethod::No) = (has_eq, has_hash) {
+        let diagnostic = Diagnostic::new(EqWithoutHash, name.range());
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -143,16 +140,16 @@ fn has_eq_hash(body: &[Stmt], nested: bool) -> (HasEq, HasHash) {
             }
 
             Stmt::With(StmtWith { body, .. }) => {
-                let bodies = vec![body];
+                let bodies = [body];
 
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..])
+                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
             }
 
             Stmt::For(StmtFor { body, orelse, .. })
             | Stmt::While(StmtWhile { body, orelse, .. }) => {
-                let bodies = vec![body, orelse];
+                let bodies = [body, orelse];
 
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..])
+                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
             }
 
             Stmt::If(StmtIf {
@@ -163,13 +160,13 @@ fn has_eq_hash(body: &[Stmt], nested: bool) -> (HasEq, HasHash) {
                 let mut bodies = vec![body];
                 bodies.extend(elif_else_clauses.iter().map(|it| &it.body));
 
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..])
+                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
             }
 
             Stmt::Match(StmtMatch { cases, .. }) => {
                 let bodies = cases.iter().map(|it| &it.body).collect_vec();
 
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..])
+                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
             }
 
             Stmt::Try(StmtTry {
@@ -186,7 +183,7 @@ fn has_eq_hash(body: &[Stmt], nested: bool) -> (HasEq, HasHash) {
                         .map(|ExceptHandler::ExceptHandler(it)| &it.body),
                 );
 
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..])
+                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
             }
 
             _ => {
@@ -212,7 +209,7 @@ fn has_eq_hash(body: &[Stmt], nested: bool) -> (HasEq, HasHash) {
 
 fn any_has_eq_hash(has_eq: HasEq, has_hash: HasHash, bodies: &[&Vec<Stmt>]) -> (HasEq, HasHash) {
     bodies
-        .into_iter()
+        .iter()
         .fold((has_eq, has_hash), |(has_eq, has_hash), body| {
             if !has_eq.is_no() && !has_hash.is_no() {
                 return (has_eq, has_hash);
