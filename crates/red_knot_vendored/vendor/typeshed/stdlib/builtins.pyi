@@ -1931,8 +1931,8 @@ class OSError(Exception):
 
 EnvironmentError = OSError
 IOError = OSError
-if sys.platform == "win32":
-    WindowsError = OSError
+# if sys.platform == "win32":
+#     WindowsError = OSError
 
 class ArithmeticError(Exception): ...
 class AssertionError(Exception): ...

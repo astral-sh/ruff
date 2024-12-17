@@ -164,28 +164,12 @@ pub(crate) fn infer_deferred_types<'db>(
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index).finish()
 }
 
-/// TODO: get rid of this? if not, at least build a cycle-recovery-variant of [`infer_expression_types`],
-/// which is only used in static visibility analysis.
-pub(crate) fn infer_expression_types_cycle_recovery<'db>(
-    db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    expr: Expression<'db>,
-) -> TypeInference<'db> {
-    tracing::trace!("infer_expression_types_cycle_recovery");
-    let mut inference = TypeInference::empty(expr.scope(db));
-    inference.expressions.insert(
-        expr.node_ref(db).scoped_expression_id(db, expr.scope(db)),
-        Type::Unknown,
-    );
-    inference
-}
-
 /// Infer all types for an [`Expression`] (including sub-expressions).
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
 #[allow(unused)]
-#[salsa::tracked(return_ref, recovery_fn=infer_expression_types_cycle_recovery)]
+#[salsa::tracked(return_ref)]
 pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
