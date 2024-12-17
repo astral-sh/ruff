@@ -49,6 +49,7 @@ impl ModuleDb {
             &db,
             &ProgramSettings {
                 python_version,
+                python_platform: Default::default(),
                 search_paths,
             },
         )?;

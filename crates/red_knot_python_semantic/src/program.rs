@@ -1,3 +1,4 @@
+use crate::python_platform::PythonPlatform;
 use crate::python_version::PythonVersion;
 use anyhow::Context;
 use salsa::Durability;
@@ -12,6 +13,8 @@ use crate::Db;
 pub struct Program {
     pub python_version: PythonVersion,
 
+    pub python_platform: PythonPlatform,
+
     #[return_ref]
     pub(crate) search_paths: SearchPaths,
 }
@@ -20,6 +23,7 @@ impl Program {
     pub fn from_settings(db: &dyn Db, settings: &ProgramSettings) -> anyhow::Result<Self> {
         let ProgramSettings {
             python_version,
+            python_platform,
             search_paths,
         } = settings;
 
@@ -28,9 +32,11 @@ impl Program {
         let search_paths = SearchPaths::from_settings(db, search_paths)
             .with_context(|| "Invalid search path settings")?;
 
-        Ok(Program::builder(settings.python_version, search_paths)
-            .durability(Durability::HIGH)
-            .new(db))
+        Ok(
+            Program::builder(*python_version, python_platform.clone(), search_paths)
+                .durability(Durability::HIGH)
+                .new(db),
+        )
     }
 
     pub fn update_search_paths(
@@ -57,6 +63,7 @@ impl Program {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ProgramSettings {
     pub python_version: PythonVersion,
+    pub python_platform: PythonPlatform,
     pub search_paths: SearchPathSettings,
 }
 

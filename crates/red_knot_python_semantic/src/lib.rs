@@ -7,6 +7,7 @@ pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{resolve_module, system_module_search_paths, KnownModule, Module};
 pub use program::{Program, ProgramSettings, SearchPathSettings, SitePackages};
+pub use python_platform::PythonPlatform;
 pub use python_version::PythonVersion;
 pub use semantic_model::{HasTy, SemanticModel};
 
@@ -17,6 +18,7 @@ mod module_name;
 mod module_resolver;
 mod node_key;
 mod program;
+mod python_platform;
 mod python_version;
 pub mod semantic_index;
 mod semantic_model;

@@ -137,6 +137,21 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
     {
         return Symbol::Type(Type::BooleanLiteral(true), Boundness::Bound);
     }
+    if name == "platform"
+        && file_to_module(db, scope.file(db)).is_some_and(|module| module.name() == "sys")
+    {
+        match Program::get(db).python_platform(db) {
+            crate::PythonPlatform::Individual(platform) => {
+                return Symbol::Type(
+                    Type::StringLiteral(StringLiteralType::new(db, platform.as_str())),
+                    Boundness::Bound,
+                );
+            }
+            crate::PythonPlatform::All => {
+                // Fall through to the looked up type
+            }
+        }
+    }
 
     let table = symbol_table(db, scope);
     table
