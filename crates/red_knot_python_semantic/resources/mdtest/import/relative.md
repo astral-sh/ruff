@@ -130,11 +130,13 @@ reveal_type(y)  # revealed: Literal[42]
 
 ## Non-existent + bare to module
 
+This test verifies that we can an error when we try to import a symbol that is neither a submodule
+nor an attribute of `package`.
+
 ```py path=package/__init__.py
 ```
 
 ```py path=package/bar.py
-# TODO: support submodule imports
 from . import foo  # error: [unresolved-import]
 
 reveal_type(foo)  # revealed: Unknown

@@ -2241,12 +2241,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO:
         // - Absolute `*` imports (`from collections import *`)
         // - Relative `*` imports (`from ...foo import *`)
-        // - Submodule imports (`from collections import abc`,
-        //   where `abc` is a submodule of the `collections` package)
-        //
-        // For the last item, see the currently skipped tests
-        // `follow_relative_import_bare_to_module()` and
-        // `follow_nonexistent_import_bare_to_module()`.
         let ast::StmtImportFrom { module, level, .. } = import_from;
         let module = module.as_deref();
 
