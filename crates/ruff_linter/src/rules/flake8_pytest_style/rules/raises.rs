@@ -238,28 +238,54 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 fn string_has_unescaped_metacharacters(value: &StringLiteralValue) -> bool {
-    let mut skip = false;
-    let mut last = '\0';
+    let mut escaped = false;
+    let mut last = '\x00';
 
     for (current, next) in value.chars().tuple_windows() {
-        if skip {
-            skip = false;
+        last = next;
+
+        if escaped {
+            if escaped_char_is_regex_metasequence(current) {
+                return true;
+            }
+
+            escaped = false;
             continue;
         }
 
         if current == '\\' {
-            skip = true;
+            escaped = true;
             continue;
         }
 
         if char_is_regex_metacharacter(current) {
             return true;
         }
-
-        last = next;
     }
 
-    !skip && char_is_regex_metacharacter(last)
+    if escaped {
+        escaped_char_is_regex_metasequence(last)
+    } else {
+        char_is_regex_metacharacter(last)
+    }
+}
+
+/// Whether the sequence `\<c>` means anything special:
+///
+/// * `\A`: Start of input
+/// * `\b`, `\B`: Word boundary and non-word-boundary
+/// * `\d`, `\D`: Digit and non-digit
+/// * `\s`, `\S`: Whitespace and non-whitespace
+/// * `\w`, `\W`: Word and non-word character
+/// * `\z`: End of input
+///
+/// `\u`, `\U`, `\N`, `\x`, `\a`, `\f`, `\n`, `\r`, `\t`, `\v`
+/// are also valid in normal strings and thus do not count.
+/// `\b` means backspace only in character sets,
+/// while backreferences (e.g., `\1`) are not valid without groups,
+/// both of which should be caught in [`string_has_unescaped_metacharacters`].
+const fn escaped_char_is_regex_metasequence(c: char) -> bool {
+    matches!(c, 'A' | 'b' | 'B' | 'd' | 'D' | 's' | 'S' | 'w' | 'W' | 'z')
 }
 
 const fn char_is_regex_metacharacter(c: char) -> bool {
