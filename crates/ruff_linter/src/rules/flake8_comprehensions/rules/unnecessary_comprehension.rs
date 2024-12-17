@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Comprehension, Expr};
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -114,33 +115,21 @@ pub(crate) fn unnecessary_dict_comprehension(
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
-    let [target_key, target_value] = elts.as_slice() else {
-        return;
-    };
 
-    let Expr::Name(ast::ExprName {
-        id: target_key_name,
-        ..
-    }) = &target_key
+    let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
+        id: target_value, ..
+    })] = elts.as_slice()
     else {
         return;
     };
-    let Expr::Name(ast::ExprName {
-        id: target_value_name,
-        ..
-    }) = &target_value
-    else {
+    let Expr::Name(ast::ExprName { id: key, .. }) = &key else {
+        return;
+    };
+    let Expr::Name(ast::ExprName { id: value, .. }) = &value else {
         return;
     };
 
-    let Expr::Name(ast::ExprName { id: key_name, .. }) = &key else {
-        return;
-    };
-    let Expr::Name(ast::ExprName { id: value_name, .. }) = &value else {
-        return;
-    };
-
-    if target_key_name == key_name && target_value_name == value_name {
+    if target_key == key && target_value == value {
         add_diagnostic(checker, expr);
     }
 }
@@ -159,18 +148,80 @@ pub(crate) fn unnecessary_list_set_comprehension(
         return;
     }
 
-    let Expr::Name(ast::ExprName {
-        id: target_name, ..
-    }) = &generator.target
-    else {
-        return;
-    };
-    let Expr::Name(ast::ExprName { id: elt_name, .. }) = &elt else {
-        return;
-    };
-    if elt_name == target_name {
-        add_diagnostic(checker, expr);
+    if is_dict_items(checker, &generator.iter) {
+        match (&generator.target, elt) {
+            // [(k, v) for k, v in dictionary.items()]j
+            (
+                Expr::Tuple(ast::ExprTuple {
+                    elts: target_elts, ..
+                }),
+                Expr::Tuple(ast::ExprTuple { elts, .. }),
+            ) => {
+                let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
+                    id: target_value, ..
+                })] = target_elts.as_slice()
+                else {
+                    return;
+                };
+                let [Expr::Name(ast::ExprName { id: key, .. }), Expr::Name(ast::ExprName { id: value, .. })] =
+                    elts.as_slice()
+                else {
+                    return;
+                };
+                if target_key == key && target_value == value {
+                    add_diagnostic(checker, expr);
+                }
+            }
+            // [x for x in dictionary.items()]
+            (
+                Expr::Name(ast::ExprName {
+                    id: target_name, ..
+                }),
+                Expr::Name(ast::ExprName { id: elt_name, .. }),
+            ) if target_name == elt_name => {
+                add_diagnostic(checker, expr);
+            }
+            _ => {}
+        }
+    } else {
+        // [x for x in iterable]
+        let Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = &generator.target
+        else {
+            return;
+        };
+        let Expr::Name(ast::ExprName { id: elt_name, .. }) = &elt else {
+            return;
+        };
+        if elt_name == target_name {
+            add_diagnostic(checker, expr);
+        }
     }
+}
+
+fn is_dict_items(checker: &Checker, expr: &Expr) -> bool {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+        return false;
+    };
+
+    if attr.as_str() != "items" {
+        return false;
+    }
+
+    let Expr::Name(name) = value.as_ref() else {
+        return false;
+    };
+
+    let Some(id) = checker.semantic().resolve_name(name) else {
+        return false;
+    };
+
+    typing::is_dict(checker.semantic().binding(id), checker.semantic())
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

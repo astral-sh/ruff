@@ -85,6 +85,26 @@ C416.py:9:1: C416 [*] Unnecessary dict comprehension (rewrite using `dict()`)
 11 11 | {k: (a, b) for k, (a, b) in d.items()}
 12 12 | 
 
+C416.py:10:1: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
+   |
+ 8 | {k: v for k, v in y}
+ 9 | {k: v for k, v in d.items()}
+10 | [(k, v) for k, v in d.items()]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C416
+11 | {k: (a, b) for k, (a, b) in d.items()}
+   |
+   = help: Rewrite using `list()`
+
+ℹ Unsafe fix
+7  7  | {i for i in x}
+8  8  | {k: v for k, v in y}
+9  9  | {k: v for k, v in d.items()}
+10    |-[(k, v) for k, v in d.items()]
+   10 |+list(d.items())
+11 11 | {k: (a, b) for k, (a, b) in d.items()}
+12 12 | 
+13 13 | [i for i, in z]
+
 C416.py:24:70: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
    |
 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196
