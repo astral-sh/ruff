@@ -1392,33 +1392,33 @@ else:
     ) -> Any: ...
 
 # Comment above regarding `eval` applies to `exec` as well
-if sys.version_info >= (3, 13):
-    def exec(
-        source: str | ReadableBuffer | CodeType,
-        /,
-        globals: dict[str, Any] | None = None,
-        locals: Mapping[str, object] | None = None,
-        *,
-        closure: tuple[CellType, ...] | None = None,
-    ) -> None: ...
+# if sys.version_info >= (3, 13):
+#     def exec(
+#         source: str | ReadableBuffer | CodeType,
+#         /,
+#         globals: dict[str, Any] | None = None,
+#         locals: Mapping[str, object] | None = None,
+#         *,
+#         closure: tuple[CellType, ...] | None = None,
+#     ) -> None: ...
 
-elif sys.version_info >= (3, 11):
-    def exec(
-        source: str | ReadableBuffer | CodeType,
-        globals: dict[str, Any] | None = None,
-        locals: Mapping[str, object] | None = None,
-        /,
-        *,
-        closure: tuple[CellType, ...] | None = None,
-    ) -> None: ...
+# elif sys.version_info >= (3, 11):
+#     def exec(
+#         source: str | ReadableBuffer | CodeType,
+#         globals: dict[str, Any] | None = None,
+#         locals: Mapping[str, object] | None = None,
+#         /,
+#         *,
+#         closure: tuple[CellType, ...] | None = None,
+#     ) -> None: ...
 
-else:
-    def exec(
-        source: str | ReadableBuffer | CodeType,
-        globals: dict[str, Any] | None = None,
-        locals: Mapping[str, object] | None = None,
-        /,
-    ) -> None: ...
+# else:
+#     def exec(
+#         source: str | ReadableBuffer | CodeType,
+#         globals: dict[str, Any] | None = None,
+#         locals: Mapping[str, object] | None = None,
+#         /,
+#     ) -> None: ...
 
 exit: _sitebuiltins.Quitter
 

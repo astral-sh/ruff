@@ -2081,7 +2081,7 @@ impl<'db> Type<'db> {
     /// but it's a useful fallback for us in order to infer `Literal` types from `sys.version_info` comparisons.
     fn version_info_tuple(db: &'db dyn Db) -> Self {
         let python_version = Program::get(db).python_version(db);
-        let int_instance_ty = Type::Unknown;
+        let int_instance_ty = KnownClass::Int.to_instance(db);
 
         // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
         let release_level_ty = {
