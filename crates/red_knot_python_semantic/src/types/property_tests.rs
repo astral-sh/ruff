@@ -75,6 +75,8 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::AbcClassLiteral("ABCMeta"),
         Ty::SubclassOfAbcClass("ABC"),
         Ty::SubclassOfAbcClass("ABCMeta"),
+        Ty::AlwaysTruthy,
+        Ty::AlwaysFalsy,
     ])
     .unwrap()
     .clone()

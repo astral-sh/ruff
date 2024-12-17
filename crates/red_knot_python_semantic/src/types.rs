@@ -431,6 +431,11 @@ pub enum Type<'db> {
     Union(UnionType<'db>),
     /// The set of objects in all of the types in the intersection
     Intersection(IntersectionType<'db>),
+    /// Represents objects whose `__bool__` method is deterministic:
+    /// - `AlwaysTruthy`: `__bool__` always returns `True`
+    /// - `AlwaysFalsy`: `__bool__` always returns `False`
+    AlwaysTruthy,
+    AlwaysFalsy,
     /// An integer literal
     IntLiteral(i64),
     /// A boolean literal, either `True` or `False`.
@@ -715,6 +720,15 @@ impl<'db> Type<'db> {
                         .negative(db)
                         .iter()
                         .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
+            }
+
+            // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
+            // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
+            (left, Type::AlwaysFalsy) => matches!(left.bool(db), Truthiness::AlwaysFalse),
+            (left, Type::AlwaysTruthy) => matches!(left.bool(db), Truthiness::AlwaysTrue),
+            // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
+            (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
+                target.is_equivalent_to(db, KnownClass::Object.to_instance(db))
             }
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
@@ -1105,6 +1119,16 @@ impl<'db> Type<'db> {
                 false
             }
 
+            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
+                // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
+                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
+                matches!(ty.bool(db), Truthiness::AlwaysFalse)
+            }
+            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
+                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
+                matches!(ty.bool(db), Truthiness::AlwaysTrue)
+            }
+
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_disjoint_from(db, right)
             }
@@ -1238,7 +1262,9 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
-            | Type::KnownInstance(_) => true,
+            | Type::KnownInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy => true,
             Type::SubclassOf(SubclassOfType { base }) => matches!(base, ClassBase::Class(_)),
             Type::ClassLiteral(_) | Type::Instance(_) => {
                 // TODO: Ideally, we would iterate over the MRO of the class, check if all
@@ -1340,6 +1366,7 @@ impl<'db> Type<'db> {
                 //
                 false
             }
+            Type::AlwaysTruthy | Type::AlwaysFalsy => false,
         }
     }
 
@@ -1410,7 +1437,9 @@ impl<'db> Type<'db> {
             | Type::Todo(_)
             | Type::Union(..)
             | Type::Intersection(..)
-            | Type::LiteralString => false,
+            | Type::LiteralString
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => false,
         }
     }
 
@@ -1578,6 +1607,10 @@ impl<'db> Type<'db> {
                 // TODO: implement tuple methods
                 todo_type!().into()
             }
+            Type::AlwaysTruthy | Type::AlwaysFalsy => {
+                // TODO return `Callable[[], Literal[True/False]]` for `__bool__` access
+                KnownClass::Object.to_instance(db).member(db, name)
+            }
             &todo @ Type::Todo(_) => todo.into(),
         }
     }
@@ -1600,6 +1633,8 @@ impl<'db> Type<'db> {
                 // TODO: see above
                 Truthiness::Ambiguous
             }
+            Type::AlwaysTruthy => Truthiness::AlwaysTrue,
+            Type::AlwaysFalsy => Truthiness::AlwaysFalse,
             instance_ty @ Type::Instance(InstanceType { class }) => {
                 if class.is_known(db, KnownClass::NoneType) {
                     Truthiness::AlwaysFalse
@@ -1912,7 +1947,9 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
-            | Type::LiteralString => Type::Unknown,
+            | Type::LiteralString
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => Type::Unknown,
         }
     }
 
@@ -2074,6 +2111,7 @@ impl<'db> Type<'db> {
                 ClassBase::try_from_ty(db, todo_type!("Intersection meta-type"))
                     .expect("Type::Todo should be a valid ClassBase"),
             ),
+            Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::Todo(todo) => Type::subclass_of_base(ClassBase::Todo(*todo)),
         }
     }
@@ -3558,6 +3596,8 @@ pub(crate) mod tests {
         SubclassOfAbcClass(&'static str),
         StdlibModule(CoreStdlibModule),
         SliceLiteral(i32, i32, i32),
+        AlwaysTruthy,
+        AlwaysFalsy,
     }
 
     impl Ty {
@@ -3625,6 +3665,8 @@ pub(crate) mod tests {
                     Some(stop),
                     Some(step),
                 )),
+                Ty::AlwaysTruthy => Type::AlwaysTruthy,
+                Ty::AlwaysFalsy => Type::AlwaysFalsy,
             }
         }
     }
@@ -3763,6 +3805,12 @@ pub(crate) mod tests {
     )]
     #[test_case(Ty::SliceLiteral(1, 2, 3), Ty::BuiltinInstance("slice"))]
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::Intersection{pos: vec![], neg: vec![Ty::None]})]
+    #[test_case(Ty::IntLiteral(1), Ty::AlwaysTruthy)]
+    #[test_case(Ty::IntLiteral(0), Ty::AlwaysFalsy)]
+    #[test_case(Ty::AlwaysTruthy, Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::AlwaysFalsy, Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::Never, Ty::AlwaysTruthy)]
+    #[test_case(Ty::Never, Ty::AlwaysFalsy)]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3797,6 +3845,10 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("type"))]
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::IntLiteral(1), Ty::AlwaysFalsy)]
+    #[test_case(Ty::IntLiteral(0), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysFalsy)]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3931,6 +3983,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![]), Ty::BuiltinClassLiteral("object"))]
     #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::None)]
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::LiteralString)]
+    #[test_case(Ty::AlwaysFalsy, Ty::AlwaysTruthy)]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
@@ -3961,6 +4014,8 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     #[test_case(Ty::AbcClassLiteral("ABC"), Ty::AbcInstance("ABCMeta"))]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysFalsy)]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
