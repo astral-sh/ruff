@@ -2307,11 +2307,24 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        // Check if the symbol being imported is a submodule.  This won't get handled by the
-        // `Type::member` call below because it relies on the semantic index's `imported_modules`
-        // set.  The semantic index does not include information about `from...import` statements
-        // because there are two things it cannot determine while only inspecting the content of
-        // the current file:
+        // First try loading the requested attribute from the module.
+        if let Symbol::Type(ty, boundness) = module_ty.member(self.db, name) {
+            if boundness == Boundness::PossiblyUnbound {
+                self.diagnostics.add_lint(
+                    &POSSIBLY_UNBOUND_IMPORT,
+                    AnyNodeRef::Alias(alias),
+                    format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
+                );
+            }
+            self.add_declaration_with_binding(alias.into(), definition, ty, ty);
+            return;
+        };
+
+        // If the module doesn't bind the symbol, check if it's a submodule.  This won't get
+        // handled by the `Type::member` call because it relies on the semantic index's
+        // `imported_modules` set.  The semantic index does not include information about
+        // `from...import` statements because there are two things it cannot determine while only
+        // inspecting the content of the current file:
         //
         //   - whether the imported symbol is an attribute or submodule
         //   - whether the containing file is in a module or a package (needed to correctly resolve
@@ -2336,26 +2349,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        // Otherwise load the requested attribute from the module.
-        let Symbol::Type(ty, boundness) = module_ty.member(self.db, name) else {
-            self.diagnostics.add_lint(
-                &UNRESOLVED_IMPORT,
-                AnyNodeRef::Alias(alias),
-                format_args!("Module `{module_name}` has no member `{name}`",),
-            );
-            self.add_unknown_declaration_with_binding(alias.into(), definition);
-            return;
-        };
-
-        if boundness == Boundness::PossiblyUnbound {
-            self.diagnostics.add_lint(
-                &POSSIBLY_UNBOUND_IMPORT,
-                AnyNodeRef::Alias(alias),
-                format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
-            );
-        }
-
-        self.add_declaration_with_binding(alias.into(), definition, ty, ty);
+        self.diagnostics.add_lint(
+            &UNRESOLVED_IMPORT,
+            AnyNodeRef::Alias(alias),
+            format_args!("Module `{module_name}` has no member `{name}`",),
+        );
+        self.add_unknown_declaration_with_binding(alias.into(), definition);
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
