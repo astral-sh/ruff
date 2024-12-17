@@ -9,6 +9,8 @@ use crate::semantic_index::{
 use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
 
+const MAX_RECURSION_DEPTH: usize = 8;
+
 /// Analyze the statically known visibility for a given visibility constraint.
 pub(crate) fn static_visibility<'db>(
     db: &'db dyn Db,
@@ -16,6 +18,26 @@ pub(crate) fn static_visibility<'db>(
     all_visibility_constraints: &IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
     visibility_constraint_id: ScopedVisibilityConstraintId,
 ) -> Truthiness {
+    static_visibility_impl(
+        db,
+        all_constraints,
+        all_visibility_constraints,
+        visibility_constraint_id,
+        MAX_RECURSION_DEPTH,
+    )
+}
+
+fn static_visibility_impl<'db>(
+    db: &'db dyn Db,
+    all_constraints: &IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_visibility_constraints: &IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
+    visibility_constraint_id: ScopedVisibilityConstraintId,
+    max_depth: usize,
+) -> Truthiness {
+    if max_depth == 0 {
+        return Truthiness::Ambiguous;
+    }
+
     let visibility_constraint = &all_visibility_constraints[visibility_constraint_id];
     match visibility_constraint {
         VisibilityConstraintRef::Single(id) => {
@@ -66,17 +88,30 @@ pub(crate) fn static_visibility<'db>(
                 },
             }
         }
-        VisibilityConstraintRef::Negated(visibility_constraint_id) => static_visibility(
+        VisibilityConstraintRef::Negated(visibility_constraint_id) => static_visibility_impl(
             db,
             all_constraints,
             all_visibility_constraints,
             *visibility_constraint_id,
+            max_depth - 1,
         )
         .negate(),
         VisibilityConstraintRef::None => Truthiness::AlwaysTrue,
         VisibilityConstraintRef::And(lhs_id, rhs_id) => {
-            let lhs = static_visibility(db, all_constraints, all_visibility_constraints, *lhs_id);
-            let rhs = static_visibility(db, all_constraints, all_visibility_constraints, *rhs_id);
+            let lhs = static_visibility_impl(
+                db,
+                all_constraints,
+                all_visibility_constraints,
+                *lhs_id,
+                max_depth - 1,
+            );
+            let rhs = static_visibility_impl(
+                db,
+                all_constraints,
+                all_visibility_constraints,
+                *rhs_id,
+                max_depth - 1,
+            );
 
             if lhs == Truthiness::AlwaysFalse || rhs == Truthiness::AlwaysFalse {
                 Truthiness::AlwaysFalse
@@ -87,8 +122,20 @@ pub(crate) fn static_visibility<'db>(
             }
         }
         VisibilityConstraintRef::Or(lhs_id, rhs_id) => {
-            let lhs = static_visibility(db, all_constraints, all_visibility_constraints, *lhs_id);
-            let rhs = static_visibility(db, all_constraints, all_visibility_constraints, *rhs_id);
+            let lhs = static_visibility_impl(
+                db,
+                all_constraints,
+                all_visibility_constraints,
+                *lhs_id,
+                max_depth - 1,
+            );
+            let rhs = static_visibility_impl(
+                db,
+                all_constraints,
+                all_visibility_constraints,
+                *rhs_id,
+                max_depth - 1,
+            );
 
             if lhs == Truthiness::AlwaysFalse && rhs == Truthiness::AlwaysFalse {
                 Truthiness::AlwaysFalse
