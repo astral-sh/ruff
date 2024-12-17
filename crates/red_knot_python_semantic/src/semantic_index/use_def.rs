@@ -508,11 +508,18 @@ impl<'db> UseDefMapBuilder<'db> {
         constraint_id
     }
 
+    pub(super) fn add_visibility_constraint(
+        &mut self,
+        constraint: VisibilityConstraintRef,
+    ) -> ScopedVisibilityConstraintId {
+        self.all_visibility_constraints.push(constraint)
+    }
+
     pub(super) fn record_visibility_constraint(
         &mut self,
-        constraint: &VisibilityConstraintRef,
+        constraint: VisibilityConstraintRef,
     ) -> ScopedVisibilityConstraintId {
-        let new_constraint_id = self.all_visibility_constraints.push(constraint.clone());
+        let new_constraint_id = self.add_visibility_constraint(constraint);
         for state in &mut self.symbol_states {
             state.record_visibility_constraint(
                 &mut self.all_visibility_constraints,

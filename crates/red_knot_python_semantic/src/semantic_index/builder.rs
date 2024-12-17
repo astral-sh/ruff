@@ -296,12 +296,20 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().record_constraint(constraint)
     }
 
+    fn add_visibility_constraint(
+        &mut self,
+        constraint: ScopedConstraintId,
+    ) -> ScopedVisibilityConstraintId {
+        self.current_use_def_map_mut()
+            .add_visibility_constraint(VisibilityConstraintRef::Single(constraint))
+    }
+
     fn record_visibility_constraint(
         &mut self,
         constraint: ScopedConstraintId,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(&VisibilityConstraintRef::Single(constraint))
+            .record_visibility_constraint(VisibilityConstraintRef::Single(constraint))
     }
 
     fn reset_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
@@ -309,9 +317,12 @@ impl<'db> SemanticIndexBuilder<'db> {
             .reset_visibility_constraints(snapshot);
     }
 
-    fn record_negated_visibility_constraint(&mut self, constraint: ScopedVisibilityConstraintId) {
+    fn record_negated_visibility_constraint(
+        &mut self,
+        constraint: ScopedVisibilityConstraintId,
+    ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(&VisibilityConstraintRef::Negated(constraint));
+            .record_visibility_constraint(VisibilityConstraintRef::Negated(constraint))
     }
 
     fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
@@ -1377,23 +1388,35 @@ where
                 op,
             }) => {
                 let mut snapshots = vec![];
-                let mut last_constraint_id = None;
+                let mut constraints = vec![];
+
                 for (index, value) in values.iter().enumerate() {
                     self.visit_expr(value);
-                    if let Some(last_constraint_id) = last_constraint_id {
-                        self.record_visibility_constraint(last_constraint_id);
+                    if let Some(last_constraint_id) = constraints.last() {
+                        self.record_visibility_constraint(*last_constraint_id);
                     }
-                    // In the last value we don't need to take a snapshot nor add a constraint
+                    // Snapshot is taken after visiting the expression but before adding the constraint.
+                    snapshots.push(self.flow_snapshot());
                     if index < values.len() - 1 {
-                        // Snapshot is taken after visiting the expression but before adding the constraint.
-                        snapshots.push(self.flow_snapshot());
+                        // In the last value we don't need to add a constraint
                         let constraint = self.build_constraint(value);
-                        last_constraint_id = Some(match op {
+                        let id = match op {
                             BoolOp::And => self.record_constraint(constraint),
                             BoolOp::Or => self.record_negated_constraint(constraint),
-                        });
+                        };
+                        constraints.push(id);
                     }
                 }
+
+                let mut snapshots = snapshots.into_iter();
+                let first = snapshots.next().expect("at least one value");
+                self.flow_restore(first);
+
+                for id in constraints {
+                    let vid = self.add_visibility_constraint(id);
+                    self.record_negated_visibility_constraint(vid);
+                }
+
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
                 }
