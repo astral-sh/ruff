@@ -292,8 +292,8 @@ type DeclaredTypeResult<'db> = Result<Type<'db>, (Type<'db>, Box<[Type<'db>]>)>;
 /// `Ok(declared_type)`. If there are conflicting declarations, returns
 /// `Err((union_of_declared_types, conflicting_declared_types))`.
 ///
-/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type (and may
-/// conflict with other declarations.)
+/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type but it
+/// will not be considered to be conflicting with any other types.
 ///
 /// # Panics
 /// Will panic if there are no declarations and no `undeclared_ty` is provided. This is a logic
@@ -304,27 +304,31 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+    let mut declaration_types = declarations.map(|declaration| declaration_ty(db, declaration));
 
-    let mut all_types = undeclared_ty.into_iter().chain(decl_types);
-
-    let first = all_types.next().expect(
-        "declarations_ty must not be called with zero declarations and no may-be-undeclared",
-    );
+    let Some(first) = declaration_types.next() else {
+        if let Some(undeclared_ty) = undeclared_ty {
+            // Short-circuit to return the undeclared type if there are no declarations.
+            return Ok(undeclared_ty);
+        }
+        panic!("declarations_ty must not be called with zero declarations and no undeclared_ty");
+    };
 
     let mut conflicting: Vec<Type<'db>> = vec![];
-    let declared_ty = if let Some(second) = all_types.next() {
-        let mut builder = UnionBuilder::new(db).add(first);
-        for other in [second].into_iter().chain(all_types) {
-            if !first.is_equivalent_to(db, other) {
-                conflicting.push(other);
-            }
-            builder = builder.add(other);
+    let mut builder = UnionBuilder::new(db).add(first);
+    for other in declaration_types {
+        if !first.is_equivalent_to(db, other) {
+            conflicting.push(other);
         }
-        builder.build()
-    } else {
-        first
-    };
+        builder = builder.add(other);
+    }
+    // Avoid considering the undeclared type for the conflicting declaration diagnostics. It
+    // should still be part of the declared type.
+    if let Some(undeclared_ty) = undeclared_ty {
+        builder = builder.add(undeclared_ty);
+    }
+    let declared_ty = builder.build();
+
     if conflicting.is_empty() {
         Ok(declared_ty)
     } else {
@@ -447,6 +451,10 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Type::Unknown)
+    }
+
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -1385,6 +1393,11 @@ impl<'db> Type<'db> {
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
                     | KnownClass::SpecialForm
+                    | KnownClass::ChainMap
+                    | KnownClass::Counter
+                    | KnownClass::DefaultDict
+                    | KnownClass::Deque
+                    | KnownClass::OrderedDict
                     | KnownClass::StdlibAlias
                     | KnownClass::TypeVar,
                 ) => false,
@@ -1920,6 +1933,28 @@ impl<'db> Type<'db> {
             // We treat `typing.Type` exactly the same as `builtins.type`:
             Type::KnownInstance(KnownInstanceType::Type) => Ok(KnownClass::Type.to_instance(db)),
             Type::KnownInstance(KnownInstanceType::Tuple) => Ok(KnownClass::Tuple.to_instance(db)),
+
+            // Legacy `typing` aliases
+            Type::KnownInstance(KnownInstanceType::List) => Ok(KnownClass::List.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::Dict) => Ok(KnownClass::Dict.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::Set) => Ok(KnownClass::Set.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::FrozenSet) => {
+                Ok(KnownClass::FrozenSet.to_instance(db))
+            }
+            Type::KnownInstance(KnownInstanceType::ChainMap) => {
+                Ok(KnownClass::ChainMap.to_instance(db))
+            }
+            Type::KnownInstance(KnownInstanceType::Counter) => {
+                Ok(KnownClass::Counter.to_instance(db))
+            }
+            Type::KnownInstance(KnownInstanceType::DefaultDict) => {
+                Ok(KnownClass::DefaultDict.to_instance(db))
+            }
+            Type::KnownInstance(KnownInstanceType::Deque) => Ok(KnownClass::Deque.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::OrderedDict) => {
+                Ok(KnownClass::OrderedDict.to_instance(db))
+            }
+
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
@@ -2181,6 +2216,12 @@ pub enum KnownClass {
     TypeVar,
     TypeAliasType,
     NoDefaultType,
+    // Collections
+    ChainMap,
+    Counter,
+    DefaultDict,
+    Deque,
+    OrderedDict,
     // sys
     VersionInfo,
 }
@@ -2211,6 +2252,11 @@ impl<'db> KnownClass {
             Self::TypeVar => "TypeVar",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
+            Self::ChainMap => "ChainMap",
+            Self::Counter => "Counter",
+            Self::DefaultDict => "defaultdict",
+            Self::Deque => "deque",
+            Self::OrderedDict => "OrderedDict",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -2274,6 +2320,11 @@ impl<'db> KnownClass {
                     CoreStdlibModule::TypingExtensions
                 }
             }
+            Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict => CoreStdlibModule::Collections,
         }
     }
 
@@ -2301,6 +2352,11 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::FunctionType
             | Self::SpecialForm
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
             | Self::StdlibAlias
             | Self::BaseException
             | Self::BaseExceptionGroup
@@ -2333,6 +2389,11 @@ impl<'db> KnownClass {
             "ModuleType" => Self::ModuleType,
             "FunctionType" => Self::FunctionType,
             "TypeAliasType" => Self::TypeAliasType,
+            "ChainMap" => Self::ChainMap,
+            "Counter" => Self::Counter,
+            "defaultdict" => Self::DefaultDict,
+            "deque" => Self::Deque,
+            "OrderedDict" => Self::OrderedDict,
             "_Alias" => Self::StdlibAlias,
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
@@ -2364,6 +2425,11 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::Slice
             | Self::GenericAlias
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
             | Self::StdlibAlias  // no equivalent class exists in typing_extensions, nor ever will
             | Self::ModuleType
             | Self::VersionInfo
@@ -2399,6 +2465,24 @@ pub enum KnownInstanceType<'db> {
     Any,
     /// The symbol `typing.Tuple` (which can also be found as `typing_extensions.Tuple`)
     Tuple,
+    /// The symbol `typing.List` (which can also be found as `typing_extensions.List`)
+    List,
+    /// The symbol `typing.Dict` (which can also be found as `typing_extensions.Dict`)
+    Dict,
+    /// The symbol `typing.Set` (which can also be found as `typing_extensions.Set`)
+    Set,
+    /// The symbol `typing.FrozenSet` (which can also be found as `typing_extensions.FrozenSet`)
+    FrozenSet,
+    /// The symbol `typing.ChainMap` (which can also be found as `typing_extensions.ChainMap`)
+    ChainMap,
+    /// The symbol `typing.Counter` (which can also be found as `typing_extensions.Counter`)
+    Counter,
+    /// The symbol `typing.DefaultDict` (which can also be found as `typing_extensions.DefaultDict`)
+    DefaultDict,
+    /// The symbol `typing.Deque` (which can also be found as `typing_extensions.Deque`)
+    Deque,
+    /// The symbol `typing.OrderedDict` (which can also be found as `typing_extensions.OrderedDict`)
+    OrderedDict,
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
     Type,
     /// A single instance of `typing.TypeVar`
@@ -2419,15 +2503,6 @@ pub enum KnownInstanceType<'db> {
     TypeAlias,
     TypeGuard,
     TypeIs,
-    List,
-    Dict,
-    DefaultDict,
-    Set,
-    FrozenSet,
-    Counter,
-    Deque,
-    ChainMap,
-    OrderedDict,
     ReadOnly,
     // TODO: fill this enum out with more special forms, etc.
 }

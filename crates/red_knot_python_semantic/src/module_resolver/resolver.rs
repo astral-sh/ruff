@@ -73,6 +73,15 @@ enum SystemOrVendoredPathRef<'a> {
     Vendored(&'a VendoredPath),
 }
 
+impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SystemOrVendoredPathRef::System(system) => system.fmt(f),
+            SystemOrVendoredPathRef::Vendored(vendored) => vendored.fmt(f),
+        }
+    }
+}
+
 /// Resolves the module for the file with the given id.
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
