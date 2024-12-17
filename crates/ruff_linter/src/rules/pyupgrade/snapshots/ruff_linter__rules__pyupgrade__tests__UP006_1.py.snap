@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP006_1.py:9:10: UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
    |
@@ -28,7 +27,7 @@ UP006_1.py:17:10: UP006 [*] Use `collections.abc.Set` instead of `typing.Abstrac
    |
    = help: Replace with `collections.abc.Set`
 
-ℹ Unsafe fix
+ℹ Safe fix
 14 14 | from typing_extensions import Awaitable
 15 15 | 
 16 16 | 
@@ -45,5 +44,3 @@ UP006_1.py:25:10: UP006 Use `collections.abc.Awaitable` instead of `Awaitable` f
 26 |     ...
    |
    = help: Replace with `collections.abc.Awaitable`
-
-

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP006_0.py:4:10: UP006 [*] Use `list` instead of `typing.List` for type annotation
   |
@@ -292,7 +291,7 @@ UP006_0.py:69:10: UP006 [*] Use `collections.abc.Set` instead of `typing.Abstrac
    |
    = help: Replace with `collections.abc.Set`
 
-ℹ Unsafe fix
+ℹ Safe fix
 20 20 | 
 21 21 | 
 22 22 | from typing import List as IList
@@ -318,7 +317,7 @@ UP006_0.py:73:10: UP006 [*] Use `re.Pattern` instead of `typing.Pattern` for typ
    |
    = help: Replace with `re.Pattern`
 
-ℹ Unsafe fix
+ℹ Safe fix
 20 20 | 
 21 21 | 
 22 22 | from typing import List as IList
@@ -344,7 +343,7 @@ UP006_0.py:77:10: UP006 [*] Use `collections.abc.Sequence` instead of `typing.Se
    |
    = help: Replace with `collections.abc.Sequence`
 
-ℹ Unsafe fix
+ℹ Safe fix
 20 20 | 
 21 21 | 
 22 22 | from typing import List as IList
@@ -369,5 +368,3 @@ UP006_0.py:84:10: UP006 Use `collections.abc.Collection` instead of `typing.Coll
 85 |     ...
    |
    = help: Replace with `collections.abc.Collection`
-
-
