@@ -929,7 +929,7 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop);
+                self.flow_merge(pre_loop.clone());
                 self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
 
@@ -940,6 +940,8 @@ where
                 for break_state in break_states {
                     self.flow_merge(break_state);
                 }
+
+                self.reset_visibility_constraints(pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -1387,6 +1389,8 @@ where
                 range: _,
                 op,
             }) => {
+                let pre_op = self.flow_snapshot();
+
                 let mut snapshots = vec![];
                 let mut constraints = vec![];
 
@@ -1420,6 +1424,8 @@ where
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
                 }
+
+                self.reset_visibility_constraints(pre_op);
             }
             _ => {
                 walk_expr(self, expr);
