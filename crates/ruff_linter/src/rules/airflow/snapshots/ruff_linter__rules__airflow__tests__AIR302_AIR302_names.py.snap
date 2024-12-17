@@ -2,580 +2,543 @@
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 snapshot_kind: text
 ---
-AIR302_names.py:52:1: AIR302 `airflow.PY36` is removed in Airflow 3.0
+AIR302_names.py:54:1: AIR302 `airflow.PY36` is removed in Airflow 3.0
    |
-50 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-51 | 
-52 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+53 | # airflow.PY\d{2}
+54 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
    | ^^^^ AIR302
-53 | 
-54 | AWSAthenaHook
+55 | 
+56 | # airflow.api_connexion.security
    |
    = help: Use `sys.version_info` instead
 
-AIR302_names.py:52:7: AIR302 `airflow.PY37` is removed in Airflow 3.0
+AIR302_names.py:54:7: AIR302 `airflow.PY37` is removed in Airflow 3.0
    |
-50 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-51 | 
-52 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+53 | # airflow.PY\d{2}
+54 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
    |       ^^^^ AIR302
-53 | 
-54 | AWSAthenaHook
+55 | 
+56 | # airflow.api_connexion.security
    |
    = help: Use `sys.version_info` instead
 
-AIR302_names.py:52:13: AIR302 `airflow.PY38` is removed in Airflow 3.0
+AIR302_names.py:54:13: AIR302 `airflow.PY38` is removed in Airflow 3.0
    |
-50 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-51 | 
-52 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+53 | # airflow.PY\d{2}
+54 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
    |             ^^^^ AIR302
-53 | 
-54 | AWSAthenaHook
+55 | 
+56 | # airflow.api_connexion.security
    |
    = help: Use `sys.version_info` instead
 
-AIR302_names.py:52:19: AIR302 `airflow.PY39` is removed in Airflow 3.0
+AIR302_names.py:54:19: AIR302 `airflow.PY39` is removed in Airflow 3.0
    |
-50 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-51 | 
-52 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+53 | # airflow.PY\d{2}
+54 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
    |                   ^^^^ AIR302
-53 | 
-54 | AWSAthenaHook
+55 | 
+56 | # airflow.api_connexion.security
    |
    = help: Use `sys.version_info` instead
 
-AIR302_names.py:52:25: AIR302 `airflow.PY310` is removed in Airflow 3.0
+AIR302_names.py:54:25: AIR302 `airflow.PY310` is removed in Airflow 3.0
    |
-50 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-51 | 
-52 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+53 | # airflow.PY\d{2}
+54 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
    |                         ^^^^^ AIR302
-53 | 
-54 | AWSAthenaHook
+55 | 
+56 | # airflow.api_connexion.security
    |
    = help: Use `sys.version_info` instead
 
-AIR302_names.py:52:32: AIR302 `airflow.PY311` is removed in Airflow 3.0
+AIR302_names.py:54:32: AIR302 `airflow.PY311` is removed in Airflow 3.0
    |
-50 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-51 | 
-52 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+53 | # airflow.PY\d{2}
+54 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
    |                                ^^^^^ AIR302
-53 | 
-54 | AWSAthenaHook
+55 | 
+56 | # airflow.api_connexion.security
    |
    = help: Use `sys.version_info` instead
 
-AIR302_names.py:52:39: AIR302 `airflow.PY312` is removed in Airflow 3.0
+AIR302_names.py:54:39: AIR302 `airflow.PY312` is removed in Airflow 3.0
    |
-50 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-51 | 
-52 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+53 | # airflow.PY\d{2}
+54 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
    |                                       ^^^^^ AIR302
-53 | 
-54 | AWSAthenaHook
+55 | 
+56 | # airflow.api_connexion.security
    |
    = help: Use `sys.version_info` instead
-
-AIR302_names.py:54:1: AIR302 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0
-   |
-52 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-53 | 
-54 | AWSAthenaHook
-   | ^^^^^^^^^^^^^ AIR302
-55 | TaskStateTrigger
-   |
-
-AIR302_names.py:55:1: AIR302 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
-   |
-54 | AWSAthenaHook
-55 | TaskStateTrigger
-   | ^^^^^^^^^^^^^^^^ AIR302
-56 | 
-57 | requires_access
-   |
 
 AIR302_names.py:57:1: AIR302 `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0
    |
-55 | TaskStateTrigger
-56 | 
+56 | # airflow.api_connexion.security
 57 | requires_access
    | ^^^^^^^^^^^^^^^ AIR302
 58 | 
-59 | AllowListValidator
+59 | # airflow.configuration
    |
    = help: Use `airflow.api_connexion.security.requires_access_*` instead
 
-AIR302_names.py:59:1: AIR302 `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0
+AIR302_names.py:60:1: AIR302 `airflow.configuration.get` is removed in Airflow 3.0
    |
-57 | requires_access
-58 | 
-59 | AllowListValidator
-   | ^^^^^^^^^^^^^^^^^^ AIR302
-60 | BlockListValidator
-   |
-   = help: Use `airflow.metrics.validators.PatternAllowListValidator` instead
-
-AIR302_names.py:60:1: AIR302 `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0
-   |
-59 | AllowListValidator
-60 | BlockListValidator
-   | ^^^^^^^^^^^^^^^^^^ AIR302
-61 | 
-62 | SubDagOperator
-   |
-   = help: Use `airflow.metrics.validators.PatternBlockListValidator` instead
-
-AIR302_names.py:62:1: AIR302 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0
-   |
-60 | BlockListValidator
-61 | 
-62 | SubDagOperator
-   | ^^^^^^^^^^^^^^ AIR302
-63 | 
-64 | dates.date_range
-   |
-
-AIR302_names.py:64:7: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
-   |
-62 | SubDagOperator
-63 | 
-64 | dates.date_range
-   |       ^^^^^^^^^^ AIR302
-65 | dates.days_ago
-   |
-   = help: Use `airflow.timetables.` instead
-
-AIR302_names.py:65:7: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
-   |
-64 | dates.date_range
-65 | dates.days_ago
-   |       ^^^^^^^^ AIR302
-66 | 
-67 | date_range
-   |
-   = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
-
-AIR302_names.py:67:1: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
-   |
-65 | dates.days_ago
-66 | 
-67 | date_range
-   | ^^^^^^^^^^ AIR302
-68 | days_ago
-69 | parse_execution_date
-   |
-   = help: Use `airflow.timetables.` instead
-
-AIR302_names.py:68:1: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
-   |
-67 | date_range
-68 | days_ago
-   | ^^^^^^^^ AIR302
-69 | parse_execution_date
-70 | round_time
-   |
-   = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
-
-AIR302_names.py:69:1: AIR302 `airflow.utils.dates.parse_execution_date` is removed in Airflow 3.0
-   |
-67 | date_range
-68 | days_ago
-69 | parse_execution_date
-   | ^^^^^^^^^^^^^^^^^^^^ AIR302
-70 | round_time
-71 | scale_time_units
-   |
-
-AIR302_names.py:70:1: AIR302 `airflow.utils.dates.round_time` is removed in Airflow 3.0
-   |
-68 | days_ago
-69 | parse_execution_date
-70 | round_time
-   | ^^^^^^^^^^ AIR302
-71 | scale_time_units
-72 | infer_time_unit
-   |
-
-AIR302_names.py:71:1: AIR302 `airflow.utils.dates.scale_time_units` is removed in Airflow 3.0
-   |
-69 | parse_execution_date
-70 | round_time
-71 | scale_time_units
-   | ^^^^^^^^^^^^^^^^ AIR302
-72 | infer_time_unit
-   |
-
-AIR302_names.py:72:1: AIR302 `airflow.utils.dates.infer_time_unit` is removed in Airflow 3.0
-   |
-70 | round_time
-71 | scale_time_units
-72 | infer_time_unit
-   | ^^^^^^^^^^^^^^^ AIR302
-   |
-
-AIR302_names.py:79:1: AIR302 `airflow.configuration.get` is removed in Airflow 3.0
-   |
-77 | dates.datetime_to_nano
-78 | 
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+59 | # airflow.configuration
+60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    | ^^^ AIR302
-80 | 
-81 | get_connection, load_connections
    |
    = help: Use `airflow.configuration.conf.get` instead
 
-AIR302_names.py:79:6: AIR302 `airflow.configuration.getboolean` is removed in Airflow 3.0
+AIR302_names.py:60:6: AIR302 `airflow.configuration.getboolean` is removed in Airflow 3.0
    |
-77 | dates.datetime_to_nano
-78 | 
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+59 | # airflow.configuration
+60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |      ^^^^^^^^^^ AIR302
-80 | 
-81 | get_connection, load_connections
    |
    = help: Use `airflow.configuration.conf.getboolean` instead
 
-AIR302_names.py:79:18: AIR302 `airflow.configuration.getfloat` is removed in Airflow 3.0
+AIR302_names.py:60:18: AIR302 `airflow.configuration.getfloat` is removed in Airflow 3.0
    |
-77 | dates.datetime_to_nano
-78 | 
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+59 | # airflow.configuration
+60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |                  ^^^^^^^^ AIR302
-80 | 
-81 | get_connection, load_connections
    |
    = help: Use `airflow.configuration.conf.getfloat` instead
 
-AIR302_names.py:79:28: AIR302 `airflow.configuration.getint` is removed in Airflow 3.0
+AIR302_names.py:60:28: AIR302 `airflow.configuration.getint` is removed in Airflow 3.0
    |
-77 | dates.datetime_to_nano
-78 | 
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+59 | # airflow.configuration
+60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |                            ^^^^^^ AIR302
-80 | 
-81 | get_connection, load_connections
    |
    = help: Use `airflow.configuration.conf.getint` instead
 
-AIR302_names.py:79:36: AIR302 `airflow.configuration.has_option` is removed in Airflow 3.0
+AIR302_names.py:60:36: AIR302 `airflow.configuration.has_option` is removed in Airflow 3.0
    |
-77 | dates.datetime_to_nano
-78 | 
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+59 | # airflow.configuration
+60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |                                    ^^^^^^^^^^ AIR302
-80 | 
-81 | get_connection, load_connections
    |
    = help: Use `airflow.configuration.conf.has_option` instead
 
-AIR302_names.py:79:48: AIR302 `airflow.configuration.remove_option` is removed in Airflow 3.0
+AIR302_names.py:60:48: AIR302 `airflow.configuration.remove_option` is removed in Airflow 3.0
    |
-77 | dates.datetime_to_nano
-78 | 
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+59 | # airflow.configuration
+60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |                                                ^^^^^^^^^^^^^ AIR302
-80 | 
-81 | get_connection, load_connections
    |
    = help: Use `airflow.configuration.conf.remove_option` instead
 
-AIR302_names.py:79:63: AIR302 `airflow.configuration.as_dict` is removed in Airflow 3.0
+AIR302_names.py:60:63: AIR302 `airflow.configuration.as_dict` is removed in Airflow 3.0
    |
-77 | dates.datetime_to_nano
-78 | 
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+59 | # airflow.configuration
+60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |                                                               ^^^^^^^ AIR302
-80 | 
-81 | get_connection, load_connections
    |
    = help: Use `airflow.configuration.conf.as_dict` instead
 
-AIR302_names.py:79:72: AIR302 `airflow.configuration.set` is removed in Airflow 3.0
+AIR302_names.py:60:72: AIR302 `airflow.configuration.set` is removed in Airflow 3.0
    |
-77 | dates.datetime_to_nano
-78 | 
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+59 | # airflow.configuration
+60 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
    |                                                                        ^^^ AIR302
-80 | 
-81 | get_connection, load_connections
    |
    = help: Use `airflow.configuration.conf.set` instead
 
-AIR302_names.py:81:1: AIR302 `airflow.secrets.local_filesystem.get_connection` is removed in Airflow 3.0
+AIR302_names.py:64:1: AIR302 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0; The whole `airflow.contrib` module has been removed.
    |
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
-80 | 
-81 | get_connection, load_connections
-   | ^^^^^^^^^^^^^^ AIR302
+63 | # airflow.contrib.*
+64 | AWSAthenaHook
+   | ^^^^^^^^^^^^^ AIR302
+65 | 
+66 | # airflow.metrics.validators
    |
-   = help: Use `airflow.secrets.local_filesystem.load_connections_dict` instead
 
-AIR302_names.py:81:17: AIR302 `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0
+AIR302_names.py:67:1: AIR302 `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0
    |
-79 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
-80 | 
-81 | get_connection, load_connections
-   |                 ^^^^^^^^^^^^^^^^ AIR302
+66 | # airflow.metrics.validators
+67 | AllowListValidator, BlockListValidator
+   | ^^^^^^^^^^^^^^^^^^ AIR302
+68 | 
+69 | # airflow.operators.dummy_operator
    |
-   = help: Use `airflow.secrets.local_filesystem.load_connections_dict` instead
+   = help: Use `airflow.metrics.validators.PatternAllowListValidator` instead
 
-AIR302_names.py:84:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is removed in Airflow 3.0
+AIR302_names.py:67:21: AIR302 `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0
    |
-84 | ExternalTaskSensorLink
-   | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-85 | BashOperator
-86 | BaseBranchOperator
+66 | # airflow.metrics.validators
+67 | AllowListValidator, BlockListValidator
+   |                     ^^^^^^^^^^^^^^^^^^ AIR302
+68 | 
+69 | # airflow.operators.dummy_operator
    |
-   = help: Use `airflow.sensors.external_task.ExternalTaskSensorLink` instead
+   = help: Use `airflow.metrics.validators.PatternBlockListValidator` instead
 
-AIR302_names.py:85:1: AIR302 `airflow.operators.bash_operator.BashOperator` is removed in Airflow 3.0
+AIR302_names.py:70:16: AIR302 `airflow.operators.dummy_operator.EmptyOperator` is removed in Airflow 3.0
    |
-84 | ExternalTaskSensorLink
-85 | BashOperator
+69 | # airflow.operators.dummy_operator
+70 | dummy_operator.EmptyOperator
+   |                ^^^^^^^^^^^^^ AIR302
+71 | dummy_operator.DummyOperator
+   |
+   = help: Use `airflow.operators.empty.EmptyOperator` instead
+
+AIR302_names.py:71:16: AIR302 `airflow.operators.dummy_operator.DummyOperator` is removed in Airflow 3.0
+   |
+69 | # airflow.operators.dummy_operator
+70 | dummy_operator.EmptyOperator
+71 | dummy_operator.DummyOperator
+   |                ^^^^^^^^^^^^^ AIR302
+72 | 
+73 | # airflow.operators.bash_operator
+   |
+   = help: Use `airflow.operators.empty.EmptyOperator` instead
+
+AIR302_names.py:74:1: AIR302 `airflow.operators.bash_operator.BashOperator` is removed in Airflow 3.0
+   |
+73 | # airflow.operators.bash_operator
+74 | BashOperator
    | ^^^^^^^^^^^^ AIR302
-86 | BaseBranchOperator
-87 | EmptyOperator, DummyOperator
+75 | 
+76 | # airflow.operators.branch_operator
    |
    = help: Use `airflow.operators.bash.BashOperator` instead
 
-AIR302_names.py:86:1: AIR302 `airflow.operators.branch_operator.BaseBranchOperator` is removed in Airflow 3.0
+AIR302_names.py:77:1: AIR302 `airflow.operators.branch_operator.BaseBranchOperator` is removed in Airflow 3.0
    |
-84 | ExternalTaskSensorLink
-85 | BashOperator
-86 | BaseBranchOperator
+76 | # airflow.operators.branch_operator
+77 | BaseBranchOperator
    | ^^^^^^^^^^^^^^^^^^ AIR302
-87 | EmptyOperator, DummyOperator
-88 | dummy_operator.EmptyOperator
+78 | 
+79 | # airflow.operators.dummy
    |
    = help: Use `airflow.operators.branch.BaseBranchOperator` instead
 
-AIR302_names.py:87:16: AIR302 `airflow.operators.dummy.DummyOperator` is removed in Airflow 3.0
+AIR302_names.py:80:16: AIR302 `airflow.operators.dummy.DummyOperator` is removed in Airflow 3.0
    |
-85 | BashOperator
-86 | BaseBranchOperator
-87 | EmptyOperator, DummyOperator
+79 | # airflow.operators.dummy
+80 | EmptyOperator, DummyOperator
    |                ^^^^^^^^^^^^^ AIR302
-88 | dummy_operator.EmptyOperator
-89 | dummy_operator.DummyOperator
+81 | 
+82 | # airflow.operators.email_operator
    |
    = help: Use `airflow.operators.empty.EmptyOperator` instead
 
-AIR302_names.py:88:16: AIR302 `airflow.operators.dummy_operator.EmptyOperator` is removed in Airflow 3.0
+AIR302_names.py:83:1: AIR302 `airflow.operators.email_operator.EmailOperator` is removed in Airflow 3.0
    |
-86 | BaseBranchOperator
-87 | EmptyOperator, DummyOperator
-88 | dummy_operator.EmptyOperator
-   |                ^^^^^^^^^^^^^ AIR302
-89 | dummy_operator.DummyOperator
-90 | EmailOperator
-   |
-   = help: Use `airflow.operators.empty.EmptyOperator` instead
-
-AIR302_names.py:89:16: AIR302 `airflow.operators.dummy_operator.DummyOperator` is removed in Airflow 3.0
-   |
-87 | EmptyOperator, DummyOperator
-88 | dummy_operator.EmptyOperator
-89 | dummy_operator.DummyOperator
-   |                ^^^^^^^^^^^^^ AIR302
-90 | EmailOperator
-91 | BaseSensorOperator
-   |
-   = help: Use `airflow.operators.empty.EmptyOperator` instead
-
-AIR302_names.py:90:1: AIR302 `airflow.operators.email_operator.EmailOperator` is removed in Airflow 3.0
-   |
-88 | dummy_operator.EmptyOperator
-89 | dummy_operator.DummyOperator
-90 | EmailOperator
+82 | # airflow.operators.email_operator
+83 | EmailOperator
    | ^^^^^^^^^^^^^ AIR302
-91 | BaseSensorOperator
-92 | DateTimeSensor
+84 | 
+85 | # airflow.operators.subdag.*
    |
    = help: Use `airflow.operators.email.EmailOperator` instead
 
-AIR302_names.py:91:1: AIR302 `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
+AIR302_names.py:86:1: AIR302 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0; The whole `airflow.subdag` module has been removed.
    |
-89 | dummy_operator.DummyOperator
-90 | EmailOperator
-91 | BaseSensorOperator
+85 | # airflow.operators.subdag.*
+86 | SubDagOperator
+   | ^^^^^^^^^^^^^^ AIR302
+87 | 
+88 | # airflow.secrets
+   |
+
+AIR302_names.py:89:1: AIR302 `airflow.secrets.local_filesystem.get_connection` is removed in Airflow 3.0
+   |
+88 | # airflow.secrets
+89 | get_connection, load_connections
+   | ^^^^^^^^^^^^^^ AIR302
+90 | 
+91 | # airflow.sensors.base_sensor_operator
+   |
+   = help: Use `airflow.secrets.local_filesystem.load_connections_dict` instead
+
+AIR302_names.py:89:17: AIR302 `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0
+   |
+88 | # airflow.secrets
+89 | get_connection, load_connections
+   |                 ^^^^^^^^^^^^^^^^ AIR302
+90 | 
+91 | # airflow.sensors.base_sensor_operator
+   |
+   = help: Use `airflow.secrets.local_filesystem.load_connections_dict` instead
+
+AIR302_names.py:92:1: AIR302 `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
+   |
+91 | # airflow.sensors.base_sensor_operator
+92 | BaseSensorOperator
    | ^^^^^^^^^^^^^^^^^^ AIR302
-92 | DateTimeSensor
-93 | (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
+93 | 
+94 | # airflow.sensors.date_time_sensor
    |
    = help: Use `airflow.sensors.base.BaseSensorOperator` instead
 
-AIR302_names.py:92:1: AIR302 `airflow.sensors.date_time_sensor.DateTimeSensor` is removed in Airflow 3.0
+AIR302_names.py:95:1: AIR302 `airflow.sensors.date_time_sensor.DateTimeSensor` is removed in Airflow 3.0
    |
-90 | EmailOperator
-91 | BaseSensorOperator
-92 | DateTimeSensor
+94 | # airflow.sensors.date_time_sensor
+95 | DateTimeSensor
    | ^^^^^^^^^^^^^^ AIR302
-93 | (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
-94 | TimeDeltaSensor
+96 | 
+97 | # airflow.sensors.external_task
    |
    = help: Use `airflow.sensors.date_time.DateTimeSensor` instead
 
-AIR302_names.py:93:2: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskMarker` is removed in Airflow 3.0
-   |
-91 | BaseSensorOperator
-92 | DateTimeSensor
-93 | (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
-   |  ^^^^^^^^^^^^^^^^^^ AIR302
-94 | TimeDeltaSensor
-   |
-   = help: Use `airflow.sensors.external_task.ExternalTaskMarker` instead
-
-AIR302_names.py:93:22: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensor` is removed in Airflow 3.0
-   |
-91 | BaseSensorOperator
-92 | DateTimeSensor
-93 | (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
-   |                      ^^^^^^^^^^^^^^^^^^ AIR302
-94 | TimeDeltaSensor
-   |
-   = help: Use `airflow.sensors.external_task.ExternalTaskSensor` instead
-
-AIR302_names.py:93:42: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is removed in Airflow 3.0
-   |
-91 | BaseSensorOperator
-92 | DateTimeSensor
-93 | (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
-   |                                          ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-94 | TimeDeltaSensor
-   |
-   = help: Use `airflow.sensors.external_task.ExternalTaskSensorLink` instead
-
-AIR302_names.py:94:1: AIR302 `airflow.sensors.time_delta_sensor.TimeDeltaSensor` is removed in Airflow 3.0
-   |
-92 | DateTimeSensor
-93 | (ExternalTaskMarker, ExternalTaskSensor, ExternalTaskSensorLink)
-94 | TimeDeltaSensor
-   | ^^^^^^^^^^^^^^^ AIR302
-95 | 
-96 | apply_defaults
-   |
-   = help: Use `airflow.sensors.time_delta.TimeDeltaSensor` instead
-
-AIR302_names.py:96:1: AIR302 `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0; `apply_defaults` is now unconditionally done and can be safely removed.
-   |
-94 | TimeDeltaSensor
-95 | 
-96 | apply_defaults
-   | ^^^^^^^^^^^^^^ AIR302
-97 | 
-98 | TemporaryDirectory
-   |
-
-AIR302_names.py:98:1: AIR302 `airflow.utils.file.TemporaryDirectory` is removed in Airflow 3.0
-   |
-96 | apply_defaults
-97 | 
-98 | TemporaryDirectory
-   | ^^^^^^^^^^^^^^^^^^ AIR302
-99 | mkdirs
-   |
-
-AIR302_names.py:99:1: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 3.0
+AIR302_names.py:98:1: AIR302 `airflow.sensors.external_task.ExternalTaskSensorLink` is removed in Airflow 3.0
     |
- 98 | TemporaryDirectory
- 99 | mkdirs
-    | ^^^^^^ AIR302
-100 | 
-101 | chain
+ 97 | # airflow.sensors.external_task
+ 98 | ExternalTaskSensorLinkFromExternalTask
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+ 99 | 
+100 | # airflow.sensors.external_task_sensor
+    |
+    = help: Use `airflow.sensors.external_task.ExternalDagLink` instead
+
+AIR302_names.py:101:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskMarker` is removed in Airflow 3.0
+    |
+100 | # airflow.sensors.external_task_sensor
+101 | ExternalTaskMarker
+    | ^^^^^^^^^^^^^^^^^^ AIR302
+102 | ExternalTaskSensor
+103 | ExternalTaskSensorLinkFromExternalTaskSensor
+    |
+    = help: Use `airflow.sensors.external_task.ExternalTaskMarker` instead
+
+AIR302_names.py:102:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensor` is removed in Airflow 3.0
+    |
+100 | # airflow.sensors.external_task_sensor
+101 | ExternalTaskMarker
+102 | ExternalTaskSensor
+    | ^^^^^^^^^^^^^^^^^^ AIR302
+103 | ExternalTaskSensorLinkFromExternalTaskSensor
+    |
+    = help: Use `airflow.sensors.external_task.ExternalTaskSensor` instead
+
+AIR302_names.py:103:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is removed in Airflow 3.0
+    |
+101 | ExternalTaskMarker
+102 | ExternalTaskSensor
+103 | ExternalTaskSensorLinkFromExternalTaskSensor
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+104 | 
+105 | # airflow.sensors.time_delta_sensor
+    |
+    = help: Use `airflow.sensors.external_task.ExternalDagLink` instead
+
+AIR302_names.py:106:1: AIR302 `airflow.sensors.time_delta_sensor.TimeDeltaSensor` is removed in Airflow 3.0
+    |
+105 | # airflow.sensors.time_delta_sensor
+106 | TimeDeltaSensor
+    | ^^^^^^^^^^^^^^^ AIR302
+107 | 
+108 | # airflow.triggers.external_task
+    |
+    = help: Use `airflow.sensors.time_delta.TimeDeltaSensor` instead
+
+AIR302_names.py:109:1: AIR302 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
+    |
+108 | # airflow.triggers.external_task
+109 | TaskStateTrigger
+    | ^^^^^^^^^^^^^^^^ AIR302
+110 | 
+111 | # airflow.utils.date
+    |
+
+AIR302_names.py:112:7: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
+    |
+111 | # airflow.utils.date
+112 | dates.date_range
+    |       ^^^^^^^^^^ AIR302
+113 | dates.days_ago
+    |
+    = help: Use `airflow.timetables.` instead
+
+AIR302_names.py:113:7: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
+    |
+111 | # airflow.utils.date
+112 | dates.date_range
+113 | dates.days_ago
+    |       ^^^^^^^^ AIR302
+114 | 
+115 | date_range
     |
     = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
 
-AIR302_names.py:101:1: AIR302 `airflow.utils.helpers.chain` is removed in Airflow 3.0
+AIR302_names.py:115:1: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
     |
- 99 | mkdirs
-100 | 
-101 | chain
+113 | dates.days_ago
+114 | 
+115 | date_range
+    | ^^^^^^^^^^ AIR302
+116 | days_ago
+117 | infer_time_unit
+    |
+    = help: Use `airflow.timetables.` instead
+
+AIR302_names.py:116:1: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
+    |
+115 | date_range
+116 | days_ago
+    | ^^^^^^^^ AIR302
+117 | infer_time_unit
+118 | parse_execution_date
+    |
+    = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
+
+AIR302_names.py:117:1: AIR302 `airflow.utils.dates.infer_time_unit` is removed in Airflow 3.0
+    |
+115 | date_range
+116 | days_ago
+117 | infer_time_unit
+    | ^^^^^^^^^^^^^^^ AIR302
+118 | parse_execution_date
+119 | round_time
+    |
+
+AIR302_names.py:118:1: AIR302 `airflow.utils.dates.parse_execution_date` is removed in Airflow 3.0
+    |
+116 | days_ago
+117 | infer_time_unit
+118 | parse_execution_date
+    | ^^^^^^^^^^^^^^^^^^^^ AIR302
+119 | round_time
+120 | scale_time_units
+    |
+
+AIR302_names.py:119:1: AIR302 `airflow.utils.dates.round_time` is removed in Airflow 3.0
+    |
+117 | infer_time_unit
+118 | parse_execution_date
+119 | round_time
+    | ^^^^^^^^^^ AIR302
+120 | scale_time_units
+    |
+
+AIR302_names.py:120:1: AIR302 `airflow.utils.dates.scale_time_units` is removed in Airflow 3.0
+    |
+118 | parse_execution_date
+119 | round_time
+120 | scale_time_units
+    | ^^^^^^^^^^^^^^^^ AIR302
+121 | 
+122 | # This one was not deprecated.
+    |
+
+AIR302_names.py:127:1: AIR302 `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
+    |
+126 | # airflow.utils.dag_cycle_tester
+127 | test_cycle
+    | ^^^^^^^^^^ AIR302
+128 | 
+129 | # airflow.utils.decorators
+    |
+
+AIR302_names.py:130:1: AIR302 `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0; `apply_defaults` is now unconditionally done and can be safely removed.
+    |
+129 | # airflow.utils.decorators
+130 | apply_defaults
+    | ^^^^^^^^^^^^^^ AIR302
+131 | 
+132 | # airflow.utils.file
+    |
+
+AIR302_names.py:133:1: AIR302 `airflow.utils.file.TemporaryDirectory` is removed in Airflow 3.0
+    |
+132 | # airflow.utils.file
+133 | TemporaryDirectory, mkdirs
+    | ^^^^^^^^^^^^^^^^^^ AIR302
+134 | 
+135 | #  airflow.utils.helpers
+    |
+
+AIR302_names.py:133:21: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 3.0
+    |
+132 | # airflow.utils.file
+133 | TemporaryDirectory, mkdirs
+    |                     ^^^^^^ AIR302
+134 | 
+135 | #  airflow.utils.helpers
+    |
+    = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
+
+AIR302_names.py:136:1: AIR302 `airflow.utils.helpers.chain` is removed in Airflow 3.0
+    |
+135 | #  airflow.utils.helpers
+136 | chain, cross_downstream
     | ^^^^^ AIR302
-102 | cross_downstream
+137 | 
+138 | # airflow.utils.state
     |
     = help: Use `airflow.models.baseoperator.chain` instead
 
-AIR302_names.py:102:1: AIR302 `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
+AIR302_names.py:136:8: AIR302 `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
     |
-101 | chain
-102 | cross_downstream
-    | ^^^^^^^^^^^^^^^^ AIR302
-103 | 
-104 | SHUTDOWN
+135 | #  airflow.utils.helpers
+136 | chain, cross_downstream
+    |        ^^^^^^^^^^^^^^^^ AIR302
+137 | 
+138 | # airflow.utils.state
     |
     = help: Use `airflow.models.baseoperator.cross_downstream` instead
 
-AIR302_names.py:104:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
+AIR302_names.py:139:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
     |
-102 | cross_downstream
-103 | 
-104 | SHUTDOWN
+138 | # airflow.utils.state
+139 | SHUTDOWN, terminating_states
     | ^^^^^^^^ AIR302
-105 | terminating_states
+140 | 
+141 | #  airflow.utils.trigger_rule
     |
 
-AIR302_names.py:105:1: AIR302 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
+AIR302_names.py:139:11: AIR302 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
     |
-104 | SHUTDOWN
-105 | terminating_states
-    | ^^^^^^^^^^^^^^^^^^ AIR302
-106 | 
-107 | TriggerRule.DUMMY
+138 | # airflow.utils.state
+139 | SHUTDOWN, terminating_states
+    |           ^^^^^^^^^^^^^^^^^^ AIR302
+140 | 
+141 | #  airflow.utils.trigger_rule
     |
 
-AIR302_names.py:107:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
+AIR302_names.py:142:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
     |
-105 | terminating_states
-106 | 
-107 | TriggerRule.DUMMY
+141 | #  airflow.utils.trigger_rule
+142 | TriggerRule.DUMMY
     |             ^^^^^ AIR302
-108 | TriggerRule.NONE_FAILED_OR_SKIPPED
+143 | TriggerRule.NONE_FAILED_OR_SKIPPED
     |
 
-AIR302_names.py:108:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+AIR302_names.py:143:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
     |
-107 | TriggerRule.DUMMY
-108 | TriggerRule.NONE_FAILED_OR_SKIPPED
+141 | #  airflow.utils.trigger_rule
+142 | TriggerRule.DUMMY
+143 | TriggerRule.NONE_FAILED_OR_SKIPPED
     |             ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-109 | 
-110 | test_cycle
+144 | 
+145 | # airflow.www.auth
     |
 
-AIR302_names.py:110:1: AIR302 `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
+AIR302_names.py:146:1: AIR302 `airflow.www.auth.has_access` is removed in Airflow 3.0
     |
-108 | TriggerRule.NONE_FAILED_OR_SKIPPED
-109 | 
-110 | test_cycle
+145 | # airflow.www.auth
+146 | has_access
     | ^^^^^^^^^^ AIR302
-111 | 
-112 | has_access
-    |
-
-AIR302_names.py:112:1: AIR302 `airflow.www.auth.has_access` is removed in Airflow 3.0
-    |
-110 | test_cycle
-111 | 
-112 | has_access
-    | ^^^^^^^^^^ AIR302
-113 | get_sensitive_variables_fields, should_hide_value_for_key
+147 | 
+148 | # airflow.www.utils
     |
     = help: Use `airflow.www.auth.has_access_*` instead
 
-AIR302_names.py:113:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
+AIR302_names.py:149:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
     |
-112 | has_access
-113 | get_sensitive_variables_fields, should_hide_value_for_key
+148 | # airflow.www.utils
+149 | get_sensitive_variables_fields, should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
     |
     = help: Use `airflow.utils.log.secrets_masker.get_sensitive_variables_fields` instead
 
-AIR302_names.py:113:33: AIR302 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
+AIR302_names.py:149:33: AIR302 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
     |
-112 | has_access
-113 | get_sensitive_variables_fields, should_hide_value_for_key
+148 | # airflow.www.utils
+149 | get_sensitive_variables_fields, should_hide_value_for_key
     |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
     |
     = help: Use `airflow.utils.log.secrets_masker.should_hide_value_for_key` instead
