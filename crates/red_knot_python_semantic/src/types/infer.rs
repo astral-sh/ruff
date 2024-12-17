@@ -2308,10 +2308,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = alias;
 
         // First try loading the requested attribute from the module.
-        // TODO: Consider loading _both_ the attribute and any submodule and unioning them together
-        // if both exist.
         if let Symbol::Type(ty, boundness) = module_ty.member(self.db, name) {
             if boundness == Boundness::PossiblyUnbound {
+                // TODO: Consider loading _both_ the attribute and any submodule and unioning them
+                // together if the attribute exists but is possibly-unbound.
                 self.diagnostics.add_lint(
                     &POSSIBLY_UNBOUND_IMPORT,
                     AnyNodeRef::Alias(alias),
