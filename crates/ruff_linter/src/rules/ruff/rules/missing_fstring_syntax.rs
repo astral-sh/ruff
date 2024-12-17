@@ -209,7 +209,15 @@ fn should_be_fstring(
                     return false;
                 }
                 if semantic
-                    .lookup_symbol(id)
+                    // the parsed expression nodes have incorrect ranges
+                    // so we create a dummy node which has a range that's
+                    // close enough to being correct in order for
+                    // `simulate_runtime_load` to return the correct result.
+                    .simulate_runtime_load(&ast::ExprName {
+                        id: id.clone(),
+                        range: literal.range(),
+                        ctx: ast::ExprContext::Load,
+                    })
                     .map_or(true, |id| semantic.binding(id).kind.is_builtin())
                 {
                     return false;
