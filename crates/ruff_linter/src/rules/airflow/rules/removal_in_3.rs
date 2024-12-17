@@ -249,7 +249,12 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     Replacement::Name("airflow.auth.managers.base_auth_manager.is_authorized_asset".to_string()),
                 )),
                 // airflow.contrib.*
-                ["airflow", "contrib", ..] => Some((qualname.to_string(), Replacement::None)),
+                ["airflow", "contrib", ..] => Some((qualname.to_string(),
+                    Replacement::Message(
+                        "The whole `airflow.contrib` module has been removed."
+                            .to_string(),
+                    ),
+                )),
                 // airflow.metrics.validators
                 ["airflow", "metrics", "validators", "AllowListValidator"] => Some((
                     qualname.to_string(),
@@ -333,11 +338,16 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 )),
                 // airflow.operators
                 ["airflow", "operators", "subdag", ..] => {
-                    Some((qualname.to_string(), Replacement::None))
-                }
-                ["airflow.sensors.external_task.ExternalTaskSensorLink"] => Some((
+                    Some((
+                        qualname.to_string(),
+                        Replacement::Message(
+                            "The whole `airflow.subdag` module has been removed.".to_string(),
+                        ),
+                    ))
+                },
+                ["airflow", "sensors", "external_task", "ExternalTaskSensorLink"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sensors.external_task.ExternalDagLin".to_string()),
+                    Replacement::Name("airflow.sensors.external_task.ExternalDagLink".to_string()),
                 )),
                 ["airflow", "operators", "bash_operator", "BashOperator"] => Some((
                     qualname.to_string(),
@@ -390,7 +400,7 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensorLink"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.sensors.external_task.ExternalTaskSensorLink".to_string(),
+                        "airflow.sensors.external_task.ExternalDagLink".to_string(),
                     ),
                 )),
                 ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => Some((
