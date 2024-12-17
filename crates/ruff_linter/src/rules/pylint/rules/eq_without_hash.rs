@@ -57,7 +57,10 @@ impl Violation for EqWithoutHash {
 
 /// W1641
 pub(crate) fn object_without_hash_method(checker: &mut Checker, name: &Identifier, body: &[Stmt]) {
-    if matches!(has_eq_hash(body, false), (HasEq::Yes | HasEq::Maybe, HasHash::No)) {
+    if matches!(
+        has_eq_hash(body, false),
+        (HasEq::Yes | HasEq::Maybe, HasHash::No)
+    ) {
         let diagnostic = Diagnostic::new(EqWithoutHash, name.range());
         checker.diagnostics.push(diagnostic);
     }
@@ -185,7 +188,7 @@ fn has_eq_hash(body: &[Stmt], nested: bool) -> (HasEq, HasHash) {
             }
 
             _ => {
-                // Technically, a method can be defined using a few more methods:
+                // Technically, a method can be defined in a few more manners:
                 //
                 // ```python
                 // class C1:
