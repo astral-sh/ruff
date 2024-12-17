@@ -1028,22 +1028,23 @@ where
                     let vis_constraint_id = self.record_visibility_constraint(constraint_id);
                     vis_constraints.push(vis_constraint_id);
                 }
-                for post_clause_state in post_case_snapshots {
-                    self.flow_merge(post_clause_state);
-                }
+
+                // If there is no final wildcard match case, pretend there is one. This is similar to how
+                // we add an implicit `else` block in if-elif chains, in case it's not present.
                 if !cases
                     .last()
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
-                    self.flow_merge(after_subject);
-
-                    // for post_clause_state in post_case_snapshots {
-                    //     self.flow_merge(post_clause_state);
-                    // }
+                    post_case_snapshots.push(self.flow_snapshot());
+                    self.flow_restore(after_subject.clone());
 
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
+                }
+
+                for post_clause_state in post_case_snapshots {
+                    self.flow_merge(post_clause_state);
                 }
             }
             ast::Stmt::Try(ast::StmtTry {
