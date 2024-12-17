@@ -902,6 +902,42 @@ match "a":
 reveal_type(x)  # revealed: Literal[2]
 ```
 
+### Single-valued types, always true, with wildcard pattern
+
+```py
+x = 1
+
+match "a":
+    case "a":
+        x = 2
+    case "b":
+        x = 3
+    case _:
+        pass
+
+reveal_type(x)  # revealed: Literal[2]
+```
+
+### Single-valued types, always true, with guard
+
+Make sure we don't infer a static truthiness in case there is a case guard:
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+match "a":
+    case "a" if flag():
+        x = 2
+    case "b":
+        x = 3
+    case _:
+        pass
+
+reveal_type(x)  # revealed: Literal[1, 2]
+```
+
 ### Single-valued types, always false
 
 ```py
@@ -916,18 +952,40 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Single-valued types, with wildcard pattern
+### Single-valued types, always false, with wildcard pattern
 
 ```py
 x = 1
 
-match "a":
+match "something else":
     case "a":
         x = 2
-    case _:
+    case "b":
         x = 3
+    case _:
+        pass
 
-reveal_type(x)  # revealed: Literal[2]
+reveal_type(x)  # revealed: Literal[1]
+```
+
+### Single-valued types, always false, with guard
+
+For definitely-false cases, the presence of a guard has no influence:
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+match "something else":
+    case "a" if flag():
+        x = 2
+    case "b":
+        x = 3
+    case _:
+        pass
+
+reveal_type(x)  # revealed: Literal[1]
 ```
 
 ### Non-single-valued types
@@ -937,13 +995,48 @@ def _(s: str):
     match s:
         case "a":
             x = 1
-        case _:
+        case "b":
             x = 2
+        case _:
+            x = 3
 
-    reveal_type(x)  # revealed: Literal[1, 2]
+    reveal_type(x)  # revealed: Literal[1, 2, 3]
 ```
 
-### `sys.version_info`
+### Matching on `sys.platform`
+
+```toml
+[environment]
+python-platform = "darwin"
+```
+
+```py
+import sys
+
+match sys.platform:
+    case "linux":
+        linux = True
+    case "darwin":
+        darwin = True
+    case "win32":
+        win32 = True
+    case _:
+        other = True
+
+# error: [unresolved-reference]
+linux
+
+# no error
+darwin
+
+# error: [unresolved-reference]
+win32
+
+# error: [unresolved-reference]
+other
+```
+
+### Matching on `sys.version_info`
 
 ```toml
 [environment]

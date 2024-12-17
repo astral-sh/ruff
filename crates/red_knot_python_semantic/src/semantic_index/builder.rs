@@ -352,13 +352,18 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         subject: Expression<'db>,
         pattern: &ast::Pattern,
+        guard: Option<&ast::Expr>,
     ) -> ScopedConstraintId {
+        let guard = guard.map(|guard| self.add_standalone_expression(guard));
+
         let kind = match pattern {
             Pattern::MatchValue(pattern) => {
                 let value = self.add_standalone_expression(&pattern.value);
-                PatternConstraintKind::Value(value)
+                PatternConstraintKind::Value(value, guard)
             }
-            Pattern::MatchSingleton(singleton) => PatternConstraintKind::Singleton(singleton.value),
+            Pattern::MatchSingleton(singleton) => {
+                PatternConstraintKind::Singleton(singleton.value, guard)
+            }
             _ => PatternConstraintKind::Unsupported,
         };
 
@@ -1007,7 +1012,11 @@ where
                     return;
                 };
 
-                let first_constraint_id = self.add_pattern_constraint(subject_expr, &first.pattern);
+                let first_constraint_id = self.add_pattern_constraint(
+                    subject_expr,
+                    &first.pattern,
+                    first.guard.as_deref(),
+                );
 
                 self.visit_match_case(first);
 
@@ -1019,7 +1028,11 @@ where
                 for case in remaining {
                     post_case_snapshots.push(self.flow_snapshot());
                     self.flow_restore(after_subject.clone());
-                    let constraint_id = self.add_pattern_constraint(subject_expr, &case.pattern);
+                    let constraint_id = self.add_pattern_constraint(
+                        subject_expr,
+                        &case.pattern,
+                        case.guard.as_deref(),
+                    );
                     self.visit_match_case(case);
 
                     for id in &vis_constraints {
@@ -1046,6 +1059,8 @@ where
                 for post_clause_state in post_case_snapshots {
                     self.flow_merge(post_clause_state);
                 }
+
+                self.reset_visibility_constraints(after_subject);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,

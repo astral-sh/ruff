@@ -219,11 +219,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let subject = pattern.subject(self.db);
 
         match pattern.kind(self.db) {
-            PatternConstraintKind::Singleton(singleton) => {
+            PatternConstraintKind::Singleton(singleton, _guard) => {
                 self.evaluate_match_pattern_singleton(*subject, *singleton)
             }
             // TODO: support more pattern kinds
-            PatternConstraintKind::Value(_) | PatternConstraintKind::Unsupported => None,
+            PatternConstraintKind::Value(..) | PatternConstraintKind::Unsupported => None,
         }
     }
 
