@@ -43,6 +43,125 @@ def f(s: SomeType) -> None: ...
 
 The rest of this document contains tests for various cases where this feature can be used.
 
+## Common use cases
+
+This section makes sure that we can handle all commonly encountered patterns of static conditions.
+
+### `sys.version_info`
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+
+if sys.version_info >= (3, 11):
+    greater_equals_311 = True
+elif sys.version_info >= (3, 9):
+    greater_equals_309 = True
+else:
+    less_than_309 = True
+
+if sys.version_info[0] == 2:
+    python2 = True
+
+# error: [unresolved-reference]
+greater_equals_311
+
+# no error
+greater_equals_309
+
+# error: [unresolved-reference]
+less_than_309
+
+# error: [unresolved-reference]
+python2
+```
+
+### `sys.platform`
+
+```toml
+[environment]
+python-platform = "linux"
+```
+
+```py
+import sys
+
+if sys.platform == "linux":
+    linux = True
+elif sys.platform == "darwin":
+    darwin = True
+else:
+    other = True
+
+# no error
+linux
+
+# error: [unresolved-reference]
+darwin
+
+# error: [unresolved-reference]
+other
+```
+
+### `typing.TYPE_CHECKING`
+
+```py
+import typing
+
+if typing.TYPE_CHECKING:
+    type_checking = True
+else:
+    runtime = True
+
+# no error
+type_checking
+
+# error: [unresolved-reference]
+runtime
+```
+
+### Combination of `sys.platform` check and `sys.version_info` check
+
+```toml
+[environment]
+python-version = "3.10"
+python-platform = "darwin"
+```
+
+```py
+import sys
+
+if sys.platform == "darwin" and sys.version_info >= (3, 11):
+    only_platform_check_true = True
+elif sys.platform == "win32" and sys.version_info >= (3, 10):
+    only_version_check_true = True
+elif sys.platform == "linux" and sys.version_info >= (3, 11):
+    both_checks_false = True
+elif sys.platform == "darwin" and sys.version_info >= (3, 10):
+    both_checks_true = True
+else:
+    other = True
+
+# error: [unresolved-reference]
+only_platform_check_true
+
+# error: [unresolved-reference]
+only_version_check_true
+
+# error: [unresolved-reference]
+both_checks_false
+
+# no error
+both_checks_true
+
+# error: [unresolved-reference]
+other
+```
+
 ## If statements
 
 ### Always false
