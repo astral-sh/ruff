@@ -36,7 +36,7 @@ use crate::checkers::ast::Checker;
 ///     __slots__ = "d"
 /// ```
 #[derive(ViolationMetadata)]
-pub struct RedefinedSlotsInSubclass {
+pub(crate) struct RedefinedSlotsInSubclass {
     name: String,
 }
 
@@ -187,13 +187,20 @@ fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot> {
 
     // Ex) `__slots__ = {"name": ...}`
     let keys_iter = match expr {
-        Expr::Dict(ast::ExprDict { keys, .. }) => Some(keys.iter().filter_map(|key| match key {
-            Some(Expr::StringLiteral(ast::ExprStringLiteral { value, range })) => Some(Slot {
-                name: value.to_str(),
-                range: *range,
-            }),
-            _ => None,
-        })),
+        Expr::Dict(ast::ExprDict { .. }) => Some(
+            expr.as_dict_expr()
+                .unwrap()
+                .iter_keys()
+                .filter_map(|key| match key {
+                    Some(Expr::StringLiteral(ast::ExprStringLiteral { value, range })) => {
+                        Some(Slot {
+                            name: value.to_str(),
+                            range: *range,
+                        })
+                    }
+                    _ => None,
+                }),
+        ),
         _ => None,
     };
 
