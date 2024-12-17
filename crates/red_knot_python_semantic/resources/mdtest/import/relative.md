@@ -160,5 +160,5 @@ from . import foo
 import package
 
 # error: [unresolved-attribute] "Type `<module 'package'>` has no attribute `foo`"
-reveal_type(package.foo.X)
+reveal_type(package.foo.X)  # revealed: Unknown
 ```
