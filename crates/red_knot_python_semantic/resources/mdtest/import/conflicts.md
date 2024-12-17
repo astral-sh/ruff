@@ -60,7 +60,7 @@ sees the submodule as the value of `b` instead of the integer.
 from a import b
 import a.b
 
-# Python would say Literal[42] for `b`
+# Python would say `Literal[42]` for `b`
 reveal_type(b)  # revealed: <module 'a.b'>
 reveal_type(a.b)  # revealed: <module 'a.b'>
 ```
