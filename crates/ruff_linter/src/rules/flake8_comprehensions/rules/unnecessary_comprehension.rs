@@ -115,7 +115,6 @@ pub(crate) fn unnecessary_dict_comprehension(
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
-
     let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
         id: target_value, ..
     })] = elts.as_slice()
@@ -147,7 +146,6 @@ pub(crate) fn unnecessary_list_set_comprehension(
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
-
     if is_dict_items(checker, &generator.iter) {
         match (&generator.target, elt) {
             // [(k, v) for k, v in dictionary.items()]j
