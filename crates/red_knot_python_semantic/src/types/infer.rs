@@ -3115,8 +3115,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.deferred_state.in_string_annotation(),
                     "Expected the symbol table to create a symbol for every Name node"
                 );
-                // (None, Some(Boundness::PossiblyUnbound))
-                Symbol::Type(Type::Unknown, Boundness::PossiblyUnbound)
+                Symbol::Unbound
             }
         } else {
             let use_id = name.scoped_use_id(self.db(), self.scope());
