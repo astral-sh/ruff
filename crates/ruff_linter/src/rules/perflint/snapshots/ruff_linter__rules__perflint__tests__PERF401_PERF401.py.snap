@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
-snapshot_kind: text
 ---
 PERF401.py:6:13: PERF401 Use a list comprehension to create a transformed list
   |
@@ -189,5 +188,17 @@ PERF401.py:239:9: PERF401 Use a list comprehension to create a transformed list
 238 |     for a in values:
 239 |         result.append(a + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+240 | 
+241 | def f():
     |
     = help: Replace for loop with list comprehension
+
+PERF401.py:245:13: PERF401 Use `list.extend` to create a transformed list
+    |
+243 |     def g():
+244 |         for a in values:
+245 |             result.append(a + 1)  # PERF401
+    |             ^^^^^^^^^^^^^^^^^^^^ PERF401
+246 |     result = []
+    |
+    = help: Replace for loop with list.extend

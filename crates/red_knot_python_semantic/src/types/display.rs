@@ -79,8 +79,8 @@ impl Display for DisplayRepresentation<'_> {
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
             Type::Todo(todo) => write!(f, "@Todo{todo}"),
-            Type::ModuleLiteral(file) => {
-                write!(f, "<module '{:?}'>", file.path(self.db))
+            Type::ModuleLiteral(module) => {
+                write!(f, "<module '{}'>", module.module(self.db).name())
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),

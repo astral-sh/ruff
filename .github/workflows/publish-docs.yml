@@ -44,8 +44,8 @@ jobs:
           # Use version as display name for now
           display_name="$version"
 
-          echo "version=$version" >> $GITHUB_ENV
-          echo "display_name=$display_name" >> $GITHUB_ENV
+          echo "version=$version" >> "$GITHUB_ENV"
+          echo "display_name=$display_name" >> "$GITHUB_ENV"
 
       - name: "Set branch name"
         run: |
@@ -55,8 +55,8 @@ jobs:
           # characters disallowed in git branch names with hyphens
           branch_display_name="$(echo "${display_name}" | tr -c '[:alnum:]._' '-' | tr -s '-')"
 
-          echo "branch_name=update-docs-$branch_display_name-$timestamp" >> $GITHUB_ENV
-          echo "timestamp=$timestamp" >> $GITHUB_ENV
+          echo "branch_name=update-docs-$branch_display_name-$timestamp" >> "$GITHUB_ENV"
+          echo "timestamp=$timestamp" >> "$GITHUB_ENV"
 
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
@@ -112,7 +112,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ASTRAL_DOCS_PAT }}
         run: |
           # set the PR title
-          pull_request_title="Update ruff documentation for "${display_name}""
+          pull_request_title="Update ruff documentation for ${display_name}"
 
           # Delete any existing pull requests that are open for this version
           # by checking against pull_request_title because the new PR will
@@ -124,10 +124,12 @@ jobs:
           git push origin "${branch_name}"
 
           # create the PR
-          gh pr create --base main --head "${branch_name}" \
-            --title "$pull_request_title" \
-            --body "Automated documentation update for "${display_name}"" \
-            --label "documentation"
+          gh pr create \
+            --base=main \
+            --head="${branch_name}" \
+            --title="${pull_request_title}" \
+            --body="Automated documentation update for ${display_name}" \
+            --label="documentation"
 
       - name: "Merge Pull Request"
         if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}

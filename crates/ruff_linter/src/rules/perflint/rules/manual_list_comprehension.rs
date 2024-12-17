@@ -237,31 +237,12 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     // filtered = [x for x in y]
     // print(x)
     // ```
-    let last_target_binding = checker
+    let target_binding = checker
         .semantic()
-        .lookup_symbol(for_stmt_target_id)
-        .expect("for loop target must exist");
-
-    let target_binding = {
-        let mut bindings = [last_target_binding].into_iter().chain(
-            checker
-                .semantic()
-                .shadowed_bindings(checker.semantic().scope_id, last_target_binding)
-                .filter_map(|shadowed| shadowed.same_scope().then_some(shadowed.shadowed_id())),
-        );
-
-        bindings
-            .find_map(|binding_id| {
-                let binding = checker.semantic().binding(binding_id);
-                binding
-                    .statement(checker.semantic())
-                    .and_then(ast::Stmt::as_for_stmt)
-                    .is_some_and(|stmt| stmt.range == for_stmt.range)
-                    .then_some(binding)
-            })
-            .expect("for target binding must exist")
-    };
-
+        .bindings
+        .iter()
+        .find(|binding| for_stmt.target.range() == binding.range)
+        .unwrap();
     // If any references to the loop target variable are after the loop,
     // then converting it into a comprehension would cause a NameError
     if target_binding
@@ -305,15 +286,19 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     });
 
     // If the binding gets used in between the assignment and the for loop, a list comprehension is no longer safe
-    let binding_unused_between = list_binding_stmt.is_some_and(|binding_stmt| {
-        let from_assign_to_loop = TextRange::new(binding_stmt.end(), for_stmt.start());
-        // Test if there's any reference to the list symbol between its definition and the for loop.
-        // if there's at least one, then it's been accessed in the middle somewhere, so it's not safe to change into a list comprehension
-        !list_binding
-            .references()
-            .map(|ref_id| checker.semantic().reference(ref_id).range())
-            .any(|text_range| from_assign_to_loop.contains_range(text_range))
-    });
+
+    // If the binding is after the for loop, then it can't be fixed, and this check would panic,
+    // so we check that they are in the same statement first
+    let binding_unused_between = assignment_in_same_statement
+        && list_binding_stmt.is_some_and(|binding_stmt| {
+            let from_assign_to_loop = TextRange::new(binding_stmt.end(), for_stmt.start());
+            // Test if there's any reference to the list symbol between its definition and the for loop.
+            // if there's at least one, then it's been accessed in the middle somewhere, so it's not safe to change into a list comprehension
+            !list_binding
+                .references()
+                .map(|ref_id| checker.semantic().reference(ref_id).range())
+                .any(|text_range| from_assign_to_loop.contains_range(text_range))
+        });
 
     // A list extend works in every context, while a list comprehension only works when all the criteria are true
     let comprehension_type = if binding_is_empty_list

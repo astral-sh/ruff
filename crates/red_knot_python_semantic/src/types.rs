@@ -14,13 +14,14 @@ pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
 };
 pub(crate) use self::signatures::Signature;
-use crate::module_resolver::file_to_module;
+use crate::module_name::ModuleName;
+use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
-    global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
-    BindingWithConstraintsIterator, DeclarationsIterator,
+    global_scope, imported_modules, semantic_index, symbol_table, use_def_map,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::stdlib::{
     builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
@@ -291,8 +292,8 @@ type DeclaredTypeResult<'db> = Result<Type<'db>, (Type<'db>, Box<[Type<'db>]>)>;
 /// `Ok(declared_type)`. If there are conflicting declarations, returns
 /// `Err((union_of_declared_types, conflicting_declared_types))`.
 ///
-/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type (and may
-/// conflict with other declarations.)
+/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type but it
+/// will not be considered to be conflicting with any other types.
 ///
 /// # Panics
 /// Will panic if there are no declarations and no `undeclared_ty` is provided. This is a logic
@@ -303,27 +304,31 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+    let mut declaration_types = declarations.map(|declaration| declaration_ty(db, declaration));
 
-    let mut all_types = undeclared_ty.into_iter().chain(decl_types);
-
-    let first = all_types.next().expect(
-        "declarations_ty must not be called with zero declarations and no may-be-undeclared",
-    );
+    let Some(first) = declaration_types.next() else {
+        if let Some(undeclared_ty) = undeclared_ty {
+            // Short-circuit to return the undeclared type if there are no declarations.
+            return Ok(undeclared_ty);
+        }
+        panic!("declarations_ty must not be called with zero declarations and no undeclared_ty");
+    };
 
     let mut conflicting: Vec<Type<'db>> = vec![];
-    let declared_ty = if let Some(second) = all_types.next() {
-        let mut builder = UnionBuilder::new(db).add(first);
-        for other in [second].into_iter().chain(all_types) {
-            if !first.is_equivalent_to(db, other) {
-                conflicting.push(other);
-            }
-            builder = builder.add(other);
+    let mut builder = UnionBuilder::new(db).add(first);
+    for other in declaration_types {
+        if !first.is_equivalent_to(db, other) {
+            conflicting.push(other);
         }
-        builder.build()
-    } else {
-        first
-    };
+        builder = builder.add(other);
+    }
+    // Avoid considering the undeclared type for the conflicting declaration diagnostics. It
+    // should still be part of the declared type.
+    if let Some(undeclared_ty) = undeclared_ty {
+        builder = builder.add(undeclared_ty);
+    }
+    let declared_ty = builder.build();
+
     if conflicting.is_empty() {
         Ok(declared_ty)
     } else {
@@ -413,7 +418,7 @@ pub enum Type<'db> {
     /// A specific function object
     FunctionLiteral(FunctionType<'db>),
     /// A specific module object
-    ModuleLiteral(File),
+    ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object
     ClassLiteral(ClassLiteralType<'db>),
     // The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
@@ -451,6 +456,10 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Type::Unknown)
+    }
+
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -480,15 +489,19 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub const fn into_module_literal(self) -> Option<File> {
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module) -> Self {
+        Self::ModuleLiteral(ModuleLiteralType::new(db, importing_file, submodule))
+    }
+
+    pub const fn into_module_literal(self) -> Option<ModuleLiteralType<'db>> {
         match self {
-            Type::ModuleLiteral(file) => Some(file),
+            Type::ModuleLiteral(module) => Some(module),
             _ => None,
         }
     }
 
     #[track_caller]
-    pub fn expect_module_literal(self) -> File {
+    pub fn expect_module_literal(self) -> ModuleLiteralType<'db> {
         self.into_module_literal()
             .expect("Expected a Type::ModuleLiteral variant")
     }
@@ -1447,7 +1460,7 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on function type
                 todo_type!().into()
             }
-            Type::ModuleLiteral(file) => {
+            Type::ModuleLiteral(module_ref) => {
                 // `__dict__` is a very special member that is never overridden by module globals;
                 // we should always look it up directly as an attribute on `types.ModuleType`,
                 // never in the global scope of the module.
@@ -1457,7 +1470,30 @@ impl<'db> Type<'db> {
                         .member(db, "__dict__");
                 }
 
-                let global_lookup = symbol(db, global_scope(db, *file), name);
+                // If the file that originally imported the module has also imported a submodule
+                // named [name], then the result is (usually) that submodule, even if the module
+                // also defines a (non-module) symbol with that name.
+                //
+                // Note that technically, either the submodule or the non-module symbol could take
+                // priority, depending on the ordering of when the submodule is loaded relative to
+                // the parent module's `__init__.py` file being evaluated.  That said, we have
+                // chosen to always have the submodule take priority.  (This matches pyright's
+                // current behavior, and opposite of mypy's current behavior.)
+                if let Some(submodule_name) = ModuleName::new(name) {
+                    let importing_file = module_ref.importing_file(db);
+                    let imported_submodules = imported_modules(db, importing_file);
+                    let mut full_submodule_name = module_ref.module(db).name().clone();
+                    full_submodule_name.extend(&submodule_name);
+                    if imported_submodules.contains(&full_submodule_name) {
+                        if let Some(submodule) = resolve_module(db, &full_submodule_name) {
+                            let submodule_ty = Type::module_literal(db, importing_file, submodule);
+                            return Symbol::Type(submodule_ty, Boundness::Bound);
+                        }
+                    }
+                }
+
+                let global_lookup =
+                    symbol(db, global_scope(db, module_ref.module(db).file()), name);
 
                 // If it's unbound, check if it's present as an instance on `types.ModuleType`
                 // or `builtins.object`.
@@ -2899,6 +2935,18 @@ impl KnownFunction {
     }
 }
 
+#[salsa::interned]
+pub struct ModuleLiteralType<'db> {
+    /// The file in which this module was imported.
+    ///
+    /// We need this in order to know which submodules should be attached to it as attributes
+    /// (because the submodules were also imported in this file).
+    pub importing_file: File,
+
+    /// The imported module.
+    pub module: Module,
+}
+
 /// Representation of a runtime class object.
 ///
 /// Does not in itself represent a type,
@@ -3542,7 +3590,8 @@ pub(crate) mod tests {
                         .class,
                 ),
                 Ty::StdlibModule(module) => {
-                    Type::ModuleLiteral(resolve_module(db, &module.name()).unwrap().file())
+                    let module = resolve_module(db, &module.name()).unwrap();
+                    Type::module_literal(db, module.file(), module)
                 }
                 Ty::SliceLiteral(start, stop, step) => Type::SliceLiteral(SliceLiteralType::new(
                     db,

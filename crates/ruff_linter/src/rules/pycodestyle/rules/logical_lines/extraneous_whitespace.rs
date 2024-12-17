@@ -11,7 +11,7 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 use super::{LogicalLine, Whitespace};
 
 /// ## What it does
-/// Checks for the use of extraneous whitespace after "(".
+/// Checks for the use of extraneous whitespace after "(", "[" or "{".
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends the omission of whitespace in the following cases:
@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for WhitespaceAfterOpenBracket {
 }
 
 /// ## What it does
-/// Checks for the use of extraneous whitespace before ")".
+/// Checks for the use of extraneous whitespace before ")", "]" or "}".
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends the omission of whitespace in the following cases:

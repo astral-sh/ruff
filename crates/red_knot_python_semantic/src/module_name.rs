@@ -186,6 +186,26 @@ impl ModuleName {
         self.0.push('.');
         self.0.push_str(other);
     }
+
+    /// Returns an iterator of this module name and all of its parent modules.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use red_knot_python_semantic::ModuleName;
+    ///
+    /// assert_eq!(
+    ///     ModuleName::new_static("foo.bar.baz").unwrap().ancestors().collect::<Vec<_>>(),
+    ///     vec![
+    ///         ModuleName::new_static("foo.bar.baz").unwrap(),
+    ///         ModuleName::new_static("foo.bar").unwrap(),
+    ///         ModuleName::new_static("foo").unwrap(),
+    ///     ],
+    /// );
+    /// ```
+    pub fn ancestors(&self) -> impl Iterator<Item = Self> {
+        std::iter::successors(Some(self.clone()), Self::parent)
+    }
 }
 
 impl Deref for ModuleName {

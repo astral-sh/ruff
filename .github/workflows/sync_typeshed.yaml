@@ -59,7 +59,7 @@ jobs:
         run: |
           cd ruff
           git push --force origin typeshedbot/sync-typeshed
-          gh pr list --repo $GITHUB_REPOSITORY --head typeshedbot/sync-typeshed --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
+          gh pr list --repo "$GITHUB_REPOSITORY" --head typeshedbot/sync-typeshed --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
           gh pr create --title "Sync vendored typeshed stubs" --body "Close and reopen this PR to trigger CI" --label "internal"
 
   create-issue-on-failure:
