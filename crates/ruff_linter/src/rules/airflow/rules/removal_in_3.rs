@@ -296,9 +296,9 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name("airflow.sdk.definitions.asset.expand_alias_to_assets".to_string()),
                 )),
-                ["airflow", "datasets", "metadata"] => Some((
+                ["airflow", "datasets", "metadata", "Metadata"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sdk.definitions.asset.metadata".to_string()),
+                    Replacement::Name("airflow.sdk.definitions.asset.metadata.Metadata".to_string()),
                 )),
                 // airflow.datasets.manager
                 ["airflow", "datasets", "manager", "dataset_manager"] => Some((

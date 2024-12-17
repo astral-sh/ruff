@@ -1,4 +1,13 @@
-from airflow import PY36, PY37, PY38, PY39, PY310, PY311, PY312, Dataset as DatasetFromRoot
+from airflow import (
+    PY36,
+    PY37,
+    PY38,
+    PY39,
+    PY310,
+    PY311,
+    PY312,
+    Dataset as DatasetFromRoot,
+)
 from airflow.api_connexion.security import requires_access, requires_access_dataset
 from airflow.auth.managers.base_auth_manager import is_authorized_dataset
 from airflow.auth.managers.models.resource_details import DatasetDetails
@@ -20,9 +29,13 @@ from airflow.datasets import (
     DatasetAll,
     DatasetAny,
     expand_alias_to_datasets,
-    metadata,
 )
-from airflow.datasets.manager import DatasetManager, dataset_manager, resolve_dataset_manager
+from airflow.datasets.metadata import Metadata
+from airflow.datasets.manager import (
+    DatasetManager,
+    dataset_manager,
+    resolve_dataset_manager,
+)
 from airflow.lineage.hook import DatasetLineageInfo
 from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
 from airflow.metrics.validators import AllowListValidator, BlockListValidator
@@ -38,7 +51,10 @@ from airflow.providers.common.io.datasets import file as common_io_file
 from airflow.providers.fab.auth_manager import fab_auth_manager
 from airflow.providers.google.datasets import bigquery, gcs
 from airflow.providers.mysql.datasets import mysql
-from airflow.providers.openlineage.utils.utils import DatasetInfo, translate_airflow_dataset
+from airflow.providers.openlineage.utils.utils import (
+    DatasetInfo,
+    translate_airflow_dataset,
+)
 from airflow.providers.postgres.datasets import postgres
 from airflow.providers.trino.datasets import trino
 from airflow.secrets.local_filesystem import get_connection, load_connections
@@ -101,7 +117,7 @@ DatasetAliasEvent
 DatasetAll
 DatasetAny
 expand_alias_to_datasets
-metadata
+Metadata
 
 # airflow.datasets.manager
 DatasetManager, dataset_manager, resolve_dataset_manager
