@@ -105,7 +105,7 @@ pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
     pub(crate) live_declarations: Declarations,
 
-    /// For each live declaration, which [`VisibilityConstraints`] were active at that declaration?
+    /// For each live declaration, which visibility constraints apply to it?
     pub(crate) visibility_constraints: VisibilityConstraintPerBinding,
 }
 
@@ -176,7 +176,7 @@ pub(super) struct SymbolBindings {
     /// binding in `live_bindings`.
     constraints: ConstraintsPerBinding,
 
-    /// For each live binding, which [`VisibilityConstraints`] were active at that binding?
+    /// For each live binding, which visibility constraints apply to it?
     visibility_constraints: VisibilityConstraintPerBinding,
 }
 

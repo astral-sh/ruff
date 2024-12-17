@@ -9,7 +9,7 @@ use crate::semantic_index::{
 use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
 
-const MAX_RECURSION_DEPTH: usize = 8;
+const MAX_RECURSION_DEPTH: usize = 10;
 
 /// Analyze the statically known visibility for a given visibility constraint.
 pub(crate) fn static_visibility<'db>(
@@ -105,6 +105,11 @@ fn static_visibility_impl<'db>(
                 *lhs_id,
                 max_depth - 1,
             );
+
+            if lhs == Truthiness::AlwaysFalse {
+                return Truthiness::AlwaysFalse;
+            }
+
             let rhs = static_visibility_impl(
                 db,
                 all_constraints,
@@ -113,7 +118,7 @@ fn static_visibility_impl<'db>(
                 max_depth - 1,
             );
 
-            if lhs == Truthiness::AlwaysFalse || rhs == Truthiness::AlwaysFalse {
+            if rhs == Truthiness::AlwaysFalse {
                 Truthiness::AlwaysFalse
             } else if lhs == Truthiness::AlwaysTrue && rhs == Truthiness::AlwaysTrue {
                 Truthiness::AlwaysTrue
@@ -129,6 +134,11 @@ fn static_visibility_impl<'db>(
                 *lhs_id,
                 max_depth - 1,
             );
+
+            if lhs == Truthiness::AlwaysTrue {
+                return Truthiness::AlwaysTrue;
+            }
+
             let rhs = static_visibility_impl(
                 db,
                 all_constraints,
@@ -139,7 +149,7 @@ fn static_visibility_impl<'db>(
 
             if lhs == Truthiness::AlwaysFalse && rhs == Truthiness::AlwaysFalse {
                 Truthiness::AlwaysFalse
-            } else if lhs == Truthiness::AlwaysTrue || rhs == Truthiness::AlwaysTrue {
+            } else if rhs == Truthiness::AlwaysTrue {
                 Truthiness::AlwaysTrue
             } else {
                 Truthiness::Ambiguous
