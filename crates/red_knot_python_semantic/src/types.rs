@@ -33,7 +33,7 @@ use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
-pub(crate) use static_truthiness::static_visibility;
+pub(crate) use static_visibility::analyze;
 
 mod builder;
 mod call;
@@ -45,7 +45,7 @@ mod infer;
 mod mro;
 mod narrow;
 mod signatures;
-mod static_truthiness;
+mod static_visibility;
 mod string_annotation;
 mod unpacker;
 
@@ -279,7 +279,7 @@ fn bindings_ty<'db>(
         visibility_constraint,
     } in bindings_with_constraints
     {
-        let static_visibility = static_visibility(
+        let static_visibility = analyze(
             db,
             all_constraints,
             all_visibility_constraints,
@@ -366,7 +366,7 @@ fn declarations_ty<'db>(
     for (declaration, all_constraints, all_visibility_constraints, visibility_constraint) in
         declarations
     {
-        let static_visibility = static_visibility(
+        let static_visibility = analyze(
             db,
             all_constraints,
             all_visibility_constraints,
