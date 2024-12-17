@@ -46,7 +46,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::EndsInPeriod,
         Rule::EndsInPunctuation,
         Rule::EscapeSequenceInDocstring,
-        Rule::FirstLineCapitalized,
+        Rule::FirstWordUncapitalized,
         Rule::FitsOnOneLine,
         Rule::IndentWithSpaces,
         Rule::MultiLineSummaryFirstLine,
@@ -277,7 +277,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.enabled(Rule::NoSignature) {
                 pydocstyle::rules::no_signature(checker, &docstring);
             }
-            if checker.enabled(Rule::FirstLineCapitalized) {
+            if checker.enabled(Rule::FirstWordUncapitalized) {
                 pydocstyle::rules::capitalized(checker, &docstring);
             }
             if checker.enabled(Rule::DocstringStartsWithThis) {

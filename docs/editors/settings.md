@@ -23,6 +23,7 @@ behavior of the Ruff CLI.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.configuration": "~/path/to/ruff.toml"
@@ -30,6 +31,7 @@ behavior of the Ruff CLI.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -41,6 +43,7 @@ behavior of the Ruff CLI.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -72,6 +75,7 @@ configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.configurationPreference": "filesystemFirst"
@@ -79,6 +83,7 @@ configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -90,6 +95,7 @@ configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -116,6 +122,7 @@ documentation](https://docs.astral.sh/ruff/settings/#exclude) for more details.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.exclude": ["**/tests/**"]
@@ -123,6 +130,7 @@ documentation](https://docs.astral.sh/ruff/settings/#exclude) for more details.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -134,6 +142,7 @@ documentation](https://docs.astral.sh/ruff/settings/#exclude) for more details.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -159,6 +168,7 @@ The line length to use for the linter and formatter.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.lineLength": 100
@@ -166,6 +176,7 @@ The line length to use for the linter and formatter.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -177,6 +188,7 @@ The line length to use for the linter and formatter.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -202,6 +214,7 @@ Whether to register the server as capable of handling `source.fixAll` code actio
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.fixAll": false
@@ -209,6 +222,7 @@ Whether to register the server as capable of handling `source.fixAll` code actio
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -220,6 +234,7 @@ Whether to register the server as capable of handling `source.fixAll` code actio
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -245,6 +260,7 @@ Whether to register the server as capable of handling `source.organizeImports` c
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.organizeImports": false
@@ -252,6 +268,7 @@ Whether to register the server as capable of handling `source.organizeImports` c
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -263,6 +280,7 @@ Whether to register the server as capable of handling `source.organizeImports` c
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -290,6 +308,7 @@ Whether to show syntax error diagnostics.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.showSyntaxErrors": false
@@ -297,6 +316,7 @@ Whether to show syntax error diagnostics.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -308,6 +328,7 @@ Whether to show syntax error diagnostics.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -333,6 +354,7 @@ The log level to use for the server.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.logLevel": "debug"
@@ -340,6 +362,7 @@ The log level to use for the server.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -351,6 +374,7 @@ The log level to use for the server.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -378,6 +402,7 @@ If not set, logs will be written to stderr.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.logFile": "~/path/to/ruff.log"
@@ -385,6 +410,7 @@ If not set, logs will be written to stderr.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -396,6 +422,7 @@ If not set, logs will be written to stderr.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -425,6 +452,7 @@ Whether to display Quick Fix actions to disable rules via `noqa` suppression com
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.codeAction.disableRuleComment.enable": false
@@ -432,6 +460,7 @@ Whether to display Quick Fix actions to disable rules via `noqa` suppression com
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -447,6 +476,7 @@ Whether to display Quick Fix actions to disable rules via `noqa` suppression com
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -476,6 +506,7 @@ Whether to display Quick Fix actions to autofix violations.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.codeAction.fixViolation.enable": false
@@ -483,6 +514,7 @@ Whether to display Quick Fix actions to autofix violations.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -498,6 +530,7 @@ Whether to display Quick Fix actions to autofix violations.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -531,6 +564,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.lint.enable": false
@@ -538,6 +572,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -551,6 +586,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -580,6 +616,7 @@ Whether to enable Ruff's preview mode when linting.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.lint.preview": true
@@ -587,6 +624,7 @@ Whether to enable Ruff's preview mode when linting.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -600,6 +638,7 @@ Whether to enable Ruff's preview mode when linting.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -627,6 +666,7 @@ Rules to enable by default. See [the documentation](https://docs.astral.sh/ruff/
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.lint.select": ["E", "F"]
@@ -634,6 +674,7 @@ Rules to enable by default. See [the documentation](https://docs.astral.sh/ruff/
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -647,6 +688,7 @@ Rules to enable by default. See [the documentation](https://docs.astral.sh/ruff/
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -674,6 +716,7 @@ Rules to enable in addition to those in [`lint.select`](#select).
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.lint.extendSelect": ["W"]
@@ -681,6 +724,7 @@ Rules to enable in addition to those in [`lint.select`](#select).
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -694,6 +738,7 @@ Rules to enable in addition to those in [`lint.select`](#select).
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -721,6 +766,7 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.lint.ignore": ["E4", "E7"]
@@ -728,6 +774,7 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -741,6 +788,7 @@ Rules to disable by default. See [the documentation](https://docs.astral.sh/ruff
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -768,6 +816,7 @@ Rules to disable in addition to those in [`lint.ignore`](#ignore).
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.lint.extendIgnore": ["W1"]
@@ -775,6 +824,7 @@ Rules to disable in addition to those in [`lint.ignore`](#ignore).
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -788,6 +838,7 @@ Rules to disable in addition to those in [`lint.ignore`](#ignore).
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {
@@ -819,6 +870,7 @@ Whether to enable Ruff's preview mode when formatting.
 **Example usage**:
 
 === "VS Code"
+
     ```json
     {
         "ruff.format.preview": true
@@ -826,6 +878,7 @@ Whether to enable Ruff's preview mode when formatting.
     ```
 
 === "Neovim"
+
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
@@ -839,6 +892,7 @@ Whether to enable Ruff's preview mode when formatting.
     ```
 
 === "Zed"
+
     ```json
     {
       "lsp": {

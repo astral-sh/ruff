@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
@@ -12,6 +12,7 @@ use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::{BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
+use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
@@ -79,6 +80,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    imported_modules: FxHashSet<ModuleName>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -105,6 +107,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+
+            imported_modules: FxHashSet::default(),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -558,6 +562,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
+            imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
         }
     }
@@ -661,6 +666,12 @@ where
             }
             ast::Stmt::Import(node) => {
                 for alias in &node.names {
+                    // Mark the imported module, and all of its parents, as being imported in this
+                    // file.
+                    if let Some(module_name) = ModuleName::new(&alias.name) {
+                        self.imported_modules.extend(module_name.ancestors());
+                    }
+
                     let symbol_name = if let Some(asname) = &alias.asname {
                         asname.id.clone()
                     } else {

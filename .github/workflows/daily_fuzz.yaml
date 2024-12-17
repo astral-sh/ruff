@@ -46,6 +46,7 @@ jobs:
         run: cargo build --locked
       - name: Fuzz
         run: |
+          # shellcheck disable=SC2046
           (
             uvx \
             --python=3.12 \

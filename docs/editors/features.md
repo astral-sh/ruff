@@ -95,6 +95,7 @@ Similar to Ruff's CLI, the Ruff Language Server fully supports Jupyter Notebook 
 capabilities available to Python files.
 
 !!! note
+
     Unlike [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and similar to the Ruff's CLI, the
     native language server requires user to explicitly include the Jupyter Notebook files in the set
     of files to lint and format. Refer to the [Jupyter Notebook discovery](https://docs.astral.sh/ruff/configuration/#jupyter-notebook-discovery)

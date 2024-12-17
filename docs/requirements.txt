@@ -1,11 +1,10 @@
 PyYAML==6.0.2
-ruff==0.8.2
+ruff==0.8.3
 mkdocs==1.6.1
 mkdocs-material==9.5.38
 mkdocs-redirects==1.2.2
 mdformat==0.7.19
-mdformat-mkdocs==3.1.1
-mdformat-admon==2.0.6
+mdformat-mkdocs==4.0.0
 # Using a commit from pygments main branch so we get
 # https://github.com/pygments/pygments/pull/2773 before it's been released
 pygments @ git+https://github.com/pygments/pygments.git@67b460fdde6d9a00342b5102b37b3a8399f0e8ef
