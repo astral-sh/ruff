@@ -22,3 +22,6 @@ d = {"a": 1, "b": 2, "c": 3}
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7196
 any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
+
+[(i,) for (i,) in z]
+{(i,) for (i,) in z}
