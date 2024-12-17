@@ -289,6 +289,16 @@ impl SymbolState {
             .record_visibility_constraint(all_visibility_constraints, constraint);
     }
 
+    pub(super) fn reset_visibility_constraints(&mut self, snapshot_state: SymbolState) {
+        if self.bindings.live_bindings == snapshot_state.bindings.live_bindings {
+            self.bindings.visibility_constraints = snapshot_state.bindings.visibility_constraints;
+        }
+        if self.declarations.live_declarations == snapshot_state.declarations.live_declarations {
+            self.declarations.visibility_constraints =
+                snapshot_state.declarations.visibility_constraints;
+        }
+    }
+
     /// Record a newly-encountered declaration of this symbol.
     pub(super) fn record_declaration(&mut self, declaration_id: ScopedDefinitionId) {
         self.declarations.record_declaration(declaration_id);
