@@ -31,7 +31,7 @@ pub(crate) fn static_visibility<'db>(
                     ty.bool(db).negate_if(!constraint.is_positive)
                 }
                 ConstraintNode::Pattern(inner) => match inner.kind(db) {
-                    PatternConstraintKind::Value(value) => {
+                    PatternConstraintKind::Value(value, guard) => {
                         let subject_expression = inner.subject(db);
                         let inference = infer_expression_types(db, *subject_expression);
                         let scope = subject_expression.scope(db);
@@ -47,12 +47,20 @@ pub(crate) fn static_visibility<'db>(
                             .expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
 
                         if subject_ty.is_single_valued(db) {
-                            Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
+                            let truthiness =
+                                Truthiness::from(subject_ty.is_equivalent_to(db, value_ty));
+
+                            if truthiness.is_always_true() && guard.is_some() {
+                                // Fall back to ambiguous, the guard might change the result.
+                                Truthiness::Ambiguous
+                            } else {
+                                truthiness
+                            }
                         } else {
                             Truthiness::Ambiguous
                         }
                     }
-                    PatternConstraintKind::Singleton(_) | PatternConstraintKind::Unsupported => {
+                    PatternConstraintKind::Singleton(..) | PatternConstraintKind::Unsupported => {
                         Truthiness::Ambiguous
                     }
                 },
