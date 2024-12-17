@@ -532,7 +532,7 @@ impl<'db> UseDefMapBuilder<'db> {
         } else {
             self.unbound_visibility_constraint_id =
                 self.all_visibility_constraints
-                    .push(VisibilityConstraintRef::And(
+                    .push(VisibilityConstraintRef::Sequence(
                         self.unbound_visibility_constraint_id,
                         new_constraint_id,
                     ));
@@ -662,7 +662,7 @@ impl<'db> UseDefMapBuilder<'db> {
             _ => {
                 let constraint_id =
                     self.all_visibility_constraints
-                        .push(VisibilityConstraintRef::Or(
+                        .push(VisibilityConstraintRef::Merged(
                             self.unbound_visibility_constraint_id,
                             snapshot.unbound_visibility_constraint_id,
                         ));

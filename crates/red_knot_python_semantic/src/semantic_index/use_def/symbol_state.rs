@@ -142,7 +142,7 @@ impl SymbolDeclarations {
                 *existing = constraint;
             } else {
                 *existing = all_visibility_constraints
-                    .push(VisibilityConstraintRef::And(*existing, constraint));
+                    .push(VisibilityConstraintRef::Sequence(*existing, constraint));
             }
         }
     }
@@ -225,7 +225,7 @@ impl SymbolBindings {
                 *existing = constraint;
             } else {
                 *existing = all_visibility_constraints
-                    .push(VisibilityConstraintRef::And(*existing, constraint));
+                    .push(VisibilityConstraintRef::Sequence(*existing, constraint));
             }
         }
     }
@@ -436,8 +436,9 @@ impl SymbolState {
                                 *current = ScopedVisibilityConstraintId::from_u32(0);
                             }
                             _ => {
-                                let constraint_id = all_visibility_constraints
-                                    .push(VisibilityConstraintRef::Or(*current, a_vis_constraint));
+                                let constraint_id = all_visibility_constraints.push(
+                                    VisibilityConstraintRef::Merged(*current, a_vis_constraint),
+                                );
                                 *current = constraint_id;
                             }
                         }
@@ -520,8 +521,9 @@ impl SymbolState {
                                 *current = ScopedVisibilityConstraintId::from_u32(0);
                             }
                             _ => {
-                                let constraint_id = all_visibility_constraints
-                                    .push(VisibilityConstraintRef::Or(*current, a_vis_constraint));
+                                let constraint_id = all_visibility_constraints.push(
+                                    VisibilityConstraintRef::Merged(*current, a_vis_constraint),
+                                );
                                 *current = constraint_id;
                             }
                         }

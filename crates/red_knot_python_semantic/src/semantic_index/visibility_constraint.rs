@@ -29,6 +29,6 @@ pub(crate) enum VisibilityConstraintRef {
     None,
     Single(ScopedConstraintId),
     Negated(ScopedVisibilityConstraintId),
-    And(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-    Or(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+    Sequence(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+    Merged(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
 }
