@@ -907,7 +907,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
                 Rule::PytestRaisesTooBroad,
-                Rule::PytestRaisesAmbiguousPattern,
             ]) {
                 flake8_pytest_style::rules::raises_call(checker, call);
             }
@@ -1105,6 +1104,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::BatchedWithoutExplicitStrict) {
                 flake8_bugbear::rules::batched_without_explicit_strict(checker, call);
+            }
+            if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
+                ruff::rules::pytest_raises_ambiguous_pattern(checker, call);
             }
         }
         Expr::Dict(dict) => {

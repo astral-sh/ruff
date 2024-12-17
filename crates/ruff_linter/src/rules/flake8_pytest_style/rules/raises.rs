@@ -1,14 +1,14 @@
-use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, Expr, Keyword, Stmt, StringLiteralValue, WithItem};
+use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
-use super::helpers::is_empty_or_null_string;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+
+use super::helpers::is_empty_or_null_string;
 
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
@@ -151,79 +151,7 @@ impl Violation for PytestRaisesWithoutException {
     }
 }
 
-/// ## What it does
-/// Checks for non-raw literal string arguments passed to the `match` parameter
-/// of `pytest.raises()` where the string contains at least one unescaped
-/// regex metacharacter.
-///
-/// ## Why is this bad?
-/// The `match` argument is implicitly converted to a regex under the hood.
-/// It should be made explicit whether the string is meant to be a regex or a "plain" pattern
-/// by prefixing the string with the `r` suffix, escaping the metacharacter(s)
-/// in the string using backslashes, or wrapping the entire string in a call to
-/// `re.escape()`.
-///
-/// ## Example
-///
-/// ```python
-/// import pytest
-///
-///
-/// with pytest.raises(Exception, match="A full sentence."):
-///     do_thing_that_raises()
-/// ```
-///
-/// Use instead:
-///
-/// ```python
-/// import pytest
-///
-///
-/// with pytest.raises(Exception, match=r"A full sentence."):
-///     do_thing_that_raises()
-/// ```
-///
-/// Alternatively:
-///
-/// ```python
-/// import pytest
-/// import re
-///
-///
-/// with pytest.raises(Exception, match=re.escape("A full sentence.")):
-///     do_thing_that_raises()
-/// ```
-///
-/// or:
-///
-/// ```python
-/// import pytest
-/// import re
-///
-///
-/// with pytest.raises(Exception, "A full sentence\\."):
-///     do_thing_that_raises()
-/// ```
-///
-/// ## References
-/// - [Python documentation: `re.escape`](https://docs.python.org/3/library/re.html#re.escape)
-/// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-#[derive(ViolationMetadata)]
-pub(crate) struct PytestRaisesAmbiguousPattern;
-
-impl Violation for PytestRaisesAmbiguousPattern {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        "Pattern passed to `match=` contains metacharacters but is neither escaped nor raw"
-            .to_string()
-    }
-
-    fn fix_title(&self) -> Option<String> {
-        Some("Use a raw string or `re.escape()` to make the intention explicit".to_string())
-    }
-}
-
-fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))
@@ -237,64 +165,6 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
-fn string_has_unescaped_metacharacters(value: &StringLiteralValue) -> bool {
-    let mut escaped = false;
-    let mut last = '\x00';
-
-    for (current, next) in value.chars().tuple_windows() {
-        last = next;
-
-        if escaped {
-            if escaped_char_is_regex_metasequence(current) {
-                return true;
-            }
-
-            escaped = false;
-            continue;
-        }
-
-        if current == '\\' {
-            escaped = true;
-            continue;
-        }
-
-        if char_is_regex_metacharacter(current) {
-            return true;
-        }
-    }
-
-    if escaped {
-        escaped_char_is_regex_metasequence(last)
-    } else {
-        char_is_regex_metacharacter(last)
-    }
-}
-
-/// Whether the sequence `\<c>` means anything special:
-///
-/// * `\A`: Start of input
-/// * `\b`, `\B`: Word boundary and non-word-boundary
-/// * `\d`, `\D`: Digit and non-digit
-/// * `\s`, `\S`: Whitespace and non-whitespace
-/// * `\w`, `\W`: Word and non-word character
-/// * `\z`: End of input
-///
-/// `\u`, `\U`, `\N`, `\x`, `\a`, `\f`, `\n`, `\r`, `\t`, `\v`
-/// are also valid in normal strings and thus do not count.
-/// `\b` means backspace only in character sets,
-/// while backreferences (e.g., `\1`) are not valid without groups,
-/// both of which should be caught in [`string_has_unescaped_metacharacters`].
-const fn escaped_char_is_regex_metasequence(c: char) -> bool {
-    matches!(c, 'A' | 'b' | 'B' | 'd' | 'D' | 's' | 'S' | 'w' | 'W' | 'z')
-}
-
-const fn char_is_regex_metacharacter(c: char) -> bool {
-    matches!(
-        c,
-        '.' | '^' | '$' | '*' | '+' | '?' | '{' | '[' | '\\' | '|' | '('
-    )
-}
-
 pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
@@ -303,21 +173,6 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
                     PytestRaisesWithoutException,
                     call.func.range(),
                 ));
-            }
-        }
-
-        if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
-            if let Some(Keyword { value, .. }) = call.arguments.find_keyword("match") {
-                if let Some(string) = value.as_string_literal_expr() {
-                    let any_part_is_raw =
-                        string.value.iter().any(|part| part.flags.prefix().is_raw());
-
-                    if !any_part_is_raw && string_has_unescaped_metacharacters(&string.value) {
-                        let diagnostic =
-                            Diagnostic::new(PytestRaisesAmbiguousPattern, string.range);
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
             }
         }
 

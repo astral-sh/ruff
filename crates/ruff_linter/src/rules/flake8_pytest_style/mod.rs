@@ -314,7 +314,6 @@ mod tests {
     }
 
     #[test_case(Rule::PytestParametrizeNamesWrongType, Path::new("PT006.py"))]
-    #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("PT201.py"))]
     fn test_pytest_style_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
