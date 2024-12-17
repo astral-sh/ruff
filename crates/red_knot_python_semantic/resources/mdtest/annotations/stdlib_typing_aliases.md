@@ -3,43 +3,59 @@
 The `typing` module has various aliases to other stdlib classes. These are a legacy feature, but
 still need to be supported by a type checker.
 
-## Currently unsupported
+## Correspondence
 
-Support for most of these symbols is currently a TODO:
+All of the following symbols can be mapped one-to-one with the actual type:
 
 ```py
 import typing
 
 def f(
-    a: typing.List,
-    b: typing.List[int],
-    c: typing.Dict,
-    d: typing.Dict[int, str],
-    e: typing.DefaultDict,
-    f: typing.DefaultDict[str, int],
-    g: typing.Set,
-    h: typing.Set[int],
-    i: typing.FrozenSet,
-    j: typing.FrozenSet[str],
-    k: typing.OrderedDict,
-    l: typing.OrderedDict[int, str],
-    m: typing.Counter,
-    n: typing.Counter[int],
+    list_bare: typing.List,
+    list_parametrized: typing.List[int],
+    dict_bare: typing.Dict,
+    dict_parametrized: typing.Dict[int, str],
+    set_bare: typing.Set,
+    set_parametrized: typing.Set[int],
+    frozen_set_bare: typing.FrozenSet,
+    frozen_set_parametrized: typing.FrozenSet[str],
+    chain_map_bare: typing.ChainMap,
+    chain_map_parametrized: typing.ChainMap[int],
+    counter_bare: typing.Counter,
+    counter_parametrized: typing.Counter[int],
+    default_dict_bare: typing.DefaultDict,
+    default_dict_parametrized: typing.DefaultDict[str, int],
+    deque_bare: typing.Deque,
+    deque_parametrized: typing.Deque[str],
+    ordered_dict_bare: typing.OrderedDict,
+    ordered_dict_parametrized: typing.OrderedDict[int, str],
 ):
-    reveal_type(a)  # revealed: @Todo(Unsupported or invalid type in a type expression)
-    reveal_type(b)  # revealed: @Todo(typing.List alias)
-    reveal_type(c)  # revealed: @Todo(Unsupported or invalid type in a type expression)
-    reveal_type(d)  # revealed: @Todo(typing.Dict alias)
-    reveal_type(e)  # revealed: @Todo(Unsupported or invalid type in a type expression)
-    reveal_type(f)  # revealed: @Todo(typing.DefaultDict[] alias)
-    reveal_type(g)  # revealed: @Todo(Unsupported or invalid type in a type expression)
-    reveal_type(h)  # revealed: @Todo(typing.Set alias)
-    reveal_type(i)  # revealed: @Todo(Unsupported or invalid type in a type expression)
-    reveal_type(j)  # revealed: @Todo(typing.FrozenSet alias)
-    reveal_type(k)  # revealed: @Todo(Unsupported or invalid type in a type expression)
-    reveal_type(l)  # revealed: @Todo(typing.OrderedDict alias)
-    reveal_type(m)  # revealed: @Todo(Unsupported or invalid type in a type expression)
-    reveal_type(n)  # revealed: @Todo(typing.Counter[] alias)
+    reveal_type(list_bare)  # revealed: list
+    reveal_type(list_parametrized)  # revealed: list
+
+    reveal_type(dict_bare)  # revealed: dict
+    reveal_type(dict_parametrized)  # revealed: dict
+
+    reveal_type(set_bare)  # revealed: set
+    reveal_type(set_parametrized)  # revealed: set
+
+    reveal_type(frozen_set_bare)  # revealed: frozenset
+    reveal_type(frozen_set_parametrized)  # revealed: frozenset
+
+    reveal_type(chain_map_bare)  # revealed: ChainMap
+    reveal_type(chain_map_parametrized)  # revealed: ChainMap
+
+    reveal_type(counter_bare)  # revealed: Counter
+    reveal_type(counter_parametrized)  # revealed: Counter
+
+    reveal_type(default_dict_bare)  # revealed: defaultdict
+    reveal_type(default_dict_parametrized)  # revealed: defaultdict
+
+    reveal_type(deque_bare)  # revealed: deque
+    reveal_type(deque_parametrized)  # revealed: deque
+
+    reveal_type(ordered_dict_bare)  # revealed: OrderedDict
+    reveal_type(ordered_dict_parametrized)  # revealed: OrderedDict
 ```
 
 ## Inheritance
@@ -49,35 +65,63 @@ The aliases can be inherited from. Some of these are still partially or wholly T
 ```py
 import typing
 
-class A(typing.Dict): ...
+####################
+### Built-ins
+
+class ListSubclass(typing.List): ...
 
 # TODO: should have `Generic`, should not have `Unknown`
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[dict], Unknown, Literal[object]]
+# revealed: tuple[Literal[ListSubclass], Literal[list], Unknown, Literal[object]]
+reveal_type(ListSubclass.__mro__)
 
-class B(typing.List): ...
-
-# TODO: should have `Generic`, should not have `Unknown`
-reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[list], Unknown, Literal[object]]
-
-class C(typing.Set): ...
+class DictSubclass(typing.Dict): ...
 
 # TODO: should have `Generic`, should not have `Unknown`
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[set], Unknown, Literal[object]]
+# revealed: tuple[Literal[DictSubclass], Literal[dict], Unknown, Literal[object]]
+reveal_type(DictSubclass.__mro__)
 
-class D(typing.FrozenSet): ...
+class SetSubclass(typing.Set): ...
 
 # TODO: should have `Generic`, should not have `Unknown`
-reveal_type(D.__mro__)  # revealed: tuple[Literal[D], Literal[frozenset], Unknown, Literal[object]]
+# revealed: tuple[Literal[SetSubclass], Literal[set], Unknown, Literal[object]]
+reveal_type(SetSubclass.__mro__)
 
-class E(typing.DefaultDict): ...
+class FrozenSetSubclass(typing.FrozenSet): ...
 
-reveal_type(E.__mro__)  # revealed: tuple[Literal[E], @Todo(Support for more typing aliases as base classes), Literal[object]]
+# TODO: should have `Generic`, should not have `Unknown`
+# revealed: tuple[Literal[FrozenSetSubclass], Literal[frozenset], Unknown, Literal[object]]
+reveal_type(FrozenSetSubclass.__mro__)
 
-class F(typing.OrderedDict): ...
+####################
+### `collections`
 
-reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for more typing aliases as base classes), Literal[object]]
+class ChainMapSubclass(typing.ChainMap): ...
 
-class G(typing.Counter): ...
+# TODO: Should be (ChainMapSubclass, ChainMap, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
+# revealed: tuple[Literal[ChainMapSubclass], Literal[ChainMap], Unknown, Literal[object]]
+reveal_type(ChainMapSubclass.__mro__)
 
-reveal_type(G.__mro__)  # revealed: tuple[Literal[G], @Todo(Support for more typing aliases as base classes), Literal[object]]
+class CounterSubclass(typing.Counter): ...
+
+# TODO: Should be (CounterSubclass, Counter, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
+# revealed: tuple[Literal[CounterSubclass], Literal[Counter], Unknown, Literal[object]]
+reveal_type(CounterSubclass.__mro__)
+
+class DefaultDictSubclass(typing.DefaultDict): ...
+
+# TODO: Should be (DefaultDictSubclass, defaultdict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
+# revealed: tuple[Literal[DefaultDictSubclass], Literal[defaultdict], Unknown, Literal[object]]
+reveal_type(DefaultDictSubclass.__mro__)
+
+class DequeSubclass(typing.Deque): ...
+
+# TODO: Should be (DequeSubclass, deque, MutableSequence, Sequence, Reversible, Collection, Sized, Iterable, Container, Generic, object)
+# revealed: tuple[Literal[DequeSubclass], Literal[deque], Unknown, Literal[object]]
+reveal_type(DequeSubclass.__mro__)
+
+class OrderedDictSubclass(typing.OrderedDict): ...
+
+# TODO: Should be (OrderedDictSubclass, OrderedDict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
+# revealed: tuple[Literal[OrderedDictSubclass], Literal[OrderedDict], Unknown, Literal[object]]
+reveal_type(OrderedDictSubclass.__mro__)
 ```

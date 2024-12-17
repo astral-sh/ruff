@@ -4938,42 +4938,45 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("Callable types")
             }
+
+            // TODO: Generics
             KnownInstanceType::ChainMap => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.ChainMap alias")
+                KnownClass::ChainMap.to_instance(self.db)
             }
             KnownInstanceType::OrderedDict => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.OrderedDict alias")
+                KnownClass::OrderedDict.to_instance(self.db)
             }
             KnownInstanceType::Dict => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.Dict alias")
+                KnownClass::Dict.to_instance(self.db)
             }
             KnownInstanceType::List => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.List alias")
+                KnownClass::List.to_instance(self.db)
             }
             KnownInstanceType::DefaultDict => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.DefaultDict[] alias")
+                KnownClass::DefaultDict.to_instance(self.db)
             }
             KnownInstanceType::Counter => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.Counter[] alias")
+                KnownClass::Counter.to_instance(self.db)
             }
             KnownInstanceType::Set => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.Set alias")
+                KnownClass::Set.to_instance(self.db)
             }
             KnownInstanceType::FrozenSet => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.FrozenSet alias")
+                KnownClass::FrozenSet.to_instance(self.db)
             }
             KnownInstanceType::Deque => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("typing.Deque alias")
+                KnownClass::Deque.to_instance(self.db)
             }
+
             KnownInstanceType::ReadOnly => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("Required[] type qualifier")
