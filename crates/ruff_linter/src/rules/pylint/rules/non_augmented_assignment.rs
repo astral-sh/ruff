@@ -1,4 +1,3 @@
-use ast::Expr;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
@@ -94,7 +93,7 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
     };
 
     // Match, e.g., `x = x + 1`.
-    let Expr::BinOp(value) = &*assign.value else {
+    let ast::Expr::BinOp(value) = &*assign.value else {
         return;
     };
 
@@ -139,9 +138,7 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
     }
 }
 
-const OPERATORS: [&str; 15] = [
-    "+", "&", "|", "^", "//", "/", "<<", "<", "@", "%", "**", "*", ">>", ">", "-",
-];
+const DOUBLE_OPERATORS: [&str; 4] = ["//", "<<", "**", ">>"];
 
 macro_rules! trim_operator {
     ($half_expr:ident, $eat:ident, $bump:ident, $check:ident) => {{
@@ -149,16 +146,15 @@ macro_rules! trim_operator {
 
         cursor.$eat(is_whitespace_or_line_continuation);
 
-        let op = OPERATORS
+        if DOUBLE_OPERATORS
             .iter()
             .find(|&op| cursor.as_str().$check(op))
-            .unwrap();
+            .is_some()
+        {
+            cursor.$bump();
+        };
 
         cursor.$bump();
-
-        if op.len() == 2 {
-            cursor.$bump();
-        }
 
         cursor.$eat(is_whitespace_or_line_continuation);
 
@@ -208,7 +204,7 @@ fn is_whitespace_or_line_continuation(c: char) -> bool {
 /// For example, given `x = x + 1`, the fix would be `x += 1`.
 fn augmented_assignment(
     locator: &Locator,
-    target: &Expr,
+    target: &ast::Expr,
     operator: AugmentedOperator,
     right_operand_expr: &str,
     range: TextRange,
