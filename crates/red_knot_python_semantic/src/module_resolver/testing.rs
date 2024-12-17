@@ -4,7 +4,7 @@ use ruff_db::vendored::VendoredPathBuf;
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
 use crate::python_version::PythonVersion;
-use crate::{ProgramSettings, SitePackages};
+use crate::{ProgramSettings, PythonPlatform, SitePackages};
 
 /// A test case for the module resolver.
 ///
@@ -101,6 +101,7 @@ pub(crate) struct UnspecifiedTypeshed;
 pub(crate) struct TestCaseBuilder<T> {
     typeshed_option: T,
     python_version: PythonVersion,
+    python_platform: PythonPlatform,
     first_party_files: Vec<FileSpec>,
     site_packages_files: Vec<FileSpec>,
 }
@@ -147,6 +148,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         Self {
             typeshed_option: UnspecifiedTypeshed,
             python_version: PythonVersion::default(),
+            python_platform: PythonPlatform::default(),
             first_party_files: vec![],
             site_packages_files: vec![],
         }
@@ -157,12 +159,14 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         let TestCaseBuilder {
             typeshed_option: _,
             python_version,
+            python_platform,
             first_party_files,
             site_packages_files,
         } = self;
         TestCaseBuilder {
             typeshed_option: VendoredTypeshed,
             python_version,
+            python_platform,
             first_party_files,
             site_packages_files,
         }
@@ -176,6 +180,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         let TestCaseBuilder {
             typeshed_option: _,
             python_version,
+            python_platform,
             first_party_files,
             site_packages_files,
         } = self;
@@ -183,6 +188,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         TestCaseBuilder {
             typeshed_option: typeshed,
             python_version,
+            python_platform,
             first_party_files,
             site_packages_files,
         }
@@ -212,6 +218,7 @@ impl TestCaseBuilder<MockedTypeshed> {
         let TestCaseBuilder {
             typeshed_option,
             python_version,
+            python_platform,
             first_party_files,
             site_packages_files,
         } = self;
@@ -227,6 +234,7 @@ impl TestCaseBuilder<MockedTypeshed> {
             &db,
             &ProgramSettings {
                 python_version,
+                python_platform,
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_root: src.clone(),
@@ -269,6 +277,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
         let TestCaseBuilder {
             typeshed_option: VendoredTypeshed,
             python_version,
+            python_platform,
             first_party_files,
             site_packages_files,
         } = self;
@@ -283,6 +292,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             &db,
             &ProgramSettings {
                 python_version,
+                python_platform,
                 search_paths: SearchPathSettings {
                     site_packages: SitePackages::Known(vec![site_packages.clone()]),
                     ..SearchPathSettings::new(src.clone())
