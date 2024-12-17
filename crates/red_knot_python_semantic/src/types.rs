@@ -2956,6 +2956,10 @@ impl Truthiness {
         matches!(self, Truthiness::AlwaysFalse)
     }
 
+    pub(crate) const fn is_always_true(self) -> bool {
+        matches!(self, Truthiness::AlwaysTrue)
+    }
+
     pub(crate) const fn negate(self) -> Self {
         match self {
             Self::AlwaysTrue => Self::AlwaysFalse,

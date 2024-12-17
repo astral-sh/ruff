@@ -1741,7 +1741,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 guard,
             } = case;
             self.infer_match_pattern(pattern);
-            self.infer_optional_expression(guard.as_deref());
+            guard
+                .as_deref()
+                .map(|guard| self.infer_standalone_expression(guard));
             self.infer_body(body);
         }
     }
