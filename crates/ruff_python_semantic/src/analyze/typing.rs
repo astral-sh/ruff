@@ -108,10 +108,7 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
         .then(|| semantic.resolve_qualified_name(expr))
         .flatten()
         .and_then(|qualified_name| {
-            let [module, member] = qualified_name.segments() else {
-                return None;
-            };
-            as_pep_585_generic(module, member).map(|(module, member)| {
+            as_pep_585_generic(qualified_name.segments()).map(|(module, member)| {
                 if module.is_empty() {
                     ModuleMember::BuiltIn(member)
                 } else {
