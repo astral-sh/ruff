@@ -2311,7 +2311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // `Type::member` call below because the semantic index doesn't know whether this is a
         // submodule being imported or an attribute being loaded, and so won't add it to the file's
         // `imported_modules` set.)
-        if let Some(submodule_name) = ModuleName::new(&name) {
+        if let Some(submodule_name) = ModuleName::new(name) {
             let mut full_submodule_name = module_name.clone();
             full_submodule_name.extend(&submodule_name);
             if let Some(submodule_ty) = self.module_ty_from_name(&full_submodule_name) {
@@ -2326,7 +2326,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // Otherwise load the requested attribute from the module.
-        let Symbol::Type(ty, boundness) = module_ty.member(self.db, &name) else {
+        let Symbol::Type(ty, boundness) = module_ty.member(self.db, name) else {
             self.diagnostics.add_lint(
                 &UNRESOLVED_IMPORT,
                 AnyNodeRef::Alias(alias),
