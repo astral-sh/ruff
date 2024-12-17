@@ -111,7 +111,7 @@ C416.py:24:70: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
 24 | any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
    |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^ C416
 25 | 
-26 | [(i,) for (i,) in z]
+26 | zz = [[1], [2], [3]]
    |
    = help: Rewrite using `list()`
 
@@ -122,5 +122,5 @@ C416.py:24:70: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
 24    |-any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
    24 |+any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in list(SymbolType))
 25 25 | 
-26 26 | [(i,) for (i,) in z]
-27 27 | {(i,) for (i,) in z}
+26 26 | zz = [[1], [2], [3]]
+27 27 | [(i,) for (i,) in zz]  # != list(zz)
