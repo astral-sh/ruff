@@ -2311,7 +2311,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         // `Type::member` call below because the semantic index doesn't know whether this is a
         // submodule being imported or an attribute being loaded, and so won't add it to the file's
         // `imported_modules` set.)
-        let name = ast::name::Name::new(&name.id);
         if let Some(submodule_name) = ModuleName::new(&name) {
             let mut full_submodule_name = module_name.clone();
             full_submodule_name.extend(&submodule_name);
