@@ -124,7 +124,6 @@ pub(crate) fn infer_definition_types<'db>(
     let file = definition.file(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
-        definition = ?definition.as_id(),
         range = ?definition.kind(db).range(),
         file = %file.path(db)
     )
