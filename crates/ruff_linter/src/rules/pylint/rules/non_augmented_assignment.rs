@@ -4,8 +4,8 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{AstNode, ExpressionRef, Operator, StmtAssign};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{AstNode, ExprBinOp, ExpressionRef, Operator};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -107,7 +107,8 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
             target,
             operator,
             &value.right,
-            assign,
+            value,
+            assign.range,
         )));
         checker.diagnostics.push(diagnostic);
         return;
@@ -125,7 +126,8 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
             target,
             operator,
             &value.left,
-            assign,
+            value,
+            assign.range,
         )));
         checker.diagnostics.push(diagnostic);
     }
@@ -139,12 +141,13 @@ fn augmented_assignment(
     target: &Expr,
     operator: AugmentedOperator,
     right_operand: &Expr,
-    original_stmt: &StmtAssign,
+    original_expr: &ExprBinOp,
+    range: TextRange,
 ) -> Edit {
     let locator = checker.locator();
 
     let right_operand_ref = ExpressionRef::from(right_operand);
-    let parent = original_stmt.as_any_node_ref();
+    let parent = original_expr.as_any_node_ref();
     let comment_ranges = checker.comment_ranges();
     let source = checker.source();
 
@@ -157,7 +160,7 @@ fn augmented_assignment(
 
     let new_content = format!("{target_expr} {operator} {right_operand_expr}");
 
-    Edit::range_replacement(new_content, original_stmt.range)
+    Edit::range_replacement(new_content, range)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
