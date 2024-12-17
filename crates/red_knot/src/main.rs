@@ -279,7 +279,7 @@ impl MainLoop {
         while let Ok(message) = self.receiver.recv() {
             match message {
                 MainLoopMessage::CheckWorkspace => {
-                    let db = db.snapshot();
+                    let db = db.clone();
                     let sender = self.sender.clone();
 
                     // Spawn a new task that checks the workspace. This needs to be done in a separate thread

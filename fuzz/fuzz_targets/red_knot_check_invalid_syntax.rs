@@ -22,12 +22,13 @@ use ruff_python_parser::{parse_unchecked, Mode};
 ///
 /// Uses an in memory filesystem and it stubs out the vendored files by default.
 #[salsa::db]
+#[derive(Clone)]
 struct TestDb {
     storage: salsa::Storage<Self>,
     files: Files,
     system: TestSystem,
     vendored: VendoredFileSystem,
-    events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
+    events: std::sync::Arc<Mutex<Vec<salsa::Event>>>,
     rule_selection: std::sync::Arc<RuleSelection>,
 }
 

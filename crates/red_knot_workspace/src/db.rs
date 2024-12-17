@@ -21,6 +21,7 @@ pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
 }
 
 #[salsa::db]
+#[derive(Clone)]
 pub struct RootDatabase {
     workspace: Option<Workspace>,
     storage: salsa::Storage<RootDatabase>,
@@ -79,17 +80,6 @@ impl RootDatabase {
         F: FnOnce(&RootDatabase) -> T + std::panic::UnwindSafe,
     {
         Cancelled::catch(|| f(self))
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            workspace: self.workspace,
-            storage: self.storage.clone(),
-            files: self.files.snapshot(),
-            system: Arc::clone(&self.system),
-            rule_selection: Arc::clone(&self.rule_selection),
-        }
     }
 }
 
@@ -184,6 +174,7 @@ pub(crate) mod tests {
     use crate::DEFAULT_LINT_REGISTRY;
 
     #[salsa::db]
+    #[derive(Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         events: Arc<std::sync::Mutex<Vec<Event>>>,

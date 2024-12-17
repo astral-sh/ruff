@@ -16,7 +16,7 @@ static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::Lazy
 });
 
 #[salsa::db]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
@@ -54,17 +54,6 @@ impl ModuleDb {
         )?;
 
         Ok(db)
-    }
-
-    /// Create a snapshot of the current database.
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            storage: self.storage.clone(),
-            system: self.system.clone(),
-            files: self.files.snapshot(),
-            rule_selection: Arc::clone(&self.rule_selection),
-        }
     }
 }
 
