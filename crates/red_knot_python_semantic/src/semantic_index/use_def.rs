@@ -534,6 +534,22 @@ impl<'db> UseDefMapBuilder<'db> {
         new_constraint_id
     }
 
+    pub(super) fn reset_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
+        let num_symbols = self.symbol_states.len();
+        debug_assert!(num_symbols >= snapshot.symbol_states.len());
+
+        self.unbound_visibility_constraint_id = snapshot.unbound_visibility_constraint_id;
+
+        let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
+        for current in &mut self.symbol_states {
+            if let Some(snapshot) = snapshot_definitions_iter.next() {
+                current.reset_visibility_constraints(snapshot);
+            } else {
+                // Symbol not present in snapshot, keep visibility constraints
+            }
+        }
+    }
+
     pub(super) fn record_declaration(
         &mut self,
         symbol: ScopedSymbolId,
