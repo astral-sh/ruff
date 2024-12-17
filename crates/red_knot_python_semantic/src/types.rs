@@ -1603,9 +1603,8 @@ impl<'db> Type<'db> {
                 todo_type!().into()
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => {
-                // TODO: This should correctly handle scenarios involving negated type conditions,
-                // such as `int & ~AlwaysFalsy`.
-                todo_type!().into()
+                // TODO return `Callable[[], Literal[True/False]]` for `__bool__` access
+                KnownClass::Object.to_instance(db).member(db, name)
             }
             &todo @ Type::Todo(_) => todo.into(),
         }
@@ -2085,7 +2084,7 @@ impl<'db> Type<'db> {
                 ClassBase::try_from_ty(db, todo_type!("Intersection meta-type"))
                     .expect("Type::Todo should be a valid ClassBase"),
             ),
-            Type::AlwaysTruthy | Type::AlwaysFalsy => todo_type!(),
+            Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::Todo(todo) => Type::subclass_of_base(ClassBase::Todo(*todo)),
         }
     }
@@ -3742,6 +3741,9 @@ pub(crate) mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::AlwaysTruthy)]
     #[test_case(Ty::IntLiteral(0), Ty::AlwaysFalsy)]
     #[test_case(Ty::AlwaysTruthy, Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::AlwaysFalsy, Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::Never, Ty::AlwaysTruthy)]
+    #[test_case(Ty::Never, Ty::AlwaysFalsy)]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3778,6 +3780,8 @@ pub(crate) mod tests {
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinClassLiteral("str"))]
     #[test_case(Ty::IntLiteral(1), Ty::AlwaysFalsy)]
     #[test_case(Ty::IntLiteral(0), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysFalsy)]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3943,6 +3947,8 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     #[test_case(Ty::AbcClassLiteral("ABC"), Ty::AbcInstance("ABCMeta"))]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysFalsy)]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
