@@ -81,7 +81,7 @@ pub(crate) fn analyze_graph(
         // Collect and resolve the imports for each file.
         let result = Arc::new(Mutex::new(Vec::new()));
         let inner_result = Arc::clone(&result);
-        let db = db.snapshot();
+        let db = db.clone();
 
         rayon::scope(move |scope| {
             for resolved_file in paths {
@@ -137,7 +137,7 @@ pub(crate) fn analyze_graph(
                     continue;
                 };
 
-                let db = db.snapshot();
+                let db = db.clone();
                 let glob_resolver = glob_resolver.clone();
                 let root = root.clone();
                 let result = inner_result.clone();

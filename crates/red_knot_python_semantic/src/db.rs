@@ -27,6 +27,7 @@ pub(crate) mod tests {
     use ruff_db::{Db as SourceDb, Upcast};
 
     #[salsa::db]
+    #[derive(Clone)]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
         files: Files,
