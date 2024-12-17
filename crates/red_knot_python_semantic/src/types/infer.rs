@@ -2307,10 +2307,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        // Check if the symbol being imported is a submodule.  (This won't get handled by the
-        // `Type::member` call below because the semantic index doesn't know whether this is a
-        // submodule being imported or an attribute being loaded, and so won't add it to the file's
-        // `imported_modules` set.)
+        // Check if the symbol being imported is a submodule.  This won't get handled by the
+        // `Type::member` call below because it relies on the semantic index's `imported_modules`
+        // set.  The semantic index does not include information about `from...import` statements
+        // because there are two things it cannot determine while only inspecting the content of
+        // the current file:
+        //
+        //   - whether the imported symbol is an attribute or submodule
+        //   - whether the containing file is in a module or a package (needed to correctly resolve
+        //     relative imports)
+        //
+        // The first would be solvable by making it a _potentially_ imported modules set.  The
+        // second is not.
+        //
+        // Regardless, for now, we sidestep all of that by repeating the submodule-or-attribute
+        // check here when inferring types for a `from...import` statement.
         if let Some(submodule_name) = ModuleName::new(name) {
             let mut full_submodule_name = module_name.clone();
             full_submodule_name.extend(&submodule_name);
