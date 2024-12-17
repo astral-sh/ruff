@@ -91,3 +91,16 @@ reveal_type(c.C)  # revealed: Literal[C]
 ```py path=a/b/c.py
 class C: ...
 ```
+
+## Unresolvable submodule imports
+
+```py
+# Topmost component resolvable, submodule not resolvable:
+import a.foo  # error: [unresolved-import] "Cannot resolve import `a.foo`"
+
+# Topmost component unresolvable:
+import b.foo  # error: [unresolved-import] "Cannot resolve import `b.foo`"
+```
+
+```py path=a/__init__.py
+```
