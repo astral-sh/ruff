@@ -1,13 +1,13 @@
+use ast::Expr;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::Operator;
-use ruff_python_trivia::Cursor;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{AstNode, ExpressionRef, Operator, StmtAssign};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::Locator;
 
 /// ## What it does
 /// Checks for assignments that can be replaced with augmented assignment
@@ -93,25 +93,21 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
     };
 
     // Match, e.g., `x = x + 1`.
-    let ast::Expr::BinOp(value) = &*assign.value else {
+    let Expr::BinOp(value) = &*assign.value else {
         return;
     };
 
-    let locator = checker.locator();
     let operator = AugmentedOperator::from(value.op);
 
     // Match, e.g., `x = x + 1`.
     if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
         let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
-        let half_expr = locator.slice(TextRange::new(value.left.end(), value.end()));
-        let right_operand_expr = trim_left_operator(half_expr);
-
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
-            checker.locator(),
+            checker,
             target,
             operator,
-            right_operand_expr,
-            assign.range(),
+            &value.right,
+            assign,
         )));
         checker.diagnostics.push(diagnostic);
         return;
@@ -124,95 +120,44 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
     {
         let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
-        let half_expr = locator.slice(TextRange::new(value.left.start(), value.right.start()));
-        let right_operand_expr = trim_right_operator(half_expr);
-
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
-            checker.locator(),
+            checker,
             target,
             operator,
-            right_operand_expr,
-            assign.range(),
+            &value.left,
+            assign,
         )));
         checker.diagnostics.push(diagnostic);
     }
-}
-
-const DOUBLE_OPERATORS: [&str; 4] = ["//", "<<", "**", ">>"];
-
-macro_rules! trim_operator {
-    ($half_expr:ident, $eat:ident, $bump:ident, $check:ident) => {{
-        let mut cursor = Cursor::new($half_expr);
-
-        cursor.$eat(is_whitespace_or_line_continuation);
-
-        if DOUBLE_OPERATORS
-            .iter()
-            .find(|&op| cursor.as_str().$check(op))
-            .is_some()
-        {
-            cursor.$bump();
-        };
-
-        cursor.$bump();
-
-        cursor.$eat(is_whitespace_or_line_continuation);
-
-        cursor.as_str()
-    }};
-}
-
-/// Input:
-/// ```python
-///   \
-///    + (a -\
-/// b)
-/// ```
-///
-/// Output:
-/// ```python
-/// (a -\
-/// b)
-/// ```
-fn trim_left_operator(half_expr: &str) -> &str {
-    trim_operator!(half_expr, eat_while, bump, starts_with)
-}
-
-/// Input:
-/// ```python
-/// (a -\
-/// b) \
-///     +  \
-///
-/// ```
-///
-/// Output:
-/// ```python
-/// (a -\
-/// b)
-/// ```
-fn trim_right_operator(half_expr: &str) -> &str {
-    trim_operator!(half_expr, eat_back_while, bump_back, ends_with)
-}
-
-fn is_whitespace_or_line_continuation(c: char) -> bool {
-    c == '\\' || c.is_whitespace()
 }
 
 /// Generate a fix to convert an assignment statement to an augmented assignment.
 ///
 /// For example, given `x = x + 1`, the fix would be `x += 1`.
 fn augmented_assignment(
-    locator: &Locator,
-    target: &ast::Expr,
+    checker: &Checker,
+    target: &Expr,
     operator: AugmentedOperator,
-    right_operand_expr: &str,
-    range: TextRange,
+    right_operand: &Expr,
+    original_stmt: &StmtAssign,
 ) -> Edit {
+    let locator = checker.locator();
+
+    let right_operand_ref = ExpressionRef::from(right_operand);
+    let parent = original_stmt.as_any_node_ref();
+    let comment_ranges = checker.comment_ranges();
+    let source = checker.source();
+
+    let right_operand_range =
+        parenthesized_range(right_operand_ref, parent, comment_ranges, source)
+            .unwrap_or(right_operand.range());
+    let right_operand_expr = locator.slice(right_operand_range);
+
     let target_expr = locator.slice(target);
+
     let new_content = format!("{target_expr} {operator} {right_operand_expr}");
 
-    Edit::range_replacement(new_content, range)
+    Edit::range_replacement(new_content, original_stmt.range)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
