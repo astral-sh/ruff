@@ -292,8 +292,8 @@ type DeclaredTypeResult<'db> = Result<Type<'db>, (Type<'db>, Box<[Type<'db>]>)>;
 /// `Ok(declared_type)`. If there are conflicting declarations, returns
 /// `Err((union_of_declared_types, conflicting_declared_types))`.
 ///
-/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type (and may
-/// conflict with other declarations.)
+/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type but it
+/// will not be considered to be conflicting with any other types.
 ///
 /// # Panics
 /// Will panic if there are no declarations and no `undeclared_ty` is provided. This is a logic
@@ -304,27 +304,31 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+    let mut declaration_types = declarations.map(|declaration| declaration_ty(db, declaration));
 
-    let mut all_types = undeclared_ty.into_iter().chain(decl_types);
-
-    let first = all_types.next().expect(
-        "declarations_ty must not be called with zero declarations and no may-be-undeclared",
-    );
+    let Some(first) = declaration_types.next() else {
+        if let Some(undeclared_ty) = undeclared_ty {
+            // Short-circuit to return the undeclared type if there are no declarations.
+            return Ok(undeclared_ty);
+        }
+        panic!("declarations_ty must not be called with zero declarations and no undeclared_ty");
+    };
 
     let mut conflicting: Vec<Type<'db>> = vec![];
-    let declared_ty = if let Some(second) = all_types.next() {
-        let mut builder = UnionBuilder::new(db).add(first);
-        for other in [second].into_iter().chain(all_types) {
-            if !first.is_equivalent_to(db, other) {
-                conflicting.push(other);
-            }
-            builder = builder.add(other);
+    let mut builder = UnionBuilder::new(db).add(first);
+    for other in declaration_types {
+        if !first.is_equivalent_to(db, other) {
+            conflicting.push(other);
         }
-        builder.build()
-    } else {
-        first
-    };
+        builder = builder.add(other);
+    }
+    // Avoid considering the undeclared type for the conflicting declaration diagnostics. It
+    // should still be part of the declared type.
+    if let Some(undeclared_ty) = undeclared_ty {
+        builder = builder.add(undeclared_ty);
+    }
+    let declared_ty = builder.build();
+
     if conflicting.is_empty() {
         Ok(declared_ty)
     } else {
@@ -447,6 +451,10 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Type::Unknown)
+    }
+
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
