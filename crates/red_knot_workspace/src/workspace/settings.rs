@@ -40,6 +40,7 @@ impl Configuration {
         WorkspaceSettings {
             program: ProgramSettings {
                 python_version: self.python_version.unwrap_or_default(),
+                python_platform: Default::default(),
                 search_paths: self.search_paths.to_settings(workspace_root),
             },
         }
