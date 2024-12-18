@@ -1147,7 +1147,8 @@ dependencies = [
 [[package]]
 name = "hugealloc"
 version = "0.1.1"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "542733215a252c27c674e5d875a910d7de509cb74123d0bdbaa050f871ec84c2"
 dependencies = [
  "allocator-api2",
  "libc",
@@ -1632,7 +1633,8 @@ dependencies = [
 [[package]]
 name = "linear-hashtbl"
 version = "0.1.1"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e252bb7e9b36739fb2482438638e862241d111c76fae3ebee272454477c63a4f"
 
 [[package]]
 name = "linked-hash-map"
@@ -1934,7 +1936,8 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 [[package]]
 name = "oxidd"
 version = "0.9.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22f7c2dbbc26b8d2e1ae861401a4bfa1d2e229e39da77ff8f0d64f2b4793e6da"
 dependencies = [
  "cfg-if",
  "document-features",
@@ -1954,7 +1957,8 @@ dependencies = [
 [[package]]
 name = "oxidd-cache"
 version = "0.9.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efcc7923864f2a2525e76e26a3645b65a82e29ac3d3118d6906bad0117eb704e"
 dependencies = [
  "allocator-api2",
  "document-features",
@@ -1966,7 +1970,8 @@ dependencies = [
 [[package]]
 name = "oxidd-core"
 version = "0.9.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b47e2c527b7aba7a7c789c7e5300df5a338002b33284c823fd08e1c661d176d6"
 dependencies = [
  "nanorand",
 ]
@@ -1974,7 +1979,8 @@ dependencies = [
 [[package]]
 name = "oxidd-derive"
 version = "0.9.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ccd72606db214bdf9b3880a6dedb50990fafdac23a05b65f982b65ac22862ac"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -1985,7 +1991,8 @@ dependencies = [
 [[package]]
 name = "oxidd-dump"
 version = "0.4.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84ef9fed6a604b8199c988efce9231de372b058cf9501d1b60fa53ed0ea1d43a"
 dependencies = [
  "bitvec",
  "document-features",
@@ -1998,7 +2005,8 @@ dependencies = [
 [[package]]
 name = "oxidd-manager-index"
 version = "0.9.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd41278c0cd6f0418f78e8ed5a3a062fa31449a929b3a0d03d4c1056af620cdc"
 dependencies = [
  "bitvec",
  "crossbeam-utils",
@@ -2012,7 +2020,8 @@ dependencies = [
 [[package]]
 name = "oxidd-reorder"
 version = "0.4.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "222b3b3c71f9c4a5f875c01fda840e25d40d4fa86a5f0636938c17f7adf6c068"
 dependencies = [
  "flume",
  "is_sorted",
@@ -2024,7 +2033,8 @@ dependencies = [
 [[package]]
 name = "oxidd-rules-bdd"
 version = "0.9.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8ab7d000b0fb53ddcc282296929f51b2a5215591f6c6aa134a9fca9f133f61b"
 dependencies = [
  "bitvec",
  "document-features",
@@ -2036,7 +2046,8 @@ dependencies = [
 [[package]]
 name = "oxidd-rules-mtbdd"
 version = "0.4.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9bd51a1a297d98cefd4843cf065aba5cb04b2e78b0623857f0f8babe9f3d421"
 dependencies = [
  "document-features",
  "oxidd-core",
@@ -2047,7 +2058,8 @@ dependencies = [
 [[package]]
 name = "oxidd-rules-tdd"
 version = "0.4.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "753f378e1d76f1f23afd1a06bbe4f23025ac95d19fb3c2b3ff052c0d3fcd9af3"
 dependencies = [
  "document-features",
  "oxidd-core",
@@ -2058,7 +2070,8 @@ dependencies = [
 [[package]]
 name = "oxidd-rules-zbdd"
 version = "0.9.0"
-source = "git+https://github.com/OxiDD/oxidd.git?rev=7905546ccfdac6b26d3f3c7aa7768b0289cd27bc#7905546ccfdac6b26d3f3c7aa7768b0289cd27bc"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "821482c23511e87b1a9bd7f0454971f4a73b01a7ed16611179d79c5872690dce"
 dependencies = [
  "bitvec",
  "document-features",

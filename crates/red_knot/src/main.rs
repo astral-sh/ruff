@@ -113,12 +113,12 @@ use oxidd::TVLFunction;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
-    let mgr = oxidd::bdd::new_manager(24, 24, 1);
+    let mgr = oxidd::tdd::new_manager(24, 24, 1);
     let (x, y, z) = mgr.with_manager_exclusive(|mgr| {
         (
-            BDDFunction::new_var(mgr).unwrap(),
-            BDDFunction::new_var(mgr).unwrap(),
-            BDDFunction::new_var(mgr).unwrap(),
+            TDDFunction::new_var(mgr).unwrap(),
+            TDDFunction::new_var(mgr).unwrap(),
+            TDDFunction::new_var(mgr).unwrap(),
         )
     });
     let res = x.and(&y).unwrap().or(&z).unwrap();

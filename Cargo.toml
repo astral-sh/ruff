@@ -105,7 +105,7 @@ mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
 notify = { version = "7.0.0" }
 ordermap = { version = "0.5.0" }
-oxidd = { git = "https://github.com/OxiDD/oxidd.git", rev = "7905546ccfdac6b26d3f3c7aa7768b0289cd27bc", features = ["tdd"] }
+oxidd = { version = "0.9.0", features = ["tdd"] }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
 pathdiff = { version = "0.2.1" }
