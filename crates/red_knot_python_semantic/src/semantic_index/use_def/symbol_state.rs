@@ -43,7 +43,7 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use crate::semantic_index::use_def::{Constraint, VisibilityConstraintRef, VisibilityConstraints};
+use crate::semantic_index::use_def::{Constraint, VisibilityConstraint, VisibilityConstraints};
 
 use super::bitset::{BitSet, BitSetIterator};
 use ruff_index::{newtype_index, IndexVec};
@@ -139,7 +139,7 @@ impl SymbolDeclarations {
                 *existing = constraint;
             } else {
                 *existing = visibility_constraints
-                    .add(VisibilityConstraintRef::Sequence(*existing, constraint));
+                    .add(VisibilityConstraint::Sequence(*existing, constraint));
             }
         }
     }
@@ -219,7 +219,7 @@ impl SymbolBindings {
                 *existing = constraint;
             } else {
                 *existing = visibility_constraints
-                    .add(VisibilityConstraintRef::Sequence(*existing, constraint));
+                    .add(VisibilityConstraint::Sequence(*existing, constraint));
             }
         }
     }

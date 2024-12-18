@@ -229,7 +229,7 @@ pub(crate) use self::symbol_state::{ScopedConstraintId, ScopedVisibilityConstrai
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
-use crate::visibility_constraints::{VisibilityConstraintRef, VisibilityConstraints};
+use crate::visibility_constraints::{VisibilityConstraint, VisibilityConstraints};
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -509,14 +509,14 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn add_visibility_constraint(
         &mut self,
-        constraint: VisibilityConstraintRef,
+        constraint: VisibilityConstraint,
     ) -> ScopedVisibilityConstraintId {
         self.visibility_constraints.add(constraint)
     }
 
     pub(super) fn record_visibility_constraint(
         &mut self,
-        constraint: VisibilityConstraintRef,
+        constraint: VisibilityConstraint,
     ) -> ScopedVisibilityConstraintId {
         let new_constraint_id = self.add_visibility_constraint(constraint);
         for state in &mut self.symbol_states {
@@ -528,7 +528,7 @@ impl<'db> UseDefMapBuilder<'db> {
         } else {
             self.unbound_visibility_constraint_id =
                 self.visibility_constraints
-                    .add(VisibilityConstraintRef::Sequence(
+                    .add(VisibilityConstraint::Sequence(
                         self.unbound_visibility_constraint_id,
                         new_constraint_id,
                     ));
