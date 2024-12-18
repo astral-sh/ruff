@@ -2288,6 +2288,7 @@ dependencies = [
  "compact_str",
  "countme",
  "dir-test",
+ "drop_bomb",
  "hashbrown 0.15.2",
  "indexmap",
  "insta",

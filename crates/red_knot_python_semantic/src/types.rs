@@ -1,5 +1,7 @@
 use std::hash::Hash;
 
+use context::InferContext;
+use diagnostic::{report_not_iterable, report_not_iterable_possibly_unbound};
 use indexmap::IndexSet;
 use itertools::Itertools;
 use ruff_db::diagnostic::Severity;
@@ -29,7 +31,7 @@ use crate::stdlib::{
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{CallDunderResult, CallOutcome};
 use crate::types::class_base::ClassBase;
-use crate::types::diagnostic::{TypeCheckDiagnosticsBuilder, INVALID_TYPE_FORM};
+use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -37,6 +39,7 @@ use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 mod builder;
 mod call;
 mod class_base;
+mod context;
 mod diagnostic;
 mod display;
 mod infer;
@@ -2177,17 +2180,13 @@ pub struct InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(
-        self,
-        diagnostics: &mut TypeCheckDiagnosticsBuilder,
-        node: &ast::Expr,
-    ) -> Type<'db> {
+    fn into_fallback_type(self, context: &InferContext, node: &ast::Expr) -> Type<'db> {
         let InvalidTypeExpressionError {
             fallback_type,
             invalid_expressions,
         } = self;
         for error in invalid_expressions {
-            diagnostics.add_lint(
+            context.report_lint(
                 &INVALID_TYPE_FORM,
                 node.into(),
                 format_args!("{}", error.reason()),
@@ -2827,20 +2826,20 @@ enum IterationOutcome<'db> {
 impl<'db> IterationOutcome<'db> {
     fn unwrap_with_diagnostic(
         self,
+        context: &InferContext<'db>,
         iterable_node: ast::AnyNodeRef,
-        diagnostics: &mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Type<'db> {
         match self {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
-                diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
+                report_not_iterable(context, iterable_node, not_iterable_ty);
                 Type::Unknown
             }
             Self::PossiblyUnboundDunderIter {
                 iterable_ty,
                 element_ty,
             } => {
-                diagnostics.add_not_iterable_possibly_unbound(iterable_node, iterable_ty);
+                report_not_iterable_possibly_unbound(context, iterable_node, iterable_ty);
                 element_ty
             }
         }
