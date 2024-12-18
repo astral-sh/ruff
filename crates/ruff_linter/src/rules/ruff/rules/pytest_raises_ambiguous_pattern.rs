@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{ExprCall, Keyword, StringLiteralValue};
+use ruff_python_ast as ast;
 
 /// ## What it does
 /// Checks for non-raw literal string arguments passed to the `match` parameter
@@ -77,16 +77,18 @@ impl Violation for PytestRaisesAmbiguousPattern {
 }
 
 /// RUF043
-pub(crate) fn pytest_raises_ambiguous_pattern(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn pytest_raises_ambiguous_pattern(checker: &mut Checker, call: &ast::ExprCall) {
     if !is_pytest_raises(&call.func, checker.semantic()) {
         return;
     }
 
-    let Some(Keyword { value, .. }) = call.arguments.find_keyword("match") else {
+    // It *can* be passed as a positional argument if you try very hard,
+    // but pytest only documents it as a keyword argument, and it's quite hard pass it positionally
+    let Some(ast::Keyword { value, .. }) = call.arguments.find_keyword("match") else {
         return;
     };
 
-    let Some(string) = value.as_string_literal_expr() else {
+    let ast::Expr::StringLiteral(string) = value else {
         return;
     };
 
@@ -101,7 +103,7 @@ pub(crate) fn pytest_raises_ambiguous_pattern(checker: &mut Checker, call: &Expr
     checker.diagnostics.push(diagnostic);
 }
 
-fn string_has_unescaped_metacharacters(value: &StringLiteralValue) -> bool {
+fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool {
     let mut escaped = false;
 
     for character in value.chars() {
