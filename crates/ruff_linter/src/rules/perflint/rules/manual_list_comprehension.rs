@@ -48,7 +48,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// ```
 ///
 /// Take care that if the original for-loop uses an assignment expression
-/// as a conditional, such as `if match:=re.match("\d+")`, then
+/// as a conditional, such as `if match:=re.match("\d+","123")`, then
 /// the corresponding comprehension must wrap the assignment
 /// expression in parentheses to avoid a syntax error.
 #[derive(ViolationMetadata)]
