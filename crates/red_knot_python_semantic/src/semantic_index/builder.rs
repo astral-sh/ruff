@@ -30,7 +30,7 @@ use crate::semantic_index::use_def::{
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::Unpack;
-use crate::visibility_constraints::VisibilityConstraintRef;
+use crate::visibility_constraints::VisibilityConstraint;
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
@@ -301,7 +301,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: ScopedConstraintId,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .add_visibility_constraint(VisibilityConstraintRef::Single(constraint))
+            .add_visibility_constraint(VisibilityConstraint::Single(constraint))
     }
 
     fn record_visibility_constraint(
@@ -309,7 +309,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: ScopedConstraintId,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraintRef::Single(constraint))
+            .record_visibility_constraint(VisibilityConstraint::Single(constraint))
     }
 
     fn reset_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
@@ -322,7 +322,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraintRef::Negated(constraint))
+            .record_visibility_constraint(VisibilityConstraint::Negated(constraint))
     }
 
     fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
