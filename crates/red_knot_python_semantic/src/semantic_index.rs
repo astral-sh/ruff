@@ -62,6 +62,16 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
 }
 
 /// Returns the set of modules that are imported anywhere in `file`.
+///
+/// This set only considers `import` statements, not `from...import` statements, because:
+///
+///   - In `from foo import bar`, we cannot determine whether `foo.bar` is a submodule (and is
+///     therefore imported) without looking outside the content of this file.  (We could turn this
+///     into a _potentially_ imported modules set, but that would change how it's used in our type
+///     inference logic.)
+///
+///   - We cannot resolve relative imports (which aren't allowed in `import` statements) without
+///     knowing the name of the current module, and whether it's a package.
 #[salsa::tracked]
 pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
     semantic_index(db, file).imported_modules.clone()

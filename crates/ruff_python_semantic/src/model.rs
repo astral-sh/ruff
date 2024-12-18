@@ -711,12 +711,43 @@ impl<'a> SemanticModel<'a> {
     /// References from within an [`ast::Comprehension`] can produce incorrect
     /// results when referring to a [`BindingKind::NamedExprAssignment`].
     pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
-        let symbol = name.id.as_str();
-        let range = name.range;
+        self.simulate_runtime_load_at_location_in_scope(name.id.as_str(), name.range, self.scope_id)
+    }
+
+    /// Simulates a runtime load of the given symbol.
+    ///
+    /// This should not be run until after all the bindings have been visited.
+    ///
+    /// The main purpose of this method and what makes this different from
+    /// [`SemanticModel::lookup_symbol_in_scope`] is that it may be used to
+    /// perform speculative name lookups.
+    ///
+    /// In most cases a load can be accurately modeled simply by calling
+    /// [`SemanticModel::lookup_symbol`] at the right time during semantic
+    /// analysis, however for speculative lookups this is not the case,
+    /// since we're aiming to change the semantic meaning of our load.
+    /// E.g. we want to check what would happen if we changed a forward
+    /// reference to an immediate load or vice versa.
+    ///
+    /// Use caution when utilizing this method, since it was primarily designed
+    /// to work for speculative lookups from within type definitions, which
+    /// happen to share some nice properties, where attaching each binding
+    /// to a range in the source code and ordering those bindings based on
+    /// that range is a good enough approximation of which bindings are
+    /// available at runtime for which reference.
+    ///
+    /// References from within an [`ast::Comprehension`] can produce incorrect
+    /// results when referring to a [`BindingKind::NamedExprAssignment`].
+    pub fn simulate_runtime_load_at_location_in_scope(
+        &self,
+        symbol: &str,
+        symbol_range: TextRange,
+        scope_id: ScopeId,
+    ) -> Option<BindingId> {
         let mut seen_function = false;
         let mut class_variables_visible = true;
         let mut source_order_sensitive_lookup = true;
-        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+        for (index, scope_id) in self.scopes.ancestor_ids(scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
 
             // Only once we leave a function scope and its enclosing type scope should
@@ -776,7 +807,7 @@ impl<'a> SemanticModel<'a> {
                             _ => binding.range,
                         };
 
-                        if binding_range.ordering(range).is_lt() {
+                        if binding_range.ordering(symbol_range).is_lt() {
                             return Some(shadowed_id);
                         }
                     }

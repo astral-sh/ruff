@@ -196,6 +196,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
+            ast::Expr::Name(name) => Some(self.evaluate_expr_name(name, is_positive)),
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
             }
@@ -252,6 +253,31 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             ConstraintNode::Expression(expression) => expression.scope(self.db),
             ConstraintNode::Pattern(pattern) => pattern.scope(self.db),
         }
+    }
+
+    fn evaluate_expr_name(
+        &mut self,
+        expr_name: &ast::ExprName,
+        is_positive: bool,
+    ) -> NarrowingConstraints<'db> {
+        let ast::ExprName { id, .. } = expr_name;
+
+        let symbol = self
+            .symbols()
+            .symbol_id_by_name(id)
+            .expect("Should always have a symbol for every Name node");
+        let mut constraints = NarrowingConstraints::default();
+
+        constraints.insert(
+            symbol,
+            if is_positive {
+                Type::AlwaysFalsy.negate(self.db)
+            } else {
+                Type::AlwaysTruthy.negate(self.db)
+            },
+        );
+
+        constraints
     }
 
     fn evaluate_expr_compare(

@@ -1,5 +1,7 @@
 use std::hash::Hash;
 
+use context::InferContext;
+use diagnostic::{report_not_iterable, report_not_iterable_possibly_unbound};
 use indexmap::IndexSet;
 use itertools::Itertools;
 use ruff_db::diagnostic::Severity;
@@ -29,7 +31,7 @@ use crate::stdlib::{
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{CallDunderResult, CallOutcome};
 use crate::types::class_base::ClassBase;
-use crate::types::diagnostic::{TypeCheckDiagnosticsBuilder, INVALID_TYPE_FORM};
+use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::mro::{Mro, MroError, MroIterator};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
@@ -37,6 +39,7 @@ use crate::{Db, FxOrderSet, Module, Program, PythonVersion};
 mod builder;
 mod call;
 mod class_base;
+mod context;
 mod diagnostic;
 mod display;
 mod infer;
@@ -292,8 +295,8 @@ type DeclaredTypeResult<'db> = Result<Type<'db>, (Type<'db>, Box<[Type<'db>]>)>;
 /// `Ok(declared_type)`. If there are conflicting declarations, returns
 /// `Err((union_of_declared_types, conflicting_declared_types))`.
 ///
-/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type (and may
-/// conflict with other declarations.)
+/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type but it
+/// will not be considered to be conflicting with any other types.
 ///
 /// # Panics
 /// Will panic if there are no declarations and no `undeclared_ty` is provided. This is a logic
@@ -304,27 +307,31 @@ fn declarations_ty<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+    let mut declaration_types = declarations.map(|declaration| declaration_ty(db, declaration));
 
-    let mut all_types = undeclared_ty.into_iter().chain(decl_types);
-
-    let first = all_types.next().expect(
-        "declarations_ty must not be called with zero declarations and no may-be-undeclared",
-    );
+    let Some(first) = declaration_types.next() else {
+        if let Some(undeclared_ty) = undeclared_ty {
+            // Short-circuit to return the undeclared type if there are no declarations.
+            return Ok(undeclared_ty);
+        }
+        panic!("declarations_ty must not be called with zero declarations and no undeclared_ty");
+    };
 
     let mut conflicting: Vec<Type<'db>> = vec![];
-    let declared_ty = if let Some(second) = all_types.next() {
-        let mut builder = UnionBuilder::new(db).add(first);
-        for other in [second].into_iter().chain(all_types) {
-            if !first.is_equivalent_to(db, other) {
-                conflicting.push(other);
-            }
-            builder = builder.add(other);
+    let mut builder = UnionBuilder::new(db).add(first);
+    for other in declaration_types {
+        if !first.is_equivalent_to(db, other) {
+            conflicting.push(other);
         }
-        builder.build()
-    } else {
-        first
-    };
+        builder = builder.add(other);
+    }
+    // Avoid considering the undeclared type for the conflicting declaration diagnostics. It
+    // should still be part of the declared type.
+    if let Some(undeclared_ty) = undeclared_ty {
+        builder = builder.add(undeclared_ty);
+    }
+    let declared_ty = builder.build();
+
     if conflicting.is_empty() {
         Ok(declared_ty)
     } else {
@@ -427,6 +434,11 @@ pub enum Type<'db> {
     Union(UnionType<'db>),
     /// The set of objects in all of the types in the intersection
     Intersection(IntersectionType<'db>),
+    /// Represents objects whose `__bool__` method is deterministic:
+    /// - `AlwaysTruthy`: `__bool__` always returns `True`
+    /// - `AlwaysFalsy`: `__bool__` always returns `False`
+    AlwaysTruthy,
+    AlwaysFalsy,
     /// An integer literal
     IntLiteral(i64),
     /// A boolean literal, either `True` or `False`.
@@ -447,6 +459,10 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Type::Unknown)
+    }
+
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -707,6 +723,15 @@ impl<'db> Type<'db> {
                         .negative(db)
                         .iter()
                         .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
+            }
+
+            // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
+            // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
+            (left, Type::AlwaysFalsy) => matches!(left.bool(db), Truthiness::AlwaysFalse),
+            (left, Type::AlwaysTruthy) => matches!(left.bool(db), Truthiness::AlwaysTrue),
+            // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
+            (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
+                target.is_equivalent_to(db, KnownClass::Object.to_instance(db))
             }
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
@@ -1097,6 +1122,16 @@ impl<'db> Type<'db> {
                 false
             }
 
+            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
+                // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
+                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
+                matches!(ty.bool(db), Truthiness::AlwaysFalse)
+            }
+            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
+                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
+                matches!(ty.bool(db), Truthiness::AlwaysTrue)
+            }
+
             (Type::KnownInstance(left), right) => {
                 left.instance_fallback(db).is_disjoint_from(db, right)
             }
@@ -1230,7 +1265,9 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
-            | Type::KnownInstance(_) => true,
+            | Type::KnownInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy => true,
             Type::SubclassOf(SubclassOfType { base }) => matches!(base, ClassBase::Class(_)),
             Type::ClassLiteral(_) | Type::Instance(_) => {
                 // TODO: Ideally, we would iterate over the MRO of the class, check if all
@@ -1332,6 +1369,7 @@ impl<'db> Type<'db> {
                 //
                 false
             }
+            Type::AlwaysTruthy | Type::AlwaysFalsy => false,
         }
     }
 
@@ -1385,6 +1423,11 @@ impl<'db> Type<'db> {
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
                     | KnownClass::SpecialForm
+                    | KnownClass::ChainMap
+                    | KnownClass::Counter
+                    | KnownClass::DefaultDict
+                    | KnownClass::Deque
+                    | KnownClass::OrderedDict
                     | KnownClass::StdlibAlias
                     | KnownClass::TypeVar,
                 ) => false,
@@ -1397,7 +1440,9 @@ impl<'db> Type<'db> {
             | Type::Todo(_)
             | Type::Union(..)
             | Type::Intersection(..)
-            | Type::LiteralString => false,
+            | Type::LiteralString
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => false,
         }
     }
 
@@ -1565,6 +1610,10 @@ impl<'db> Type<'db> {
                 // TODO: implement tuple methods
                 todo_type!().into()
             }
+            Type::AlwaysTruthy | Type::AlwaysFalsy => {
+                // TODO return `Callable[[], Literal[True/False]]` for `__bool__` access
+                KnownClass::Object.to_instance(db).member(db, name)
+            }
             &todo @ Type::Todo(_) => todo.into(),
         }
     }
@@ -1587,6 +1636,8 @@ impl<'db> Type<'db> {
                 // TODO: see above
                 Truthiness::Ambiguous
             }
+            Type::AlwaysTruthy => Truthiness::AlwaysTrue,
+            Type::AlwaysFalsy => Truthiness::AlwaysFalse,
             instance_ty @ Type::Instance(InstanceType { class }) => {
                 if class.is_known(db, KnownClass::NoneType) {
                     Truthiness::AlwaysFalse
@@ -1899,7 +1950,9 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
-            | Type::LiteralString => Type::Unknown,
+            | Type::LiteralString
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => Type::Unknown,
         }
     }
 
@@ -1920,6 +1973,28 @@ impl<'db> Type<'db> {
             // We treat `typing.Type` exactly the same as `builtins.type`:
             Type::KnownInstance(KnownInstanceType::Type) => Ok(KnownClass::Type.to_instance(db)),
             Type::KnownInstance(KnownInstanceType::Tuple) => Ok(KnownClass::Tuple.to_instance(db)),
+
+            // Legacy `typing` aliases
+            Type::KnownInstance(KnownInstanceType::List) => Ok(KnownClass::List.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::Dict) => Ok(KnownClass::Dict.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::Set) => Ok(KnownClass::Set.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::FrozenSet) => {
+                Ok(KnownClass::FrozenSet.to_instance(db))
+            }
+            Type::KnownInstance(KnownInstanceType::ChainMap) => {
+                Ok(KnownClass::ChainMap.to_instance(db))
+            }
+            Type::KnownInstance(KnownInstanceType::Counter) => {
+                Ok(KnownClass::Counter.to_instance(db))
+            }
+            Type::KnownInstance(KnownInstanceType::DefaultDict) => {
+                Ok(KnownClass::DefaultDict.to_instance(db))
+            }
+            Type::KnownInstance(KnownInstanceType::Deque) => Ok(KnownClass::Deque.to_instance(db)),
+            Type::KnownInstance(KnownInstanceType::OrderedDict) => {
+                Ok(KnownClass::OrderedDict.to_instance(db))
+            }
+
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
@@ -2039,6 +2114,7 @@ impl<'db> Type<'db> {
                 ClassBase::try_from_ty(db, todo_type!("Intersection meta-type"))
                     .expect("Type::Todo should be a valid ClassBase"),
             ),
+            Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::Todo(todo) => Type::subclass_of_base(ClassBase::Todo(*todo)),
         }
     }
@@ -2104,17 +2180,13 @@ pub struct InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(
-        self,
-        diagnostics: &mut TypeCheckDiagnosticsBuilder,
-        node: &ast::Expr,
-    ) -> Type<'db> {
+    fn into_fallback_type(self, context: &InferContext, node: &ast::Expr) -> Type<'db> {
         let InvalidTypeExpressionError {
             fallback_type,
             invalid_expressions,
         } = self;
         for error in invalid_expressions {
-            diagnostics.add_lint(
+            context.report_lint(
                 &INVALID_TYPE_FORM,
                 node.into(),
                 format_args!("{}", error.reason()),
@@ -2181,6 +2253,12 @@ pub enum KnownClass {
     TypeVar,
     TypeAliasType,
     NoDefaultType,
+    // Collections
+    ChainMap,
+    Counter,
+    DefaultDict,
+    Deque,
+    OrderedDict,
     // sys
     VersionInfo,
 }
@@ -2211,6 +2289,11 @@ impl<'db> KnownClass {
             Self::TypeVar => "TypeVar",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
+            Self::ChainMap => "ChainMap",
+            Self::Counter => "Counter",
+            Self::DefaultDict => "defaultdict",
+            Self::Deque => "deque",
+            Self::OrderedDict => "OrderedDict",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -2274,6 +2357,11 @@ impl<'db> KnownClass {
                     CoreStdlibModule::TypingExtensions
                 }
             }
+            Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict => CoreStdlibModule::Collections,
         }
     }
 
@@ -2301,6 +2389,11 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::FunctionType
             | Self::SpecialForm
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
             | Self::StdlibAlias
             | Self::BaseException
             | Self::BaseExceptionGroup
@@ -2333,6 +2426,11 @@ impl<'db> KnownClass {
             "ModuleType" => Self::ModuleType,
             "FunctionType" => Self::FunctionType,
             "TypeAliasType" => Self::TypeAliasType,
+            "ChainMap" => Self::ChainMap,
+            "Counter" => Self::Counter,
+            "defaultdict" => Self::DefaultDict,
+            "deque" => Self::Deque,
+            "OrderedDict" => Self::OrderedDict,
             "_Alias" => Self::StdlibAlias,
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
@@ -2364,6 +2462,11 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::Slice
             | Self::GenericAlias
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
             | Self::StdlibAlias  // no equivalent class exists in typing_extensions, nor ever will
             | Self::ModuleType
             | Self::VersionInfo
@@ -2399,6 +2502,24 @@ pub enum KnownInstanceType<'db> {
     Any,
     /// The symbol `typing.Tuple` (which can also be found as `typing_extensions.Tuple`)
     Tuple,
+    /// The symbol `typing.List` (which can also be found as `typing_extensions.List`)
+    List,
+    /// The symbol `typing.Dict` (which can also be found as `typing_extensions.Dict`)
+    Dict,
+    /// The symbol `typing.Set` (which can also be found as `typing_extensions.Set`)
+    Set,
+    /// The symbol `typing.FrozenSet` (which can also be found as `typing_extensions.FrozenSet`)
+    FrozenSet,
+    /// The symbol `typing.ChainMap` (which can also be found as `typing_extensions.ChainMap`)
+    ChainMap,
+    /// The symbol `typing.Counter` (which can also be found as `typing_extensions.Counter`)
+    Counter,
+    /// The symbol `typing.DefaultDict` (which can also be found as `typing_extensions.DefaultDict`)
+    DefaultDict,
+    /// The symbol `typing.Deque` (which can also be found as `typing_extensions.Deque`)
+    Deque,
+    /// The symbol `typing.OrderedDict` (which can also be found as `typing_extensions.OrderedDict`)
+    OrderedDict,
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
     Type,
     /// A single instance of `typing.TypeVar`
@@ -2419,15 +2540,6 @@ pub enum KnownInstanceType<'db> {
     TypeAlias,
     TypeGuard,
     TypeIs,
-    List,
-    Dict,
-    DefaultDict,
-    Set,
-    FrozenSet,
-    Counter,
-    Deque,
-    ChainMap,
-    OrderedDict,
     ReadOnly,
     // TODO: fill this enum out with more special forms, etc.
 }
@@ -2714,20 +2826,20 @@ enum IterationOutcome<'db> {
 impl<'db> IterationOutcome<'db> {
     fn unwrap_with_diagnostic(
         self,
+        context: &InferContext<'db>,
         iterable_node: ast::AnyNodeRef,
-        diagnostics: &mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Type<'db> {
         match self {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
-                diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
+                report_not_iterable(context, iterable_node, not_iterable_ty);
                 Type::Unknown
             }
             Self::PossiblyUnboundDunderIter {
                 iterable_ty,
                 element_ty,
             } => {
-                diagnostics.add_not_iterable_possibly_unbound(iterable_node, iterable_ty);
+                report_not_iterable_possibly_unbound(context, iterable_node, iterable_ty);
                 element_ty
             }
         }
@@ -3483,6 +3595,8 @@ pub(crate) mod tests {
         SubclassOfAbcClass(&'static str),
         StdlibModule(CoreStdlibModule),
         SliceLiteral(i32, i32, i32),
+        AlwaysTruthy,
+        AlwaysFalsy,
     }
 
     impl Ty {
@@ -3550,6 +3664,8 @@ pub(crate) mod tests {
                     Some(stop),
                     Some(step),
                 )),
+                Ty::AlwaysTruthy => Type::AlwaysTruthy,
+                Ty::AlwaysFalsy => Type::AlwaysFalsy,
             }
         }
     }
@@ -3688,6 +3804,12 @@ pub(crate) mod tests {
     )]
     #[test_case(Ty::SliceLiteral(1, 2, 3), Ty::BuiltinInstance("slice"))]
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::Intersection{pos: vec![], neg: vec![Ty::None]})]
+    #[test_case(Ty::IntLiteral(1), Ty::AlwaysTruthy)]
+    #[test_case(Ty::IntLiteral(0), Ty::AlwaysFalsy)]
+    #[test_case(Ty::AlwaysTruthy, Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::AlwaysFalsy, Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::Never, Ty::AlwaysTruthy)]
+    #[test_case(Ty::Never, Ty::AlwaysFalsy)]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3722,6 +3844,10 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     #[test_case(Ty::AbcInstance("ABCMeta"), Ty::SubclassOfBuiltinClass("type"))]
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::BuiltinClassLiteral("str"))]
+    #[test_case(Ty::IntLiteral(1), Ty::AlwaysFalsy)]
+    #[test_case(Ty::IntLiteral(0), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysFalsy)]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -3856,6 +3982,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![]), Ty::BuiltinClassLiteral("object"))]
     #[test_case(Ty::SubclassOfBuiltinClass("object"), Ty::None)]
     #[test_case(Ty::SubclassOfBuiltinClass("str"), Ty::LiteralString)]
+    #[test_case(Ty::AlwaysFalsy, Ty::AlwaysTruthy)]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
@@ -3886,6 +4013,8 @@ pub(crate) mod tests {
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::SubclassOfAny)]
     #[test_case(Ty::AbcClassLiteral("ABC"), Ty::AbcInstance("ABCMeta"))]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysTruthy)]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::AlwaysFalsy)]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);

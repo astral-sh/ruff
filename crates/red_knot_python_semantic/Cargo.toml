@@ -26,6 +26,7 @@ bitflags = { workspace = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
 countme = { workspace = true }
+drop_bomb = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }
@@ -58,4 +59,3 @@ serde = ["ruff_db/serde", "dep:serde"]
 
 [lints]
 workspace = true
-

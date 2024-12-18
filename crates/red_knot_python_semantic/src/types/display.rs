@@ -140,6 +140,8 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
+            Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
+            Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
         }
     }
 }

@@ -30,6 +30,8 @@ use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
+use super::Truthiness;
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
     db: &'db dyn Db,
@@ -243,15 +245,22 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
         } else {
             // ~Literal[True] & bool = Literal[False]
+            // ~AlwaysTruthy & bool = Literal[False]
             if let Type::Instance(InstanceType { class }) = new_positive {
                 if class.is_known(db, KnownClass::Bool) {
-                    if let Some(&Type::BooleanLiteral(value)) = self
+                    if let Some(new_type) = self
                         .negative
                         .iter()
-                        .find(|element| element.is_boolean_literal())
+                        .find(|element| {
+                            element.is_boolean_literal()
+                                | matches!(element, Type::AlwaysFalsy | Type::AlwaysTruthy)
+                        })
+                        .map(|element| {
+                            Type::BooleanLiteral(element.bool(db) != Truthiness::AlwaysTrue)
+                        })
                     {
                         *self = Self::default();
-                        self.positive.insert(Type::BooleanLiteral(!value));
+                        self.positive.insert(new_type);
                         return;
                     }
                 }
@@ -318,15 +327,15 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // simplify the representation.
                 self.add_positive(db, ty);
             }
-            // ~Literal[True] & bool = Literal[False]
-            Type::BooleanLiteral(bool)
-                if self
-                    .positive
-                    .iter()
-                    .any(|pos| *pos == KnownClass::Bool.to_instance(db)) =>
+            // bool & ~Literal[True] = Literal[False]
+            // bool & ~AlwaysTruthy = Literal[False]
+            Type::BooleanLiteral(_) | Type::AlwaysFalsy | Type::AlwaysTruthy
+                if self.positive.contains(&KnownClass::Bool.to_instance(db)) =>
             {
                 *self = Self::default();
-                self.positive.insert(Type::BooleanLiteral(!bool));
+                self.positive.insert(Type::BooleanLiteral(
+                    new_negative.bool(db) != Truthiness::AlwaysTrue,
+                ));
             }
             _ => {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
@@ -380,7 +389,7 @@ mod tests {
     use super::{IntersectionBuilder, IntersectionType, Type, UnionType};
 
     use crate::db::tests::{setup_db, TestDb};
-    use crate::types::{global_symbol, todo_type, KnownClass, UnionBuilder};
+    use crate::types::{global_symbol, todo_type, KnownClass, Truthiness, UnionBuilder};
 
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithTestSystem;
@@ -997,42 +1006,43 @@ mod tests {
         assert_eq!(ty, expected);
     }
 
-    #[test_case(true)]
-    #[test_case(false)]
-    fn build_intersection_simplify_split_bool(bool_value: bool) {
+    #[test_case(Type::BooleanLiteral(true))]
+    #[test_case(Type::BooleanLiteral(false))]
+    #[test_case(Type::AlwaysTruthy)]
+    #[test_case(Type::AlwaysFalsy)]
+    fn build_intersection_simplify_split_bool(t_splitter: Type) {
         let db = setup_db();
-
-        let t_bool = KnownClass::Bool.to_instance(&db);
-        let t_boolean_literal = Type::BooleanLiteral(bool_value);
+        let bool_value = t_splitter.bool(&db) == Truthiness::AlwaysTrue;
 
         // We add t_object in various orders (in first or second position) in
         // the tests below to ensure that the boolean simplification eliminates
         // everything from the intersection, not just `bool`.
         let t_object = KnownClass::Object.to_instance(&db);
+        let t_bool = KnownClass::Bool.to_instance(&db);
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t_object)
             .add_positive(t_bool)
-            .add_negative(t_boolean_literal)
+            .add_negative(t_splitter)
             .build();
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t_bool)
             .add_positive(t_object)
-            .add_negative(t_boolean_literal)
+            .add_negative(t_splitter)
             .build();
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t_object)
-            .add_negative(t_boolean_literal)
+            .add_negative(t_splitter)
             .add_positive(t_bool)
             .build();
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
 
         let ty = IntersectionBuilder::new(&db)
-            .add_negative(t_boolean_literal)
+            .add_negative(t_splitter)
             .add_positive(t_object)
             .add_positive(t_bool)
             .build();

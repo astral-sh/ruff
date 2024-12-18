@@ -51,7 +51,7 @@ class D(TypeIs): ...  # error: [invalid-base]
 class E(Concatenate): ...  # error: [invalid-base]
 class F(Callable): ...
 
-reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for more typing aliases as base classes), Literal[object]]
+reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for Callable as a base class), Literal[object]]
 ```
 
 ## Subscriptability

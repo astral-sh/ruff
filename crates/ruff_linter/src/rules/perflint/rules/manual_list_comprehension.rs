@@ -237,31 +237,12 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     // filtered = [x for x in y]
     // print(x)
     // ```
-    let last_target_binding = checker
+    let target_binding = checker
         .semantic()
-        .lookup_symbol(for_stmt_target_id)
-        .expect("for loop target must exist");
-
-    let target_binding = {
-        let mut bindings = [last_target_binding].into_iter().chain(
-            checker
-                .semantic()
-                .shadowed_bindings(checker.semantic().scope_id, last_target_binding)
-                .filter_map(|shadowed| shadowed.same_scope().then_some(shadowed.shadowed_id())),
-        );
-
-        bindings
-            .find_map(|binding_id| {
-                let binding = checker.semantic().binding(binding_id);
-                binding
-                    .statement(checker.semantic())
-                    .and_then(ast::Stmt::as_for_stmt)
-                    .is_some_and(|stmt| stmt.range == for_stmt.range)
-                    .then_some(binding)
-            })
-            .expect("for target binding must exist")
-    };
-
+        .bindings
+        .iter()
+        .find(|binding| for_stmt.target.range() == binding.range)
+        .unwrap();
     // If any references to the loop target variable are after the loop,
     // then converting it into a comprehension would cause a NameError
     if target_binding

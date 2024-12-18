@@ -244,3 +244,10 @@ def f():
         for a in values:
             result.append(a + 1)  # PERF401
     result = []
+
+def f():
+    values = [1, 2, 3]
+    result = []
+    for i in values:
+        result.append(i + 1)  # Ok
+    del i

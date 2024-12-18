@@ -175,19 +175,26 @@ pub trait DbWithTestSystem: Db + Sized {
     ///
     /// # Panics
     /// If the system isn't using the memory file system.
-    fn write_file(
-        &mut self,
-        path: impl AsRef<SystemPath>,
-        content: impl ToString,
-    ) -> crate::system::Result<()> {
+    fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
         let path = path.as_ref();
-        let result = self
-            .test_system()
-            .memory_file_system()
-            .write_file(path, content);
+
+        let memory_fs = self.test_system().memory_file_system();
+
+        let sync_ancestors = path
+            .parent()
+            .is_some_and(|parent| !memory_fs.exists(parent));
+        let result = memory_fs.write_file(path, content);
 
         if result.is_ok() {
             File::sync_path(self, path);
+
+            // Sync the ancestor paths if the path's parent
+            // directory didn't exist before.
+            if sync_ancestors {
+                for ancestor in path.ancestors() {
+                    File::sync_path(self, ancestor);
+                }
+            }
         }
 
         result

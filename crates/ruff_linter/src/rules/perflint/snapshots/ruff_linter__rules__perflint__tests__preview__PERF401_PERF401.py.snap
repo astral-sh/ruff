@@ -484,3 +484,5 @@ PERF401.py:245:13: PERF401 [*] Use `list.extend` to create a transformed list
 245     |-            result.append(a + 1)  # PERF401
     244 |+        result.extend(a + 1 for a in values)  # PERF401
 246 245 |     result = []
+247 246 | 
+248 247 | def f():

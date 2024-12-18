@@ -104,7 +104,6 @@ impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
-
 #[derive(ViolationMetadata)]
 pub(crate) struct PytestUseFixturesWithoutParameters;
 

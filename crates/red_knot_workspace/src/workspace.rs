@@ -195,13 +195,13 @@ impl Workspace {
         let result = Arc::new(std::sync::Mutex::new(Vec::new()));
         let inner_result = Arc::clone(&result);
 
-        let db = db.snapshot();
+        let db = db.clone();
         let workspace_span = workspace_span.clone();
 
         rayon::scope(move |scope| {
             for file in &files {
                 let result = inner_result.clone();
-                let db = db.snapshot();
+                let db = db.clone();
                 let workspace_span = workspace_span.clone();
 
                 scope.spawn(move |_| {

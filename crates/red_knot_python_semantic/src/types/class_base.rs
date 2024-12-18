@@ -70,7 +70,9 @@ impl<'db> ClassBase<'db> {
             | Type::Tuple(_)
             | Type::SliceLiteral(_)
             | Type::ModuleLiteral(_)
-            | Type::SubclassOf(_) => None,
+            | Type::SubclassOf(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy => None,
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::TypeAliasType(_)
@@ -112,15 +114,24 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::FrozenSet => {
                     Self::try_from_ty(db, KnownClass::FrozenSet.to_class_literal(db))
                 }
-                KnownInstanceType::Callable
-                | KnownInstanceType::ChainMap
-                | KnownInstanceType::Counter
-                | KnownInstanceType::DefaultDict
-                | KnownInstanceType::Deque
-                | KnownInstanceType::OrderedDict => Self::try_from_ty(
-                    db,
-                    todo_type!("Support for more typing aliases as base classes"),
-                ),
+                KnownInstanceType::ChainMap => {
+                    Self::try_from_ty(db, KnownClass::ChainMap.to_class_literal(db))
+                }
+                KnownInstanceType::Counter => {
+                    Self::try_from_ty(db, KnownClass::Counter.to_class_literal(db))
+                }
+                KnownInstanceType::DefaultDict => {
+                    Self::try_from_ty(db, KnownClass::DefaultDict.to_class_literal(db))
+                }
+                KnownInstanceType::Deque => {
+                    Self::try_from_ty(db, KnownClass::Deque.to_class_literal(db))
+                }
+                KnownInstanceType::OrderedDict => {
+                    Self::try_from_ty(db, KnownClass::OrderedDict.to_class_literal(db))
+                }
+                KnownInstanceType::Callable => {
+                    Self::try_from_ty(db, todo_type!("Support for Callable as a base class"))
+                }
             },
         }
     }

@@ -1105,6 +1105,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BatchedWithoutExplicitStrict) {
                 flake8_bugbear::rules::batched_without_explicit_strict(checker, call);
             }
+            if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
+                ruff::rules::pytest_raises_ambiguous_pattern(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[

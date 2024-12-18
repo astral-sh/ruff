@@ -1,10 +1,10 @@
-use ast::{Expr, StmtAugAssign};
+use ast::Expr;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::Operator;
-use ruff_python_codegen::Generator;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{AstNode, ExprBinOp, ExpressionRef, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -103,11 +103,12 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
     if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
         let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
-            checker.generator(),
+            checker,
             target,
-            value.op,
+            operator,
             &value.right,
-            assign.range(),
+            value,
+            assign.range,
         )));
         checker.diagnostics.push(diagnostic);
         return;
@@ -121,11 +122,12 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
     {
         let mut diagnostic = Diagnostic::new(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
-            checker.generator(),
+            checker,
             target,
-            value.op,
+            operator,
             &value.left,
-            assign.range(),
+            value,
+            assign.range,
         )));
         checker.diagnostics.push(diagnostic);
     }
@@ -135,21 +137,30 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
 ///
 /// For example, given `x = x + 1`, the fix would be `x += 1`.
 fn augmented_assignment(
-    generator: Generator,
+    checker: &Checker,
     target: &Expr,
-    operator: Operator,
+    operator: AugmentedOperator,
     right_operand: &Expr,
+    original_expr: &ExprBinOp,
     range: TextRange,
 ) -> Edit {
-    Edit::range_replacement(
-        generator.stmt(&ast::Stmt::AugAssign(StmtAugAssign {
-            range: TextRange::default(),
-            target: Box::new(target.clone()),
-            op: operator,
-            value: Box::new(right_operand.clone()),
-        })),
-        range,
-    )
+    let locator = checker.locator();
+
+    let right_operand_ref = ExpressionRef::from(right_operand);
+    let parent = original_expr.as_any_node_ref();
+    let comment_ranges = checker.comment_ranges();
+    let source = checker.source();
+
+    let right_operand_range =
+        parenthesized_range(right_operand_ref, parent, comment_ranges, source)
+            .unwrap_or(right_operand.range());
+    let right_operand_expr = locator.slice(right_operand_range);
+
+    let target_expr = locator.slice(target);
+
+    let new_content = format!("{target_expr} {operator} {right_operand_expr}");
+
+    Edit::range_replacement(new_content, range)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

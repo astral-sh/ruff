@@ -151,7 +151,7 @@ impl Violation for PytestRaisesWithoutException {
     }
 }
 
-fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))

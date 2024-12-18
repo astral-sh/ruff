@@ -1,13 +1,13 @@
-use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, ModExpression, StringFlags};
 use ruff_python_parser::{parse_expression_range, Parsed};
 use ruff_text_size::Ranged;
 
+use crate::declare_lint;
 use crate::lint::{Level, LintStatus};
-use crate::types::diagnostic::{TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
-use crate::{declare_lint, Db};
+
+use super::context::InferContext;
 
 declare_lint! {
     /// ## What it does
@@ -127,24 +127,23 @@ declare_lint! {
     }
 }
 
-type AnnotationParseResult = Result<Parsed<ModExpression>, TypeCheckDiagnostics>;
-
 /// Parses the given expression as a string annotation.
 pub(crate) fn parse_string_annotation(
-    db: &dyn Db,
-    file: File,
+    context: &InferContext,
     string_expr: &ast::ExprStringLiteral,
-) -> AnnotationParseResult {
+) -> Option<Parsed<ModExpression>> {
+    let file = context.file();
+    let db = context.db();
+
     let _span = tracing::trace_span!("parse_string_annotation", string=?string_expr.range(), file=%file.path(db)).entered();
 
     let source = source_text(db.upcast(), file);
     let node_text = &source[string_expr.range()];
-    let mut diagnostics = TypeCheckDiagnosticsBuilder::new(db, file);
 
     if let [string_literal] = string_expr.value.as_slice() {
         let prefix = string_literal.flags.prefix();
         if prefix.is_raw() {
-            diagnostics.add_lint(
+            context.report_lint(
                 &RAW_STRING_TYPE_ANNOTATION,
                 string_literal.into(),
                 format_args!("Type expressions cannot use raw string literal"),
@@ -167,8 +166,8 @@ pub(crate) fn parse_string_annotation(
             // """ = 1
             // ```
             match parse_expression_range(source.as_str(), range_excluding_quotes) {
-                Ok(parsed) => return Ok(parsed),
-                Err(parse_error) => diagnostics.add_lint(
+                Ok(parsed) => return Some(parsed),
+                Err(parse_error) => context.report_lint(
                     &INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
                     string_literal.into(),
                     format_args!("Syntax error in forward annotation: {}", parse_error.error),
@@ -177,7 +176,7 @@ pub(crate) fn parse_string_annotation(
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the
             // case for annotations that contain escape sequences.
-            diagnostics.add_lint(
+            context.report_lint(
                 &ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION,
                 string_expr.into(),
                 format_args!("Type expressions cannot contain escape characters"),
@@ -185,12 +184,12 @@ pub(crate) fn parse_string_annotation(
         }
     } else {
         // String is implicitly concatenated.
-        diagnostics.add_lint(
+        context.report_lint(
             &IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
             string_expr.into(),
             format_args!("Type expressions cannot span multiple string literals"),
         );
     }
 
-    Err(diagnostics.finish())
+    None
 }

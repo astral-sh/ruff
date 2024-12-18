@@ -1,11 +1,11 @@
-use crate::lint::{Level, LintId, LintMetadata, LintRegistryBuilder, LintStatus};
+use crate::declare_lint;
+use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{ClassLiteralType, Type};
-use crate::{declare_lint, Db};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -14,6 +14,8 @@ use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
+
+use super::context::InferContext;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -564,223 +566,158 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     }
 }
 
-pub(super) struct TypeCheckDiagnosticsBuilder<'db> {
-    db: &'db dyn Db,
-    file: File,
-    diagnostics: TypeCheckDiagnostics,
+/// Emit a diagnostic declaring that the object represented by `node` is not iterable
+pub(super) fn report_not_iterable(context: &InferContext, node: AnyNodeRef, not_iterable_ty: Type) {
+    context.report_lint(
+        &NOT_ITERABLE,
+        node,
+        format_args!(
+            "Object of type `{}` is not iterable",
+            not_iterable_ty.display(context.db())
+        ),
+    );
 }
 
-impl<'db> TypeCheckDiagnosticsBuilder<'db> {
-    pub(super) fn new(db: &'db dyn Db, file: File) -> Self {
-        Self {
-            db,
-            file,
-            diagnostics: TypeCheckDiagnostics::default(),
+/// Emit a diagnostic declaring that the object represented by `node` is not iterable
+/// because its `__iter__` method is possibly unbound.
+pub(super) fn report_not_iterable_possibly_unbound(
+    context: &InferContext,
+    node: AnyNodeRef,
+    element_ty: Type,
+) {
+    context.report_lint(
+        &NOT_ITERABLE,
+        node,
+        format_args!(
+            "Object of type `{}` is not iterable because its `__iter__` method is possibly unbound",
+            element_ty.display(context.db())
+        ),
+    );
+}
+
+/// Emit a diagnostic declaring that an index is out of bounds for a tuple.
+pub(super) fn report_index_out_of_bounds(
+    context: &InferContext,
+    kind: &'static str,
+    node: AnyNodeRef,
+    tuple_ty: Type,
+    length: usize,
+    index: i64,
+) {
+    context.report_lint(
+        &INDEX_OUT_OF_BOUNDS,
+        node,
+        format_args!(
+            "Index {index} is out of bounds for {kind} `{}` with length {length}",
+            tuple_ty.display(context.db())
+        ),
+    );
+}
+
+/// Emit a diagnostic declaring that a type does not support subscripting.
+pub(super) fn report_non_subscriptable(
+    context: &InferContext,
+    node: AnyNodeRef,
+    non_subscriptable_ty: Type,
+    method: &str,
+) {
+    context.report_lint(
+        &NON_SUBSCRIPTABLE,
+        node,
+        format_args!(
+            "Cannot subscript object of type `{}` with no `{method}` method",
+            non_subscriptable_ty.display(context.db())
+        ),
+    );
+}
+
+pub(super) fn report_unresolved_module<'db>(
+    context: &InferContext,
+    import_node: impl Into<AnyNodeRef<'db>>,
+    level: u32,
+    module: Option<&str>,
+) {
+    context.report_lint(
+        &UNRESOLVED_IMPORT,
+        import_node.into(),
+        format_args!(
+            "Cannot resolve import `{}{}`",
+            ".".repeat(level as usize),
+            module.unwrap_or_default()
+        ),
+    );
+}
+
+pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
+    context.report_lint(
+        &ZERO_STEPSIZE_IN_SLICE,
+        node,
+        format_args!("Slice step size can not be zero"),
+    );
+}
+
+pub(super) fn report_invalid_assignment(
+    context: &InferContext,
+    node: AnyNodeRef,
+    declared_ty: Type,
+    assigned_ty: Type,
+) {
+    match declared_ty {
+        Type::ClassLiteral(ClassLiteralType { class }) => {
+            context.report_lint(&INVALID_ASSIGNMENT, node, format_args!(
+                    "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
+                    class.name(context.db())));
+        }
+        Type::FunctionLiteral(function) => {
+            context.report_lint(&INVALID_ASSIGNMENT, node, format_args!(
+                    "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
+                    function.name(context.db())));
+        }
+        _ => {
+            context.report_lint(
+                &INVALID_ASSIGNMENT,
+                node,
+                format_args!(
+                    "Object of type `{}` is not assignable to `{}`",
+                    assigned_ty.display(context.db()),
+                    declared_ty.display(context.db()),
+                ),
+            );
         }
     }
+}
 
-    /// Emit a diagnostic declaring that the object represented by `node` is not iterable
-    pub(super) fn add_not_iterable(&mut self, node: AnyNodeRef, not_iterable_ty: Type<'db>) {
-        self.add_lint(
-            &NOT_ITERABLE,
-            node,
-            format_args!(
-                "Object of type `{}` is not iterable",
-                not_iterable_ty.display(self.db)
-            ),
-        );
-    }
+pub(super) fn report_possibly_unresolved_reference(
+    context: &InferContext,
+    expr_name_node: &ast::ExprName,
+) {
+    let ast::ExprName { id, .. } = expr_name_node;
 
-    /// Emit a diagnostic declaring that the object represented by `node` is not iterable
-    /// because its `__iter__` method is possibly unbound.
-    pub(super) fn add_not_iterable_possibly_unbound(
-        &mut self,
-        node: AnyNodeRef,
-        element_ty: Type<'db>,
-    ) {
-        self.add_lint(
-            &NOT_ITERABLE,
-            node,
-            format_args!(
-                "Object of type `{}` is not iterable because its `__iter__` method is possibly unbound",
-                element_ty.display(self.db)
-            ),
-        );
-    }
+    context.report_lint(
+        &POSSIBLY_UNRESOLVED_REFERENCE,
+        expr_name_node.into(),
+        format_args!("Name `{id}` used when possibly not defined"),
+    );
+}
 
-    /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
-    pub(super) fn add_index_out_of_bounds(
-        &mut self,
-        kind: &'static str,
-        node: AnyNodeRef,
-        tuple_ty: Type<'db>,
-        length: usize,
-        index: i64,
-    ) {
-        self.add_lint(
-            &INDEX_OUT_OF_BOUNDS,
-            node,
-            format_args!(
-                "Index {index} is out of bounds for {kind} `{}` with length {length}",
-                tuple_ty.display(self.db)
-            ),
-        );
-    }
+pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
+    let ast::ExprName { id, .. } = expr_name_node;
 
-    /// Emit a diagnostic declaring that a type does not support subscripting.
-    pub(super) fn add_non_subscriptable(
-        &mut self,
-        node: AnyNodeRef,
-        non_subscriptable_ty: Type<'db>,
-        method: &str,
-    ) {
-        self.add_lint(
-            &NON_SUBSCRIPTABLE,
-            node,
-            format_args!(
-                "Cannot subscript object of type `{}` with no `{method}` method",
-                non_subscriptable_ty.display(self.db)
-            ),
-        );
-    }
+    context.report_lint(
+        &UNRESOLVED_REFERENCE,
+        expr_name_node.into(),
+        format_args!("Name `{id}` used when not defined"),
+    );
+}
 
-    pub(super) fn add_unresolved_module(
-        &mut self,
-        import_node: impl Into<AnyNodeRef<'db>>,
-        level: u32,
-        module: Option<&str>,
-    ) {
-        self.add_lint(
-            &UNRESOLVED_IMPORT,
-            import_node.into(),
-            format_args!(
-                "Cannot resolve import `{}{}`",
-                ".".repeat(level as usize),
-                module.unwrap_or_default()
-            ),
-        );
-    }
-
-    pub(super) fn add_slice_step_size_zero(&mut self, node: AnyNodeRef) {
-        self.add_lint(
-            &ZERO_STEPSIZE_IN_SLICE,
-            node,
-            format_args!("Slice step size can not be zero"),
-        );
-    }
-
-    pub(super) fn add_invalid_assignment(
-        &mut self,
-        node: AnyNodeRef,
-        declared_ty: Type<'db>,
-        assigned_ty: Type<'db>,
-    ) {
-        match declared_ty {
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                self.add_lint(&INVALID_ASSIGNMENT, node, format_args!(
-                        "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
-                        class.name(self.db)));
-            }
-            Type::FunctionLiteral(function) => {
-                self.add_lint(&INVALID_ASSIGNMENT, node, format_args!(
-                        "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
-                        function.name(self.db)));
-            }
-            _ => {
-                self.add_lint(
-                    &INVALID_ASSIGNMENT,
-                    node,
-                    format_args!(
-                        "Object of type `{}` is not assignable to `{}`",
-                        assigned_ty.display(self.db),
-                        declared_ty.display(self.db),
-                    ),
-                );
-            }
-        }
-    }
-
-    pub(super) fn add_possibly_unresolved_reference(&mut self, expr_name_node: &ast::ExprName) {
-        let ast::ExprName { id, .. } = expr_name_node;
-
-        self.add_lint(
-            &POSSIBLY_UNRESOLVED_REFERENCE,
-            expr_name_node.into(),
-            format_args!("Name `{id}` used when possibly not defined"),
-        );
-    }
-
-    pub(super) fn add_unresolved_reference(&mut self, expr_name_node: &ast::ExprName) {
-        let ast::ExprName { id, .. } = expr_name_node;
-
-        self.add_lint(
-            &UNRESOLVED_REFERENCE,
-            expr_name_node.into(),
-            format_args!("Name `{id}` used when not defined"),
-        );
-    }
-
-    pub(super) fn add_invalid_exception_caught(&mut self, db: &dyn Db, node: &ast::Expr, ty: Type) {
-        self.add_lint(
-            &INVALID_EXCEPTION_CAUGHT,
-            node.into(),
-            format_args!(
-                "Cannot catch object of type `{}` in an exception handler \
-                (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
-                ty.display(db)
-            ),
-        );
-    }
-
-    pub(super) fn add_lint(
-        &mut self,
-        lint: &'static LintMetadata,
-        node: AnyNodeRef,
-        message: std::fmt::Arguments,
-    ) {
-        // Skip over diagnostics if the rule is disabled.
-        let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
-            return;
-        };
-
-        self.add(node, DiagnosticId::Lint(lint.name()), severity, message);
-    }
-
-    /// Adds a new diagnostic.
-    ///
-    /// The diagnostic does not get added if the rule isn't enabled for this file.
-    pub(super) fn add(
-        &mut self,
-        node: AnyNodeRef,
-        id: DiagnosticId,
-        severity: Severity,
-        message: std::fmt::Arguments,
-    ) {
-        if !self.db.is_file_open(self.file) {
-            return;
-        }
-
-        // TODO: Don't emit the diagnostic if:
-        // * The enclosing node contains any syntax errors
-        // * The rule is disabled for this file. We probably want to introduce a new query that
-        //   returns a rule selector for a given file that respects the package's settings,
-        //   any global pragma comments in the file, and any per-file-ignores.
-
-        self.diagnostics.push(TypeCheckDiagnostic {
-            file: self.file,
-            id,
-            message: message.to_string(),
-            range: node.range(),
-            severity,
-        });
-    }
-
-    pub(super) fn extend(&mut self, diagnostics: &TypeCheckDiagnostics) {
-        self.diagnostics.extend(diagnostics);
-    }
-
-    pub(super) fn finish(mut self) -> TypeCheckDiagnostics {
-        self.diagnostics.shrink_to_fit();
-        self.diagnostics
-    }
+pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
+    context.report_lint(
+        &INVALID_EXCEPTION_CAUGHT,
+        node.into(),
+        format_args!(
+            "Cannot catch object of type `{}` in an exception handler \
+            (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
+            ty.display(context.db())
+        ),
+    );
 }
