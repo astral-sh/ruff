@@ -238,6 +238,8 @@ use super::constraint::Constraint;
 mod bitset;
 mod symbol_state;
 
+pub(crate) type AllConstraints<'db> = IndexVec<ScopedConstraintId, Constraint<'db>>;
+
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct UseDefMap<'db> {
@@ -245,7 +247,7 @@ pub(crate) struct UseDefMap<'db> {
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
 
     /// Array of [`Constraint`] in this scope.
-    all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_constraints: AllConstraints<'db>,
 
     /// Array of [`VisibilityConstraintRef`] in this scope.
     visibility_constraints: VisibilityConstraints,
@@ -358,7 +360,7 @@ enum SymbolDefinitions {
 #[derive(Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
-    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_constraints: &'map AllConstraints<'db>,
     inner: BindingIdWithConstraintsIterator<'map, 'db>,
 }
 
@@ -388,13 +390,13 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Option<Definition<'db>>,
     pub(crate) constraints: ConstraintsIterator<'map, 'db>,
-    pub(crate) all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    pub(crate) all_constraints: &'map AllConstraints<'db>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
-    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_constraints: &'map AllConstraints<'db>,
     constraint_ids: ConstraintIdIterator<'map>,
 }
 
@@ -418,7 +420,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
     type Item = (
         Option<Definition<'db>>,
-        &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+        &'map AllConstraints<'db>,
         &'map VisibilityConstraints,
         ScopedVisibilityConstraintId,
     );
@@ -452,7 +454,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
 
     /// Append-only array of [`Constraint`].
-    all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_constraints: AllConstraints<'db>,
 
     /// Append-only array of [`VisibilityConstraintRef`].
     visibility_constraints: VisibilityConstraints,
@@ -477,7 +479,7 @@ impl<'db> UseDefMapBuilder<'db> {
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
             visibility_constraints: VisibilityConstraints::new(),
-            unbound_visibility: ScopedVisibilityConstraintId::from_u32(0),
+            unbound_visibility: ScopedVisibilityConstraintId::ALWAYS_VISIBLE,
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
