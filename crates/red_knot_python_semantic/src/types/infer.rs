@@ -2198,11 +2198,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let base_exception_type = KnownClass::BaseException.to_subclass_of(self.db());
         let base_exception_instance = base_exception_type.to_instance(self.db());
-        let none = KnownClass::NoneType.to_instance(self.db());
 
         let can_be_raised =
             UnionType::from_elements(self.db(), [base_exception_type, base_exception_instance]);
-        let can_be_exception_cause = UnionType::from_elements(self.db(), [can_be_raised, none]);
+        let can_be_exception_cause = UnionType::from_elements(self.db(), [can_be_raised, Type::none(self.db())]);
 
         if let Some(raised) = exc {
             let raised_type = self.infer_expression(raised);
