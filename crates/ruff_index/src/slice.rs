@@ -1,5 +1,6 @@
 use crate::vec::IndexVec;
 use crate::Idx;
+use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut, Range};
@@ -113,6 +114,29 @@ impl<I: Idx, T> IndexSlice<I, T> {
         T: Ord,
     {
         match self.raw.binary_search(value) {
+            Ok(i) => Ok(Idx::new(i)),
+            Err(i) => Err(Idx::new(i)),
+        }
+    }
+
+    #[inline]
+    pub fn binary_search_by<'a, F>(&'a self, f: F) -> Result<I, I>
+    where
+        F: FnMut(&'a T) -> Ordering,
+    {
+        match self.raw.binary_search_by(f) {
+            Ok(i) => Ok(Idx::new(i)),
+            Err(i) => Err(Idx::new(i)),
+        }
+    }
+
+    #[inline]
+    pub fn binary_search_by_key<'a, B, F>(&'a self, key: &B, f: F) -> Result<I, I>
+    where
+        F: FnMut(&'a T) -> B,
+        B: Ord,
+    {
+        match self.raw.binary_search_by_key(key, f) {
             Ok(i) => Ok(Idx::new(i)),
             Err(i) => Err(Idx::new(i)),
         }
