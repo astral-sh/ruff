@@ -62,11 +62,11 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
-    typing_extensions_symbol, Boundness, Class, ClassLiteralType, FunctionType, InstanceType,
-    IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol,
-    Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionBuilder, UnionType,
+    typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
+    InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
+    KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
+    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -3203,10 +3203,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                let meta = operand_type.to_meta_type(self.db());
-                if let Symbol::Type(class_member, _) = meta.member(self.db(), unary_dunder_method) {
-                    let call = class_member.call(self.db(), &[operand_type]);
-
+                if let CallDunderResult::CallOutcome(call)
+                | CallDunderResult::PossiblyUnbound(call) =
+                    operand_type.call_dunder(self.db(), unary_dunder_method, &[operand_type])
+                {
                     match call.return_ty_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
                         Ok(t) => t,
                         Err(e) => {
