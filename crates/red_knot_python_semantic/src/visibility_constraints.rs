@@ -11,7 +11,7 @@ use crate::Db;
 const MAX_RECURSION_DEPTH: usize = 10;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum VisibilityConstraintRef {
+pub(crate) enum VisibilityConstraint {
     None,
     Single(ScopedConstraintId),
     Negated(ScopedVisibilityConstraintId),
@@ -21,20 +21,17 @@ pub(crate) enum VisibilityConstraintRef {
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraints {
-    constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
+    constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint>,
 }
 
 impl VisibilityConstraints {
     pub(crate) fn new() -> Self {
         Self {
-            constraints: IndexVec::from_iter([VisibilityConstraintRef::None]),
+            constraints: IndexVec::from_iter([VisibilityConstraint::None]),
         }
     }
 
-    pub(crate) fn add(
-        &mut self,
-        constraint: VisibilityConstraintRef,
-    ) -> ScopedVisibilityConstraintId {
+    pub(crate) fn add(&mut self, constraint: VisibilityConstraint) -> ScopedVisibilityConstraintId {
         self.constraints.push(constraint)
     }
 
@@ -44,13 +41,13 @@ impl VisibilityConstraints {
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
         match (&self.constraints[a], &self.constraints[b]) {
-            (_, VisibilityConstraintRef::Negated(id)) if a == *id => {
+            (_, VisibilityConstraint::Negated(id)) if a == *id => {
                 ScopedVisibilityConstraintId::from_u32(0)
             }
-            (VisibilityConstraintRef::Negated(id), _) if *id == b => {
+            (VisibilityConstraint::Negated(id), _) if *id == b => {
                 ScopedVisibilityConstraintId::from_u32(0)
             }
-            _ => self.add(VisibilityConstraintRef::Merged(a, b)),
+            _ => self.add(VisibilityConstraint::Merged(a, b)),
         }
     }
 
@@ -77,7 +74,7 @@ impl VisibilityConstraints {
 
         let visibility_constraint = &self.constraints[id];
         match visibility_constraint {
-            VisibilityConstraintRef::Single(id) => {
+            VisibilityConstraint::Single(id) => {
                 let constraint = &constraints[*id];
 
                 match constraint.node {
@@ -124,11 +121,11 @@ impl VisibilityConstraints {
                     },
                 }
             }
-            VisibilityConstraintRef::Negated(inner_id) => self
+            VisibilityConstraint::Negated(inner_id) => self
                 .analyze_impl(db, constraints, *inner_id, max_depth - 1)
                 .negate(),
-            VisibilityConstraintRef::None => Truthiness::AlwaysTrue,
-            VisibilityConstraintRef::Sequence(lhs, rhs) => {
+            VisibilityConstraint::None => Truthiness::AlwaysTrue,
+            VisibilityConstraint::Sequence(lhs, rhs) => {
                 let lhs = self.analyze_impl(db, constraints, *lhs, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysFalse {
@@ -145,7 +142,7 @@ impl VisibilityConstraints {
                     Truthiness::Ambiguous
                 }
             }
-            VisibilityConstraintRef::Merged(lhs_id, rhs_id) => {
+            VisibilityConstraint::Merged(lhs_id, rhs_id) => {
                 let lhs = self.analyze_impl(db, constraints, *lhs_id, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysTrue {
