@@ -338,14 +338,7 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
-            inner: {
-                DeclarationIdIterator {
-                    all_constraints: &self.all_constraints,
-                    visibility_constraints: &self.visibility_constraints,
-                    declarations_iter: declarations.live_declarations.iter(),
-                    visibility_constraints_iter: declarations.visibility_constraints.iter(),
-                }
-            },
+            inner: declarations.iter(&self.all_constraints, &self.visibility_constraints),
         }
     }
 }

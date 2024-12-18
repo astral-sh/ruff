@@ -53,6 +53,10 @@ use smallvec::SmallVec;
 #[newtype_index]
 pub(super) struct ScopedDefinitionId;
 
+impl ScopedDefinitionId {
+    pub(super) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
+}
+
 /// A newtype-index for a constraint expression in a particular scope.
 #[newtype_index]
 pub(crate) struct ScopedConstraintId;
@@ -145,17 +149,19 @@ impl SymbolDeclarations {
         }
     }
 
-    // /// Return an iterator over live declarations for this symbol.
-    // pub(super) fn iter<'map, 'db>(
-    //     &'db self,
-    //     all_constraints: &'map AllConstraints<'db>,
-    // ) -> DeclarationIdIterator<'map, 'db> {
-    //     DeclarationIdIterator {
-    //         all_constraints,
-    //         inner: self.live_declarations.iter(),
-    //         visibility_constraints: self.visibility_constraints.iter(),
-    //     }
-    // }
+    /// Return an iterator over live declarations for this symbol.
+    pub(super) fn iter<'map, 'db>(
+        &'map self,
+        all_constraints: &'map AllConstraints<'db>,
+        visibility_constraints: &'map VisibilityConstraints,
+    ) -> DeclarationIdIterator<'map, 'db> {
+        DeclarationIdIterator {
+            all_constraints,
+            visibility_constraints,
+            declarations_iter: self.live_declarations.iter(),
+            visibility_constraints_iter: self.visibility_constraints.iter(),
+        }
+    }
 
     // pub(super) fn is_empty(&self) -> bool {
     //     self.live_declarations.is_empty()
@@ -251,6 +257,7 @@ impl SymbolState {
 
     /// Record a newly-encountered binding for this symbol.
     pub(super) fn record_binding(&mut self, binding_id: ScopedDefinitionId) {
+        debug_assert!(binding_id != ScopedDefinitionId::UNBOUND);
         self.bindings.record_binding(binding_id);
     }
 
@@ -596,184 +603,207 @@ impl std::iter::FusedIterator for DeclarationIdIterator<'_, '_> {}
 
 #[cfg(test)]
 mod tests {
-    // use crate::visibility_constraints;
+    use super::*;
 
-    // use super::*;
+    #[track_caller]
+    fn assert_bindings<'db>(
+        constraints: &AllConstraints<'db>,
+        visibility_constraints: &VisibilityConstraints,
+        symbol: &SymbolState,
+        expected: &[&str],
+    ) {
+        let actual = symbol
+            .bindings()
+            .iter(&constraints, &visibility_constraints)
+            .map(|def_id_with_constraints| {
+                let def_id = def_id_with_constraints.definition;
+                let def = if def_id == ScopedDefinitionId::UNBOUND {
+                    "unbound".into()
+                } else {
+                    def_id.as_u32().to_string()
+                };
+                let constraints = def_id_with_constraints
+                    .constraint_ids
+                    .map(ScopedConstraintId::as_u32)
+                    .map(|idx| idx.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{def}<{constraints}>")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
 
-    // #[track_caller]
-    // fn assert_bindings(symbol: &SymbolState, may_be_unbound: bool, expected: &[&str]) {
-    //     // assert_eq!(symbol.bindings.may_be_unbound, may_be_unbound);
-    //     let mut actual = symbol
-    //         .bindings()
-    //         .iter()
-    //         .map(|def_id_with_constraints| {
-    //             format!(
-    //                 "{}<{}>",
-    //                 def_id_with_constraints.definition.as_u32(),
-    //                 def_id_with_constraints
-    //                     .constraint_ids
-    //                     .map(ScopedConstraintId::as_u32)
-    //                     .map(|idx| idx.to_string())
-    //                     .collect::<Vec<_>>()
-    //                     .join(", ")
-    //             )
-    //         })
-    //         .collect::<Vec<_>>();
-    //     actual.reverse();
-    //     assert_eq!(actual, expected);
-    // }
+    #[track_caller]
+    pub(crate) fn assert_declarations<'db>(
+        constraints: &AllConstraints<'db>,
+        visibility_constraints: &VisibilityConstraints,
+        symbol: &SymbolState,
+        expected: &[&str],
+    ) {
+        let actual = symbol
+            .declarations()
+            .iter(&constraints, &visibility_constraints)
+            .map(|(def_id, _, _, _)| {
+                if def_id == ScopedDefinitionId::UNBOUND {
+                    "undeclared".into()
+                } else {
+                    def_id.as_u32().to_string()
+                }
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
 
-    // #[track_caller]
-    // pub(crate) fn assert_declarations(
-    //     symbol: &SymbolState,
-    //     may_be_undeclared: bool,
-    //     expected: &[u32],
-    // ) {
-    //     // assert_eq!(symbol.declarations.may_be_undeclared(), may_be_undeclared);
-    //     let mut actual = symbol
-    //         .declarations()
-    //         .iter()
-    //         .map(|(d, _)| d.as_u32())
-    //         .collect::<Vec<_>>();
-    //     actual.reverse();
-    //     assert_eq!(actual, expected);
-    // }
+    #[test]
+    fn unbound() {
+        let constraints = AllConstraints::new();
+        let visibility_constraints = VisibilityConstraints::new();
+        let sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
 
-    // #[test]
-    // fn unbound() {
-    //     let visibility_constraints = VisibilityConstraints::new();
-    //     let unbound_visibility = ScopedVisibilityConstraintId::ALWAYS_VISIBLE;
-    //     let sym = SymbolState::undefined(unbound_visibility);
+        assert_bindings(&constraints, &visibility_constraints, &sym, &["unbound<>"]);
+    }
 
-    //     assert_bindings(&sym, true, &[]);
-    // }
+    #[test]
+    fn with() {
+        let constraints = AllConstraints::new();
+        let visibility_constraints = VisibilityConstraints::new();
+        let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym.record_binding(ScopedDefinitionId::from_u32(1));
 
-    // #[test]
-    // fn with() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_binding(ScopedDefinitionId::from_u32(0));
+        assert_bindings(&constraints, &visibility_constraints, &sym, &["1<>"]);
+    }
 
-    //     assert_bindings(&sym, false, &["0<>"]);
-    // }
+    #[test]
+    fn record_constraint() {
+        let constraints = AllConstraints::new();
+        let visibility_constraints = VisibilityConstraints::new();
+        let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym.record_binding(ScopedDefinitionId::from_u32(1));
+        sym.record_constraint(ScopedConstraintId::from_u32(0));
 
-    // #[test]
-    // fn set_may_be_unbound() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_binding(ScopedDefinitionId::from_u32(0));
-    //     sym.set_may_be_unbound();
+        assert_bindings(&constraints, &visibility_constraints, &sym, &["1<0>"]);
+    }
 
-    //     assert_bindings(&sym, true, &["0<>"]);
-    // }
+    #[test]
+    fn merge() {
+        let constraints = AllConstraints::new();
+        let mut visibility_constraints = VisibilityConstraints::new();
 
-    // #[test]
-    // fn record_constraint() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_binding(ScopedDefinitionId::from_u32(0));
-    //     sym.record_constraint(ScopedConstraintId::from_u32(0));
+        // merging the same definition with the same constraint keeps the constraint
+        let mut sym1a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym1a.record_binding(ScopedDefinitionId::from_u32(1));
+        sym1a.record_constraint(ScopedConstraintId::from_u32(0));
 
-    //     assert_bindings(&sym, false, &["0<0>"]);
-    // }
+        let mut sym1b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym1b.record_binding(ScopedDefinitionId::from_u32(1));
+        sym1b.record_constraint(ScopedConstraintId::from_u32(0));
 
-    // #[test]
-    // fn merge() {
-    //     // merging the same definition with the same constraint keeps the constraint
-    //     let mut sym0a = SymbolState::undefined();
-    //     sym0a.record_binding(ScopedDefinitionId::from_u32(0));
-    //     sym0a.record_constraint(ScopedConstraintId::from_u32(0));
+        sym1a.merge(sym1b, &mut visibility_constraints);
+        let mut sym1 = sym1a;
+        assert_bindings(&constraints, &visibility_constraints, &sym1, &["1<0>"]);
 
-    //     let mut sym0b = SymbolState::undefined();
-    //     sym0b.record_binding(ScopedDefinitionId::from_u32(0));
-    //     sym0b.record_constraint(ScopedConstraintId::from_u32(0));
+        // merging the same definition with differing constraints drops all constraints
+        let mut sym2a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym2a.record_binding(ScopedDefinitionId::from_u32(2));
+        sym2a.record_constraint(ScopedConstraintId::from_u32(1));
 
-    //     sym0a.merge(sym0b);
-    //     let mut sym0 = sym0a;
-    //     assert_bindings(&sym0, false, &["0<0>"]);
+        let mut sym1b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym1b.record_binding(ScopedDefinitionId::from_u32(2));
+        sym1b.record_constraint(ScopedConstraintId::from_u32(2));
 
-    //     // merging the same definition with differing constraints drops all constraints
-    //     let mut sym1a = SymbolState::undefined();
-    //     sym1a.record_binding(ScopedDefinitionId::from_u32(1));
-    //     sym1a.record_constraint(ScopedConstraintId::from_u32(1));
+        sym2a.merge(sym1b, &mut visibility_constraints);
+        let sym2 = sym2a;
+        assert_bindings(&constraints, &visibility_constraints, &sym2, &["2<>"]);
 
-    //     let mut sym1b = SymbolState::undefined();
-    //     sym1b.record_binding(ScopedDefinitionId::from_u32(1));
-    //     sym1b.record_constraint(ScopedConstraintId::from_u32(2));
+        // merging a constrained definition with unbound keeps both
+        let mut sym3a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym3a.record_binding(ScopedDefinitionId::from_u32(3));
+        sym3a.record_constraint(ScopedConstraintId::from_u32(3));
 
-    //     sym1a.merge(sym1b);
-    //     let sym1 = sym1a;
-    //     assert_bindings(&sym1, false, &["1<>"]);
+        let sym2b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
 
-    //     // merging a constrained definition with unbound keeps both
-    //     let mut sym2a = SymbolState::undefined();
-    //     sym2a.record_binding(ScopedDefinitionId::from_u32(2));
-    //     sym2a.record_constraint(ScopedConstraintId::from_u32(3));
+        sym3a.merge(sym2b, &mut visibility_constraints);
+        let sym3 = sym3a;
+        assert_bindings(
+            &constraints,
+            &visibility_constraints,
+            &sym3,
+            &["unbound<>", "3<3>"],
+        );
 
-    //     let sym2b = SymbolState::undefined();
+        // merging different definitions keeps them each with their existing constraints
+        sym1.merge(sym3, &mut visibility_constraints);
+        let sym = sym1;
+        assert_bindings(
+            &constraints,
+            &visibility_constraints,
+            &sym,
+            &["unbound<>", "1<0>", "3<3>"],
+        );
+    }
 
-    //     sym2a.merge(sym2b);
-    //     let sym2 = sym2a;
-    //     assert_bindings(&sym2, true, &["2<3>"]);
+    #[test]
+    fn no_declaration() {
+        let constraints = AllConstraints::new();
+        let visibility_constraints = VisibilityConstraints::new();
+        let sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
 
-    //     // merging different definitions keeps them each with their existing constraints
-    //     sym0.merge(sym2);
-    //     let sym = sym0;
-    //     assert_bindings(&sym, true, &["0<0>", "2<3>"]);
-    // }
+        assert_declarations(&constraints, &visibility_constraints, &sym, &["undeclared"]);
+    }
 
-    // #[test]
-    // fn no_declaration() {
-    //     let sym = SymbolState::undefined();
+    #[test]
+    fn record_declaration() {
+        let constraints = AllConstraints::new();
+        let visibility_constraints = VisibilityConstraints::new();
+        let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
-    //     assert_declarations(&sym, true, &[]);
-    // }
+        assert_declarations(&constraints, &visibility_constraints, &sym, &["1"]);
+    }
 
-    // #[test]
-    // fn record_declaration() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(1));
+    #[test]
+    fn record_declaration_override() {
+        let constraints = AllConstraints::new();
+        let visibility_constraints = VisibilityConstraints::new();
+        let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym.record_declaration(ScopedDefinitionId::from_u32(1));
+        sym.record_declaration(ScopedDefinitionId::from_u32(2));
 
-    //     assert_declarations(&sym, false, &[1]);
-    // }
+        assert_declarations(&constraints, &visibility_constraints, &sym, &["2"]);
+    }
 
-    // #[test]
-    // fn record_declaration_override() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(1));
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(2));
+    #[test]
+    fn record_declaration_merge() {
+        let constraints = AllConstraints::new();
+        let mut visibility_constraints = VisibilityConstraints::new();
+        let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
-    //     assert_declarations(&sym, false, &[2]);
-    // }
+        let mut sym2 = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym2.record_declaration(ScopedDefinitionId::from_u32(2));
 
-    // #[test]
-    // fn record_declaration_merge() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(1));
+        sym.merge(sym2, &mut visibility_constraints);
 
-    //     let mut sym2 = SymbolState::undefined();
-    //     sym2.record_declaration(ScopedDefinitionId::from_u32(2));
+        assert_declarations(&constraints, &visibility_constraints, &sym, &["1", "2"]);
+    }
 
-    //     sym.merge(sym2);
+    #[test]
+    fn record_declaration_merge_partial_undeclared() {
+        let constraints = AllConstraints::new();
+        let mut visibility_constraints = VisibilityConstraints::new();
+        let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
+        sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
-    //     assert_declarations(&sym, false, &[1, 2]);
-    // }
+        let sym2 = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
 
-    // #[test]
-    // fn record_declaration_merge_partial_undeclared() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(1));
+        sym.merge(sym2, &mut visibility_constraints);
 
-    //     let sym2 = SymbolState::undefined();
-
-    //     sym.merge(sym2);
-
-    //     assert_declarations(&sym, true, &[1]);
-    // }
-
-    // #[test]
-    // fn set_may_be_undeclared() {
-    //     let mut sym = SymbolState::undefined();
-    //     sym.record_declaration(ScopedDefinitionId::from_u32(0));
-    //     sym.set_may_be_undeclared();
-
-    //     assert_declarations(&sym, true, &[0]);
-    // }
+        assert_declarations(
+            &constraints,
+            &visibility_constraints,
+            &sym,
+            &["undeclared", "1"],
+        );
+    }
 }
