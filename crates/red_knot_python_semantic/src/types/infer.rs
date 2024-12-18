@@ -62,11 +62,11 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
-    typing_extensions_symbol, Boundness, Class, ClassLiteralType, FunctionType, InstanceType,
-    IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, Symbol,
-    Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionBuilder, UnionType,
+    typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
+    InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
+    KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
+    Symbol, Truthiness, TupleType, Type, TypeAliasType, TypeArrayDisplay,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -3201,6 +3201,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let operand_type = self.infer_expression(operand);
 
         match (op, operand_type) {
+            (_, Type::Any) => Type::Any,
+            (_, Type::Todo(_)) => operand_type,
+            (_, Type::Never) => Type::Never,
+            (_, Type::Unknown) => Type::Unknown,
+
             (UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
             (UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
@@ -3210,11 +3215,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
 
             (UnaryOp::Not, ty) => ty.bool(self.db()).negate().into_type(self.db()),
-            (_, Type::Any) => Type::Any,
-            (_, Type::Unknown) => Type::Unknown,
             (
                 op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert),
-                Type::Instance(InstanceType { class }),
+                Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::Instance(_)
+                | Type::KnownInstance(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)
+                | Type::SliceLiteral(_)
+                | Type::Tuple(_),
             ) => {
                 let unary_dunder_method = match op {
                     UnaryOp::Invert => "__invert__",
@@ -3225,11 +3242,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                if let Symbol::Type(class_member, _) =
-                    class.class_member(self.db(), unary_dunder_method)
+                if let CallDunderResult::CallOutcome(call)
+                | CallDunderResult::PossiblyUnbound(call) =
+                    operand_type.call_dunder(self.db(), unary_dunder_method, &[operand_type])
                 {
-                    let call = class_member.call(self.db(), &[operand_type]);
-
                     match call.return_ty_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
                         Ok(t) => t,
                         Err(e) => {
@@ -3257,7 +3273,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Unknown
                 }
             }
-            _ => todo_type!(), // TODO other unary op types
         }
     }
 
