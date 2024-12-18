@@ -1,6 +1,5 @@
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
-use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{ExprCall, Keyword, StringLiteralValue};
@@ -104,13 +103,10 @@ pub(crate) fn pytest_raises_ambiguous_pattern(checker: &mut Checker, call: &Expr
 
 fn string_has_unescaped_metacharacters(value: &StringLiteralValue) -> bool {
     let mut escaped = false;
-    let mut last = '\x00';
 
-    for (current, next) in value.chars().tuple_windows() {
-        last = next;
-
+    for character in value.chars() {
         if escaped {
-            if escaped_char_is_regex_metasequence(current) {
+            if escaped_char_is_regex_metasequence(character) {
                 return true;
             }
 
@@ -118,21 +114,17 @@ fn string_has_unescaped_metacharacters(value: &StringLiteralValue) -> bool {
             continue;
         }
 
-        if current == '\\' {
+        if character == '\\' {
             escaped = true;
             continue;
         }
 
-        if char_is_regex_metacharacter(current) {
+        if char_is_regex_metacharacter(character) {
             return true;
         }
     }
 
-    if escaped {
-        escaped_char_is_regex_metasequence(last)
-    } else {
-        char_is_regex_metacharacter(last)
-    }
+    false
 }
 
 /// Whether the sequence `\<c>` means anything special:
