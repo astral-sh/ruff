@@ -41,3 +41,31 @@ import sys
 
 reveal_type(sys.platform)  # revealed: Literal["linux"]
 ```
+
+## Testing for a specific platform
+
+### Exact comparison
+
+```toml
+[environment]
+python-platform = "freebsd8"
+```
+
+```py
+import sys
+
+reveal_type(sys.platform == "freebsd8")  # revealed: Literal[True]
+reveal_type(sys.platform == "linux")  # revealed: Literal[False]
+```
+
+### Substring comparison
+
+It is [recommended](https://docs.python.org/3/library/sys.html#sys.platform) to use
+`sys.platform.startswith(...)` for platform checks. This is not yet supported in type inference:
+
+```py
+import sys
+
+reveal_type(sys.platform.startswith("freebsd"))  # revealed: @Todo(call todo)
+reveal_type(sys.platform.startswith("linux"))  # revealed: @Todo(call todo)
+```
