@@ -1,6 +1,6 @@
 # Custom unary operations
 
-## Class method
+## Class instances
 
 ```py
 class Yes:
@@ -30,4 +30,103 @@ reveal_type(+No())  # revealed: Unknown
 reveal_type(-No())  # revealed: Unknown
 # error: [unsupported-operator] "Unary operator `~` is unsupported for type `No`"
 reveal_type(~No())  # revealed: Unknown
+```
+
+## Classes
+
+```py
+class Yes:
+    def __pos__(self) -> bool:
+        return False
+
+    def __neg__(self) -> str:
+        return "negative"
+
+    def __invert__(self) -> int:
+        return 17
+
+class Sub(Yes): ...
+class No: ...
+
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[Yes]`"
+reveal_type(+Yes)  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[Yes]`"
+reveal_type(-Yes)  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[Yes]`"
+reveal_type(~Yes)  # revealed: Unknown
+
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[Sub]`"
+reveal_type(+Sub)  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[Sub]`"
+reveal_type(-Sub)  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[Sub]`"
+reveal_type(~Sub)  # revealed: Unknown
+
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[No]`"
+reveal_type(+No)  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[No]`"
+reveal_type(-No)  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[No]`"
+reveal_type(~No)  # revealed: Unknown
+```
+
+## Function literals
+
+```py
+def f():
+    pass
+
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[f]`"
+reveal_type(+f)  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[f]`"
+reveal_type(-f)  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[f]`"
+reveal_type(~f)  # revealed: Unknown
+```
+
+## Subclass
+
+```py
+class Yes:
+    def __pos__(self) -> bool:
+        return False
+
+    def __neg__(self) -> str:
+        return "negative"
+
+    def __invert__(self) -> int:
+        return 17
+
+class Sub(Yes): ...
+class No: ...
+
+def yes() -> type[Yes]:
+    return Yes
+
+def sub() -> type[Sub]:
+    return Sub
+
+def no() -> type[No]:
+    return No
+
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[Yes]`"
+reveal_type(+yes())  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[Yes]`"
+reveal_type(-yes())  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[Yes]`"
+reveal_type(~yes())  # revealed: Unknown
+
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[Sub]`"
+reveal_type(+sub())  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[Sub]`"
+reveal_type(-sub())  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[Sub]`"
+reveal_type(~sub())  # revealed: Unknown
+
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `type[No]`"
+reveal_type(+no())  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `type[No]`"
+reveal_type(-no())  # revealed: Unknown
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `type[No]`"
+reveal_type(~no())  # revealed: Unknown
 ```
