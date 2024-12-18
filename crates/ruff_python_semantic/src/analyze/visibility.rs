@@ -1,7 +1,8 @@
-use ruff_python_ast::{self as ast, Decorator, Expr};
+use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
+use ruff_python_ast::{self as ast, Decorator, Expr};
 
 use crate::model::SemanticModel;
 use crate::{Module, ModuleSource};
@@ -42,22 +43,57 @@ pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
 pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    decorator_list.iter().any(|decorator| {
-        semantic
-            .resolve_qualified_name(&decorator.expression)
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    [
-                        "abc",
-                        "abstractmethod"
-                            | "abstractclassmethod"
-                            | "abstractstaticmethod"
-                            | "abstractproperty"
-                    ]
-                )
-            })
-    })
+    AbstractDecoratorKind::from_decorators(decorator_list, semantic).is_some()
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum AbstractDecoratorKind {
+    /// `abc.abstractmethod`
+    AbstractMethod,
+    /// `abc.abstractclassmethod`
+    AbstractClassMethod,
+    /// `abc.abstractstaticmethod`
+    AbstractStaticMethod,
+    /// `abc.abstractproperty`
+    AbstractProperty,
+}
+
+impl AbstractDecoratorKind {
+    pub fn from_decorators(decorators: &[Decorator], semantic: &SemanticModel) -> Option<Self> {
+        decorators
+            .iter()
+            .find_map(|decorator| Self::from_decorator(decorator, semantic))
+    }
+    fn from_decorator(decorator: &Decorator, semantic: &SemanticModel) -> Option<Self> {
+        let qualified_name = semantic.resolve_qualified_name(&decorator.expression)?;
+
+        Self::from_name(&qualified_name)
+    }
+
+    fn from_name(name: &QualifiedName) -> Option<Self> {
+        if let ["abc", abc_method] = name.segments() {
+            match *abc_method {
+                "abstractmethod" => Some(Self::AbstractMethod),
+                "abstractclassmethod" => Some(Self::AbstractClassMethod),
+                "abstractstaticmethod" => Some(Self::AbstractStaticMethod),
+                "abstractproperty" => Some(Self::AbstractProperty),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl Display for AbstractDecoratorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::AbstractMethod => "abstractmethod",
+            Self::AbstractClassMethod => "abstractclassmethod",
+            Self::AbstractStaticMethod => "abstractstaticmethod",
+            Self::AbstractProperty => "abstractproperty",
+        })
+    }
 }
 
 /// Returns `true` if a function definition is a `@property`.
