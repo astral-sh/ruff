@@ -3,7 +3,8 @@ use ruff_index::IndexVec;
 use crate::semantic_index::{
     ast_ids::HasScopedExpressionId,
     constraint::{Constraint, ConstraintNode, PatternConstraintKind},
-    visibility_constraint::VisibilityConstraintRef,
+    visibility_constraints::VisibilityConstraintRef,
+    visibility_constraints::VisibilityConstraints,
     ScopedConstraintId, ScopedVisibilityConstraintId,
 };
 use crate::types::{infer_expression_types, Truthiness};
@@ -15,7 +16,7 @@ const MAX_RECURSION_DEPTH: usize = 10;
 pub(crate) fn analyze<'db>(
     db: &'db dyn Db,
     all_constraints: &IndexVec<ScopedConstraintId, Constraint<'db>>,
-    all_visibility_constraints: &IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
+    all_visibility_constraints: &VisibilityConstraints,
     visibility_constraint_id: ScopedVisibilityConstraintId,
 ) -> Truthiness {
     analyze_impl(
@@ -30,7 +31,7 @@ pub(crate) fn analyze<'db>(
 fn analyze_impl<'db>(
     db: &'db dyn Db,
     all_constraints: &IndexVec<ScopedConstraintId, Constraint<'db>>,
-    all_visibility_constraints: &IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
+    all_visibility_constraints: &VisibilityConstraints,
     visibility_constraint_id: ScopedVisibilityConstraintId,
     max_depth: usize,
 ) -> Truthiness {
