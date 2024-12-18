@@ -209,7 +209,14 @@ fn should_be_fstring(
                     return false;
                 }
                 if semantic
-                    .lookup_symbol(id)
+                    // the parsed expression nodes have incorrect ranges
+                    // so we need to use the range of the literal for the
+                    // lookup in order to get reasonable results.
+                    .simulate_runtime_load_at_location_in_scope(
+                        id,
+                        literal.range(),
+                        semantic.scope_id,
+                    )
                     .map_or(true, |id| semantic.binding(id).kind.is_builtin())
                 {
                     return false;
