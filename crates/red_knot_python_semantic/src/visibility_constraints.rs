@@ -12,9 +12,9 @@ const MAX_RECURSION_DEPTH: usize = 10;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum VisibilityConstraint {
-    None,
-    Single(ScopedConstraintId),
-    Negated(ScopedVisibilityConstraintId),
+    AlwaysTrue,
+    VisibleIf(ScopedConstraintId),
+    VisibleIfNot(ScopedVisibilityConstraintId),
     Sequence(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
     Merged(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
 }
@@ -27,7 +27,7 @@ pub(crate) struct VisibilityConstraints {
 impl VisibilityConstraints {
     pub(crate) fn new() -> Self {
         Self {
-            constraints: IndexVec::from_iter([VisibilityConstraint::None]),
+            constraints: IndexVec::from_iter([VisibilityConstraint::AlwaysTrue]),
         }
     }
 
@@ -41,13 +41,25 @@ impl VisibilityConstraints {
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
         match (&self.constraints[a], &self.constraints[b]) {
-            (_, VisibilityConstraint::Negated(id)) if a == *id => {
+            (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => {
                 ScopedVisibilityConstraintId::from_u32(0)
             }
-            (VisibilityConstraint::Negated(id), _) if *id == b => {
+            (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => {
                 ScopedVisibilityConstraintId::from_u32(0)
             }
             _ => self.add(VisibilityConstraint::Merged(a, b)),
+        }
+    }
+
+    pub(crate) fn add_sequence(
+        &mut self,
+        a: ScopedVisibilityConstraintId,
+        b: ScopedVisibilityConstraintId,
+    ) -> ScopedVisibilityConstraintId {
+        if a == ScopedVisibilityConstraintId::from_u32(0) {
+            b
+        } else {
+            self.add(VisibilityConstraint::Sequence(a, b))
         }
     }
 
@@ -74,57 +86,13 @@ impl VisibilityConstraints {
 
         let visibility_constraint = &self.constraints[id];
         match visibility_constraint {
-            VisibilityConstraint::Single(id) => {
-                let constraint = &constraints[*id];
-
-                match constraint.node {
-                    ConstraintNode::Expression(test_expr) => {
-                        let inference = infer_expression_types(db, test_expr);
-                        let scope = test_expr.scope(db);
-                        let ty = inference
-                            .expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope));
-
-                        ty.bool(db).negate_if(!constraint.is_positive)
-                    }
-                    ConstraintNode::Pattern(inner) => match inner.kind(db) {
-                        PatternConstraintKind::Value(value, guard) => {
-                            let subject_expression = inner.subject(db);
-                            let inference = infer_expression_types(db, *subject_expression);
-                            let scope = subject_expression.scope(db);
-                            let subject_ty = inference.expression_ty(
-                                subject_expression
-                                    .node_ref(db)
-                                    .scoped_expression_id(db, scope),
-                            );
-
-                            let inference = infer_expression_types(db, *value);
-                            let scope = value.scope(db);
-                            let value_ty = inference
-                                .expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
-
-                            if subject_ty.is_single_valued(db) {
-                                let truthiness =
-                                    Truthiness::from(subject_ty.is_equivalent_to(db, value_ty));
-
-                                if truthiness.is_always_true() && guard.is_some() {
-                                    // Fall back to ambiguous, the guard might change the result.
-                                    Truthiness::Ambiguous
-                                } else {
-                                    truthiness
-                                }
-                            } else {
-                                Truthiness::Ambiguous
-                            }
-                        }
-                        PatternConstraintKind::Singleton(..)
-                        | PatternConstraintKind::Unsupported => Truthiness::Ambiguous,
-                    },
-                }
+            VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
+            VisibilityConstraint::VisibleIf(single) => {
+                Self::analyze_single(db, &constraints[*single])
             }
-            VisibilityConstraint::Negated(inner_id) => self
-                .analyze_impl(db, constraints, *inner_id, max_depth - 1)
+            VisibilityConstraint::VisibleIfNot(negated) => self
+                .analyze_impl(db, constraints, *negated, max_depth - 1)
                 .negate(),
-            VisibilityConstraint::None => Truthiness::AlwaysTrue,
             VisibilityConstraint::Sequence(lhs, rhs) => {
                 let lhs = self.analyze_impl(db, constraints, *lhs, max_depth - 1);
 
@@ -159,6 +127,53 @@ impl VisibilityConstraints {
                     Truthiness::Ambiguous
                 }
             }
+        }
+    }
+
+    fn analyze_single(db: &dyn Db, constraint: &Constraint) -> Truthiness {
+        match constraint.node {
+            ConstraintNode::Expression(test_expr) => {
+                let inference = infer_expression_types(db, test_expr);
+                let scope = test_expr.scope(db);
+                let ty =
+                    inference.expression_ty(test_expr.node_ref(db).scoped_expression_id(db, scope));
+
+                ty.bool(db).negate_if(!constraint.is_positive)
+            }
+            ConstraintNode::Pattern(inner) => match inner.kind(db) {
+                PatternConstraintKind::Value(value, guard) => {
+                    let subject_expression = inner.subject(db);
+                    let inference = infer_expression_types(db, *subject_expression);
+                    let scope = subject_expression.scope(db);
+                    let subject_ty = inference.expression_ty(
+                        subject_expression
+                            .node_ref(db)
+                            .scoped_expression_id(db, scope),
+                    );
+
+                    let inference = infer_expression_types(db, *value);
+                    let scope = value.scope(db);
+                    let value_ty =
+                        inference.expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
+
+                    if subject_ty.is_single_valued(db) {
+                        let truthiness =
+                            Truthiness::from(subject_ty.is_equivalent_to(db, value_ty));
+
+                        if truthiness.is_always_true() && guard.is_some() {
+                            // Fall back to ambiguous, the guard might change the result.
+                            Truthiness::Ambiguous
+                        } else {
+                            truthiness
+                        }
+                    } else {
+                        Truthiness::Ambiguous
+                    }
+                }
+                PatternConstraintKind::Singleton(..) | PatternConstraintKind::Unsupported => {
+                    Truthiness::Ambiguous
+                }
+            },
         }
     }
 }

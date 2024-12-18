@@ -523,16 +523,9 @@ impl<'db> UseDefMapBuilder<'db> {
             state.record_visibility_constraint(&mut self.visibility_constraints, new_constraint_id);
         }
 
-        if self.unbound_visibility_constraint_id == ScopedVisibilityConstraintId::from_u32(0) {
-            self.unbound_visibility_constraint_id = new_constraint_id;
-        } else {
-            self.unbound_visibility_constraint_id =
-                self.visibility_constraints
-                    .add(VisibilityConstraint::Sequence(
-                        self.unbound_visibility_constraint_id,
-                        new_constraint_id,
-                    ));
-        }
+        self.unbound_visibility_constraint_id = self
+            .visibility_constraints
+            .add_sequence(self.unbound_visibility_constraint_id, new_constraint_id);
 
         new_constraint_id
     }
