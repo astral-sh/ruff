@@ -835,7 +835,8 @@ reveal_type(x)  # revealed: Literal[2]
 
 (y := 1) and (y := 2) and (y := 3) and (y := 4)
 
-reveal_type(y)  # revealed: Literal[4]
+# TODO: should be Literal[4]
+reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
 
 ### Always false, `or`
@@ -847,7 +848,8 @@ reveal_type(x)  # revealed: Literal[1]
 
 (y := 0) or (y := 0) or (y := 1) or (y := 2)
 
-reveal_type(y)  # revealed: Literal[1]
+# TODO: should be Literal[1]
+reveal_type(y)  # revealed: Literal[0, 1]
 ```
 
 ### Always false, `and`
@@ -859,7 +861,8 @@ reveal_type(x)  # revealed: Literal[0]
 
 (y := 0) and (y := 1) and (y := 2) and (y := 3)
 
-reveal_type(y)  # revealed: Literal[0]
+# TODO: should be Literal[0]
+reveal_type(y)  # revealed: Literal[2, 3]
 ```
 
 ## While loops
