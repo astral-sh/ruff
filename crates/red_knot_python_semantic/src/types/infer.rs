@@ -3196,7 +3196,24 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
 
             (UnaryOp::Not, ty) => ty.bool(self.db()).negate().into_type(self.db()),
-            (op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert), _) => {
+            (
+                op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert),
+                Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::Instance(_)
+                | Type::KnownInstance(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)
+                | Type::SliceLiteral(_)
+                | Type::Tuple(_),
+            ) => {
                 let unary_dunder_method = match op {
                     UnaryOp::Invert => "__invert__",
                     UnaryOp::UAdd => "__pos__",
