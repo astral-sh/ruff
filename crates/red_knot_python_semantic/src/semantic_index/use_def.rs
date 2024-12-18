@@ -472,7 +472,7 @@ impl<'db> UseDefMapBuilder<'db> {
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
             visibility_constraints: VisibilityConstraints::new(),
-            unbound_visibility: ScopedVisibilityConstraintId::ALWAYS_VISIBLE,
+            unbound_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
@@ -504,18 +504,11 @@ impl<'db> UseDefMapBuilder<'db> {
         constraint_id
     }
 
-    pub(super) fn add_visibility_constraint(
-        &mut self,
-        constraint: VisibilityConstraint,
-    ) -> ScopedVisibilityConstraintId {
-        self.visibility_constraints.add(constraint)
-    }
-
     pub(super) fn record_visibility_constraint(
         &mut self,
         constraint: VisibilityConstraint,
     ) -> ScopedVisibilityConstraintId {
-        let new_constraint_id = self.add_visibility_constraint(constraint);
+        let new_constraint_id = self.visibility_constraints.add(constraint);
         for state in &mut self.symbol_states {
             state.record_visibility_constraint(&mut self.visibility_constraints, new_constraint_id);
         }

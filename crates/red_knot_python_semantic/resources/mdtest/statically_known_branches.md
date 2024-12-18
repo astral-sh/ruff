@@ -41,8 +41,6 @@ if typing.TYPE_CHECKING:
 def f(s: SomeType) -> None: ...
 ```
 
-The rest of this document contains tests for various cases where this feature can be used.
-
 ## Common use cases
 
 This section makes sure that we can handle all commonly encountered patterns of static conditions.
@@ -163,6 +161,9 @@ other
 ```
 
 ## If statements
+
+The rest of this document contains tests for various control flow elements. This section tests `if`
+statements.
 
 ### Always false
 
@@ -349,7 +350,7 @@ else:
 reveal_type(x)  # revealed: Literal[2, 3, 4]
 ```
 
-#### `elif` without `else` branch
+#### `elif` without `else` branch, always true
 
 ```py
 def flag() -> bool: ...
@@ -362,6 +363,21 @@ elif True:
     x = 3
 
 reveal_type(x)  # revealed: Literal[2, 3]
+```
+
+#### `elif` without `else` branch, always false
+
+```py
+def flag() -> bool: ...
+
+x = 1
+
+if flag():
+    x = 2
+elif False:
+    x = 3
+
+reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
 ### Nested conditionals
@@ -769,22 +785,31 @@ reveal_type(x)  # revealed: Literal[3, 4]
 
 ## If expressions
 
-See also: tests in [expression/if.md](expression/if.md).
+Note that the result type of an `if`-expression can be precisely inferred if the condition is
+statically known. This is a plain type inference feature that does not need support for statically
+known branches. The tests for this feature are in [expression/if.md](expression/if.md).
+
+The tests here make sure that we also handle assignment expressions inside `if`-expressions
+correctly.
+
+### Type inference
 
 ### Always true
 
 ```py
-x = 1 if True else 2
+x = (y := 1) if True else (y := 2)
 
 reveal_type(x)  # revealed: Literal[1]
+reveal_type(y)  # revealed: Literal[1]
 ```
 
 ### Always false
 
 ```py
-x = 1 if False else 2
+x = (y := 1) if False else (y := 2)
 
 reveal_type(x)  # revealed: Literal[2]
+reveal_type(y)  # revealed: Literal[2]
 ```
 
 ## Boolean expressions
@@ -795,6 +820,10 @@ reveal_type(x)  # revealed: Literal[2]
 (x := 1) or (x := 2)
 
 reveal_type(x)  # revealed: Literal[1]
+
+(y := 1) or (y := 2) or (y := 3) or (y := 4)
+
+reveal_type(y)  # revealed: Literal[1]
 ```
 
 ### Always true, `and`
@@ -803,22 +832,34 @@ reveal_type(x)  # revealed: Literal[1]
 (x := 1) and (x := 2)
 
 reveal_type(x)  # revealed: Literal[2]
+
+(y := 1) and (y := 2) and (y := 3) and (y := 4)
+
+reveal_type(y)  # revealed: Literal[4]
 ```
 
 ### Always false, `or`
 
 ```py
-(x := 0) or (x := 2)
+(x := 0) or (x := 1)
 
-reveal_type(x)  # revealed: Literal[2]
+reveal_type(x)  # revealed: Literal[1]
+
+(y := 0) or (y := 0) or (y := 1) or (y := 2)
+
+reveal_type(y)  # revealed: Literal[1]
 ```
 
 ### Always false, `and`
 
 ```py
-(x := 0) and (x := 2)
+(x := 0) and (x := 1)
 
 reveal_type(x)  # revealed: Literal[0]
+
+(y := 0) and (y := 1) and (y := 2) and (y := 3)
+
+reveal_type(y)  # revealed: Literal[0]
 ```
 
 ## While loops

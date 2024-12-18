@@ -43,10 +43,10 @@ impl VisibilityConstraints {
     ) -> ScopedVisibilityConstraintId {
         match (&self.constraints[a], &self.constraints[b]) {
             (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => {
-                ScopedVisibilityConstraintId::ALWAYS_VISIBLE
+                ScopedVisibilityConstraintId::ALWAYS_TRUE
             }
             (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => {
-                ScopedVisibilityConstraintId::ALWAYS_VISIBLE
+                ScopedVisibilityConstraintId::ALWAYS_TRUE
             }
             _ => self.add(VisibilityConstraint::Merged(a, b)),
         }
@@ -57,7 +57,7 @@ impl VisibilityConstraints {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if a == ScopedVisibilityConstraintId::ALWAYS_VISIBLE {
+        if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
             b
         } else {
             self.add(VisibilityConstraint::Sequence(a, b))
