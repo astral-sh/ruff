@@ -130,7 +130,7 @@ jobs:
     name: "cargo test (linux)"
     runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -176,7 +176,7 @@ jobs:
     name: "cargo test (linux, release)"
     runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -205,7 +205,7 @@ jobs:
     name: "cargo test (windows)"
     runs-on: windows-latest-xlarge
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -231,7 +231,7 @@ jobs:
     name: "cargo test (wasm)"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -278,7 +278,7 @@ jobs:
     name: "cargo build (msrv)"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -341,7 +341,7 @@ jobs:
     needs:
       - cargo-test-linux
       - determine_changes
-    if: ${{ needs.determine_changes.outputs.parser == 'true' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && needs.determine_changes.outputs.parser == 'true' }}
     timeout-minutes: 20
     env:
       FORCE_COLOR: 1
@@ -377,7 +377,7 @@ jobs:
     name: "test scripts"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -403,7 +403,7 @@ jobs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
-    if: ${{ github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -537,6 +537,7 @@ jobs:
     name: "python package"
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -637,7 +638,7 @@ jobs:
     name: "formatter instabilities and black similarity"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -661,7 +662,7 @@ jobs:
     needs:
       - cargo-test-linux
       - determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     steps:
       - uses: extractions/setup-just@v2
         env:
@@ -703,7 +704,7 @@ jobs:
   benchmarks:
     runs-on: ubuntu-22.04
     needs: determine_changes
-    if: ${{ github.repository == 'astral-sh/ruff' && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+    if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
