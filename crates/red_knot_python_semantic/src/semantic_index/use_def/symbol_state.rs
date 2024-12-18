@@ -162,10 +162,6 @@ impl SymbolDeclarations {
             visibility_constraints_iter: self.visibility_constraints.iter(),
         }
     }
-
-    // pub(super) fn is_empty(&self) -> bool {
-    //     self.live_declarations.is_empty()
-    // }
 }
 
 /// Live bindings and narrowing constraints for a single symbol at some point in control flow.
@@ -606,15 +602,15 @@ mod tests {
     use super::*;
 
     #[track_caller]
-    fn assert_bindings<'db>(
-        constraints: &AllConstraints<'db>,
+    fn assert_bindings(
+        constraints: &AllConstraints<'_>,
         visibility_constraints: &VisibilityConstraints,
         symbol: &SymbolState,
         expected: &[&str],
     ) {
         let actual = symbol
             .bindings()
-            .iter(&constraints, &visibility_constraints)
+            .iter(constraints, visibility_constraints)
             .map(|def_id_with_constraints| {
                 let def_id = def_id_with_constraints.definition;
                 let def = if def_id == ScopedDefinitionId::UNBOUND {
@@ -635,15 +631,15 @@ mod tests {
     }
 
     #[track_caller]
-    pub(crate) fn assert_declarations<'db>(
-        constraints: &AllConstraints<'db>,
+    pub(crate) fn assert_declarations(
+        constraints: &AllConstraints<'_>,
         visibility_constraints: &VisibilityConstraints,
         symbol: &SymbolState,
         expected: &[&str],
     ) {
         let actual = symbol
             .declarations()
-            .iter(&constraints, &visibility_constraints)
+            .iter(constraints, visibility_constraints)
             .map(|(def_id, _, _, _)| {
                 if def_id == ScopedDefinitionId::UNBOUND {
                     "undeclared".into()

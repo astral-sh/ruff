@@ -824,11 +824,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(binding.is_binding(self.db()));
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
-        // let undeclared_ty = if declarations.clone().may_be_undeclared(self.db) {
-        //     Symbol::Type(Type::Unknown, Boundness::Bound)
-        // } else {
-        //     Symbol::Unbound
-        // };
         let mut bound_ty = ty;
         let declared_ty = declarations_ty(self.db(), declarations)
             .map(|s| s.ignore_possibly_unbound().unwrap_or(Type::Unknown))

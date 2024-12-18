@@ -69,6 +69,8 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
 fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Symbol<'db> {
+    let _span = tracing::trace_span!("symbol_by_id", ?symbol).entered();
+
     let use_def = use_def_map(db, scope);
 
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
@@ -125,8 +127,6 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
 /// Shorthand for `symbol_by_id` that takes a symbol name instead of an ID.
 fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
-    let _span = tracing::trace_span!("symbol", ?name).entered();
-
     // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
     // is just a re-export of `typing.TYPE_CHECKING`.
     if name == "TYPE_CHECKING"
