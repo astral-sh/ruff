@@ -292,52 +292,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         (constraint_id, constraint)
     }
 
-    fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
-        let expression = self.add_standalone_expression(constraint_node);
-        Constraint {
-            node: ConstraintNode::Expression(expression),
-            is_positive: true,
-        }
-    }
-
-    fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        self.current_use_def_map_mut().add_constraint(constraint)
-    }
-
-    fn add_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        let negated = Constraint {
-            node: constraint.node,
-            is_positive: false,
-        };
-        self.current_use_def_map_mut().add_constraint(negated)
-    }
-
-    fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
-        self.current_use_def_map_mut()
-            .record_constraint_id(constraint)
-    }
-
     fn record_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
         self.current_use_def_map_mut().record_constraint(constraint)
-    }
-
-    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        let constraint_id = self.add_negated_constraint(constraint);
-        self.record_constraint_id(constraint_id);
-        constraint_id
-    }
-
-    fn add_visibility_constraint(
-        &mut self,
-        constraint: VisibilityConstraint,
-    ) -> ScopedVisibilityConstraintId {
-        self.current_use_def_map_mut()
-            .add_visibility_constraint(constraint)
-    }
-
-    fn record_visibility_constraint_id(&mut self, constraint: ScopedVisibilityConstraintId) {
-        self.current_use_def_map_mut()
-            .record_visibility_constraint_id(constraint)
     }
 
     fn record_visibility_constraint(
@@ -359,6 +315,23 @@ impl<'db> SemanticIndexBuilder<'db> {
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
             .record_visibility_constraint(VisibilityConstraint::VisibleIfNot(constraint))
+    }
+
+    fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
+        let expression = self.add_standalone_expression(constraint_node);
+        Constraint {
+            node: ConstraintNode::Expression(expression),
+            is_positive: true,
+        }
+    }
+
+    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        let negated = Constraint {
+            node: constraint.node,
+            is_positive: false,
+        };
+        let constraint_id = self.current_use_def_map_mut().record_constraint(negated);
+        constraint_id
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
@@ -1415,32 +1388,34 @@ where
 
                 let mut snapshots = vec![];
                 let mut visibility_constraints = vec![];
+                let mut last_constraint = None;
 
                 for (index, value) in values.iter().enumerate() {
                     self.visit_expr(value);
-
-                    for id in &visibility_constraints {
-                        self.record_visibility_constraint_id(*id);
+                    if let Some(id) = last_constraint {
+                        visibility_constraints.push(self.record_visibility_constraint(id));
                     }
-
-                    // In the last value we don't need to take a snapshot nor add a constraint
+                    // Snapshot is taken after visiting the expression but before adding the constraint.
+                    snapshots.push(self.flow_snapshot());
                     if index < values.len() - 1 {
+                        // In the last value we don't need to add a constraint
                         let constraint = self.build_constraint(value);
                         let id = match op {
-                            BoolOp::And => self.add_constraint(constraint),
-                            BoolOp::Or => self.add_negated_constraint(constraint),
+                            BoolOp::And => self.record_constraint(constraint),
+                            BoolOp::Or => self.record_negated_constraint(constraint),
                         };
-                        let visibility_constraint =
-                            self.add_visibility_constraint(VisibilityConstraint::VisibleIf(id));
-                        visibility_constraints.push(visibility_constraint);
-                        self.record_negated_visibility_constraint(visibility_constraint);
-
-                        // Snapshot is taken after visiting the expression and adding the visibility
-                        // constraint, but before adding the narrowing constraint.
-                        snapshots.push(self.flow_snapshot());
-
-                        self.record_constraint_id(id);
+                        last_constraint = Some(id);
                     }
+                }
+
+                let mut snapshots = snapshots.into_iter();
+                let first = snapshots.next().expect("at least one value");
+                self.flow_restore(first);
+
+                // debug_assert(constraints.len() == snapshots.len());
+
+                for id in visibility_constraints {
+                    self.record_negated_visibility_constraint(id);
                 }
 
                 for snapshot in snapshots {
