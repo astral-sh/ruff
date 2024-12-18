@@ -229,7 +229,9 @@ pub(crate) use self::symbol_state::{ScopedConstraintId, ScopedVisibilityConstrai
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
-pub(crate) use crate::semantic_index::visibility_constraint::VisibilityConstraintRef;
+use crate::semantic_index::visibility_constraints::{
+    VisibilityConstraintRef, VisibilityConstraints,
+};
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
@@ -248,7 +250,7 @@ pub(crate) struct UseDefMap<'db> {
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
     /// Array of [`VisibilityConstraintRef`] in this scope.
-    all_visibility_constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
+    all_visibility_constraints: VisibilityConstraints,
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -389,8 +391,7 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Option<Definition<'db>>,
     pub(crate) constraints: ConstraintsIterator<'map, 'db>,
     pub(crate) all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
-    pub(crate) all_visibility_constraints:
-        &'map IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
+    pub(crate) all_visibility_constraints: &'map VisibilityConstraints,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
@@ -420,7 +421,7 @@ impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
     type Item = (
         Option<Definition<'db>>,
         &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
-        &'map IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
+        &'map VisibilityConstraints,
         ScopedVisibilityConstraintId,
     );
 
@@ -456,7 +457,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
     /// Append-only array of [`VisibilityConstraintRef`].
-    all_visibility_constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraintRef>,
+    all_visibility_constraints: VisibilityConstraints,
 
     unbound_visibility_constraint_id: ScopedVisibilityConstraintId,
 
@@ -475,7 +476,7 @@ impl<'db> UseDefMapBuilder<'db> {
         Self {
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
-            all_visibility_constraints: IndexVec::from_iter([VisibilityConstraintRef::None]),
+            all_visibility_constraints: VisibilityConstraints::new(),
             unbound_visibility_constraint_id: ScopedVisibilityConstraintId::from_u32(0),
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
@@ -512,7 +513,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         constraint: VisibilityConstraintRef,
     ) -> ScopedVisibilityConstraintId {
-        self.all_visibility_constraints.push(constraint)
+        self.all_visibility_constraints.add(constraint)
     }
 
     pub(super) fn record_visibility_constraint(
@@ -532,7 +533,7 @@ impl<'db> UseDefMapBuilder<'db> {
         } else {
             self.unbound_visibility_constraint_id =
                 self.all_visibility_constraints
-                    .push(VisibilityConstraintRef::Sequence(
+                    .add(VisibilityConstraintRef::Sequence(
                         self.unbound_visibility_constraint_id,
                         new_constraint_id,
                     ));
@@ -644,31 +645,11 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         // Merge unbound visibility constraints:
-        match (
-            &self.all_visibility_constraints[self.unbound_visibility_constraint_id],
-            &self.all_visibility_constraints[snapshot.unbound_visibility_constraint_id],
-        ) {
-            (_, VisibilityConstraintRef::Negated(id))
-                if self.unbound_visibility_constraint_id == *id =>
-            {
-                self.unbound_visibility_constraint_id = ScopedVisibilityConstraintId::from_u32(0);
-            }
 
-            (VisibilityConstraintRef::Negated(id), _)
-                if *id == snapshot.unbound_visibility_constraint_id =>
-            {
-                self.unbound_visibility_constraint_id = ScopedVisibilityConstraintId::from_u32(0);
-            }
-            _ => {
-                let constraint_id =
-                    self.all_visibility_constraints
-                        .push(VisibilityConstraintRef::Merged(
-                            self.unbound_visibility_constraint_id,
-                            snapshot.unbound_visibility_constraint_id,
-                        ));
-                self.unbound_visibility_constraint_id = constraint_id;
-            }
-        }
+        self.unbound_visibility_constraint_id = self.all_visibility_constraints.add_merged(
+            self.unbound_visibility_constraint_id,
+            snapshot.unbound_visibility_constraint_id,
+        );
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
