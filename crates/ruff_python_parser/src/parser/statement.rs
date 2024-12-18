@@ -413,6 +413,17 @@ impl<'src> Parser<'src> {
 
         let exc = if self.at(TokenKind::Newline) {
             None
+        } else if self.at(TokenKind::From) {
+            // test_err raise_stmt_from_without_exc
+            // raise from exc
+            // raise from None
+            self.add_error(
+                ParseErrorType::OtherError(
+                    "Exception missing in `raise ... from ...` statement.".to_string(),
+                ),
+                self.current_token_range(),
+            );
+            None
         } else {
             // test_err raise_stmt_invalid_exc
             // raise *x
@@ -435,7 +446,7 @@ impl<'src> Parser<'src> {
             Some(Box::new(exc.expr))
         };
 
-        let cause = (exc.is_some() && self.eat(TokenKind::From)).then(|| {
+        let cause = self.eat(TokenKind::From).then(|| {
             // test_err raise_stmt_invalid_cause
             // raise x from *y
             // raise x from yield y
