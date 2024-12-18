@@ -202,3 +202,12 @@ PERF401.py:245:13: PERF401 Use `list.extend` to create a transformed list
 246 |     result = []
     |
     = help: Replace for loop with list.extend
+
+PERF401.py:262:13: PERF401 Use a list comprehension to create a transformed list
+    |
+260 |     for i in range(5):
+261 |         if j := i:
+262 |             items.append(j)
+    |             ^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
