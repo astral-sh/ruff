@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_python_semantic::analyze::class::any_base_class;
-use ruff_python_semantic::analyze::visibility::{abstract_decorator_kind, AbstractDecoratorKind};
+use ruff_python_semantic::analyze::visibility::AbstractDecoratorKind;
 use ruff_python_semantic::{BindingKind, NodeRef, SemanticModel};
 
 use crate::checkers::ast::Checker;
@@ -110,14 +110,12 @@ pub(crate) fn abstract_method_in_normal_class(checker: &mut Checker, class: &Stm
         return;
     }
 
-    if might_be_abstract(class, checker.semantic()) {
+    if is_abstract_class(class, checker.semantic()) {
         return;
     }
 
-    let class_name = class.name.as_str();
-
     for stmt in &class.body {
-        check_class_stmt(checker, class_name, stmt);
+        check_class_body_stmt(checker, &class.name, stmt);
     }
 }
 
@@ -129,8 +127,8 @@ pub(crate) fn abstract_method_in_normal_class(checker: &mut Checker, class: &Stm
 /// Thus, a class is *not* abstract when all of its bases are:
 /// * Inspectable
 /// * Does not have a metaclass that inherits from `abc.ABCMeta`
-fn might_be_abstract(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
-    if metaclass_might_be_abcmeta(class_def, semantic) {
+fn is_abstract_class(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
+    if is_metaclass_abcmeta(class_def, semantic) {
         return true;
     }
 
@@ -143,11 +141,11 @@ fn might_be_abstract(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool
             return true;
         };
 
-        metaclass_might_be_abcmeta(base_def, semantic)
+        is_metaclass_abcmeta(base_def, semantic)
     })
 }
 
-fn metaclass_might_be_abcmeta(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
+fn is_metaclass_abcmeta(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
     let Some(arguments) = class_def.arguments.as_ref() else {
         return false;
     };
@@ -206,7 +204,7 @@ fn find_class_def<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a
     Some(base_def)
 }
 
-fn check_class_stmt(checker: &mut Checker, class_name: &str, stmt: &Stmt) {
+fn check_class_body_stmt(checker: &mut Checker, class_name: &str, stmt: &Stmt) {
     let Stmt::FunctionDef(StmtFunctionDef {
         decorator_list,
         name,
@@ -216,7 +214,9 @@ fn check_class_stmt(checker: &mut Checker, class_name: &str, stmt: &Stmt) {
         return;
     };
 
-    let Some(decorator_kind) = abstract_decorator_kind(decorator_list, checker.semantic()) else {
+    let Some(decorator_kind) =
+        AbstractDecoratorKind::from_decorators(decorator_list, checker.semantic())
+    else {
         return;
     };
 

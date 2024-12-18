@@ -13,41 +13,6 @@ pub enum Visibility {
     Private,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum AbstractDecoratorKind {
-    /// `abc.abstractmethod`
-    AbstractMethod,
-    /// `abc.abstractclassmethod`
-    AbstractClassMethod,
-    /// `abc.abstractstaticmethod`
-    AbstractStaticMethod,
-    /// `abc.abstractproperty`
-    AbstractProperty,
-}
-
-impl AbstractDecoratorKind {
-    fn from(name: &str) -> Option<Self> {
-        match name {
-            "abstractmethod" => Some(Self::AbstractMethod),
-            "abstractclassmethod" => Some(Self::AbstractClassMethod),
-            "abstractstaticmethod" => Some(Self::AbstractStaticMethod),
-            "abstractproperty" => Some(Self::AbstractProperty),
-            _ => None,
-        }
-    }
-}
-
-impl Display for AbstractDecoratorKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::AbstractMethod => "abstractmethod",
-            Self::AbstractClassMethod => "abstractclassmethod",
-            Self::AbstractStaticMethod => "abstractstaticmethod",
-            Self::AbstractProperty => "abstractproperty",
-        })
-    }
-}
-
 /// Returns `true` if a function is a "static method".
 pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list
@@ -78,21 +43,57 @@ pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
 pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    abstract_decorator_kind(decorator_list, semantic).is_some()
+    AbstractDecoratorKind::from_decorators(decorator_list, semantic).is_some()
 }
 
-pub fn abstract_decorator_kind(
-    decorator_list: &[Decorator],
-    semantic: &SemanticModel,
-) -> Option<AbstractDecoratorKind> {
-    decorator_list.iter().find_map(|decorator| {
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum AbstractDecoratorKind {
+    /// `abc.abstractmethod`
+    AbstractMethod,
+    /// `abc.abstractclassmethod`
+    AbstractClassMethod,
+    /// `abc.abstractstaticmethod`
+    AbstractStaticMethod,
+    /// `abc.abstractproperty`
+    AbstractProperty,
+}
+
+impl AbstractDecoratorKind {
+    pub fn from_decorators(decorators: &[Decorator], semantic: &SemanticModel) -> Option<Self> {
+        decorators
+            .iter()
+            .find_map(|decorator| Self::from_decorator(decorator, semantic))
+    }
+    fn from_decorator(decorator: &Decorator, semantic: &SemanticModel) -> Option<Self> {
         let qualified_name = semantic.resolve_qualified_name(&decorator.expression)?;
 
-        match qualified_name.segments() {
-            ["abc", name] => AbstractDecoratorKind::from(name),
-            _ => None,
+        Self::from_name(&qualified_name)
+    }
+
+    fn from_name(name: &QualifiedName) -> Option<Self> {
+        if let ["abc", abc_method] = name.segments() {
+            match *abc_method {
+                "abstractmethod" => Some(Self::AbstractMethod),
+                "abstractclassmethod" => Some(Self::AbstractClassMethod),
+                "abstractstaticmethod" => Some(Self::AbstractStaticMethod),
+                "abstractproperty" => Some(Self::AbstractProperty),
+                _ => None,
+            }
+        } else {
+            None
         }
-    })
+    }
+}
+
+impl Display for AbstractDecoratorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::AbstractMethod => "abstractmethod",
+            Self::AbstractClassMethod => "abstractclassmethod",
+            Self::AbstractStaticMethod => "abstractstaticmethod",
+            Self::AbstractProperty => "abstractproperty",
+        })
+    }
 }
 
 /// Returns `true` if a function definition is a `@property`.
