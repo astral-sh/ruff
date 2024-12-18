@@ -3193,10 +3193,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Not, ty) => ty.bool(self.db()).negate().into_type(self.db()),
             (_, Type::Any) => Type::Any,
             (_, Type::Unknown) => Type::Unknown,
-            (
-                op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert),
-                Type::Instance(InstanceType { class }),
-            ) => {
+            (op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert), _) => {
                 let unary_dunder_method = match op {
                     UnaryOp::Invert => "__invert__",
                     UnaryOp::UAdd => "__pos__",
@@ -3206,9 +3203,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                if let Symbol::Type(class_member, _) =
-                    class.class_member(self.db(), unary_dunder_method)
-                {
+                let meta = operand_type.to_meta_type(self.db());
+                if let Symbol::Type(class_member, _) = meta.member(self.db(), unary_dunder_method) {
                     let call = class_member.call(self.db(), &[operand_type]);
 
                     match call.return_ty_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
@@ -3238,7 +3234,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Unknown
                 }
             }
-            _ => todo_type!(), // TODO other unary op types
         }
     }
 
