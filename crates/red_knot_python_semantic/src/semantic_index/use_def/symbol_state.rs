@@ -131,14 +131,14 @@ impl SymbolDeclarations {
     /// Add given visibility constraint to all live bindings.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        all_visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraints,
         constraint: ScopedVisibilityConstraintId,
     ) {
         for existing in &mut self.visibility_constraints {
             if existing == &ScopedVisibilityConstraintId::from_u32(0) {
                 *existing = constraint;
             } else {
-                *existing = all_visibility_constraints
+                *existing = visibility_constraints
                     .add(VisibilityConstraintRef::Sequence(*existing, constraint));
             }
         }
@@ -211,14 +211,14 @@ impl SymbolBindings {
     /// Add given visibility constraint to all live bindings.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        all_visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraints,
         constraint: ScopedVisibilityConstraintId,
     ) {
         for existing in &mut self.visibility_constraints {
             if existing == &ScopedVisibilityConstraintId::from_u32(0) {
                 *existing = constraint;
             } else {
-                *existing = all_visibility_constraints
+                *existing = visibility_constraints
                     .add(VisibilityConstraintRef::Sequence(*existing, constraint));
             }
         }
@@ -228,14 +228,14 @@ impl SymbolBindings {
     pub(super) fn iter<'map, 'db>(
         &'map self,
         all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
-        all_visibility_constraints: &'map VisibilityConstraints,
+        visibility_constraints: &'map VisibilityConstraints,
     ) -> BindingIdWithConstraintsIterator<'map, 'db> {
         BindingIdWithConstraintsIterator {
             all_constraints,
-            all_visibility_constraints,
+            visibility_constraints,
             definitions: self.live_bindings.iter(),
             constraints: self.constraints.iter(),
-            visibility_constraints: self.visibility_constraints.iter(),
+            visibility_constraints_iter: self.visibility_constraints.iter(),
         }
     }
 }
@@ -268,13 +268,13 @@ impl SymbolState {
     /// Add given visibility constraint to all live bindings.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        all_visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraints,
         constraint: ScopedVisibilityConstraintId,
     ) {
         self.bindings
-            .record_visibility_constraint(all_visibility_constraints, constraint);
+            .record_visibility_constraint(visibility_constraints, constraint);
         self.declarations
-            .record_visibility_constraint(all_visibility_constraints, constraint);
+            .record_visibility_constraint(visibility_constraints, constraint);
     }
 
     pub(super) fn reset_visibility_constraints(&mut self, snapshot_state: SymbolState) {
@@ -296,7 +296,7 @@ impl SymbolState {
     pub(super) fn merge(
         &mut self,
         b: SymbolState,
-        all_visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraints,
     ) {
         let mut a = Self {
             bindings: SymbolBindings {
@@ -407,8 +407,7 @@ impl SymbolState {
                             .next()
                             .expect("visibility_constraints length mismatch");
                         let current = self.bindings.visibility_constraints.last_mut().unwrap();
-                        *current =
-                            all_visibility_constraints.add_merged(*current, a_vis_constraint);
+                        *current = visibility_constraints.add_merged(*current, a_vis_constraint);
 
                         opt_a_def = a_defs_iter.next();
                         opt_b_def = b_defs_iter.next();
@@ -474,8 +473,7 @@ impl SymbolState {
                             .next()
                             .expect("declarations and visibility_constraints length mismatch");
                         let current = self.declarations.visibility_constraints.last_mut().unwrap();
-                        *current =
-                            all_visibility_constraints.add_merged(*current, a_vis_constraint);
+                        *current = visibility_constraints.add_merged(*current, a_vis_constraint);
 
                         opt_a_decl = a_decls_iter.next();
                         opt_b_decl = b_decls_iter.next();
@@ -510,17 +508,17 @@ pub(super) struct BindingIdWithConstraints<'map, 'db> {
     pub(super) definition: ScopedDefinitionId,
     pub(super) constraint_ids: ConstraintIdIterator<'map>,
     pub(super) all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
-    pub(super) all_visibility_constraints: &'map VisibilityConstraints,
+    pub(super) visibility_constraints: &'map VisibilityConstraints,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
 #[derive(Debug)]
 pub(super) struct BindingIdWithConstraintsIterator<'map, 'db> {
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
-    all_visibility_constraints: &'map VisibilityConstraints,
+    visibility_constraints: &'map VisibilityConstraints,
     definitions: BindingsIterator<'map>,
     constraints: ConstraintsIterator<'map>,
-    visibility_constraints: VisibilityConstraintsIterator<'map>,
+    visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for BindingIdWithConstraintsIterator<'map, 'db> {
@@ -530,7 +528,7 @@ impl<'map, 'db> Iterator for BindingIdWithConstraintsIterator<'map, 'db> {
         match (
             self.definitions.next(),
             self.constraints.next(),
-            self.visibility_constraints.next(),
+            self.visibility_constraints_iter.next(),
         ) {
             (None, None, None) => None,
             (Some(def), Some(constraints), Some(visibility_constraint_id)) => {
@@ -540,7 +538,7 @@ impl<'map, 'db> Iterator for BindingIdWithConstraintsIterator<'map, 'db> {
                         wrapped: constraints.iter(),
                     },
                     all_constraints: self.all_constraints,
-                    all_visibility_constraints: self.all_visibility_constraints,
+                    visibility_constraints: self.visibility_constraints,
                     visibility_constraint: *visibility_constraint_id,
                 })
             }
@@ -569,9 +567,9 @@ impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
 pub(super) struct DeclarationIdIterator<'map, 'db> {
     pub(crate) all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
-    pub(crate) all_visibility_constraints: &'map VisibilityConstraints,
-    pub(crate) inner: DeclarationsIterator<'map>,
-    pub(crate) visibility_constraints: VisibilityConstraintsIterator<'map>,
+    pub(crate) visibility_constraints: &'map VisibilityConstraints,
+    pub(crate) declarations_iter: DeclarationsIterator<'map>,
+    pub(crate) visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for DeclarationIdIterator<'map, 'db> {
@@ -583,12 +581,15 @@ impl<'map, 'db> Iterator for DeclarationIdIterator<'map, 'db> {
     );
 
     fn next(&mut self) -> Option<Self::Item> {
-        match (self.inner.next(), self.visibility_constraints.next()) {
+        match (
+            self.declarations_iter.next(),
+            self.visibility_constraints_iter.next(),
+        ) {
             (None, None) => None,
             (Some(declaration), Some(visibility_constraints_id)) => Some((
                 ScopedDefinitionId::from_u32(declaration),
                 self.all_constraints,
-                self.all_visibility_constraints,
+                self.visibility_constraints,
                 *visibility_constraints_id,
             )),
             // SAFETY: see above.

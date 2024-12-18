@@ -28,9 +28,9 @@ use crate::semantic_index::symbol::{
 use crate::semantic_index::use_def::{
     FlowSnapshot, ScopedConstraintId, ScopedVisibilityConstraintId, UseDefMapBuilder,
 };
-use crate::semantic_index::visibility_constraints::VisibilityConstraintRef;
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::Unpack;
+use crate::visibility_constraints::VisibilityConstraintRef;
 use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
