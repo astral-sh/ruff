@@ -496,27 +496,48 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol_state.record_binding(def_id);
     }
 
-    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        let constraint_id = self.all_constraints.push(constraint);
+    pub(super) fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        self.all_constraints.push(constraint)
+    }
+
+    pub(super) fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
         for state in &mut self.symbol_states {
-            state.record_constraint(constraint_id);
+            state.record_constraint(constraint);
         }
+    }
+
+    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        let constraint_id = self.add_constraint(constraint);
+        self.record_constraint_id(constraint_id);
         constraint_id
+    }
+
+    pub(super) fn add_visibility_constraint(
+        &mut self,
+        constraint: VisibilityConstraint,
+    ) -> ScopedVisibilityConstraintId {
+        self.visibility_constraints.add(constraint)
+    }
+
+    pub(super) fn record_visibility_constraint_id(
+        &mut self,
+        constraint: ScopedVisibilityConstraintId,
+    ) {
+        for state in &mut self.symbol_states {
+            state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
+        }
+
+        self.unbound_visibility = self
+            .visibility_constraints
+            .add_sequence(self.unbound_visibility, constraint);
     }
 
     pub(super) fn record_visibility_constraint(
         &mut self,
         constraint: VisibilityConstraint,
     ) -> ScopedVisibilityConstraintId {
-        let new_constraint_id = self.visibility_constraints.add(constraint);
-        for state in &mut self.symbol_states {
-            state.record_visibility_constraint(&mut self.visibility_constraints, new_constraint_id);
-        }
-
-        self.unbound_visibility = self
-            .visibility_constraints
-            .add_sequence(self.unbound_visibility, new_constraint_id);
-
+        let new_constraint_id = self.add_visibility_constraint(constraint);
+        self.record_visibility_constraint_id(new_constraint_id);
         new_constraint_id
     }
 
