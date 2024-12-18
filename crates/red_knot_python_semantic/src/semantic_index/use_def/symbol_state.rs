@@ -110,11 +110,11 @@ pub(super) struct SymbolDeclarations {
 }
 
 impl SymbolDeclarations {
-    fn undeclared(unbound_visibility_constraint_id: ScopedVisibilityConstraintId) -> Self {
+    fn undeclared(undeclared_visibility: ScopedVisibilityConstraintId) -> Self {
         Self {
             live_declarations: Declarations::with(0),
             visibility_constraints: VisibilityConstraintPerBinding::from_iter([
-                unbound_visibility_constraint_id,
+                undeclared_visibility,
             ]),
         }
     }
@@ -173,13 +173,11 @@ pub(super) struct SymbolBindings {
 }
 
 impl SymbolBindings {
-    fn unbound(unbound_visibility_constraint_id: ScopedVisibilityConstraintId) -> Self {
+    fn unbound(unbound_visibility: ScopedVisibilityConstraintId) -> Self {
         Self {
             live_bindings: Bindings::with(0),
             constraints: ConstraintsPerBinding::from_iter([Constraints::default()]),
-            visibility_constraints: VisibilityConstraintPerBinding::from_iter([
-                unbound_visibility_constraint_id,
-            ]),
+            visibility_constraints: VisibilityConstraintPerBinding::from_iter([unbound_visibility]),
         }
     }
 
@@ -238,10 +236,10 @@ pub(super) struct SymbolState {
 
 impl SymbolState {
     /// Return a new [`SymbolState`] representing an unbound, undeclared symbol.
-    pub(super) fn undefined(unbound_visibility_constraint: ScopedVisibilityConstraintId) -> Self {
+    pub(super) fn undefined(unbound_visibility: ScopedVisibilityConstraintId) -> Self {
         Self {
-            declarations: SymbolDeclarations::undeclared(unbound_visibility_constraint),
-            bindings: SymbolBindings::unbound(unbound_visibility_constraint),
+            declarations: SymbolDeclarations::undeclared(unbound_visibility),
+            bindings: SymbolBindings::unbound(unbound_visibility),
         }
     }
 
