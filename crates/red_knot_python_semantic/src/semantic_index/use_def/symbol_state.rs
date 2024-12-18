@@ -43,7 +43,7 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use crate::semantic_index::use_def::{Constraint, VisibilityConstraint, VisibilityConstraints};
+use crate::semantic_index::use_def::{Constraint, VisibilityConstraints};
 
 use super::bitset::{BitSet, BitSetIterator};
 use ruff_index::{newtype_index, IndexVec};
@@ -135,12 +135,7 @@ impl SymbolDeclarations {
         constraint: ScopedVisibilityConstraintId,
     ) {
         for existing in &mut self.visibility_constraints {
-            if existing == &ScopedVisibilityConstraintId::from_u32(0) {
-                *existing = constraint;
-            } else {
-                *existing = visibility_constraints
-                    .add(VisibilityConstraint::Sequence(*existing, constraint));
-            }
+            *existing = visibility_constraints.add_sequence(*existing, constraint);
         }
     }
 
@@ -215,12 +210,7 @@ impl SymbolBindings {
         constraint: ScopedVisibilityConstraintId,
     ) {
         for existing in &mut self.visibility_constraints {
-            if existing == &ScopedVisibilityConstraintId::from_u32(0) {
-                *existing = constraint;
-            } else {
-                *existing = visibility_constraints
-                    .add(VisibilityConstraint::Sequence(*existing, constraint));
-            }
+            *existing = visibility_constraints.add_sequence(*existing, constraint);
         }
     }
 

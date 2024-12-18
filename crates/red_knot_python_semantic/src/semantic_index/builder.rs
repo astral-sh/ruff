@@ -301,7 +301,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: ScopedConstraintId,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .add_visibility_constraint(VisibilityConstraint::Single(constraint))
+            .add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint))
     }
 
     fn record_visibility_constraint(
@@ -309,7 +309,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: ScopedConstraintId,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::Single(constraint))
+            .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint))
     }
 
     fn reset_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
@@ -322,7 +322,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::Negated(constraint))
+            .record_visibility_constraint(VisibilityConstraint::VisibleIfNot(constraint))
     }
 
     fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
