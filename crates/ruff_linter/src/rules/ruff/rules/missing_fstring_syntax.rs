@@ -210,14 +210,13 @@ fn should_be_fstring(
                 }
                 if semantic
                     // the parsed expression nodes have incorrect ranges
-                    // so we create a dummy node which has a range that's
-                    // close enough to being correct in order for
-                    // `simulate_runtime_load` to return the correct result.
-                    .simulate_runtime_load(&ast::ExprName {
-                        id: id.clone(),
-                        range: literal.range(),
-                        ctx: ast::ExprContext::Load,
-                    })
+                    // so we need to use the range of the literal for the
+                    // lookup in order to get reasonable results.
+                    .simulate_runtime_load_at_location_in_scope(
+                        id,
+                        literal.range(),
+                        semantic.scope_id,
+                    )
                     .map_or(true, |id| semantic.binding(id).kind.is_builtin())
                 {
                     return false;
