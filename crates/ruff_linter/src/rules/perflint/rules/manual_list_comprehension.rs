@@ -46,6 +46,11 @@ use ruff_text_size::{Ranged, TextRange};
 /// original = list(range(10000))
 /// filtered.extend(x for x in original if x % 2)
 /// ```
+///
+/// Take care that if the original for-loop uses an assignment expression
+/// as a conditional, such as `if match:=re.match("\d+")`, then
+/// the corresponding comprehension must wrap the assignment
+/// expression in parentheses to avoid a syntax error.
 #[derive(ViolationMetadata)]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
