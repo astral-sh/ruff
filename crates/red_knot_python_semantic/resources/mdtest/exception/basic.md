@@ -90,3 +90,83 @@ def foo(
         # TODO: should emit a diagnostic here:
         reveal_type(g)  # revealed: @Todo(full tuple[...] support)
 ```
+
+## Object raised is not an exception
+
+```py
+try:
+    raise AttributeError()  # fine
+except:
+    ...
+
+try:
+    raise FloatingPointError  # fine
+except:
+    ...
+
+try:
+    raise 1  # error: [invalid-raise]
+except:
+    ...
+
+try:
+    raise int  # error: [invalid-raise]
+except:
+    ...
+
+def _(e: Exception | type[Exception]):
+    raise e  # fine
+
+def _(e: Exception | type[Exception] | None):
+    raise e  # error: [invalid-raise]
+```
+
+## Exception cause is not an exception
+
+```py
+try:
+    raise EOFError() from GeneratorExit  # fine
+except:
+    ...
+
+try:
+    raise StopIteration from MemoryError()  # fine
+except:
+    ...
+
+try:
+    raise BufferError() from None  # fine
+except:
+    ...
+
+try:
+    raise ZeroDivisionError from False  # error: [invalid-raise]
+except:
+    ...
+
+try:
+    raise SystemExit from bool()  # error: [invalid-raise]
+except:
+    ...
+
+try:
+    raise
+except KeyboardInterrupt as e:  # fine
+    reveal_type(e)  # revealed: KeyboardInterrupt
+    raise LookupError from e  # fine
+
+try:
+    raise
+except int as e:  # error: [invalid-exception-caught]
+    reveal_type(e)  # revealed: Unknown
+    raise KeyError from e
+
+def _(e: Exception | type[Exception]):
+    raise ModuleNotFoundError from e  # fine
+
+def _(e: Exception | type[Exception] | None):
+    raise IndexError from e  # fine
+
+def _(e: int | None):
+    raise IndexError from e  # error: [invalid-raise]
+```

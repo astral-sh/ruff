@@ -74,7 +74,8 @@ use crate::Db;
 
 use super::context::{InferContext, WithDiagnostics};
 use super::diagnostic::{
-    report_index_out_of_bounds, report_invalid_exception_caught, report_non_subscriptable,
+    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_non_subscriptable,
     report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
 };
 use super::string_annotation::{
@@ -1574,9 +1575,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If it's an `except*` handler, this won't actually be the type of the bound symbol;
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
-            let type_base_exception = KnownClass::BaseException
-                .to_subclass_of(self.db())
-                .unwrap_or(Type::Unknown);
+            let type_base_exception = KnownClass::BaseException.to_subclass_of(self.db());
             let mut builder = UnionBuilder::new(self.db());
             for element in tuple.elements(self.db()).iter().copied() {
                 builder = builder.add(
@@ -1594,9 +1593,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else if node_ty.is_subtype_of(self.db(), KnownClass::Tuple.to_instance(self.db())) {
             todo_type!("Homogeneous tuple in exception handler")
         } else {
-            let type_base_exception = KnownClass::BaseException
-                .to_subclass_of(self.db())
-                .unwrap_or(Type::Unknown);
+            let type_base_exception = KnownClass::BaseException.to_subclass_of(self.db());
             if node_ty.is_assignable_to(self.db(), type_base_exception) {
                 node_ty.to_instance(self.db())
             } else {
@@ -2198,8 +2195,30 @@ impl<'db> TypeInferenceBuilder<'db> {
             exc,
             cause,
         } = raise;
-        self.infer_optional_expression(exc.as_deref());
-        self.infer_optional_expression(cause.as_deref());
+
+        let base_exception_type = KnownClass::BaseException.to_subclass_of(self.db());
+        let base_exception_instance = base_exception_type.to_instance(self.db());
+
+        let can_be_raised =
+            UnionType::from_elements(self.db(), [base_exception_type, base_exception_instance]);
+        let can_be_exception_cause =
+            UnionType::from_elements(self.db(), [can_be_raised, Type::none(self.db())]);
+
+        if let Some(raised) = exc {
+            let raised_type = self.infer_expression(raised);
+
+            if !raised_type.is_assignable_to(self.db(), can_be_raised) {
+                report_invalid_exception_raised(&self.context, raised, raised_type);
+            }
+        }
+
+        if let Some(cause) = cause {
+            let cause_type = self.infer_expression(cause);
+
+            if !cause_type.is_assignable_to(self.db(), can_be_exception_cause) {
+                report_invalid_exception_cause(&self.context, cause, cause_type);
+            }
+        }
     }
 
     /// Given a `from .foo import bar` relative import, resolve the relative module

@@ -2315,10 +2315,11 @@ impl<'db> KnownClass {
             .unwrap_or(Type::Unknown)
     }
 
-    pub fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .into_class_literal()
             .map(|ClassLiteralType { class }| Type::subclass_of(class))
+            .unwrap_or(Type::subclass_of_base(ClassBase::Unknown))
     }
 
     /// Return the module in which we should look up the definition for this class
