@@ -2319,7 +2319,7 @@ impl<'db> KnownClass {
         self.to_class_literal(db)
             .into_class_literal()
             .map(|ClassLiteralType { class }| Type::subclass_of(class))
-            .unwrap_or(Type::Unknown)
+            .unwrap_or(Type::subclass_of_base(ClassBase::Unknown))
     }
 
     /// Return the module in which we should look up the definition for this class
