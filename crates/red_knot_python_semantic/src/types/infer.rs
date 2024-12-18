@@ -2201,7 +2201,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let can_be_raised =
             UnionType::from_elements(self.db(), [base_exception_type, base_exception_instance]);
-        let can_be_exception_cause = UnionType::from_elements(self.db(), [can_be_raised, Type::none(self.db())]);
+        let can_be_exception_cause =
+            UnionType::from_elements(self.db(), [can_be_raised, Type::none(self.db())]);
 
         if let Some(raised) = exc {
             let raised_type = self.infer_expression(raised);
