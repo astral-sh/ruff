@@ -43,10 +43,10 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use crate::semantic_index::use_def::{Constraint, VisibilityConstraints};
+use crate::semantic_index::{use_def::VisibilityConstraints, AllConstraints};
 
 use super::bitset::{BitSet, BitSetIterator};
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::newtype_index;
 use smallvec::SmallVec;
 
 /// A newtype-index for a definition in a particular scope.
@@ -92,6 +92,12 @@ type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
 /// Similar to what we have above, but for visibility constraints.
 #[newtype_index]
 pub(crate) struct ScopedVisibilityConstraintId;
+
+impl ScopedVisibilityConstraintId {
+    pub(crate) const ALWAYS_VISIBLE: ScopedVisibilityConstraintId =
+        ScopedVisibilityConstraintId::from_u32(0);
+}
+
 const INLINE_VISIBILITY_CONSTRAINTS: usize = 4;
 type InlineVisibilityConstraintsArray =
     [ScopedVisibilityConstraintId; INLINE_VISIBILITY_CONSTRAINTS];
@@ -125,7 +131,7 @@ impl SymbolDeclarations {
 
         self.visibility_constraints = VisibilityConstraintPerBinding::with_capacity(1);
         self.visibility_constraints
-            .push(ScopedVisibilityConstraintId::from_u32(0));
+            .push(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
     }
 
     /// Add given visibility constraint to all live bindings.
@@ -142,7 +148,7 @@ impl SymbolDeclarations {
     // /// Return an iterator over live declarations for this symbol.
     // pub(super) fn iter<'map, 'db>(
     //     &'db self,
-    //     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    //     all_constraints: &'map AllConstraints<'db>,
     // ) -> DeclarationIdIterator<'map, 'db> {
     //     DeclarationIdIterator {
     //         all_constraints,
@@ -191,7 +197,7 @@ impl SymbolBindings {
 
         self.visibility_constraints = VisibilityConstraintPerBinding::with_capacity(1);
         self.visibility_constraints
-            .push(ScopedVisibilityConstraintId::from_u32(0));
+            .push(ScopedVisibilityConstraintId::ALWAYS_VISIBLE);
     }
 
     /// Add given constraint to all live bindings.
@@ -215,7 +221,7 @@ impl SymbolBindings {
     /// Iterate over currently live bindings for this symbol
     pub(super) fn iter<'map, 'db>(
         &'map self,
-        all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+        all_constraints: &'map AllConstraints<'db>,
         visibility_constraints: &'map VisibilityConstraints,
     ) -> BindingIdWithConstraintsIterator<'map, 'db> {
         BindingIdWithConstraintsIterator {
@@ -495,14 +501,14 @@ impl SymbolState {
 pub(super) struct BindingIdWithConstraints<'map, 'db> {
     pub(super) definition: ScopedDefinitionId,
     pub(super) constraint_ids: ConstraintIdIterator<'map>,
-    pub(super) all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    pub(super) all_constraints: &'map AllConstraints<'db>,
     pub(super) visibility_constraints: &'map VisibilityConstraints,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
 #[derive(Debug)]
 pub(super) struct BindingIdWithConstraintsIterator<'map, 'db> {
-    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    all_constraints: &'map AllConstraints<'db>,
     visibility_constraints: &'map VisibilityConstraints,
     definitions: BindingsIterator<'map>,
     constraints: ConstraintsIterator<'map>,
@@ -554,7 +560,7 @@ impl Iterator for ConstraintIdIterator<'_> {
 impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
 pub(super) struct DeclarationIdIterator<'map, 'db> {
-    pub(crate) all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+    pub(crate) all_constraints: &'map AllConstraints<'db>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints,
     pub(crate) declarations_iter: DeclarationsIterator<'map>,
     pub(crate) visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
@@ -563,7 +569,7 @@ pub(super) struct DeclarationIdIterator<'map, 'db> {
 impl<'map, 'db> Iterator for DeclarationIdIterator<'map, 'db> {
     type Item = (
         ScopedDefinitionId,
-        &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
+        &'map AllConstraints<'db>,
         &'map VisibilityConstraints,
         ScopedVisibilityConstraintId,
     );
@@ -590,11 +596,13 @@ impl std::iter::FusedIterator for DeclarationIdIterator<'_, '_> {}
 
 #[cfg(test)]
 mod tests {
+    // use crate::visibility_constraints;
+
     // use super::*;
 
     // #[track_caller]
     // fn assert_bindings(symbol: &SymbolState, may_be_unbound: bool, expected: &[&str]) {
-    //     assert_eq!(symbol.bindings.may_be_unbound, may_be_unbound);
+    //     // assert_eq!(symbol.bindings.may_be_unbound, may_be_unbound);
     //     let mut actual = symbol
     //         .bindings()
     //         .iter()
@@ -621,7 +629,7 @@ mod tests {
     //     may_be_undeclared: bool,
     //     expected: &[u32],
     // ) {
-    //     assert_eq!(symbol.declarations.may_be_undeclared(), may_be_undeclared);
+    //     // assert_eq!(symbol.declarations.may_be_undeclared(), may_be_undeclared);
     //     let mut actual = symbol
     //         .declarations()
     //         .iter()
@@ -633,7 +641,9 @@ mod tests {
 
     // #[test]
     // fn unbound() {
-    //     let sym = SymbolState::undefined();
+    //     let visibility_constraints = VisibilityConstraints::new();
+    //     let unbound_visibility = ScopedVisibilityConstraintId::ALWAYS_VISIBLE;
+    //     let sym = SymbolState::undefined(unbound_visibility);
 
     //     assert_bindings(&sym, true, &[]);
     // }

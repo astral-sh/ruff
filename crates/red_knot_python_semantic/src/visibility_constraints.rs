@@ -3,6 +3,7 @@ use ruff_index::IndexVec;
 use crate::semantic_index::{
     ast_ids::HasScopedExpressionId,
     constraint::{Constraint, ConstraintNode, PatternConstraintKind},
+    AllConstraints,
 };
 use crate::semantic_index::{ScopedConstraintId, ScopedVisibilityConstraintId};
 use crate::types::{infer_expression_types, Truthiness};
@@ -42,10 +43,10 @@ impl VisibilityConstraints {
     ) -> ScopedVisibilityConstraintId {
         match (&self.constraints[a], &self.constraints[b]) {
             (_, VisibilityConstraint::VisibleIfNot(id)) if a == *id => {
-                ScopedVisibilityConstraintId::from_u32(0)
+                ScopedVisibilityConstraintId::ALWAYS_VISIBLE
             }
             (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => {
-                ScopedVisibilityConstraintId::from_u32(0)
+                ScopedVisibilityConstraintId::ALWAYS_VISIBLE
             }
             _ => self.add(VisibilityConstraint::Merged(a, b)),
         }
@@ -56,7 +57,7 @@ impl VisibilityConstraints {
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        if a == ScopedVisibilityConstraintId::from_u32(0) {
+        if a == ScopedVisibilityConstraintId::ALWAYS_VISIBLE {
             b
         } else {
             self.add(VisibilityConstraint::Sequence(a, b))
@@ -67,7 +68,7 @@ impl VisibilityConstraints {
     pub(crate) fn analyze<'db>(
         self: &VisibilityConstraints,
         db: &'db dyn Db,
-        all_constraints: &IndexVec<ScopedConstraintId, Constraint<'db>>,
+        all_constraints: &AllConstraints<'db>,
         id: ScopedVisibilityConstraintId,
     ) -> Truthiness {
         self.analyze_impl(db, all_constraints, id, MAX_RECURSION_DEPTH)
@@ -76,7 +77,7 @@ impl VisibilityConstraints {
     fn analyze_impl<'db>(
         self: &VisibilityConstraints,
         db: &'db dyn Db,
-        constraints: &IndexVec<ScopedConstraintId, Constraint<'db>>,
+        constraints: &AllConstraints<'db>,
         id: ScopedVisibilityConstraintId,
         max_depth: usize,
     ) -> Truthiness {
