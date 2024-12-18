@@ -139,7 +139,7 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
         && file_to_module(db, scope.file(db)).is_some_and(|module| module.name() == "sys")
     {
         match Program::get(db).python_platform(db) {
-            crate::PythonPlatform::Individual(platform) => {
+            crate::PythonPlatform::Identifier(platform) => {
                 return Symbol::Type(
                     Type::StringLiteral(StringLiteralType::new(db, platform.as_str())),
                     Boundness::Bound,
