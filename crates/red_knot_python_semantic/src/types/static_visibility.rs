@@ -17,32 +17,32 @@ pub(crate) fn analyze<'db>(
     db: &'db dyn Db,
     all_constraints: &IndexVec<ScopedConstraintId, Constraint<'db>>,
     all_visibility_constraints: &VisibilityConstraints,
-    visibility_constraint_id: ScopedVisibilityConstraintId,
+    id: ScopedVisibilityConstraintId,
 ) -> Truthiness {
     analyze_impl(
         db,
         all_constraints,
         all_visibility_constraints,
-        visibility_constraint_id,
+        id,
         MAX_RECURSION_DEPTH,
     )
 }
 
 fn analyze_impl<'db>(
     db: &'db dyn Db,
-    all_constraints: &IndexVec<ScopedConstraintId, Constraint<'db>>,
-    all_visibility_constraints: &VisibilityConstraints,
-    visibility_constraint_id: ScopedVisibilityConstraintId,
+    constraints: &IndexVec<ScopedConstraintId, Constraint<'db>>,
+    visibility_constraints: &VisibilityConstraints,
+    id: ScopedVisibilityConstraintId,
     max_depth: usize,
 ) -> Truthiness {
     if max_depth == 0 {
         return Truthiness::Ambiguous;
     }
 
-    let visibility_constraint = &all_visibility_constraints[visibility_constraint_id];
+    let visibility_constraint = &visibility_constraints[id];
     match visibility_constraint {
         VisibilityConstraintRef::Single(id) => {
-            let constraint = &all_constraints[*id];
+            let constraint = &constraints[*id];
 
             match constraint.node {
                 ConstraintNode::Expression(test_expr) => {
@@ -89,35 +89,23 @@ fn analyze_impl<'db>(
                 },
             }
         }
-        VisibilityConstraintRef::Negated(visibility_constraint_id) => analyze_impl(
+        VisibilityConstraintRef::Negated(inner_id) => analyze_impl(
             db,
-            all_constraints,
-            all_visibility_constraints,
-            *visibility_constraint_id,
+            constraints,
+            visibility_constraints,
+            *inner_id,
             max_depth - 1,
         )
         .negate(),
         VisibilityConstraintRef::None => Truthiness::AlwaysTrue,
-        VisibilityConstraintRef::Sequence(lhs_id, rhs_id) => {
-            let lhs = analyze_impl(
-                db,
-                all_constraints,
-                all_visibility_constraints,
-                *lhs_id,
-                max_depth - 1,
-            );
+        VisibilityConstraintRef::Sequence(lhs, rhs) => {
+            let lhs = analyze_impl(db, constraints, visibility_constraints, *lhs, max_depth - 1);
 
             if lhs == Truthiness::AlwaysFalse {
                 return Truthiness::AlwaysFalse;
             }
 
-            let rhs = analyze_impl(
-                db,
-                all_constraints,
-                all_visibility_constraints,
-                *rhs_id,
-                max_depth - 1,
-            );
+            let rhs = analyze_impl(db, constraints, visibility_constraints, *rhs, max_depth - 1);
 
             if rhs == Truthiness::AlwaysFalse {
                 Truthiness::AlwaysFalse
@@ -130,8 +118,8 @@ fn analyze_impl<'db>(
         VisibilityConstraintRef::Merged(lhs_id, rhs_id) => {
             let lhs = analyze_impl(
                 db,
-                all_constraints,
-                all_visibility_constraints,
+                constraints,
+                visibility_constraints,
                 *lhs_id,
                 max_depth - 1,
             );
@@ -142,8 +130,8 @@ fn analyze_impl<'db>(
 
             let rhs = analyze_impl(
                 db,
-                all_constraints,
-                all_visibility_constraints,
+                constraints,
+                visibility_constraints,
                 *rhs_id,
                 max_depth - 1,
             );
