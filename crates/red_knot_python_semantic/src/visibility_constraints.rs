@@ -16,8 +16,8 @@ pub(crate) enum VisibilityConstraint {
     AlwaysTrue,
     VisibleIf(ScopedConstraintId),
     VisibleIfNot(ScopedVisibilityConstraintId),
-    Sequence(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
-    Merged(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+    KleeneAnd(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
+    KleeneOr(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -48,7 +48,7 @@ impl VisibilityConstraints {
             (VisibilityConstraint::VisibleIfNot(id), _) if *id == b => {
                 ScopedVisibilityConstraintId::ALWAYS_TRUE
             }
-            _ => self.add(VisibilityConstraint::Merged(a, b)),
+            _ => self.add(VisibilityConstraint::KleeneOr(a, b)),
         }
     }
 
@@ -60,7 +60,7 @@ impl VisibilityConstraints {
         if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
             b
         } else {
-            self.add(VisibilityConstraint::Sequence(a, b))
+            self.add(VisibilityConstraint::KleeneAnd(a, b))
         }
     }
 
@@ -94,7 +94,7 @@ impl VisibilityConstraints {
             VisibilityConstraint::VisibleIfNot(negated) => self
                 .analyze_impl(db, constraints, *negated, max_depth - 1)
                 .negate(),
-            VisibilityConstraint::Sequence(lhs, rhs) => {
+            VisibilityConstraint::KleeneAnd(lhs, rhs) => {
                 let lhs = self.analyze_impl(db, constraints, *lhs, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysFalse {
@@ -111,7 +111,7 @@ impl VisibilityConstraints {
                     Truthiness::Ambiguous
                 }
             }
-            VisibilityConstraint::Merged(lhs_id, rhs_id) => {
+            VisibilityConstraint::KleeneOr(lhs_id, rhs_id) => {
                 let lhs = self.analyze_impl(db, constraints, *lhs_id, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysTrue {
