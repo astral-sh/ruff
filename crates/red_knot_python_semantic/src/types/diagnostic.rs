@@ -34,6 +34,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
+    registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&NON_SUBSCRIPTABLE);
@@ -243,6 +244,49 @@ declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_PARAMETER_DEFAULT = {
         summary: "detects default values that can't be assigned to the parameter's annotated type",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// Checks for `raise` statements that raise non-exceptions or use invalid
+    /// causes for their raised exceptions.
+    ///
+    /// ## Why is this bad?
+    /// Only subclasses or instances of `BaseException` can be raised.
+    /// For an exception's cause, the same rules apply, except that `None` is also
+    /// permitted. Violating these rules results in a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def f():
+    ///     try:
+    ///         something()
+    ///     except NameError:
+    ///         raise "oops!" from f
+    ///
+    /// def g():
+    ///     raise NotImplemented from 42
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def f():
+    ///     try:
+    ///         something()
+    ///     except NameError as e:
+    ///         raise RuntimeError("oops!") from e
+    ///
+    /// def g():
+    ///     raise NotImplementedError from None
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#raise)
+    /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
+    pub(crate) static INVALID_RAISE = {
+        summary: "detects `raise` statements that raise invalid exceptions or use invalid causes",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -717,6 +761,29 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
         format_args!(
             "Cannot catch object of type `{}` in an exception handler \
             (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
+            ty.display(context.db())
+        ),
+    );
+}
+
+pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast::Expr, ty: Type) {
+    context.report_lint(
+        &INVALID_RAISE,
+        node.into(),
+        format_args!(
+            "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
+            ty.display(context.db())
+        ),
+    );
+}
+
+pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
+    context.report_lint(
+        &INVALID_RAISE,
+        node.into(),
+        format_args!(
+            "Cannot use object of type `{}` as exception cause \
+            (must be a `BaseException` subclass or instance or `None`)",
             ty.display(context.db())
         ),
     );
