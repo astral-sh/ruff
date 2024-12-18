@@ -1,6 +1,6 @@
 use std::fmt;
 
-use drop_bomb::DropBomb;
+use drop_bomb::DebugDropBomb;
 use ruff_db::{
     diagnostic::{DiagnosticId, Severity},
     files::File,
@@ -31,7 +31,7 @@ pub(crate) struct InferContext<'db> {
     db: &'db dyn Db,
     file: File,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
-    defused: DropBomb,
+    bomb: DebugDropBomb,
 }
 
 impl<'db> InferContext<'db> {
@@ -40,7 +40,7 @@ impl<'db> InferContext<'db> {
             db,
             file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
-            defused: DropBomb::new("`TyContext` need to be explicitly consumed by calling `::finish` to prevent accidental lose of diagnostics."),
+            bomb: DebugDropBomb::new("`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics."),
         }
     }
 
@@ -109,7 +109,7 @@ impl<'db> InferContext<'db> {
 
     #[must_use]
     pub(crate) fn finish(mut self) -> TypeCheckDiagnostics {
-        self.defused.defuse();
+        self.bomb.defuse();
         let mut diagnostics = self.diagnostics.into_inner();
         diagnostics.shrink_to_fit();
         diagnostics
@@ -121,7 +121,7 @@ impl fmt::Debug for InferContext<'_> {
         f.debug_struct("TyContext")
             .field("file", &self.file)
             .field("diagnostics", &self.diagnostics)
-            .field("defused", &self.defused)
+            .field("defused", &self.bomb)
             .finish()
     }
 }
