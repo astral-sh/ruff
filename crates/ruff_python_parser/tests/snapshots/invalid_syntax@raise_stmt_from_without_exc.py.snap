@@ -45,7 +45,7 @@ Module(
 
   |
 1 | raise from exc
-  |       ^^^^ Syntax Error: Exception missing in `raise ... from ...` statement.
+  |       ^^^^ Syntax Error: Exception missing in `raise` statement with cause
 2 | raise from None
   |
 
@@ -53,5 +53,5 @@ Module(
   |
 1 | raise from exc
 2 | raise from None
-  |       ^^^^ Syntax Error: Exception missing in `raise ... from ...` statement.
+  |       ^^^^ Syntax Error: Exception missing in `raise` statement with cause
   |

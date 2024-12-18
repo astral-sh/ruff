@@ -419,7 +419,7 @@ impl<'src> Parser<'src> {
             // raise from None
             self.add_error(
                 ParseErrorType::OtherError(
-                    "Exception missing in `raise ... from ...` statement.".to_string(),
+                    "Exception missing in `raise` statement with cause".to_string(),
                 ),
                 self.current_token_range(),
             );
