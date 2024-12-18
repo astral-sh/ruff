@@ -105,8 +105,25 @@ pub enum Command {
     Server,
 }
 
+use oxidd::bdd::BDDFunction;
+use oxidd::tdd::TDDFunction;
+use oxidd::BooleanFunction;
+use oxidd::ManagerRef;
+use oxidd::TVLFunction;
+
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
+    let mgr = oxidd::bdd::new_manager(24, 24, 1);
+    let (x, y, z) = mgr.with_manager_exclusive(|mgr| {
+        (
+            BDDFunction::new_var(mgr).unwrap(),
+            BDDFunction::new_var(mgr).unwrap(),
+            BDDFunction::new_var(mgr).unwrap(),
+        )
+    });
+    let res = x.and(&y).unwrap().or(&z).unwrap();
+    dbg!(res.eval([(&x, false), (&y, true), (&z, false)]));
+    panic!("FOO");
     run().unwrap_or_else(|error| {
         use std::io::Write;
 

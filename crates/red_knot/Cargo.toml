@@ -24,6 +24,7 @@ colored = { workspace = true }
 countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
+oxidd = { workspace = true }
 rayon = { workspace = true }
 salsa = { workspace = true }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
