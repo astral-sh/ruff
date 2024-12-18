@@ -17,7 +17,7 @@ pub(crate) enum ConstraintNode<'db> {
     Pattern(PatternConstraint<'db>),
 }
 
-/// Pattern kinds for which we do support type narrowing and/or static truthiness analysis.
+/// Pattern kinds for which we support type narrowing and/or static visibility analysis.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum PatternConstraintKind<'db> {
     Singleton(Singleton, Option<Expression<'db>>),
