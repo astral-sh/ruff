@@ -145,7 +145,7 @@ impl SymbolDeclarations {
         constraint: ScopedVisibilityConstraintId,
     ) {
         for existing in &mut self.visibility_constraints {
-            *existing = visibility_constraints.add_sequence(*existing, constraint);
+            *existing = visibility_constraints.add_and_constraint(*existing, constraint);
         }
     }
 
@@ -216,7 +216,7 @@ impl SymbolBindings {
         constraint: ScopedVisibilityConstraintId,
     ) {
         for existing in &mut self.visibility_constraints {
-            *existing = visibility_constraints.add_sequence(*existing, constraint);
+            *existing = visibility_constraints.add_and_constraint(*existing, constraint);
         }
     }
 
@@ -404,7 +404,8 @@ impl SymbolState {
                             .next()
                             .expect("visibility_constraints length mismatch");
                         let current = self.bindings.visibility_constraints.last_mut().unwrap();
-                        *current = visibility_constraints.add_merged(*current, a_vis_constraint);
+                        *current =
+                            visibility_constraints.add_or_constraint(*current, a_vis_constraint);
 
                         opt_a_def = a_defs_iter.next();
                         opt_b_def = b_defs_iter.next();
@@ -470,7 +471,8 @@ impl SymbolState {
                             .next()
                             .expect("declarations and visibility_constraints length mismatch");
                         let current = self.declarations.visibility_constraints.last_mut().unwrap();
-                        *current = visibility_constraints.add_merged(*current, a_vis_constraint);
+                        *current =
+                            visibility_constraints.add_or_constraint(*current, a_vis_constraint);
 
                         opt_a_decl = a_decls_iter.next();
                         opt_b_decl = b_decls_iter.next();
