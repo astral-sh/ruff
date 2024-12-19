@@ -560,13 +560,14 @@ impl<'db> UseDefMapBuilder<'db> {
 
         self.scope_start_visibility = snapshot.scope_start_visibility;
 
-        let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
-        for current in &mut self.symbol_states {
-            if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.simplify_visibility_constraints(snapshot);
-            } else {
-                // Symbol not present in snapshot, keep visibility constraints
-            }
+        // Note that this loop terminates when we reach a symbol not present in the snapshot.
+        // This means we keep visibility constraints for all new symbols, which is intended,
+        // since these symbols have been introduced in the corresponding branch, which might
+        // be subject to visibility constraints. We only simplify/reset visibility constraints
+        // for symbols that have the same bindings and declarations present compared to the
+        // snapshot.
+        for (current, snapshot) in self.symbol_states.iter_mut().zip(snapshot.symbol_states) {
+            current.simplify_visibility_constraints(snapshot);
         }
     }
 
