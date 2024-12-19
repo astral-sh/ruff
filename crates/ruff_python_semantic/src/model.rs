@@ -1880,6 +1880,13 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::TYPE_ALIAS)
     }
 
+    /// Return `true` if the model is visiting the type expression of
+    /// a `typing.cast` call.
+    pub const fn in_cast_type_expression(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::CAST_TYPE_EXPRESSION)
+    }
+
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
@@ -2476,6 +2483,16 @@ bitflags! {
         /// assert (y := x**2) > 42, y
         /// ```
         const ASSERT_STATEMENT = 1 << 29;
+
+        /// The model is visiting the type expression of a `typing.cast` call.
+        ///
+        /// For example, the model might be visiting `float` in
+        /// ```python
+        /// from typing import cast
+        ///
+        /// cast(float, 5)
+        /// ```
+        const CAST_TYPE_EXPRESSION = 1 << 30;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
