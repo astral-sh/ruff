@@ -1,5 +1,7 @@
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::constraint::{Constraint, ConstraintNode, PatternConstraint};
+use crate::semantic_index::constraint::{
+    Constraint, ConstraintNode, PatternConstraint, PatternConstraintKind,
+};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
@@ -216,31 +218,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
 
-        match pattern.pattern(self.db).node() {
-            ast::Pattern::MatchValue(_) => {
-                None // TODO
+        match pattern.kind(self.db) {
+            PatternConstraintKind::Singleton(singleton, _guard) => {
+                self.evaluate_match_pattern_singleton(*subject, *singleton)
             }
-            ast::Pattern::MatchSingleton(singleton_pattern) => {
-                self.evaluate_match_pattern_singleton(subject, singleton_pattern)
-            }
-            ast::Pattern::MatchSequence(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchMapping(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchClass(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchStar(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchAs(_) => {
-                None // TODO
-            }
-            ast::Pattern::MatchOr(_) => {
-                None // TODO
-            }
+            // TODO: support more pattern kinds
+            PatternConstraintKind::Value(..) | PatternConstraintKind::Unsupported => None,
         }
     }
 
@@ -483,14 +466,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
     fn evaluate_match_pattern_singleton(
         &mut self,
-        subject: &ast::Expr,
-        pattern: &ast::PatternMatchSingleton,
+        subject: Expression<'db>,
+        singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        if let Some(ast::ExprName { id, .. }) = subject.as_name_expr() {
+        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
             // SAFETY: we should always have a symbol for every Name node.
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-            let ty = match pattern.value {
+            let ty = match singleton {
                 ast::Singleton::None => Type::none(self.db),
                 ast::Singleton::True => Type::BooleanLiteral(true),
                 ast::Singleton::False => Type::BooleanLiteral(false),

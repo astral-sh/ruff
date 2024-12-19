@@ -1,5 +1,7 @@
 use crate::workspace::PackageMetadata;
-use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings, SitePackages};
+use red_knot_python_semantic::{
+    ProgramSettings, PythonPlatform, PythonVersion, SearchPathSettings, SitePackages,
+};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 
 /// The resolved configurations.
@@ -40,6 +42,7 @@ impl Configuration {
         WorkspaceSettings {
             program: ProgramSettings {
                 python_version: self.python_version.unwrap_or_default(),
+                python_platform: PythonPlatform::default(),
                 search_paths: self.search_paths.to_settings(workspace_root),
             },
         }
