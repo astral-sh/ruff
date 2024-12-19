@@ -486,3 +486,23 @@ PERF401.py:245:13: PERF401 [*] Use `list.extend` to create a transformed list
 246 245 |     result = []
 247 246 | 
 248 247 | def f():
+
+PERF401.py:262:13: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+260 |     for i in range(5):
+261 |         if j := i:
+262 |             items.append(j)
+    |             ^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+255 255 | # The fix here must parenthesize the walrus operator
+256 256 | # https://github.com/astral-sh/ruff/issues/15047
+257 257 | def f():
+258     |-    items = []
+259 258 | 
+260     |-    for i in range(5):
+261     |-        if j := i:
+262     |-            items.append(j)
+    259 |+    items = [j for i in range(5) if (j := i)]

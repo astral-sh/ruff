@@ -46,6 +46,11 @@ use ruff_text_size::{Ranged, TextRange};
 /// original = list(range(10000))
 /// filtered.extend(x for x in original if x % 2)
 /// ```
+///
+/// Take care that if the original for-loop uses an assignment expression
+/// as a conditional, such as `if match:=re.match("\d+","123")`, then
+/// the corresponding comprehension must wrap the assignment
+/// expression in parentheses to avoid a syntax error.
 #[derive(ViolationMetadata)]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
@@ -347,7 +352,21 @@ fn convert_to_list_extend(
     let semantic = checker.semantic();
     let locator = checker.locator();
     let if_str = match if_test {
-        Some(test) => format!(" if {}", locator.slice(test.range())),
+        Some(test) => {
+            // If the test is an assignment expression,
+            // we must parenthesize it when it appears
+            // inside the comprehension to avoid a syntax error.
+            //
+            // Notice that we do not need `any_over_expr` here,
+            // since if the assignment expression appears
+            // internally (e.g. as an operand in a boolean
+            // operation) then it will already be parenthesized.
+            if test.is_named_expr() {
+                format!(" if ({})", locator.slice(test.range()))
+            } else {
+                format!(" if {}", locator.slice(test.range()))
+            }
+        }
         None => String::new(),
     };
 
