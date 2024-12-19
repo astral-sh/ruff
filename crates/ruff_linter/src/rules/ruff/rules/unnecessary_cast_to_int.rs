@@ -1,10 +1,11 @@
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::{Expr, ExprCall};
 use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::analyze::typing::IsStrictlyInt;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -54,40 +55,18 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
 pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
-    let Some(Expr::Call(inner_call)) = single_argument_to_int_call(semantic, call) else {
+    let Some(argument) = single_argument_to_int_call(semantic, call) else {
         return;
     };
 
-    let (func, arguments) = (&inner_call.func, &inner_call.arguments);
-    let (outer_range, inner_range) = (call.range, inner_call.range);
-
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
-        return;
-    };
-
-    let fix = match qualified_name.segments() {
-        // Always returns a strict instance of `int`
-        ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
-        | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => {
-            Fix::safe_edit(replace_with_inner(checker, outer_range, inner_range))
-        }
-
-        // Depends on `ndigits` and `number.__round__`
-        ["" | "builtins", "round"] => {
-            if let Some(fix) = replace_with_round(checker, outer_range, inner_range, arguments) {
-                fix
-            } else {
-                return;
-            }
-        }
-
-        // Depends on `__ceil__`/`__floor__`/`__trunc__`
-        ["math", "ceil" | "floor" | "trunc"] => {
-            Fix::unsafe_edit(replace_with_inner(checker, outer_range, inner_range))
-        }
-
+    let applicability = match typing::is_strictly_int_expr(argument, semantic) {
+        IsStrictlyInt::True => Applicability::Safe,
+        IsStrictlyInt::Likely => Applicability::Unsafe,
         _ => return,
     };
+
+    let edit = replace_with_inner(checker, call, argument);
+    let fix = Fix::applicable_edit(edit, applicability);
 
     let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
 
@@ -117,92 +96,28 @@ fn single_argument_to_int_call<'a>(
     Some(argument)
 }
 
-/// The type of the first argument to `round()`
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Rounded {
-    InferredInt,
-    InferredFloat,
-    LiteralInt,
-    LiteralFloat,
-    Other,
-}
+fn replace_with_inner(checker: &mut Checker, call: &ExprCall, argument: &Expr) -> Edit {
+    let has_parent_expr = checker.semantic().current_expression_parent().is_some();
+    let argument_expr = checker.locator().slice(argument.range());
 
-/// The type of the second argument to `round()`
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Ndigits {
-    NotGiven,
-    LiteralInt,
-    LiteralNone,
-    Other,
-}
-
-fn replace_with_round(
-    checker: &Checker,
-    outer_range: TextRange,
-    inner_range: TextRange,
-    arguments: &Arguments,
-) -> Option<Fix> {
-    if arguments.len() > 2 {
-        return None;
-    }
-
-    let number = arguments.find_argument("number", 0)?;
-    let ndigits = arguments.find_argument("ndigits", 1);
-
-    let number_kind = match number {
-        Expr::Name(name) => {
-            let semantic = checker.semantic();
-
-            match semantic.only_binding(name).map(|id| semantic.binding(id)) {
-                Some(binding) if typing::is_int(binding, semantic) => Rounded::InferredInt,
-                Some(binding) if typing::is_float(binding, semantic) => Rounded::InferredFloat,
-                _ => Rounded::Other,
-            }
-        }
-
-        Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
-            Number::Int(..) => Rounded::LiteralInt,
-            Number::Float(..) => Rounded::LiteralFloat,
-            Number::Complex { .. } => Rounded::Other,
-        },
-
-        _ => Rounded::Other,
+    let new_content = if has_parent_expr || should_be_parenthesized_when_standalone(argument) {
+        format!("({argument_expr})")
+    } else {
+        argument_expr.to_string()
     };
 
-    let ndigits_kind = match ndigits {
-        None => Ndigits::NotGiven,
-        Some(Expr::NoneLiteral(_)) => Ndigits::LiteralNone,
-
-        Some(Expr::NumberLiteral(ExprNumberLiteral {
-            value: Number::Int(..),
-            ..
-        })) => Ndigits::LiteralInt,
-
-        _ => Ndigits::Other,
-    };
-
-    let applicability = match (number_kind, ndigits_kind) {
-        (Rounded::LiteralInt, Ndigits::LiteralInt)
-        | (Rounded::LiteralInt | Rounded::LiteralFloat, Ndigits::NotGiven | Ndigits::LiteralNone) => {
-            Applicability::Safe
-        }
-
-        (Rounded::InferredInt, Ndigits::LiteralInt)
-        | (
-            Rounded::InferredInt | Rounded::InferredFloat | Rounded::Other,
-            Ndigits::NotGiven | Ndigits::LiteralNone,
-        ) => Applicability::Unsafe,
-
-        _ => return None,
-    };
-
-    let edit = replace_with_inner(checker, outer_range, inner_range);
-
-    Some(Fix::applicable_edit(edit, applicability))
+    Edit::range_replacement(new_content, call.range)
 }
 
-fn replace_with_inner(checker: &Checker, outer_range: TextRange, inner_range: TextRange) -> Edit {
-    let inner_expr = checker.locator().slice(inner_range);
-
-    Edit::range_replacement(inner_expr.to_string(), outer_range)
+/// Whether `expr` should be parenthesized when used on its own.
+///
+/// ```python
+/// a := 0            # (a := 0)
+/// a = b := 0        # a = (b := 0)
+/// a for a in b      # (a for a in b)
+/// a = b for b in c  # a = (b for b in c)
+/// ```
+#[inline]
+fn should_be_parenthesized_when_standalone(expr: &Expr) -> bool {
+    matches!(expr, Expr::Named(_) | Expr::Generator(_))
 }
