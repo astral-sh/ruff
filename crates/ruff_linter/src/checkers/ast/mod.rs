@@ -1431,10 +1431,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 range: _,
                 ctx,
                 attr: _,
-            }) => match ctx {
-                ExprContext::Load => self.handle_attribute_load(expr),
-                _ => {}
-            },
+            }) => {
+                if ctx == &ExprContext::Load {
+                    self.handle_attribute_load(expr);
+                }
+            }
             Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => self.handle_node_store(id, expr),

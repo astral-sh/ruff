@@ -304,7 +304,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
 
         let binding_name = top_binding
             .name(checker.source())
-            .split(".")
+            .split('.')
             .next()
             .unwrap_or("");
 
