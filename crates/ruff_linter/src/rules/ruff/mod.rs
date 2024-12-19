@@ -416,6 +416,10 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_if.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_for.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_while.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_try.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
