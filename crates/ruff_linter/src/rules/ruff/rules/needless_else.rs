@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::identifier::{else_loop, else_try};
-use ruff_python_ast::{ExceptHandler, Expr, Stmt, StmtExpr};
+use ruff_python_ast::{ExceptHandler, Expr, Stmt, StmtExpr, StmtFor, StmtWhile};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -42,31 +42,12 @@ impl AlwaysFixableViolation for NeedlessElse {
 
 /// RUF047
 pub(crate) fn needless_else(checker: &mut Checker, stmt: &Stmt) {
-    let (comment_ranges, source) = (checker.comment_ranges(), checker.source());
+    let comment_ranges = checker.comment_ranges();
+    let source = checker.source();
 
-    let (body, report_range, remove_range, comment_range) = match stmt {
-        Stmt::For(for_stmt) => {
-            let (previous, else_body) = (&for_stmt.body, &for_stmt.orelse[..]);
-
-            let Some(keyword_range) = else_loop(stmt, source) else {
-                return;
-            };
-            let Some(last_stmt) = else_body.last() else {
-                return;
-            };
-            let report_range = TextRange::new(keyword_range.start(), last_stmt.end());
-
-            let Some((remove_range, comment_range)) =
-                remove_and_comment_range(source, previous, else_body)
-            else {
-                return;
-            };
-
-            (else_body, report_range, remove_range, comment_range)
-        }
-
-        Stmt::While(while_stmt) => {
-            let (previous, else_body) = (&while_stmt.body, &while_stmt.orelse[..]);
+    let (body, diagnostic_range, remove_range, comment_range) = match stmt {
+        Stmt::For(StmtFor { body, orelse, .. }) | Stmt::While(StmtWhile { body, orelse, .. }) => {
+            let (previous, else_body) = (&body, &orelse[..]);
 
             let Some(keyword_range) = else_loop(stmt, source) else {
                 return;
@@ -74,7 +55,7 @@ pub(crate) fn needless_else(checker: &mut Checker, stmt: &Stmt) {
             let Some(last_stmt) = else_body.last() else {
                 return;
             };
-            let report_range = TextRange::new(keyword_range.start(), last_stmt.end());
+            let diagnostic_range = TextRange::new(keyword_range.start(), last_stmt.end());
 
             let Some((remove_range, comment_range)) =
                 remove_and_comment_range(source, previous, else_body)
@@ -82,7 +63,7 @@ pub(crate) fn needless_else(checker: &mut Checker, stmt: &Stmt) {
                 return;
             };
 
-            (else_body, report_range, remove_range, comment_range)
+            (else_body, diagnostic_range, remove_range, comment_range)
         }
 
         Stmt::Try(try_stmt) => {
@@ -98,7 +79,7 @@ pub(crate) fn needless_else(checker: &mut Checker, stmt: &Stmt) {
 
             let mut previous = &try_stmt.body[..];
 
-            if let [.., ExceptHandler::ExceptHandler(last_handler)] = &&try_stmt.handlers[..] {
+            if let [.., ExceptHandler::ExceptHandler(last_handler)] = &try_stmt.handlers[..] {
                 previous = &last_handler.body[..];
             };
 
@@ -145,7 +126,7 @@ pub(crate) fn needless_else(checker: &mut Checker, stmt: &Stmt) {
     let edit = Edit::range_deletion(remove_range);
     let fix = Fix::safe_edit(edit);
 
-    let diagnostic = Diagnostic::new(NeedlessElse, report_range);
+    let diagnostic = Diagnostic::new(NeedlessElse, diagnostic_range);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
