@@ -250,7 +250,7 @@ pub(crate) struct UseDefMap<'db> {
     all_constraints: AllConstraints<'db>,
 
     /// Array of [`VisibilityConstraint`]s in this scope.
-    visibility_constraints: VisibilityConstraints,
+    visibility_constraints: VisibilityConstraints<'db>,
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -339,7 +339,6 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
-            all_constraints: &self.all_constraints,
             visibility_constraints: &self.visibility_constraints,
             inner: declarations.iter(),
         }
@@ -357,7 +356,7 @@ enum SymbolDefinitions {
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     all_constraints: &'map AllConstraints<'db>,
-    all_visibility_constraints: &'map VisibilityConstraints,
+    all_visibility_constraints: &'map VisibilityConstraints<'db>,
     inner: BindingIdWithConstraintsIterator<'map>,
 }
 
@@ -375,7 +374,6 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                     all_constraints,
                     constraint_ids: binding_id_with_constraints.constraint_ids,
                 },
-                all_constraints: self.all_constraints,
                 visibility_constraints: self.all_visibility_constraints,
                 visibility_constraint: binding_id_with_constraints.visibility_constraint,
             })
@@ -387,8 +385,7 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Option<Definition<'db>>,
     pub(crate) constraints: ConstraintsIterator<'map, 'db>,
-    pub(crate) all_constraints: &'map AllConstraints<'db>,
-    pub(crate) visibility_constraints: &'map VisibilityConstraints,
+    pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
@@ -411,16 +408,14 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
-    all_constraints: &'map AllConstraints<'db>,
-    visibility_constraints: &'map VisibilityConstraints,
+    visibility_constraints: &'map VisibilityConstraints<'db>,
     inner: DeclarationIdIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
     type Item = (
         Option<Definition<'db>>,
-        &'map AllConstraints<'db>,
-        &'map VisibilityConstraints,
+        &'map VisibilityConstraints<'db>,
         ScopedVisibilityConstraintId,
     );
 
@@ -428,7 +423,6 @@ impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
         self.inner.next().map(|(def_id, visibility_constraint_id)| {
             (
                 self.all_definitions[def_id],
-                self.all_constraints,
                 self.visibility_constraints,
                 visibility_constraint_id,
             )
@@ -454,7 +448,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     all_constraints: AllConstraints<'db>,
 
     /// Append-only array of [`VisibilityConstraint`].
-    visibility_constraints: VisibilityConstraints,
+    visibility_constraints: VisibilityConstraints<'db>,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
     /// whether or not the start of the scope is visible. This is important for cases like
@@ -506,21 +500,16 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_constraints.push(constraint)
     }
 
-    pub(super) fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
-        for state in &mut self.symbol_states {
-            state.record_constraint(constraint);
-        }
-    }
-
-    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
         let constraint_id = self.add_constraint(constraint);
-        self.record_constraint_id(constraint_id);
-        constraint_id
+        for state in &mut self.symbol_states {
+            state.record_constraint(constraint_id);
+        }
     }
 
     pub(super) fn add_visibility_constraint(
         &mut self,
-        constraint: VisibilityConstraint,
+        constraint: VisibilityConstraint<'db>,
     ) -> ScopedVisibilityConstraintId {
         self.visibility_constraints.add(constraint)
     }
@@ -540,7 +529,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn record_visibility_constraint(
         &mut self,
-        constraint: VisibilityConstraint,
+        constraint: VisibilityConstraint<'db>,
     ) -> ScopedVisibilityConstraintId {
         let new_constraint_id = self.add_visibility_constraint(constraint);
         self.record_visibility_constraint_id(new_constraint_id);
