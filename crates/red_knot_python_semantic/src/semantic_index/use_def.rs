@@ -547,7 +547,25 @@ impl<'db> UseDefMapBuilder<'db> {
         new_constraint_id
     }
 
-    pub(super) fn reset_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
+    /// This method resets the visibility constraints for all symbols to a previous state
+    /// *if* there have been no new declarations or bindings since then. Consider the
+    /// following example:
+    /// ```py
+    /// x = 0
+    /// y = 0
+    /// if test_a:
+    ///     y = 1
+    /// elif test_b:
+    ///     y = 2
+    /// elif test_c:
+    ///    y = 3
+    ///
+    /// # RESET
+    /// ```
+    /// We build a complex visibility constraint for the `y = 0` binding. We build the same
+    /// constraint for the `x = 0` binding as well, but at the `RESET` point, we can get rid
+    /// of it, as the `if`-`elif`-`elif` chain doesn't include any new bindings of `x`.
+    pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
         let num_symbols = self.symbol_states.len();
         debug_assert!(num_symbols >= snapshot.symbol_states.len());
 
@@ -556,7 +574,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.reset_visibility_constraints(snapshot);
+                current.simplify_visibility_constraints(snapshot);
             } else {
                 // Symbol not present in snapshot, keep visibility constraints
             }

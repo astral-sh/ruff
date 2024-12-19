@@ -265,7 +265,7 @@ impl SymbolState {
             .record_visibility_constraint(visibility_constraints, constraint);
     }
 
-    pub(super) fn reset_visibility_constraints(&mut self, snapshot_state: SymbolState) {
+    pub(super) fn simplify_visibility_constraints(&mut self, snapshot_state: SymbolState) {
         if self.bindings.live_bindings == snapshot_state.bindings.live_bindings {
             self.bindings.visibility_constraints = snapshot_state.bindings.visibility_constraints;
         }
