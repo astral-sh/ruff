@@ -36,7 +36,7 @@ impl VisibilityConstraints {
         self.constraints.push(constraint)
     }
 
-    pub(crate) fn add_merged(
+    pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,
@@ -52,7 +52,7 @@ impl VisibilityConstraints {
         }
     }
 
-    pub(crate) fn add_sequence(
+    pub(crate) fn add_and_constraint(
         &mut self,
         a: ScopedVisibilityConstraintId,
         b: ScopedVisibilityConstraintId,

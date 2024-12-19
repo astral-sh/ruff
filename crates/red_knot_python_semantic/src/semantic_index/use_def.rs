@@ -515,7 +515,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         self.unbound_visibility = self
             .visibility_constraints
-            .add_sequence(self.unbound_visibility, new_constraint_id);
+            .add_and_constraint(self.unbound_visibility, new_constraint_id);
 
         new_constraint_id
     }
@@ -622,7 +622,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         self.unbound_visibility = self
             .visibility_constraints
-            .add_merged(self.unbound_visibility, snapshot.unbound_visibility);
+            .add_or_constraint(self.unbound_visibility, snapshot.unbound_visibility);
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
