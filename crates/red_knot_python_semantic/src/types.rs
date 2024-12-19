@@ -17,7 +17,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::signatures::Signature;
 use crate::module_name::ModuleName;
-use crate::module_resolver::{file_to_module, resolve_module};
+use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
@@ -25,9 +25,7 @@ use crate::semantic_index::{
     global_scope, imported_modules, semantic_index, symbol_table, use_def_map,
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
-use crate::stdlib::{
-    builtins_symbol, core_module_symbol, typing_extensions_symbol, CoreStdlibModule,
-};
+use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{CallDunderResult, CallOutcome};
 use crate::types::class_base::ClassBase;
@@ -129,7 +127,8 @@ fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> 
     // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
     // is just a re-export of `typing.TYPE_CHECKING`.
     if name == "TYPE_CHECKING"
-        && file_to_module(db, scope.file(db)).is_some_and(|module| module.name() == "typing")
+        && file_to_module(db, scope.file(db))
+            .is_some_and(|module| module.is_known(KnownModule::Typing))
     {
         return Symbol::Type(Type::BooleanLiteral(true), Boundness::Bound);
     }
@@ -2178,7 +2177,7 @@ impl InvalidTypeExpression {
 ///
 /// Feel free to expand this enum if you ever find yourself using the same class in multiple
 /// places.
-/// Note: good candidates are any classes in `[crate::stdlib::CoreStdlibModule]`
+/// Note: good candidates are any classes in `[crate::module_resolver::module::KnownModule]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KnownClass {
     // To figure out where an stdlib symbol is defined, you can go into `crates/red_knot_vendored`
@@ -2269,7 +2268,7 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        core_module_symbol(db, self.canonical_module(db), self.as_str())
+        known_module_symbol(db, self.canonical_module(db), self.as_str())
             .ignore_possibly_unbound()
             .unwrap_or(Type::Unknown)
     }
@@ -2282,7 +2281,7 @@ impl<'db> KnownClass {
     }
 
     /// Return the module in which we should look up the definition for this class
-    pub(crate) fn canonical_module(self, db: &'db dyn Db) -> CoreStdlibModule {
+    pub(crate) fn canonical_module(self, db: &'db dyn Db) -> KnownModule {
         match self {
             Self::Bool
             | Self::Object
@@ -2298,12 +2297,12 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::BaseException
             | Self::BaseExceptionGroup
-            | Self::Slice => CoreStdlibModule::Builtins,
-            Self::VersionInfo => CoreStdlibModule::Sys,
-            Self::GenericAlias | Self::ModuleType | Self::FunctionType => CoreStdlibModule::Types,
-            Self::NoneType => CoreStdlibModule::Typeshed,
+            | Self::Slice => KnownModule::Builtins,
+            Self::VersionInfo => KnownModule::Sys,
+            Self::GenericAlias | Self::ModuleType | Self::FunctionType => KnownModule::Types,
+            Self::NoneType => KnownModule::Typeshed,
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::StdlibAlias => {
-                CoreStdlibModule::Typing
+                KnownModule::Typing
             }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
@@ -2312,16 +2311,16 @@ impl<'db> KnownClass {
                 // singleton, but not for `typing._NoDefaultType`. So we need to switch
                 // to `typing._NoDefaultType` for newer versions:
                 if python_version >= PythonVersion::PY313 {
-                    CoreStdlibModule::Typing
+                    KnownModule::Typing
                 } else {
-                    CoreStdlibModule::TypingExtensions
+                    KnownModule::TypingExtensions
                 }
             }
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
             | Self::Deque
-            | Self::OrderedDict => CoreStdlibModule::Collections,
+            | Self::OrderedDict => KnownModule::Collections,
         }
     }
 
@@ -2361,7 +2360,7 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn try_from_file(db: &dyn Db, file: File, class_name: &str) -> Option<Self> {
+    pub fn try_from_file_and_symbol(db: &dyn Db, file: File, class_name: &str) -> Option<Self> {
         // Note: if this becomes hard to maintain (as rust can't ensure at compile time that all
         // variants of `Self` are covered), we might use a macro (in-house or dependency)
         // See: https://stackoverflow.com/q/39070244
@@ -2398,15 +2397,13 @@ impl<'db> KnownClass {
             _ => return None,
         };
 
-        let module = file_to_module(db, file)?;
-        candidate.check_module(db, &module).then_some(candidate)
+        candidate
+            .check_module(db, file_to_module(db, file)?.known()?)
+            .then_some(candidate)
     }
 
-    /// Return `true` if the module of `self` matches `module_name`
-    fn check_module(self, db: &'db dyn Db, module: &Module) -> bool {
-        if !module.search_path().is_standard_library() {
-            return false;
-        }
+    /// Return `true` if the module of `self` matches `module`
+    fn check_module(self, db: &'db dyn Db, module: KnownModule) -> bool {
         match self {
             Self::Bool
             | Self::Object
@@ -2432,10 +2429,10 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::BaseException
             | Self::BaseExceptionGroup
-            | Self::FunctionType => module.name() == self.canonical_module(db).as_str(),
-            Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
+            | Self::FunctionType => module == self.canonical_module(db),
+            Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
-                matches!(module.name().as_str(), "typing" | "typing_extensions")
+                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
         }
     }
@@ -2669,43 +2666,92 @@ impl<'db> KnownInstanceType<'db> {
         self.class().to_instance(db)
     }
 
-    pub fn try_from_module_and_symbol(module: &Module, instance_name: &str) -> Option<Self> {
-        if !module.search_path().is_standard_library() {
-            return None;
-        }
-        match (module.name().as_str(), instance_name) {
-            ("typing", "Any") => Some(Self::Any),
-            ("typing", "ClassVar") => Some(Self::ClassVar),
-            ("typing", "Deque") => Some(Self::Deque),
-            ("typing", "List") => Some(Self::List),
-            ("typing", "Dict") => Some(Self::Dict),
-            ("typing", "DefaultDict") => Some(Self::DefaultDict),
-            ("typing", "Set") => Some(Self::Set),
-            ("typing", "FrozenSet") => Some(Self::FrozenSet),
-            ("typing", "Counter") => Some(Self::Counter),
-            ("typing", "ChainMap") => Some(Self::ChainMap),
-            ("typing", "OrderedDict") => Some(Self::OrderedDict),
-            ("typing", "Optional") => Some(Self::Optional),
-            ("typing", "Union") => Some(Self::Union),
-            ("typing", "NoReturn") => Some(Self::NoReturn),
-            ("typing", "Tuple") => Some(Self::Tuple),
-            ("typing", "Type") => Some(Self::Type),
-            ("typing", "Callable") => Some(Self::Callable),
-            ("typing" | "typing_extensions", "Annotated") => Some(Self::Annotated),
-            ("typing" | "typing_extensions", "Literal") => Some(Self::Literal),
-            ("typing" | "typing_extensions", "LiteralString") => Some(Self::LiteralString),
-            ("typing" | "typing_extensions", "Never") => Some(Self::Never),
-            ("typing" | "typing_extensions", "Self") => Some(Self::TypingSelf),
-            ("typing" | "typing_extensions", "Final") => Some(Self::Final),
-            ("typing" | "typing_extensions", "Concatenate") => Some(Self::Concatenate),
-            ("typing" | "typing_extensions", "Unpack") => Some(Self::Unpack),
-            ("typing" | "typing_extensions", "Required") => Some(Self::Required),
-            ("typing" | "typing_extensions", "NotRequired") => Some(Self::NotRequired),
-            ("typing" | "typing_extensions", "TypeAlias") => Some(Self::TypeAlias),
-            ("typing" | "typing_extensions", "TypeGuard") => Some(Self::TypeGuard),
-            ("typing" | "typing_extensions", "TypeIs") => Some(Self::TypeIs),
-            ("typing" | "typing_extensions", "ReadOnly") => Some(Self::ReadOnly),
-            _ => None,
+    pub fn try_from_file_and_symbol(
+        db: &'db dyn Db,
+        file: File,
+        instance_name: &str,
+    ) -> Option<Self> {
+        let candidate = match instance_name {
+            "Any" => Self::Any,
+            "ClassVar" => Self::ClassVar,
+            "Deque" => Self::Deque,
+            "List" => Self::List,
+            "Dict" => Self::Dict,
+            "DefaultDict" => Self::DefaultDict,
+            "Set" => Self::Set,
+            "FrozenSet" => Self::FrozenSet,
+            "Counter" => Self::Counter,
+            "ChainMap" => Self::ChainMap,
+            "OrderedDict" => Self::OrderedDict,
+            "Optional" => Self::Optional,
+            "Union" => Self::Union,
+            "NoReturn" => Self::NoReturn,
+            "Tuple" => Self::Tuple,
+            "Type" => Self::Type,
+            "Callable" => Self::Callable,
+            "Annotated" => Self::Annotated,
+            "Literal" => Self::Literal,
+            "Never" => Self::Never,
+            "Self" => Self::TypingSelf,
+            "Final" => Self::Final,
+            "Unpack" => Self::Unpack,
+            "Required" => Self::Required,
+            "TypeAlias" => Self::TypeAlias,
+            "TypeGuard" => Self::TypeGuard,
+            "TypeIs" => Self::TypeIs,
+            "ReadOnly" => Self::ReadOnly,
+            "Concatenate" => Self::Concatenate,
+            "NotRequired" => Self::NotRequired,
+            "LiteralString" => Self::LiteralString,
+            _ => return None,
+        };
+
+        candidate
+            .check_module(file_to_module(db, file)?.known()?)
+            .then_some(candidate)
+    }
+
+    /// Return `true` if `module` is a module from which this `KnownInstance` variant can validly originate.
+    ///
+    /// Most variants can only exist in one module, which is the same as `self.class().canonical_module()`.
+    /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
+    pub fn check_module(self, module: KnownModule) -> bool {
+        match self {
+            Self::Any
+            | Self::ClassVar
+            | Self::Deque
+            | Self::List
+            | Self::Dict
+            | Self::DefaultDict
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Counter
+            | Self::ChainMap
+            | Self::OrderedDict
+            | Self::Optional
+            | Self::Union
+            | Self::NoReturn
+            | Self::Tuple
+            | Self::Type
+            | Self::Callable => module.is_typing(),
+            Self::Annotated
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Never
+            | Self::TypingSelf
+            | Self::Final
+            | Self::Concatenate
+            | Self::Unpack
+            | Self::Required
+            | Self::NotRequired
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::TypeIs
+            | Self::ReadOnly
+            | Self::TypeAliasType(_)
+            | Self::TypeVar(_) => {
+                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
         }
     }
 
@@ -3614,7 +3660,7 @@ pub(crate) mod tests {
         SubclassOfUnknown,
         SubclassOfBuiltinClass(&'static str),
         SubclassOfAbcClass(&'static str),
-        StdlibModule(CoreStdlibModule),
+        StdlibModule(KnownModule),
         SliceLiteral(i32, i32, i32),
         AlwaysTruthy,
         AlwaysFalsy,
@@ -3634,11 +3680,11 @@ pub(crate) mod tests {
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
                 Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
-                Ty::AbcInstance(s) => core_module_symbol(db, CoreStdlibModule::Abc, s)
+                Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
                     .expect_type()
                     .to_instance(db),
                 Ty::AbcClassLiteral(s) => {
-                    core_module_symbol(db, CoreStdlibModule::Abc, s).expect_type()
+                    known_module_symbol(db, KnownModule::Abc, s).expect_type()
                 }
                 Ty::TypingInstance(s) => typing_symbol(db, s).expect_type().to_instance(db),
                 Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
@@ -3670,7 +3716,7 @@ pub(crate) mod tests {
                         .class,
                 ),
                 Ty::SubclassOfAbcClass(s) => Type::subclass_of(
-                    core_module_symbol(db, CoreStdlibModule::Abc, s)
+                    known_module_symbol(db, KnownModule::Abc, s)
                         .expect_type()
                         .expect_class_literal()
                         .class,
@@ -3820,7 +3866,7 @@ pub(crate) mod tests {
     #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("tuple"))]
     #[test_case(Ty::BuiltinClassLiteral("str"), Ty::BuiltinInstance("type"))]
     #[test_case(
-        Ty::StdlibModule(CoreStdlibModule::Typing),
+        Ty::StdlibModule(KnownModule::Typing),
         Ty::KnownClassInstance(KnownClass::ModuleType)
     )]
     #[test_case(Ty::SliceLiteral(1, 2, 3), Ty::BuiltinInstance("slice"))]

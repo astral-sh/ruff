@@ -19,12 +19,14 @@ impl Module {
         search_path: SearchPath,
         file: File,
     ) -> Self {
+        let known = KnownModule::try_from_name_and_search_path(&name, &search_path);
         Self {
             inner: Arc::new(ModuleInner {
                 name,
                 kind,
                 search_path,
                 file,
+                known,
             }),
         }
     }
@@ -37,6 +39,16 @@ impl Module {
     /// The file to the source code that defines this module
     pub fn file(&self) -> File {
         self.inner.file
+    }
+
+    /// Is this a module that we special-case somehow? If so, which one?
+    pub fn known(&self) -> Option<KnownModule> {
+        self.inner.known
+    }
+
+    /// Does this module represent the given known module?
+    pub fn is_known(&self, known_module: KnownModule) -> bool {
+        self.known() == Some(known_module)
     }
 
     /// The search path from which the module was resolved.
@@ -67,6 +79,7 @@ struct ModuleInner {
     kind: ModuleKind,
     search_path: SearchPath,
     file: File,
+    known: Option<KnownModule>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -81,5 +94,64 @@ pub enum ModuleKind {
 impl ModuleKind {
     pub const fn is_package(self) -> bool {
         matches!(self, ModuleKind::Package)
+    }
+}
+
+/// Enumeration of various core stdlib modules in which important types are located
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KnownModule {
+    Builtins,
+    Types,
+    Typeshed,
+    TypingExtensions,
+    Typing,
+    Sys,
+    #[allow(dead_code)]
+    Abc, // currently only used in tests
+    Collections,
+}
+
+impl KnownModule {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Builtins => "builtins",
+            Self::Types => "types",
+            Self::Typing => "typing",
+            Self::Typeshed => "_typeshed",
+            Self::TypingExtensions => "typing_extensions",
+            Self::Sys => "sys",
+            Self::Abc => "abc",
+            Self::Collections => "collections",
+        }
+    }
+
+    pub fn name(self) -> ModuleName {
+        let self_as_str = self.as_str();
+        ModuleName::new_static(self_as_str)
+            .unwrap_or_else(|| panic!("{self_as_str} should be a valid module name!"))
+    }
+
+    pub(crate) fn try_from_name_and_search_path(
+        name: &ModuleName,
+        search_path: &SearchPath,
+    ) -> Option<Self> {
+        if !search_path.is_standard_library() {
+            return None;
+        }
+        match name.as_str() {
+            "builtins" => Some(Self::Builtins),
+            "types" => Some(Self::Types),
+            "typing" => Some(Self::Typing),
+            "_typeshed" => Some(Self::Typeshed),
+            "typing_extensions" => Some(Self::TypingExtensions),
+            "sys" => Some(Self::Sys),
+            "abc" => Some(Self::Abc),
+            "collections" => Some(Self::Collections),
+            _ => None,
+        }
+    }
+
+    pub const fn is_typing(self) -> bool {
+        matches!(self, Self::Typing)
     }
 }
