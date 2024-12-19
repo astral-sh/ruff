@@ -580,6 +580,13 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::KnownInstance variant")
     }
 
+    pub const fn into_tuple(self) -> Option<TupleType<'db>> {
+        match self {
+            Type::Tuple(tuple_type) => Some(tuple_type),
+            _ => None,
+        }
+    }
+
     pub const fn is_boolean_literal(&self) -> bool {
         matches!(self, Type::BooleanLiteral(..))
     }
@@ -3516,6 +3523,11 @@ impl<'db> UnionType<'db> {
         transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
+    }
+
+    /// Return an iterator over the types in this union.
+    pub fn iter(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'db {
+        self.elements(db).iter().copied()
     }
 }
 
