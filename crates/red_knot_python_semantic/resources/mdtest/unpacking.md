@@ -306,3 +306,110 @@ reveal_type(b)  # revealed: Unknown
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
 ```
+
+## Union
+
+### Same types
+
+Union of two tuples of equal length and each element is of the same type.
+
+```py
+def _(arg: tuple[int, int] | tuple[int, int]):
+    (a, b) = arg
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Mixed types (1)
+
+Union of two tuples of equal length and one element differs in its type.
+
+```py
+def _(arg: tuple[int, int] | tuple[int, str]):
+    a, b = arg
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int | str
+```
+
+### Mixed types (2)
+
+Union of two tuples of equal length and both the element types are different.
+
+```py
+def _(arg: tuple[int, str] | tuple[str, int]):
+    a, b = arg
+    reveal_type(a)  # revealed: int | str
+    reveal_type(b)  # revealed: str | int
+```
+
+### Mixed types (3)
+
+Union of three tuples of equal length and various combination of element types:
+
+1. All same types
+1. One different type
+1. All different types
+
+```py
+def _(arg: tuple[int, int, int] | tuple[int, str, bytes] | tuple[int, int, str]):
+    a, b, c = arg
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int | str
+    reveal_type(c)  # revealed: int | bytes | str
+```
+
+### Same literal types
+
+```py
+def _(flag: bool):
+    if flag:
+        value = (1, 2)
+    else:
+        value = (3, 4)
+
+    a, b = value
+    reveal_type(a)  # revealed: Literal[1, 3]
+    reveal_type(b)  # revealed: Literal[2, 4]
+```
+
+### Mixed literal types
+
+```py
+def _(flag: bool):
+    if flag:
+        value = (1, 2)
+    else:
+        value = ("a", "b")
+
+    a, b = value
+    reveal_type(a)  # revealed: Literal[1] | Literal["a"]
+    reveal_type(b)  # revealed: Literal[2] | Literal["b"]
+```
+
+### Typing literal
+
+```py
+from typing import Literal
+
+def _(arg: tuple[int, int] | Literal["ab"]):
+    a, b = arg
+    reveal_type(a)  # revealed: int | LiteralString
+    reveal_type(b)  # revealed: int | LiteralString
+```
+
+### Custom iterator
+
+```py
+class Iterator:
+    def __next__(self) -> tuple[int, int] | tuple[int, str]:
+        return (1, 2)
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+((a, b), c) = Iterable()
+reveal_type(a)  # revealed: int
+reveal_type(b)  # revealed: int | str
+reveal_type(c)  # revealed: tuple[int, int] | tuple[int, str]
+```

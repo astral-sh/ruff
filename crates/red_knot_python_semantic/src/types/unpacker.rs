@@ -1,8 +1,10 @@
 use std::borrow::Cow;
 
+use itertools::Either;
+use rustc_hash::FxHashMap;
+
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use rustc_hash::FxHashMap;
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
@@ -10,18 +12,21 @@ use crate::types::{todo_type, Type, TypeCheckDiagnostics};
 use crate::Db;
 
 use super::context::{InferContext, WithDiagnostics};
+use super::{TupleType, UnionType};
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db> {
     context: InferContext<'db>,
+    scope: ScopeId<'db>,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
 }
 
 impl<'db> Unpacker<'db> {
-    pub(crate) fn new(db: &'db dyn Db, file: File) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, file: File, scope: ScopeId<'db>) -> Self {
         Self {
             context: InferContext::new(db, file),
             targets: FxHashMap::default(),
+            scope,
         }
     }
 
@@ -29,95 +34,149 @@ impl<'db> Unpacker<'db> {
         self.context.db()
     }
 
-    pub(crate) fn unpack(&mut self, target: &ast::Expr, value_ty: Type<'db>, scope: ScopeId<'db>) {
+    /// Unpack the value type to the target expression.
+    pub(crate) fn unpack(&mut self, target: &ast::Expr, value_ty: Type<'db>) {
+        debug_assert!(
+            matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
+            "Unpacking target must be a list or tuple expression"
+        );
+
+        self.unpack_inner(target, value_ty);
+    }
+
+    fn unpack_inner(&mut self, target: &ast::Expr, value_ty: Type<'db>) {
         match target {
             ast::Expr::Name(target_name) => {
-                self.targets
-                    .insert(target_name.scoped_expression_id(self.db(), scope), value_ty);
+                self.targets.insert(
+                    target_name.scoped_expression_id(self.db(), self.scope),
+                    value_ty,
+                );
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.unpack(value, value_ty, scope);
+                self.unpack_inner(value, value_ty);
             }
             ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
-                Type::Tuple(tuple_ty) => {
-                    let starred_index = elts.iter().position(ast::Expr::is_starred_expr);
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                // Initialize the vector of target types, one for each target.
+                //
+                // This is mainly useful for the union type where the target type at index `n` is
+                // going to be a union of types from every union type element at index `n`.
+                //
+                // For example, if the type is `tuple[int, int] | tuple[int, str]` and the target
+                // has two elements `(a, b)`, then
+                // * The type of `a` will be a union of `int` and `int` which are at index 0 in the
+                //   first and second tuple respectively which resolves to an `int`.
+                // * Similarly, the type of `b` will be a union of `int` and `str` which are at
+                //   index 1 in the first and second tuple respectively which will be `int | str`.
+                let mut target_types = vec![vec![]; elts.len()];
 
-                    let element_types = if let Some(starred_index) = starred_index {
-                        if tuple_ty.len(self.db()) >= elts.len() - 1 {
-                            let mut element_types = Vec::with_capacity(elts.len());
-                            element_types.extend_from_slice(
-                                // SAFETY: Safe because of the length check above.
-                                &tuple_ty.elements(self.db())[..starred_index],
-                            );
+                let unpack_types = match value_ty {
+                    Type::Union(union_ty) => {
+                        Either::Left(union_ty.elements(self.db()).iter().copied())
+                    }
+                    _ => Either::Right(std::iter::once(value_ty)),
+                };
 
-                            // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
-                            // is 1 and the remaining elements after that are 2.
-                            let remaining = elts.len() - (starred_index + 1);
-                            // This index represents the type of the last element that belongs
-                            // to the starred expression, in an exclusive manner.
-                            let starred_end_index = tuple_ty.len(self.db()) - remaining;
-                            // SAFETY: Safe because of the length check above.
-                            let _starred_element_types =
-                                &tuple_ty.elements(self.db())[starred_index..starred_end_index];
-                            // TODO: Combine the types into a list type. If the
-                            // starred_element_types is empty, then it should be `List[Any]`.
-                            // combine_types(starred_element_types);
-                            element_types.push(todo_type!("starred unpacking"));
+                for ty in unpack_types {
+                    // Deconstruct certain types to delegate the inference back to the tuple type
+                    // for correct handling of starred expressions.
+                    let ty = match ty {
+                        Type::StringLiteral(string_literal_ty) => {
+                            // We could go further and deconstruct to an array of `StringLiteral`
+                            // with each individual character, instead of just an array of
+                            // `LiteralString`, but there would be a cost and it's not clear that
+                            // it's worth it.
+                            Type::tuple(
+                                self.db(),
+                                std::iter::repeat(Type::LiteralString)
+                                    .take(string_literal_ty.python_len(self.db())),
+                            )
+                        }
+                        _ => ty,
+                    };
 
-                            element_types.extend_from_slice(
-                                // SAFETY: Safe because of the length check above.
-                                &tuple_ty.elements(self.db())[starred_end_index..],
-                            );
-                            Cow::Owned(element_types)
-                        } else {
-                            let mut element_types = tuple_ty.elements(self.db()).to_vec();
-                            // Subtract 1 to insert the starred expression type at the correct
-                            // index.
-                            element_types.resize(elts.len() - 1, Type::Unknown);
-                            // TODO: This should be `list[Unknown]`
-                            element_types.insert(starred_index, todo_type!("starred unpacking"));
-                            Cow::Owned(element_types)
+                    if let Some(tuple_ty) = ty.into_tuple() {
+                        let tuple_ty_elements = self.tuple_ty_elements(elts, tuple_ty);
+
+                        // TODO: Add diagnostic for length mismatch
+
+                        for (index, ty) in tuple_ty_elements.iter().enumerate() {
+                            if let Some(element_types) = target_types.get_mut(index) {
+                                element_types.push(*ty);
+                            }
                         }
                     } else {
-                        Cow::Borrowed(tuple_ty.elements(self.db()).as_ref())
-                    };
+                        let ty = if ty.is_literal_string() {
+                            Type::LiteralString
+                        } else {
+                            ty.iterate(self.db())
+                                .unwrap_with_diagnostic(&self.context, AnyNodeRef::from(target))
+                        };
+                        for target_type in &mut target_types {
+                            target_type.push(ty);
+                        }
+                    }
+                }
 
-                    for (index, element) in elts.iter().enumerate() {
-                        self.unpack(
-                            element,
-                            element_types.get(index).copied().unwrap_or(Type::Unknown),
-                            scope,
-                        );
-                    }
-                }
-                Type::StringLiteral(string_literal_ty) => {
-                    // Deconstruct the string literal to delegate the inference back to the
-                    // tuple type for correct handling of starred expressions. We could go
-                    // further and deconstruct to an array of `StringLiteral` with each
-                    // individual character, instead of just an array of `LiteralString`, but
-                    // there would be a cost and it's not clear that it's worth it.
-                    let value_ty = Type::tuple(
-                        self.db(),
-                        std::iter::repeat(Type::LiteralString)
-                            .take(string_literal_ty.python_len(self.db())),
-                    );
-                    self.unpack(target, value_ty, scope);
-                }
-                _ => {
-                    let value_ty = if value_ty.is_literal_string() {
-                        Type::LiteralString
-                    } else {
-                        value_ty
-                            .iterate(self.db())
-                            .unwrap_with_diagnostic(&self.context, AnyNodeRef::from(target))
+                for (index, element) in elts.iter().enumerate() {
+                    let element_ty = match target_types[index].as_slice() {
+                        [] => Type::Unknown,
+                        types => UnionType::from_elements(self.db(), types),
                     };
-                    for element in elts {
-                        self.unpack(element, value_ty, scope);
-                    }
+                    self.unpack_inner(element, element_ty);
                 }
-            },
+            }
             _ => {}
+        }
+    }
+
+    /// Returns the [`Type`] elements inside the given [`TupleType`] taking into account that there
+    /// can be a starred expression in the `elements`.
+    fn tuple_ty_elements(
+        &mut self,
+        elements: &[ast::Expr],
+        tuple_ty: TupleType<'db>,
+    ) -> Cow<'_, [Type<'db>]> {
+        // If there is a starred expression, it will consume all of the entries at that location.
+        let Some(starred_index) = elements.iter().position(ast::Expr::is_starred_expr) else {
+            // Otherwise, the types will be unpacked 1-1 to the elements.
+            return Cow::Borrowed(tuple_ty.elements(self.db()).as_ref());
+        };
+
+        if tuple_ty.len(self.db()) >= elements.len() - 1 {
+            let mut element_types = Vec::with_capacity(elements.len());
+            element_types.extend_from_slice(
+                // SAFETY: Safe because of the length check above.
+                &tuple_ty.elements(self.db())[..starred_index],
+            );
+
+            // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
+            // is 1 and the remaining elements after that are 2.
+            let remaining = elements.len() - (starred_index + 1);
+            // This index represents the type of the last element that belongs
+            // to the starred expression, in an exclusive manner.
+            let starred_end_index = tuple_ty.len(self.db()) - remaining;
+            // SAFETY: Safe because of the length check above.
+            let _starred_element_types =
+                &tuple_ty.elements(self.db())[starred_index..starred_end_index];
+            // TODO: Combine the types into a list type. If the
+            // starred_element_types is empty, then it should be `List[Any]`.
+            // combine_types(starred_element_types);
+            element_types.push(todo_type!("starred unpacking"));
+
+            element_types.extend_from_slice(
+                // SAFETY: Safe because of the length check above.
+                &tuple_ty.elements(self.db())[starred_end_index..],
+            );
+            Cow::Owned(element_types)
+        } else {
+            let mut element_types = tuple_ty.elements(self.db()).to_vec();
+            // Subtract 1 to insert the starred expression type at the correct
+            // index.
+            element_types.resize(elements.len() - 1, Type::Unknown);
+            // TODO: This should be `list[Unknown]`
+            element_types.insert(starred_index, todo_type!("starred unpacking"));
+            Cow::Owned(element_types)
         }
     }
 

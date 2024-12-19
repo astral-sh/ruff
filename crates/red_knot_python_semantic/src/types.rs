@@ -580,6 +580,13 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::KnownInstance variant")
     }
 
+    pub const fn into_tuple(self) -> Option<TupleType<'db>> {
+        match self {
+            Type::Tuple(tuple_type) => Some(tuple_type),
+            _ => None,
+        }
+    }
+
     pub const fn is_boolean_literal(&self) -> bool {
         matches!(self, Type::BooleanLiteral(..))
     }
