@@ -2973,13 +2973,15 @@ pub enum KnownFunction {
     RevealType,
     /// `builtins.len`
     Len,
+    /// `typing(_extensions).final`
+    Final,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType | Self::Len => None,
+            Self::RevealType | Self::Len | Self::Final => None,
         }
     }
 
@@ -2997,6 +2999,7 @@ impl KnownFunction {
                 KnownFunction::ConstraintFunction(KnownConstraintFunction::IsSubclass),
             ),
             "len" if definition.is_builtin_definition(db) => Some(KnownFunction::Len),
+            "final" if definition.is_typing_definition(db) => Some(KnownFunction::Final),
             _ => None,
         }
     }
@@ -3147,6 +3150,31 @@ impl<'db> Class<'db> {
     /// query depends on the AST of another file (bad!).
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
         self.body_scope(db).node(db).expect_class()
+    }
+
+    /// Return the types of the decorators on this class
+    #[salsa::tracked(return_ref)]
+    fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        let class_stmt = self.node(db);
+        if class_stmt.decorator_list.is_empty() {
+            return Box::new([]);
+        }
+        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+        class_stmt
+            .decorator_list
+            .iter()
+            .map(|decorator_node| {
+                definition_expression_ty(db, class_definition, &decorator_node.expression)
+            })
+            .collect()
+    }
+
+    /// Is this class final?
+    fn is_final(self, db: &'db dyn Db) -> bool {
+        self.decorators(db)
+            .iter()
+            .filter_map(|deco| deco.into_function_literal())
+            .any(|decorator| decorator.is_known(db, KnownFunction::Final))
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
