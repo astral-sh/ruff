@@ -16,9 +16,9 @@ a = (
 )  # fmt: skip
 ```
 
-## Before opening parentheses
+## Before opening parenthesis
 
-A suppression that applies to all errors before the openign parentheses.
+A suppression that applies to all errors before the opening parenthesis.
 
 ```py
 a: Test = (  # type: ignore
@@ -55,6 +55,7 @@ TODO: We should support this for better interopability with other suppression co
 
 ```py
 # fmt: off
+# TODO this error should be suppressed
 # error: [unresolved-reference]
 a = test \
   + 2  # fmt: skip # type: ignore

@@ -31,7 +31,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                 }
             }
             TokenKind::Newline | TokenKind::NonLogicalNewline => {
-                line_start = token.range().end();
+                line_start = token.end();
             }
             _ => {}
         }
@@ -92,7 +92,7 @@ pub(crate) struct SuppressionIndex;
 pub(crate) struct Suppression {
     /// The range for which this suppression applies.
     /// Most of the time, this is the range of the comment's line.
-    /// However, there are few cases where the range gets expanted to
+    /// However, there are few cases where the range gets expanded to
     /// cover multiple lines:
     /// * multiline strings: `expr + """multiline\nstring"""  # type: ignore`
     /// * line continuations: `expr \ + "test"  # type: ignore`
