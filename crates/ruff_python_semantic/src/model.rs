@@ -1067,6 +1067,14 @@ impl<'a> SemanticModel<'a> {
             return None;
         }
 
+        if !submodule
+            .qualified_name()
+            .to_string()
+            .starts_with(&import.qualified_name().to_string())
+        {
+            return None;
+        }
+
         Some(binding_id)
     }
 
