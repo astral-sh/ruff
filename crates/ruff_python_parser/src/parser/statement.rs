@@ -411,31 +411,44 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Raise);
 
-        let exc = if self.at(TokenKind::Newline) {
-            None
-        } else {
-            // test_err raise_stmt_invalid_exc
-            // raise *x
-            // raise yield x
-            // raise x := 1
-            let exc = self.parse_expression_list(ExpressionContext::default());
-
-            if let Some(ast::ExprTuple {
-                parenthesized: false,
-                ..
-            }) = exc.as_tuple_expr()
-            {
-                // test_err raise_stmt_unparenthesized_tuple_exc
-                // raise x,
-                // raise x, y
-                // raise x, y from z
-                self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &exc);
+        let exc = match self.current_token_kind() {
+            TokenKind::Newline => None,
+            TokenKind::From => {
+                // test_err raise_stmt_from_without_exc
+                // raise from exc
+                // raise from None
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Exception missing in `raise` statement with cause".to_string(),
+                    ),
+                    self.current_token_range(),
+                );
+                None
             }
+            _ => {
+                // test_err raise_stmt_invalid_exc
+                // raise *x
+                // raise yield x
+                // raise x := 1
+                let exc = self.parse_expression_list(ExpressionContext::default());
 
-            Some(Box::new(exc.expr))
+                if let Some(ast::ExprTuple {
+                    parenthesized: false,
+                    ..
+                }) = exc.as_tuple_expr()
+                {
+                    // test_err raise_stmt_unparenthesized_tuple_exc
+                    // raise x,
+                    // raise x, y
+                    // raise x, y from z
+                    self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &exc);
+                }
+
+                Some(Box::new(exc.expr))
+            }
         };
 
-        let cause = (exc.is_some() && self.eat(TokenKind::From)).then(|| {
+        let cause = self.eat(TokenKind::From).then(|| {
             // test_err raise_stmt_invalid_cause
             // raise x from *y
             // raise x from yield y
