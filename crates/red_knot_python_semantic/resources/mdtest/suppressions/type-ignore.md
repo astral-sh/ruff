@@ -8,13 +8,49 @@ Type check errors can be suppressed by a `type: ignore` comment on the same line
 a = 4 + test  # type: ignore
 ```
 
-## In parenthesized expression
+## Multiline ranges
+
+A diagnostic with a multiline range can be suppressed
+by a comment on the same line as the diagnostic's start or end.
+This is the same behavior as Mypy's.
 
 ```py
-a = (
-    4 + test  # type: ignore
-)  # fmt: skip
+# fmt: off
+y = (
+    4 / 0  # type: ignore
+)
+
+y = (
+    4 /  # type: ignore
+    0
+)
+
+y = (
+    4 /
+    0  # type: ignore
+)
 ```
+
+This is different from Pyright where Pyright uses the intersection between
+the diagnostic range and any suppression comment. This can be problematic for nested expressions
+because a suppression in a child expression now suppresses errors in the outer expression.
+
+For example, the `type: ignore` comment in this example
+suppresses the error of adding `2` to `"test"` and
+adding `"other"` to the result of the cast.
+
+```py path=nested.py
+from typing import cast 
+
+y = (
+    cast(int, "test" +
+            2 # type: ignore
+    )
+    + "other"  # TODO: expected-error[invalid-operator]
+)
+```
+
+Mypy flags the second usage.
 
 ## Before opening parenthesis
 
@@ -47,6 +83,15 @@ a = test \
 a = test \
   + a \
   + 2  # type: ignore
+```
+
+## Codes
+
+Mypy supports `type: ignore[code]`. Red Knot doesn't understand mypy's
+rule names. Therefore, ignore the codes and suppress all errors.
+
+```py
+a = test  # type: ignore[name-defined]
 ```
 
 ## Nested comments
