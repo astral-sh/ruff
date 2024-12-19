@@ -348,6 +348,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint))
     }
 
+    fn record_ambiguous_visibility(&mut self) -> ScopedVisibilityConstraintId {
+        self.current_use_def_map_mut()
+            .record_visibility_constraint(VisibilityConstraint::Ambiguous)
+    }
+
     fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
         self.current_use_def_map_mut()
             .simplify_visibility_constraints(snapshot);
@@ -939,25 +944,27 @@ where
                 self.visit_body(body);
                 self.set_inside_loop(outer_loop_state);
 
+                let vis_constraint_id = self.record_visibility_constraint(constraint_id);
+
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
                 let break_states =
                     std::mem::replace(&mut self.loop_break_states, saved_break_states);
-
-                let vis_constraint_id = self.record_visibility_constraint(constraint_id);
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop.clone());
                 self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
-
                 self.record_negated_visibility_constraint(vis_constraint_id);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(break_state);
+                    let snapshot = self.flow_snapshot();
+                    self.flow_restore(break_state);
+                    self.record_visibility_constraint(constraint_id);
+                    self.flow_merge(snapshot);
                 }
 
                 self.simplify_visibility_constraints(pre_loop);
@@ -1000,6 +1007,8 @@ where
             ) => {
                 self.add_standalone_expression(iter);
                 self.visit_expr(iter);
+
+                self.record_ambiguous_visibility();
 
                 let pre_loop = self.flow_snapshot();
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -1102,6 +1111,8 @@ where
                 is_star,
                 range: _,
             }) => {
+                self.record_ambiguous_visibility();
+
                 // Save the state prior to visiting any of the `try` block.
                 //
                 // Potentially none of the `try` block could have been executed prior to executing
