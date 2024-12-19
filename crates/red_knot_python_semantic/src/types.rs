@@ -1458,15 +1458,10 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::Any => Type::Any.into(),
-            Type::Never => {
-                // TODO: attribute lookup on Never type
-                todo_type!().into()
-            }
-            Type::Unknown => Type::Unknown.into(),
+            Type::Any | Type::Unknown | Type::Todo(_) => self.into(),
+            Type::Never => todo_type!("attribute lookup on Never").into(),
             Type::FunctionLiteral(_) => {
-                // TODO: attribute lookup on function type
-                todo_type!().into()
+                todo_type!("Attribute access on `FunctionLiteral` types").into()
             }
             Type::ModuleLiteral(module_ref) => {
                 // `__dict__` is a very special member that is never overridden by module globals;
@@ -1581,40 +1576,38 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                todo_type!().into()
+                todo_type!("Attribute access on `Intersection` types").into()
             }
-            Type::IntLiteral(_) => {
-                // TODO raise error
-                todo_type!().into()
+            Type::IntLiteral(_) => todo_type!("Attribute access on `IntLiteral` types").into(),
+            Type::BooleanLiteral(_) => {
+                todo_type!("Attribute access on `BooleanLiteral` types").into()
             }
-            Type::BooleanLiteral(_) => todo_type!().into(),
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                todo_type!().into()
+                todo_type!("Attribute access on `StringLiteral` types").into()
             }
             Type::LiteralString => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                todo_type!().into()
+                todo_type!("Attribute access on `LiteralString` types").into()
             }
             Type::BytesLiteral(_) => {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
-                todo_type!().into()
+                todo_type!("Attribute access on `BytesLiteral` types").into()
             }
             Type::SliceLiteral(_) => {
                 // TODO defer to `builtins.slice` methods
-                todo_type!().into()
+                todo_type!("Attribute access on `SliceLiteral` types").into()
             }
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
-                todo_type!().into()
+                todo_type!("Attribute access on heterogeneous tuple types").into()
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => {
                 // TODO return `Callable[[], Literal[True/False]]` for `__bool__` access
                 KnownClass::Object.to_instance(db).member(db, name)
             }
-            &todo @ Type::Todo(_) => todo.into(),
         }
     }
 
@@ -1819,12 +1812,8 @@ impl<'db> Type<'db> {
                 }
             }
 
-            // `Any` is callable, and its return type is also `Any`.
-            Type::Any => CallOutcome::callable(Type::Any),
-
-            Type::Todo(_) => CallOutcome::callable(todo_type!("call todo")),
-
-            Type::Unknown => CallOutcome::callable(Type::Unknown),
+            // Dynamic types are callable, and the return type is the same dynamic type
+            Type::Any | Type::Todo(_) | Type::Unknown => CallOutcome::callable(self),
 
             Type::Union(union) => CallOutcome::union(
                 self,
@@ -1834,8 +1823,7 @@ impl<'db> Type<'db> {
                     .map(|elem| elem.call(db, arg_types)),
             ),
 
-            // TODO: intersection types
-            Type::Intersection(_) => CallOutcome::callable(todo_type!()),
+            Type::Intersection(_) => CallOutcome::callable(todo_type!("Type::Intersection.call()")),
 
             _ => CallOutcome::not_callable(self),
         }
@@ -1936,8 +1924,7 @@ impl<'db> Type<'db> {
             }) => Type::instance(*class),
             Type::SubclassOf(_) => Type::Any,
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
-            // TODO: we can probably do better here: --Alex
-            Type::Intersection(_) => todo_type!(),
+            Type::Intersection(_) => todo_type!("Type::Intersection.to_instance()"),
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
@@ -2167,6 +2154,12 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 impl<'db> From<Type<'db>> for Symbol<'db> {
     fn from(value: Type<'db>) -> Self {
         Symbol::Type(value, Boundness::Bound)
+    }
+}
+
+impl<'db> From<&Type<'db>> for Symbol<'db> {
+    fn from(value: &Type<'db>) -> Self {
+        Self::from(*value)
     }
 }
 
