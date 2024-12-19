@@ -1,0 +1,46 @@
+# Ellipsis
+
+## Function and Methods
+
+For default values the ellipsis literal `...` can be used, in a stub file only.
+
+```py path=test.pyi
+def f(x: int = ...) -> None: ...
+def f2(x: dict = ...) -> None: ...
+```
+
+## Class and Module Level Attributes
+
+For default values the ellipsis literal can be used in classes and module level attributes, in a
+stub file only.
+
+```py path=test.pyi
+y: float = ...
+
+class Foo:
+    y: int = ...
+```
+
+## Ellipsis Usage In Non Stub File
+
+Ellipsis can only be used in assignment if it's actually assignable to the type it's being assigned
+to.
+
+```py
+# error: [invalid-parameter-default] "Default value of type `EllipsisType | ellipsis` is not assignable to annotated parameter type `int`"
+def f(x: int = ...) -> None: ...
+
+# error: [invalid-assignment] "Object of type `EllipsisType | ellipsis` is not assignable to `int`"
+a: int = ...
+b = ...
+reveal_type(b)  # revealed: EllipsisType | ellipsis
+```
+
+## Use of Ellipsis Symbol
+
+When the ellipsis symbol is used as default value the assignment is checked.
+
+```py path=test.pyi
+# error: [invalid-parameter-default] "Default value of type `EllipsisType | ellipsis` is not assignable to annotated parameter type `int`"
+def f(x: int = Ellipsis) -> None: ...
+```
