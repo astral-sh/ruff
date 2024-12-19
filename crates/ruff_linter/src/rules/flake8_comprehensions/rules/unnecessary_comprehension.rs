@@ -148,9 +148,12 @@ pub(crate) fn unnecessary_list_set_comprehension(
     }
     if is_dict_items(checker, &generator.iter) {
         match (&generator.target, elt) {
-            // [(k, v) for k, v in dictionary.items()]j
+            // [(k, v) for k, v in dictionary.items()] or [(k, v) for [k, v] in dictionary.items()]
             (
                 Expr::Tuple(ast::ExprTuple {
+                    elts: target_elts, ..
+                })
+                | Expr::List(ast::ExprList {
                     elts: target_elts, ..
                 }),
                 Expr::Tuple(ast::ExprTuple { elts, .. }),

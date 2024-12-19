@@ -8,6 +8,7 @@ d = {"a": 1, "b": 2, "c": 3}
 {k: v for k, v in y}
 {k: v for k, v in d.items()}
 [(k, v) for k, v in d.items()]
+[(k, v) for [k, v] in d.items()]
 {k: (a, b) for k, (a, b) in d.items()}
 
 [i for i, in z]
