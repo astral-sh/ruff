@@ -1468,65 +1468,7 @@ impl<'db> Type<'db> {
                 _ => KnownClass::FunctionType.to_instance(db).member(db, name),
             },
 
-            Type::ModuleLiteral(module_ref) => {
-                // `__dict__` is a very special member that is never overridden by module globals;
-                // we should always look it up directly as an attribute on `types.ModuleType`,
-                // never in the global scope of the module.
-                if name == "__dict__" {
-                    return KnownClass::ModuleType
-                        .to_instance(db)
-                        .member(db, "__dict__");
-                }
-
-                // If the file that originally imported the module has also imported a submodule
-                // named [name], then the result is (usually) that submodule, even if the module
-                // also defines a (non-module) symbol with that name.
-                //
-                // Note that technically, either the submodule or the non-module symbol could take
-                // priority, depending on the ordering of when the submodule is loaded relative to
-                // the parent module's `__init__.py` file being evaluated.  That said, we have
-                // chosen to always have the submodule take priority.  (This matches pyright's
-                // current behavior, and opposite of mypy's current behavior.)
-                if let Some(submodule_name) = ModuleName::new(name) {
-                    let importing_file = module_ref.importing_file(db);
-                    let imported_submodules = imported_modules(db, importing_file);
-                    let mut full_submodule_name = module_ref.module(db).name().clone();
-                    full_submodule_name.extend(&submodule_name);
-                    if imported_submodules.contains(&full_submodule_name) {
-                        if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                            let submodule_ty = Type::module_literal(db, importing_file, submodule);
-                            return Symbol::Type(submodule_ty, Boundness::Bound);
-                        }
-                    }
-                }
-
-                let global_lookup =
-                    symbol(db, global_scope(db, module_ref.module(db).file()), name);
-
-                // If it's unbound, check if it's present as an instance on `types.ModuleType`
-                // or `builtins.object`.
-                //
-                // We do a more limited version of this in `global_symbol_ty`,
-                // but there are two crucial differences here:
-                // - If a member is looked up as an attribute, `__init__` is also available
-                //   on the module, but it isn't available as a global from inside the module
-                // - If a member is looked up as an attribute, members on `builtins.object`
-                //   are also available (because `types.ModuleType` inherits from `object`);
-                //   these attributes are also not available as globals from inside the module.
-                //
-                // The same way as in `global_symbol_ty`, however, we need to be careful to
-                // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
-                // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
-                // where we know exactly which module we're dealing with.
-                if name != "__getattr__" && global_lookup.possibly_unbound() {
-                    // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
-                    let module_type_instance_member =
-                        KnownClass::ModuleType.to_class_literal(db).member(db, name);
-                    global_lookup.or_fall_back_to(db, &module_type_instance_member)
-                } else {
-                    global_lookup
-                }
-            }
+            Type::ModuleLiteral(module) => module.member(db, name),
 
             Type::ClassLiteral(class_ty) => class_ty.member(db, name),
 
@@ -3028,6 +2970,67 @@ pub struct ModuleLiteralType<'db> {
 
     /// The imported module.
     pub module: Module,
+}
+
+impl<'db> ModuleLiteralType<'db> {
+    fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        // `__dict__` is a very special member that is never overridden by module globals;
+        // we should always look it up directly as an attribute on `types.ModuleType`,
+        // never in the global scope of the module.
+        if name == "__dict__" {
+            return KnownClass::ModuleType
+                .to_instance(db)
+                .member(db, "__dict__");
+        }
+
+        // If the file that originally imported the module has also imported a submodule
+        // named `name`, then the result is (usually) that submodule, even if the module
+        // also defines a (non-module) symbol with that name.
+        //
+        // Note that technically, either the submodule or the non-module symbol could take
+        // priority, depending on the ordering of when the submodule is loaded relative to
+        // the parent module's `__init__.py` file being evaluated. That said, we have
+        // chosen to always have the submodule take priority. (This matches pyright's
+        // current behavior, but is the opposite of mypy's current behavior.)
+        if let Some(submodule_name) = ModuleName::new(name) {
+            let importing_file = self.importing_file(db);
+            let imported_submodules = imported_modules(db, importing_file);
+            let mut full_submodule_name = self.module(db).name().clone();
+            full_submodule_name.extend(&submodule_name);
+            if imported_submodules.contains(&full_submodule_name) {
+                if let Some(submodule) = resolve_module(db, &full_submodule_name) {
+                    let submodule_ty = Type::module_literal(db, importing_file, submodule);
+                    return Symbol::Type(submodule_ty, Boundness::Bound);
+                }
+            }
+        }
+
+        let global_lookup = symbol(db, global_scope(db, self.module(db).file()), name);
+
+        // If it's unbound, check if it's present as an instance on `types.ModuleType`
+        // or `builtins.object`.
+        //
+        // We do a more limited version of this in `global_symbol_ty`,
+        // but there are two crucial differences here:
+        // - If a member is looked up as an attribute, `__init__` is also available
+        //   on the module, but it isn't available as a global from inside the module
+        // - If a member is looked up as an attribute, members on `builtins.object`
+        //   are also available (because `types.ModuleType` inherits from `object`);
+        //   these attributes are also not available as globals from inside the module.
+        //
+        // The same way as in `global_symbol_ty`, however, we need to be careful to
+        // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
+        // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
+        // where we know exactly which module we're dealing with.
+        if name != "__getattr__" && global_lookup.possibly_unbound() {
+            // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
+            let module_type_instance_member =
+                KnownClass::ModuleType.to_class_literal(db).member(db, name);
+            global_lookup.or_fall_back_to(db, &module_type_instance_member)
+        } else {
+            global_lookup
+        }
+    }
 }
 
 /// Representation of a runtime class object.
