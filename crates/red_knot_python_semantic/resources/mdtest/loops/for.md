@@ -98,7 +98,7 @@ reveal_type(x)
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Literal[1] | Literal["a"] | Literal[b"foo"]
+# revealed: Literal[1, "a", b"foo"]
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
