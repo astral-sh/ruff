@@ -104,7 +104,8 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
         Ok(Symbol::Unbound) => inferred_ty,
         // Symbol is possibly undeclared
         Err((declared_ty, _)) => {
-            // TODO: conflicting declarations error
+            // Intentionally ignore conflicting declared types; that's not our problem,
+            // it's the problem of the module we are importing from.
             declared_ty.into()
         }
     }
