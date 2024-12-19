@@ -1,12 +1,11 @@
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_logging::helpers;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of `logging.exception()` with `exc_info` set to `False`.
@@ -73,20 +72,9 @@ pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall)
         _ => return,
     }
 
-    if exc_info_arg_is_falsey(call, checker) {
+    if helpers::exc_info_arg_is_falsey(checker, call) {
         checker
             .diagnostics
             .push(Diagnostic::new(ExceptionWithoutExcInfo, call.range()));
     }
-}
-
-fn exc_info_arg_is_falsey(call: &ExprCall, checker: &mut Checker) -> bool {
-    call.arguments
-        .find_keyword("exc_info")
-        .map(|keyword| &keyword.value)
-        .is_some_and(|value| {
-            let truthiness =
-                Truthiness::from_expr(value, |id| checker.semantic().has_builtin_binding(id));
-            truthiness.into_bool() == Some(false)
-        })
 }
