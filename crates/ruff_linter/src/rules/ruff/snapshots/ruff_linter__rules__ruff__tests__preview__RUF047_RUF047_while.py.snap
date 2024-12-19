@@ -1,0 +1,64 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF047_while.py:4:1: RUF047 [*] Empty `else` clause
+  |
+2 |       loop_body_is_not_checked()
+3 |       break
+4 | / else:
+5 | |     pass
+  | |________^ RUF047
+  |
+  = help: Remove `else` clause
+
+ℹ Safe fix
+1 1 | while True:
+2 2 |     loop_body_is_not_checked()
+3 3 |     break
+4   |-else:
+5   |-    pass
+6 4 | 
+7 5 | 
+8 6 | while this_comment:
+
+RUF047_while.py:10:1: RUF047 [*] Empty `else` clause
+   |
+ 8 |   while this_comment:
+ 9 |       belongs_to()  # `for`
+10 | / else:
+11 | |     ...
+   | |_______^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+7  7  | 
+8  8  | while this_comment:
+9  9  |     belongs_to()  # `for`
+10    |-else:
+11    |-    ...
+12 10 | 
+13 11 | 
+14 12 | while this_second_comment:
+
+RUF047_while.py:35:1: RUF047 [*] Empty `else` clause
+   |
+33 |   while of_course():
+34 |       this()
+35 | / else:
+36 | |     ...
+   | |_______^ RUF047
+37 |       # this comment belongs to the else
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+32 32 | 
+33 33 | while of_course():
+34 34 |     this()
+35    |-else:
+36    |-    ...
+37 35 |     # this comment belongs to the else
+38 36 | 
+39 37 | while of_course():

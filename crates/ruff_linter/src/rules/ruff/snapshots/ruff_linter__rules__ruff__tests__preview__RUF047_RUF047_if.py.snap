@@ -1,0 +1,158 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF047_if.py:5:1: RUF047 [*] Empty `else` clause
+  |
+3 |   if False:
+4 |       condition_is_not_evaluated()
+5 | / else:
+6 | |     pass
+  | |________^ RUF047
+  |
+  = help: Remove `else` clause
+
+ℹ Safe fix
+2 2 | 
+3 3 | if False:
+4 4 |     condition_is_not_evaluated()
+5   |-else:
+6   |-    pass
+7 5 | 
+8 6 | 
+9 7 | if this_comment():
+
+RUF047_if.py:11:1: RUF047 [*] Empty `else` clause
+   |
+ 9 |   if this_comment():
+10 |       belongs_to()  # `if`
+11 | / else:
+12 | |     ...
+   | |_______^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+8  8  | 
+9  9  | if this_comment():
+10 10 |     belongs_to()  # `if`
+11    |-else:
+12    |-    ...
+13 11 | 
+14 12 | 
+15 13 | if elif_is():
+
+RUF047_if.py:19:1: RUF047 [*] Empty `else` clause
+   |
+17 |   elif the_same():
+18 |       as_if()
+19 | / else:
+20 | |     pass
+   | |________^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+16 16 |     treated()
+17 17 | elif the_same():
+18 18 |     as_if()
+19    |-else:
+20    |-    pass
+21 19 | 
+22 20 | 
+23 21 | if this_second_comment():
+
+RUF047_if.py:26:1: RUF047 [*] Empty `else` clause
+   |
+24 |       belongs()  # to
+25 |        # `if`
+26 | / else:
+27 | |     pass
+   | |________^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+23 23 | if this_second_comment():
+24 24 |     belongs()  # to
+25 25 |      # `if`
+26    |-else:
+27    |-    pass
+28 26 | 
+29 27 | 
+30 28 | if of_course():
+
+RUF047_if.py:38:1: RUF047 [*] Empty `else` clause
+   |
+37 | if of_course: this()
+38 | else: ...
+   | ^^^^^^^^^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+35 35 | 
+36 36 | 
+37 37 | if of_course: this()
+38    |-else: ...
+39 38 | 
+40 39 | 
+41 40 | if of_course:
+
+RUF047_if.py:43:1: RUF047 [*] Empty `else` clause
+   |
+41 | if of_course:
+42 |     this() # comment
+43 | else: ...
+   | ^^^^^^^^^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+40 40 | 
+41 41 | if of_course:
+42 42 |     this() # comment
+43    |-else: ...
+44 43 | 
+45 44 | 
+46 45 | def nested():
+
+RUF047_if.py:49:5: RUF047 [*] Empty `else` clause
+   |
+47 |       if a:
+48 |           b()
+49 | /     else:
+50 | |         ...
+   | |___________^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+46 46 | def nested():
+47 47 |     if a:
+48 48 |         b()
+49    |-    else:
+50    |-        ...
+51 49 | 
+52 50 | 
+53 51 | # No errors
+
+RUF047_if.py:77:1: RUF047 [*] Empty `else` clause
+   |
+75 |   if of_course():
+76 |       this()
+77 | / else:
+78 | |     ...
+   | |_______^ RUF047
+79 |       # comment
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+74 74 | 
+75 75 | if of_course():
+76 76 |     this()
+77    |-else:
+78    |-    ...
+79 77 |     # comment
+80 78 | 
+81 79 |

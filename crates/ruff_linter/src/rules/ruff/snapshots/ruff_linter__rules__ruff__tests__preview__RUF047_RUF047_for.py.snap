@@ -1,0 +1,64 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF047_for.py:4:1: RUF047 [*] Empty `else` clause
+  |
+2 |       loop_body_is_not_checked()
+3 |       break
+4 | / else:
+5 | |     pass
+  | |________^ RUF047
+  |
+  = help: Remove `else` clause
+
+ℹ Safe fix
+1 1 | for _ in range(0):
+2 2 |     loop_body_is_not_checked()
+3 3 |     break
+4   |-else:
+5   |-    pass
+6 4 | 
+7 5 | 
+8 6 | for this in comment:
+
+RUF047_for.py:10:1: RUF047 [*] Empty `else` clause
+   |
+ 8 |   for this in comment:
+ 9 |       belongs_to()  # `for`
+10 | / else:
+11 | |     ...
+   | |_______^ RUF047
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+7  7  | 
+8  8  | for this in comment:
+9  9  |     belongs_to()  # `for`
+10    |-else:
+11    |-    ...
+12 10 | 
+13 11 | 
+14 12 | for this in second_comment:
+
+RUF047_for.py:36:1: RUF047 [*] Empty `else` clause
+   |
+34 |   for of in course():
+35 |       this()
+36 | / else:
+37 | |     ...
+   | |_______^ RUF047
+38 |       # too
+   |
+   = help: Remove `else` clause
+
+ℹ Safe fix
+33 33 | 
+34 34 | for of in course():
+35 35 |     this()
+36    |-else:
+37    |-    ...
+38 36 |     # too
+39 37 | 
+40 38 | for of in course():

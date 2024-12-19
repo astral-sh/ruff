@@ -423,6 +423,10 @@ mod tests {
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     #[test_case(Rule::StarmapZip, Path::new("RUF058.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_if.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_for.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_while.py"))]
+    #[test_case(Rule::NeedlessElse, Path::new("RUF047_try.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
