@@ -14,6 +14,7 @@ const MAX_RECURSION_DEPTH: usize = 10;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum VisibilityConstraint {
     AlwaysTrue,
+    Ambiguous,
     VisibleIf(ScopedConstraintId),
     VisibleIfNot(ScopedVisibilityConstraintId),
     KleeneAnd(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
@@ -90,6 +91,7 @@ impl VisibilityConstraints {
         let visibility_constraint = &self.constraints[id];
         match visibility_constraint {
             VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
+            VisibilityConstraint::Ambiguous => Truthiness::Ambiguous,
             VisibilityConstraint::VisibleIf(single) => {
                 Self::analyze_single(db, &constraints[*single])
             }

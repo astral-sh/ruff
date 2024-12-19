@@ -267,7 +267,7 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Symbol<'db> {
-    let mut is_unbound_visible = false;
+    let mut unbound_visibility = Truthiness::AlwaysFalse;
     let mut types = vec![];
 
     for BindingWithConstraints {
@@ -282,10 +282,7 @@ fn bindings_ty<'db>(
             visibility_constraints.evaluate(db, all_constraints, visibility_constraint);
 
         let Some(binding) = binding else {
-            if !static_visibility.is_always_false() {
-                // TODO: also distinguish between always-true and ambiguous?
-                is_unbound_visible = true;
-            }
+            unbound_visibility = static_visibility;
             continue;
         };
 
@@ -316,10 +313,12 @@ fn bindings_ty<'db>(
     let mut types = types.into_iter();
 
     if let Some(first) = types.next() {
-        let boundness = if is_unbound_visible {
-            Boundness::PossiblyUnbound
-        } else {
-            Boundness::Bound
+        let boundness = match unbound_visibility {
+            Truthiness::AlwaysTrue => {
+                unreachable!("If we have at least one binding, the scope-start should not be definitely visible")
+            }
+            Truthiness::AlwaysFalse => Boundness::Bound,
+            Truthiness::Ambiguous => Boundness::PossiblyUnbound,
         };
 
         if let Some(second) = types.next() {
@@ -355,7 +354,7 @@ fn declarations_ty<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
 ) -> DeclaredTypeResult<'db> {
-    let mut is_unbound_visible = false;
+    let mut unbound_visibility = Truthiness::AlwaysFalse;
     let mut types = vec![];
 
     for (declaration, all_constraints, visibility_constraints, visibility_constraint) in
@@ -365,9 +364,7 @@ fn declarations_ty<'db>(
             visibility_constraints.evaluate(db, all_constraints, visibility_constraint);
 
         let Some(declaration) = declaration else {
-            if !static_visibility.is_always_false() {
-                is_unbound_visible = true;
-            }
+            unbound_visibility = static_visibility;
             continue;
         };
 
@@ -396,10 +393,12 @@ fn declarations_ty<'db>(
             first
         };
         if conflicting.is_empty() {
-            let boundness = if is_unbound_visible {
-                Boundness::PossiblyUnbound
-            } else {
-                Boundness::Bound
+            let boundness = match unbound_visibility {
+                Truthiness::AlwaysTrue => {
+                    unreachable!("If we have at least one declaration, the scope-start should not be definitely visible")
+                }
+                Truthiness::AlwaysFalse => Boundness::Bound,
+                Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };
 
             Ok(Symbol::Type(declared_ty, boundness))
