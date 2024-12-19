@@ -585,6 +585,7 @@ jobs:
         run: |
           echo '```console' > "$GITHUB_STEP_SUMMARY"
           # Enable color output for pre-commit and remove it for the summary
+          # Use --hook-stage=manual to enable slower pre-commit hooks that are skipped by default
           SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always --hook-stage=manual | \
             tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> "$GITHUB_STEP_SUMMARY") >&1
           exit_code="${PIPESTATUS[0]}"
