@@ -234,6 +234,7 @@ enum CondensedDisplayTypeKind {
     Int,
     String,
     Bytes,
+    Literal,
 }
 
 impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
@@ -243,9 +244,10 @@ impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
         match value {
             Type::ClassLiteral(_) => Ok(Self::Class),
             Type::FunctionLiteral(_) => Ok(Self::Function),
-            Type::IntLiteral(_) => Ok(Self::Int),
-            Type::StringLiteral(_) => Ok(Self::String),
-            Type::BytesLiteral(_) => Ok(Self::Bytes),
+            Type::IntLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::BooleanLiteral(_) => Ok(Self::Literal),
             _ => Err(()),
         }
     }
