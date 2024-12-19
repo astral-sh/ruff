@@ -1,7 +1,6 @@
 use ruff_python_parser::TokenKind;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-use std::ops::RangeBounds;
 
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 
@@ -12,6 +11,8 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let source = source_text(db.upcast(), file);
     let parsed = parsed_module(db.upcast(), file);
 
+    // TODO: Support `type: ignore` comments at the
+    //   [start of the file](https://typing.readthedocs.io/en/latest/spec/directives.html#type-ignore-comments).
     let mut suppressions = Vec::default();
     let mut line_start = source.bom_start_offset();
 
@@ -50,7 +51,9 @@ pub(crate) struct Suppressions {
 impl Suppressions {
     /// Finds a suppression for the specified lint.
     ///
-    /// Returns the first matching suppression if more than one suppression apply for the current line.
+    /// Returns the first matching suppression if more than one suppression apply to `range` and `id`.
+    ///
+    /// Returns `None` if the lint isn't suppressed.
     pub(crate) fn find_suppression(&self, range: TextRange, _id: LintId) -> Option<&Suppression> {
         // TODO(micha):
         //   * Test if the suppression suppresses the passed lint
@@ -63,48 +66,22 @@ impl Suppressions {
     /// start or end offset. This means the suppression is on the same line
     /// as the diagnostic's start or end.
     fn for_range(&self, range: TextRange) -> impl Iterator<Item = &Suppression> + '_ {
-        // First find the index of the suppression that starts closest to the range's start.
-        let start_offset = self
+        // First find the index of the suppression comment that ends right before the range
+        // starts. This allows us to skip suppressions that are not relevant for the range.
+        let end_offset = self
             .suppressions
             .binary_search_by_key(&range.start(), |suppression| {
-                suppression.suppressed_range.start()
+                suppression.suppressed_range.end()
             })
             .unwrap_or_else(|index| index);
 
-        // Search backward for suppressions that start before the range's start
-        // but overlap with `range`.
-        //
-        // ```python
-        // y = (
-        //     4 / 0  # type: ignore
-        //     ^----^ range
-        // ^--- suppression range --^
-        // )
-        // ```
-        self.suppressions[..start_offset]
+        // From here, search the remaining suppression comments for one that
+        // contains the range's start or end offset. Stop the search
+        // as soon as the suppression's range and the range no longer overlap.
+        self.suppressions[end_offset..]
             .iter()
-            .rev()
+            // Stop searching if the suppression starts after the range we're looking for.
             .take_while(move |suppression| range.end() >= suppression.suppressed_range.start())
-            .chain(
-                // Search forward for suppressions that start at or after the range's start
-                // but overlap with `range`.
-                //
-                // ```python
-                // y = (
-                //     4 /
-                //     ^--- range start
-                // ^------ suppression start
-                //     0  # type: ignore
-                //      ^- range end    ^---suppression end
-                // )
-                // ```
-                //
-                self.suppressions[start_offset..]
-                    .iter()
-                    .take_while(move |suppression| {
-                        range.end() >= suppression.suppressed_range.start()
-                    }),
-            )
             .filter(move |suppression| {
                 // Don't use intersect to avoid that suppressions on inner-expression
                 // ignore errors for outer expressions

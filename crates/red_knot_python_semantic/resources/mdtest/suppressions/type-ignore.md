@@ -10,9 +10,8 @@ a = 4 + test  # type: ignore
 
 ## Multiline ranges
 
-A diagnostic with a multiline range can be suppressed
-by a comment on the same line as the diagnostic's start or end.
-This is the same behavior as Mypy's.
+A diagnostic with a multiline range can be suppressed by a comment on the same line as the
+diagnostic's start or end. This is the same behavior as Mypy's.
 
 ```py
 # fmt: off
@@ -31,16 +30,16 @@ y = (
 )
 ```
 
-This is different from Pyright where Pyright uses the intersection between
-the diagnostic range and any suppression comment. This can be problematic for nested expressions
-because a suppression in a child expression now suppresses errors in the outer expression.
+Pyright diverges from this behavior and instead applies a suppression if its range intersects with
+the diagnostic range. This can be problematic for nested expressions because a suppression in a
+child expression now suppresses errors in the outer expression.
 
-For example, the `type: ignore` comment in this example
-suppresses the error of adding `2` to `"test"` and
-adding `"other"` to the result of the cast.
+For example, the `type: ignore` comment in this example suppresses the error of adding `2` to
+`"test"` and adding `"other"` to the result of the cast.
 
 ```py path=nested.py
-from typing import cast 
+# fmt: off
+from typing import cast
 
 y = (
     cast(int, "test" +
@@ -58,7 +57,7 @@ A suppression that applies to all errors before the opening parenthesis.
 
 ```py
 a: Test = (  # type: ignore
-  5
+  Test()  # error: [unresolved-reference]
 )  # fmt: skip
 ```
 
@@ -87,8 +86,8 @@ a = test \
 
 ## Codes
 
-Mypy supports `type: ignore[code]`. Red Knot doesn't understand mypy's
-rule names. Therefore, ignore the codes and suppress all errors.
+Mypy supports `type: ignore[code]`. Red Knot doesn't understand mypy's rule names. Therefore, ignore
+the codes and suppress all errors.
 
 ```py
 a = test  # type: ignore[name-defined]
