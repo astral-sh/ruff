@@ -77,6 +77,7 @@ use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_non_subscriptable,
     report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
+    SUBCLASS_OF_FINAL_CLASS,
 };
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -568,7 +569,28 @@ impl<'db> TypeInferenceBuilder<'db> {
                 continue;
             }
 
-            // (2) Check that the class's MRO is resolvable
+            // (2) Check for classes that inherit from `@final` classes
+            for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
+                // dynamic/unknown bases are never `@final`
+                let Some(ClassLiteralType { class: base_class }) = base_class.into_class_literal()
+                else {
+                    continue;
+                };
+                if !base_class.is_final(self.db()) {
+                    continue;
+                }
+                self.context.report_lint(
+                    &SUBCLASS_OF_FINAL_CLASS,
+                    (&class_node.bases()[i]).into(),
+                    format_args!(
+                        "Class `{}` cannot inherit from final class `{}`",
+                        class.name(self.db()),
+                        base_class.name(self.db()),
+                    ),
+                );
+            }
+
+            // (3) Check that the class's MRO is resolvable
             if let Err(mro_error) = class.try_mro(self.db()).as_ref() {
                 match mro_error.reason() {
                     MroErrorKind::DuplicateBases(duplicates) => {
@@ -606,7 +628,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            // (3) Check that the class's metaclass can be determined without error.
+            // (4) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Conflict {

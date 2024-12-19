@@ -42,6 +42,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
+    registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
@@ -392,6 +393,29 @@ declare_lint! {
         summary: "detects references to possibly undefined names",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for classes that subclass final classes.
+    ///
+    /// ## Why is this bad?
+    /// Decorating a class with `@final` declares to the type checker that it should not be subclassed.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// @final
+    /// class A: ...
+    /// class B(A): ...  # Error raised here
+    /// ```
+    pub(crate) static SUBCLASS_OF_FINAL_CLASS = {
+        summary: "detects subclasses of final classes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
     }
 }
 
