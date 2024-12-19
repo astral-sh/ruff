@@ -1,39 +1,41 @@
 use ruff_index::IndexVec;
 
+use crate::semantic_index::ScopedVisibilityConstraintId;
 use crate::semantic_index::{
     ast_ids::HasScopedExpressionId,
     constraint::{Constraint, ConstraintNode, PatternConstraintKind},
-    AllConstraints,
 };
-use crate::semantic_index::{ScopedConstraintId, ScopedVisibilityConstraintId};
 use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
 
 const MAX_RECURSION_DEPTH: usize = 10;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum VisibilityConstraint {
+pub(crate) enum VisibilityConstraint<'db> {
     AlwaysTrue,
     Ambiguous,
-    VisibleIf(ScopedConstraintId),
+    VisibleIf(Constraint<'db>),
     VisibleIfNot(ScopedVisibilityConstraintId),
     KleeneAnd(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
     KleeneOr(ScopedVisibilityConstraintId, ScopedVisibilityConstraintId),
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct VisibilityConstraints {
-    constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint>,
+pub(crate) struct VisibilityConstraints<'db> {
+    constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint<'db>>,
 }
 
-impl VisibilityConstraints {
+impl<'db> VisibilityConstraints<'db> {
     pub(crate) fn new() -> Self {
         Self {
             constraints: IndexVec::from_iter([VisibilityConstraint::AlwaysTrue]),
         }
     }
 
-    pub(crate) fn add(&mut self, constraint: VisibilityConstraint) -> ScopedVisibilityConstraintId {
+    pub(crate) fn add(
+        &mut self,
+        constraint: VisibilityConstraint<'db>,
+    ) -> ScopedVisibilityConstraintId {
         self.constraints.push(constraint)
     }
 
@@ -68,19 +70,13 @@ impl VisibilityConstraints {
     }
 
     /// Analyze the statically known visibility for a given visibility constraint.
-    pub(crate) fn evaluate<'db>(
-        &self,
-        db: &'db dyn Db,
-        all_constraints: &AllConstraints<'db>,
-        id: ScopedVisibilityConstraintId,
-    ) -> Truthiness {
-        self.evaluate_impl(db, all_constraints, id, MAX_RECURSION_DEPTH)
+    pub(crate) fn evaluate(&self, db: &'db dyn Db, id: ScopedVisibilityConstraintId) -> Truthiness {
+        self.evaluate_impl(db, id, MAX_RECURSION_DEPTH)
     }
 
-    fn evaluate_impl<'db>(
+    fn evaluate_impl(
         &self,
         db: &'db dyn Db,
-        constraints: &AllConstraints<'db>,
         id: ScopedVisibilityConstraintId,
         max_depth: usize,
     ) -> Truthiness {
@@ -92,20 +88,18 @@ impl VisibilityConstraints {
         match visibility_constraint {
             VisibilityConstraint::AlwaysTrue => Truthiness::AlwaysTrue,
             VisibilityConstraint::Ambiguous => Truthiness::Ambiguous,
-            VisibilityConstraint::VisibleIf(single) => {
-                Self::analyze_single(db, &constraints[*single])
+            VisibilityConstraint::VisibleIf(constraint) => Self::analyze_single(db, constraint),
+            VisibilityConstraint::VisibleIfNot(negated) => {
+                self.evaluate_impl(db, *negated, max_depth - 1).negate()
             }
-            VisibilityConstraint::VisibleIfNot(negated) => self
-                .evaluate_impl(db, constraints, *negated, max_depth - 1)
-                .negate(),
             VisibilityConstraint::KleeneAnd(lhs, rhs) => {
-                let lhs = self.evaluate_impl(db, constraints, *lhs, max_depth - 1);
+                let lhs = self.evaluate_impl(db, *lhs, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysFalse {
                     return Truthiness::AlwaysFalse;
                 }
 
-                let rhs = self.evaluate_impl(db, constraints, *rhs, max_depth - 1);
+                let rhs = self.evaluate_impl(db, *rhs, max_depth - 1);
 
                 if rhs == Truthiness::AlwaysFalse {
                     Truthiness::AlwaysFalse
@@ -116,13 +110,13 @@ impl VisibilityConstraints {
                 }
             }
             VisibilityConstraint::KleeneOr(lhs_id, rhs_id) => {
-                let lhs = self.evaluate_impl(db, constraints, *lhs_id, max_depth - 1);
+                let lhs = self.evaluate_impl(db, *lhs_id, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysTrue {
                     return Truthiness::AlwaysTrue;
                 }
 
-                let rhs = self.evaluate_impl(db, constraints, *rhs_id, max_depth - 1);
+                let rhs = self.evaluate_impl(db, *rhs_id, max_depth - 1);
 
                 if rhs == Truthiness::AlwaysTrue {
                     Truthiness::AlwaysTrue
