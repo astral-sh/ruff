@@ -1455,3 +1455,14 @@ if True:
 # no error
 from module import symbol
 ```
+
+## Unsupported features
+
+We do not support full unreachable code analysis yet. We also raise diagnostics from
+statically-known to be false branches:
+
+```py
+if False:
+    # error: [unresolved-reference]
+    x
+```
