@@ -66,6 +66,6 @@ It is [recommended](https://docs.python.org/3/library/sys.html#sys.platform) to 
 ```py
 import sys
 
-reveal_type(sys.platform.startswith("freebsd"))  # revealed: @Todo(call todo)
-reveal_type(sys.platform.startswith("linux"))  # revealed: @Todo(call todo)
+reveal_type(sys.platform.startswith("freebsd"))  # revealed: @Todo(instance attributes)
+reveal_type(sys.platform.startswith("linux"))  # revealed: @Todo(instance attributes)
 ```
