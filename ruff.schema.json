@@ -1386,6 +1386,16 @@
             "type": "string"
           }
         },
+        "runtime-evaluated-decorator-classes": {
+          "description": "Exempt classes and functions decorated with methods of any of the enumerated decorator classes from being moved into type-checking blocks.\n\nCommon examples include FastAPI's `fastapi.FastAPI` and `fastapi.Router`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "runtime-evaluated-decorators": {
           "description": "Exempt classes and functions decorated with any of the enumerated decorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator (for functions) and attrs' `@attrs.define` decorator (for classes).",
           "type": [
