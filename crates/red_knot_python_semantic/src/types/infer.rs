@@ -42,7 +42,7 @@ use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
-    ExceptHandlerDefinitionKind, TargetKind,
+    ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
@@ -198,17 +198,11 @@ pub(crate) fn infer_expression_types<'db>(
 fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
-        tracing::trace_span!("infer_unpack_types", unpack=?unpack.as_id(), file=%file.path(db))
+        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
             .entered();
 
-    let value = unpack.value(db);
-    let scope = unpack.scope(db);
-
-    let result = infer_expression_types(db, value);
-    let value_ty = result.expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
-
-    let mut unpacker = Unpacker::new(db, scope);
-    unpacker.unpack(unpack.target(db), value_ty);
+    let mut unpacker = Unpacker::new(db, unpack.scope(db));
+    unpacker.unpack(unpack.target(db), unpack.value(db));
     unpacker.finish()
 }
 
@@ -710,12 +704,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_augment_assignment_definition(augmented_assignment.node(), definition);
             }
             DefinitionKind::For(for_statement_definition) => {
-                self.infer_for_statement_definition(
-                    for_statement_definition.target(),
-                    for_statement_definition.iterable(),
-                    for_statement_definition.is_async(),
-                    definition,
-                );
+                self.infer_for_statement_definition(for_statement_definition, definition);
             }
             DefinitionKind::NamedExpression(named_expression) => {
                 self.infer_named_expression_definition(named_expression.node(), definition);
@@ -1833,18 +1822,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = assignment;
 
         for target in targets {
-            self.infer_assignment_target(target, value);
+            self.infer_target(target, value);
         }
     }
 
+    /// Infer the definition type involved in a `target` expression.
+    ///
+    /// This is used for assignment statements, for statements, etc. with a single or multiple
+    /// targets (unpacking).
     // TODO: Remove the `value` argument once we handle all possible assignment targets.
-    fn infer_assignment_target(&mut self, target: &ast::Expr, value: &ast::Expr) {
+    fn infer_target(&mut self, target: &ast::Expr, value: &ast::Expr) {
         match target {
             ast::Expr::Name(name) => self.infer_definition(name),
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for element in elts {
-                    self.infer_assignment_target(element, value);
+                    self.infer_target(element, value);
                 }
             }
             _ => {
@@ -1863,10 +1856,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value = assignment.value();
         let name = assignment.name();
 
-        self.infer_standalone_expression(value);
-
-        let value_ty = self.expression_ty(value);
-        let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
+        let value_ty = self.infer_standalone_expression(value);
 
         let mut target_ty = match assignment.target() {
             TargetKind::Sequence(unpack) => {
@@ -1877,6 +1867,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.context.extend(unpacked);
                 }
 
+                let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
                 unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
             }
             TargetKind::Name => value_ty,
@@ -2104,36 +2095,41 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        // TODO more complex assignment targets
-        if let ast::Expr::Name(name) = &**target {
-            self.infer_definition(name);
-        } else {
-            self.infer_standalone_expression(iter);
-            self.infer_expression(target);
-        }
+        self.infer_target(target, iter);
         self.infer_body(body);
         self.infer_body(orelse);
     }
 
     fn infer_for_statement_definition(
         &mut self,
-        target: &ast::ExprName,
-        iterable: &ast::Expr,
-        is_async: bool,
+        for_stmt: &ForStmtDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
+        let iterable = for_stmt.iterable();
+        let name = for_stmt.name();
+
         let iterable_ty = self.infer_standalone_expression(iterable);
 
-        let loop_var_value_ty = if is_async {
+        let loop_var_value_ty = if for_stmt.is_async() {
             todo_type!("async iterables/iterators")
         } else {
-            iterable_ty
-                .iterate(self.db())
-                .unwrap_with_diagnostic(&self.context, iterable.into())
+            match for_stmt.target() {
+                TargetKind::Sequence(unpack) => {
+                    let unpacked = infer_unpack_types(self.db(), unpack);
+                    if for_stmt.is_first() {
+                        self.context.extend(unpacked);
+                    }
+                    let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
+                    unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
+                }
+                TargetKind::Name => iterable_ty
+                    .iterate(self.db())
+                    .unwrap_with_diagnostic(&self.context, iterable.into()),
+            }
         };
 
-        self.store_expression_type(target, loop_var_value_ty);
-        self.add_binding(target.into(), definition, loop_var_value_ty);
+        self.store_expression_type(name, loop_var_value_ty);
+        self.add_binding(name.into(), definition, loop_var_value_ty);
     }
 
     fn infer_while_statement(&mut self, while_statement: &ast::StmtWhile) {

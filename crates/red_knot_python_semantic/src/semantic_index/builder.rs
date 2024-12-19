@@ -29,7 +29,7 @@ use crate::semantic_index::use_def::{
     FlowSnapshot, ScopedConstraintId, ScopedVisibilityConstraintId, UseDefMapBuilder,
 };
 use crate::semantic_index::SemanticIndex;
-use crate::unpack::Unpack;
+use crate::unpack::{Unpack, UnpackValue};
 use crate::visibility_constraints::VisibilityConstraint;
 use crate::Db;
 
@@ -810,7 +810,7 @@ where
                                     unsafe {
                                         AstNodeRef::new(self.module.clone(), target)
                                     },
-                                    value,
+                                    UnpackValue::Assign(value),
                                     countme::Count::default(),
                                 )),
                             })
@@ -1021,7 +1021,9 @@ where
                     orelse,
                 },
             ) => {
-                self.add_standalone_expression(iter);
+                debug_assert_eq!(&self.current_assignments, &[]);
+
+                let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
                 self.record_ambiguous_visibility();
@@ -1029,10 +1031,37 @@ where
                 let pre_loop = self.flow_snapshot();
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
 
-                debug_assert_eq!(&self.current_assignments, &[]);
-                self.push_assignment(for_stmt.into());
+                let current_assignment = match &**target {
+                    ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(CurrentAssignment::For {
+                        node: for_stmt,
+                        first: true,
+                        unpack: Some(Unpack::new(
+                            self.db,
+                            self.file,
+                            self.current_scope(),
+                            #[allow(unsafe_code)]
+                            unsafe {
+                                AstNodeRef::new(self.module.clone(), target)
+                            },
+                            UnpackValue::Iterable(iter_expr),
+                            countme::Count::default(),
+                        )),
+                    }),
+                    ast::Expr::Name(_) => Some(CurrentAssignment::For {
+                        node: for_stmt,
+                        unpack: None,
+                        first: false,
+                    }),
+                    _ => None,
+                };
+
+                if let Some(current_assignment) = current_assignment {
+                    self.push_assignment(current_assignment);
+                }
                 self.visit_expr(target);
-                self.pop_assignment();
+                if current_assignment.is_some() {
+                    self.pop_assignment();
+                }
 
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
@@ -1283,12 +1312,18 @@ where
                         Some(CurrentAssignment::AugAssign(aug_assign)) => {
                             self.add_definition(symbol, aug_assign);
                         }
-                        Some(CurrentAssignment::For(node)) => {
+                        Some(CurrentAssignment::For {
+                            node,
+                            first,
+                            unpack,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 ForStmtDefinitionNodeRef {
+                                    unpack,
+                                    first,
                                     iterable: &node.iter,
-                                    target: name_node,
+                                    name: name_node,
                                     is_async: node.is_async,
                                 },
                             );
@@ -1324,7 +1359,9 @@ where
                     }
                 }
 
-                if let Some(CurrentAssignment::Assign { first, .. }) = self.current_assignment_mut()
+                if let Some(
+                    CurrentAssignment::Assign { first, .. } | CurrentAssignment::For { first, .. },
+                ) = self.current_assignment_mut()
                 {
                     *first = false;
                 }
@@ -1566,7 +1603,11 @@ enum CurrentAssignment<'a> {
     },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),
-    For(&'a ast::StmtFor),
+    For {
+        node: &'a ast::StmtFor,
+        first: bool,
+        unpack: Option<Unpack<'a>>,
+    },
     Named(&'a ast::ExprNamed),
     Comprehension {
         node: &'a ast::Comprehension,
@@ -1587,12 +1628,6 @@ impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
     fn from(value: &'a ast::StmtAugAssign) -> Self {
         Self::AugAssign(value)
-    }
-}
-
-impl<'a> From<&'a ast::StmtFor> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtFor) -> Self {
-        Self::For(value)
     }
 }
 
