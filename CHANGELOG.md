@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.4
+
+### Preview features
+
+- \[`airflow`\] Extend `AIR302` with additional functions and classes ([#15015](https://github.com/astral-sh/ruff/pull/15015))
+- \[`airflow`\] Implement `moved-to-provider-in-3` for modules that has been moved to Airflow providers (`AIR303`) ([#14764](https://github.com/astral-sh/ruff/pull/14764))
+- \[`flake8-use-pathlib`\] Extend check for invalid path suffix to include the case `"."` (`PTH210`) ([#14902](https://github.com/astral-sh/ruff/pull/14902))
+- \[`perflint`\] Fix panic in `PERF401` when list variable is after the `for` loop ([#14971](https://github.com/astral-sh/ruff/pull/14971))
+- \[`perflint`\] Simplify finding the loop target in `PERF401` ([#15025](https://github.com/astral-sh/ruff/pull/15025))
+- \[`pylint`\] Preserve original value format (`PLR6104`) ([#14978](https://github.com/astral-sh/ruff/pull/14978))
+- \[`ruff`\] Avoid false positives for `RUF027` for typing context bindings ([#15037](https://github.com/astral-sh/ruff/pull/15037))
+- \[`ruff`\] Check for ambiguous pattern passed to `pytest.raises()` (`RUF043`) ([#14966](https://github.com/astral-sh/ruff/pull/14966))
+
+### Rule changes
+
+- \[`flake8-bandit`\] Check `S105` for annotated assignment ([#15059](https://github.com/astral-sh/ruff/pull/15059))
+- \[`flake8-pyi`\] More autofixes for `redundant-none-literal` (`PYI061`) ([#14872](https://github.com/astral-sh/ruff/pull/14872))
+- \[`pydocstyle`\] Skip leading whitespace for `D403` ([#14963](https://github.com/astral-sh/ruff/pull/14963))
+- \[`ruff`\] Skip `SQLModel` base classes for `mutable-class-default` (`RUF012`) ([#14949](https://github.com/astral-sh/ruff/pull/14949))
+
+### Bug
+
+- \[`perflint`\] Parenthesize walrus expressions in autofix for `manual-list-comprehension` (`PERF401`) ([#15050](https://github.com/astral-sh/ruff/pull/15050))
+
+### Server
+
+- Check diagnostic refresh support from client capability which enables dynamic configuration for various editors ([#15014](https://github.com/astral-sh/ruff/pull/15014))
+
 ## 0.8.3
 
 ### Preview features
