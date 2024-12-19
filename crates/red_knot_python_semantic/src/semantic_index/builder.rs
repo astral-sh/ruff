@@ -314,7 +314,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
         self.current_use_def_map_mut()
-            .record_constraint_id(constraint)
+            .record_constraint_id(constraint);
     }
 
     fn record_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
@@ -337,7 +337,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn record_visibility_constraint_id(&mut self, constraint: ScopedVisibilityConstraintId) {
         self.current_use_def_map_mut()
-            .record_visibility_constraint_id(constraint)
+            .record_visibility_constraint_id(constraint);
     }
 
     fn record_visibility_constraint(
