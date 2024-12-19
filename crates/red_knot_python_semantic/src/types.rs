@@ -2360,7 +2360,7 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn try_from_file_and_symbol(db: &dyn Db, file: File, class_name: &str) -> Option<Self> {
+    pub fn try_from_file_and_name(db: &dyn Db, file: File, class_name: &str) -> Option<Self> {
         // Note: if this becomes hard to maintain (as rust can't ensure at compile time that all
         // variants of `Self` are covered), we might use a macro (in-house or dependency)
         // See: https://stackoverflow.com/q/39070244
@@ -2666,12 +2666,8 @@ impl<'db> KnownInstanceType<'db> {
         self.class().to_instance(db)
     }
 
-    pub fn try_from_file_and_symbol(
-        db: &'db dyn Db,
-        file: File,
-        instance_name: &str,
-    ) -> Option<Self> {
-        let candidate = match instance_name {
+    pub fn try_from_file_and_name(db: &'db dyn Db, file: File, symbol_name: &str) -> Option<Self> {
+        let candidate = match symbol_name {
             "Any" => Self::Any,
             "ClassVar" => Self::ClassVar,
             "Deque" => Self::Deque,
@@ -2987,7 +2983,7 @@ impl KnownFunction {
         }
     }
 
-    fn from_definition<'db>(
+    fn try_from_definition_and_name<'db>(
         db: &'db dyn Db,
         definition: Definition<'db>,
         name: &str,

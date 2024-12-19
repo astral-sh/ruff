@@ -19,7 +19,7 @@ impl Module {
         search_path: SearchPath,
         file: File,
     ) -> Self {
-        let known = KnownModule::try_from_name_and_search_path(&name, &search_path);
+        let known = KnownModule::try_from_search_path_and_name(&search_path, &name);
         Self {
             inner: Arc::new(ModuleInner {
                 name,
@@ -131,9 +131,9 @@ impl KnownModule {
             .unwrap_or_else(|| panic!("{self_as_str} should be a valid module name!"))
     }
 
-    pub(crate) fn try_from_name_and_search_path(
-        name: &ModuleName,
+    pub(crate) fn try_from_search_path_and_name(
         search_path: &SearchPath,
+        name: &ModuleName,
     ) -> Option<Self> {
         if !search_path.is_standard_library() {
             return None;
