@@ -8,6 +8,7 @@ d = {"a": 1, "b": 2, "c": 3}
 {k: v for k, v in y}
 {k: v for k, v in d.items()}
 [(k, v) for k, v in d.items()]
+[(k, v) for [k, v] in d.items()]
 {k: (a, b) for k, (a, b) in d.items()}
 
 [i for i, in z]
@@ -22,3 +23,7 @@ d = {"a": 1, "b": 2, "c": 3}
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7196
 any(len(symbol_table.get_by_type(symbol_type)) > 0 for symbol_type in[t for t in SymbolType])
+
+zz = [[1], [2], [3]]
+[(i,) for (i,) in zz]  # != list(zz)
+{(i,) for (i,) in zz}  # != set(zz)
