@@ -16,7 +16,6 @@ while this_second_comment:
 # `else`
 else:
     pass
-    ...
 
 
 while and_so:
@@ -24,10 +23,22 @@ while and_so:
 # this
 else:
     ...
-    pass
 
 
 while of_course():
     this()
 else:
     ...  # too
+
+while of_course():
+    this()
+else:
+    ...
+    # this comment belongs to the else
+
+while of_course():
+    this()
+else:
+    ...
+# this comment belongs to the statement coming after the else
+

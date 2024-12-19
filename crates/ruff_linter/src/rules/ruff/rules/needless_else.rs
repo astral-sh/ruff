@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::identifier::{else_loop, else_try};
-use ruff_python_ast::{ExceptHandler, Expr, Stmt, StmtExpr, StmtFor, StmtWhile};
+use ruff_python_ast::{Stmt, StmtExpr, StmtFor, StmtIf, StmtTry, StmtWhile};
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -41,123 +41,151 @@ impl AlwaysFixableViolation for NeedlessElse {
 }
 
 /// RUF047
-pub(crate) fn needless_else(checker: &mut Checker, stmt: &Stmt) {
-    let comment_ranges = checker.comment_ranges();
+pub(crate) fn needless_else(checker: &mut Checker, stmt: AnyNodeWithOrElse) {
     let source = checker.source();
 
-    let (body, diagnostic_range, remove_range, comment_range) = match stmt {
-        Stmt::For(StmtFor { body, orelse, .. }) | Stmt::While(StmtWhile { body, orelse, .. }) => {
-            let (previous, else_body) = (&body, &orelse[..]);
+    let else_body = stmt.else_body();
 
-            let Some(keyword_range) = else_loop(stmt, source) else {
-                return;
-            };
-            let Some(last_stmt) = else_body.last() else {
-                return;
-            };
-            let diagnostic_range = TextRange::new(keyword_range.start(), last_stmt.end());
+    if !body_is_useless(else_body) {
+        return;
+    }
 
-            let Some((remove_range, comment_range)) =
-                remove_and_comment_range(source, previous, else_body)
-            else {
-                return;
-            };
-
-            (else_body, diagnostic_range, remove_range, comment_range)
-        }
-
-        Stmt::Try(try_stmt) => {
-            let else_body = &try_stmt.orelse[..];
-
-            let Some(keyword_range) = else_try(stmt, source) else {
-                return;
-            };
-            let Some(last_stmt) = else_body.last() else {
-                return;
-            };
-            let report_range = TextRange::new(keyword_range.start(), last_stmt.end());
-
-            let mut previous = &try_stmt.body[..];
-
-            if let [.., ExceptHandler::ExceptHandler(last_handler)] = &try_stmt.handlers[..] {
-                previous = &last_handler.body[..];
-            };
-
-            let Some((remove_range, comment_range)) =
-                remove_and_comment_range(source, previous, else_body)
-            else {
-                return;
-            };
-
-            (else_body, report_range, remove_range, comment_range)
-        }
-
-        Stmt::If(if_stmt) => {
-            let (previous, else_clause) = match &if_stmt.elif_else_clauses[..] {
-                [.., elif, possibly_else] if possibly_else.test.is_none() => {
-                    (&elif.body, possibly_else)
-                }
-                [possibly_else] if possibly_else.test.is_none() => (&if_stmt.body, possibly_else),
-                _ => return,
-            };
-
-            let body = &else_clause.body[..];
-
-            let Some((remove_range, comment_range)) =
-                remove_and_comment_range(source, previous, body)
-            else {
-                return;
-            };
-
-            (body, else_clause.range, remove_range, comment_range)
-        }
-
-        _ => return,
+    let Some(else_range) = stmt.else_range(checker.tokens()) else {
+        return;
     };
 
-    if !body_is_empty(body) {
+    let before_else = stmt.body_before_else();
+    let Some(preceding_stmt) = before_else.last() else {
+        return;
+    };
+
+    let before_else_full_end = source.full_line_end(preceding_stmt.end());
+    let else_full_end = source.full_line_end(else_range.end());
+
+    // Preserve else blocks that contain a comment.
+    if checker
+        .comment_ranges()
+        .intersects(TextRange::new(before_else_full_end, else_full_end))
+    {
         return;
     }
 
-    if comment_ranges.has_comments(&comment_range, source) {
-        return;
-    }
+    let remove_range = TextRange::new(before_else_full_end, else_full_end);
 
     let edit = Edit::range_deletion(remove_range);
     let fix = Fix::safe_edit(edit);
 
-    let diagnostic = Diagnostic::new(NeedlessElse, diagnostic_range);
+    let diagnostic = Diagnostic::new(NeedlessElse, else_range);
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
-fn remove_and_comment_range(
-    source: &str,
-    previous_body: &[Stmt],
-    else_body: &[Stmt],
-) -> Option<(TextRange, TextRange)> {
-    let preceding_stmt = previous_body.last()?;
-    let else_last_stmt = else_body.last()?;
-
-    let previous_block_end = source.line_end(preceding_stmt.end());
-    let previous_block_end_plus_line_break = source.full_line_end(preceding_stmt.end());
-    let else_block_end = source.line_end(else_last_stmt.end());
-
-    let remove_range = TextRange::new(previous_block_end, else_block_end);
-    let comment_range = TextRange::new(previous_block_end_plus_line_break, else_block_end);
-
-    Some((remove_range, comment_range))
+/// Whether `body` contains only `pass` or `...` statements.
+fn body_is_useless(body: &[Stmt]) -> bool {
+    match body {
+        [Stmt::Pass(_)] => true,
+        [Stmt::Expr(StmtExpr { value, .. })] => value.is_ellipsis_literal_expr(),
+        _ => false,
+    }
 }
 
-/// Whether `body` contains only `pass` or `...` statements.
-fn body_is_empty(body: &[Stmt]) -> bool {
-    if body.is_empty() {
-        return false;
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum AnyNodeWithOrElse<'a> {
+    While(&'a StmtWhile),
+    For(&'a StmtFor),
+    Try(&'a StmtTry),
+    If(&'a StmtIf),
+}
+
+impl<'a> AnyNodeWithOrElse<'a> {
+    /// Returns the range from the `else` keyword to the last statement
+    /// in it's block.
+    fn else_range(self, tokens: &Tokens) -> Option<TextRange> {
+        match self {
+            Self::For(_) | Self::While(_) | Self::Try(_) => {
+                let before_else = self.body_before_else();
+
+                let else_body = self.else_body();
+                let end = else_body.last()?.end();
+
+                let start = tokens
+                    .in_range(TextRange::new(before_else.last()?.end(), end))
+                    .iter()
+                    .find(|token| token.kind() == TokenKind::Else)?
+                    .start();
+
+                Some(TextRange::new(start, end))
+            }
+
+            Self::If(StmtIf {
+                elif_else_clauses, ..
+            }) => elif_else_clauses
+                .last()
+                .filter(|clause| clause.test.is_none())
+                .map(Ranged::range),
+        }
     }
 
-    body.iter().all(|stmt| match stmt {
-        Stmt::Pass(..) => true,
-        Stmt::Expr(StmtExpr { value, .. }) => matches!(value.as_ref(), Expr::EllipsisLiteral(..)),
-        _ => false,
-    })
+    /// Returns the suite before the else block.
+    fn body_before_else(self) -> &'a [Stmt] {
+        match self {
+            Self::Try(StmtTry { body, handlers, .. }) => handlers
+                .last()
+                .and_then(|handler| handler.as_except_handler())
+                .map(|handler| &handler.body)
+                .unwrap_or(body),
+            Self::While(StmtWhile { body, .. }) | Self::For(StmtFor { body, .. }) => body,
+            Self::If(StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => elif_else_clauses
+                .iter()
+                .rev()
+                .find(|clause| clause.test.is_some())
+                .map(|clause| &*clause.body)
+                .unwrap_or(body),
+        }
+    }
+
+    // Returns the `else` suite. Defaults to an empty suite if the statement
+    // has no `else` block.
+    fn else_body(self) -> &'a [Stmt] {
+        match self {
+            Self::While(StmtWhile { orelse, .. })
+            | Self::For(StmtFor { orelse, .. })
+            | Self::Try(StmtTry { orelse, .. }) => orelse,
+            Self::If(StmtIf {
+                elif_else_clauses, ..
+            }) => elif_else_clauses
+                .last()
+                .filter(|clause| clause.test.is_none())
+                .map(|clause| &*clause.body)
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl<'a> From<&'a StmtFor> for AnyNodeWithOrElse<'a> {
+    fn from(value: &'a StmtFor) -> Self {
+        Self::For(value)
+    }
+}
+
+impl<'a> From<&'a StmtWhile> for AnyNodeWithOrElse<'a> {
+    fn from(value: &'a StmtWhile) -> Self {
+        Self::While(value)
+    }
+}
+
+impl<'a> From<&'a StmtIf> for AnyNodeWithOrElse<'a> {
+    fn from(value: &'a StmtIf) -> Self {
+        Self::If(value)
+    }
+}
+
+impl<'a> From<&'a StmtTry> for AnyNodeWithOrElse<'a> {
+    fn from(value: &'a StmtTry) -> Self {
+        Self::Try(value)
+    }
 }

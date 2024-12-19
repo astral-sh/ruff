@@ -16,14 +16,12 @@ for this in second_comment:
 # `else`
 else:
     pass
-    ...
 
 
 for _and in so:
     does()
 # this
 else:
-    ...
     pass
 
 
@@ -31,3 +29,16 @@ for of in course():
     this()
 else:
     ...  # too
+
+
+for of in course():
+    this()
+else:
+    ...
+    # too
+
+for of in course():
+    this()
+else:
+    ...
+# this comment does not belong to the else

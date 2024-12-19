@@ -60,3 +60,63 @@ RUF047_if.py:17:1: RUF047 [*] Empty `else` clause
 19 17 | 
 20 18 | 
 21 19 | if this_second_comment():
+
+RUF047_if.py:41:1: RUF047 [*] Empty `else` clause
+   |
+39 |   if of_course():
+40 |       this()
+41 | / else:
+42 | |     ...
+   | |_______^ RUF047
+43 |       # comment
+   |
+   = help: Remove clause
+
+ℹ Safe fix
+38 38 | 
+39 39 | if of_course():
+40 40 |     this()
+41    |-else:
+42    |-    ...
+43 41 |     # comment
+44 42 | 
+45 43 | if of_course():
+
+RUF047_if.py:52:1: RUF047 [*] Empty `else` clause
+   |
+51 | if of_course: this()
+52 | else: ...
+   | ^^^^^^^^^ RUF047
+53 | 
+54 | if of_course:
+   |
+   = help: Remove clause
+
+ℹ Safe fix
+49 49 | # this comment doesn't belong to the if
+50 50 | 
+51 51 | if of_course: this()
+52    |-else: ...
+53 52 | 
+54 53 | if of_course:
+55 54 |     this() # comment
+
+RUF047_if.py:56:1: RUF047 [*] Empty `else` clause
+   |
+54 | if of_course:
+55 |     this() # comment
+56 | else: ...
+   | ^^^^^^^^^ RUF047
+57 | 
+58 | if of_course:
+   |
+   = help: Remove clause
+
+ℹ Safe fix
+53 53 | 
+54 54 | if of_course:
+55 55 |     this() # comment
+56    |-else: ...
+57 56 | 
+58 57 | if of_course:
+59 58 |     this() # comment

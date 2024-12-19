@@ -23,7 +23,6 @@ except (second, comment):
 # `else`
 else:
     pass
-    ...
 
 
 try:
@@ -33,7 +32,6 @@ except:
 # this
 else:
     ...
-    pass
 
 
 try:
@@ -42,3 +40,32 @@ except:
     this()
 else:
     ...  # too
+
+try:
+    of_course()
+except:
+    this()
+else:
+    ...
+    # This comment belongs to else
+finally:
+    pass
+
+try:
+    of_course()
+except:
+    this()
+else:
+    ...
+# This comment belongs to finally
+finally:
+    pass
+
+
+try:
+    of_course()
+except:
+    this()
+else:
+    ...
+# This comment belongs to the statement coming after the else

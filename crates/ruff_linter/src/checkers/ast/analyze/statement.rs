@@ -1239,7 +1239,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::if_key_in_dict_del(checker, if_);
             }
             if checker.enabled(Rule::NeedlessElse) {
-                ruff::rules::needless_else(checker, stmt);
+                ruff::rules::needless_else(checker, if_.into());
             }
         }
         Stmt::Assert(
@@ -1348,7 +1348,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_async::rules::async_busy_wait(checker, while_stmt);
             }
             if checker.enabled(Rule::NeedlessElse) {
-                ruff::rules::needless_else(checker, stmt);
+                ruff::rules::needless_else(checker, while_stmt.into());
             }
         }
         Stmt::For(
@@ -1437,16 +1437,18 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::NeedlessElse) {
-                ruff::rules::needless_else(checker, stmt);
+                ruff::rules::needless_else(checker, for_stmt.into());
             }
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
+        Stmt::Try(
+            try_stmt @ ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            },
+        ) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
@@ -1514,7 +1516,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
             }
             if checker.enabled(Rule::NeedlessElse) {
-                ruff::rules::needless_else(checker, stmt);
+                ruff::rules::needless_else(checker, try_stmt.into());
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
