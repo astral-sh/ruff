@@ -153,8 +153,8 @@ impl SymbolDeclarations {
     /// Return an iterator over live declarations for this symbol.
     pub(super) fn iter(&self) -> DeclarationIdIterator {
         DeclarationIdIterator {
-            declarations_iter: self.live_declarations.iter(),
-            visibility_constraints_iter: self.visibility_constraints.iter(),
+            declarations: self.live_declarations.iter(),
+            visibility_constraints: self.visibility_constraints.iter(),
         }
     }
 }
@@ -222,7 +222,7 @@ impl SymbolBindings {
         BindingIdWithConstraintsIterator {
             definitions: self.live_bindings.iter(),
             constraints: self.constraints.iter(),
-            visibility_constraints_iter: self.visibility_constraints.iter(),
+            visibility_constraints: self.visibility_constraints.iter(),
         }
     }
 }
@@ -435,14 +435,18 @@ impl SymbolState {
         let mut opt_a_decl: Option<u32> = a_decls_iter.next();
         let mut opt_b_decl: Option<u32> = b_decls_iter.next();
 
-        let push =
-            |decl, conditions_iter: &mut VisibilityConstraintsIntoIterator, merged: &mut Self| {
-                merged.declarations.live_declarations.insert(decl);
-                let conditions = conditions_iter
-                    .next()
-                    .expect("declarations and visibility_constraints length mismatch");
-                merged.declarations.visibility_constraints.push(conditions);
-            };
+        let push = |decl,
+                    vis_constraints_iter: &mut VisibilityConstraintsIntoIterator,
+                    merged: &mut Self| {
+            merged.declarations.live_declarations.insert(decl);
+            let vis_constraints = vis_constraints_iter
+                .next()
+                .expect("declarations and visibility_constraints length mismatch");
+            merged
+                .declarations
+                .visibility_constraints
+                .push(vis_constraints);
+        };
 
         loop {
             match (opt_a_decl, opt_b_decl) {
@@ -504,7 +508,7 @@ pub(super) struct BindingIdWithConstraints<'map> {
 pub(super) struct BindingIdWithConstraintsIterator<'map> {
     definitions: BindingsIterator<'map>,
     constraints: ConstraintsIterator<'map>,
-    visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
+    visibility_constraints: VisibilityConstraintsIterator<'map>,
 }
 
 impl<'map> Iterator for BindingIdWithConstraintsIterator<'map> {
@@ -514,7 +518,7 @@ impl<'map> Iterator for BindingIdWithConstraintsIterator<'map> {
         match (
             self.definitions.next(),
             self.constraints.next(),
-            self.visibility_constraints_iter.next(),
+            self.visibility_constraints.next(),
         ) {
             (None, None, None) => None,
             (Some(def), Some(constraints), Some(visibility_constraint_id)) => {
@@ -550,18 +554,15 @@ impl Iterator for ConstraintIdIterator<'_> {
 impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
 pub(super) struct DeclarationIdIterator<'map> {
-    pub(crate) declarations_iter: DeclarationsIterator<'map>,
-    pub(crate) visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
+    pub(crate) declarations: DeclarationsIterator<'map>,
+    pub(crate) visibility_constraints: VisibilityConstraintsIterator<'map>,
 }
 
 impl Iterator for DeclarationIdIterator<'_> {
     type Item = (ScopedDefinitionId, ScopedVisibilityConstraintId);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match (
-            self.declarations_iter.next(),
-            self.visibility_constraints_iter.next(),
-        ) {
+        match (self.declarations.next(), self.visibility_constraints.next()) {
             (None, None) => None,
             (Some(declaration), Some(visibility_constraints_id)) => Some((
                 ScopedDefinitionId::from_u32(declaration),
