@@ -1658,6 +1658,15 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NonPEP695TypeAlias) {
                 pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
             }
+            if let Some(value) = value.as_deref() {
+                if checker.enabled(Rule::HardcodedPasswordString) {
+                    flake8_bandit::rules::assign_hardcoded_password_string(
+                        checker,
+                        value,
+                        std::slice::from_ref(target),
+                    );
+                }
+            }
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
             }
