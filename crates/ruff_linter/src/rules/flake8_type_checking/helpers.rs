@@ -7,6 +7,7 @@ use ruff_python_ast::visitor::transformer::{walk_expr, Transformer};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
+use ruff_python_semantic::analyze::typing::resolve_assignment;
 use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
@@ -50,10 +51,21 @@ pub(crate) fn is_valid_runtime_import(
 /// Returns `true` if a function's parameters should be treated as runtime-required.
 pub(crate) fn runtime_required_function(
     function_def: &ast::StmtFunctionDef,
-    decorators: &[String],
     semantic: &SemanticModel,
+    settings: &Settings,
 ) -> bool {
-    if runtime_required_decorators(&function_def.decorator_list, decorators, semantic) {
+    if runtime_required_decorators(
+        &function_def.decorator_list,
+        &settings.runtime_required_decorators,
+        semantic,
+    ) {
+        return true;
+    }
+    if runtime_required_decorator_classes(
+        &function_def.decorator_list,
+        &settings.runtime_required_decorator_classes,
+        semantic,
+    ) {
         return true;
     }
     false
@@ -62,14 +74,24 @@ pub(crate) fn runtime_required_function(
 /// Returns `true` if a class's assignments should be treated as runtime-required.
 pub(crate) fn runtime_required_class(
     class_def: &ast::StmtClassDef,
-    base_classes: &[String],
-    decorators: &[String],
     semantic: &SemanticModel,
+    settings: &Settings,
 ) -> bool {
-    if runtime_required_base_class(class_def, base_classes, semantic) {
+    if runtime_required_base_class(class_def, &settings.runtime_required_base_classes, semantic) {
         return true;
     }
-    if runtime_required_decorators(&class_def.decorator_list, decorators, semantic) {
+    if runtime_required_decorators(
+        &class_def.decorator_list,
+        &settings.runtime_required_decorators,
+        semantic,
+    ) {
+        return true;
+    }
+    if runtime_required_decorator_classes(
+        &class_def.decorator_list,
+        &settings.runtime_required_decorator_classes,
+        semantic,
+    ) {
         return true;
     }
     false
@@ -105,6 +127,35 @@ fn runtime_required_decorators(
                     .iter()
                     .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
             })
+    })
+}
+
+fn runtime_required_decorator_classes(
+    decorator_list: &[Decorator],
+    decorator_classes: &[String],
+    semantic: &SemanticModel,
+) -> bool {
+    if decorator_classes.is_empty() {
+        return false;
+    }
+
+    decorator_list.iter().any(|decorator| {
+        let expression = if let ast::Expr::Call(ast::ExprCall { func, .. }) = &decorator.expression
+        {
+            func
+        } else {
+            &decorator.expression
+        };
+
+        let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = expression else {
+            return false;
+        };
+
+        resolve_assignment(value, semantic).is_some_and(|qualified_name| {
+            decorator_classes.iter().any(|decorator_class| {
+                QualifiedName::from_dotted_name(decorator_class) == qualified_name
+            })
+        })
     })
 }
 
