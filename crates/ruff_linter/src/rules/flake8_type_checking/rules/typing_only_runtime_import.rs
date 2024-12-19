@@ -33,10 +33,11 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
-/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
-/// as such.
+/// the case for Pydantic, SQLAlchemy, FastAPI, and other libraries), consider
+/// using the [`lint.flake8-type-checking.runtime-evaluated-base-classes`],
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`], and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorator-classes`] settings
+/// to mark them as such.
 ///
 /// ## Example
 /// ```python
@@ -108,10 +109,11 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
-/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
-/// as such.
+/// the case for Pydantic, SQLAlchemy, FastAPI, and other libraries), consider
+/// using the [`lint.flake8-type-checking.runtime-evaluated-base-classes`],
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`], and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorator-classes`] settings
+/// to mark them as such.
 ///
 /// ## Example
 /// ```python
@@ -146,7 +148,8 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - `lint.typing-modules`
 ///
 /// ## References
-/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+/// - [PEP 563: Runtime annotation resolution and
+///   `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
 pub(crate) struct TypingOnlyThirdPartyImport {
     qualified_name: String,
@@ -183,10 +186,11 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
-/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
-/// as such.
+/// the case for Pydantic, SQLAlchemy, FastAPI, and other libraries), consider
+/// using the [`lint.flake8-type-checking.runtime-evaluated-base-classes`],
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`], and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorator-classes`] settings
+/// to mark them as such.
 ///
 /// ## Example
 /// ```python

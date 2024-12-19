@@ -1828,6 +1828,19 @@ pub struct Flake8TypeCheckingOptions {
     )]
     pub runtime_evaluated_decorators: Option<Vec<String>>,
 
+    /// Exempt classes and functions decorated with methods of any of the enumerated
+    /// decorator classes from being moved into type-checking blocks.
+    ///
+    /// Common examples include FastAPI's `fastapi.FastAPI` and `fastapi.Router`.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            runtime-evaluated-decorator_classes = ["fastapi.FastAPI", "fastapi.Router"]
+        "#
+    )]
+    pub runtime_evaluated_decorator_classes: Option<Vec<String>>,
+
     /// Whether to add quotes around type annotations, if doing so would allow
     /// the corresponding import to be moved into a type-checking block.
     ///
@@ -1889,6 +1902,9 @@ impl Flake8TypeCheckingOptions {
                 .unwrap_or_else(|| vec!["typing".to_string()]),
             runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
             runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
+            runtime_required_decorator_classes: self
+                .runtime_evaluated_decorator_classes
+                .unwrap_or_default(),
             quote_annotations: self.quote_annotations.unwrap_or_default(),
         }
     }

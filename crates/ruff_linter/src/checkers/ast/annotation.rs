@@ -37,9 +37,8 @@ impl AnnotationContext {
             ScopeKind::Class(class_def)
                 if flake8_type_checking::helpers::runtime_required_class(
                     class_def,
-                    &settings.flake8_type_checking.runtime_required_base_classes,
-                    &settings.flake8_type_checking.runtime_required_decorators,
                     semantic,
+                    &settings.flake8_type_checking,
                 ) =>
             {
                 return Self::RuntimeRequired
@@ -47,8 +46,8 @@ impl AnnotationContext {
             ScopeKind::Function(function_def)
                 if flake8_type_checking::helpers::runtime_required_function(
                     function_def,
-                    &settings.flake8_type_checking.runtime_required_decorators,
                     semantic,
+                    &settings.flake8_type_checking,
                 ) =>
             {
                 return Self::RuntimeRequired
@@ -84,8 +83,8 @@ impl AnnotationContext {
     ) -> Self {
         if flake8_type_checking::helpers::runtime_required_function(
             function_def,
-            &settings.flake8_type_checking.runtime_required_decorators,
             semantic,
+            &settings.flake8_type_checking,
         ) {
             Self::RuntimeRequired
         } else if semantic.future_annotations_or_stub() {

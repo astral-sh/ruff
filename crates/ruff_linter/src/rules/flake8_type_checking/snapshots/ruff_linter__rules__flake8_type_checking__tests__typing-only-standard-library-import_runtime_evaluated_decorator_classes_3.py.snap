@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
+---
+runtime_evaluated_decorator_classes_3.py:9:18: TC003 [*] Move standard library import `uuid.UUID` into a type-checking block
+   |
+ 7 | from example import DecoratingClass
+ 8 | 
+ 9 | from uuid import UUID  # TC003
+   |                  ^^^^ TC003
+10 | 
+11 | app1 = fastapi.FastAPI("First application")
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+6  6  | from fastapi import FastAPI as Api
+7  7  | from example import DecoratingClass
+8  8  | 
+9     |-from uuid import UUID  # TC003
+   9  |+from typing import TYPE_CHECKING
+   10 |+
+   11 |+if TYPE_CHECKING:
+   12 |+    from uuid import UUID
+10 13 | 
+11 14 | app1 = fastapi.FastAPI("First application")
+12 15 | app2 = Api("Second application")

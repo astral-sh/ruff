@@ -237,6 +237,37 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_decorator_classes_1.py")
+    )]
+    #[test_case(
+        Rule::TypingOnlyThirdPartyImport,
+        Path::new("runtime_evaluated_decorator_classes_2.py")
+    )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("runtime_evaluated_decorator_classes_3.py")
+    )]
+    fn runtime_evaluated_decorator_classes(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    runtime_required_decorator_classes: vec![
+                        "fastapi.FastAPI".to_string(),
+                        "example.DecoratingClass".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/direct.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/import.py"))]
     #[test_case(

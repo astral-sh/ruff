@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+snapshot_kind: text
+---
+runtime_evaluated_decorator_classes_1.py:11:12: TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+   |
+10 | if TYPE_CHECKING:
+11 |     import datetime  # TC004
+   |            ^^^^^^^^ TC004
+12 |     from array import array  # TC004
+   |
+   = help: Move out of type-checking block
+
+ℹ Unsafe fix
+6  6  | from fastapi import FastAPI as Api
+7  7  | 
+8  8  | from example import DecoratingClass
+   9  |+import datetime
+9  10 | 
+10 11 | if TYPE_CHECKING:
+11    |-    import datetime  # TC004
+12 12 |     from array import array  # TC004
+13 13 | 
+14 14 |     import pathlib  # TC004
+
+runtime_evaluated_decorator_classes_1.py:12:23: TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+   |
+10 | if TYPE_CHECKING:
+11 |     import datetime  # TC004
+12 |     from array import array  # TC004
+   |                       ^^^^^ TC004
+13 | 
+14 |     import pathlib  # TC004
+   |
+   = help: Move out of type-checking block
+
+ℹ Unsafe fix
+6  6  | from fastapi import FastAPI as Api
+7  7  | 
+8  8  | from example import DecoratingClass
+   9  |+from array import array
+9  10 | 
+10 11 | if TYPE_CHECKING:
+11 12 |     import datetime  # TC004
+12    |-    from array import array  # TC004
+13 13 | 
+14 14 |     import pathlib  # TC004
+15 15 | 
+
+runtime_evaluated_decorator_classes_1.py:14:12: TC004 [*] Move import `pathlib` out of type-checking block. Import is used for more than type hinting.
+   |
+12 |     from array import array  # TC004
+13 | 
+14 |     import pathlib  # TC004
+   |            ^^^^^^^ TC004
+15 | 
+16 |     import pyproj
+   |
+   = help: Move out of type-checking block
+
+ℹ Unsafe fix
+6  6  | from fastapi import FastAPI as Api
+7  7  | 
+8  8  | from example import DecoratingClass
+   9  |+import pathlib
+9  10 | 
+10 11 | if TYPE_CHECKING:
+11 12 |     import datetime  # TC004
+12 13 |     from array import array  # TC004
+13 14 | 
+14    |-    import pathlib  # TC004
+15 15 | 
+16 16 |     import pyproj
+17 17 |
