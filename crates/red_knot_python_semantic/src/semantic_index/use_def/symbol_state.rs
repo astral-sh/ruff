@@ -151,7 +151,7 @@ impl SymbolDeclarations {
     }
 
     /// Return an iterator over live declarations for this symbol.
-    pub(super) fn iter<'map, 'db>(&'map self) -> DeclarationIdIterator<'map> {
+    pub(super) fn iter(&self) -> DeclarationIdIterator {
         DeclarationIdIterator {
             declarations_iter: self.live_declarations.iter(),
             visibility_constraints_iter: self.visibility_constraints.iter(),
@@ -218,7 +218,7 @@ impl SymbolBindings {
     }
 
     /// Iterate over currently live bindings for this symbol
-    pub(super) fn iter<'map>(&'map self) -> BindingIdWithConstraintsIterator<'map> {
+    pub(super) fn iter(&self) -> BindingIdWithConstraintsIterator {
         BindingIdWithConstraintsIterator {
             definitions: self.live_bindings.iter(),
             constraints: self.constraints.iter(),
@@ -507,7 +507,7 @@ pub(super) struct BindingIdWithConstraintsIterator<'map> {
     visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
 }
 
-impl<'map, 'db> Iterator for BindingIdWithConstraintsIterator<'map> {
+impl<'map> Iterator for BindingIdWithConstraintsIterator<'map> {
     type Item = BindingIdWithConstraints<'map>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -554,7 +554,7 @@ pub(super) struct DeclarationIdIterator<'map> {
     pub(crate) visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
 }
 
-impl<'map> Iterator for DeclarationIdIterator<'map> {
+impl Iterator for DeclarationIdIterator<'_> {
     type Item = (ScopedDefinitionId, ScopedVisibilityConstraintId);
 
     fn next(&mut self) -> Option<Self::Item> {
