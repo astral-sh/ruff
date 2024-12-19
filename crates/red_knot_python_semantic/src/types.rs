@@ -273,13 +273,11 @@ fn bindings_ty<'db>(
     for BindingWithConstraints {
         binding,
         constraints,
-        all_constraints,
         visibility_constraints,
         visibility_constraint,
     } in bindings_with_constraints
     {
-        let static_visibility =
-            visibility_constraints.evaluate(db, all_constraints, visibility_constraint);
+        let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
 
         let Some(binding) = binding else {
             unbound_visibility = static_visibility;
@@ -357,11 +355,8 @@ fn declarations_ty<'db>(
     let mut unbound_visibility = Truthiness::AlwaysFalse;
     let mut types = vec![];
 
-    for (declaration, all_constraints, visibility_constraints, visibility_constraint) in
-        declarations
-    {
-        let static_visibility =
-            visibility_constraints.evaluate(db, all_constraints, visibility_constraint);
+    for (declaration, visibility_constraints, visibility_constraint) in declarations {
+        let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
 
         let Some(declaration) = declaration else {
             unbound_visibility = static_visibility;
