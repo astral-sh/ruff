@@ -75,19 +75,18 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
-    // let declaredness = use_def.public_declarations(symbol).declaredness(db);
 
     let declarations = use_def.public_declarations(symbol);
     let declared_ty = declarations_ty(db, declarations);
-
-    let bindings = use_def.public_bindings(symbol); // TODO: short circuit if declaredness is Bound
-    let inferred_ty = bindings_ty(db, bindings);
 
     match declared_ty {
         // Symbol is declared, trust the declared type
         Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
         // Symbol is possibly declared
         Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
+            let bindings = use_def.public_bindings(symbol);
+            let inferred_ty = bindings_ty(db, bindings);
+
             match inferred_ty {
                 // Symbol is possibly undeclared and definitely unbound
                 Symbol::Unbound => Symbol::Type(declared_ty, Boundness::Bound),
@@ -100,8 +99,11 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
                 ),
             }
         }
-        // Symbol is undeclared
-        Ok(Symbol::Unbound) => inferred_ty,
+        // Symbol is undeclared, return the inferred type
+        Ok(Symbol::Unbound) => {
+            let bindings = use_def.public_bindings(symbol);
+            bindings_ty(db, bindings)
+        }
         // Symbol is possibly undeclared
         Err((declared_ty, _)) => {
             // Intentionally ignore conflicting declared types; that's not our problem,
