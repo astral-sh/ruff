@@ -72,3 +72,14 @@ def f():
     x: TypeAlias = DataFrame | dict
 
     assert isinstance({}, x)  # runtime use of type alias
+
+
+def f():
+    from typing import Annotated, TypeAlias
+    from expensive import Foo
+    from expensive2 import Foo2
+
+    Y: TypeAlias = Annotated[Foo, "metadata"]
+    some_object = Y()
+
+    class Z(Annotated[Foo2, "metadata"]): ...
