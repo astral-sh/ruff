@@ -348,9 +348,9 @@ impl<'db> SemanticIndexBuilder<'db> {
             .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint))
     }
 
-    fn reset_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
+    fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
         self.current_use_def_map_mut()
-            .reset_visibility_constraints(snapshot);
+            .simplify_visibility_constraints(snapshot);
     }
 
     fn record_negated_visibility_constraint(
@@ -916,7 +916,7 @@ where
                     self.flow_merge(post_clause_state);
                 }
 
-                self.reset_visibility_constraints(pre_if);
+                self.simplify_visibility_constraints(pre_if);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -960,7 +960,7 @@ where
                     self.flow_merge(break_state);
                 }
 
-                self.reset_visibility_constraints(pre_loop);
+                self.simplify_visibility_constraints(pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -1092,7 +1092,7 @@ where
                     self.flow_merge(post_clause_state);
                 }
 
-                self.reset_visibility_constraints(after_subject);
+                self.simplify_visibility_constraints(after_subject);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
@@ -1354,7 +1354,7 @@ where
                 self.visit_expr(orelse);
                 self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
-                self.reset_visibility_constraints(pre_if);
+                self.simplify_visibility_constraints(pre_if);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -1459,7 +1459,7 @@ where
                     self.flow_merge(snapshot);
                 }
 
-                self.reset_visibility_constraints(pre_op);
+                self.simplify_visibility_constraints(pre_op);
             }
             _ => {
                 walk_expr(self, expr);
