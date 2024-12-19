@@ -73,7 +73,8 @@ pub(crate) fn useless_else_on_loop(
         return;
     }
 
-    let else_range = identifier::else_(stmt, checker.locator().contents()).expect("else clause");
+    let else_range =
+        identifier::else_loop(stmt, checker.locator().contents()).expect("else clause");
 
     let mut diagnostic = Diagnostic::new(UselessElseOnLoop, else_range);
     diagnostic.try_set_fix(|| {

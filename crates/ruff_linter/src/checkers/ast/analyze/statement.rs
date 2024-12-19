@@ -1238,6 +1238,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::IfKeyInDictDel) {
                 ruff::rules::if_key_in_dict_del(checker, if_);
             }
+            if checker.enabled(Rule::NeedlessElse) {
+                ruff::rules::needless_else(checker, stmt);
+            }
         }
         Stmt::Assert(
             assert_stmt @ ast::StmtAssert {
@@ -1344,6 +1347,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::AsyncBusyWait) {
                 flake8_async::rules::async_busy_wait(checker, while_stmt);
             }
+            if checker.enabled(Rule::NeedlessElse) {
+                ruff::rules::needless_else(checker, stmt);
+            }
         }
         Stmt::For(
             for_stmt @ ast::StmtFor {
@@ -1430,6 +1436,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     refurb::rules::for_loop_set_mutations(checker, for_stmt);
                 }
             }
+            if checker.enabled(Rule::NeedlessElse) {
+                ruff::rules::needless_else(checker, stmt);
+            }
         }
         Stmt::Try(ast::StmtTry {
             body,
@@ -1503,6 +1512,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ErrorInsteadOfException) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
+            }
+            if checker.enabled(Rule::NeedlessElse) {
+                ruff::rules::needless_else(checker, stmt);
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {

@@ -1,0 +1,62 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF047_if.py:3:1: RUF047 [*] Empty `else` clause
+  |
+1 |   if False:
+2 |       condition_is_not_evaluated()
+3 | / else:
+4 | |     pass
+  | |________^ RUF047
+  |
+  = help: Remove clause
+
+ℹ Safe fix
+1 1 | if False:
+2 2 |     condition_is_not_evaluated()
+3   |-else:
+4   |-    pass
+5 3 | 
+6 4 | 
+7 5 | if this_comment():
+
+RUF047_if.py:9:1: RUF047 [*] Empty `else` clause
+   |
+ 7 |   if this_comment():
+ 8 |       belongs_to()  # `if`
+ 9 | / else:
+10 | |     ...
+   | |_______^ RUF047
+   |
+   = help: Remove clause
+
+ℹ Safe fix
+6  6  | 
+7  7  | if this_comment():
+8  8  |     belongs_to()  # `if`
+9     |-else:
+10    |-    ...
+11 9  | 
+12 10 | 
+13 11 | if elif_is():
+
+RUF047_if.py:17:1: RUF047 [*] Empty `else` clause
+   |
+15 |   elif the_same():
+16 |       as_if()
+17 | / else:
+18 | |     pass
+   | |________^ RUF047
+   |
+   = help: Remove clause
+
+ℹ Safe fix
+14 14 |     treated()
+15 15 | elif the_same():
+16 16 |     as_if()
+17    |-else:
+18    |-    pass
+19 17 | 
+20 18 | 
+21 19 | if this_second_comment():
