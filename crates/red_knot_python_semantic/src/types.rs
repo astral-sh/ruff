@@ -89,7 +89,7 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
             match inferred_ty {
                 // Symbol is possibly undeclared and definitely unbound
-                Symbol::Unbound => Symbol::Type(declared_ty, Boundness::Bound),
+                Symbol::Unbound => Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
                 // Symbol is possibly undeclared and (possibly) bound
                 Symbol::Type(inferred_ty, boundness) => Symbol::Type(
                     UnionType::from_elements(db, [inferred_ty, declared_ty].iter().copied()),
