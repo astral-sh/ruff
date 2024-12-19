@@ -1,7 +1,6 @@
 ---
 source: crates/red_knot_workspace/src/workspace/metadata.rs
 expression: "&workspace"
-snapshot_kind: text
 ---
 WorkspaceMetadata(
   root: "/app",
@@ -23,6 +22,7 @@ WorkspaceMetadata(
   settings: WorkspaceSettings(
     program: ProgramSettings(
       python_version: "3.9",
+      python_platform: all,
       search_paths: SearchPathSettings(
         extra_paths: [],
         src_root: "/app",
