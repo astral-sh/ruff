@@ -328,7 +328,8 @@ impl<'db> UseDefMap<'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             all_constraints: &self.all_constraints,
-            inner: bindings.iter(&self.all_constraints, &self.visibility_constraints),
+            all_visibility_constraints: &self.visibility_constraints,
+            inner: bindings.iter(),
         }
     }
 
@@ -338,7 +339,9 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
-            inner: declarations.iter(&self.all_constraints, &self.visibility_constraints),
+            all_constraints: &self.all_constraints,
+            visibility_constraints: &self.visibility_constraints,
+            inner: declarations.iter(),
         }
     }
 }
@@ -354,7 +357,8 @@ enum SymbolDefinitions {
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     all_constraints: &'map AllConstraints<'db>,
-    inner: BindingIdWithConstraintsIterator<'map, 'db>,
+    all_visibility_constraints: &'map VisibilityConstraints,
+    inner: BindingIdWithConstraintsIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
@@ -371,8 +375,8 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                     all_constraints,
                     constraint_ids: binding_id_with_constraints.constraint_ids,
                 },
-                all_constraints: binding_id_with_constraints.all_constraints,
-                visibility_constraints: binding_id_with_constraints.visibility_constraints,
+                all_constraints: self.all_constraints,
+                visibility_constraints: self.all_visibility_constraints,
                 visibility_constraint: binding_id_with_constraints.visibility_constraint,
             })
     }
@@ -407,7 +411,9 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
-    inner: DeclarationIdIterator<'map, 'db>,
+    all_constraints: &'map AllConstraints<'db>,
+    visibility_constraints: &'map VisibilityConstraints,
+    inner: DeclarationIdIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
@@ -419,16 +425,14 @@ impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
     );
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(
-            |(def_id, all_constraints, visibility_constraints, visibility_constraint_id)| {
-                (
-                    self.all_definitions[def_id],
-                    all_constraints,
-                    visibility_constraints,
-                    visibility_constraint_id,
-                )
-            },
-        )
+        self.inner.next().map(|(def_id, visibility_constraint_id)| {
+            (
+                self.all_definitions[def_id],
+                self.all_constraints,
+                self.visibility_constraints,
+                visibility_constraint_id,
+            )
+        })
     }
 }
 
