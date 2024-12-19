@@ -1,4 +1,6 @@
-# Class attributes
+# Attributes
+
+Tests for attribute access on various kinds of types.
 
 ## Union of attributes
 
@@ -154,4 +156,68 @@ reveal_type(f.__class__)  # revealed: Literal[FunctionType]
 class Foo: ...
 
 reveal_type(Foo.__class__)  # revealed: Literal[type]
+```
+
+## Function-literal attributes
+
+Most attribute accesses on function-literal types are delegated to `types.FunctionType`, since all
+functions are instances of that class:
+
+```py path=a.py
+def f(): ...
+
+reveal_type(f.__defaults__)  # revealed: @Todo(instance attributes)
+reveal_type(f.__kwdefaults__)  # revealed: @Todo(instance attributes)
+```
+
+Some attributes are special-cased, however:
+
+```py path=b.py
+def f(): ...
+
+reveal_type(f.__get__)  # revealed: @Todo(`__get__` method on functions)
+reveal_type(f.__call__)  # revealed: @Todo(`__call__` method on functions)
+```
+
+## Int-literal attributes
+
+Most attribute accesses on int-literal types are delegated to `builtins.int`, since all literal
+integers are instances of that class:
+
+```py path=a.py
+reveal_type((2).bit_length)  # revealed: @Todo(instance attributes)
+reveal_type((2).denominator)  # revealed: @Todo(instance attributes)
+```
+
+Some attributes are special-cased, however:
+
+```py path=b.py
+reveal_type((2).numerator)  # revealed: Literal[2]
+reveal_type((2).real)  # revealed: Literal[2]
+```
+
+## Literal `bool` attributes
+
+Most attribute accesses on bool-literal types are delegated to `builtins.bool`, since all literal
+bols are instances of that class:
+
+```py path=a.py
+reveal_type(True.__and__)  # revealed: @Todo(instance attributes)
+reveal_type(False.__or__)  # revealed: @Todo(instance attributes)
+```
+
+Some attributes are special-cased, however:
+
+```py path=b.py
+reveal_type(True.numerator)  # revealed: Literal[1]
+reveal_type(False.real)  # revealed: Literal[0]
+```
+
+## Bytes-literal attributes
+
+All attribute access on literal `bytes` types is currently delegated to `buitins.bytes`:
+
+```py
+reveal_type(b"foo".join)  # revealed: @Todo(instance attributes)
+reveal_type(b"foo".endswith)  # revealed: @Todo(instance attributes)
 ```

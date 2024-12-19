@@ -1459,10 +1459,15 @@ impl<'db> Type<'db> {
 
         match self {
             Type::Any | Type::Unknown | Type::Todo(_) => self.into(),
+
             Type::Never => todo_type!("attribute lookup on Never").into(),
-            Type::FunctionLiteral(_) => {
-                todo_type!("Attribute access on `FunctionLiteral` types").into()
-            }
+
+            Type::FunctionLiteral(_) => match name {
+                "__get__" => todo_type!("`__get__` method on functions").into(),
+                "__call__" => todo_type!("`__call__` method on functions").into(),
+                _ => KnownClass::FunctionType.to_instance(db).member(db, name),
+            },
+
             Type::ModuleLiteral(module_ref) => {
                 // `__dict__` is a very special member that is never overridden by module globals;
                 // we should always look it up directly as an attribute on `types.ModuleType`,
@@ -1522,9 +1527,13 @@ impl<'db> Type<'db> {
                     global_lookup
                 }
             }
+
             Type::ClassLiteral(class_ty) => class_ty.member(db, name),
+
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.member(db, name),
+
             Type::KnownInstance(known_instance) => known_instance.member(db, name),
+
             Type::Instance(InstanceType { class }) => {
                 let ty = match (class.known(db), name) {
                     (Some(KnownClass::VersionInfo), "major") => {
@@ -1538,6 +1547,7 @@ impl<'db> Type<'db> {
                 };
                 ty.into()
             }
+
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
 
@@ -1573,41 +1583,55 @@ impl<'db> Type<'db> {
                     )
                 }
             }
+
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
                 todo_type!("Attribute access on `Intersection` types").into()
             }
-            Type::IntLiteral(_) => todo_type!("Attribute access on `IntLiteral` types").into(),
-            Type::BooleanLiteral(_) => {
-                todo_type!("Attribute access on `BooleanLiteral` types").into()
-            }
+
+            Type::IntLiteral(_) => match name {
+                "real" | "numerator" => self.into(),
+                // TODO more attributes could probably be usefully special-cased
+                _ => KnownClass::Int.to_instance(db).member(db, name),
+            },
+
+            Type::BooleanLiteral(bool_value) => match name {
+                "real" | "numerator" => Type::IntLiteral(i64::from(*bool_value)).into(),
+                _ => KnownClass::Bool.to_instance(db).member(db, name),
+            },
+
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
                 todo_type!("Attribute access on `StringLiteral` types").into()
             }
+
             Type::LiteralString => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
                 todo_type!("Attribute access on `LiteralString` types").into()
             }
-            Type::BytesLiteral(_) => {
-                // TODO defer to Type::Instance(<bytes from typeshed>).member
-                todo_type!("Attribute access on `BytesLiteral` types").into()
-            }
-            Type::SliceLiteral(_) => {
-                // TODO defer to `builtins.slice` methods
-                todo_type!("Attribute access on `SliceLiteral` types").into()
-            }
+
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).member(db, name),
+
+            // We could plausibly special-case `start`, `step`, and `stop` here,
+            // but it doesn't seem worth the complexity given the very narrow range of places
+            // where we infer `SliceLiteral` types.
+            Type::SliceLiteral(_) => KnownClass::Slice.to_instance(db).member(db, name),
+
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
                 todo_type!("Attribute access on heterogeneous tuple types").into()
             }
-            Type::AlwaysTruthy | Type::AlwaysFalsy => {
-                // TODO return `Callable[[], Literal[True/False]]` for `__bool__` access
-                KnownClass::Object.to_instance(db).member(db, name)
-            }
+
+            Type::AlwaysTruthy | Type::AlwaysFalsy => match name {
+                "__bool__" => {
+                    // TODO should be `Callable[[], Literal[True/False]]`
+                    todo_type!("`__bool__` for `AlwaysTruthy`/`AlwaysFalsy` Type variants").into()
+                }
+                _ => KnownClass::Object.to_instance(db).member(db, name),
+            },
         }
     }
 
