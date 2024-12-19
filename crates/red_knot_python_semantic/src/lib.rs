@@ -5,7 +5,7 @@ use rustc_hash::FxHasher;
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 pub use db::Db;
 pub use module_name::ModuleName;
-pub use module_resolver::{resolve_module, system_module_search_paths, Module};
+pub use module_resolver::{resolve_module, system_module_search_paths, KnownModule, Module};
 pub use program::{Program, ProgramSettings, SearchPathSettings, SitePackages};
 pub use python_version::PythonVersion;
 pub use semantic_model::{HasTy, SemanticModel};

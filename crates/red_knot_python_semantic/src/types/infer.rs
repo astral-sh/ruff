@@ -1036,7 +1036,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let function_kind = KnownFunction::from_definition(self.db(), definition, name);
+        let function_kind =
+            KnownFunction::try_from_definition_and_name(self.db(), definition, name);
 
         let body_scope = self
             .index
@@ -1251,7 +1252,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class_node))
             .to_scope_id(self.db(), self.file());
 
-        let maybe_known_class = KnownClass::try_from_file(self.db(), self.file(), name);
+        let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
         let class = Class::new(self.db(), &name.id, body_scope, maybe_known_class);
         let class_ty = Type::class_literal(class);
@@ -1849,9 +1850,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             TargetKind::Name => value_ty,
         };
 
-        if let Some(known_instance) = file_to_module(self.db(), definition.file(self.db()))
-            .as_ref()
-            .and_then(|module| KnownInstanceType::try_from_module_and_symbol(module, &name.id))
+        if let Some(known_instance) =
+            KnownInstanceType::try_from_file_and_name(self.db(), self.file(), &name.id)
         {
             target_ty = Type::KnownInstance(known_instance);
         }
@@ -1901,12 +1901,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Type::Instance(InstanceType { class }) = annotation_ty {
             if class.is_known(self.db(), KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
-                    if let Some(known_instance) = file_to_module(self.db(), self.file())
-                        .as_ref()
-                        .and_then(|module| {
-                            KnownInstanceType::try_from_module_and_symbol(module, &name_expr.id)
-                        })
-                    {
+                    if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
+                        self.db(),
+                        self.file(),
+                        &name_expr.id,
+                    ) {
                         annotation_ty = Type::KnownInstance(known_instance);
                     }
                 }
