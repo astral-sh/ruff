@@ -43,7 +43,7 @@
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use crate::semantic_index::{use_def::VisibilityConstraints, AllConstraints};
+use crate::semantic_index::use_def::VisibilityConstraints;
 
 use super::bitset::{BitSet, BitSetIterator};
 use ruff_index::newtype_index;
@@ -151,14 +151,8 @@ impl SymbolDeclarations {
     }
 
     /// Return an iterator over live declarations for this symbol.
-    pub(super) fn iter<'map, 'db>(
-        &'map self,
-        all_constraints: &'map AllConstraints<'db>,
-        visibility_constraints: &'map VisibilityConstraints,
-    ) -> DeclarationIdIterator<'map, 'db> {
+    pub(super) fn iter<'map, 'db>(&'map self) -> DeclarationIdIterator<'map> {
         DeclarationIdIterator {
-            all_constraints,
-            visibility_constraints,
             declarations_iter: self.live_declarations.iter(),
             visibility_constraints_iter: self.visibility_constraints.iter(),
         }
@@ -222,14 +216,8 @@ impl SymbolBindings {
     }
 
     /// Iterate over currently live bindings for this symbol
-    pub(super) fn iter<'map, 'db>(
-        &'map self,
-        all_constraints: &'map AllConstraints<'db>,
-        visibility_constraints: &'map VisibilityConstraints,
-    ) -> BindingIdWithConstraintsIterator<'map, 'db> {
+    pub(super) fn iter<'map>(&'map self) -> BindingIdWithConstraintsIterator<'map> {
         BindingIdWithConstraintsIterator {
-            all_constraints,
-            visibility_constraints,
             definitions: self.live_bindings.iter(),
             constraints: self.constraints.iter(),
             visibility_constraints_iter: self.visibility_constraints.iter(),
@@ -504,25 +492,21 @@ impl SymbolState {
 /// A single binding (as [`ScopedDefinitionId`]) with an iterator of its applicable
 /// [`ScopedConstraintId`].
 #[derive(Debug)]
-pub(super) struct BindingIdWithConstraints<'map, 'db> {
+pub(super) struct BindingIdWithConstraints<'map> {
     pub(super) definition: ScopedDefinitionId,
     pub(super) constraint_ids: ConstraintIdIterator<'map>,
-    pub(super) all_constraints: &'map AllConstraints<'db>,
-    pub(super) visibility_constraints: &'map VisibilityConstraints,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
 #[derive(Debug)]
-pub(super) struct BindingIdWithConstraintsIterator<'map, 'db> {
-    all_constraints: &'map AllConstraints<'db>,
-    visibility_constraints: &'map VisibilityConstraints,
+pub(super) struct BindingIdWithConstraintsIterator<'map> {
     definitions: BindingsIterator<'map>,
     constraints: ConstraintsIterator<'map>,
     visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
 }
 
-impl<'map, 'db> Iterator for BindingIdWithConstraintsIterator<'map, 'db> {
-    type Item = BindingIdWithConstraints<'map, 'db>;
+impl<'map, 'db> Iterator for BindingIdWithConstraintsIterator<'map> {
+    type Item = BindingIdWithConstraints<'map>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match (
@@ -537,8 +521,6 @@ impl<'map, 'db> Iterator for BindingIdWithConstraintsIterator<'map, 'db> {
                     constraint_ids: ConstraintIdIterator {
                         wrapped: constraints.iter(),
                     },
-                    all_constraints: self.all_constraints,
-                    visibility_constraints: self.visibility_constraints,
                     visibility_constraint: *visibility_constraint_id,
                 })
             }
@@ -548,7 +530,7 @@ impl<'map, 'db> Iterator for BindingIdWithConstraintsIterator<'map, 'db> {
     }
 }
 
-impl std::iter::FusedIterator for BindingIdWithConstraintsIterator<'_, '_> {}
+impl std::iter::FusedIterator for BindingIdWithConstraintsIterator<'_> {}
 
 #[derive(Debug)]
 pub(super) struct ConstraintIdIterator<'a> {
@@ -565,20 +547,13 @@ impl Iterator for ConstraintIdIterator<'_> {
 
 impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
-pub(super) struct DeclarationIdIterator<'map, 'db> {
-    pub(crate) all_constraints: &'map AllConstraints<'db>,
-    pub(crate) visibility_constraints: &'map VisibilityConstraints,
+pub(super) struct DeclarationIdIterator<'map> {
     pub(crate) declarations_iter: DeclarationsIterator<'map>,
     pub(crate) visibility_constraints_iter: VisibilityConstraintsIterator<'map>,
 }
 
-impl<'map, 'db> Iterator for DeclarationIdIterator<'map, 'db> {
-    type Item = (
-        ScopedDefinitionId,
-        &'map AllConstraints<'db>,
-        &'map VisibilityConstraints,
-        ScopedVisibilityConstraintId,
-    );
+impl<'map> Iterator for DeclarationIdIterator<'map> {
+    type Item = (ScopedDefinitionId, ScopedVisibilityConstraintId);
 
     fn next(&mut self) -> Option<Self::Item> {
         match (
@@ -588,8 +563,6 @@ impl<'map, 'db> Iterator for DeclarationIdIterator<'map, 'db> {
             (None, None) => None,
             (Some(declaration), Some(visibility_constraints_id)) => Some((
                 ScopedDefinitionId::from_u32(declaration),
-                self.all_constraints,
-                self.visibility_constraints,
                 *visibility_constraints_id,
             )),
             // SAFETY: see above.
@@ -598,22 +571,17 @@ impl<'map, 'db> Iterator for DeclarationIdIterator<'map, 'db> {
     }
 }
 
-impl std::iter::FusedIterator for DeclarationIdIterator<'_, '_> {}
+impl std::iter::FusedIterator for DeclarationIdIterator<'_> {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[track_caller]
-    fn assert_bindings(
-        constraints: &AllConstraints<'_>,
-        visibility_constraints: &VisibilityConstraints,
-        symbol: &SymbolState,
-        expected: &[&str],
-    ) {
+    fn assert_bindings(symbol: &SymbolState, expected: &[&str]) {
         let actual = symbol
             .bindings()
-            .iter(constraints, visibility_constraints)
+            .iter()
             .map(|def_id_with_constraints| {
                 let def_id = def_id_with_constraints.definition;
                 let def = if def_id == ScopedDefinitionId::UNBOUND {
@@ -634,16 +602,11 @@ mod tests {
     }
 
     #[track_caller]
-    pub(crate) fn assert_declarations(
-        constraints: &AllConstraints<'_>,
-        visibility_constraints: &VisibilityConstraints,
-        symbol: &SymbolState,
-        expected: &[&str],
-    ) {
+    pub(crate) fn assert_declarations(symbol: &SymbolState, expected: &[&str]) {
         let actual = symbol
             .declarations()
-            .iter(constraints, visibility_constraints)
-            .map(|(def_id, _, _, _)| {
+            .iter()
+            .map(|(def_id, _)| {
                 if def_id == ScopedDefinitionId::UNBOUND {
                     "undeclared".into()
                 } else {
@@ -656,37 +619,30 @@ mod tests {
 
     #[test]
     fn unbound() {
-        let constraints = AllConstraints::new();
-        let visibility_constraints = VisibilityConstraints::new();
         let sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
 
-        assert_bindings(&constraints, &visibility_constraints, &sym, &["unbound<>"]);
+        assert_bindings(&sym, &["unbound<>"]);
     }
 
     #[test]
     fn with() {
-        let constraints = AllConstraints::new();
-        let visibility_constraints = VisibilityConstraints::new();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_binding(ScopedDefinitionId::from_u32(1));
 
-        assert_bindings(&constraints, &visibility_constraints, &sym, &["1<>"]);
+        assert_bindings(&sym, &["1<>"]);
     }
 
     #[test]
     fn record_constraint() {
-        let constraints = AllConstraints::new();
-        let visibility_constraints = VisibilityConstraints::new();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_binding(ScopedDefinitionId::from_u32(1));
         sym.record_constraint(ScopedConstraintId::from_u32(0));
 
-        assert_bindings(&constraints, &visibility_constraints, &sym, &["1<0>"]);
+        assert_bindings(&sym, &["1<0>"]);
     }
 
     #[test]
     fn merge() {
-        let constraints = AllConstraints::new();
         let mut visibility_constraints = VisibilityConstraints::new();
 
         // merging the same definition with the same constraint keeps the constraint
@@ -700,7 +656,7 @@ mod tests {
 
         sym1a.merge(sym1b, &mut visibility_constraints);
         let mut sym1 = sym1a;
-        assert_bindings(&constraints, &visibility_constraints, &sym1, &["1<0>"]);
+        assert_bindings(&sym1, &["1<0>"]);
 
         // merging the same definition with differing constraints drops all constraints
         let mut sym2a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
@@ -713,7 +669,7 @@ mod tests {
 
         sym2a.merge(sym1b, &mut visibility_constraints);
         let sym2 = sym2a;
-        assert_bindings(&constraints, &visibility_constraints, &sym2, &["2<>"]);
+        assert_bindings(&sym2, &["2<>"]);
 
         // merging a constrained definition with unbound keeps both
         let mut sym3a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
@@ -724,57 +680,40 @@ mod tests {
 
         sym3a.merge(sym2b, &mut visibility_constraints);
         let sym3 = sym3a;
-        assert_bindings(
-            &constraints,
-            &visibility_constraints,
-            &sym3,
-            &["unbound<>", "3<3>"],
-        );
+        assert_bindings(&sym3, &["unbound<>", "3<3>"]);
 
         // merging different definitions keeps them each with their existing constraints
         sym1.merge(sym3, &mut visibility_constraints);
         let sym = sym1;
-        assert_bindings(
-            &constraints,
-            &visibility_constraints,
-            &sym,
-            &["unbound<>", "1<0>", "3<3>"],
-        );
+        assert_bindings(&sym, &["unbound<>", "1<0>", "3<3>"]);
     }
 
     #[test]
     fn no_declaration() {
-        let constraints = AllConstraints::new();
-        let visibility_constraints = VisibilityConstraints::new();
         let sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
 
-        assert_declarations(&constraints, &visibility_constraints, &sym, &["undeclared"]);
+        assert_declarations(&sym, &["undeclared"]);
     }
 
     #[test]
     fn record_declaration() {
-        let constraints = AllConstraints::new();
-        let visibility_constraints = VisibilityConstraints::new();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
-        assert_declarations(&constraints, &visibility_constraints, &sym, &["1"]);
+        assert_declarations(&sym, &["1"]);
     }
 
     #[test]
     fn record_declaration_override() {
-        let constraints = AllConstraints::new();
-        let visibility_constraints = VisibilityConstraints::new();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
         sym.record_declaration(ScopedDefinitionId::from_u32(2));
 
-        assert_declarations(&constraints, &visibility_constraints, &sym, &["2"]);
+        assert_declarations(&sym, &["2"]);
     }
 
     #[test]
     fn record_declaration_merge() {
-        let constraints = AllConstraints::new();
         let mut visibility_constraints = VisibilityConstraints::new();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
@@ -784,12 +723,11 @@ mod tests {
 
         sym.merge(sym2, &mut visibility_constraints);
 
-        assert_declarations(&constraints, &visibility_constraints, &sym, &["1", "2"]);
+        assert_declarations(&sym, &["1", "2"]);
     }
 
     #[test]
     fn record_declaration_merge_partial_undeclared() {
-        let constraints = AllConstraints::new();
         let mut visibility_constraints = VisibilityConstraints::new();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
@@ -798,11 +736,6 @@ mod tests {
 
         sym.merge(sym2, &mut visibility_constraints);
 
-        assert_declarations(
-            &constraints,
-            &visibility_constraints,
-            &sym,
-            &["undeclared", "1"],
-        );
+        assert_declarations(&sym, &["undeclared", "1"]);
     }
 }
