@@ -105,24 +105,39 @@ pub enum Command {
     Server,
 }
 
-use oxidd::bdd::BDDFunction;
 use oxidd::tdd::TDDFunction;
-use oxidd::BooleanFunction;
 use oxidd::ManagerRef;
 use oxidd::TVLFunction;
+use oxidd_core::Manager;
+use oxidd_dump::dot::dump_all;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
     let mgr = oxidd::tdd::new_manager(24, 24, 1);
-    let (x, y, z) = mgr.with_manager_exclusive(|mgr| {
+    let (x, y) = mgr.with_manager_exclusive(|mgr| {
         (
-            TDDFunction::new_var(mgr).unwrap(),
             TDDFunction::new_var(mgr).unwrap(),
             TDDFunction::new_var(mgr).unwrap(),
         )
     });
-    let res = x.and(&y).unwrap().or(&z).unwrap();
-    dbg!(res.eval([(&x, false), (&y, true), (&z, false)]));
+    mgr.with_manager_shared(|manager| {
+        let res = x
+            .or(&y.and(&x.not().unwrap()).unwrap())
+            .unwrap()
+            .or(&y.not().unwrap().and(&x.not().unwrap()).unwrap())
+            .unwrap();
+
+        manager.gc();
+
+        let file = std::fs::File::create("tdd.dot").expect("could not create `tdd.dot`");
+        dump_all(
+            file,
+            manager,
+            [(&x, "x"), (&y, "y")],
+            [(&res, "x ∨ (y ∧ ~x) ∨ (~y ∧ ~x)")],
+        )
+        .expect("dot export failed");
+    });
     panic!("FOO");
     run().unwrap_or_else(|error| {
         use std::io::Write;

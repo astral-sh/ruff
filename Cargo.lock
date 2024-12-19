@@ -2519,6 +2519,8 @@ dependencies = [
  "ctrlc",
  "filetime",
  "oxidd",
+ "oxidd-core",
+ "oxidd-dump",
  "rayon",
  "red_knot_python_semantic",
  "red_knot_server",
