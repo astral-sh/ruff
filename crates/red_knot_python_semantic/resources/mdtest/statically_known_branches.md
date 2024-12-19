@@ -160,6 +160,34 @@ both_checks_true
 other
 ```
 
+## Based on type inference
+
+For the the rest of this test suite, we will mostly use `True` and `False` literals to indicate
+statically known conditions, but here, we show that the results are truly based on type inference,
+not some special handling of specific conditions in semantic index building. We use two modules to
+demonstrate this, since semantic index building is inherently single-module:
+
+```py path=module.py
+class AlwaysTrue:
+    def __bool__(self) -> Literal[True]:
+        return True
+```
+
+```py
+from module import AlwaysTrue
+
+if AlwaysTrue():
+    yes = True
+else:
+    no = True
+
+# no error
+yes
+
+# error: [unresolved-reference]
+no
+```
+
 ## If statements
 
 The rest of this document contains tests for various control flow elements. This section tests `if`
