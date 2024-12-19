@@ -943,6 +943,20 @@ else:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
+#### `while False` with `break`
+
+```py
+x = 1
+while False:
+    x = 2
+    break
+    x = 3
+else:
+    x = 4
+
+reveal_type(x)  # revealed: Literal[4]
+```
+
 #### `while True`
 
 ```py
