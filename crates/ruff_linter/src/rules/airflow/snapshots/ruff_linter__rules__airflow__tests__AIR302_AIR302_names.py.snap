@@ -894,6 +894,8 @@ AIR302_names.py:255:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields`
 254 | # airflow.www.utils
 255 | get_sensitive_variables_fields, should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+256 | 
+257 | from airflow.datasets.manager import DatasetManager
     |
     = help: Use `airflow.utils.log.secrets_masker.get_sensitive_variables_fields` instead
 
@@ -902,5 +904,106 @@ AIR302_names.py:255:33: AIR302 `airflow.www.utils.should_hide_value_for_key` is 
 254 | # airflow.www.utils
 255 | get_sensitive_variables_fields, should_hide_value_for_key
     |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+256 | 
+257 | from airflow.datasets.manager import DatasetManager
     |
     = help: Use `airflow.utils.log.secrets_masker.should_hide_value_for_key` instead
+
+AIR302_names.py:260:4: AIR302 `register_dataset_change` is removed in Airflow 3.0
+    |
+259 | dm = DatasetManager()
+260 | dm.register_dataset_change()
+    |    ^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+261 | dm.create_datasets()
+262 | dm.notify_dataset_created()
+    |
+    = help: Use `register_asset_change` instead
+
+AIR302_names.py:261:4: AIR302 `create_datasets` is removed in Airflow 3.0
+    |
+259 | dm = DatasetManager()
+260 | dm.register_dataset_change()
+261 | dm.create_datasets()
+    |    ^^^^^^^^^^^^^^^ AIR302
+262 | dm.notify_dataset_created()
+263 | dm.notify_dataset_changed()
+    |
+    = help: Use `create_assets` instead
+
+AIR302_names.py:262:4: AIR302 `notify_dataset_created` is removed in Airflow 3.0
+    |
+260 | dm.register_dataset_change()
+261 | dm.create_datasets()
+262 | dm.notify_dataset_created()
+    |    ^^^^^^^^^^^^^^^^^^^^^^ AIR302
+263 | dm.notify_dataset_changed()
+264 | dm.notify_dataset_alias_created()
+    |
+    = help: Use `notify_asset_created` instead
+
+AIR302_names.py:263:4: AIR302 `notify_dataset_changed` is removed in Airflow 3.0
+    |
+261 | dm.create_datasets()
+262 | dm.notify_dataset_created()
+263 | dm.notify_dataset_changed()
+    |    ^^^^^^^^^^^^^^^^^^^^^^ AIR302
+264 | dm.notify_dataset_alias_created()
+    |
+    = help: Use `notify_asset_changed` instead
+
+AIR302_names.py:264:4: AIR302 `notify_dataset_alias_created` is removed in Airflow 3.0
+    |
+262 | dm.notify_dataset_created()
+263 | dm.notify_dataset_changed()
+264 | dm.notify_dataset_alias_created()
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Use `notify_asset_alias_created` instead
+
+AIR302_names.py:270:5: AIR302 `create_dataset` is removed in Airflow 3.0
+    |
+269 | hlc = HookLineageCollector()
+270 | hlc.create_dataset()
+    |     ^^^^^^^^^^^^^^ AIR302
+271 | hlc.add_input_dataset()
+272 | hlc.add_output_dataset()
+    |
+    = help: Use `create_asset` instead
+
+AIR302_names.py:271:5: AIR302 `add_input_dataset` is removed in Airflow 3.0
+    |
+269 | hlc = HookLineageCollector()
+270 | hlc.create_dataset()
+271 | hlc.add_input_dataset()
+    |     ^^^^^^^^^^^^^^^^^ AIR302
+272 | hlc.add_output_dataset()
+273 | hlc.collected_datasets()
+    |
+    = help: Use `add_input_asset` instead
+
+AIR302_names.py:272:5: AIR302 `add_output_dataset` is removed in Airflow 3.0
+    |
+270 | hlc.create_dataset()
+271 | hlc.add_input_dataset()
+272 | hlc.add_output_dataset()
+    |     ^^^^^^^^^^^^^^^^^^ AIR302
+273 | hlc.collected_datasets()
+    |
+    = help: Use `add_output_asset` instead
+
+AIR302_names.py:273:5: AIR302 `collected_datasets` is removed in Airflow 3.0
+    |
+271 | hlc.add_input_dataset()
+272 | hlc.add_output_dataset()
+273 | hlc.collected_datasets()
+    |     ^^^^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Use `collected_assets` instead
+
+AIR302_names.py:279:5: AIR302 `is_authorized_dataset` is removed in Airflow 3.0
+    |
+278 | aam = AwsAuthManager()
+279 | aam.is_authorized_dataset()
+    |     ^^^^^^^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Use `is_authorized_asset` instead
