@@ -1,5 +1,6 @@
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::expression::Expression;
@@ -41,7 +42,7 @@ pub(crate) struct Unpack<'db> {
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
     #[no_eq]
-    pub(crate) value: Expression<'db>,
+    pub(crate) value: UnpackValue<'db>,
 
     #[no_eq]
     count: countme::Count<Unpack<'static>>,
@@ -51,5 +52,28 @@ impl<'db> Unpack<'db> {
     /// Returns the scope where the unpacking is happening.
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+
+    /// Returns the range of the unpack target expression.
+    pub(crate) fn range(self, db: &'db dyn Db) -> TextRange {
+        self.target(db).range()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum UnpackValue<'db> {
+    Iterable(Expression<'db>),
+    Assign(Expression<'db>),
+}
+
+impl<'db> UnpackValue<'db> {
+    pub(crate) const fn is_iterable(self) -> bool {
+        matches!(self, UnpackValue::Iterable(_))
+    }
+
+    pub(crate) const fn expression(self) -> Expression<'db> {
+        match self {
+            UnpackValue::Assign(expr) | UnpackValue::Iterable(expr) => expr,
+        }
     }
 }

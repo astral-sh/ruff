@@ -8,7 +8,8 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{todo_type, Type, TypeCheckDiagnostics};
+use crate::types::{infer_expression_types, todo_type, Type, TypeCheckDiagnostics};
+use crate::unpack::UnpackValue;
 use crate::Db;
 
 use super::context::{InferContext, WithDiagnostics};
@@ -35,11 +36,24 @@ impl<'db> Unpacker<'db> {
     }
 
     /// Unpack the value type to the target expression.
-    pub(crate) fn unpack(&mut self, target: &ast::Expr, value_ty: Type<'db>) {
+    pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         debug_assert!(
             matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
             "Unpacking target must be a list or tuple expression"
         );
+
+        let expression = value.expression();
+        let mut value_ty = infer_expression_types(self.db(), expression).expression_ty(
+            expression
+                .node_ref(self.db())
+                .scoped_expression_id(self.db(), self.scope),
+        );
+        if value.is_iterable() {
+            value_ty = value_ty.iterate(self.db()).unwrap_with_diagnostic(
+                &self.context,
+                expression.node_ref(self.db()).node().into(),
+            );
+        }
 
         self.unpack_inner(target, value_ty);
     }
