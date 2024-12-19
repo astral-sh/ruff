@@ -1658,8 +1658,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NonPEP695TypeAlias) {
                 pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
             }
-            if let Some(value) = value.as_deref() {
-                if checker.enabled(Rule::HardcodedPasswordString) {
+            if checker.enabled(Rule::HardcodedPasswordString) {
+                if let Some(value) = value.as_deref() {
                     flake8_bandit::rules::assign_hardcoded_password_string(
                         checker,
                         value,
