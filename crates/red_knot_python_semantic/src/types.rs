@@ -267,48 +267,52 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Symbol<'db> {
-    let mut unbound_visibility = Truthiness::AlwaysFalse;
-    let mut types = vec![];
+    let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
-    for BindingWithConstraints {
-        binding,
-        constraints,
+    let unbound_visibility = if let Some(BindingWithConstraints {
+        binding: None,
+        constraints: _,
         visibility_constraints,
         visibility_constraint,
-    } in bindings_with_constraints
+    }) = bindings_with_constraints.peek()
     {
-        let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
+        visibility_constraints.evaluate(db, *visibility_constraint)
+    } else {
+        Truthiness::AlwaysFalse
+    };
 
-        let Some(binding) = binding else {
-            unbound_visibility = static_visibility;
-            continue;
-        };
+    let mut types = bindings_with_constraints.filter_map(
+        |BindingWithConstraints {
+             binding,
+             constraints,
+             visibility_constraints,
+             visibility_constraint,
+         }| {
+            let binding = binding?;
+            let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
 
-        if static_visibility.is_always_false() {
-            continue;
-        }
+            if static_visibility.is_always_false() {
+                return None;
+            }
 
-        let mut constraint_tys = constraints
-            .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
-            .peekable();
+            let mut constraint_tys = constraints
+                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+                .peekable();
 
-        let binding_ty = binding_ty(db, binding);
-        let ty = if constraint_tys.peek().is_some() {
-            let intersection_ty = constraint_tys
-                .fold(
-                    IntersectionBuilder::new(db).add_positive(binding_ty),
-                    IntersectionBuilder::add_positive,
-                )
-                .build();
-            intersection_ty
-        } else {
-            binding_ty
-        };
-
-        types.push(ty);
-    }
-
-    let mut types = types.into_iter();
+            let binding_ty = binding_ty(db, binding);
+            if constraint_tys.peek().is_some() {
+                let intersection_ty = constraint_tys
+                    .fold(
+                        IntersectionBuilder::new(db).add_positive(binding_ty),
+                        IntersectionBuilder::add_positive,
+                    )
+                    .build();
+                Some(intersection_ty)
+            } else {
+                Some(binding_ty)
+            }
+        },
+    );
 
     if let Some(first) = types.next() {
         let boundness = match unbound_visibility {
@@ -352,26 +356,27 @@ fn declarations_ty<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
 ) -> DeclaredTypeResult<'db> {
-    let mut unbound_visibility = Truthiness::AlwaysFalse;
-    let mut types = vec![];
+    let mut declarations = declarations.peekable();
 
-    for (declaration, visibility_constraints, visibility_constraint) in declarations {
-        let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
-
-        let Some(declaration) = declaration else {
-            unbound_visibility = static_visibility;
-            continue;
+    let undeclared_visibility =
+        if let Some((None, visibility_constraints, visibility_constraint)) = declarations.peek() {
+            visibility_constraints.evaluate(db, *visibility_constraint)
+        } else {
+            Truthiness::AlwaysFalse
         };
 
-        if static_visibility.is_always_false() {
-            continue;
-        }
+    let mut types = declarations.filter_map(
+        |(declaration, visibility_constraints, visibility_constraint)| {
+            let declaration = declaration?;
+            let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
 
-        let ty = declaration_ty(db, declaration);
-        types.push(ty);
-    }
-
-    let mut types = types.into_iter();
+            if static_visibility.is_always_false() {
+                None
+            } else {
+                Some(declaration_ty(db, declaration))
+            }
+        },
+    );
 
     if let Some(first) = types.next() {
         let mut conflicting: Vec<Type<'db>> = vec![];
@@ -388,7 +393,7 @@ fn declarations_ty<'db>(
             first
         };
         if conflicting.is_empty() {
-            let boundness = match unbound_visibility {
+            let boundness = match undeclared_visibility {
                 Truthiness::AlwaysTrue => {
                     unreachable!("If we have at least one declaration, the scope-start should not be definitely visible")
                 }
