@@ -5031,7 +5031,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             KnownInstanceType::ReadOnly => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("`Required[]` type qualifier")
+                todo_type!("`ReadOnly[]` type qualifier")
             }
             KnownInstanceType::NotRequired => {
                 self.infer_type_expression(arguments_slice);
