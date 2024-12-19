@@ -1447,7 +1447,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         // TODO: Handle async with statements (they use `aenter` and `aexit`)
         if is_async {
-            return todo_type!("async with statement");
+            return todo_type!("async `with` statement");
         }
 
         let context_manager_ty = context_expression_ty.to_meta_type(self.db());
@@ -1680,7 +1680,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
         } = node;
         self.infer_optional_expression(default.as_deref());
-        self.add_declaration_with_binding(node.into(), definition, todo_type!(), todo_type!());
+        let pep_695_todo = todo_type!("PEP-695 ParamSpec definition types");
+        self.add_declaration_with_binding(node.into(), definition, pep_695_todo, pep_695_todo);
     }
 
     fn infer_typevartuple_definition(
@@ -1694,7 +1695,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             default,
         } = node;
         self.infer_optional_expression(default.as_deref());
-        self.add_declaration_with_binding(node.into(), definition, todo_type!(), todo_type!());
+        let pep_695_todo = todo_type!("PEP-695 TypeVarTuple definition types");
+        self.add_declaration_with_binding(node.into(), definition, pep_695_todo, pep_695_todo);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -1729,7 +1731,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         // against the subject expression type (which we can query via `infer_expression_types`)
         // and extract the type at the `index` position if the pattern matches. This will be
         // similar to the logic in `self.infer_assignment_definition`.
-        self.add_binding(pattern.into(), definition, todo_type!());
+        self.add_binding(
+            pattern.into(),
+            definition,
+            todo_type!("`match` pattern definition types"),
+        );
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
@@ -2483,8 +2489,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
             ast::Expr::IpyEscapeCommand(_) => {
-                // TODO Implement Ipy escape command support
-                todo_type!()
+                todo_type!("Ipy escape command support")
             }
         };
 
@@ -2922,8 +2927,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_parameters(parameters);
         }
 
-        // TODO function type
-        todo_type!()
+        todo_type!("typing.Callable type")
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
@@ -2959,11 +2963,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
         let ast::ExprYield { range: _, value } = yield_expression;
-
         self.infer_optional_expression(value.as_deref());
-
-        // TODO awaitable type
-        todo_type!()
+        todo_type!("yield expressions")
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -2975,16 +2976,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(&self.context, value.as_ref().into());
 
         // TODO get type from `ReturnType` of generator
-        todo_type!()
+        todo_type!("Generic `typing.Generator` type")
     }
 
     fn infer_await_expression(&mut self, await_expression: &ast::ExprAwait) -> Type<'db> {
         let ast::ExprAwait { range: _, value } = await_expression;
-
         self.infer_expression(value);
-
-        // TODO awaitable type
-        todo_type!()
+        todo_type!("generic `typing.Awaitable` type")
     }
 
     /// Look up a name reference that isn't bound in the local scope.
@@ -3521,7 +3519,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (left, Type::BooleanLiteral(bool_value), op) => {
                 self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
             }
-            _ => Some(todo_type!()), // TODO
+            _ => Some(todo_type!("Support for more binary expressions")),
         }
     }
 
@@ -4040,10 +4038,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
             }
-            // TODO: handle more types
             _ => match op {
                 ast::CmpOp::Is | ast::CmpOp::IsNot => Ok(KnownClass::Bool.to_instance(self.db())),
-                _ => Ok(todo_type!()),
+                _ => Ok(todo_type!("Binary comparisons between more types")),
             },
         }
     }
@@ -4795,7 +4792,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             single_element => {
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
-                    todo_type!()
+                    todo_type!("full tuple[...] support")
                 } else {
                     Type::tuple(self.db(), [single_element_ty])
                 }
@@ -5034,39 +5031,39 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             KnownInstanceType::ReadOnly => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("Required[] type qualifier")
+                todo_type!("`Required[]` type qualifier")
             }
             KnownInstanceType::NotRequired => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("NotRequired[] type qualifier")
+                todo_type!("`NotRequired[]` type qualifier")
             }
             KnownInstanceType::ClassVar => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("ClassVar[] type qualifier")
+                todo_type!("`ClassVar[]` type qualifier")
             }
             KnownInstanceType::Final => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("Final[] type qualifier")
+                todo_type!("`Final[]` type qualifier")
             }
             KnownInstanceType::Required => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("Required[] type qualifier")
+                todo_type!("`Required[]` type qualifier")
             }
             KnownInstanceType::TypeIs => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("TypeIs[] special form")
+                todo_type!("`TypeIs[]` special form")
             }
             KnownInstanceType::TypeGuard => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("TypeGuard[] special form")
+                todo_type!("`TypeGuard[]` special form")
             }
             KnownInstanceType::Concatenate => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("Concatenate[] special form")
+                todo_type!("`Concatenate[]` special form")
             }
             KnownInstanceType::Unpack => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("Unpack[] special form")
+                todo_type!("`Unpack[]` special form")
             }
             KnownInstanceType::NoReturn | KnownInstanceType::Never | KnownInstanceType::Any => {
                 self.context.report_lint(

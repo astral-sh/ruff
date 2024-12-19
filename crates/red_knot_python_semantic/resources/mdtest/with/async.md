@@ -17,5 +17,5 @@ class Manager:
 
 async def test():
     async with Manager() as f:
-        reveal_type(f)  # revealed: @Todo(async with statement)
+        reveal_type(f)  # revealed: @Todo(async `with` statement)
 ```

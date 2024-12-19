@@ -73,12 +73,12 @@ qux = (foo, bar)
 reveal_type(qux)  # revealed: tuple[Literal["foo"], Literal["bar"]]
 
 # TODO: Infer "LiteralString"
-reveal_type(foo.join(qux))  # revealed: @Todo(call todo)
+reveal_type(foo.join(qux))  # revealed: @Todo(Attribute access on `StringLiteral` types)
 
 template: LiteralString = "{}, {}"
 reveal_type(template)  # revealed: Literal["{}, {}"]
 # TODO: Infer `LiteralString`
-reveal_type(template.format(foo, bar))  # revealed: @Todo(call todo)
+reveal_type(template.format(foo, bar))  # revealed: @Todo(Attribute access on `StringLiteral` types)
 ```
 
 ### Assignability
