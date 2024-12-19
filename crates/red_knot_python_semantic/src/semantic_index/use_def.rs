@@ -442,7 +442,7 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
-    unbound_visibility: ScopedVisibilityConstraintId,
+    scope_start_visibility: ScopedVisibilityConstraintId,
 }
 
 #[derive(Debug)]
@@ -457,8 +457,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     visibility_constraints: VisibilityConstraints,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
-    /// whether or not the start of the scope is visible.
-    unbound_visibility: ScopedVisibilityConstraintId,
+    /// whether or not the start of the scope is visible. This is important for cases like
+    /// `if True: x = 1; use(x)` where we need to hide the implicit "x = unbound" binding
+    /// in the "else" branch.
+    scope_start_visibility: ScopedVisibilityConstraintId,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -476,7 +478,7 @@ impl<'db> UseDefMapBuilder<'db> {
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
             visibility_constraints: VisibilityConstraints::new(),
-            unbound_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
@@ -486,7 +488,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
         let new_symbol = self
             .symbol_states
-            .push(SymbolState::undefined(self.unbound_visibility));
+            .push(SymbolState::undefined(self.scope_start_visibility));
         debug_assert_eq!(symbol, new_symbol);
     }
 
@@ -531,9 +533,9 @@ impl<'db> UseDefMapBuilder<'db> {
             state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
         }
 
-        self.unbound_visibility = self
+        self.scope_start_visibility = self
             .visibility_constraints
-            .add_and_constraint(self.unbound_visibility, constraint);
+            .add_and_constraint(self.scope_start_visibility, constraint);
     }
 
     pub(super) fn record_visibility_constraint(
@@ -549,7 +551,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let num_symbols = self.symbol_states.len();
         debug_assert!(num_symbols >= snapshot.symbol_states.len());
 
-        self.unbound_visibility = snapshot.unbound_visibility;
+        self.scope_start_visibility = snapshot.scope_start_visibility;
 
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
@@ -600,7 +602,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
             symbol_states: self.symbol_states.clone(),
-            unbound_visibility: self.unbound_visibility,
+            scope_start_visibility: self.scope_start_visibility,
         }
     }
 
@@ -614,13 +616,15 @@ impl<'db> UseDefMapBuilder<'db> {
 
         // Restore the current visible-definitions state to the given snapshot.
         self.symbol_states = snapshot.symbol_states;
-        self.unbound_visibility = snapshot.unbound_visibility;
+        self.scope_start_visibility = snapshot.scope_start_visibility;
 
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
         // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
-        self.symbol_states
-            .resize(num_symbols, SymbolState::undefined(self.unbound_visibility));
+        self.symbol_states.resize(
+            num_symbols,
+            SymbolState::undefined(self.scope_start_visibility),
+        );
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -638,16 +642,16 @@ impl<'db> UseDefMapBuilder<'db> {
                 current.merge(snapshot, &mut self.visibility_constraints);
             } else {
                 current.merge(
-                    SymbolState::undefined(snapshot.unbound_visibility),
+                    SymbolState::undefined(snapshot.scope_start_visibility),
                     &mut self.visibility_constraints,
                 );
                 // Symbol not present in snapshot, so it's unbound/undeclared from that path.
             }
         }
 
-        self.unbound_visibility = self
+        self.scope_start_visibility = self
             .visibility_constraints
-            .add_or_constraint(self.unbound_visibility, snapshot.unbound_visibility);
+            .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
