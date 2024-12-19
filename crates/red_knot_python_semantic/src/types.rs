@@ -91,7 +91,7 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
             match inferred_ty {
                 // Symbol is possibly undeclared and definitely unbound
                 Symbol::Unbound => Symbol::Type(declared_ty, Boundness::Bound),
-                // Symbol is possibly undeclared and possibly bound
+                // Symbol is possibly undeclared and definitely bound
                 inferred @ Symbol::Type(_, Boundness::Bound) => inferred,
                 // Symbol is possibly undeclared and possibly unbound
                 Symbol::Type(inferred_ty, Boundness::PossiblyUnbound) => Symbol::Type(
