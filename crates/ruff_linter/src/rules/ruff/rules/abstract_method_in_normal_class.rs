@@ -60,6 +60,9 @@ use crate::checkers::ast::Checker;
 /// print(str(fb))  # message='hello goodbye'
 /// ```
 ///
+/// ## Known problems
+/// Does not check for base and metaclasses defined in different files.
+///
 /// ## Example
 ///
 /// ```python
@@ -110,7 +113,7 @@ pub(crate) fn abstract_method_in_normal_class(checker: &mut Checker, class: &Stm
         return;
     }
 
-    if is_abstract_class(class, checker.semantic()) {
+    if might_be_abstract(class, checker.semantic()) {
         return;
     }
 
@@ -119,21 +122,21 @@ pub(crate) fn abstract_method_in_normal_class(checker: &mut Checker, class: &Stm
     }
 }
 
-/// Returns false if a class is definitely not an abstract class.
+/// Returns false if the class is definitely not an abstract class.
 ///
 /// A class is considered abstract when it inherits from a class
 /// created by `abc.ABCMeta` without implementing all abstract methods.
 ///
 /// Thus, a class is *not* abstract when all of its bases are:
 /// * Inspectable
-/// * Does not have a metaclass that inherits from `abc.ABCMeta`
-fn is_abstract_class(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
-    if is_metaclass_abcmeta(class_def, semantic) {
+/// * Do not have a metaclass that inherits from `abc.ABCMeta`
+fn might_be_abstract(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
+    if metaclass_might_be_abcmeta(class_def, semantic) {
         return true;
     }
 
     any_base_class(class_def, semantic, &mut |base| {
-        if is_abc(base, semantic) {
+        if is_abc_abc(base, semantic) {
             return true;
         }
 
@@ -141,11 +144,16 @@ fn is_abstract_class(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool
             return true;
         };
 
-        is_metaclass_abcmeta(base_def, semantic)
+        metaclass_might_be_abcmeta(base_def, semantic)
     })
 }
 
-fn is_metaclass_abcmeta(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
+/// Returns false if the class is definitely not `abc.ABCMeta` or a subclass thereof.
+///
+/// A class is *not* a subclass of `ABCMeta` when all of its bases are:
+/// * Inspectable
+/// * Do not inherit from `ABCMeta`
+fn metaclass_might_be_abcmeta(class_def: &StmtClassDef, semantic: &SemanticModel) -> bool {
     let Some(arguments) = class_def.arguments.as_ref() else {
         return false;
     };
@@ -155,7 +163,7 @@ fn is_metaclass_abcmeta(class_def: &StmtClassDef, semantic: &SemanticModel) -> b
     };
     let metaclass = &metaclass.value;
 
-    if is_abcmeta(metaclass, semantic) {
+    if is_abc_abcmeta(metaclass, semantic) {
         return true;
     }
 
@@ -164,11 +172,11 @@ fn is_metaclass_abcmeta(class_def: &StmtClassDef, semantic: &SemanticModel) -> b
     };
 
     any_base_class(metaclass_def, semantic, &mut |base| {
-        is_abcmeta(base, semantic) || find_class_def(base, semantic).is_none()
+        is_abc_abcmeta(base, semantic) || find_class_def(base, semantic).is_none()
     })
 }
 
-fn is_abc(base: &Expr, semantic: &SemanticModel) -> bool {
+fn is_abc_abc(base: &Expr, semantic: &SemanticModel) -> bool {
     let Some(qualified_name) = semantic.resolve_qualified_name(base) else {
         return false;
     };
@@ -176,7 +184,7 @@ fn is_abc(base: &Expr, semantic: &SemanticModel) -> bool {
     matches!(qualified_name.segments(), ["abc", "ABC"])
 }
 
-fn is_abcmeta(base: &Expr, semantic: &SemanticModel) -> bool {
+fn is_abc_abcmeta(base: &Expr, semantic: &SemanticModel) -> bool {
     let Some(qualified_name) = semantic.resolve_qualified_name(base) else {
         return false;
     };
