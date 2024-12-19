@@ -97,7 +97,11 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
 
     let test_files: Vec<_> = test
         .files()
-        .map(|embedded| {
+        .filter_map(|embedded| {
+            if embedded.lang == "ignore" {
+                return None;
+            }
+
             assert!(
                 matches!(embedded.lang, "py" | "pyi"),
                 "Non-Python files not supported yet."
@@ -106,10 +110,10 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             db.write_file(&full_path, embedded.code).unwrap();
             let file = system_path_to_file(db, full_path).unwrap();
 
-            TestFile {
+            Some(TestFile {
                 file,
                 backtick_offset: embedded.md_offset,
-            }
+            })
         })
         .collect();
 
