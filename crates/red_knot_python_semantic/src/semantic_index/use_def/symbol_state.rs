@@ -105,7 +105,7 @@ impl ScopedVisibilityConstraintId {
 const INLINE_VISIBILITY_CONSTRAINTS: usize = 4;
 type InlineVisibilityConstraintsArray =
     [ScopedVisibilityConstraintId; INLINE_VISIBILITY_CONSTRAINTS];
-type VisibilityConstraintPerBinding = SmallVec<InlineVisibilityConstraintsArray>;
+type VisibilityConstraintPerDefinition = SmallVec<InlineVisibilityConstraintsArray>;
 type VisibilityConstraintsIterator<'a> = std::slice::Iter<'a, ScopedVisibilityConstraintId>;
 type VisibilityConstraintsIntoIterator = smallvec::IntoIter<InlineVisibilityConstraintsArray>;
 
@@ -116,14 +116,14 @@ pub(super) struct SymbolDeclarations {
     pub(crate) live_declarations: Declarations,
 
     /// For each live declaration, which visibility constraints apply to it?
-    pub(crate) visibility_constraints: VisibilityConstraintPerBinding,
+    pub(crate) visibility_constraints: VisibilityConstraintPerDefinition,
 }
 
 impl SymbolDeclarations {
     fn undeclared(undeclared_visibility: ScopedVisibilityConstraintId) -> Self {
         Self {
             live_declarations: Declarations::with(0),
-            visibility_constraints: VisibilityConstraintPerBinding::from_iter([
+            visibility_constraints: VisibilityConstraintPerDefinition::from_iter([
                 undeclared_visibility,
             ]),
         }
@@ -133,7 +133,7 @@ impl SymbolDeclarations {
     fn record_declaration(&mut self, declaration_id: ScopedDefinitionId) {
         self.live_declarations = Declarations::with(declaration_id.into());
 
-        self.visibility_constraints = VisibilityConstraintPerBinding::with_capacity(1);
+        self.visibility_constraints = VisibilityConstraintPerDefinition::with_capacity(1);
         self.visibility_constraints
             .push(ScopedVisibilityConstraintId::ALWAYS_TRUE);
     }
@@ -177,7 +177,7 @@ pub(super) struct SymbolBindings {
     constraints: ConstraintsPerBinding,
 
     /// For each live binding, which visibility constraints apply to it?
-    visibility_constraints: VisibilityConstraintPerBinding,
+    visibility_constraints: VisibilityConstraintPerDefinition,
 }
 
 impl SymbolBindings {
@@ -185,7 +185,9 @@ impl SymbolBindings {
         Self {
             live_bindings: Bindings::with(0),
             constraints: ConstraintsPerBinding::from_iter([Constraints::default()]),
-            visibility_constraints: VisibilityConstraintPerBinding::from_iter([unbound_visibility]),
+            visibility_constraints: VisibilityConstraintPerDefinition::from_iter([
+                unbound_visibility,
+            ]),
         }
     }
 
@@ -197,7 +199,7 @@ impl SymbolBindings {
         self.constraints = ConstraintsPerBinding::with_capacity(1);
         self.constraints.push(Constraints::default());
 
-        self.visibility_constraints = VisibilityConstraintPerBinding::with_capacity(1);
+        self.visibility_constraints = VisibilityConstraintPerDefinition::with_capacity(1);
         self.visibility_constraints
             .push(ScopedVisibilityConstraintId::ALWAYS_TRUE);
     }
@@ -299,11 +301,11 @@ impl SymbolState {
             bindings: SymbolBindings {
                 live_bindings: Bindings::default(),
                 constraints: ConstraintsPerBinding::default(),
-                visibility_constraints: VisibilityConstraintPerBinding::default(),
+                visibility_constraints: VisibilityConstraintPerDefinition::default(),
             },
             declarations: SymbolDeclarations {
                 live_declarations: self.declarations.live_declarations.clone(),
-                visibility_constraints: VisibilityConstraintPerBinding::default(),
+                visibility_constraints: VisibilityConstraintPerDefinition::default(),
             },
         };
 

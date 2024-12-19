@@ -278,7 +278,7 @@ fn bindings_ty<'db>(
     } in bindings_with_constraints
     {
         let static_visibility =
-            visibility_constraints.analyze(db, all_constraints, visibility_constraint);
+            visibility_constraints.evaluate(db, all_constraints, visibility_constraint);
 
         let Some(binding) = binding else {
             if !static_visibility.is_always_false() {
@@ -361,7 +361,7 @@ fn declarations_ty<'db>(
         declarations
     {
         let static_visibility =
-            visibility_constraints.analyze(db, all_constraints, visibility_constraint);
+            visibility_constraints.evaluate(db, all_constraints, visibility_constraint);
 
         let Some(declaration) = declaration else {
             if !static_visibility.is_always_false() {

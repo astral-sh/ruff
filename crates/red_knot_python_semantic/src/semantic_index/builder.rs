@@ -859,7 +859,7 @@ where
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
                 let (constraint_id, constraint) = self.record_expression_constraint(&node.test);
-                let mut constraints = vec![(constraint_id, constraint)];
+                let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
 
                 let visibility_constraint_id = self.record_visibility_constraint(constraint_id);
@@ -888,7 +888,7 @@ where
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
                     self.flow_restore(pre_if.clone());
-                    for (_, constraint) in &constraints {
+                    for constraint in &constraints {
                         self.record_negated_constraint(*constraint);
                     }
 
@@ -896,7 +896,7 @@ where
                         self.visit_expr(elif_test);
                         let (constraint_id, constraint) =
                             self.record_expression_constraint(elif_test);
-                        constraints.push((constraint_id, constraint));
+                        constraints.push(constraint);
                         Some(constraint_id)
                     } else {
                         None

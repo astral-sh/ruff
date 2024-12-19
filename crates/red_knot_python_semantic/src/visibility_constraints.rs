@@ -59,23 +59,25 @@ impl VisibilityConstraints {
     ) -> ScopedVisibilityConstraintId {
         if a == ScopedVisibilityConstraintId::ALWAYS_TRUE {
             b
+        } else if b == ScopedVisibilityConstraintId::ALWAYS_TRUE {
+            a
         } else {
             self.add(VisibilityConstraint::KleeneAnd(a, b))
         }
     }
 
     /// Analyze the statically known visibility for a given visibility constraint.
-    pub(crate) fn analyze<'db>(
-        self: &VisibilityConstraints,
+    pub(crate) fn evaluate<'db>(
+        &self,
         db: &'db dyn Db,
         all_constraints: &AllConstraints<'db>,
         id: ScopedVisibilityConstraintId,
     ) -> Truthiness {
-        self.analyze_impl(db, all_constraints, id, MAX_RECURSION_DEPTH)
+        self.evaluate_impl(db, all_constraints, id, MAX_RECURSION_DEPTH)
     }
 
-    fn analyze_impl<'db>(
-        self: &VisibilityConstraints,
+    fn evaluate_impl<'db>(
+        &self,
         db: &'db dyn Db,
         constraints: &AllConstraints<'db>,
         id: ScopedVisibilityConstraintId,
@@ -92,16 +94,16 @@ impl VisibilityConstraints {
                 Self::analyze_single(db, &constraints[*single])
             }
             VisibilityConstraint::VisibleIfNot(negated) => self
-                .analyze_impl(db, constraints, *negated, max_depth - 1)
+                .evaluate_impl(db, constraints, *negated, max_depth - 1)
                 .negate(),
             VisibilityConstraint::KleeneAnd(lhs, rhs) => {
-                let lhs = self.analyze_impl(db, constraints, *lhs, max_depth - 1);
+                let lhs = self.evaluate_impl(db, constraints, *lhs, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysFalse {
                     return Truthiness::AlwaysFalse;
                 }
 
-                let rhs = self.analyze_impl(db, constraints, *rhs, max_depth - 1);
+                let rhs = self.evaluate_impl(db, constraints, *rhs, max_depth - 1);
 
                 if rhs == Truthiness::AlwaysFalse {
                     Truthiness::AlwaysFalse
@@ -112,13 +114,13 @@ impl VisibilityConstraints {
                 }
             }
             VisibilityConstraint::KleeneOr(lhs_id, rhs_id) => {
-                let lhs = self.analyze_impl(db, constraints, *lhs_id, max_depth - 1);
+                let lhs = self.evaluate_impl(db, constraints, *lhs_id, max_depth - 1);
 
                 if lhs == Truthiness::AlwaysTrue {
                     return Truthiness::AlwaysTrue;
                 }
 
-                let rhs = self.analyze_impl(db, constraints, *rhs_id, max_depth - 1);
+                let rhs = self.evaluate_impl(db, constraints, *rhs_id, max_depth - 1);
 
                 if rhs == Truthiness::AlwaysTrue {
                     Truthiness::AlwaysTrue
