@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D403.py:2:5: D403 [*] First word of the docstring should be capitalized: `this` -> `This`
   |
@@ -72,6 +73,8 @@ D403.py:36:5: D403 [*] First word of the docstring should be capitalized: `here`
 42 | |     What do you think?    
 43 | |     """
    | |_______^ D403
+44 |   
+45 |   def single_word_newline():
    |
    = help: Capitalize `here` to `Here`
 
@@ -84,3 +87,191 @@ D403.py:36:5: D403 [*] First word of the docstring should be capitalized: `here`
 41 41 | 
 42 42 |     What do you think?    
 43 43 |     """
+
+D403.py:46:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+45 |   def single_word_newline():
+46 |       """singleword
+   |  _____^
+47 | | 
+48 | |     """
+   | |_______^ D403
+49 |   
+50 |   def single_word_dot_newline():
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+43 43 |     """
+44 44 | 
+45 45 | def single_word_newline():
+46    |-    """singleword
+   46 |+    """Singleword
+47 47 | 
+48 48 |     """
+49 49 | 
+
+D403.py:51:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+50 |   def single_word_dot_newline():
+51 |       """singleword.
+   |  _____^
+52 | | 
+53 | |     """
+   | |_______^ D403
+54 |   
+55 |   def single_word_second_line():
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+48 48 |     """
+49 49 | 
+50 50 | def single_word_dot_newline():
+51    |-    """singleword.
+   51 |+    """Singleword.
+52 52 | 
+53 53 |     """
+54 54 | 
+
+D403.py:56:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+55 |   def single_word_second_line():
+56 |       """
+   |  _____^
+57 | |     singleword
+58 | |     """
+   | |_______^ D403
+59 |   
+60 |   def single_word_dot_second_line():
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+54 54 | 
+55 55 | def single_word_second_line():
+56 56 |     """
+57    |-    singleword
+   57 |+    Singleword
+58 58 |     """
+59 59 | 
+60 60 | def single_word_dot_second_line():
+
+D403.py:61:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+60 |   def single_word_dot_second_line():
+61 |       """
+   |  _____^
+62 | |     singleword.
+63 | |     """
+   | |_______^ D403
+64 |   
+65 |   def single_word_then_more_text():
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+59 59 | 
+60 60 | def single_word_dot_second_line():
+61 61 |     """
+62    |-    singleword.
+   62 |+    Singleword.
+63 63 |     """
+64 64 | 
+65 65 | def single_word_then_more_text():
+
+D403.py:66:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+65 |   def single_word_then_more_text():
+66 |       """singleword
+   |  _____^
+67 | | 
+68 | |     This is more text.
+69 | |     """
+   | |_______^ D403
+70 |   
+71 |   def single_word_dot_then_more_text():
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+63 63 |     """
+64 64 | 
+65 65 | def single_word_then_more_text():
+66    |-    """singleword
+   66 |+    """Singleword
+67 67 | 
+68 68 |     This is more text.
+69 69 |     """
+
+D403.py:72:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+71 |   def single_word_dot_then_more_text():
+72 |       """singleword.
+   |  _____^
+73 | | 
+74 | |     This is more text.
+75 | |     """
+   | |_______^ D403
+76 |   
+77 |   def single_word_second_line_then_more_text():
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+69 69 |     """
+70 70 | 
+71 71 | def single_word_dot_then_more_text():
+72    |-    """singleword.
+   72 |+    """Singleword.
+73 73 | 
+74 74 |     This is more text.
+75 75 |     """
+
+D403.py:78:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+77 |   def single_word_second_line_then_more_text():
+78 |       """
+   |  _____^
+79 | |     singleword
+80 | | 
+81 | |     This is more text.
+82 | |     """
+   | |_______^ D403
+83 |   
+84 |   def single_word_dot_second_line_then_more_text():
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+76 76 | 
+77 77 | def single_word_second_line_then_more_text():
+78 78 |     """
+79    |-    singleword
+   79 |+    Singleword
+80 80 | 
+81 81 |     This is more text.
+82 82 |     """
+
+D403.py:85:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+84 |   def single_word_dot_second_line_then_more_text():
+85 |       """
+   |  _____^
+86 | |     singleword.
+87 | | 
+88 | |     This is more text.
+89 | |     """
+   | |_______^ D403
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+83 83 | 
+84 84 | def single_word_dot_second_line_then_more_text():
+85 85 |     """
+86    |-    singleword.
+   86 |+    Singleword.
+87 87 | 
+88 88 |     This is more text.
+89 89 |     """
