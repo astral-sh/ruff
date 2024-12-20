@@ -41,10 +41,9 @@ use crate::checkers::ast::Checker;
 ///         return hash(self.name)
 /// ```
 ///
-/// ### When inheriting
-///
-/// The mere presence of an `__eq__` function will cause the classes `__hash__` to be `None` and must be explicitly
-/// implemented:
+/// This issue is particularly tricky with inheritance. Even if a parent class correctly implements
+/// both `__eq__` and `__hash__`, overriding `__eq__` in a child class without also implementing
+/// `__hash__` will make the child class unhashable:
 ///
 /// ```python
 /// class Person:
@@ -74,35 +73,27 @@ use crate::checkers::ast::Checker;
 /// hash(Developer())  # TypeError: unhashable type: 'Developer'
 /// ```
 ///
-/// It is idiomatic to write a hash function using a tuple of members required for the `__eq__` function to operate:
+/// One way to fix this is to retain the implementation of `__hash__` from the parent class:
 ///
 /// ```python
 /// class Developer(Person):
-///     ...
-///     def __hash__(self):
-///         return hash((self.name, self.other))
+///     def __init__(self):
+///         super().__init__()
+///         self.language = "python"
+///
+///     def __eq__(self, other):
+///         return (
+///             super().__eq__(other)
+///             and isinstance(other, Developer)
+///             and self.language == other.language
+///         )
+///
+///     __hash__ = Person.__hash__
 /// ```
 ///
-/// ### When the hash logic is identical
-///
-/// ```python
-/// class Derived(Base):
-///     def __eq__(self, other): ...
-///
-///     def __hash__(self):
-///         return super().__hash__()
-/// ```
-///
-/// or:
-///
-/// ```python
-/// class Derived(Base):
-///     def __eq__(self, other): ...
-///
-///     __hash__ = Base.__hash__
-/// ```
 /// ## References
 /// - [Python documentation: `object.__hash__`](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
+/// - [Python glossary: hashable](https://docs.python.org/3/glossary.html#term-hashable)
 #[derive(ViolationMetadata)]
 pub(crate) struct EqWithoutHash;
 
