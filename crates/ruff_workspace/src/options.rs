@@ -3079,12 +3079,11 @@ pub struct RuffOptions {
     )]
     pub parenthesize_tuple_in_subscript: Option<bool>,
 
-    /// A list of additional callable names that behave like [`markupsafe.Markup`].
+    /// A list of additional callable names that behave like
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
     /// `literal`).
-    ///
-    /// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -3092,10 +3091,10 @@ pub struct RuffOptions {
     )]
     pub extend_markup_names: Option<Vec<String>>,
 
-    /// A list of callable names, whose result may be safely passed into [`markupsafe.Markup`].
+    /// A list of callable names, whose result may be safely passed into
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
     ///
-    /// Expects to receive a list of fully-qualified names (e.g., [`bleach.clean`], rather than
-    /// `clean`).
+    /// Expects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).
     ///
     /// This setting helps you avoid false positives in code like:
     ///
@@ -3106,20 +3105,17 @@ pub struct RuffOptions {
     /// cleaned_markup = Markup(clean(some_user_input))
     /// ```
     ///
-    /// Where the use of [`bleach.clean`] usually ensures that there's no XSS vulnerability.
+    /// Where the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html)
+    /// usually ensures that there's no XSS vulnerability.
     ///
     /// Although it is not recommended, you may also use this setting to whitelist other
     /// kinds of calls, e.g. calls to i18n translation functions, where how safe that is
     /// will depend on the implementation and how well the translations are audited.
     ///
     /// Another common use-case is to wrap the output of functions that generate markup
-    /// like [`xml.etree.ElementTree.tostring`] or template rendering engines where
-    /// sanitization of potential user input is either already baked in or has to happen
-    /// before rendering.
-    ///
-    /// [`bleach.clean`]: https://bleach.readthedocs.io/en/latest/clean.html
-    /// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
-    /// [`xml.etree.ElementTree.tostring`]: https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring
+    /// like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring)
+    /// or template rendering engines where sanitization of potential user input is either
+    /// already baked in or has to happen before rendering.
     #[option(
         default = "[]",
         value_type = "list[str]",
