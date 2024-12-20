@@ -58,9 +58,7 @@ impl<'db> InferContext<'db> {
     where
         T: WithDiagnostics,
     {
-        self.diagnostics
-            .get_mut()
-            .extend(other.diagnostics().iter().cloned());
+        self.diagnostics.get_mut().extend(other.diagnostics());
     }
 
     /// Reports a lint located at `node`.
@@ -68,7 +66,7 @@ impl<'db> InferContext<'db> {
         &self,
         lint: &'static LintMetadata,
         node: AnyNodeRef,
-        message: std::fmt::Arguments,
+        message: fmt::Arguments,
     ) {
         // Skip over diagnostics if the rule is disabled.
         let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
@@ -77,10 +75,8 @@ impl<'db> InferContext<'db> {
 
         let suppressions = suppressions(self.db, self.file);
 
-        if suppressions
-            .find_suppression(node.range(), LintId::of(lint))
-            .is_some()
-        {
+        if let Some(suppression) = suppressions.find_suppression(node.range(), LintId::of(lint)) {
+            self.diagnostics.borrow_mut().mark_used(suppression.id());
             return;
         }
 
@@ -95,7 +91,7 @@ impl<'db> InferContext<'db> {
         node: AnyNodeRef,
         id: DiagnosticId,
         severity: Severity,
-        message: std::fmt::Arguments,
+        message: fmt::Arguments,
     ) {
         if !self.db.is_file_open(self.file) {
             return;
@@ -106,7 +102,6 @@ impl<'db> InferContext<'db> {
         // * The rule is disabled for this file. We probably want to introduce a new query that
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
-        // * Check for suppression comments, bump a counter if the diagnostic is suppressed.
 
         self.diagnostics.borrow_mut().push(TypeCheckDiagnostic {
             file: self.file,

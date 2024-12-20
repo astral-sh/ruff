@@ -43,6 +43,8 @@ from typing import cast
 
 y = (
     cast(int, "test" +
+            # TODO: Remove the expected error after implementing `invalid-operator` for binary expressions
+            # error: [unused-ignore-comment]
             2 # type: ignore
     )
     + "other"  # TODO: expected-error[invalid-operator]
@@ -118,6 +120,7 @@ in Pyright. Neither Ruff, nor mypy support this and neither does Red Knot.
 
 ```py
 # fmt: off
+# error: [unused-ignore-comment]
 a = (  # type: ignore
     test + 4  # error: [unresolved-reference]
 )
@@ -150,6 +153,7 @@ File level suppressions must come before any non-trivia token,
 including module docstrings. 
 """
 
+# error: [unused-ignore-comment] "Unused blanked `type: ignore` directive"
 # type: ignore
 
 a = 10 / 0  # error: [division-by-zero]

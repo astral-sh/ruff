@@ -3,6 +3,7 @@ use std::hash::BuildHasherDefault;
 use rustc_hash::FxHasher;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
+use crate::suppression::UNUSED_IGNORE_COMMENT;
 pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{resolve_module, system_module_search_paths, KnownModule, Module};
@@ -47,4 +48,5 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 /// Register all known semantic lints.
 pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
+    registry.register_lint(&UNUSED_IGNORE_COMMENT);
 }
