@@ -78,17 +78,17 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
     // on inference from bindings.
 
     let declarations = use_def.public_declarations(symbol);
-    let declared_ty = declarations_ty(db, declarations);
+    let declared = declarations_ty(db, declarations);
 
-    match declared_ty {
+    match declared {
         // Symbol is declared, trust the declared type
         Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
         // Symbol is possibly declared
         Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
             let bindings = use_def.public_bindings(symbol);
-            let inferred_ty = bindings_ty(db, bindings);
+            let inferred = bindings_ty(db, bindings);
 
-            match inferred_ty {
+            match inferred {
                 // Symbol is possibly undeclared and definitely unbound
                 Symbol::Unbound => Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
                 // Symbol is possibly undeclared and (possibly) bound
