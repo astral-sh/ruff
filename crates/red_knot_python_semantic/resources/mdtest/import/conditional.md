@@ -69,8 +69,6 @@ if coinflip():
 ```
 
 ```py
-# TODO: We should potentially distinguish between possibly-unbound and possibly-undeclared here:
-# error: [possibly-unbound-import]
 from maybe_undeclared import x
 
 reveal_type(x)  # revealed: int
