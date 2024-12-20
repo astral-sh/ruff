@@ -105,8 +105,44 @@ pub enum Command {
     Server,
 }
 
+use oxidd::bdd::BDDFunction;
+use oxidd::ManagerRef;
+use oxidd::{BooleanFunction, BooleanFunctionQuant};
+use oxidd_core::Manager;
+use oxidd_dump::dot::dump_all;
+
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
+    let mgr = oxidd::bdd::new_manager(24, 24, 1);
+    let (x, y, z) = mgr.with_manager_exclusive(|mgr| {
+        (
+            BDDFunction::new_var(mgr).unwrap(),
+            BDDFunction::new_var(mgr).unwrap(),
+            BDDFunction::new_var(mgr).unwrap(),
+        )
+    });
+    mgr.with_manager_shared(|manager| {
+        let inner_func = x
+            .or(&y.and(&x.not().unwrap()).unwrap())
+            .unwrap()
+            .or(&y.not().unwrap().and(&x.not().unwrap()).unwrap())
+            .unwrap();
+        let func = z.and(&inner_func).unwrap();
+
+        let func = func.restrict(&z).unwrap();
+
+        manager.gc();
+
+        let file = std::fs::File::create("bdd.dot").expect("could not create `bdd.dot`");
+        dump_all(
+            file,
+            manager,
+            [(&x, "x"), (&y, "y"), (&z, "z")],
+            [(&func, "z ^ (x ∨ (y ∧ ~x) ∨ (~y ∧ ~x))")],
+        )
+        .expect("dot export failed");
+    });
+    panic!("FOO");
     run().unwrap_or_else(|error| {
         use std::io::Write;
 
