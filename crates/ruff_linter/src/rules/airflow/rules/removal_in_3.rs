@@ -4,8 +4,16 @@ use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprC
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
+use std::sync::LazyLock;
 
 use crate::checkers::ast::Checker;
+use regex::Regex;
+
+static SECRET_BACKEND_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"airflow\..*secrets\.\w+\.\w+Backend").unwrap());
+
+static AIRFLOW_HOOK_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"airflow\..*hooks\.\w+\.\w+Hook").unwrap());
 
 #[derive(Debug, Eq, PartialEq)]
 enum Replacement {
@@ -155,6 +163,49 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
     };
 }
 
+fn removed_class_attribute(checker: &mut Checker, expr: &Expr) {
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = expr else {
+        return;
+    };
+
+    let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) else {
+        return;
+    };
+
+    // checker.diagnostics.push(Diagnostic::new(
+    //     Airflow3Removal {
+    //         deprecated: qualname.to_string(),
+    //         replacement: Replacement::Name("te"),
+    //     },
+    //     attr.range(),
+    // ));
+
+    let replacement = match *qualname.segments() {
+        ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
+            "dataset_factories" => Some(Replacement::Name("asset_factories")),
+            "dataset_uri_handlers" => Some(Replacement::Name("asset_uri_handlers")),
+            "dataset_to_openlineage_converters" => {
+                Some(Replacement::Name("asset_to_openlineage_converters"))
+            }
+            &_ => None,
+        },
+        ["airflow", "lineage", "hook"] => match attr.as_str() {
+            "dataset" => Some(Replacement::Name("asset")),
+            &_ => None,
+        },
+        _ => None,
+    };
+    if let Some(replacement) = replacement {
+        checker.diagnostics.push(Diagnostic::new(
+            Airflow3Removal {
+                deprecated: attr.to_string(),
+                replacement,
+            },
+            attr.range(),
+        ));
+    }
+}
+
 fn removed_method(checker: &mut Checker, expr: &Expr) {
     let Expr::Call(ExprCall { func, .. }) = expr else {
         return;
@@ -194,6 +245,20 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
             "initialize_providers_dataset_uri_resources" => Some(Replacement::Name(
                 "initialize_providers_asset_uri_resources",
             )),
+            &_ => None,
+        },
+        ["airflow", "datasets", ..] | ["airflow", "Dataset"] => match attr.as_str() {
+            "iter_datasets" => Some(Replacement::Name("iter_assets")),
+            "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
+            &_ => None,
+        },
+        _ if SECRET_BACKEND_REGEX.is_match(&qualname.segments().join(".")) => match attr.as_str() {
+            "get_conn_uri" => Some(Replacement::Name("get_conn_value")),
+            "get_connections" => Some(Replacement::Name("get_connection")),
+            &_ => None,
+        },
+        _ if AIRFLOW_HOOK_REGEX.is_match(&qualname.segments().join(".")) => match attr.as_str() {
+            "get_connections" => Some(Replacement::Name("get_connection")),
             &_ => None,
         },
         _ => None,
@@ -662,7 +727,10 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
 
             removed_method(checker, expr);
         }
-        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => removed_name(checker, expr, ranged),
+        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => {
+            removed_name(checker, expr, ranged);
+            removed_class_attribute(checker, expr);
+        }
         ranged @ Expr::Name(_) => removed_name(checker, expr, ranged),
         _ => {}
     }
