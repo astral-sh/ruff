@@ -160,7 +160,7 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = &**func else {
         return;
     };
 
@@ -207,7 +207,7 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
     if let Some(replacement) = replacement {
         checker.diagnostics.push(Diagnostic::new(
             Airflow3Removal {
-                deprecated: attr.as_str().to_string(),
+                deprecated: attr.to_string(),
                 replacement,
             },
             attr.range(),
