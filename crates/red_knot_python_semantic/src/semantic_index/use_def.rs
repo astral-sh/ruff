@@ -213,6 +213,43 @@
 //! snapshot (which has `x = 3` as the only live binding). The result of this merge is that we now
 //! have two live bindings of `x`: `x = 3` and `x = 4`.
 //!
+//! Another piece of information that the `UseDefMap` needs to provide are visibility constraints.
+//! These are similar to the narrowing constraints, but apply to bindings and declarations within a
+//! control flow path. Consider the following example:
+//! ```py
+//! x = 1
+//! if test:
+//!     x = 2
+//!     y = "y"
+//! ```
+//! In principle, there are two possible control flow paths here. However, if we can statically
+//! infer `test` to be of type `Literal[True]` or `Literal[False]`, we can rule out one of the
+//! possible paths. To support this feature, we record a visibility constraint of `test` to all
+//! live bindings and declarations *after* visiting the body of the `if` statement. And we record
+//! a negative visibility constraint `~test` to all live bindings/declarations in the (implicit)
+//! `else` branch. For the example above, we would record the following visibility constraints
+//! (adding the implicit "unbound" definitions for clarity):
+//! ```py
+//! x = <unbound>  # not live, shadowed by `x = 1`
+//! y = <unbound>  # visibility constraint: ~test
+//!
+//! x = 1  # visibility constraint: ~test
+//! if test:
+//!     x = 2  # visibility constraint: test
+//!     y = "y"  # visibility constraint: test
+//! ```
+//! When we encounter a use of `x` after this `if` statement, we would record two live bindings: `x
+//! = 1` with a constraint of `~test`, and `x = 2` with a constraint of `test`. In type inference,
+//! when we iterate over all live bindings, we can evaluate these constraints to determine if a
+//! particular binding is actually visible. For example, if `test` is `Literal[True]`, we only see
+//! the `x = 2` binding. If `test` is `Literal[False]`, we only see the `x = 1` binding. And if the
+//! type of `test` is `bool`, we can see both bindings.
+//!
+//! Note that we also record visibility constraints for the start of the scope. This is important
+//! to determine if a symbol is definitely bound, possibly unbound, or definitely unbound. In the
+//! example above, The `y = <unbound>` binding is constrained by `~test`, so `y` would only be
+//! definitely-bound if `test` is `Literal[True]`.
+//!
 //! The [`UseDefMapBuilder`] itself just exposes methods for taking a snapshot, resetting to a
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
 //! [`SemanticIndexBuilder`](crate::semantic_index::builder::SemanticIndexBuilder), e.g. where it
