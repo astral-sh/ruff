@@ -559,8 +559,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// constraint for the `x = 0` binding as well, but at the `RESET` point, we can get rid
     /// of it, as the `if`-`elif`-`elif` chain doesn't include any new bindings of `x`.
     pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
-        let num_symbols = self.symbol_states.len();
-        debug_assert!(num_symbols >= snapshot.symbol_states.len());
+        debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
 
         self.scope_start_visibility = snapshot.scope_start_visibility;
 

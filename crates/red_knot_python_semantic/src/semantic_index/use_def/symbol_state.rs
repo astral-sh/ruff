@@ -244,7 +244,7 @@ impl SymbolState {
 
     /// Record a newly-encountered binding for this symbol.
     pub(super) fn record_binding(&mut self, binding_id: ScopedDefinitionId) {
-        debug_assert!(binding_id != ScopedDefinitionId::UNBOUND);
+        debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
         self.bindings.record_binding(binding_id);
     }
 
