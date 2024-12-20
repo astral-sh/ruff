@@ -279,11 +279,10 @@ fn bindings_ty<'db>(
     let unbound_visibility = if let Some(BindingWithConstraints {
         binding: None,
         constraints: _,
-        visibility_constraints,
         visibility_constraint,
     }) = bindings_with_constraints.peek()
     {
-        visibility_constraints.evaluate(db, *visibility_constraint)
+        crate::visibility_constraints::evaluate(db, *visibility_constraint)
     } else {
         Truthiness::AlwaysFalse
     };
@@ -292,11 +291,11 @@ fn bindings_ty<'db>(
         |BindingWithConstraints {
              binding,
              constraints,
-             visibility_constraints,
              visibility_constraint,
          }| {
             let binding = binding?;
-            let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
+            let static_visibility =
+                crate::visibility_constraints::evaluate(db, visibility_constraint);
 
             if static_visibility.is_always_false() {
                 return None;
@@ -367,11 +366,10 @@ fn declarations_ty<'db>(
 
     let undeclared_visibility = if let Some(DeclarationWithConstraint {
         declaration: None,
-        visibility_constraints,
         visibility_constraint,
     }) = declarations.peek()
     {
-        visibility_constraints.evaluate(db, *visibility_constraint)
+        crate::visibility_constraints::evaluate(db, *visibility_constraint)
     } else {
         Truthiness::AlwaysFalse
     };
@@ -379,11 +377,11 @@ fn declarations_ty<'db>(
     let mut types = declarations.filter_map(
         |DeclarationWithConstraint {
              declaration,
-             visibility_constraints,
              visibility_constraint,
          }| {
             let declaration = declaration?;
-            let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
+            let static_visibility =
+                crate::visibility_constraints::evaluate(db, visibility_constraint);
 
             if static_visibility.is_always_false() {
                 None
