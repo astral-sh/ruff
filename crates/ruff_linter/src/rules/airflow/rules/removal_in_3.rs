@@ -10,8 +10,8 @@ use crate::checkers::ast::Checker;
 #[derive(Debug, Eq, PartialEq)]
 enum Replacement {
     None,
-    Name(String),
-    Message(String),
+    Name(&'static str),
+    Message(&'static str),
 }
 
 /// ## What it does
@@ -76,14 +76,14 @@ impl Violation for Airflow3Removal {
 fn diagnostic_for_argument(
     arguments: &Arguments,
     deprecated: &str,
-    replacement: Option<&str>,
+    replacement: Option<&'static str>,
 ) -> Option<Diagnostic> {
     let keyword = arguments.find_keyword(deprecated)?;
     let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: (*deprecated).to_string(),
             replacement: match replacement {
-                Some(name) => Replacement::Name(name.to_owned()),
+                Some(name) => Replacement::Name(name),
                 None => Replacement::None,
             },
         },
@@ -170,35 +170,29 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
 
     let replacement = match *qualname.segments() {
         ["airflow", "datasets", "manager", "DatasetManager"] => match attr.as_str() {
-            "register_dataset_change" => {
-                Some(Replacement::Name("register_asset_change".to_string()))
-            }
-            "create_datasets" => Some(Replacement::Name("create_assets".to_string())),
-            "notify_dataset_created" => Some(Replacement::Name("notify_asset_created".to_string())),
-            "notify_dataset_changed" => Some(Replacement::Name("notify_asset_changed".to_string())),
-            "notify_dataset_alias_created" => {
-                Some(Replacement::Name("notify_asset_alias_created".to_string()))
-            }
+            "register_dataset_change" => Some(Replacement::Name("register_asset_change")),
+            "create_datasets" => Some(Replacement::Name("create_assets")),
+            "notify_dataset_created" => Some(Replacement::Name("notify_asset_created")),
+            "notify_dataset_changed" => Some(Replacement::Name("notify_asset_changed")),
+            "notify_dataset_alias_created" => Some(Replacement::Name("notify_asset_alias_created")),
             &_ => None,
         },
         ["airflow", "lineage", "hook", "HookLineageCollector"] => match attr.as_str() {
-            "create_dataset" => Some(Replacement::Name("create_asset".to_string())),
-            "add_input_dataset" => Some(Replacement::Name("add_input_asset".to_string())),
-            "add_output_dataset" => Some(Replacement::Name("add_output_asset".to_string())),
-            "collected_datasets" => Some(Replacement::Name("collected_assets".to_string())),
+            "create_dataset" => Some(Replacement::Name("create_asset")),
+            "add_input_dataset" => Some(Replacement::Name("add_input_asset")),
+            "add_output_dataset" => Some(Replacement::Name("add_output_asset")),
+            "collected_datasets" => Some(Replacement::Name("collected_assets")),
             &_ => None,
         },
         ["airflow", "providers", "amazon", "auth_manager", "aws_auth_manager", "AwsAuthManager"] => {
             match attr.as_str() {
-                "is_authorized_dataset" => {
-                    Some(Replacement::Name("is_authorized_asset".to_string()))
-                }
+                "is_authorized_dataset" => Some(Replacement::Name("is_authorized_asset")),
                 &_ => None,
             }
         }
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "initialize_providers_dataset_uri_resources" => Some(Replacement::Name(
-                "initialize_providers_asset_uri_resources".to_string(),
+                "initialize_providers_asset_uri_resources",
             )),
             &_ => None,
         },
@@ -224,271 +218,270 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "api_connexion", "security", "requires_access"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.api_connexion.security.requires_access_*".to_string(),
+                        "airflow.api_connexion.security.requires_access_*",
                     ),
                 )),
                 ["airflow", "api_connexion", "security", "requires_access_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.api_connexion.security.requires_access_asset".to_string()),
+                    Replacement::Name("airflow.api_connexion.security.requires_access_asset"),
                 )),
                 ["airflow", "triggers", "external_task", "TaskStateTrigger"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
                 ["airflow", "security", "permissions", "RESOURCE_DATASET"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.security.permissions.RESOURCE_ASSET".to_string()),
+                    Replacement::Name("airflow.security.permissions.RESOURCE_ASSET"),
                 )),
                 // airflow.PY\d{1,2}
                 ["airflow", "PY36"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("sys.version_info".to_string()),
+                    Replacement::Name("sys.version_info"),
                 )),
                 ["airflow", "PY37"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("sys.version_info".to_string()),
+                    Replacement::Name("sys.version_info"),
                 )),
                 ["airflow", "PY38"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("sys.version_info".to_string()),
+                    Replacement::Name("sys.version_info"),
                 )),
                 ["airflow", "PY39"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("sys.version_info".to_string()),
+                    Replacement::Name("sys.version_info"),
                 )),
                 ["airflow", "PY310"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("sys.version_info".to_string()),
+                    Replacement::Name("sys.version_info"),
                 )),
                 ["airflow", "PY311"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("sys.version_info".to_string()),
+                    Replacement::Name("sys.version_info"),
                 )),
                 ["airflow", "PY312"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("sys.version_info".to_string()),
+                    Replacement::Name("sys.version_info"),
                 )),
                 // airflow.configuration
                 ["airflow", "configuration", "get"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.configuration.conf.get".to_string()),
+                    Replacement::Name("airflow.configuration.conf.get"),
                 )),
                 ["airflow", "configuration", "getboolean"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.configuration.conf.getboolean".to_string()),
+                    Replacement::Name("airflow.configuration.conf.getboolean"),
                 )),
                 ["airflow", "configuration", "getfloat"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.configuration.conf.getfloat".to_string()),
+                    Replacement::Name("airflow.configuration.conf.getfloat"),
                 )),
                 ["airflow", "configuration", "getint"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.configuration.conf.getint".to_string()),
+                    Replacement::Name("airflow.configuration.conf.getint"),
                 )),
                 ["airflow", "configuration", "has_option"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.configuration.conf.has_option".to_string()),
+                    Replacement::Name("airflow.configuration.conf.has_option"),
                 )),
                 ["airflow", "configuration", "remove_option"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.configuration.conf.remove_option".to_string()),
+                    Replacement::Name("airflow.configuration.conf.remove_option"),
                 )),
                 ["airflow", "configuration", "as_dict"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.configuration.conf.as_dict".to_string()),
+                    Replacement::Name("airflow.configuration.conf.as_dict"),
                 )),
                 ["airflow", "configuration", "set"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.configuration.conf.set".to_string()),
+                    Replacement::Name("airflow.configuration.conf.set"),
                 )),
                 // airflow.auth.managers
                 ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.auth.managers.models.resource_details.AssetDetails".to_string()),
+                    Replacement::Name("airflow.auth.managers.models.resource_details.AssetDetails"),
                 )),
                 ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.auth.managers.base_auth_manager.is_authorized_asset".to_string()),
+                    Replacement::Name("airflow.auth.managers.base_auth_manager.is_authorized_asset"),
                 )),
                 // airflow.contrib.*
                 ["airflow", "contrib", ..] => Some((qualname.to_string(),
                     Replacement::Message(
-                        "The whole `airflow.contrib` module has been removed."
-                            .to_string(),
+                        "The whole `airflow.contrib` module has been removed.",
                     ),
                 )),
                 // airflow.metrics.validators
                 ["airflow", "metrics", "validators", "AllowListValidator"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.metrics.validators.PatternAllowListValidator".to_string(),
+                        "airflow.metrics.validators.PatternAllowListValidator",
                     ),
                 )),
                 ["airflow", "metrics", "validators", "BlockListValidator"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.metrics.validators.PatternBlockListValidator".to_string(),
+                        "airflow.metrics.validators.PatternBlockListValidator",
                     ),
                 )),
                 // airflow.datasets
                 ["airflow", "Dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sdk.definitions.asset.Asset".to_string()),
+                    Replacement::Name("airflow.sdk.definitions.asset.Asset"),
                 )),
                 ["airflow", "datasets", "DatasetAliasEvent"] => {
                     Some((qualname.to_string(), Replacement::None))
                 }
                 ["airflow", "datasets", "Dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sdk.definitions.asset.Asset".to_string()),
+                    Replacement::Name("airflow.sdk.definitions.asset.Asset"),
                 )),
                 ["airflow", "datasets", "DatasetAlias"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sdk.definitions.asset.AssetAlias".to_string()),
+                    Replacement::Name("airflow.sdk.definitions.asset.AssetAlias"),
                 )),
                 ["airflow", "datasets", "DatasetAll"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sdk.definitions.asset.AssetAll".to_string()),
+                    Replacement::Name("airflow.sdk.definitions.asset.AssetAll"),
                 )),
                 ["airflow", "datasets", "DatasetAny"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sdk.definitions.asset.AssetAny".to_string()),
+                    Replacement::Name("airflow.sdk.definitions.asset.AssetAny"),
                 )),
                 ["airflow", "datasets", "expand_alias_to_datasets"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sdk.definitions.asset.expand_alias_to_assets".to_string()),
+                    Replacement::Name("airflow.sdk.definitions.asset.expand_alias_to_assets"),
                 )),
                 ["airflow", "datasets", "metadata", "Metadata"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sdk.definitions.asset.metadata.Metadata".to_string()),
+                    Replacement::Name("airflow.sdk.definitions.asset.metadata.Metadata"),
                 )),
                 // airflow.datasets.manager
                 ["airflow", "datasets", "manager", "dataset_manager"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.assets.manager".to_string()),
+                    Replacement::Name("airflow.assets.manager"),
                 )),
                 ["airflow", "datasets", "manager", "resolve_dataset_manager"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.assets.resolve_asset_manager".to_string()),
+                    Replacement::Name("airflow.assets.resolve_asset_manager"),
                 )),
                 ["airflow", "datasets.manager", "DatasetManager"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.assets.AssetManager".to_string()),
+                    Replacement::Name("airflow.assets.AssetManager"),
                 )),
                 // airflow.listeners.spec
                 ["airflow", "listeners", "spec", "dataset", "on_dataset_created"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.listeners.spec.asset.on_asset_created".to_string()),
+                    Replacement::Name("airflow.listeners.spec.asset.on_asset_created"),
                 )),
                 ["airflow", "listeners", "spec", "dataset", "on_dataset_changed"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.listeners.spec.asset.on_asset_changed".to_string()),
+                    Replacement::Name("airflow.listeners.spec.asset.on_asset_changed"),
                 )),
                 // airflow.timetables
                 ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule".to_string()),
+                    Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule"),
                 )),
                 ["airflow", "timetables", "simple", "DatasetTriggeredTimetable"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable".to_string()),
+                    Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable"),
                 )),
                 // airflow.lineage.hook
                 ["airflow", "lineage", "hook", "DatasetLineageInfo"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.lineage.hook.AssetLineageInfo".to_string()),
+                    Replacement::Name("airflow.lineage.hook.AssetLineageInfo"),
                 )),
                 // airflow.operators
                 ["airflow", "operators", "subdag", ..] => {
                     Some((
                         qualname.to_string(),
                         Replacement::Message(
-                            "The whole `airflow.subdag` module has been removed.".to_string(),
+                            "The whole `airflow.subdag` module has been removed.",
                         ),
                     ))
                 },
                 ["airflow", "sensors", "external_task", "ExternalTaskSensorLink"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sensors.external_task.ExternalDagLink".to_string()),
+                    Replacement::Name("airflow.sensors.external_task.ExternalDagLink"),
                 )),
                 ["airflow", "operators", "bash_operator", "BashOperator"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.operators.bash.BashOperator".to_string()),
+                    Replacement::Name("airflow.operators.bash.BashOperator"),
                 )),
                 ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.operators.branch.BaseBranchOperator".to_string()),
+                    Replacement::Name("airflow.operators.branch.BaseBranchOperator"),
                 )),
                 ["airflow", "operators", " dummy", "EmptyOperator"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator"),
                 )),
                 ["airflow", "operators", "dummy", "DummyOperator"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator"),
                 )),
                 ["airflow", "operators", "dummy_operator", "EmptyOperator"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator"),
                 )),
                 ["airflow", "operators", "dummy_operator", "DummyOperator"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.operators.empty.EmptyOperator".to_string()),
+                    Replacement::Name("airflow.operators.empty.EmptyOperator"),
                 )),
                 ["airflow", "operators", "email_operator", "EmailOperator"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.operators.email.EmailOperator".to_string()),
+                    Replacement::Name("airflow.operators.email.EmailOperator"),
                 )),
                 ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sensors.base.BaseSensorOperator".to_string()),
+                    Replacement::Name("airflow.sensors.base.BaseSensorOperator"),
                 )),
                 ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sensors.date_time.DateTimeSensor".to_string()),
+                    Replacement::Name("airflow.sensors.date_time.DateTimeSensor"),
                 )),
                 ["airflow", "sensors", "external_task_sensor", "ExternalTaskMarker"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.sensors.external_task.ExternalTaskMarker".to_string(),
+                        "airflow.sensors.external_task.ExternalTaskMarker",
                     ),
                 )),
                 ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensor"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.sensors.external_task.ExternalTaskSensor".to_string(),
+                        "airflow.sensors.external_task.ExternalTaskSensor",
                     ),
                 )),
                 ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensorLink"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.sensors.external_task.ExternalDagLink".to_string(),
+                        "airflow.sensors.external_task.ExternalDagLink",
                     ),
                 )),
                 ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor".to_string()),
+                    Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor"),
                 )),
                 // airflow.secrets
                 ["airflow", "secrets", "local_filesystem", "load_connections"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.secrets.local_filesystem.load_connections_dict".to_string(),
+                        "airflow.secrets.local_filesystem.load_connections_dict",
                     ),
                 )),
                 ["airflow", "secrets", "local_filesystem", "get_connection"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.secrets.local_filesystem.load_connections_dict".to_string(),
+                        "airflow.secrets.local_filesystem.load_connections_dict",
                     ),
                 )),
                 // airflow.utils.dates
                 ["airflow", "utils", "dates", "date_range"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.timetables.".to_string()),
+                    Replacement::Name("airflow.timetables."),
                 )),
                 ["airflow", "utils", "dates", "days_ago"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("pendulum.today('UTC').add(days=-N, ...)".to_string()),
+                    Replacement::Name("pendulum.today('UTC').add(days=-N, ...)"),
                 )),
                 ["airflow", "utils", "dates", "parse_execution_date"] => {
                     Some((qualname.to_string(), Replacement::None))
@@ -508,16 +501,16 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 }
                 ["airflow", "utils", "file", "mkdirs"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("pendulum.today('UTC').add(days=-N, ...)".to_string()),
+                    Replacement::Name("pendulum.today('UTC').add(days=-N, ...)"),
                 )),
                 // airflow.utils.helpers
                 ["airflow", "utils", "helpers", "chain"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.models.baseoperator.chain".to_string()),
+                    Replacement::Name("airflow.models.baseoperator.chain"),
                 )),
                 ["airflow", "utils", "helpers", "cross_downstream"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.models.baseoperator.cross_downstream".to_string()),
+                    Replacement::Name("airflow.models.baseoperator.cross_downstream"),
                 )),
                 // airflow.utils.state
                 ["airflow", "utils", "state", "SHUTDOWN"] => {
@@ -540,107 +533,105 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "utils", "decorators", "apply_defaults"] => Some((
                     qualname.to_string(),
                     Replacement::Message(
-                        "`apply_defaults` is now unconditionally done and can be safely removed."
-                            .to_string(),
+                        "`apply_defaults` is now unconditionally done and can be safely removed.",
                     ),
                 )),
                 // airflow.www
                 ["airflow", "www", "auth", "has_access"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.www.auth.has_access_*".to_string()),
+                    Replacement::Name("airflow.www.auth.has_access_*"),
                 )),
                 ["airflow", "www", "auth", "has_access_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.www.auth.has_access_dataset.has_access_asset".to_string()),
+                    Replacement::Name("airflow.www.auth.has_access_dataset.has_access_asset"),
                 )),
                 ["airflow", "www", "utils", "get_sensitive_variables_fields"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.utils.log.secrets_masker.get_sensitive_variables_fields"
-                            .to_string(),
+                        "airflow.utils.log.secrets_masker.get_sensitive_variables_fields",
                     ),
                 )),
                 ["airflow", "www", "utils", "should_hide_value_for_key"] => Some((
                     qualname.to_string(),
                     Replacement::Name(
-                        "airflow.utils.log.secrets_masker.should_hide_value_for_key".to_string(),
+                        "airflow.utils.log.secrets_masker.should_hide_value_for_key",
                     ),
                 )),
                 // airflow.providers.amazon
                 ["airflow", "providers", "amazon", "aws", "datasets", "s3", "create_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.amazon.aws.assets.s3.create_asset".to_string()),
+                    Replacement::Name("airflow.providers.amazon.aws.assets.s3.create_asset"),
                 )),
                 ["airflow", "providers", "amazon", "aws", "datasets", "s3", "convert_dataset_to_openlineage"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.amazon.aws.assets.s3.convert_asset_to_openlineage".to_string()),
+                    Replacement::Name("airflow.providers.amazon.aws.assets.s3.convert_asset_to_openlineage"),
                 )),
                 ["airflow", "providers", "amazon", "aws", "datasets", "s3", "sanitize_uri"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.amazon.aws.assets.s3.sanitize_uri".to_string()),
+                    Replacement::Name("airflow.providers.amazon.aws.assets.s3.sanitize_uri"),
                 )),
                 ["airflow", "providers", "amazon", "auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.ASSET".to_string()),
+                    Replacement::Name("airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.ASSET"),
                 )),
                 // airflow.providers.common.io
                 ["airflow", "providers", "common", "io", "datasets", "file", "create_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.common.io.assets.file.create_asset".to_string()),
+                    Replacement::Name("airflow.providers.common.io.assets.file.create_asset"),
                 )),
                 ["airflow", "providers", "common", "io", "datasets", "file", "convert_dataset_to_openlineage"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.common.io.assets.file.convert_asset_to_openlineage".to_string()),
+                    Replacement::Name("airflow.providers.common.io.assets.file.convert_asset_to_openlineage"),
                 )),
                 ["airflow", "providers", "common", "io", "datasets", "file", "sanitize_uri"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.common.io.assets.file.sanitize_uri".to_string()),
+                    Replacement::Name("airflow.providers.common.io.assets.file.sanitize_uri"),
                 )),
                 // airflow.providers.fab
                 ["airflow", "providers", "fab", "auth_manager", "fab_auth_manager", "is_authorized_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_asset".to_string()),
+                    Replacement::Name("airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_asset"),
                 )),
                 // airflow.providers.google
                 ["airflow", "providers", "google", "datasets", "bigquery", "create_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.google.assets.bigquery.create_asset".to_string()),
+                    Replacement::Name("airflow.providers.google.assets.bigquery.create_asset"),
                 )),
                 ["airflow", "providers", "google", "datasets", "gcs", "create_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.google.assets.gcs.create_asset".to_string()),
+                    Replacement::Name("airflow.providers.google.assets.gcs.create_asset"),
                 )),
                 ["airflow", "providers", "google", "datasets", "gcs", "convert_dataset_to_openlineage"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.google.assets.gcs.convert_asset_to_openlineage".to_string()),
+                    Replacement::Name("airflow.providers.google.assets.gcs.convert_asset_to_openlineage"),
                 )),
                 ["airflow", "providers", "google", "datasets", "gcs", "sanitize_uri"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.google.assets.gcs.sanitize_uri".to_string()),
+                    Replacement::Name("airflow.providers.google.assets.gcs.sanitize_uri"),
                 )),
                 // airflow.providers.mysql
                 ["airflow", "providers", "mysql", "datasets", "mysql", "sanitize_uri"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.mysql.assets.mysql.sanitize_uri".to_string()),
+                    Replacement::Name("airflow.providers.mysql.assets.mysql.sanitize_uri"),
                 )),
                 // airflow.providers.postgres
                 ["airflow", "providers", "postgres", "datasets", "postgres", "sanitize_uri"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.postgres.assets.postgres.sanitize_uri".to_string()),
+                    Replacement::Name("airflow.providers.postgres.assets.postgres.sanitize_uri"),
                 )),
                 // airflow.providers.openlineage
                 ["airflow", "providers", "openlineage", "utils", "utils", "DatasetInfo"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.openlineage.utils.utils.AssetInfo".to_string()),
+                    Replacement::Name("airflow.providers.openlineage.utils.utils.AssetInfo"),
                 )),
                 ["airflow", "providers", "openlineage", "utils", "utils", "translate_airflow_dataset"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.openlineage.utils.utils.translate_airflow_asset".to_string()),
+                    Replacement::Name("airflow.providers.openlineage.utils.utils.translate_airflow_asset"),
                 )),
                 // airflow.providers.trino
                 ["airflow", "providers", "trino", "datasets", "trino", "sanitize_uri"] => Some((
                     qualname.to_string(),
-                    Replacement::Name("airflow.providers.trino.assets.trino.sanitize_uri".to_string()),
+                    Replacement::Name("airflow.providers.trino.assets.trino.sanitize_uri"),
                 )),
                 _ => None,
             });
