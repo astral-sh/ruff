@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
-snapshot_kind: text
 ---
 DOC501_google.py:34:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
@@ -167,3 +166,26 @@ DOC501_google.py:238:5: DOC501 Raised exception `ValueError` missing from docstr
 244 |           raise TypeError  # DOC501
     |
     = help: Add `ValueError` to the docstring
+
+DOC501_google.py:253:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+    |
+251 |   # DOC501
+252 |   def calculate_speed(distance: float, time: float) -> float:
+253 |       """Calculate speed as distance divided by time.
+    |  _____^
+254 | | 
+255 | |     Args:
+256 | |         distance: Distance traveled.
+257 | |         time: Time spent traveling.
+258 | | 
+259 | |     Returns:
+260 | |         Speed as distance divided by time.
+261 | | 
+262 | |     Raises:
+263 | |         FasterThanLightError: 
+264 | |     """
+    | |_______^ DOC501
+265 |       try:
+266 |           return distance / time
+    |
+    = help: Add `FasterThanLightError` to the docstring
