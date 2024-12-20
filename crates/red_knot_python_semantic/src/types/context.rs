@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::{
     lint::{LintId, LintMetadata},
+    suppression::suppressions,
     Db,
 };
 
@@ -73,6 +74,15 @@ impl<'db> InferContext<'db> {
         let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
             return;
         };
+
+        let suppressions = suppressions(self.db, self.file);
+
+        if suppressions
+            .find_suppression(node.range(), LintId::of(lint))
+            .is_some()
+        {
+            return;
+        }
 
         self.report_diagnostic(node, DiagnosticId::Lint(lint.name()), severity, message);
     }
