@@ -3084,7 +3084,7 @@ pub struct RuffOptions {
     /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
     /// `literal`).
     ///
-    /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+    /// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -3117,9 +3117,9 @@ pub struct RuffOptions {
     /// sanitization of potential user input is either already baked in or has to happen
     /// before rendering.
     ///
-    /// [bleach.clean]: https://bleach.readthedocs.io/en/latest/clean.html
-    /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
-    /// [xml.etree.ElementTree.tostring]: https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring
+    /// [`bleach.clean`]: https://bleach.readthedocs.io/en/latest/clean.html
+    /// [`markupsafe.Markup`]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+    /// [`xml.etree.ElementTree.tostring`]: https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring
     #[option(
         default = "[]",
         value_type = "list[str]",
