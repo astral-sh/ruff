@@ -91,6 +91,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
                     extend_markup_names: vec![],
+                    whitelisted_markup_calls: vec![],
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -107,6 +108,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
                     extend_markup_names: vec![],
+                    whitelisted_markup_calls: vec![],
                 },
                 target_version: PythonVersion::Py310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -447,6 +449,30 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
                     extend_markup_names: vec!["webhelpers.html.literal".to_string()],
+                    whitelisted_markup_calls: vec![],
+                },
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035_whitelisted_markup_calls.py"))]
+    fn whitelisted_markup_calls(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "whitelisted_markup_calls__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    parenthesize_tuple_in_subscript: true,
+                    extend_markup_names: vec![],
+                    whitelisted_markup_calls: vec!["bleach.clean".to_string()],
                 },
                 preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)

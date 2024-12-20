@@ -3091,6 +3091,41 @@ pub struct RuffOptions {
         example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
     )]
     pub extend_markup_names: Option<Vec<String>>,
+
+    /// A list of callable names, whose result may be safely passed into [`markupsafe.Markup`].
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., [`bleach.clean`], rather than
+    /// `clean`).
+    ///
+    /// This setting helps you avoid false positives in code like:
+    ///
+    /// ```python
+    /// from bleach import clean
+    /// from markupsafe import Markup
+    ///
+    /// cleaned_markup = Markup(bleach.clean(some_user_input))
+    /// ```
+    ///
+    /// Where the use of [`bleach.clean`] usually ensures that there's no XSS vulnerability.
+    ///
+    /// Although it is not recommended, you may also use this setting to whitelist other
+    /// kinds of calls, e.g. calls to i18n translation functions, where how safe that is
+    /// will depend on the implementation and how well the translations are audited.
+    ///
+    /// Another common use-case is to wrap the output of functions that generate markup
+    /// like [`xml.etree.ElementTree.tostring`] or template rendering engines where
+    /// sanitization of potential user input is either already baked in or has to happen
+    /// before rendering.
+    ///
+    /// [bleach.clean]: https://bleach.readthedocs.io/en/latest/clean.html
+    /// [markupsafe.Markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
+    /// [xml.etree.ElementTree.tostring]: https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "whitelisted-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
+    )]
+    pub whitelisted_markup_calls: Option<Vec<String>>,
 }
 
 impl RuffOptions {
@@ -3100,6 +3135,7 @@ impl RuffOptions {
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
             extend_markup_names: self.extend_markup_names.unwrap_or_default(),
+            whitelisted_markup_calls: self.whitelisted_markup_calls.unwrap_or_default(),
         }
     }
 }

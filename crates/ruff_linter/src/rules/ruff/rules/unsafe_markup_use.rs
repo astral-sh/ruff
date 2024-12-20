@@ -1,9 +1,9 @@
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::{Expr, ExprCall};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_semantic::Modules;
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, settings::LinterSettings};
@@ -22,7 +22,9 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// treated like [`markupsafe.Markup`].
 ///
 /// This rule was originally inspired by [flake8-markupsafe] but doesn't carve
-/// out any exceptions for i18n related calls.
+/// out any exceptions for i18n related calls by default.
+///
+/// You can use [`lint.ruff.whitelisted-markup-calls`] to specify exceptions.
 ///
 /// ## Example
 /// Given:
@@ -64,6 +66,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// ```
 /// ## Options
 /// - `lint.ruff.extend-markup-names`
+/// - `lint.ruff.whitelisted-markup-calls`
 ///
 /// ## References
 /// - [MarkupSafe](https://pypi.org/project/MarkupSafe/)
@@ -95,7 +98,7 @@ pub(crate) fn unsafe_markup_call(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    if !is_unsafe_call(call) {
+    if !is_unsafe_call(call, checker.semantic(), checker.settings) {
         return;
     }
 
@@ -127,12 +130,29 @@ fn is_markup_call(qualified_name: &QualifiedName, settings: &LinterSettings) -> 
         .any(|target| *qualified_name == target)
 }
 
-fn is_unsafe_call(call: &ExprCall) -> bool {
+fn is_unsafe_call(call: &ExprCall, semantic: &SemanticModel, settings: &LinterSettings) -> bool {
     // technically this could be circumvented by using a keyword argument
     // but without type-inference we can't really know which keyword argument
     // corresponds to the first positional argument and either way it is
     // unlikely that someone will actually use a keyword argument here
     // TODO: Eventually we may want to allow dynamic values, as long as they
     //       have a __html__ attribute, since that is part of the API
-    matches!(&*call.arguments.args, [first] if !first.is_string_literal_expr() && !first.is_bytes_literal_expr())
+    matches!(&*call.arguments.args, [first] if !first.is_string_literal_expr() && !first.is_bytes_literal_expr() && !is_whitelisted_call(first, semantic, settings))
+}
+
+fn is_whitelisted_call(expr: &Expr, semantic: &SemanticModel, settings: &LinterSettings) -> bool {
+    let Expr::Call(ExprCall { func, .. }) = expr else {
+        return false;
+    };
+
+    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+        return false;
+    };
+
+    settings
+        .ruff
+        .whitelisted_markup_calls
+        .iter()
+        .map(|target| QualifiedName::from_dotted_name(target))
+        .any(|target| qualified_name == target)
 }
