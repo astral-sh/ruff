@@ -250,7 +250,8 @@ reveal_type(x)  # revealed: Literal[2]
 Just for comparison, we still infer the combined type if the condition is not statically known:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -278,7 +279,8 @@ reveal_type(x)  # revealed: Literal[2]
 #### Always false
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -295,7 +297,8 @@ reveal_type(x)  # revealed: Literal[2, 4]
 #### Always true
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -312,7 +315,8 @@ reveal_type(x)  # revealed: Literal[2, 3]
 #### Ambiguous
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -331,7 +335,8 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 Make sure that we include bindings from all non-`False` branches:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -358,7 +363,8 @@ reveal_type(x)  # revealed: Literal[2, 3, 6, 7, 8]
 Make sure that we only include the binding from the first `elif True` branch:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -381,7 +387,8 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 #### `elif` without `else` branch, always true
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -396,7 +403,8 @@ reveal_type(x)  # revealed: Literal[2, 3]
 #### `elif` without `else` branch, always false
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -441,7 +449,8 @@ reveal_type(x)  # revealed: Literal[1]
 #### `if <bool>` inside `if True`
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -457,7 +466,8 @@ reveal_type(x)  # revealed: Literal[1, 2]
 #### `if True` inside `if <bool>`
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -501,7 +511,8 @@ reveal_type(x)  # revealed: Literal[1]
 #### `if <bool>` inside `if False` ... `else`
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -551,7 +562,8 @@ reveal_type(x)  # revealed: Literal[3]
 #### `if <bool>` inside `if True`
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -569,7 +581,8 @@ reveal_type(x)  # revealed: Literal[2, 3]
 #### `if True` inside `if <bool>`
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -619,7 +632,8 @@ reveal_type(x)  # revealed: Literal[4]
 #### `if <bool>` inside `if False` ... `else`
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -727,7 +741,8 @@ reveal_type(x)  # revealed: Literal[5]
 ##### `if True` inside `for`
 
 ```py
-def iterable() -> list[object]: ...
+def iterable() -> list[object]:
+    return [1, ""]
 
 x = 1
 
@@ -742,7 +757,8 @@ reveal_type(x)  # revealed: Literal[1, 3]
 ##### `if True` inside `for` ... `else`
 
 ```py
-def iterable() -> list[object]: ...
+def iterable() -> list[object]:
+    return [1, ""]
 
 x = 1
 
@@ -760,7 +776,8 @@ reveal_type(x)  # revealed: Literal[3]
 ##### `for` inside `if True`
 
 ```py
-def iterable() -> list[object]: ...
+def iterable() -> list[object]:
+    return [1, ""]
 
 x = 1
 
@@ -776,7 +793,8 @@ reveal_type(x)  # revealed: Literal[1, 2]
 ##### `for` ... `else` inside `if True`
 
 ```py
-def iterable() -> list[object]: ...
+def iterable() -> list[object]:
+    return [1, ""]
 
 x = 1
 
@@ -794,7 +812,8 @@ reveal_type(x)  # revealed: Literal[3]
 ##### `for` loop with `break` inside `if True`
 
 ```py
-def iterable() -> list[object]: ...
+def iterable() -> list[object]:
+    return [1, ""]
 
 x = 1
 
@@ -920,7 +939,8 @@ reveal_type(x)  # revealed: Literal[2]
 Make sure that we still infer the combined type if the condition is not statically known:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -1006,7 +1026,8 @@ reveal_type(x)  # revealed: Literal[2]
 Make sure we don't infer a static truthiness in case there is a case guard:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -1056,7 +1077,8 @@ reveal_type(x)  # revealed: Literal[1]
 For definitely-false cases, the presence of a guard has no influence:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x = 1
 
@@ -1203,7 +1225,8 @@ def f() -> None:
 ### Ambiguous
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 x: str
 
@@ -1217,14 +1240,19 @@ def f() -> None:
 ## Conditional function definitions
 
 ```py
-def f() -> int: ...
-def g() -> int: ...
+def f() -> int:
+    return 1
+
+def g() -> int:
+    return 1
 
 if True:
-    def f() -> str: ...
+    def f() -> str:
+        return ""
 
 else:
-    def g() -> str: ...
+    def g() -> str:
+        return ""
 
 reveal_type(f())  # revealed: str
 reveal_type(g())  # revealed: int
@@ -1308,7 +1336,8 @@ For comparison, we still detect definitions inside non-statically known branches
 unbound:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 if flag():
     x = 1
@@ -1320,7 +1349,8 @@ x
 ### Nested conditionals
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 if False:
     if True:
@@ -1419,7 +1449,8 @@ from module import symbol
 #### Ambiguous, possibly unbound
 
 ```py path=module.py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 if flag():
     symbol = 1
