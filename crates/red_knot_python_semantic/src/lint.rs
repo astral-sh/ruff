@@ -321,7 +321,7 @@ impl LintRegistryBuilder {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct LintRegistry {
     lints: Vec<LintId>,
     by_name: FxHashMap<&'static str, LintEntry>,
@@ -385,7 +385,7 @@ pub enum GetLintError {
     Unknown(String),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum LintEntry {
     /// An existing lint rule. Can be in preview, stable or deprecated.
     Lint(LintId),

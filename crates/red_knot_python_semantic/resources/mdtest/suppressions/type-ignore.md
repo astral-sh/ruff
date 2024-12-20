@@ -95,12 +95,8 @@ a = test  # type: ignore[name-defined]
 
 ## Nested comments
 
-TODO: We should support this for better interopability with other suppression comments.
-
 ```py
 # fmt: off
-# TODO this error should be suppressed
-# error: [unresolved-reference]
 a = test \
   + 2  # fmt: skip # type: ignore
 

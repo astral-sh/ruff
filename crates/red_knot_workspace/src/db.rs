@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 use crate::DEFAULT_LINT_REGISTRY;
-use red_knot_python_semantic::lint::RuleSelection;
+use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
@@ -116,6 +116,10 @@ impl SemanticDb for RootDatabase {
     fn rule_selection(&self) -> &RuleSelection {
         &self.rule_selection
     }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        &DEFAULT_LINT_REGISTRY
+    }
 }
 
 #[salsa::db]
@@ -162,7 +166,7 @@ pub(crate) mod tests {
 
     use salsa::Event;
 
-    use red_knot_python_semantic::lint::RuleSelection;
+    use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
     use red_knot_python_semantic::Db as SemanticDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
@@ -267,6 +271,10 @@ pub(crate) mod tests {
 
         fn rule_selection(&self) -> &RuleSelection {
             &self.rule_selection
+        }
+
+        fn lint_registry(&self) -> &LintRegistry {
+            &DEFAULT_LINT_REGISTRY
         }
     }
 

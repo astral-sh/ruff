@@ -7,6 +7,7 @@ use std::sync::{Mutex, OnceLock};
 
 use libfuzzer_sys::{fuzz_target, Corpus};
 
+use red_knot_python_semantic::lint::LintRegistry;
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{
     default_lint_registry, lint::RuleSelection, Db as SemanticDb, Program, ProgramSettings,
@@ -40,7 +41,7 @@ impl TestDb {
             vendored: red_knot_vendored::file_system().clone(),
             events: std::sync::Arc::default(),
             files: Files::default(),
-            rule_selection: RuleSelection::from_registry(&default_lint_registry()).into(),
+            rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
         }
     }
 }
@@ -87,6 +88,10 @@ impl SemanticDb for TestDb {
 
     fn rule_selection(&self) -> &RuleSelection {
         &self.rule_selection
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        default_lint_registry()
     }
 }
 

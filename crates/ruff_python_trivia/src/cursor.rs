@@ -56,10 +56,8 @@ impl<'a> Cursor<'a> {
         self.chars.clone().next_back().unwrap_or(EOF_CHAR)
     }
 
-    // SAFETY: The `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
-    #[allow(clippy::cast_possible_truncation)]
     pub fn text_len(&self) -> TextSize {
-        TextSize::new(self.chars.as_str().len() as u32)
+        self.chars.as_str().text_len()
     }
 
     pub fn token_len(&self) -> TextSize {
@@ -97,6 +95,16 @@ impl<'a> Cursor<'a> {
     pub fn eat_char_back(&mut self, c: char) -> bool {
         if self.last() == c {
             self.bump_back();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Eats the next character if `predicate` returns `true`.
+    pub fn eat_if(&mut self, mut predicate: impl FnMut(char) -> bool) -> bool {
+        if predicate(self.first()) && !self.is_eof() {
+            self.bump();
             true
         } else {
             false
