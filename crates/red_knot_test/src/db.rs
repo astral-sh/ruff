@@ -1,4 +1,4 @@
-use red_knot_python_semantic::lint::RuleSelection;
+use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{
     default_lint_registry, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
     PythonVersion, SearchPathSettings,
@@ -21,7 +21,7 @@ pub(crate) struct Db {
 
 impl Db {
     pub(crate) fn setup(workspace_root: SystemPathBuf) -> Self {
-        let rule_selection = RuleSelection::from_registry(&default_lint_registry());
+        let rule_selection = RuleSelection::from_registry(default_lint_registry());
 
         let db = Self {
             workspace_root,
@@ -96,6 +96,10 @@ impl SemanticDb for Db {
 
     fn rule_selection(&self) -> &RuleSelection {
         &self.rule_selection
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        default_lint_registry()
     }
 }
 

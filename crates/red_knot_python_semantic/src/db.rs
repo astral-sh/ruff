@@ -1,4 +1,4 @@
-use crate::lint::RuleSelection;
+use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::files::File;
 use ruff_db::{Db as SourceDb, Upcast};
 
@@ -8,6 +8,8 @@ pub trait Db: SourceDb + Upcast<dyn SourceDb> {
     fn is_file_open(&self, file: File) -> bool;
 
     fn rule_selection(&self) -> &RuleSelection;
+
+    fn lint_registry(&self) -> &LintRegistry;
 }
 
 #[cfg(test)]
@@ -19,7 +21,7 @@ pub(crate) mod tests {
     use crate::{default_lint_registry, ProgramSettings, PythonPlatform};
 
     use super::Db;
-    use crate::lint::RuleSelection;
+    use crate::lint::{LintRegistry, RuleSelection};
     use anyhow::Context;
     use ruff_db::files::{File, Files};
     use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
@@ -45,7 +47,7 @@ pub(crate) mod tests {
                 vendored: red_knot_vendored::file_system().clone(),
                 events: Arc::default(),
                 files: Files::default(),
-                rule_selection: Arc::new(RuleSelection::from_registry(&default_lint_registry())),
+                rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
             }
         }
 
@@ -111,6 +113,10 @@ pub(crate) mod tests {
 
         fn rule_selection(&self) -> &RuleSelection {
             &self.rule_selection
+        }
+
+        fn lint_registry(&self) -> &LintRegistry {
+            default_lint_registry()
         }
     }
 
