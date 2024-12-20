@@ -169,17 +169,11 @@
 //! indexvecs in the [`UseDefMap`].
 //!
 //! There is another special kind of possible "definition" for a symbol: there might be a path from
-//! the scope entry to a given use in which the symbol is never bound.
-//!
-//! The simplest way to model "unbound" would be as a "binding" itself: the initial "binding" for
-//! each symbol in a scope. But actually modeling it this way would unnecessarily increase the
-//! number of [`Definition`]s that Salsa must track. Since "unbound" is special in that all symbols
-//! share it, and it doesn't have any additional per-symbol state, and constraints are irrelevant
-//! to it, we can represent it more efficiently: we use the `may_be_unbound` boolean on the
-//! [`SymbolBindings`] struct. If this flag is `true` for a use of a symbol, it means the symbol
-//! has a path to the use in which it is never bound. If this flag is `false`, it means we've
-//! eliminated the possibility of unbound: every control flow path to the use includes a binding
-//! for this symbol.
+//! the scope entry to a given use in which the symbol is never bound. We model this with a special
+//! "unbound" definition (a `None` entry at the start of the `all_definitions` vector). If that
+//! sentinel definition is present in the live bindings at a given use, it means that there is a
+//! possible path through control flow in which that symbol is unbound. Similarly, if that sentinel
+//! is present in the live declarations, it means that the symbol is (possibly) undeclared.
 //!
 //! To build a [`UseDefMap`], the [`UseDefMapBuilder`] is notified of each new use, definition, and
 //! constraint as they are encountered by the
@@ -190,11 +184,13 @@
 //! end of the scope, it records the state for each symbol as the public definitions of that
 //! symbol.
 //!
-//! Let's walk through the above example. Initially we record for `x` that it has no bindings, and
-//! may be unbound. When we see `x = 1`, we record that as the sole live binding of `x`, and flip
-//! `may_be_unbound` to `false`. Then we see `x = 2`, and we replace `x = 1` as the sole live
-//! binding of `x`. When we get to `y = x`, we record that the live bindings for that use of `x`
-//! are just the `x = 2` definition.
+//! Let's walk through the above example. Initially we do not have any record of `x`. When we add
+//! the new symbol (before we process the first binding), we create a new undefined `SymbolState`
+//! which has a single live binding (the "unbound" definition) and a single live declaration (the
+//! "undeclared" definition). When we see `x = 1`, we record that as the sole live binding of `x`.
+//! The "unbound" binding is no longer visible. Then we see `x = 2`, and we replace `x = 1` as the
+//! sole live binding of `x`. When we get to `y = x`, we record that the live bindings for that use
+//! of `x` are just the `x = 2` definition.
 //!
 //! Then we hit the `if` branch. We visit the `test` node (`flag` in this case), since that will
 //! happen regardless. Then we take a pre-branch snapshot of the current state for all symbols,
@@ -207,8 +203,8 @@
 //! be the pre-if conditions; if we are entering the `else` clause, we know that the `if` test
 //! failed and we didn't execute the `if` body. So we first reset the builder to the pre-if state,
 //! using the snapshot we took previously (meaning we now have `x = 2` as the sole binding for `x`
-//! again), then visit the `else` clause, where `x = 4` replaces `x = 2` as the sole live binding
-//! of `x`.
+//! again), and record a *negative* `flag` constraint for all live bindings (`x = 2`). We then
+//! visit the `else` clause, where `x = 4` replaces `x = 2` as the sole live binding of `x`.
 //!
 //! Now we reach the end of the if/else, and want to visit the following code. The state here needs
 //! to reflect that we might have gone through the `if` branch, or we might have gone through the
