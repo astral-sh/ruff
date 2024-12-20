@@ -321,19 +321,69 @@ type ModuleMember = (&'static str, &'static str);
 /// library (e.g., `list` for `typing.List`), if such a generic was introduced by [PEP 585].
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
-pub fn as_pep_585_generic(module: &str, member: &str) -> Option<ModuleMember> {
-    match (module, member) {
-        ("typing", "Dict") => Some(("", "dict")),
-        ("typing", "FrozenSet") => Some(("", "frozenset")),
-        ("typing", "List") => Some(("", "list")),
-        ("typing", "Set") => Some(("", "set")),
-        ("typing", "Tuple") => Some(("", "tuple")),
-        ("typing", "Type") => Some(("", "type")),
-        ("typing_extensions", "Type") => Some(("", "type")),
-        ("typing", "Deque") => Some(("collections", "deque")),
-        ("typing_extensions", "Deque") => Some(("collections", "deque")),
-        ("typing", "DefaultDict") => Some(("collections", "defaultdict")),
-        ("typing_extensions", "DefaultDict") => Some(("collections", "defaultdict")),
+pub fn as_pep_585_generic(call_path: &[&str]) -> Option<ModuleMember> {
+    match call_path {
+        // Builtins
+        ["typing" | "typing_extensions", "Tuple"] => Some(("", "tuple")),
+        ["typing" | "typing_extensions", "List"] => Some(("", "list")),
+        ["typing" | "typing_extensions", "Dict"] => Some(("", "dict")),
+        ["typing" | "typing_extensions", "Set"] => Some(("", "set")),
+        ["typing" | "typing_extensions", "FrozenSet"] => Some(("", "frozenset")),
+        ["typing" | "typing_extensions", "Type"] => Some(("", "type")),
+
+        // collections
+        ["typing" | "typing_extensions", "Deque"] => Some(("collections", "deque")),
+        ["typing" | "typing_extensions", "DefaultDict"] => Some(("collections", "defaultdict")),
+        ["typing" | "typing_extensions", "OrderedDict"] => Some(("collections", "OrderedDict")),
+        ["typing" | "typing_extensions", "Counter"] => Some(("collections", "Counter")),
+        ["typing" | "typing_extensions", "ChainMap"] => Some(("collections", "ChainMap")),
+
+        // collections.abc
+        ["typing" | "typing_extensions", "Awaitable"] => Some(("collections.abc", "Awaitable")),
+        ["typing" | "typing_extensions", "Coroutine"] => Some(("collections.abc", "Coroutine")),
+        ["typing" | "typing_extensions", "AsyncIterable"] => {
+            Some(("collections.abc", "AsyncIterable"))
+        }
+        ["typing" | "typing_extensions", "AsyncGenerator"] => {
+            Some(("collections.abc", "AsyncGenerator"))
+        }
+        ["typing" | "typing_extensions", "Iterable"] => Some(("collections.abc", "Iterable")),
+        ["typing" | "typing_extensions", "Iterator"] => Some(("collections.abc", "Iterator")),
+        ["typing" | "typing_extensions", "Generator"] => Some(("collections.abc", "Generator")),
+        ["typing" | "typing_extensions", "Reversible"] => Some(("collections.abc", "Reversible")),
+        ["typing" | "typing_extensions", "Container"] => Some(("collections.abc", "Container")),
+        ["typing" | "typing_extensions", "Collection"] => Some(("collections.abc", "Collection")),
+        ["typing" | "typing_extensions", "Callable"] => Some(("collections.abc", "Callable")),
+        ["typing" | "typing_extensions", "AbstractSet"] => Some(("collections.abc", "Set")),
+        ["typing" | "typing_extensions", "MutableSet"] => Some(("collections.abc", "MutableSet")),
+        ["typing" | "typing_extensions", "Mapping"] => Some(("collections.abc", "Mapping")),
+        ["typing" | "typing_extensions", "MutableMapping"] => {
+            Some(("collections.abc", "MutableMapping"))
+        }
+        ["typing" | "typing_extensions", "Sequence"] => Some(("collections.abc", "Sequence")),
+        ["typing" | "typing_extensions", "MutableSequence"] => {
+            Some(("collections.abc", "MutableSequence"))
+        }
+        ["typing" | "typing_extensions", "ByteString"] => Some(("collections.abc", "ByteString")),
+        ["typing" | "typing_extensions", "MappingView"] => Some(("collections.abc", "MappingView")),
+        ["typing" | "typing_extensions", "KeysView"] => Some(("collections.abc", "KeysView")),
+        ["typing" | "typing_extensions", "ItemsView"] => Some(("collections.abc", "ItemsView")),
+        ["typing" | "typing_extensions", "ValuesView"] => Some(("collections.abc", "ValuesView")),
+
+        // contextlib
+        ["typing" | "typing_extensions", "ContextManager"] => {
+            Some(("contextlib", "AbstractContextManager"))
+        }
+        ["typing" | "typing_extensions", "AsyncContextManager"] => {
+            Some(("contextlib", "AbstractAsyncContextManager"))
+        }
+
+        // re
+        ["typing" | "typing_extensions", "Pattern"] => Some(("re", "Pattern")),
+        ["typing" | "typing_extensions", "Match"] => Some(("re", "Match")),
+        ["typing" | "typing_extensions", "re", "Pattern"] => Some(("re", "Pattern")),
+        ["typing" | "typing_extensions", "re", "Match"] => Some(("re", "Match")),
+
         _ => None,
     }
 }
@@ -347,8 +397,39 @@ pub fn has_pep_585_generic(module: &str, member: &str) -> bool {
     // the last element in each pattern, and de-duplicating the values.
     matches!(
         (module, member),
-        ("", "dict" | "frozenset" | "list" | "set" | "tuple" | "type")
-            | ("collections", "deque" | "defaultdict")
+        ("", "tuple" | "list" | "dict" | "set" | "frozenset" | "type")
+            | (
+                "collections",
+                "deque" | "defaultdict" | "OrderedDict" | "Counter" | "ChainMap"
+            )
+            | (
+                "collections.abc",
+                "Awaitable"
+                    | "Coroutine"
+                    | "Iterable"
+                    | "Iterator"
+                    | "Generator"
+                    | "Reversible"
+                    | "Container"
+                    | "Collection"
+                    | "Callable"
+                    | "Set"
+                    | "MutableSet"
+                    | "Mapping"
+                    | "MutableMapping"
+                    | "Sequence"
+                    | "MutableSequence"
+                    | "ByteString"
+                    | "MappingView"
+                    | "KeysView"
+                    | "ItemsView"
+                    | "ValuesView"
+            )
+            | (
+                "contextlib",
+                "AbstractContextManager" | "AbstractAsyncContextManager"
+            )
+            | ("re", "Pattern" | "Match")
     )
 }
 
