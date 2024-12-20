@@ -412,21 +412,23 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     inner: DeclarationIdIterator<'map>,
 }
 
+pub(crate) struct DeclarationWithConstraint<'map, 'db> {
+    pub(crate) declaration: Option<Definition<'db>>,
+    pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
+    pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
+}
+
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
-    type Item = (
-        Option<Definition<'db>>,
-        &'map VisibilityConstraints<'db>,
-        ScopedVisibilityConstraintId,
-    );
+    type Item = DeclarationWithConstraint<'map, 'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|(def_id, visibility_constraint_id)| {
-            (
-                self.all_definitions[def_id],
-                self.visibility_constraints,
-                visibility_constraint_id,
-            )
-        })
+        self.inner.next().map(
+            |(def_id, visibility_constraint)| DeclarationWithConstraint {
+                declaration: self.all_definitions[def_id],
+                visibility_constraints: self.visibility_constraints,
+                visibility_constraint,
+            },
+        )
     }
 }
 

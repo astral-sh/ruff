@@ -23,7 +23,8 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, imported_modules, semantic_index, symbol_table, use_def_map,
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
+    DeclarationsIterator,
 };
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
 use crate::symbol::{Boundness, Symbol};
@@ -358,15 +359,23 @@ fn declarations_ty<'db>(
 ) -> DeclaredTypeResult<'db> {
     let mut declarations = declarations.peekable();
 
-    let undeclared_visibility =
-        if let Some((None, visibility_constraints, visibility_constraint)) = declarations.peek() {
-            visibility_constraints.evaluate(db, *visibility_constraint)
-        } else {
-            Truthiness::AlwaysFalse
-        };
+    let undeclared_visibility = if let Some(DeclarationWithConstraint {
+        declaration: None,
+        visibility_constraints,
+        visibility_constraint,
+    }) = declarations.peek()
+    {
+        visibility_constraints.evaluate(db, *visibility_constraint)
+    } else {
+        Truthiness::AlwaysFalse
+    };
 
     let mut types = declarations.filter_map(
-        |(declaration, visibility_constraints, visibility_constraint)| {
+        |DeclarationWithConstraint {
+             declaration,
+             visibility_constraints,
+             visibility_constraint,
+         }| {
             let declaration = declaration?;
             let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
 
