@@ -29,6 +29,33 @@ int(round(1, None))
 int(round(1.))
 int(round(1., None))
 
+int(1)
+int(v := 1)
+int(~1)
+int(-1)
+int(+1)
+
+int(1 + 1)
+int(1 - 1)
+int(1 * 1)
+int(1 % 1)
+int(1 ** 1)
+int(1 << 1)
+int(1 >> 1)
+int(1 | 1)
+int(1 ^ 1)
+int(1 & 1)
+int(1 // 1)
+
+int(1 if ... else 2)
+
+int(1 and 0)
+int(0 or -1)
+
+
+if int(1 + 2) * 3:
+    ...
+
 
 ### Unsafe
 
@@ -68,3 +95,62 @@ int(round(inferred_int, 3.14))
 
 int(round(0, 0), base)
 int(round(0, 0, extra=keyword))
+
+int(foo if ... else 4)
+
+int(3.14)
+int(2.8j)
+
+async def f():
+    int(await f())
+
+int(foo.bar)
+int(bar([1][False]))
+
+int(1 == 1)
+int(1 != 1)
+int(1 < 1)
+int(1 <= 1)
+int(1 > 1)
+int(1 >= 1)
+int(1 in 1)
+int(1 not in 1)
+int(1 is 1)
+int(2 is not 3)
+int(foo in 1)
+int(foo not in 1)
+int(foo is 1)
+int(foo is not 1)
+
+int(1 == 2 == 3)
+int(foo == 1)
+int(foo != 1)
+int(foo < 1)
+int(foo <= 1)
+int(foo > 1)
+int(foo >= 1)
+
+int(v := {}[{}['']])
+
+int(foo + 1)
+int(foo - 1)
+int(foo * 1)
+int(foo @ 1)
+int(foo / 1)
+int(foo % 1)
+int(foo ** 1)
+int(foo << 1)
+int(foo >> 1)
+int(foo | 1)
+int(foo ^ 1)
+int(foo & 1)
+int(foo // 1)
+
+int(v := 3.7)
+
+int(not 109)
+
+int(1 / 1)
+int(1 @ 1)
+
+int(1. if ... else .2)
