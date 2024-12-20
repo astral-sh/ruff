@@ -90,7 +90,12 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
 
             match inferred {
                 // Symbol is possibly undeclared and definitely unbound
-                Symbol::Unbound => Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
+                Symbol::Unbound => {
+                    // TODO: We probably don't want to report `Bound` here. This requires a bit of
+                    // design work though as we might want a different behavior for stubs and for
+                    // normal modules.
+                    Symbol::Type(declared_ty, Boundness::Bound)
+                }
                 // Symbol is possibly undeclared and (possibly) bound
                 Symbol::Type(inferred_ty, boundness) => Symbol::Type(
                     UnionType::from_elements(db, [inferred_ty, declared_ty].iter().copied()),
