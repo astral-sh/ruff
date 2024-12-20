@@ -4,8 +4,16 @@ use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprC
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
+use std::sync::LazyLock;
 
 use crate::checkers::ast::Checker;
+use regex::Regex;
+
+static SECRET_BACKEND_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"airflow\..*secrets\.\w+\.\w+Backend").unwrap());
+
+static AIRFLOW_HOOK_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"airflow\..*hooks\.\w+\.\w+Hook").unwrap());
 
 #[derive(Debug, Eq, PartialEq)]
 enum Replacement {
@@ -194,6 +202,20 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
             "initialize_providers_dataset_uri_resources" => Some(Replacement::Name(
                 "initialize_providers_asset_uri_resources",
             )),
+            &_ => None,
+        },
+        ["airflow", "datasets", ..] | ["airflow", "Dataset"] => match attr.as_str() {
+            "iter_datasets" => Some(Replacement::Name("iter_assets")),
+            "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
+            &_ => None,
+        },
+        _ if SECRET_BACKEND_REGEX.is_match(&qualname.segments().join(".")) => match attr.as_str() {
+            "get_conn_uri" => Some(Replacement::Name("get_conn_value")),
+            "get_connections" => Some(Replacement::Name("get_connection")),
+            &_ => None,
+        },
+        _ if AIRFLOW_HOOK_REGEX.is_match(&qualname.segments().join(".")) => match attr.as_str() {
+            "get_connections" => Some(Replacement::Name("get_connection")),
             &_ => None,
         },
         _ => None,
