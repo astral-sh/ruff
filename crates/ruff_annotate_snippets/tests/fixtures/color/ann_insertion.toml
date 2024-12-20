@@ -1,0 +1,15 @@
+[message]
+level = "Error"
+title = "expected `.`, `=`"
+
+[[message.snippets]]
+source = "asf"
+line_start = 1
+origin = "Cargo.toml"
+[[message.snippets.annotations]]
+label = "'d' belongs here"
+level = "Error"
+range = [2, 2]
+
+[renderer]
+color = true

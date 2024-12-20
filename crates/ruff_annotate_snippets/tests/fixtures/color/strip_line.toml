@@ -1,0 +1,18 @@
+[message]
+level = "Error"
+id = "E0308"
+title = "mismatched types"
+
+[[message.snippets]]
+source = "                                                                                                                                                                                    let _: () = 42;"
+line_start = 4
+origin = "$DIR/whitespace-trimming.rs"
+
+[[message.snippets.annotations]]
+label = "expected (), found integer"
+level = "Error"
+range = [192, 194]
+
+[renderer]
+color = true
+anonymized_line_numbers = true

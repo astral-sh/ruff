@@ -1,0 +1,21 @@
+[message]
+level = "Error"
+id = "E0027"
+title = "pattern does not mention fields `lineno`, `content`"
+
+[[message.snippets]]
+source = """
+                        if let DisplayLine::Source {
+                            ref mut inline_marks,
+                        } = body[body_idx]
+"""
+line_start = 139
+origin = "src/display_list.rs"
+fold = false
+[[message.snippets.annotations]]
+label = "missing fields `lineno`, `content`"
+level = "Error"
+range = [31, 128]
+
+[renderer]
+color = true

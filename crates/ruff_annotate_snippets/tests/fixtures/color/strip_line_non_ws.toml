@@ -1,0 +1,26 @@
+[message]
+level = "Error"
+id = "E0308"
+title = "mismatched types"
+
+[[message.snippets]]
+source = """
+	let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = 42; let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = (); let _: () = ();
+"""
+line_start = 4
+origin = "$DIR/non-whitespace-trimming.rs"
+
+[[message.snippets.annotations]]
+label = "expected `()`, found integer"
+level = "Error"
+range = [241, 243]
+
+[[message.snippets.annotations]]
+label = "expected due to this"
+level = "Error"
+range = [236, 238]
+
+
+[renderer]
+anonymized_line_numbers = true
+color = true

@@ -1,0 +1,37 @@
+[package]
+name = "ruff_annotate_snippets"
+version = "0.1.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = "MIT OR Apache-2.0"
+
+[lib]
+
+[features]
+default = []
+testing-colors = []
+
+[dependencies]
+anstyle = { workspace = true }
+memchr = { workspace = true }
+unicode-width = { workspace = true }
+
+[dev-dependencies]
+ruff_annotate_snippets = { workspace = true, features = ["testing-colors"] }
+anstream = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+snapbox = { workspace = true, features = ["diff", "term-svg", "cmd", "examples"] }
+toml = { workspace = true }
+tryfn = { workspace = true }
+
+[[test]]
+name = "fixtures"
+harness = false
+
+[lints]
+workspace = true
