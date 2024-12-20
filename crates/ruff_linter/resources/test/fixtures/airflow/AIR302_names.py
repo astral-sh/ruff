@@ -253,3 +253,34 @@ has_access_dataset
 
 # airflow.www.utils
 get_sensitive_variables_fields, should_hide_value_for_key
+
+from airflow.datasets.manager import DatasetManager
+
+dm = DatasetManager()
+dm.register_dataset_change()
+dm.create_datasets()
+dm.notify_dataset_created()
+dm.notify_dataset_changed()
+dm.notify_dataset_alias_created()
+
+
+from airflow.lineage.hook import HookLineageCollector
+
+hlc = HookLineageCollector()
+hlc.create_dataset()
+hlc.add_input_dataset()
+hlc.add_output_dataset()
+hlc.collected_datasets()
+
+
+from airflow.providers.amazon.auth_manager.aws_auth_manager import AwsAuthManager
+
+aam = AwsAuthManager()
+aam.is_authorized_dataset()
+
+
+from airflow.providers_manager import ProvidersManager
+
+pm = ProvidersManager()
+pm.initialize_providers_asset_uri_resources()
+pm.dataset_factories

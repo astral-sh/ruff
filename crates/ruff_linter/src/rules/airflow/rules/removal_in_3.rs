@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall};
+use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -152,6 +153,66 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
         }
         _ => {}
     };
+}
+
+fn removed_method(checker: &mut Checker, expr: &Expr) {
+    let Expr::Call(ExprCall { func, .. }) = expr else {
+        return;
+    };
+
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
+        return;
+    };
+
+    let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) else {
+        return;
+    };
+
+    let replacement = match *qualname.segments() {
+        ["airflow", "datasets", "manager", "DatasetManager"] => match attr.as_str() {
+            "register_dataset_change" => {
+                Some(Replacement::Name("register_asset_change".to_string()))
+            }
+            "create_datasets" => Some(Replacement::Name("create_assets".to_string())),
+            "notify_dataset_created" => Some(Replacement::Name("notify_asset_created".to_string())),
+            "notify_dataset_changed" => Some(Replacement::Name("notify_asset_changed".to_string())),
+            "notify_dataset_alias_created" => {
+                Some(Replacement::Name("notify_asset_alias_created".to_string()))
+            }
+            &_ => None,
+        },
+        ["airflow", "lineage", "hook", "HookLineageCollector"] => match attr.as_str() {
+            "create_dataset" => Some(Replacement::Name("create_asset".to_string())),
+            "add_input_dataset" => Some(Replacement::Name("add_input_asset".to_string())),
+            "add_output_dataset" => Some(Replacement::Name("add_output_asset".to_string())),
+            "collected_datasets" => Some(Replacement::Name("collected_assets".to_string())),
+            &_ => None,
+        },
+        ["airflow", "providers", "amazon", "auth_manager", "aws_auth_manager", "AwsAuthManager"] => {
+            match attr.as_str() {
+                "is_authorized_dataset" => {
+                    Some(Replacement::Name("is_authorized_asset".to_string()))
+                }
+                &_ => None,
+            }
+        }
+        ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
+            "initialize_providers_dataset_uri_resources" => Some(Replacement::Name(
+                "initialize_providers_asset_uri_resources".to_string(),
+            )),
+            &_ => None,
+        },
+        _ => None,
+    };
+    if let Some(replacement) = replacement {
+        checker.diagnostics.push(Diagnostic::new(
+            Airflow3Removal {
+                deprecated: attr.as_str().to_string(),
+                replacement,
+            },
+            attr.range(),
+        ));
+    }
 }
 
 fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
@@ -607,6 +668,8 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
             if let Some(qualname) = checker.semantic().resolve_qualified_name(func) {
                 removed_argument(checker, &qualname, arguments);
             };
+
+            removed_method(checker, expr);
         }
         Expr::Attribute(ExprAttribute { attr: ranged, .. }) => removed_name(checker, expr, ranged),
         ranged @ Expr::Name(_) => removed_name(checker, expr, ranged),
