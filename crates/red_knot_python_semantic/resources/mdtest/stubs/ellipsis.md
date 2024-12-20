@@ -29,8 +29,8 @@ reveal_type(Foo.y)  # revealed: int
 
 ## Ellipsis Usage In Non Stub File
 
-Ellipsis can only be used in assignment if it's actually assignable to the type it's being assigned
-to.
+In a non-stub file, there's no special treatment of ellipsis literals. An ellipsis literal can only be assigned if
+`EllipsisType` is actually assignable to the annotated type.
 
 ```py
 # error: [invalid-parameter-default] "Default value of type `EllipsisType | ellipsis` is not assignable to annotated parameter type `int`"
