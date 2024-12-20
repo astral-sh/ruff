@@ -1,0 +1,32 @@
+[message]
+level = "Error"
+title = ""
+
+[[message.snippets]]
+source = """
+fn add_title_line(result: &mut Vec<String>, main_annotation: Option<&Annotation>) {
+    if let Some(annotation) = main_annotation {
+        result.push(format_title_line(
+            &annotation.annotation_type,
+            None,
+            &annotation.label,
+        ));
+    }
+}
+"""
+line_start = 96
+[[message.snippets.annotations]]
+label = "Variable defined here"
+level = "Error"
+range = [100, 110]
+[[message.snippets.annotations]]
+label = "Referenced here"
+level = "Error"
+range = [184, 194]
+[[message.snippets.annotations]]
+label = "Referenced again here"
+level = "Error"
+range = [243, 253]
+
+[renderer]
+color = true

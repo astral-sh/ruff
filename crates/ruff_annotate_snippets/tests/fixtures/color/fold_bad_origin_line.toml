@@ -1,0 +1,20 @@
+[message]
+level = "Error"
+title = ""
+
+[[message.snippets]]
+source = """
+
+
+invalid syntax
+"""
+line_start = 1
+origin = "path/to/error.rs"
+fold = true
+[[message.snippets.annotations]]
+label = "error here"
+level = "Warning"
+range = [2,16]
+
+[renderer]
+color = true
