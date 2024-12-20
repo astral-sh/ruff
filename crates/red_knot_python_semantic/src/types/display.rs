@@ -324,6 +324,12 @@ impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
     }
 }
 
+impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+        DisplayTypeArray { types: self, db }
+    }
+}
+
 pub(crate) struct DisplayTypeArray<'b, 'db> {
     types: &'b [Type<'db>],
     db: &'db dyn Db,
