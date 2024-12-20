@@ -2,9 +2,10 @@ use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -54,10 +55,44 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
 pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
-    let Some(Expr::Call(inner_call)) = single_argument_to_int_call(semantic, call) else {
+    let Some(argument) = single_argument_to_int_call(semantic, call) else {
         return;
     };
 
+    if matches!(
+        ResolvedPythonType::from(argument),
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+    ) {
+        simplify_expression(checker, call, argument);
+        return;
+    }
+
+    if let Expr::Call(inner_call) = argument {
+        simplify_call(checker, call, inner_call);
+    }
+}
+
+fn simplify_expression(checker: &mut Checker, call: &ExprCall, argument: &Expr) {
+    let (locator, semantic) = (checker.locator(), checker.semantic());
+
+    let argument_expr = locator.slice(argument.range());
+
+    let has_parent_expr = semantic.current_expression_parent().is_some();
+    let new_content = if has_parent_expr || argument.is_named_expr() {
+        format!("({argument_expr})")
+    } else {
+        argument_expr.to_string()
+    };
+
+    let edit = Edit::range_replacement(new_content, call.range);
+    let fix = Fix::safe_edit(edit);
+
+    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
+
+    checker.diagnostics.push(diagnostic.with_fix(fix));
+}
+
+fn simplify_call(checker: &mut Checker, call: &ExprCall, inner_call: &ExprCall) {
     let (func, arguments) = (&inner_call.func, &inner_call.arguments);
     let (outer_range, inner_range) = (call.range, inner_call.range);
 
