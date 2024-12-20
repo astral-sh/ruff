@@ -3103,7 +3103,7 @@ pub struct RuffOptions {
     /// from bleach import clean
     /// from markupsafe import Markup
     ///
-    /// cleaned_markup = Markup(bleach.clean(some_user_input))
+    /// cleaned_markup = Markup(clean(some_user_input))
     /// ```
     ///
     /// Where the use of [`bleach.clean`] usually ensures that there's no XSS vulnerability.
