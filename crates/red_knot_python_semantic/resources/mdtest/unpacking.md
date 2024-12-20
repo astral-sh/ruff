@@ -61,7 +61,7 @@ reveal_type(c)  # revealed: Literal[4]
 ### Uneven unpacking (1)
 
 ```py
-# TODO: Add diagnostic (there aren't enough values to unpack)
+# error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
 (a, b, c) = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
@@ -71,7 +71,7 @@ reveal_type(c)  # revealed: Unknown
 ### Uneven unpacking (2)
 
 ```py
-# TODO: Add diagnostic (too many values to unpack)
+# error: [invalid-assignment] "Too many values to unpack (expected 2, got 3)"
 (a, b) = (1, 2, 3)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
@@ -80,7 +80,7 @@ reveal_type(b)  # revealed: Literal[2]
 ### Starred expression (1)
 
 ```py
-# TODO: Add diagnostic (need more values to unpack)
+# error: [invalid-assignment] "Not enough values to unpack (expected 3 or more, got 2)"
 [a, *b, c, d] = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
 # TODO: Should be list[Any] once support for assigning to starred expression is added
@@ -133,7 +133,7 @@ reveal_type(c)  # revealed: @Todo(starred unpacking)
 ### Starred expression (6)
 
 ```py
-# TODO: Add diagnostic (need more values to unpack)
+# error: [invalid-assignment] "Not enough values to unpack (expected 5 or more, got 1)"
 (a, b, c, *d, e, f) = (1,)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Unknown
@@ -199,7 +199,7 @@ reveal_type(b)  # revealed: LiteralString
 ### Uneven unpacking (1)
 
 ```py
-# TODO: Add diagnostic (there aren't enough values to unpack)
+# error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
 a, b, c = "ab"
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
@@ -209,7 +209,7 @@ reveal_type(c)  # revealed: Unknown
 ### Uneven unpacking (2)
 
 ```py
-# TODO: Add diagnostic (too many values to unpack)
+# error: [invalid-assignment] "Too many values to unpack (expected 2, got 3)"
 a, b = "abc"
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
@@ -218,7 +218,7 @@ reveal_type(b)  # revealed: LiteralString
 ### Starred expression (1)
 
 ```py
-# TODO: Add diagnostic (need more values to unpack)
+# error: [invalid-assignment] "Not enough values to unpack (expected 3 or more, got 2)"
 (a, *b, c, d) = "ab"
 reveal_type(a)  # revealed: LiteralString
 # TODO: Should be list[LiteralString] once support for assigning to starred expression is added
@@ -271,7 +271,7 @@ reveal_type(c)  # revealed: @Todo(starred unpacking)
 ### Unicode
 
 ```py
-# TODO: Add diagnostic (need more values to unpack)
+# error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 (a, b) = "é"
 
 reveal_type(a)  # revealed: LiteralString
@@ -281,7 +281,7 @@ reveal_type(b)  # revealed: Unknown
 ### Unicode escape (1)
 
 ```py
-# TODO: Add diagnostic (need more values to unpack)
+# error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 (a, b) = "\u9E6C"
 
 reveal_type(a)  # revealed: LiteralString
@@ -291,7 +291,7 @@ reveal_type(b)  # revealed: Unknown
 ### Unicode escape (2)
 
 ```py
-# TODO: Add diagnostic (need more values to unpack)
+# error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 (a, b) = "\U0010FFFF"
 
 reveal_type(a)  # revealed: LiteralString
@@ -383,7 +383,8 @@ def _(arg: tuple[int, bytes, int] | tuple[int, int, str, int, bytes]):
 
 ```py
 def _(arg: tuple[int, bytes, int] | tuple[int, int, str, int, bytes]):
-    # TODO: Add diagnostic (too many values to unpack)
+    # error: [invalid-assignment] "Too many values to unpack (expected 2, got 3)"
+    # error: [invalid-assignment] "Too many values to unpack (expected 2, got 5)"
     a, b = arg
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: bytes | int
@@ -393,7 +394,8 @@ def _(arg: tuple[int, bytes, int] | tuple[int, int, str, int, bytes]):
 
 ```py
 def _(arg: tuple[int, bytes] | tuple[int, str]):
-    # TODO: Add diagnostic (there aren't enough values to unpack)
+    # error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
+    # error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
     a, b, c = arg
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: bytes | str
@@ -536,6 +538,7 @@ for a, b in ((1, 2), ("a", "b")):
 # error: "Object of type `Literal[1]` is not iterable"
 # error: "Object of type `Literal[2]` is not iterable"
 # error: "Object of type `Literal[4]` is not iterable"
+# error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 for a, b in (1, 2, (3, "a"), 4, (5, "b"), "c"):
     reveal_type(a)  # revealed: Unknown | Literal[3, 5] | LiteralString
     reveal_type(b)  # revealed: Unknown | Literal["a", "b"]
