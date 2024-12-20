@@ -205,17 +205,17 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
             &_ => None,
         },
         ["airflow", "datasets", ..] | ["airflow", "Dataset"] => match attr.as_str() {
-            "iter_datasets" => Some(Replacement::Name("iter_assets".to_string())),
-            "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases".to_string())),
+            "iter_datasets" => Some(Replacement::Name("iter_assets")),
+            "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
             &_ => None,
         },
         _ if SECRET_BACKEND_REGEX.is_match(&qualname.segments().join(".")) => match attr.as_str() {
-            "get_conn_uri" => Some(Replacement::Name("get_conn_value".to_string())),
-            "get_connections" => Some(Replacement::Name("get_connection".to_string())),
+            "get_conn_uri" => Some(Replacement::Name("get_conn_value")),
+            "get_connections" => Some(Replacement::Name("get_connection")),
             &_ => None,
         },
         _ if AIRFLOW_HOOK_REGEX.is_match(&qualname.segments().join(".")) => match attr.as_str() {
-            "get_connections" => Some(Replacement::Name("get_connection".to_string())),
+            "get_connections" => Some(Replacement::Name("get_connection")),
             &_ => None,
         },
         _ => None,
