@@ -2,8 +2,10 @@ use anyhow::Result;
 use std::sync::Arc;
 use zip::CompressionMethod;
 
-use red_knot_python_semantic::lint::RuleSelection;
-use red_knot_python_semantic::{Db, Program, ProgramSettings, PythonVersion, SearchPathSettings};
+use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
+use red_knot_python_semantic::{
+    default_lint_registry, Db, Program, ProgramSettings, PythonVersion, SearchPathSettings,
+};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
@@ -89,6 +91,10 @@ impl Db for ModuleDb {
 
     fn rule_selection(&self) -> &RuleSelection {
         &self.rule_selection
+    }
+
+    fn lint_registry(&self) -> &LintRegistry {
+        default_lint_registry()
     }
 }
 
