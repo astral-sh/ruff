@@ -127,6 +127,35 @@ fn test_format_title() {
     assert_data_eq!(renderer.render(input).to_string(), expected);
 }
 
+/// Tests that we can format a message *without* a header.
+///
+/// This uses `Level::None`, which is somewhat of a hacky API addition I made
+/// to our vendored copy of `annotate-snippets` in order to do exactly what
+/// this test asserts: skip the header.
+#[test]
+fn test_format_skip_title() {
+    let source =
+        "# Docstring followed by a newline\n\ndef foobar(foot, bar={}):\n    \"\"\"\n    \"\"\"\n";
+    let src_annotation = Level::Error.span(56..58).label("B006");
+    let snippet = Snippet::source(source)
+        .line_start(1)
+        .annotation(src_annotation)
+        .fold(false);
+    let message = Level::None.title("").snippet(snippet);
+
+    let expected = str![[r#"
+  |
+1 | # Docstring followed by a newline
+2 |
+3 | def foobar(foot, bar={}):
+  |                      ^^ B006
+4 |     """
+5 |     """
+  |
+"#]];
+    assert_data_eq!(Renderer::plain().render(message).to_string(), expected);
+}
+
 #[test]
 fn test_format_snippet_only() {
     let source = "This is line 1\nThis is line 2";
