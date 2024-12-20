@@ -93,11 +93,14 @@ type ConstraintsPerBinding = SmallVec<InlineConstraintArray>;
 type ConstraintsIterator<'a> = std::slice::Iter<'a, Constraints>;
 type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
 
-/// Similar to what we have above, but for visibility constraints.
+/// A newtype-index for a visibility constraint in a particular scope.
 #[newtype_index]
 pub(crate) struct ScopedVisibilityConstraintId;
 
 impl ScopedVisibilityConstraintId {
+    /// A special ID that is used for an "always true" / "always visible" constraint.
+    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
+    /// present at index 0.
     pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
         ScopedVisibilityConstraintId::from_u32(0);
 }
@@ -105,18 +108,26 @@ impl ScopedVisibilityConstraintId {
 const INLINE_VISIBILITY_CONSTRAINTS: usize = 4;
 type InlineVisibilityConstraintsArray =
     [ScopedVisibilityConstraintId; INLINE_VISIBILITY_CONSTRAINTS];
+
+/// One [`ScopedVisibilityConstraintId`] per live declaration.
 type VisibilityConstraintPerDeclaration = SmallVec<InlineVisibilityConstraintsArray>;
+
+/// One [`ScopedVisibilityConstraintId`] per live binding.
 type VisibilityConstraintPerBinding = SmallVec<InlineVisibilityConstraintsArray>;
+
+/// Iterator over the visibility constraints for all live bindings/declarations.
 type VisibilityConstraintsIterator<'a> = std::slice::Iter<'a, ScopedVisibilityConstraintId>;
+
 type VisibilityConstraintsIntoIterator = smallvec::IntoIter<InlineVisibilityConstraintsArray>;
 
-/// Live declarations for a single symbol at some point in control flow.
+/// Live declarations for a single symbol at some point in control flow, with their
+/// corresponding visibility constraints.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
     pub(crate) live_declarations: Declarations,
 
-    /// For each live declaration, which visibility constraints apply to it?
+    /// For each live declaration, which visibility constraint applies to it?
     pub(crate) visibility_constraints: VisibilityConstraintPerDeclaration,
 }
 
@@ -159,7 +170,8 @@ impl SymbolDeclarations {
     }
 }
 
-/// Live bindings and narrowing constraints for a single symbol at some point in control flow.
+/// Live bindings for a single symbol at some point in control flow. Each live binding comes
+/// with a set of narrowing constraints and a visibility constraint.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct SymbolBindings {
     /// [`BitSet`]: which bindings (as [`ScopedDefinitionId`]) can reach the current location?
@@ -171,14 +183,14 @@ pub(super) struct SymbolBindings {
     /// binding in `live_bindings`.
     constraints: ConstraintsPerBinding,
 
-    /// For each live binding, which visibility constraints apply to it?
+    /// For each live binding, which visibility constraint applies to it?
     visibility_constraints: VisibilityConstraintPerBinding,
 }
 
 impl SymbolBindings {
     fn unbound(scope_start_visibility: ScopedVisibilityConstraintId) -> Self {
         Self {
-            live_bindings: Bindings::with(0),
+            live_bindings: Bindings::with(ScopedDefinitionId::UNBOUND.as_u32()),
             constraints: ConstraintsPerBinding::from_iter([Constraints::default()]),
             visibility_constraints: VisibilityConstraintPerBinding::from_iter([
                 scope_start_visibility,
@@ -322,10 +334,13 @@ impl SymbolState {
                     visibility_constraints_iter: &mut VisibilityConstraintsIntoIterator,
                     merged: &mut Self| {
             merged.bindings.live_bindings.insert(def);
-            // SAFETY: we only ever create SymbolState with either no definitions and no constraint
-            // bitsets (`::unbound`) or one definition and one constraint bitset (`::with`), and
-            // `::merge` always pushes one definition and one constraint bitset together (just
-            // below), so the number of definitions and the number of constraint bitsets can never
+            // SAFETY: we only ever create SymbolState using [`SymbolState::undefined`], which adds
+            // one "unbound" definition with corresponding narrowing and visibility constraints, or
+            // using [`SymbolState::record_binding`] or [`SymbolState::record_declaration`], which
+            // similarly add one definition with corresponding constraints. [`SymbolState::merge`]
+            // always pushes one definition and one constraint bitset and one visibility constraint
+            // together (just below), so the number of definitions and the number of constraints can
+            // never get out of sync.
             // get out of sync.
             let constraints = constraints_iter
                 .next()
@@ -371,32 +386,26 @@ impl SymbolState {
                             &mut b_vis_constraints_iter,
                             self,
                         );
-                        // SAFETY: we only ever create SymbolState with either no definitions and
-                        // no constraint bitsets (`::unbound`) or one definition and one constraint
-                        // bitset (`::with`), and `::merge` always pushes one definition and one
-                        // constraint bitset together (just below), so the number of definitions
-                        // and the number of constraint bitsets can never get out of sync.
+
+                        // SAFETY: see comment in `push` above.
                         let a_constraints = a_constraints_iter
                             .next()
                             .expect("definitions and constraints length mismatch");
+                        let current_constraints = self.bindings.constraints.last_mut().unwrap();
 
                         // If the same definition is visible through both paths, any constraint
                         // that applies on only one path is irrelevant to the resulting type from
                         // unioning the two paths, so we intersect the constraints.
-                        self.bindings
-                            .constraints
-                            .last_mut()
-                            .unwrap()
-                            .intersect(&a_constraints);
+                        current_constraints.intersect(&a_constraints);
 
-                        // TODO: documentation
-                        // SAFETY: See above
+                        // For visibility constraints, we merge them using a ternary OR operation:
                         let a_vis_constraint = a_vis_constraints_iter
                             .next()
                             .expect("visibility_constraints length mismatch");
-                        let current = self.bindings.visibility_constraints.last_mut().unwrap();
-                        *current =
-                            visibility_constraints.add_or_constraint(*current, a_vis_constraint);
+                        let current_vis_constraint =
+                            self.bindings.visibility_constraints.last_mut().unwrap();
+                        *current_vis_constraint = visibility_constraints
+                            .add_or_constraint(*current_vis_constraint, a_vis_constraint);
 
                         opt_a_def = a_defs_iter.next();
                         opt_b_def = b_defs_iter.next();
