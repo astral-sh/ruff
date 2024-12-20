@@ -1132,6 +1132,15 @@ AIR302_names.py:297:5: AIR302 `is_authorized_dataset` is removed in Airflow 3.0
     |
     = help: Use `is_authorized_asset` instead
 
+AIR302_names.py:303:4: AIR302 `dataset_factories` is removed in Airflow 3.0
+    |
+301 | pm = ProvidersManager()
+302 | pm.initialize_providers_asset_uri_resources()
+303 | pm.dataset_factories
+    |    ^^^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Use `asset_factories` instead
+
 AIR302_names.py:309:21: AIR302 `get_conn_uri` is removed in Airflow 3.0
     |
 308 | base_secret_backend = BaseSecretsBackend()
@@ -1187,5 +1196,48 @@ AIR302_names.py:324:15: AIR302 `get_connections` is removed in Airflow 3.0
 323 | vault_backend.get_conn_uri()
 324 | vault_backend.get_connections()
     |               ^^^^^^^^^^^^^^^ AIR302
+325 | 
+326 | from airflow.providers_manager import ProvidersManager
     |
     = help: Use `get_connection` instead
+
+AIR302_names.py:329:18: AIR302 `dataset_factories` is removed in Airflow 3.0
+    |
+328 | provider_manager = ProvidersManager()
+329 | provider_manager.dataset_factories
+    |                  ^^^^^^^^^^^^^^^^^ AIR302
+330 | provider_manager.dataset_uri_handlers
+331 | provider_manager.dataset_to_openlineage_converters
+    |
+    = help: Use `asset_factories` instead
+
+AIR302_names.py:330:18: AIR302 `dataset_uri_handlers` is removed in Airflow 3.0
+    |
+328 | provider_manager = ProvidersManager()
+329 | provider_manager.dataset_factories
+330 | provider_manager.dataset_uri_handlers
+    |                  ^^^^^^^^^^^^^^^^^^^^ AIR302
+331 | provider_manager.dataset_to_openlineage_converters
+    |
+    = help: Use `asset_uri_handlers` instead
+
+AIR302_names.py:331:18: AIR302 `dataset_to_openlineage_converters` is removed in Airflow 3.0
+    |
+329 | provider_manager.dataset_factories
+330 | provider_manager.dataset_uri_handlers
+331 | provider_manager.dataset_to_openlineage_converters
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+332 | 
+333 | from airflow.lineage.hook import DatasetLineageInfo
+    |
+    = help: Use `asset_to_openlineage_converters` instead
+
+AIR302_names.py:335:11: AIR302 `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+    |
+333 | from airflow.lineage.hook import DatasetLineageInfo
+334 | 
+335 | dl_info = DatasetLineageInfo()
+    |           ^^^^^^^^^^^^^^^^^^ AIR302
+336 | dl_info.dataset
+    |
+    = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
