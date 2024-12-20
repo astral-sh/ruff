@@ -137,7 +137,7 @@ use crate::semantic_index::{
 use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
 
-const MAX_RECURSION_DEPTH: usize = 10;
+const MAX_RECURSION_DEPTH: usize = 24;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum VisibilityConstraint<'db> {
