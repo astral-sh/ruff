@@ -374,7 +374,7 @@ impl LintRegistry {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum GetLintError {
     /// The name maps to this removed lint.
     #[error("lint {0} has been removed")]
