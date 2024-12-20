@@ -6,8 +6,10 @@ The ellipsis literal `...` can be used as a placeholder default value for a func
  in a stub file only, regardless of the type of the parameter.
 
 ```py path=test.pyi
-def f(x: int = ...) -> None: ...
-def f2(x: dict = ...) -> None: ...
+def f(x: int = ...) -> None:
+    reveal_type(x)  # revealed: int
+def f2(x: str = ...) -> None:
+    reveal_type(x)  # revealed: str
 ```
 
 ## Class and Module Level Attributes
