@@ -468,8 +468,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 }
 
-impl<'db> UseDefMapBuilder<'db> {
-    pub(super) fn new() -> Self {
+impl Default for UseDefMapBuilder<'_> {
+    fn default() -> Self {
         Self {
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
@@ -480,7 +480,9 @@ impl<'db> UseDefMapBuilder<'db> {
             symbol_states: IndexVec::new(),
         }
     }
+}
 
+impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
         let new_symbol = self
             .symbol_states
