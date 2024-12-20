@@ -118,3 +118,15 @@ An empty codes array suppresses no-diagnostics and is always useless
 # error: [division-by-zero]
 a = 4 / 0  # knot: ignore[]
 ```
+
+## File-level suppression comments
+
+File level suppression comments are currently intentionally unsupported because we've yet to decide
+if they should use a different syntax that also supports enabling rules or changing the rule's
+severity: `knot: possibly-undefined-reference=error`
+
+```py
+# knot: ignore[division-by-zero]
+
+a = 4 / 0  # error: [division-by-zero]
+```
