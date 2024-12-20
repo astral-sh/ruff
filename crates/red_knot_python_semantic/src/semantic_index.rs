@@ -29,8 +29,8 @@ pub mod symbol;
 mod use_def;
 
 pub(crate) use self::use_def::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
-    ScopedVisibilityConstraintId,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
+    DeclarationsIterator, ScopedVisibilityConstraintId,
 };
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
