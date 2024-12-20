@@ -392,7 +392,7 @@ fn declarations_ty<'db>(
         let mut conflicting: Vec<Type<'db>> = vec![];
         let declared_ty = if let Some(second) = types.next() {
             let mut builder = UnionBuilder::new(db).add(first);
-            for other in [second].into_iter().chain(types) {
+            for other in std::iter::once(second).chain(types) {
                 if !first.is_equivalent_to(db, other) {
                     conflicting.push(other);
                 }
@@ -415,7 +415,7 @@ fn declarations_ty<'db>(
         } else {
             Err((
                 declared_ty,
-                [first].into_iter().chain(conflicting).collect(),
+                std::iter::once(first).chain(conflicting).collect(),
             ))
         }
     } else {
