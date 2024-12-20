@@ -122,3 +122,36 @@ a = (  # type: ignore
     test + 4  # error: [unresolved-reference]
 )
 ```
+
+## File level suppression
+
+```py
+# type: ignore
+
+a = 10 / 0
+b = a / 0
+```
+
+## File level suppression with leading shebang
+
+```py
+#!/usr/bin/env/python
+# type: ignore
+
+a = 10 / 0
+b = a / 0
+```
+
+## Invalid own-line suppression
+
+```py
+"""
+File level suppressions must come before any non-trivia token,
+including module docstrings. 
+"""
+
+# type: ignore
+
+a = 10 / 0  # error: [division-by-zero]
+b = a / 0  # error: [division-by-zero]
+```
