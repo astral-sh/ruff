@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+snapshot_kind: text
+---
+F821_30.py:13:18: F821 Undefined name `qux`
+   |
+11 | multiple: TypedDict[{
+12 |     "bar": str,
+13 |     "baz": list["qux"],
+   |                  ^^^ F821
+14 | }]
+   |
+
+F821_30.py:19:19: F821 Undefined name `dolor`
+   |
+17 | nested: TypedDict[
+18 |     "lorem": TypedDict[{
+19 |         "ipsum": "dolor"
+   |                   ^^^^^ F821
+20 |     }],
+21 |     "sit": Literal["amet"]
+   |
+
+F821_30.py:26:31: F821 Undefined name `adipiscing`
+   |
+24 | # Error at `adipiscing`, `eiusmod`, `tempor`
+25 | unpack: TypedDict[{
+26 |     "consectetur": Annotated["adipiscing", "elit"]
+   |                               ^^^^^^^^^^ F821
+27 |     **{"sed do": str, int: "eiusmod", **tempor}
+28 | }]
+   |
+
+F821_30.py:27:29: F821 Undefined name `eiusmod`
+   |
+25 | unpack: TypedDict[{
+26 |     "consectetur": Annotated["adipiscing", "elit"]
+27 |     **{"sed do": str, int: "eiusmod", **tempor}
+   |                             ^^^^^^^ F821
+28 | }]
+   |
+
+F821_30.py:27:41: F821 Undefined name `tempor`
+   |
+25 | unpack: TypedDict[{
+26 |     "consectetur": Annotated["adipiscing", "elit"]
+27 |     **{"sed do": str, int: "eiusmod", **tempor}
+   |                                         ^^^^^^ F821
+28 | }]
+   |
