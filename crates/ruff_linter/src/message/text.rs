@@ -2,10 +2,9 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
-use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
+use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
@@ -186,12 +185,8 @@ pub(super) struct MessageCodeFrame<'a> {
 impl Display for MessageCodeFrame<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let suggestion = self.message.suggestion();
-        let footer = if suggestion.is_some() {
-            vec![Annotation {
-                id: None,
-                label: suggestion,
-                annotation_type: AnnotationType::Help,
-            }]
+        let footers = if let Some(suggestion) = suggestion {
+            vec![Level::Help.title(suggestion)]
         } else {
             Vec::new()
         };
@@ -257,51 +252,37 @@ impl Display for MessageCodeFrame<'_> {
 
         let source_text = source.text.show_nonprinting();
 
-        let start_char = source.text[TextRange::up_to(source.annotation_range.start())]
-            .chars()
-            .count();
-
-        let char_length = source.text[source.annotation_range].chars().count();
-
         let label = self
             .message
             .rule()
             .map_or_else(String::new, |rule| rule.noqa_code().to_string());
 
-        let snippet = Snippet {
-            title: None,
-            slices: vec![Slice {
-                source: &source_text,
-                line_start: self.notebook_index.map_or_else(
-                    || start_index.get(),
-                    |notebook_index| {
-                        notebook_index
-                            .cell_row(start_index)
-                            .unwrap_or(OneIndexed::MIN)
-                            .get()
-                    },
-                ),
-                annotations: vec![SourceAnnotation {
-                    label: &label,
-                    annotation_type: AnnotationType::Error,
-                    range: (start_char, start_char + char_length),
-                }],
-                // The origin (file name, line number, and column number) is already encoded
-                // in the `label`.
-                origin: None,
-                fold: false,
-            }],
-            footer,
-            opt: FormatOptions {
-                #[cfg(test)]
-                color: false,
-                #[cfg(not(test))]
-                color: colored::control::SHOULD_COLORIZE.should_colorize(),
-                ..FormatOptions::default()
+        let line_start = self.notebook_index.map_or_else(
+            || start_index.get(),
+            |notebook_index| {
+                notebook_index
+                    .cell_row(start_index)
+                    .unwrap_or(OneIndexed::MIN)
+                    .get()
             },
-        };
+        );
 
-        writeln!(f, "{message}", message = DisplayList::from(snippet))
+        let span = usize::from(source.annotation_range.start())
+            ..usize::from(source.annotation_range.end());
+        let annotation = Level::Error.span(span).label(&label);
+        let snippet = Snippet::source(&source_text)
+            .line_start(line_start)
+            .annotation(annotation)
+            .fold(false);
+        let message = Level::None.title("").snippet(snippet).footers(footers);
+
+        let renderer = if !cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize() {
+            Renderer::styled()
+        } else {
+            Renderer::plain()
+        };
+        let rendered = renderer.render(message);
+        writeln!(f, "{rendered}")
     }
 }
 
