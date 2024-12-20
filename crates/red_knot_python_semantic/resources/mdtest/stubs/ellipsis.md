@@ -44,7 +44,7 @@ reveal_type(b)  # revealed: EllipsisType | ellipsis
 
 ## Use of Ellipsis Symbol
 
-When the ellipsis symbol is used as default value the assignment is checked.
+There is no special treatment of the builtin name `Ellipsis`, only of `...` literals.
 
 ```py path=test.pyi
 # error: [invalid-parameter-default] "Default value of type `EllipsisType | ellipsis` is not assignable to annotated parameter type `int`"
