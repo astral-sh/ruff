@@ -1505,6 +1505,22 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
                             }
                         }
+                        Some(typing::SubscriptKind::TypedDict) => {
+                            self.semantic.flags |= SemanticModelFlags::INLINE_TYPEDDICT;
+
+                            if let Expr::Dict(ast::ExprDict { items, range: _ }) = slice.as_ref() {
+                                for item in items {
+                                    if let Some(key) = &item.key {
+                                        self.visit_non_type_definition(key);
+                                        self.visit_type_definition(&item.value);
+                                    } else {
+                                        self.visit_non_type_definition(&item.value);
+                                    }
+                                }
+                            } else {
+                                self.visit_non_type_definition(slice);
+                            }
+                        }
                         None => {
                             self.visit_expr(slice);
                             self.visit_expr_context(ctx);
