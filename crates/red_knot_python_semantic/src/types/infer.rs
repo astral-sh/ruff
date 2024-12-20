@@ -207,7 +207,7 @@ fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult
     let result = infer_expression_types(db, value);
     let value_ty = result.expression_ty(value.node_ref(db).scoped_expression_id(db, scope));
 
-    let mut unpacker = Unpacker::new(db, file, scope);
+    let mut unpacker = Unpacker::new(db, scope);
     unpacker.unpack(unpack.target(db), value_ty);
     unpacker.finish()
 }

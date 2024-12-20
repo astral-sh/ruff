@@ -1,9 +1,7 @@
 use std::borrow::Cow;
 
-use itertools::Either;
 use rustc_hash::FxHashMap;
 
-use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
@@ -22,9 +20,9 @@ pub(crate) struct Unpacker<'db> {
 }
 
 impl<'db> Unpacker<'db> {
-    pub(crate) fn new(db: &'db dyn Db, file: File, scope: ScopeId<'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
         Self {
-            context: InferContext::new(db, file),
+            context: InferContext::new(db, scope.file(db)),
             targets: FxHashMap::default(),
             scope,
         }
@@ -71,13 +69,11 @@ impl<'db> Unpacker<'db> {
                 let mut target_types = vec![vec![]; elts.len()];
 
                 let unpack_types = match value_ty {
-                    Type::Union(union_ty) => {
-                        Either::Left(union_ty.elements(self.db()).iter().copied())
-                    }
-                    _ => Either::Right(std::iter::once(value_ty)),
+                    Type::Union(union_ty) => union_ty.elements(self.db()),
+                    _ => std::slice::from_ref(&value_ty),
                 };
 
-                for ty in unpack_types {
+                for ty in unpack_types.iter().copied() {
                     // Deconstruct certain types to delegate the inference back to the tuple type
                     // for correct handling of starred expressions.
                     let ty = match ty {
@@ -119,6 +115,7 @@ impl<'db> Unpacker<'db> {
                 }
 
                 for (index, element) in elts.iter().enumerate() {
+                    // SAFETY: `target_types` is initialized with the same length as `elts`.
                     let element_ty = match target_types[index].as_slice() {
                         [] => Type::Unknown,
                         types => UnionType::from_elements(self.db(), types),
@@ -134,17 +131,17 @@ impl<'db> Unpacker<'db> {
     /// can be a starred expression in the `elements`.
     fn tuple_ty_elements(
         &mut self,
-        elements: &[ast::Expr],
+        targets: &[ast::Expr],
         tuple_ty: TupleType<'db>,
     ) -> Cow<'_, [Type<'db>]> {
         // If there is a starred expression, it will consume all of the entries at that location.
-        let Some(starred_index) = elements.iter().position(ast::Expr::is_starred_expr) else {
+        let Some(starred_index) = targets.iter().position(ast::Expr::is_starred_expr) else {
             // Otherwise, the types will be unpacked 1-1 to the elements.
             return Cow::Borrowed(tuple_ty.elements(self.db()).as_ref());
         };
 
-        if tuple_ty.len(self.db()) >= elements.len() - 1 {
-            let mut element_types = Vec::with_capacity(elements.len());
+        if tuple_ty.len(self.db()) >= targets.len() - 1 {
+            let mut element_types = Vec::with_capacity(targets.len());
             element_types.extend_from_slice(
                 // SAFETY: Safe because of the length check above.
                 &tuple_ty.elements(self.db())[..starred_index],
@@ -152,7 +149,7 @@ impl<'db> Unpacker<'db> {
 
             // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
             // is 1 and the remaining elements after that are 2.
-            let remaining = elements.len() - (starred_index + 1);
+            let remaining = targets.len() - (starred_index + 1);
             // This index represents the type of the last element that belongs
             // to the starred expression, in an exclusive manner.
             let starred_end_index = tuple_ty.len(self.db()) - remaining;
@@ -173,7 +170,7 @@ impl<'db> Unpacker<'db> {
             let mut element_types = tuple_ty.elements(self.db()).to_vec();
             // Subtract 1 to insert the starred expression type at the correct
             // index.
-            element_types.resize(elements.len() - 1, Type::Unknown);
+            element_types.resize(targets.len() - 1, Type::Unknown);
             // TODO: This should be `list[Unknown]`
             element_types.insert(starred_index, todo_type!("starred unpacking"));
             Cow::Owned(element_types)

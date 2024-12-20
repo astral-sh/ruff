@@ -358,6 +358,48 @@ def _(arg: tuple[int, int, int] | tuple[int, str, bytes] | tuple[int, int, str])
     reveal_type(c)  # revealed: int | bytes | str
 ```
 
+### Nested
+
+```py
+def _(arg: tuple[int, tuple[str, bytes]] | tuple[tuple[int, bytes], Literal["ab"]]):
+    a, (b, c) = arg
+    reveal_type(a)  # revealed: int | tuple[int, bytes]
+    reveal_type(b)  # revealed: str
+    reveal_type(c)  # revealed: bytes | LiteralString
+```
+
+### Starred expression
+
+```py
+def _(arg: tuple[int, bytes, int] | tuple[int, int, str, int, bytes]):
+    a, *b, c = arg
+    reveal_type(a)  # revealed: int
+    # TODO: Should be `list[bytes | int | str]`
+    reveal_type(b)  # revealed: @Todo(starred unpacking)
+    reveal_type(c)  # revealed: int | bytes
+```
+
+### Size mismatch (1)
+
+```py
+def _(arg: tuple[int, bytes, int] | tuple[int, int, str, int, bytes]):
+    # TODO: Add diagnostic (too many values to unpack)
+    a, b = arg
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: bytes | int
+```
+
+### Size mismatch (2)
+
+```py
+def _(arg: tuple[int, bytes] | tuple[int, str]):
+    # TODO: Add diagnostic (there aren't enough values to unpack)
+    a, b, c = arg
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: bytes | str
+    reveal_type(c)  # revealed: Unknown
+```
+
 ### Same literal types
 
 ```py
@@ -397,7 +439,7 @@ def _(arg: tuple[int, int] | Literal["ab"]):
     reveal_type(b)  # revealed: int | LiteralString
 ```
 
-### Custom iterator
+### Custom iterator (1)
 
 ```py
 class Iterator:
@@ -412,4 +454,21 @@ class Iterable:
 reveal_type(a)  # revealed: int
 reveal_type(b)  # revealed: int | str
 reveal_type(c)  # revealed: tuple[int, int] | tuple[int, str]
+```
+
+### Custom iterator (2)
+
+```py
+class Iterator:
+    def __next__(self) -> bytes:
+        return b""
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+def _(arg: tuple[int, str] | Iterable):
+    a, b = arg
+    reveal_type(a)  # revealed: int | bytes
+    reveal_type(b)  # revealed: str | bytes
 ```
