@@ -57,7 +57,7 @@ impl ScopedDefinitionId {
     /// A special ID that is used to describe an implicit start-of-scope state. When
     /// we see that this definition is live, we know that the symbol is (possibly)
     /// unbound or undeclared at a given usage site.
-    /// When creating a [`UseDefMapBuilder`], we always add an empty `None` definition
+    /// When creating a use-def-map builder, we always add an empty `None` definition
     /// at index 0, so this ID is always present.
     pub(super) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
 }
