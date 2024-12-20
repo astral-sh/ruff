@@ -1,4 +1,4 @@
-use crate::lint::{Level, LintRegistry, LintStatus};
+use crate::lint::{GetLintError, Level, LintRegistry, LintStatus};
 use crate::types::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::{declare_lint, lint::LintId, Db};
 use ruff_db::diagnostic::DiagnosticId;
@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::{smallvec, SmallVec};
 use std::fmt;
 use std::fmt::Formatter;
+use thiserror::Error;
 
 declare_lint! {
     /// ## What it does
@@ -35,6 +36,31 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Checks for `knot: ignore[code]` where `code` isn't a known lint rule.
+    ///
+    /// ## Why is this bad?
+    /// A `knot: ignore[code]` directive with a `code` that doesn't match
+    /// any known rule is probably mistake.
+    ///
+    /// ## Examples
+    /// ```py
+    /// a = 20 / 0  # knot: ignore[division-by-zer]
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```py
+    /// a = 20 / 0  # knot: ignore[division-by-zero]
+    /// ```
+    pub(crate) static UNKNOWN_RULE = {
+        summary: "detects `knot: ignore` comments that reference unknown rules",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
 #[salsa::tracked(return_ref)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db.upcast(), file);
@@ -52,7 +78,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
             TokenKind::Comment => {
                 let parser = SuppressionParser::new(&source, token.range());
 
-                for comment in parser {
+                for comment in parser.flatten() {
                     builder.add_comment(comment, TextRange::new(line_start, token.end()));
                 }
             }
@@ -66,15 +92,47 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     builder.finish()
 }
 
+pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut TypeCheckDiagnostics) {
+    let suppressions = suppressions(db, file);
+
+    // TODO reuse some infrastructure from InferContext?
+
+    if let Some(severity) = db.rule_selection().severity(LintId::of(&UNKNOWN_RULE)) {
+        for unknown in &suppressions.unknown {
+            if let Some(suppression) =
+                suppressions.find_suppression(unknown.range, LintId::of(&UNKNOWN_RULE))
+            {
+                diagnostics.mark_used(suppression.id());
+                continue;
+            }
+
+            let message = match &unknown.reason {
+                GetLintError::Removed(removed) => {
+                    format!("Removed rule `{removed}`")
+                }
+                GetLintError::Unknown(unknown) => {
+                    format!("Unknown rule `{unknown}`")
+                }
+            };
+
+            diagnostics.push(TypeCheckDiagnostic {
+                id: DiagnosticId::Lint(UNKNOWN_RULE.name()),
+                message,
+                range: unknown.range,
+                severity,
+                file,
+            });
+        }
+    }
+
+    check_unused_suppressions(db, file, diagnostics);
+}
+
 /// Checks for unused suppression comments in `file` and
 /// adds diagnostic for each of them to `diagnostics`.
 ///
 /// Does nothing if the [`UNUSED_IGNORE_COMMENT`] rule is disabled.
-pub(crate) fn check_unused_suppressions(
-    db: &dyn Db,
-    file: File,
-    diagnostics: &mut TypeCheckDiagnostics,
-) {
+fn check_unused_suppressions(db: &dyn Db, file: File, diagnostics: &mut TypeCheckDiagnostics) {
     let Some(severity) = db
         .rule_selection()
         .severity(LintId::of(&UNUSED_IGNORE_COMMENT))
@@ -147,7 +205,7 @@ pub(crate) fn check_unused_suppressions(
 }
 
 /// The suppressions of a single file.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct Suppressions {
     /// Suppressions that apply to the entire file.
     ///
@@ -163,6 +221,9 @@ pub(crate) struct Suppressions {
     ///
     /// The suppressions are sorted by [`Suppression::range`] (which implies [`Suppression::comment_range`]).
     line: Vec<Suppression>,
+
+    /// Suppressions with lint codes that are unknown.
+    unknown: Vec<UnknownSuppression>,
 }
 
 impl Suppressions {
@@ -303,6 +364,7 @@ struct SuppressionsBuilder<'a> {
 
     line: Vec<Suppression>,
     file: Vec<Suppression>,
+    unknown: Vec<UnknownSuppression>,
 }
 
 impl<'a> SuppressionsBuilder<'a> {
@@ -313,6 +375,7 @@ impl<'a> SuppressionsBuilder<'a> {
             seen_non_trivia_token: false,
             line: Vec::new(),
             file: Vec::new(),
+            unknown: Vec::new(),
         }
     }
 
@@ -323,10 +386,12 @@ impl<'a> SuppressionsBuilder<'a> {
     fn finish(mut self) -> Suppressions {
         self.line.shrink_to_fit();
         self.file.shrink_to_fit();
+        self.unknown.shrink_to_fit();
 
         Suppressions {
             file: self.file,
             line: self.line,
+            unknown: self.unknown,
         }
     }
 
@@ -379,14 +444,14 @@ impl<'a> SuppressionsBuilder<'a> {
             Some(codes) => {
                 for code_range in &codes {
                     let code = &self.source[*code_range];
+                    let range = if codes.len() == 1 {
+                        comment.range
+                    } else {
+                        *code_range
+                    };
+
                     match self.lint_registry.get(code) {
                         Ok(lint) => {
-                            let range = if codes.len() == 1 {
-                                comment.range
-                            } else {
-                                *code_range
-                            };
-
                             suppressions.push(Suppression {
                                 target: SuppressionTarget::Lint(lint),
                                 kind: comment.kind,
@@ -395,15 +460,28 @@ impl<'a> SuppressionsBuilder<'a> {
                                 suppressed_range,
                             });
                         }
-                        Err(error) => {
-                            tracing::debug!("Invalid suppression: {error}");
-                            // TODO(micha): Handle invalid lint codes
-                        }
+                        Err(error) => self.unknown.push(UnknownSuppression {
+                            range,
+                            comment_range: comment.range,
+                            reason: error,
+                        }),
                     }
                 }
             }
         }
     }
+}
+
+/// Suppression for an unknown lint rule.
+#[derive(Debug, PartialEq, Eq)]
+struct UnknownSuppression {
+    /// The range of the code.
+    range: TextRange,
+
+    /// The range of the suppression comment
+    comment_range: TextRange,
+
+    reason: GetLintError,
 }
 
 struct SuppressionParser<'src> {
@@ -418,36 +496,38 @@ impl<'src> SuppressionParser<'src> {
         Self { cursor, range }
     }
 
-    fn parse_comment(&mut self) -> Option<SuppressionComment> {
+    fn parse_comment(&mut self) -> Result<SuppressionComment, SuppressionCommentParseError> {
         let comment_start = self.offset();
         self.cursor.start_token();
 
         if !self.cursor.eat_char('#') {
-            return None;
+            return Err(SuppressionCommentParseError::MissingHash);
         }
 
         self.eat_whitespace();
 
         // type: ignore[code]
         // ^^^^^^^^^^^^
-        let kind = self.eat_kind()?;
+        let Some(kind) = self.eat_kind() else {
+            return Err(SuppressionCommentParseError::NotASuppression);
+        };
 
         let has_trailing_whitespace = self.eat_whitespace();
 
         // type: ignore[code1, code2]
         //             ^^^^^^
-        let codes = self.eat_codes();
+        let codes = self.eat_codes()?;
 
         if self.cursor.is_eof() || codes.is_some() || has_trailing_whitespace {
             // Consume the comment until its end or until the next "sub-comment" starts.
             self.cursor.eat_while(|c| c != '#');
-            Some(SuppressionComment {
+            Ok(SuppressionComment {
                 kind,
                 codes,
                 range: TextRange::at(comment_start, self.cursor.token_len()),
             })
         } else {
-            None
+            Err(SuppressionCommentParseError::PossiblyMisspelledIgnore)
         }
     }
 
@@ -479,28 +559,30 @@ impl<'src> SuppressionParser<'src> {
         Some(kind)
     }
 
-    fn eat_codes(&mut self) -> Option<SmallVec<[TextRange; 2]>> {
+    fn eat_codes(
+        &mut self,
+    ) -> Result<Option<SmallVec<[TextRange; 2]>>, SuppressionCommentParseError> {
         if !self.cursor.eat_char('[') {
-            return None;
+            return Ok(None);
         }
 
         let mut codes: SmallVec<[TextRange; 2]> = smallvec![];
 
         loop {
             if self.cursor.is_eof() {
-                return None;
+                return Err(SuppressionCommentParseError::CodesMissingClosingBracket);
             }
 
             self.eat_whitespace();
 
             // `knot: ignore[]` or `knot: ignore[a,]`
             if self.cursor.eat_char(']') {
-                break Some(codes);
+                break Ok(Some(codes));
             }
 
             let code_start = self.offset();
             if !self.eat_word() {
-                return None;
+                return Err(SuppressionCommentParseError::UnexpectedCode);
             }
 
             codes.push(TextRange::new(code_start, self.offset()));
@@ -511,10 +593,10 @@ impl<'src> SuppressionParser<'src> {
                 self.eat_whitespace();
 
                 if self.cursor.eat_char(']') {
-                    break Some(codes);
+                    break Ok(Some(codes));
                 }
                 // `knot: ignore[a b]
-                return None;
+                return Err(SuppressionCommentParseError::CodesNotSeparatedByComma);
             }
         }
     }
@@ -544,19 +626,19 @@ impl<'src> SuppressionParser<'src> {
 }
 
 impl Iterator for SuppressionParser<'_> {
-    type Item = SuppressionComment;
+    type Item = Result<SuppressionComment, SuppressionCommentParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.cursor.is_eof() {
-                return None;
-            }
+        if self.cursor.is_eof() {
+            return None;
+        }
 
-            if let Some(suppression) = self.parse_comment() {
-                return Some(suppression);
+        match self.parse_comment() {
+            Ok(result) => Some(Ok(result)),
+            Err(error) => {
+                self.cursor.eat_while(|c| c != '#');
+                Some(Err(error))
             }
-
-            self.cursor.eat_while(|c| c != '#');
         }
     }
 }
@@ -611,6 +693,36 @@ impl fmt::Display for SuppressionKind {
             SuppressionKind::Knot => f.write_str("knot: ignore"),
         }
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Error)]
+enum SuppressionCommentParseError {
+    /// The comment isn't a suppression comment.
+    #[error("not a suppression comment")]
+    NotASuppression,
+
+    #[error("the comment doesn't start with a `#`")]
+    MissingHash,
+
+    /// A valid suppression comment but it has no trailing whitespace that
+    /// separates it from the reason
+    /// ```py
+    /// type: ignoree
+    /// ```
+    #[error("possibly misspelled ignore")]
+    PossiblyMisspelledIgnore,
+
+    /// Two codes aren't separated by a comma
+    #[error("codes not separated by comma")]
+    CodesNotSeparatedByComma,
+
+    /// `knot: ignore[*.*]`
+    #[error("unexpected code")]
+    UnexpectedCode,
+
+    /// `knot: ignore[a, b`
+    #[error("missing closing bracket")]
+    CodesMissingClosingBracket,
 }
 
 #[cfg(test)]
@@ -816,7 +928,9 @@ mod tests {
             for comment in SuppressionParser::new(
                 self.source,
                 TextRange::new(0.into(), self.source.text_len()),
-            ) {
+            )
+            .flatten()
+            {
                 list.entry(&comment.debug(self.source));
             }
 
