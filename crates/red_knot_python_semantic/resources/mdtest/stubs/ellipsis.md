@@ -2,7 +2,8 @@
 
 ## Function and Methods
 
-For default values the ellipsis literal `...` can be used, in a stub file only.
+The ellipsis literal `...` can be used as a placeholder default value for a function parameter,
+ in a stub file only, regardless of the type of the parameter.
 
 ```py path=test.pyi
 def f(x: int = ...) -> None: ...
