@@ -473,7 +473,7 @@ impl Default for UseDefMapBuilder<'_> {
         Self {
             all_definitions: IndexVec::from_iter([None]),
             all_constraints: IndexVec::new(),
-            visibility_constraints: VisibilityConstraints::new(),
+            visibility_constraints: VisibilityConstraints::default(),
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),

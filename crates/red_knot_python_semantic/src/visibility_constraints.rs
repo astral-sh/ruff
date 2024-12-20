@@ -25,13 +25,15 @@ pub(crate) struct VisibilityConstraints<'db> {
     constraints: IndexVec<ScopedVisibilityConstraintId, VisibilityConstraint<'db>>,
 }
 
-impl<'db> VisibilityConstraints<'db> {
-    pub(crate) fn new() -> Self {
+impl Default for VisibilityConstraints<'_> {
+    fn default() -> Self {
         Self {
             constraints: IndexVec::from_iter([VisibilityConstraint::AlwaysTrue]),
         }
     }
+}
 
+impl<'db> VisibilityConstraints<'db> {
     pub(crate) fn add(
         &mut self,
         constraint: VisibilityConstraint<'db>,
