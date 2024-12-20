@@ -322,3 +322,15 @@ from airflow.providers.hashicorp.secrets.vault import VaultBackend
 vault_backend = VaultBackend()
 vault_backend.get_conn_uri()
 vault_backend.get_connections()
+
+from airflow.providers_manager import ProvidersManager
+
+provider_manager = ProvidersManager()
+provider_manager.dataset_factories
+provider_manager.dataset_uri_handlers
+provider_manager.dataset_to_openlineage_converters
+
+from airflow.lineage.hook import DatasetLineageInfo
+
+dl_info = DatasetLineageInfo()
+dl_info.dataset

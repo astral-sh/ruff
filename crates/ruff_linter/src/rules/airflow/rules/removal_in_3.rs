@@ -163,6 +163,49 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
     };
 }
 
+fn removed_class_attribute(checker: &mut Checker, expr: &Expr) {
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = expr else {
+        return;
+    };
+
+    let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) else {
+        return;
+    };
+
+    // checker.diagnostics.push(Diagnostic::new(
+    //     Airflow3Removal {
+    //         deprecated: qualname.to_string(),
+    //         replacement: Replacement::Name("te"),
+    //     },
+    //     attr.range(),
+    // ));
+
+    let replacement = match *qualname.segments() {
+        ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
+            "dataset_factories" => Some(Replacement::Name("asset_factories")),
+            "dataset_uri_handlers" => Some(Replacement::Name("asset_uri_handlers")),
+            "dataset_to_openlineage_converters" => {
+                Some(Replacement::Name("asset_to_openlineage_converters"))
+            }
+            &_ => None,
+        },
+        ["airflow", "lineage", "hook"] => match attr.as_str() {
+            "dataset" => Some(Replacement::Name("asset")),
+            &_ => None,
+        },
+        _ => None,
+    };
+    if let Some(replacement) = replacement {
+        checker.diagnostics.push(Diagnostic::new(
+            Airflow3Removal {
+                deprecated: attr.to_string(),
+                replacement,
+            },
+            attr.range(),
+        ));
+    }
+}
+
 fn removed_method(checker: &mut Checker, expr: &Expr) {
     let Expr::Call(ExprCall { func, .. }) = expr else {
         return;
@@ -684,7 +727,10 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
 
             removed_method(checker, expr);
         }
-        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => removed_name(checker, expr, ranged),
+        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => {
+            removed_name(checker, expr, ranged);
+            removed_class_attribute(checker, expr);
+        }
         ranged @ Expr::Name(_) => removed_name(checker, expr, ranged),
         _ => {}
     }
