@@ -182,11 +182,11 @@ impl<'db> PullTypesVisitor<'db> {
         }
     }
 
-    fn visit_assign_target(&mut self, target: &Expr) {
+    fn visit_target(&mut self, target: &Expr) {
         match target {
             Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for element in elts {
-                    self.visit_assign_target(element);
+                    self.visit_target(element);
                 }
             }
             _ => self.visit_expr(target),
@@ -205,8 +205,18 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
             }
             Stmt::Assign(assign) => {
                 for target in &assign.targets {
-                    self.visit_assign_target(target);
+                    self.visit_target(target);
                 }
+                // TODO
+                //self.visit_expr(&assign.value);
+                return;
+            }
+            Stmt::For(for_stmt) => {
+                self.visit_target(&for_stmt.target);
+                // TODO
+                //self.visit_expr(&for_stmt.iter);
+                self.visit_body(&for_stmt.body);
+                self.visit_body(&for_stmt.orelse);
                 return;
             }
             Stmt::AnnAssign(_)
@@ -214,7 +224,6 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
             | Stmt::Delete(_)
             | Stmt::AugAssign(_)
             | Stmt::TypeAlias(_)
-            | Stmt::For(_)
             | Stmt::While(_)
             | Stmt::If(_)
             | Stmt::With(_)

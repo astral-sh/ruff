@@ -225,8 +225,10 @@ pub(crate) struct WithItemDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ForStmtDefinitionNodeRef<'a> {
+    pub(crate) unpack: Option<Unpack<'a>>,
     pub(crate) iterable: &'a ast::Expr,
-    pub(crate) target: &'a ast::ExprName,
+    pub(crate) name: &'a ast::ExprName,
+    pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
 
@@ -298,12 +300,16 @@ impl<'db> DefinitionNodeRef<'db> {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
+                unpack,
                 iterable,
-                target,
+                name,
+                first,
                 is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
+                target: TargetKind::from(unpack),
                 iterable: AstNodeRef::new(parsed.clone(), iterable),
-                target: AstNodeRef::new(parsed, target),
+                name: AstNodeRef::new(parsed, name),
+                first,
                 is_async,
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
@@ -382,10 +388,12 @@ impl<'db> DefinitionNodeRef<'db> {
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
             Self::For(ForStmtDefinitionNodeRef {
+                unpack: _,
                 iterable: _,
-                target,
+                name,
+                first: _,
                 is_async: _,
-            }) => target.into(),
+            }) => name.into(),
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => target.into(),
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
@@ -452,7 +460,7 @@ pub enum DefinitionKind<'db> {
     Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
-    For(ForStmtDefinitionKind),
+    For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind),
     VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
     VariadicKeywordParameter(AstNodeRef<ast::Parameter>),
@@ -477,7 +485,7 @@ impl Ranged for DefinitionKind<'_> {
             DefinitionKind::Assignment(assignment) => assignment.name().range(),
             DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.target.range(),
-            DefinitionKind::For(for_stmt) => for_stmt.target().range(),
+            DefinitionKind::For(for_stmt) => for_stmt.name().range(),
             DefinitionKind::Comprehension(comp) => comp.target().range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => parameter.name.range(),
             DefinitionKind::VariadicKeywordParameter(parameter) => parameter.name.range(),
@@ -665,22 +673,32 @@ impl WithItemDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct ForStmtDefinitionKind {
+pub struct ForStmtDefinitionKind<'db> {
+    target: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
-    target: AstNodeRef<ast::ExprName>,
+    name: AstNodeRef<ast::ExprName>,
+    first: bool,
     is_async: bool,
 }
 
-impl ForStmtDefinitionKind {
+impl<'db> ForStmtDefinitionKind<'db> {
     pub(crate) fn iterable(&self) -> &ast::Expr {
         self.iterable.node()
     }
 
-    pub(crate) fn target(&self) -> &ast::ExprName {
-        self.target.node()
+    pub(crate) fn target(&self) -> TargetKind<'db> {
+        self.target
     }
 
-    pub(crate) fn is_async(&self) -> bool {
+    pub(crate) fn name(&self) -> &ast::ExprName {
+        self.name.node()
+    }
+
+    pub(crate) const fn is_first(&self) -> bool {
+        self.first
+    }
+
+    pub(crate) const fn is_async(&self) -> bool {
         self.is_async
     }
 }
@@ -753,12 +771,6 @@ impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
 impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
     fn from(node: &ast::StmtAugAssign) -> Self {
         Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtFor> for DefinitionNodeKey {
-    fn from(value: &ast::StmtFor) -> Self {
-        Self(NodeKey::from_node(value))
     }
 }
 

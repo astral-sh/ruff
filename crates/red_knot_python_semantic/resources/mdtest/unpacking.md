@@ -472,3 +472,104 @@ def _(arg: tuple[int, str] | Iterable):
     reveal_type(a)  # revealed: int | bytes
     reveal_type(b)  # revealed: str | bytes
 ```
+
+## For statement
+
+Unpacking in a `for` statement.
+
+### Same types
+
+```py
+def _(arg: tuple[tuple[int, int], tuple[int, int]]):
+    for a, b in arg:
+        reveal_type(a)  # revealed: int
+        reveal_type(b)  # revealed: int
+```
+
+### Mixed types (1)
+
+```py
+def _(arg: tuple[tuple[int, int], tuple[int, str]]):
+    for a, b in arg:
+        reveal_type(a)  # revealed: int
+        reveal_type(b)  # revealed: int | str
+```
+
+### Mixed types (2)
+
+```py
+def _(arg: tuple[tuple[int, str], tuple[str, int]]):
+    for a, b in arg:
+        reveal_type(a)  # revealed: int | str
+        reveal_type(b)  # revealed: str | int
+```
+
+### Mixed types (3)
+
+```py
+def _(arg: tuple[tuple[int, int, int], tuple[int, str, bytes], tuple[int, int, str]]):
+    for a, b, c in arg:
+        reveal_type(a)  # revealed: int
+        reveal_type(b)  # revealed: int | str
+        reveal_type(c)  # revealed: int | bytes | str
+```
+
+### Same literal values
+
+```py
+for a, b in ((1, 2), (3, 4)):
+    reveal_type(a)  # revealed: Literal[1, 3]
+    reveal_type(b)  # revealed: Literal[2, 4]
+```
+
+### Mixed literal values (1)
+
+```py
+for a, b in ((1, 2), ("a", "b")):
+    reveal_type(a)  # revealed: Literal[1] | Literal["a"]
+    reveal_type(b)  # revealed: Literal[2] | Literal["b"]
+```
+
+### Mixed literals values (2)
+
+```py
+# error: "Object of type `Literal[1]` is not iterable"
+# error: "Object of type `Literal[2]` is not iterable"
+# error: "Object of type `Literal[4]` is not iterable"
+for a, b in (1, 2, (3, "a"), 4, (5, "b"), "c"):
+    reveal_type(a)  # revealed: Unknown | Literal[3, 5] | LiteralString
+    reveal_type(b)  # revealed: Unknown | Literal["a", "b"]
+```
+
+### Custom iterator (1)
+
+```py
+class Iterator:
+    def __next__(self) -> tuple[int, int]:
+        return (1, 2)
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+for a, b in Iterable():
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Custom iterator (2)
+
+```py
+class Iterator:
+    def __next__(self) -> bytes:
+        return b""
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+def _(arg: tuple[tuple[int, str], Iterable]):
+    for a, b in arg:
+        reveal_type(a)  # revealed: int | bytes
+        reveal_type(b)  # revealed: str | bytes
+```
