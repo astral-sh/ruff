@@ -114,6 +114,23 @@
 //! use(x)
 //! ```
 //!
+//! ### Explicit ambiguity
+//!
+//! In some cases, we explicitly add a `VisibilityConstraint::Ambiguous` constraint to all bindings
+//! in a certain control flow path. We do this when branching on something that we can not (or
+//! intentionally do not want to) analyze statically. `for` loops are one example:
+//! ```py
+//! x = <unbound>
+//!
+//! for _ in range(2):
+//!    x = 1
+//! ```
+//! Here, we report an ambiguous visibility constraint before branching off. If we don't do this,
+//! the `x = <unbound>` binding would be considered unconditionally visible in the no-loop case.
+//! And since the other branch does not have the live `x = <unbound>` binding, we would incorrectly
+//! create a state where the `x = <unbound>` binding is always visible.
+//!
+//!
 //! ### Properties
 //!
 //! The ternary `AND` and `OR` operations have the property that `~a OR ~b = ~(a AND b)`. This
