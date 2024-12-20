@@ -505,7 +505,8 @@ impl SymbolState {
 }
 
 /// A single binding (as [`ScopedDefinitionId`]) with an iterator of its applicable
-/// [`ScopedConstraintId`].
+/// narrowing constraints ([`ScopedConstraintId`]) and a corresponding visibility
+/// visibility constraint ([`ScopedVisibilityConstraintId`]).
 #[derive(Debug)]
 pub(super) struct BindingIdWithConstraints<'map> {
     pub(super) definition: ScopedDefinitionId,
@@ -562,21 +563,31 @@ impl Iterator for ConstraintIdIterator<'_> {
 
 impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
+/// A single declaration (as [`ScopedDefinitionId`]) with a corresponding visibility
+/// visibility constraint ([`ScopedVisibilityConstraintId`]).
+#[derive(Debug)]
+pub(super) struct DeclarationIdWithConstraint {
+    pub(super) definition: ScopedDefinitionId,
+    pub(super) visibility_constraint: ScopedVisibilityConstraintId,
+}
+
 pub(super) struct DeclarationIdIterator<'map> {
     pub(crate) declarations: DeclarationsIterator<'map>,
     pub(crate) visibility_constraints: VisibilityConstraintsIterator<'map>,
 }
 
 impl Iterator for DeclarationIdIterator<'_> {
-    type Item = (ScopedDefinitionId, ScopedVisibilityConstraintId);
+    type Item = DeclarationIdWithConstraint;
 
     fn next(&mut self) -> Option<Self::Item> {
         match (self.declarations.next(), self.visibility_constraints.next()) {
             (None, None) => None,
-            (Some(declaration), Some(visibility_constraints_id)) => Some((
-                ScopedDefinitionId::from_u32(declaration),
-                *visibility_constraints_id,
-            )),
+            (Some(declaration), Some(&visibility_constraint)) => {
+                Some(DeclarationIdWithConstraint {
+                    definition: ScopedDefinitionId::from_u32(declaration),
+                    visibility_constraint,
+                })
+            }
             // SAFETY: see above.
             _ => unreachable!("declarations and visibility_constraints length mismatch"),
         }
@@ -618,13 +629,18 @@ mod tests {
         let actual = symbol
             .declarations()
             .iter()
-            .map(|(def_id, _)| {
-                if def_id == ScopedDefinitionId::UNBOUND {
-                    "undeclared".into()
-                } else {
-                    def_id.as_u32().to_string()
-                }
-            })
+            .map(
+                |DeclarationIdWithConstraint {
+                     definition,
+                     visibility_constraint: _,
+                 }| {
+                    if definition == ScopedDefinitionId::UNBOUND {
+                        "undeclared".into()
+                    } else {
+                        definition.as_u32().to_string()
+                    }
+                },
+            )
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
     }

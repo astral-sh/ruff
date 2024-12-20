@@ -229,6 +229,7 @@ pub(crate) use self::symbol_state::{ScopedConstraintId, ScopedVisibilityConstrai
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
 use crate::visibility_constraints::{VisibilityConstraint, VisibilityConstraints};
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
@@ -423,10 +424,15 @@ impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(
-            |(def_id, visibility_constraint)| DeclarationWithConstraint {
-                declaration: self.all_definitions[def_id],
-                visibility_constraints: self.visibility_constraints,
-                visibility_constraint,
+            |DeclarationIdWithConstraint {
+                 definition,
+                 visibility_constraint,
+             }| {
+                DeclarationWithConstraint {
+                    declaration: self.all_definitions[definition],
+                    visibility_constraints: self.visibility_constraints,
+                    visibility_constraint,
+                }
             },
         )
     }
