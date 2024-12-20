@@ -126,6 +126,8 @@ impl<'a> Annotation<'a> {
 /// Types of annotations.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Level {
+    /// Do not attach any annotation.
+    None,
     /// Error annotations are displayed using red color and "^" character.
     Error,
     /// Warning annotations are displayed using blue color and "-" character.

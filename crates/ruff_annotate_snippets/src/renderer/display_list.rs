@@ -909,6 +909,7 @@ pub(crate) enum DisplayAnnotationType {
 impl From<snippet::Level> for DisplayAnnotationType {
     fn from(at: snippet::Level) -> Self {
         match at {
+            snippet::Level::None => DisplayAnnotationType::None,
             snippet::Level::Error => DisplayAnnotationType::Error,
             snippet::Level::Warning => DisplayAnnotationType::Warning,
             snippet::Level::Info => DisplayAnnotationType::Info,
