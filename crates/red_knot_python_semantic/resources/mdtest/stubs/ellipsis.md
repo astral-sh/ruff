@@ -12,7 +12,7 @@ def f2(x: dict = ...) -> None: ...
 
 ## Class and Module Level Attributes
 
-For default values the ellipsis literal can be used in classes and module level attributes, in a
+The ellipsis literal can be assigned to a class or module attribute, regardless of its type, in a
 stub file only.
 
 ```py path=test.pyi
