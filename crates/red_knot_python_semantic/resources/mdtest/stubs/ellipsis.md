@@ -18,10 +18,13 @@ The ellipsis literal can be assigned to a class or module attribute, regardless 
 stub file only.
 
 ```py path=test.pyi
-y: float = ...
+y: bytes = ...
+reveal_type(y)  # revealed: bytes
 
 class Foo:
     y: int = ...
+    
+reveal_type(Foo.y)  # revealed: int
 ```
 
 ## Ellipsis Usage In Non Stub File
