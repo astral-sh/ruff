@@ -1168,6 +1168,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             let inferred_ty = if let Some(default_ty) = default_ty {
                 if default_ty.is_assignable_to(self.db(), declared_ty) {
                     UnionType::from_elements(self.db(), [declared_ty, default_ty])
+                } else if self.file().is_stub(self.db().upcast())
+                    && default
+                        .as_ref()
+                        .is_some_and(|d| d.is_ellipsis_literal_expr())
+                {
+                    declared_ty
                 } else {
                     self.context.report_lint(
                         &INVALID_PARAMETER_DEFAULT,
@@ -1869,7 +1875,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
             }
-            TargetKind::Name => value_ty,
+            TargetKind::Name => {
+                if self.file().is_stub(self.db().upcast()) && value.is_ellipsis_literal_expr() {
+                    Type::Any
+                } else {
+                    value_ty
+                }
+            }
         };
 
         if let Some(known_instance) =
@@ -1936,6 +1948,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if let Some(value) = value.as_deref() {
             let value_ty = self.infer_expression(value);
+            let value_ty = if self.file().is_stub(self.db().upcast()) && value.is_ellipsis_literal_expr() {
+                annotation_ty
+            } else {
+                value_ty
+            }
             self.add_declaration_with_binding(
                 assignment.into(),
                 definition,
