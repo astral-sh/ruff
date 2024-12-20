@@ -3123,9 +3123,9 @@ pub struct RuffOptions {
     #[option(
         default = "[]",
         value_type = "list[str]",
-        example = "whitelisted-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
+        example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
     )]
-    pub whitelisted_markup_calls: Option<Vec<String>>,
+    pub allowed_markup_calls: Option<Vec<String>>,
 }
 
 impl RuffOptions {
@@ -3135,7 +3135,7 @@ impl RuffOptions {
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
             extend_markup_names: self.extend_markup_names.unwrap_or_default(),
-            whitelisted_markup_calls: self.whitelisted_markup_calls.unwrap_or_default(),
+            allowed_markup_calls: self.allowed_markup_calls.unwrap_or_default(),
         }
     }
 }

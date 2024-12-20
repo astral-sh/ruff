@@ -91,7 +91,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
                     extend_markup_names: vec![],
-                    whitelisted_markup_calls: vec![],
+                    allowed_markup_calls: vec![],
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -108,7 +108,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
                     extend_markup_names: vec![],
-                    whitelisted_markup_calls: vec![],
+                    allowed_markup_calls: vec![],
                 },
                 target_version: PythonVersion::Py310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -449,7 +449,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
                     extend_markup_names: vec!["webhelpers.html.literal".to_string()],
-                    whitelisted_markup_calls: vec![],
+                    allowed_markup_calls: vec![],
                 },
                 preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
@@ -472,7 +472,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
                     extend_markup_names: vec![],
-                    whitelisted_markup_calls: vec!["bleach.clean".to_string()],
+                    allowed_markup_calls: vec!["bleach.clean".to_string()],
                 },
                 preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)

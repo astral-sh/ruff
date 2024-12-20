@@ -24,7 +24,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// This rule was originally inspired by [flake8-markupsafe] but doesn't carve
 /// out any exceptions for i18n related calls by default.
 ///
-/// You can use [`lint.ruff.whitelisted-markup-calls`] to specify exceptions.
+/// You can use [`lint.ruff.allowed-markup-calls`] to specify exceptions.
 ///
 /// ## Example
 /// Given:
@@ -66,7 +66,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// ```
 /// ## Options
 /// - `lint.ruff.extend-markup-names`
-/// - `lint.ruff.whitelisted-markup-calls`
+/// - `lint.ruff.allowed-markup-calls`
 ///
 /// ## References
 /// - [MarkupSafe](https://pypi.org/project/MarkupSafe/)
@@ -151,7 +151,7 @@ fn is_whitelisted_call(expr: &Expr, semantic: &SemanticModel, settings: &LinterS
 
     settings
         .ruff
-        .whitelisted_markup_calls
+        .allowed_markup_calls
         .iter()
         .map(|target| QualifiedName::from_dotted_name(target))
         .any(|target| qualified_name == target)
