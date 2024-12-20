@@ -26,7 +26,7 @@ use crate::semantic_index::symbol::{
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
-    FlowSnapshot, ScopedVisibilityConstraintId, UseDefMapBuilder,
+    FlowSnapshot, ScopedConstraintId, ScopedVisibilityConstraintId, UseDefMapBuilder,
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::Unpack;
@@ -297,30 +297,45 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn add_constraint(&mut self, constraint: Constraint<'db>) -> Constraint<'db> {
-        self.current_use_def_map_mut().add_constraint(constraint);
-        constraint
+    /// Adds a new constraint to the list of all constraints, but does not record it. Returns the
+    /// constraint ID for later recording using [`SemanticIndexBuilder::record_constraint_id`].
+    fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        self.current_use_def_map_mut().add_constraint(constraint)
     }
 
-    fn add_negated_constraint(&mut self, constraint: Constraint<'db>) -> Constraint<'db> {
+    /// Negates a constraint and adds it to the list of all constraints, does not record it.
+    fn add_negated_constraint(
+        &mut self,
+        constraint: Constraint<'db>,
+    ) -> (Constraint<'db>, ScopedConstraintId) {
         let negated = Constraint {
             node: constraint.node,
             is_positive: false,
         };
-        self.current_use_def_map_mut().add_constraint(negated);
-        negated
+        let id = self.current_use_def_map_mut().add_constraint(negated);
+        (negated, id)
     }
 
+    /// Records a previously added constraint by adding it to all live bindings.
+    fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
+        self.current_use_def_map_mut()
+            .record_constraint_id(constraint);
+    }
+
+    /// Adds and records a constraint, i.e. adds it to all live bindings.
     fn record_constraint(&mut self, constraint: Constraint<'db>) {
         self.current_use_def_map_mut().record_constraint(constraint);
     }
 
-    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) -> Constraint<'db> {
-        let negated = self.add_negated_constraint(constraint);
-        self.record_constraint(negated);
-        negated
+    /// Negates the given constraint and then adds it to all live bindings.
+    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        let (_, id) = self.add_negated_constraint(constraint);
+        self.record_constraint_id(id);
+        id
     }
 
+    /// Adds a new visibility constraint, but does not record it. Returns the constraint ID
+    /// for later recording using [`SemanticIndexBuilder::record_visibility_constraint_id`].
     fn add_visibility_constraint(
         &mut self,
         constraint: VisibilityConstraint<'db>,
@@ -329,11 +344,23 @@ impl<'db> SemanticIndexBuilder<'db> {
             .add_visibility_constraint(constraint)
     }
 
+    /// Records a previously added visibility constraint by applying it to all live bindings
+    /// and declarations.
     fn record_visibility_constraint_id(&mut self, constraint: ScopedVisibilityConstraintId) {
         self.current_use_def_map_mut()
             .record_visibility_constraint_id(constraint);
     }
 
+    /// Negates the given visibility constraint and then adds it to all live bindings and declarations.
+    fn record_negated_visibility_constraint(
+        &mut self,
+        constraint: ScopedVisibilityConstraintId,
+    ) -> ScopedVisibilityConstraintId {
+        self.current_use_def_map_mut()
+            .record_visibility_constraint(VisibilityConstraint::VisibleIfNot(constraint))
+    }
+
+    /// Records a visibility constraint by applying it to all live bindings and declarations.
     fn record_visibility_constraint(
         &mut self,
         constraint: Constraint<'db>,
@@ -342,22 +369,17 @@ impl<'db> SemanticIndexBuilder<'db> {
             .record_visibility_constraint(VisibilityConstraint::VisibleIf(constraint))
     }
 
+    /// Records a [`VisibilityConstraint::Ambiguous`] constraint.
     fn record_ambiguous_visibility(&mut self) -> ScopedVisibilityConstraintId {
         self.current_use_def_map_mut()
             .record_visibility_constraint(VisibilityConstraint::Ambiguous)
     }
 
+    /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
+    /// not see any new definitions since the given snapshot.
     fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
         self.current_use_def_map_mut()
             .simplify_visibility_constraints(snapshot);
-    }
-
-    fn record_negated_visibility_constraint(
-        &mut self,
-        constraint: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
-        self.current_use_def_map_mut()
-            .record_visibility_constraint(VisibilityConstraint::VisibleIfNot(constraint))
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
@@ -1432,8 +1454,8 @@ where
                     // anymore.
                     if index < values.len() - 1 {
                         let constraint = self.build_constraint(value);
-                        let constraint = match op {
-                            BoolOp::And => self.add_constraint(constraint),
+                        let (constraint, constraint_id) = match op {
+                            BoolOp::And => (constraint, self.add_constraint(constraint)),
                             BoolOp::Or => self.add_negated_constraint(constraint),
                         };
                         let visibility_constraint = self
@@ -1455,7 +1477,7 @@ where
                         // the application of the visibility constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
-                        self.record_constraint(constraint);
+                        self.record_constraint_id(constraint_id);
                         visibility_constraints.push(visibility_constraint);
                     }
                 }

@@ -510,11 +510,16 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_constraints.push(constraint)
     }
 
-    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
-        let constraint_id = self.add_constraint(constraint);
+    pub(super) fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
         for state in &mut self.symbol_states {
-            state.record_constraint(constraint_id);
+            state.record_constraint(constraint);
         }
+    }
+
+    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        let new_constraint_id = self.add_constraint(constraint);
+        self.record_constraint_id(new_constraint_id);
+        new_constraint_id
     }
 
     pub(super) fn add_visibility_constraint(
