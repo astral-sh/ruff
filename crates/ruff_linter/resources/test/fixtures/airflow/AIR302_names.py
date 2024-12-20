@@ -96,6 +96,10 @@ from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_
 PY36, PY37, PY38, PY39, PY310, PY311, PY312
 DatasetFromRoot
 
+dataset_from_root = DatasetFromRoot()
+dataset_from_root.iter_datasets()
+dataset_from_root.iter_dataset_aliases()
+
 # airflow.api_connexion.security
 requires_access, requires_access_dataset
 
@@ -118,6 +122,18 @@ DatasetAll
 DatasetAny
 expand_alias_to_datasets
 Metadata
+
+dataset_to_test_method_call = Dataset()
+dataset_to_test_method_call.iter_datasets()
+dataset_to_test_method_call.iter_dataset_aliases()
+
+alias_to_test_method_call = DatasetAlias()
+alias_to_test_method_call.iter_datasets()
+alias_to_test_method_call.iter_dataset_aliases()
+
+any_to_test_method_call = DatasetAny()
+any_to_test_method_call.iter_datasets()
+any_to_test_method_call.iter_dataset_aliases()
 
 # airflow.datasets.manager
 DatasetManager, dataset_manager, resolve_dataset_manager
@@ -254,6 +270,9 @@ has_access_dataset
 # airflow.www.utils
 get_sensitive_variables_fields, should_hide_value_for_key
 
+
+# methods
+
 from airflow.datasets.manager import DatasetManager
 
 dm = DatasetManager()
@@ -272,15 +291,34 @@ hlc.add_input_dataset()
 hlc.add_output_dataset()
 hlc.collected_datasets()
 
-
 from airflow.providers.amazon.auth_manager.aws_auth_manager import AwsAuthManager
 
 aam = AwsAuthManager()
 aam.is_authorized_dataset()
-
 
 from airflow.providers_manager import ProvidersManager
 
 pm = ProvidersManager()
 pm.initialize_providers_asset_uri_resources()
 pm.dataset_factories
+
+
+from airflow.secrets.base_secrets import BaseSecretsBackend
+
+base_secret_backend = BaseSecretsBackend()
+base_secret_backend.get_conn_uri()
+base_secret_backend.get_connections()
+
+from airflow.providers.google.cloud.secrets.secret_manager import (
+    CloudSecretManagerBackend,
+)
+
+csm_backend = CloudSecretManagerBackend()
+csm_backend.get_conn_uri()
+csm_backend.get_connections()
+
+from airflow.providers.hashicorp.secrets.vault import VaultBackend
+
+vault_backend = VaultBackend()
+vault_backend.get_conn_uri()
+vault_backend.get_connections()
