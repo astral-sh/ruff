@@ -30,7 +30,7 @@ mod use_def;
 
 pub(crate) use self::use_def::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator, ScopedVisibilityConstraintId,
+    DeclarationsIterator,
 };
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
@@ -156,7 +156,7 @@ impl<'db> SemanticIndex<'db> {
     /// Use the Salsa cached [`use_def_map()`] query if you only need the
     /// use-def map for a single scope.
     #[track_caller]
-    pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> Arc<UseDefMap> {
+    pub(super) fn use_def_map(&'db self, scope_id: FileScopeId) -> Arc<UseDefMap<'db>> {
         self.use_def_maps[scope_id].clone()
     }
 

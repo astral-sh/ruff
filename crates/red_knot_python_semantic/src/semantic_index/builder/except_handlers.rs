@@ -4,9 +4,9 @@ use super::SemanticIndexBuilder;
 
 /// An abstraction over the fact that each scope should have its own [`TryNodeContextStack`]
 #[derive(Debug, Default)]
-pub(super) struct TryNodeContextStackManager(Vec<TryNodeContextStack>);
+pub(super) struct TryNodeContextStackManager<'db>(Vec<TryNodeContextStack<'db>>);
 
-impl TryNodeContextStackManager {
+impl<'db> TryNodeContextStackManager<'db> {
     /// Push a new [`TryNodeContextStack`] onto the stack of stacks.
     ///
     /// Each [`TryNodeContextStack`] is only valid for a single scope
@@ -46,7 +46,7 @@ impl TryNodeContextStackManager {
     }
 
     /// Retrieve the [`TryNodeContextStack`] that is relevant for the current scope.
-    fn current_try_context_stack(&mut self) -> &mut TryNodeContextStack {
+    fn current_try_context_stack(&'db mut self) -> &'db mut TryNodeContextStack<'db> {
         self.0
             .last_mut()
             .expect("There should always be at least one `TryBlockContexts` on the stack")
@@ -55,9 +55,9 @@ impl TryNodeContextStackManager {
 
 /// The contexts of nested `try`/`except` blocks for a single scope
 #[derive(Debug, Default)]
-struct TryNodeContextStack(Vec<TryNodeContext>);
+struct TryNodeContextStack<'db>(Vec<TryNodeContext<'db>>);
 
-impl TryNodeContextStack {
+impl<'db> TryNodeContextStack<'db> {
     /// Push a new [`TryNodeContext`] for recording intermediate states
     /// while visiting a [`ruff_python_ast::StmtTry`] node that has a `finally` branch.
     fn push_context(&mut self) {
@@ -90,11 +90,11 @@ impl TryNodeContextStack {
 /// It will likely be necessary to add more fields to this struct in the future
 /// when we add more advanced handling of `finally` branches.
 #[derive(Debug, Default)]
-struct TryNodeContext {
-    try_suite_snapshots: Vec<FlowSnapshot>,
+struct TryNodeContext<'db> {
+    try_suite_snapshots: Vec<FlowSnapshot<'db>>,
 }
 
-impl TryNodeContext {
+impl<'db> TryNodeContext<'db> {
     /// Take a record of what the internal state looked like after a definition
     fn record_definition(&mut self, snapshot: FlowSnapshot) {
         self.try_suite_snapshots.push(snapshot);
