@@ -6361,15 +6361,13 @@ mod tests {
     }
 
     // Incremental inference tests
-
+    #[track_caller]
     fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         use_def_map(db, scope)
             .public_bindings(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .map(|b| b.binding)
-            .find(Option::is_some)
-            .unwrap()
-            .unwrap()
+            .find_map(|b| b.binding)
+            .expect("no binding found")
     }
 
     #[test]

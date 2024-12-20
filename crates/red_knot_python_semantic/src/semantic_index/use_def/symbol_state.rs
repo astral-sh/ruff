@@ -646,7 +646,7 @@ mod tests {
 
     #[test]
     fn merge() {
-        let mut visibility_constraints = VisibilityConstraints::new();
+        let mut visibility_constraints = VisibilityConstraints::default();
 
         // merging the same definition with the same constraint keeps the constraint
         let mut sym1a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
@@ -717,7 +717,7 @@ mod tests {
 
     #[test]
     fn record_declaration_merge() {
-        let mut visibility_constraints = VisibilityConstraints::new();
+        let mut visibility_constraints = VisibilityConstraints::default();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
@@ -731,7 +731,7 @@ mod tests {
 
     #[test]
     fn record_declaration_merge_partial_undeclared() {
-        let mut visibility_constraints = VisibilityConstraints::new();
+        let mut visibility_constraints = VisibilityConstraints::default();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
