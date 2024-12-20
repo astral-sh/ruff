@@ -824,14 +824,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(binding.is_binding(self.db()));
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
-        let undeclared_ty = if declarations.may_be_undeclared() {
-            Some(Type::Unknown)
-        } else {
-            None
-        };
         let mut bound_ty = ty;
-        let declared_ty = declarations_ty(self.db(), declarations, undeclared_ty).unwrap_or_else(
-            |(ty, conflicting)| {
+        let declared_ty = declarations_ty(self.db(), declarations)
+            .map(|s| s.ignore_possibly_unbound().unwrap_or(Type::Unknown))
+            .unwrap_or_else(|(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
                 let symbol_table = self.index.symbol_table(binding.file_scope(self.db()));
                 let symbol_name = symbol_table.symbol(binding.symbol(self.db())).name();
@@ -844,8 +840,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ),
                 );
                 ty
-            },
-        );
+            });
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
@@ -860,7 +855,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = bindings_ty(self.db(), prior_bindings).unwrap_or(Type::Never);
+        let inferred_ty = bindings_ty(self.db(), prior_bindings)
+            .ignore_possibly_unbound()
+            .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty) {
             ty
         } else {
@@ -1739,7 +1736,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 guard,
             } = case;
             self.infer_match_pattern(pattern);
-            self.infer_optional_expression(guard.as_deref());
+            guard
+                .as_deref()
+                .map(|guard| self.infer_standalone_expression(guard));
             self.infer_body(body);
         }
     }
@@ -1766,11 +1765,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
+                self.infer_standalone_expression(&match_value.value);
+            }
+            _ => {
+                self.infer_match_pattern_impl(pattern);
+            }
+        }
+    }
+
+    fn infer_match_pattern_impl(&mut self, pattern: &ast::Pattern) {
+        match pattern {
+            ast::Pattern::MatchValue(match_value) => {
                 self.infer_expression(&match_value.value);
             }
             ast::Pattern::MatchSequence(match_sequence) => {
                 for pattern in &match_sequence.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
             }
             ast::Pattern::MatchMapping(match_mapping) => {
@@ -1784,7 +1794,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(key);
                 }
                 for pattern in patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -1794,21 +1804,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                     arguments,
                 } = match_class;
                 for pattern in &arguments.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.infer_match_pattern(&keyword.pattern);
+                    self.infer_match_pattern_impl(&keyword.pattern);
                 }
                 self.infer_expression(cls);
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
-                    self.infer_match_pattern(pattern);
+                    self.infer_match_pattern_impl(pattern);
                 }
             }
             ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
@@ -3094,28 +3104,24 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(file_scope_id);
 
         // If we're inferring types of deferred expressions, always treat them as public symbols
-        let (bindings_ty, boundness) = if self.is_deferred() {
+        let bindings_ty = if self.is_deferred() {
             if let Some(symbol) = self.index.symbol_table(file_scope_id).symbol_id_by_name(id) {
-                (
-                    bindings_ty(self.db(), use_def.public_bindings(symbol)),
-                    use_def.public_boundness(symbol),
-                )
+                bindings_ty(self.db(), use_def.public_bindings(symbol))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
                     "Expected the symbol table to create a symbol for every Name node"
                 );
-                (None, Boundness::PossiblyUnbound)
+                Symbol::Unbound
             }
         } else {
             let use_id = name.scoped_use_id(self.db(), self.scope());
-            (
-                bindings_ty(self.db(), use_def.bindings_at_use(use_id)),
-                use_def.use_boundness(use_id),
-            )
+            bindings_ty(self.db(), use_def.bindings_at_use(use_id))
         };
 
-        if boundness == Boundness::PossiblyUnbound {
+        if let Symbol::Type(ty, Boundness::Bound) = bindings_ty {
+            ty
+        } else {
             match self.lookup_name(name) {
                 Symbol::Type(looked_up_ty, looked_up_boundness) => {
                     if looked_up_boundness == Boundness::PossiblyUnbound {
@@ -3123,20 +3129,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
 
                     bindings_ty
+                        .ignore_possibly_unbound()
                         .map(|ty| UnionType::from_elements(self.db(), [ty, looked_up_ty]))
                         .unwrap_or(looked_up_ty)
                 }
-                Symbol::Unbound => {
-                    if bindings_ty.is_some() {
+                Symbol::Unbound => match bindings_ty {
+                    Symbol::Type(ty, Boundness::PossiblyUnbound) => {
                         report_possibly_unresolved_reference(&self.context, name);
-                    } else {
-                        report_unresolved_reference(&self.context, name);
+                        ty
                     }
-                    bindings_ty.unwrap_or(Type::Unknown)
-                }
+                    Symbol::Unbound => {
+                        report_unresolved_reference(&self.context, name);
+                        Type::Unknown
+                    }
+                    Symbol::Type(_, Boundness::Bound) => unreachable!("Handled above"),
+                },
             }
-        } else {
-            bindings_ty.unwrap_or(Type::Unknown)
         }
     }
 
@@ -6353,14 +6361,13 @@ mod tests {
     }
 
     // Incremental inference tests
-
+    #[track_caller]
     fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         use_def_map(db, scope)
             .public_bindings(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .next()
-            .unwrap()
-            .binding
+            .find_map(|b| b.binding)
+            .expect("no binding found")
     }
 
     #[test]

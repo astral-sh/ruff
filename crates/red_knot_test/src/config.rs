@@ -9,7 +9,7 @@
 //! ```
 
 use anyhow::Context;
-use red_knot_python_semantic::PythonVersion;
+use red_knot_python_semantic::{PythonPlatform, PythonVersion};
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Default, Clone)]
@@ -28,13 +28,22 @@ impl MarkdownTestConfig {
     pub(crate) fn python_version(&self) -> Option<PythonVersion> {
         self.environment.as_ref().and_then(|env| env.python_version)
     }
+
+    pub(crate) fn python_platform(&self) -> Option<PythonPlatform> {
+        self.environment
+            .as_ref()
+            .and_then(|env| env.python_platform.clone())
+    }
 }
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Environment {
-    /// Python version to assume when resolving types.
+    /// Target Python version to assume when resolving types.
     pub(crate) python_version: Option<PythonVersion>,
+
+    /// Target platform to assume when resolving types.
+    pub(crate) python_platform: Option<PythonPlatform>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

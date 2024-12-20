@@ -29,7 +29,8 @@ pub mod symbol;
 mod use_def;
 
 pub(crate) use self::use_def::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
+    DeclarationsIterator, ScopedVisibilityConstraintId,
 };
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
@@ -378,14 +379,12 @@ mod tests {
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
             self.public_bindings(symbol)
-                .next()
-                .map(|constrained_binding| constrained_binding.binding)
+                .find_map(|constrained_binding| constrained_binding.binding)
         }
 
         fn first_binding_at_use(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
             self.bindings_at_use(use_id)
-                .next()
-                .map(|constrained_binding| constrained_binding.binding)
+                .find_map(|constrained_binding| constrained_binding.binding)
         }
     }
 

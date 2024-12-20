@@ -81,10 +81,7 @@ python-version = "3.9"
 ```
 
 ```py
-# TODO:
-#  * `tuple.__class_getitem__` is always bound on 3.9 (`sys.version_info`)
-#  * `tuple[int, str]` is a valid base (generics)
-# error: [call-possibly-unbound-method] "Method `__class_getitem__` of type `Literal[tuple]` is possibly unbound"
+# TODO: `tuple[int, str]` is a valid base (generics)
 # error: [invalid-base] "Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class A(tuple[int, str]): ...
 
