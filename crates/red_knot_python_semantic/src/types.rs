@@ -26,6 +26,7 @@ use crate::semantic_index::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
+use crate::suppression::check_unused_suppressions;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{CallDunderResult, CallOutcome};
 use crate::types::class_base::ClassBase;
@@ -63,6 +64,8 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         let result = infer_scope_types(db, scope_id);
         diagnostics.extend(result.diagnostics());
     }
+
+    check_unused_suppressions(db, file, &mut diagnostics);
 
     diagnostics
 }
