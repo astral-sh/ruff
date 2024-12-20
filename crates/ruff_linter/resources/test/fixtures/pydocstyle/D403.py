@@ -41,3 +41,13 @@ def first_word_lots_of_whitespace():
 
     What do you think?    
     """
+
+def single_word_then_newline():
+    """singleword
+
+    """
+
+def single_word_on_second_line():
+    """
+    singleword
+    """

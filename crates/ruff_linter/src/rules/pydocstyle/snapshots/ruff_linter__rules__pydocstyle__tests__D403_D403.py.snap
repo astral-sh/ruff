@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+snapshot_kind: text
 ---
 D403.py:2:5: D403 [*] First word of the docstring should be capitalized: `this` -> `This`
   |
@@ -72,6 +73,8 @@ D403.py:36:5: D403 [*] First word of the docstring should be capitalized: `here`
 42 | |     What do you think?    
 43 | |     """
    | |_______^ D403
+44 |   
+45 |   def single_word_then_newline():
    |
    = help: Capitalize `here` to `Here`
 
@@ -84,3 +87,45 @@ D403.py:36:5: D403 [*] First word of the docstring should be capitalized: `here`
 41 41 | 
 42 42 |     What do you think?    
 43 43 |     """
+
+D403.py:46:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+45 |   def single_word_then_newline():
+46 |       """singleword
+   |  _____^
+47 | | 
+48 | |     """
+   | |_______^ D403
+49 |   
+50 |   def single_word_on_second_line():
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+43 43 |     """
+44 44 | 
+45 45 | def single_word_then_newline():
+46    |-    """singleword
+   46 |+    """Singleword
+47 47 | 
+48 48 |     """
+49 49 | 
+
+D403.py:51:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+   |
+50 |   def single_word_on_second_line():
+51 |       """
+   |  _____^
+52 | |     singleword
+53 | |     """
+   | |_______^ D403
+   |
+   = help: Capitalize `singleword` to `Singleword`
+
+ℹ Safe fix
+49 49 | 
+50 50 | def single_word_on_second_line():
+51 51 |     """
+52    |-    singleword
+   52 |+    Singleword
+53 53 |     """
