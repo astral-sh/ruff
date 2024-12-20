@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cmp::Ordering;
 
 use rustc_hash::FxHashMap;
 
@@ -11,6 +12,7 @@ use crate::unpack::UnpackValue;
 use crate::Db;
 
 use super::context::{InferContext, WithDiagnostics};
+use super::diagnostic::INVALID_ASSIGNMENT;
 use super::{TupleType, UnionType};
 
 /// Unpacks the value expression type to their respective targets.
@@ -104,9 +106,33 @@ impl<'db> Unpacker<'db> {
                     };
 
                     if let Some(tuple_ty) = ty.into_tuple() {
-                        let tuple_ty_elements = self.tuple_ty_elements(elts, tuple_ty);
+                        let tuple_ty_elements = self.tuple_ty_elements(target, elts, tuple_ty);
 
-                        // TODO: Add diagnostic for length mismatch
+                        match elts.len().cmp(&tuple_ty_elements.len()) {
+                            Ordering::Less => {
+                                self.context.report_lint(
+                                    &INVALID_ASSIGNMENT,
+                                    target.into(),
+                                    format_args!(
+                                        "Too many values to unpack (expected {}, got {})",
+                                        elts.len(),
+                                        tuple_ty_elements.len()
+                                    ),
+                                );
+                            }
+                            Ordering::Greater => {
+                                self.context.report_lint(
+                                    &INVALID_ASSIGNMENT,
+                                    target.into(),
+                                    format_args!(
+                                        "Not enough values to unpack (expected {}, got {})",
+                                        elts.len(),
+                                        tuple_ty_elements.len()
+                                    ),
+                                );
+                            }
+                            Ordering::Equal => {}
+                        }
 
                         for (index, ty) in tuple_ty_elements.iter().enumerate() {
                             if let Some(element_types) = target_types.get_mut(index) {
@@ -142,29 +168,40 @@ impl<'db> Unpacker<'db> {
     /// Returns the [`Type`] elements inside the given [`TupleType`] taking into account that there
     /// can be a starred expression in the `elements`.
     fn tuple_ty_elements(
-        &mut self,
+        &self,
+        expr: &ast::Expr,
         targets: &[ast::Expr],
         tuple_ty: TupleType<'db>,
     ) -> Cow<'_, [Type<'db>]> {
-        // If there is a starred expression, it will consume all of the entries at that location.
+        // If there is a starred expression, it will consume all of the types at that location.
         let Some(starred_index) = targets.iter().position(ast::Expr::is_starred_expr) else {
-            // Otherwise, the types will be unpacked 1-1 to the elements.
+            // Otherwise, the types will be unpacked 1-1 to the targets.
             return Cow::Borrowed(tuple_ty.elements(self.db()).as_ref());
         };
 
         if tuple_ty.len(self.db()) >= targets.len() - 1 {
+            // This branch is only taken when there are enough elements in the tuple type to
+            // combine for the starred expression. So, the arithmetic and indexing operations are
+            // safe to perform.
             let mut element_types = Vec::with_capacity(targets.len());
+
+            // Insert all the elements before the starred expression.
             element_types.extend_from_slice(
                 // SAFETY: Safe because of the length check above.
                 &tuple_ty.elements(self.db())[..starred_index],
             );
 
-            // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
-            // is 1 and the remaining elements after that are 2.
+            // The number of target expressions that are remaining after the starred expression.
+            // For example, in `(a, *b, c, d) = ...`, the index of starred element `b` is 1 and the
+            // remaining elements after that are 2.
             let remaining = targets.len() - (starred_index + 1);
-            // This index represents the type of the last element that belongs
-            // to the starred expression, in an exclusive manner.
+
+            // This index represents the position of the last element that belongs to the starred
+            // expression, in an exclusive manner. For example, in `(a, *b, c) = (1, 2, 3, 4)`, the
+            // starred expression `b` will consume the elements `Literal[2]` and `Literal[3]` and
+            // the index value would be 3.
             let starred_end_index = tuple_ty.len(self.db()) - remaining;
+
             // SAFETY: Safe because of the length check above.
             let _starred_element_types =
                 &tuple_ty.elements(self.db())[starred_index..starred_end_index];
@@ -173,18 +210,32 @@ impl<'db> Unpacker<'db> {
             // combine_types(starred_element_types);
             element_types.push(todo_type!("starred unpacking"));
 
+            // Insert the types remaining that aren't consumed by the starred expression.
             element_types.extend_from_slice(
                 // SAFETY: Safe because of the length check above.
                 &tuple_ty.elements(self.db())[starred_end_index..],
             );
+
             Cow::Owned(element_types)
         } else {
+            self.context.report_lint(
+                &INVALID_ASSIGNMENT,
+                expr.into(),
+                format_args!(
+                    "Not enough values to unpack (expected {} or more, got {})",
+                    targets.len() - 1,
+                    tuple_ty.len(self.db())
+                ),
+            );
+
             let mut element_types = tuple_ty.elements(self.db()).to_vec();
+
             // Subtract 1 to insert the starred expression type at the correct
             // index.
             element_types.resize(targets.len() - 1, Type::Unknown);
             // TODO: This should be `list[Unknown]`
             element_types.insert(starred_index, todo_type!("starred unpacking"));
+
             Cow::Owned(element_types)
         }
     }
