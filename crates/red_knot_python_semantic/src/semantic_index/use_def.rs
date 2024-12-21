@@ -278,7 +278,8 @@ pub(crate) type AllConstraints<'db> = IndexVec<ScopedConstraintId, Constraint<'d
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct UseDefMap<'db> {
-    /// Array of [`Definition`] in this scope.
+    /// Array of [`Definition`] in this scope. Only the first entry should be `None`;
+    /// this represents the implicit "unbound"/"undeclared" definition of every symbol.
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
 
     /// Array of [`Constraint`] in this scope.
