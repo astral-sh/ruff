@@ -28,11 +28,13 @@
 //! we need to consider both options during type inference and boundness analysis. For the example
 //! above, these are the possible type inference / boundness results for the uses of `x` and `y`:
 //!
+//! ```text
 //!       | `test` truthiness | `~test` truthiness | type of `x`     | boundness of `y` |
 //!       |-------------------|--------------------|-----------------|------------------|
 //!       | always false      | always true        | `Literal[1]`    | unbound          |
 //!       | ambiguous         | ambiguous          | `Literal[1, 2]` | possibly unbound |
 //!       | always true       | always false       | `Literal[2]`    | bound            |
+//! ```
 //!
 //! ### Sequential constraints (ternary AND)
 //!
@@ -55,11 +57,13 @@
 //! `test2` is always-true. And it is ambiguous otherwise. This corresponds to a ternary *test1 AND
 //! ~test2* operation in three-valued Kleene logic [Kleene]:
 //!
+//! ```text
 //!       | AND          | always-false | ambiguous    | always-true  |
 //!       |--------------|--------------|--------------|--------------|
 //!       | always false | always-false | always-false | always-false |
 //!       | ambiguous    | always-false | ambiguous    | ambiguous    |
 //!       | always true  | always-false | ambiguous    | always-true  |
+//! ```
 //!
 //! The `x = 0` binding can be handled similarly, with the difference that both `test1` and `test2`
 //! are negated:
@@ -94,11 +98,13 @@
 //! `test2` is always-false; and it is never visible if `test1` is always-true *and* `test2` is
 //! always-true. This corresponds to a ternary *OR* operation in Kleene logic:
 //!
+//! ```text
 //!       | OR           | always-false | ambiguous    | always-true  |
 //!       |--------------|--------------|--------------|--------------|
 //!       | always false | always-false | ambiguous    | always-true  |
 //!       | ambiguous    | ambiguous    | ambiguous    | always-true  |
 //!       | always true  | always-true  | always-true  | always-true  |
+//! ```
 //!
 //! Using this, we can annotate the visibility constraints for the example above:
 //! ```py
