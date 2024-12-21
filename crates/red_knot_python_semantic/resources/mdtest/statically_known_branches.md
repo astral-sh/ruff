@@ -1495,18 +1495,24 @@ supported. This is to avoid pathological cases that would require us to recurse 
 ```py
 x = 1
 
-False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or (
-    x := 2
-)
+False or False or False or False or \
+    False or False or False or False or \
+    False or False or False or False or \
+    False or False or False or False or \
+    False or False or False or False or \
+    False or False or (x := 2)  # fmt: skip
 
 # This still works fine:
 reveal_type(x)  # revealed: Literal[2]
 
 y = 1
 
-False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or False or (
-    y := 2
-)
+False or False or False or False or \
+    False or False or False or False or \
+    False or False or False or False or \
+    False or False or False or False or \
+    False or False or False or False or \
+    False or False or False or (y := 2)  # fmt: skip
 
 # TODO: This should ideally be `Literal[2]` as well:
 reveal_type(y)  # revealed: Literal[1, 2]
