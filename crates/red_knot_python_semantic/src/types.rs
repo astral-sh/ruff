@@ -275,12 +275,12 @@ fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Symbol<'db> {
+    let visibility_constraints = bindings_with_constraints.visibility_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let unbound_visibility = if let Some(BindingWithConstraints {
         binding: None,
         constraints: _,
-        visibility_constraints,
         visibility_constraint,
     }) = bindings_with_constraints.peek()
     {
@@ -293,7 +293,6 @@ fn bindings_ty<'db>(
         |BindingWithConstraints {
              binding,
              constraints,
-             visibility_constraints,
              visibility_constraint,
          }| {
             let binding = binding?;
@@ -364,11 +363,11 @@ fn declarations_ty<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
 ) -> DeclaredTypeResult<'db> {
+    let visibility_constraints = declarations.visibility_constraints;
     let mut declarations = declarations.peekable();
 
     let undeclared_visibility = if let Some(DeclarationWithConstraint {
         declaration: None,
-        visibility_constraints,
         visibility_constraint,
     }) = declarations.peek()
     {
@@ -380,7 +379,6 @@ fn declarations_ty<'db>(
     let mut types = declarations.filter_map(
         |DeclarationWithConstraint {
              declaration,
-             visibility_constraints,
              visibility_constraint,
          }| {
             let declaration = declaration?;

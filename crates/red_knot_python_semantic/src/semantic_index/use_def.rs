@@ -364,7 +364,7 @@ impl<'db> UseDefMap<'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             all_constraints: &self.all_constraints,
-            all_visibility_constraints: &self.visibility_constraints,
+            visibility_constraints: &self.visibility_constraints,
             inner: bindings.iter(),
         }
     }
@@ -392,7 +392,7 @@ enum SymbolDefinitions {
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     all_constraints: &'map AllConstraints<'db>,
-    all_visibility_constraints: &'map VisibilityConstraints<'db>,
+    pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
     inner: BindingIdWithConstraintsIterator<'map>,
 }
 
@@ -410,7 +410,6 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                     all_constraints,
                     constraint_ids: binding_id_with_constraints.constraint_ids,
                 },
-                visibility_constraints: self.all_visibility_constraints,
                 visibility_constraint: binding_id_with_constraints.visibility_constraint,
             })
     }
@@ -421,7 +420,6 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Option<Definition<'db>>,
     pub(crate) constraints: ConstraintsIterator<'map, 'db>,
-    pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
@@ -444,18 +442,17 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
-    visibility_constraints: &'map VisibilityConstraints<'db>,
+    pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
     inner: DeclarationIdIterator<'map>,
 }
 
-pub(crate) struct DeclarationWithConstraint<'map, 'db> {
+pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: Option<Definition<'db>>,
-    pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
-impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
-    type Item = DeclarationWithConstraint<'map, 'db>;
+impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
+    type Item = DeclarationWithConstraint<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(
@@ -465,7 +462,6 @@ impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
              }| {
                 DeclarationWithConstraint {
                     declaration: self.all_definitions[definition],
-                    visibility_constraints: self.visibility_constraints,
                     visibility_constraint,
                 }
             },
