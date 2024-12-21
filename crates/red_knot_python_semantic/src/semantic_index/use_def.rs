@@ -273,7 +273,7 @@ use super::constraint::Constraint;
 mod bitset;
 mod symbol_state;
 
-pub(crate) type AllConstraints<'db> = IndexVec<ScopedConstraintId, Constraint<'db>>;
+type AllConstraints<'db> = IndexVec<ScopedConstraintId, Constraint<'db>>;
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq)]
