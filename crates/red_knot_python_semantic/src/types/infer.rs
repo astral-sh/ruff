@@ -3573,13 +3573,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         values: impl IntoIterator<Item = Type<'db>>,
         n_values: usize,
     ) -> Type<'db> {
-        let mut done = false;
-
-        let filtered_ty = match op {
-            ast::BoolOp::And => Type::AlwaysTruthy,
-            ast::BoolOp::Or => Type::AlwaysFalsy,
-        };
-
         fn filter<'db>(db: &'db dyn Db, ty: Type<'db>, filtered_ty: Type<'db>) -> Type<'db> {
             let filter_single = |ty| {
                 IntersectionBuilder::new(db)
@@ -3603,6 +3596,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 _ => ty,
             }
         }
+
+        let mut done = false;
+
+        let filtered_ty = match op {
+            ast::BoolOp::And => Type::AlwaysTruthy,
+            ast::BoolOp::Or => Type::AlwaysFalsy,
+        };
 
         let elements = values.into_iter().enumerate().map(|(i, ty)| {
             if done {
