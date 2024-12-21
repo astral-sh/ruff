@@ -34,7 +34,7 @@ x = A() < B() < C()
 reveal_type(x)  # revealed: A | B
 
 y = 0 < 1 < A() < 3
-reveal_type(y)  # revealed: bool | A
+reveal_type(y)  # revealed: Literal[False] | A
 
 z = 10 < 0 < A() < B() < C()
 reveal_type(z)  # revealed: Literal[False]

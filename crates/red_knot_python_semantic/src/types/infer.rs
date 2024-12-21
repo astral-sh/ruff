@@ -3574,27 +3574,60 @@ impl<'db> TypeInferenceBuilder<'db> {
         n_values: usize,
     ) -> Type<'db> {
         let mut done = false;
-        UnionType::from_elements(
-            db,
-            values.into_iter().enumerate().map(|(i, ty)| {
-                if done {
-                    Type::Never
-                } else {
-                    let is_last = i == n_values - 1;
-                    match (ty.bool(db), is_last, op) {
-                        (Truthiness::Ambiguous, _, _) => ty,
-                        (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
-                        (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
-                        (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
-                        | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
-                            done = true;
-                            ty
-                        }
-                        (_, true, _) => ty,
-                    }
+
+        let filtered_ty = match op {
+            ast::BoolOp::And => Type::AlwaysTruthy,
+            ast::BoolOp::Or => Type::AlwaysFalsy,
+        };
+
+        fn filter<'db>(db: &'db dyn Db, ty: Type<'db>, filtered_ty: Type<'db>) -> Type<'db> {
+            let filter_single = |ty| {
+                IntersectionBuilder::new(db)
+                    .add_positive(ty)
+                    .add_negative(filtered_ty)
+                    .build()
+            };
+
+            match ty {
+                Type::BooleanLiteral(_) => filter_single(ty),
+                Type::Instance(instance) if instance.class.is_known(db, KnownClass::Bool) => {
+                    filter_single(ty)
                 }
-            }),
-        )
+                Type::Union(union) => union.map(db, |element_ty| {
+                    if element_ty.is_subtype_of(db, filtered_ty) {
+                        Type::Never
+                    } else {
+                        filter(db, *element_ty, filtered_ty)
+                    }
+                }),
+                _ => ty,
+            }
+        }
+
+        let elements = values.into_iter().enumerate().map(|(i, ty)| {
+            if done {
+                return Type::Never;
+            }
+
+            let is_last = i == n_values - 1;
+
+            match (ty.bool(db), is_last, op) {
+                (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
+                (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
+
+                (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
+                | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
+                    done = true;
+                    ty
+                }
+
+                (Truthiness::Ambiguous, false, _) => filter(db, ty, filtered_ty),
+
+                (_, true, _) => ty,
+            }
+        });
+
+        UnionType::from_elements(db, elements)
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
