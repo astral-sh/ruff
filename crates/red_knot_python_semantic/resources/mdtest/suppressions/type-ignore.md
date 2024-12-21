@@ -110,6 +110,7 @@ a = test \
 
 ```py
 # error: [unresolved-reference]
+# error: [invalid-ignore-comment]
 a = test + 2  # type: ignoree
 ```
 

@@ -117,6 +117,7 @@ a = 10 / 0  # knot: ignore[division-by-zero,]
 
 ```py
 # error: [division-by-zero]
+# error: [invalid-ignore-comment] "Invalid `knot: ignore` comment: expected a alphanumeric character or `-` or `_` as code"
 a = 10 / 0  # knot: ignore[*-*]
 ```
 
@@ -138,7 +139,16 @@ future.
 
 ```py
 # error: [unresolved-reference]
+# error: [invalid-ignore-comment] "Invalid `knot: ignore` comment: expected a comma separating the rule codes"
 a = x / 0  # knot: ignore[division-by-zero unresolved-reference]
+```
+
+## Missing closing bracket
+
+```py
+# error: [unresolved-reference] "Name `x` used when not defined"
+# error: [invalid-ignore-comment] "Invalid `knot: ignore` comment: expected a comma separating the rule codes"
+a = x / 2  # knot: ignore[unresolved-reference
 ```
 
 ## Empty codes
