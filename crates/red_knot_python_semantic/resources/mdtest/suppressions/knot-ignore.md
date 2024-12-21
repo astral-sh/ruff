@@ -84,11 +84,10 @@ def test(  # knot: ignore
 
 ## Can't suppress `revealed-type` diagnostics
 
-TODO: Emit an error that the rule code is unknown: `unknown-rule`
-
 ```py
 a = 10
 # revealed: Literal[10]
+# error: [unknown-rule] "Unknown rule `revealed-type`"
 reveal_type(a)  # knot: ignore[revealed-type]
 ```
 
@@ -163,4 +162,11 @@ severity: `knot: possibly-undefined-reference=error`
 # knot: ignore[division-by-zero]
 
 a = 4 / 0  # error: [division-by-zero]
+```
+
+## Unknown rule
+
+```py
+# error: [unknown-rule] "Unknown rule `is-equal-14`"
+a = 10 + 4  # knot: ignore[is-equal-14]
 ```
