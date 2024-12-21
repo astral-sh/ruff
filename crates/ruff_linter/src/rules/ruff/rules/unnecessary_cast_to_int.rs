@@ -101,8 +101,8 @@ fn unwrap_int_expression(
     Fix::applicable_edit(edit, applicability)
 }
 
-/// Returns `Some` if `call` in `int(call(..))` is a method that returns an `int` and `None`
-/// otherwise.
+/// Returns `Some` if `call` in `int(call(...))` is a method that returns an `int`
+/// and `None` otherwise.
 fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Applicability> {
     let (func, arguments) = (&inner_call.func, &inner_call.arguments);
 
@@ -116,7 +116,7 @@ fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Ap
         }
 
         // Depends on `ndigits` and `number.__round__`
-        ["" | "builtins", "round"] => replace_with_round(checker, arguments),
+        ["" | "builtins", "round"] => round_applicability(checker, arguments),
 
         // Depends on `__ceil__`/`__floor__`/`__trunc__`
         ["math", "ceil" | "floor" | "trunc"] => Some(Applicability::Unsafe),
@@ -170,7 +170,7 @@ enum Ndigits {
 /// Determines the [`Applicability`] for a `round(..)` call.
 ///
 /// The Applicability depends on the `ndigits` and the number argument.
-fn replace_with_round(checker: &Checker, arguments: &Arguments) -> Option<Applicability> {
+fn round_applicability(checker: &Checker, arguments: &Arguments) -> Option<Applicability> {
     if arguments.len() > 2 {
         return None;
     }
