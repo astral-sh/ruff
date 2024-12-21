@@ -2,9 +2,10 @@ use crate::checkers::ast::Checker;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -54,44 +55,74 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
 pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
-    let Some(Expr::Call(inner_call)) = single_argument_to_int_call(semantic, call) else {
+    let Some(argument) = single_argument_to_int_call(semantic, call) else {
         return;
     };
 
+    let applicability = if matches!(
+        ResolvedPythonType::from(argument),
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+    ) {
+        Some(Applicability::Safe)
+    } else if let Expr::Call(inner_call) = argument {
+        call_applicability(checker, inner_call)
+    } else {
+        None
+    };
+
+    let Some(applicability) = applicability else {
+        return;
+    };
+
+    let fix = unwrap_int_expression(checker, call, argument, applicability);
+    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
+    checker.diagnostics.push(diagnostic.with_fix(fix));
+}
+
+/// Creates a fix that replaces `int(expression)` with `expression`.
+fn unwrap_int_expression(
+    checker: &mut Checker,
+    call: &ExprCall,
+    argument: &Expr,
+    applicability: Applicability,
+) -> Fix {
+    let (locator, semantic) = (checker.locator(), checker.semantic());
+
+    let argument_expr = locator.slice(argument.range());
+
+    let has_parent_expr = semantic.current_expression_parent().is_some();
+    let new_content = if has_parent_expr || argument.is_named_expr() {
+        format!("({argument_expr})")
+    } else {
+        argument_expr.to_string()
+    };
+
+    let edit = Edit::range_replacement(new_content, call.range);
+    Fix::applicable_edit(edit, applicability)
+}
+
+/// Returns `Some` if `call` in `int(call(..))` is a method that returns an `int` and `None`
+/// otherwise.
+fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Applicability> {
     let (func, arguments) = (&inner_call.func, &inner_call.arguments);
-    let (outer_range, inner_range) = (call.range, inner_call.range);
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
-        return;
-    };
+    let qualified_name = checker.semantic().resolve_qualified_name(func)?;
 
-    let fix = match qualified_name.segments() {
+    match qualified_name.segments() {
         // Always returns a strict instance of `int`
         ["" | "builtins", "len" | "id" | "hash" | "ord" | "int"]
         | ["math", "comb" | "factorial" | "gcd" | "lcm" | "isqrt" | "perm"] => {
-            Fix::safe_edit(replace_with_inner(checker, outer_range, inner_range))
+            Some(Applicability::Safe)
         }
 
         // Depends on `ndigits` and `number.__round__`
-        ["" | "builtins", "round"] => {
-            if let Some(fix) = replace_with_round(checker, outer_range, inner_range, arguments) {
-                fix
-            } else {
-                return;
-            }
-        }
+        ["" | "builtins", "round"] => replace_with_round(checker, arguments),
 
         // Depends on `__ceil__`/`__floor__`/`__trunc__`
-        ["math", "ceil" | "floor" | "trunc"] => {
-            Fix::unsafe_edit(replace_with_inner(checker, outer_range, inner_range))
-        }
+        ["math", "ceil" | "floor" | "trunc"] => Some(Applicability::Unsafe),
 
-        _ => return,
-    };
-
-    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
-
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+        _ => None,
+    }
 }
 
 fn single_argument_to_int_call<'a>(
@@ -136,12 +167,10 @@ enum Ndigits {
     Other,
 }
 
-fn replace_with_round(
-    checker: &Checker,
-    outer_range: TextRange,
-    inner_range: TextRange,
-    arguments: &Arguments,
-) -> Option<Fix> {
+/// Determines the [`Applicability`] for a `round(..)` call.
+///
+/// The Applicability depends on the `ndigits` and the number argument.
+fn replace_with_round(checker: &Checker, arguments: &Arguments) -> Option<Applicability> {
     if arguments.len() > 2 {
         return None;
     }
@@ -181,28 +210,18 @@ fn replace_with_round(
         _ => Ndigits::Other,
     };
 
-    let applicability = match (number_kind, ndigits_kind) {
+    match (number_kind, ndigits_kind) {
         (Rounded::LiteralInt, Ndigits::LiteralInt)
         | (Rounded::LiteralInt | Rounded::LiteralFloat, Ndigits::NotGiven | Ndigits::LiteralNone) => {
-            Applicability::Safe
+            Some(Applicability::Safe)
         }
 
         (Rounded::InferredInt, Ndigits::LiteralInt)
         | (
             Rounded::InferredInt | Rounded::InferredFloat | Rounded::Other,
             Ndigits::NotGiven | Ndigits::LiteralNone,
-        ) => Applicability::Unsafe,
+        ) => Some(Applicability::Unsafe),
 
-        _ => return None,
-    };
-
-    let edit = replace_with_inner(checker, outer_range, inner_range);
-
-    Some(Fix::applicable_edit(edit, applicability))
-}
-
-fn replace_with_inner(checker: &Checker, outer_range: TextRange, inner_range: TextRange) -> Edit {
-    let inner_expr = checker.locator().slice(inner_range);
-
-    Edit::range_replacement(inner_expr.to_string(), outer_range)
+        _ => None,
+    }
 }
