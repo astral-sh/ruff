@@ -16,7 +16,7 @@ pub(crate) mod tests {
 
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::{default_lint_registry, ProgramSettings};
+    use crate::{default_lint_registry, ProgramSettings, PythonPlatform};
 
     use super::Db;
     use crate::lint::RuleSelection;
@@ -127,6 +127,8 @@ pub(crate) mod tests {
     pub(crate) struct TestDbBuilder<'a> {
         /// Target Python version
         python_version: PythonVersion,
+        /// Target Python platform
+        python_platform: PythonPlatform,
         /// Path to a custom typeshed directory
         custom_typeshed: Option<SystemPathBuf>,
         /// Path and content pairs for files that should be present
@@ -137,6 +139,7 @@ pub(crate) mod tests {
         pub(crate) fn new() -> Self {
             Self {
                 python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
                 custom_typeshed: None,
                 files: vec![],
             }
@@ -173,6 +176,7 @@ pub(crate) mod tests {
                 &db,
                 &ProgramSettings {
                     python_version: self.python_version,
+                    python_platform: self.python_platform,
                     search_paths,
                 },
             )
