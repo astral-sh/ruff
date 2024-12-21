@@ -155,7 +155,7 @@ impl SymbolDeclarations {
             .push(ScopedVisibilityConstraintId::ALWAYS_TRUE);
     }
 
-    /// Add given visibility constraint to all live bindings.
+    /// Add given visibility constraint to all live declarations.
     pub(super) fn record_visibility_constraint(
         &mut self,
         visibility_constraints: &mut VisibilityConstraints,

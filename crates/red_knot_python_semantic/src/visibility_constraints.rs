@@ -154,6 +154,12 @@ use crate::semantic_index::{
 use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
 
+/// The maximum depth of recursion when evaluating visibility constraints.
+///
+/// This is a performance optimization that prevents us from descending deeply in case of
+/// pathological cases. The actual limit here has been derived from performance testing on
+/// the `black` codebase. When increasing the limit beyond 32, we see a 5x runtime increase
+/// resulting from a few files with a lot of boolean expressions and `if`-statements.
 const MAX_RECURSION_DEPTH: usize = 24;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
