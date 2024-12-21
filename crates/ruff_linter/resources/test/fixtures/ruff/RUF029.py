@@ -88,3 +88,11 @@ app = FastAPI()
 @app.post("/count")
 async def fastapi_route(): # Ok: FastApi routes can be async without actually using await
     return 1
+
+
+def setup_app(app_arg: FastAPI, non_app: str) -> None:
+    # Error
+    @app_arg.get("/")
+    async def get_root() -> str:
+        return "Hello World!"
+

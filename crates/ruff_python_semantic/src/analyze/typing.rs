@@ -786,6 +786,35 @@ impl TypeChecker for PathlibPathChecker {
     }
 }
 
+pub struct FastApiRouteChecker;
+
+impl FastApiRouteChecker {
+    fn is_fastapi_route_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            ["fastapi", "FastAPI" | "APIRouter"]
+        )
+    }
+}
+
+impl TypeChecker for FastApiRouteChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_fastapi_route_constructor(semantic, annotation)
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_fastapi_route_constructor(semantic, func)
+    }
+}
+
 pub struct TypeVarLikeChecker;
 
 impl TypeVarLikeChecker {
@@ -912,6 +941,10 @@ pub fn is_io_base_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// or an instance of a subclass thereof.
 pub fn is_pathlib_path(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<PathlibPathChecker>(binding, semantic)
+}
+
+pub fn is_fastapi_route(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<FastApiRouteChecker>(binding, semantic)
 }
 
 /// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.
