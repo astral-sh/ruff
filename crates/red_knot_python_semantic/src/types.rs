@@ -46,6 +46,7 @@ mod mro;
 mod narrow;
 mod signatures;
 mod string_annotation;
+mod type_api;
 mod unpacker;
 
 #[cfg(test)]

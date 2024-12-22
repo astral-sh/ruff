@@ -28,7 +28,7 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
@@ -61,7 +61,7 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
+    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type, type_api,
     typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType, FunctionType,
     InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
     KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
@@ -70,7 +70,7 @@ use crate::types::{
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::Db;
+use crate::{Db, KnownModule};
 
 use super::context::{InferContext, WithDiagnostics};
 use super::diagnostic::{
@@ -2968,9 +2968,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             arguments,
         } = call_expression;
 
+        let function_type = self.infer_expression(func);
+
+        if let Some(result_type) = self.try_infer_type_api_predicate(function_type, arguments) {
+            return result_type;
+        }
+
         // TODO: proper typed call signature, representing keyword args etc
         let arg_types = self.infer_arguments(arguments);
-        let function_type = self.infer_expression(func);
         function_type
             .call(self.db(), arg_types.as_slice())
             .unwrap_with_diagnostic(&self.context, func.as_ref().into())
@@ -4160,6 +4165,69 @@ impl<'db> TypeInferenceBuilder<'db> {
         Ok(builder.build())
     }
 
+    fn try_infer_type_api_operation(
+        &mut self,
+        api_type: Type<'db>,
+        arguments: &ast::Expr,
+    ) -> Option<Type<'db>> {
+        match api_type.into_class_literal() {
+            Some(class)
+                if file_to_module(self.db(), class.class.file(self.db()))
+                    .is_some_and(|module| module.is_known(KnownModule::RedKnot)) =>
+            {
+                let db = self.db();
+
+                let is_type_of = class.class.name(db).as_str() == "TypeOf";
+
+                let argument_types = match arguments {
+                    ast::Expr::Tuple(tuple) => Either::Left(
+                        tuple
+                            .elts
+                            .iter()
+                            .map(|element| self.infer_type_expression(element)),
+                    ),
+                    expr => Either::Right(std::iter::once(if is_type_of {
+                        self.infer_expression(expr)
+                    } else {
+                        self.infer_type_expression(expr)
+                    })),
+                };
+                Some(type_api::resolve_type_operation(db, class.class, argument_types).unwrap())
+            }
+            _ => None,
+        }
+    }
+
+    fn try_infer_type_api_predicate(
+        &mut self,
+        function: Type<'db>,
+        arguments: &ast::Arguments,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+
+        match function.into_function_literal() {
+            Some(function)
+                if file_to_module(self.db(), function.body_scope(self.db()).file(self.db()))
+                    .is_some_and(|module| module.is_known(KnownModule::RedKnot)) =>
+            {
+                let argument_types = arguments
+                    .args
+                    .iter()
+                    .map(|arg| self.infer_type_expression(arg));
+
+                Some(
+                    type_api::resolve_type_predicate(
+                        db,
+                        function.name(db).as_str(),
+                        argument_types,
+                    )
+                    .unwrap(),
+                )
+            }
+            _ => None,
+        }
+    }
+
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
@@ -4919,6 +4987,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             slice,
             ctx: _,
         } = subscript;
+
+        if let Some(result) = self.try_infer_type_api_operation(value_ty, slice) {
+            return result;
+        }
 
         match value_ty {
             Type::KnownInstance(known_instance) => {
