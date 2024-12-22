@@ -48,6 +48,7 @@ mod narrow;
 mod signatures;
 mod slots;
 mod string_annotation;
+mod type_api;
 mod unpacker;
 
 #[cfg(test)]
