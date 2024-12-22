@@ -22,7 +22,7 @@ mod tests {
     #[test_case(Rule::MissingBlankLineAfterLastSection, Path::new("D413.py"))]
     #[test_case(Rule::MissingBlankLineAfterSummary, Path::new("D.py"))]
     #[test_case(Rule::NoBlankLineBeforeSection, Path::new("sections.py"))]
-    #[test_case(Rule::NonCapitalizeSectionName, Path::new("sections.py"))]
+    #[test_case(Rule::NonCapitalizedSectionName, Path::new("sections.py"))]
     #[test_case(Rule::MissingDashedUnderlineAfterSection, Path::new("sections.py"))]
     #[test_case(Rule::UndocumentedParam, Path::new("canonical_google_examples.py"))]
     #[test_case(Rule::UndocumentedParam, Path::new("canonical_numpy_examples.py"))]

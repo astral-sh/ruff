@@ -59,7 +59,7 @@ impl Convention {
                 Rule::OverindentedSection,
                 Rule::OverindentedSectionUnderline,
                 Rule::DocstringStartsWithThis,
-                Rule::NonCapitalizeSectionName,
+                Rule::NonCapitalizedSectionName,
                 Rule::MissingNewLineAfterSectionName,
                 Rule::MissingDashedUnderlineAfterSection,
                 Rule::MissingSectionUnderlineAfterName,

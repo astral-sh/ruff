@@ -38,7 +38,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingBlankLineAfterSummary,
         Rule::BlankLineBeforeClass,
         Rule::BlankLinesBetweenHeaderAndContent,
-        Rule::NonCapitalizeSectionName,
+        Rule::NonCapitalizedSectionName,
         Rule::MissingDashedUnderlineAfterSection,
         Rule::DocstringStartsWithThis,
         Rule::EmptyDocstring,
@@ -290,7 +290,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             let enforce_sections = checker.any_enabled(&[
                 Rule::MissingBlankLineAfterLastSection,
                 Rule::BlankLinesBetweenHeaderAndContent,
-                Rule::NonCapitalizeSectionName,
+                Rule::NonCapitalizedSectionName,
                 Rule::MissingDashedUnderlineAfterSection,
                 Rule::EmptyDocstringSection,
                 Rule::MultiLineSummaryFirstLine,

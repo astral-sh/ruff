@@ -568,7 +568,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "402") => (RuleGroup::Stable, rules::pydocstyle::rules::SignatureInDocstring),
         (Pydocstyle, "403") => (RuleGroup::Stable, rules::pydocstyle::rules::FirstWordUncapitalized),
         (Pydocstyle, "404") => (RuleGroup::Stable, rules::pydocstyle::rules::DocstringStartsWithThis),
-        (Pydocstyle, "405") => (RuleGroup::Stable, rules::pydocstyle::rules::NonCapitalizeSectionName),
+        (Pydocstyle, "405") => (RuleGroup::Stable, rules::pydocstyle::rules::NonCapitalizedSectionName),
         (Pydocstyle, "406") => (RuleGroup::Stable, rules::pydocstyle::rules::MissingNewLineAfterSectionName),
         (Pydocstyle, "407") => (RuleGroup::Stable, rules::pydocstyle::rules::MissingDashedUnderlineAfterSection),
         (Pydocstyle, "408") => (RuleGroup::Stable, rules::pydocstyle::rules::MissingSectionUnderlineAfterName),

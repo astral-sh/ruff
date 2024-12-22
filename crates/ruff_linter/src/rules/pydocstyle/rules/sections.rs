@@ -276,19 +276,19 @@ impl AlwaysFixableViolation for OverindentedSectionUnderline {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-pub(crate) struct NonCapitalizeSectionName {
+pub(crate) struct NonCapitalizedSectionName {
     name: String,
 }
 
-impl AlwaysFixableViolation for NonCapitalizeSectionName {
+impl AlwaysFixableViolation for NonCapitalizedSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonCapitalizeSectionName { name } = self;
+        let NonCapitalizedSectionName { name } = self;
         format!("Section name should be properly capitalized (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let NonCapitalizeSectionName { name } = self;
+        let NonCapitalizedSectionName { name } = self;
         format!("Capitalize \"{name}\"")
     }
 }
@@ -1649,12 +1649,12 @@ fn common_section(
     next: Option<&SectionContext>,
     style: SectionStyle,
 ) {
-    if checker.enabled(Rule::NonCapitalizeSectionName) {
+    if checker.enabled(Rule::NonCapitalizedSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
             let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
-                NonCapitalizeSectionName {
+                NonCapitalizedSectionName {
                     name: context.section_name().to_string(),
                 },
                 section_range,
