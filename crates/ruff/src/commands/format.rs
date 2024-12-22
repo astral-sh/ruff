@@ -830,7 +830,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
         }
 
         // Validate all rules that rely on tab styles.
-        if setting.linter.rules.enabled(Rule::TabIndentation)
+        if setting.linter.rules.enabled(Rule::DocstringTabIndentation)
             && setting.formatter.indent_style.is_tab()
         {
             warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");

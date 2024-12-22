@@ -35,7 +35,7 @@ mod tests {
     #[test_case(Rule::FirstWordUncapitalized, Path::new("D.py"))]
     #[test_case(Rule::FirstWordUncapitalized, Path::new("D403.py"))]
     #[test_case(Rule::UnnecessaryMultilineDocstring, Path::new("D.py"))]
-    #[test_case(Rule::TabIndentation, Path::new("D.py"))]
+    #[test_case(Rule::DocstringTabIndentation, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedMagicMethod, Path::new("D.py"))]
     #[test_case(Rule::MultiLineSummaryFirstLine, Path::new("D.py"))]
     #[test_case(Rule::MultiLineSummarySecondLine, Path::new("D.py"))]

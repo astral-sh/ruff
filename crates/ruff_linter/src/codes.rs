@@ -551,7 +551,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "203") => (RuleGroup::Stable, rules::pydocstyle::rules::IncorrectBlankLineBeforeClass),
         (Pydocstyle, "204") => (RuleGroup::Stable, rules::pydocstyle::rules::IncorrectBlankLineAfterClass),
         (Pydocstyle, "205") => (RuleGroup::Stable, rules::pydocstyle::rules::MissingBlankLineAfterSummary),
-        (Pydocstyle, "206") => (RuleGroup::Stable, rules::pydocstyle::rules::TabIndentation),
+        (Pydocstyle, "206") => (RuleGroup::Stable, rules::pydocstyle::rules::DocstringTabIndentation),
         (Pydocstyle, "207") => (RuleGroup::Stable, rules::pydocstyle::rules::UnderIndentation),
         (Pydocstyle, "208") => (RuleGroup::Stable, rules::pydocstyle::rules::OverIndentation),
         (Pydocstyle, "209") => (RuleGroup::Stable, rules::pydocstyle::rules::NewLineAfterLastParagraph),

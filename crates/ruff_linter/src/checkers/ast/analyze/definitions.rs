@@ -48,7 +48,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::EscapeSequenceInDocstring,
         Rule::FirstWordUncapitalized,
         Rule::UnnecessaryMultilineDocstring,
-        Rule::TabIndentation,
+        Rule::DocstringTabIndentation,
         Rule::MultiLineSummaryFirstLine,
         Rule::MultiLineSummarySecondLine,
         Rule::NewLineAfterLastParagraph,
@@ -237,7 +237,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 pydocstyle::rules::blank_after_summary(checker, &docstring);
             }
             if checker.any_enabled(&[
-                Rule::TabIndentation,
+                Rule::DocstringTabIndentation,
                 Rule::OverIndentation,
                 Rule::UnderIndentation,
             ]) {
