@@ -220,7 +220,7 @@ else:
 reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
 ```
 
-## Filtering in chained boolean expressions
+## Narrowing in chained boolean expressions
 
 ```py
 from typing import Literal
@@ -231,14 +231,13 @@ def _(x: Literal[0, 1]):
     reveal_type(x or A())  # revealed: Literal[1] | A
     reveal_type(x and A())  # revealed: Literal[0] | A
 
-# Filtering should not happen in cases where it makes the result type more complex
 def _(x: str):
-    reveal_type(x or A())  # revealed: str | A
-    reveal_type(x and A())  # revealed: str | A
+    reveal_type(x or A())  # revealed: str & ~AlwaysFalsy | A
+    reveal_type(x and A())  # revealed: str & ~AlwaysTruthy | A
 
 def _(x: bool | str):
-    reveal_type(x or A())  # revealed: Literal[True] | str | A
-    reveal_type(x and A())  # revealed: Literal[False] | str | A
+    reveal_type(x or A())  # revealed: Literal[True] | str & ~AlwaysFalsy | A
+    reveal_type(x and A())  # revealed: Literal[False] | str & ~AlwaysTruthy | A
 
 class Falsy:
     def __bool__(self) -> Literal[False]: ...
@@ -261,7 +260,10 @@ class TruthyClass(metaclass=MetaTruthy): ...
 
 def _(x: type[FalsyClass] | type[TruthyClass]):
     # TODO: Should be `type[TruthyClass] | A`
-    reveal_type(x or A())  # revealed: type[FalsyClass] | type[TruthyClass] | A
+    # revealed: type[FalsyClass] & ~AlwaysFalsy | type[TruthyClass] & ~AlwaysFalsy | A
+    reveal_type(x or A())
+
     # TODO: Should be `type[FalsyClass] | A`
-    reveal_type(x and A())  # revealed: type[FalsyClass] | type[TruthyClass] | A
+    # revealed: type[FalsyClass] & ~AlwaysTruthy | type[TruthyClass] & ~AlwaysTruthy | A
+    reveal_type(x and A())
 ```

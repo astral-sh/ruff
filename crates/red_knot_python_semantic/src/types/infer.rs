@@ -3573,36 +3573,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         values: impl IntoIterator<Item = Type<'db>>,
         n_values: usize,
     ) -> Type<'db> {
-        fn filter<'db>(db: &'db dyn Db, ty: Type<'db>, filtered_ty: Type<'db>) -> Type<'db> {
-            let filter_single = |ty| {
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_negative(filtered_ty)
-                    .build()
-            };
-
-            match ty {
-                Type::BooleanLiteral(_) => filter_single(ty),
-                Type::Instance(instance) if instance.class.is_known(db, KnownClass::Bool) => {
-                    filter_single(ty)
-                }
-                Type::Union(union) => union.map(db, |element_ty| {
-                    if element_ty.is_subtype_of(db, filtered_ty) {
-                        Type::Never
-                    } else {
-                        filter(db, *element_ty, filtered_ty)
-                    }
-                }),
-                _ => ty,
-            }
-        }
-
         let mut done = false;
-
-        let filtered_ty = match op {
-            ast::BoolOp::And => Type::AlwaysTruthy,
-            ast::BoolOp::Or => Type::AlwaysFalsy,
-        };
 
         let elements = values.into_iter().enumerate().map(|(i, ty)| {
             if done {
@@ -3621,7 +3592,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ty
                 }
 
-                (Truthiness::Ambiguous, false, _) => filter(db, ty, filtered_ty),
+                (Truthiness::Ambiguous, false, _) => IntersectionBuilder::new(db)
+                    .add_positive(ty)
+                    .add_negative(match op {
+                        ast::BoolOp::And => Type::AlwaysTruthy,
+                        ast::BoolOp::Or => Type::AlwaysFalsy,
+                    })
+                    .build(),
 
                 (_, true, _) => ty,
             }
