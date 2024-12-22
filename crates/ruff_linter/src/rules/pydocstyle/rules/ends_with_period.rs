@@ -45,9 +45,9 @@ use crate::rules::pydocstyle::helpers::logical_line;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-pub(crate) struct EndsInPeriod;
+pub(crate) struct MissingTrailingPeriod;
 
-impl Violation for EndsInPeriod {
+impl Violation for MissingTrailingPeriod {
     /// `None` in the case a fix is never available or otherwise Some
     /// [`FixAvailability`] describing the available fix.
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -106,7 +106,7 @@ pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
         }
 
         if !trimmed.ends_with('.') {
-            let mut diagnostic = Diagnostic::new(EndsInPeriod, docstring.range());
+            let mut diagnostic = Diagnostic::new(MissingTrailingPeriod, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
             if !trimmed.ends_with([':', ';', '?', '!']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

@@ -52,9 +52,9 @@ use crate::registry::Rule;
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-pub(crate) struct IndentWithSpaces;
+pub(crate) struct TabIndentation;
 
-impl Violation for IndentWithSpaces {
+impl Violation for TabIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Docstring should be indented with spaces, not tabs".to_string()
@@ -264,11 +264,11 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
         current = lines.next();
     }
 
-    if checker.enabled(Rule::IndentWithSpaces) {
+    if checker.enabled(Rule::TabIndentation) {
         if has_seen_tab {
             checker
                 .diagnostics
-                .push(Diagnostic::new(IndentWithSpaces, docstring.range()));
+                .push(Diagnostic::new(TabIndentation, docstring.range()));
         }
     }
 
