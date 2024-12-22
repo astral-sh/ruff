@@ -219,3 +219,51 @@ else:
 # TODO: It should be A. We should improve UnionBuilder or IntersectionBuilder. (issue #15023)
 reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
 ```
+
+## Narrowing in chained boolean expressions
+
+```py
+from typing import Literal
+
+class A: ...
+
+def _(x: Literal[0, 1]):
+    reveal_type(x or A())  # revealed: Literal[1] | A
+    reveal_type(x and A())  # revealed: Literal[0] | A
+
+def _(x: str):
+    reveal_type(x or A())  # revealed: str & ~AlwaysFalsy | A
+    reveal_type(x and A())  # revealed: str & ~AlwaysTruthy | A
+
+def _(x: bool | str):
+    reveal_type(x or A())  # revealed: Literal[True] | str & ~AlwaysFalsy | A
+    reveal_type(x and A())  # revealed: Literal[False] | str & ~AlwaysTruthy | A
+
+class Falsy:
+    def __bool__(self) -> Literal[False]: ...
+
+class Truthy:
+    def __bool__(self) -> Literal[True]: ...
+
+def _(x: Falsy | Truthy):
+    reveal_type(x or A())  # revealed: Truthy | A
+    reveal_type(x and A())  # revealed: Falsy | A
+
+class MetaFalsy(type):
+    def __bool__(self) -> Literal[False]: ...
+
+class MetaTruthy(type):
+    def __bool__(self) -> Literal[False]: ...
+
+class FalsyClass(metaclass=MetaFalsy): ...
+class TruthyClass(metaclass=MetaTruthy): ...
+
+def _(x: type[FalsyClass] | type[TruthyClass]):
+    # TODO: Should be `type[TruthyClass] | A`
+    # revealed: type[FalsyClass] & ~AlwaysFalsy | type[TruthyClass] & ~AlwaysFalsy | A
+    reveal_type(x or A())
+
+    # TODO: Should be `type[FalsyClass] | A`
+    # revealed: type[FalsyClass] & ~AlwaysTruthy | type[TruthyClass] & ~AlwaysTruthy | A
+    reveal_type(x and A())
+```

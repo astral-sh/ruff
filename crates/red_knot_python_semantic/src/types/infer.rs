@@ -3582,27 +3582,37 @@ impl<'db> TypeInferenceBuilder<'db> {
         n_values: usize,
     ) -> Type<'db> {
         let mut done = false;
-        UnionType::from_elements(
-            db,
-            values.into_iter().enumerate().map(|(i, ty)| {
-                if done {
-                    Type::Never
-                } else {
-                    let is_last = i == n_values - 1;
-                    match (ty.bool(db), is_last, op) {
-                        (Truthiness::Ambiguous, _, _) => ty,
-                        (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
-                        (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
-                        (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
-                        | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
-                            done = true;
-                            ty
-                        }
-                        (_, true, _) => ty,
-                    }
+
+        let elements = values.into_iter().enumerate().map(|(i, ty)| {
+            if done {
+                return Type::Never;
+            }
+
+            let is_last = i == n_values - 1;
+
+            match (ty.bool(db), is_last, op) {
+                (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
+                (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
+
+                (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
+                | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
+                    done = true;
+                    ty
                 }
-            }),
-        )
+
+                (Truthiness::Ambiguous, false, _) => IntersectionBuilder::new(db)
+                    .add_positive(ty)
+                    .add_negative(match op {
+                        ast::BoolOp::And => Type::AlwaysTruthy,
+                        ast::BoolOp::Or => Type::AlwaysFalsy,
+                    })
+                    .build(),
+
+                (_, true, _) => ty,
+            }
+        });
+
+        UnionType::from_elements(db, elements)
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
