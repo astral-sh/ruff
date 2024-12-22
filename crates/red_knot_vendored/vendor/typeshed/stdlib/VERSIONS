@@ -341,3 +341,4 @@ zipfile._path: 3.12-
 zipimport: 3.0-
 zlib: 3.0-
 zoneinfo: 3.9-
+knot_extensions: 3.0-

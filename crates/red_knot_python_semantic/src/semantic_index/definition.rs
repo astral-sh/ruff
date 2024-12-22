@@ -74,6 +74,11 @@ impl<'db> Definition<'db> {
             Some(KnownModule::Typing | KnownModule::TypingExtensions)
         )
     }
+
+    pub(crate) fn is_knot_extensions_definition(self, db: &'db dyn Db) -> bool {
+        file_to_module(db, self.file(db))
+            .is_some_and(|module| module.is_known(KnownModule::KnotExtensions))
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

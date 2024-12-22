@@ -56,6 +56,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_OPERATOR);
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
+    registry.register_lint(&STATIC_ASSERT_ERROR);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -673,6 +674,25 @@ declare_lint! {
     /// ```
     pub(crate) static ZERO_STEPSIZE_IN_SLICE = {
         summary: "detects a slice step size of zero",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Makes sure that the argument of `static_assert` has a statically-known truthiness.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from knot_extensions import static_assert
+    ///
+    /// static_assert(1 + 1 == 3)  # error: evaluates to `False`
+    ///
+    /// static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness
+    /// ```
+    pub(crate) static STATIC_ASSERT_ERROR = {
+        summary: "Failed static assertion",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

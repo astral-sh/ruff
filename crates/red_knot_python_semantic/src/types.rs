@@ -1778,6 +1778,68 @@ impl<'db> Type<'db> {
                         let revealed_ty = binding.first_parameter().unwrap_or(Type::Unknown);
                         CallOutcome::revealed(binding, revealed_ty)
                     }
+                    Some(KnownFunction::StaticAssert) => {
+                        let parameter_ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        let truthiness = parameter_ty.bool(db);
+
+                        binding.set_return_ty(Type::none(db));
+
+                        if truthiness.is_always_true() {
+                            CallOutcome::callable(binding)
+                        } else {
+                            CallOutcome::StaticAssertionError {
+                                parameter_ty,
+                                truthiness,
+                            }
+                        }
+                    }
+                    Some(KnownFunction::IsEquivalentTo) => {
+                        let return_ty = match binding.parameter_tys() {
+                            [ty_a, ty_b] => Type::BooleanLiteral(ty_a.is_equivalent_to(db, *ty_b)),
+                            _ => Type::Unknown,
+                        };
+                        binding.set_return_ty(return_ty);
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsSubtypeOf) => {
+                        let return_ty = match binding.parameter_tys() {
+                            [ty_a, ty_b] => Type::BooleanLiteral(ty_a.is_subtype_of(db, *ty_b)),
+                            _ => Type::Unknown,
+                        };
+                        binding.set_return_ty(return_ty);
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsAssignableTo) => {
+                        let return_ty = match binding.parameter_tys() {
+                            [ty_a, ty_b] => Type::BooleanLiteral(ty_a.is_assignable_to(db, *ty_b)),
+                            _ => Type::Unknown,
+                        };
+                        binding.set_return_ty(return_ty);
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsDisjointFrom) => {
+                        let return_ty = match binding.parameter_tys() {
+                            [ty_a, ty_b] => Type::BooleanLiteral(ty_a.is_disjoint_from(db, *ty_b)),
+                            _ => Type::Unknown,
+                        };
+                        binding.set_return_ty(return_ty);
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsFullyStatic) => {
+                        let ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        binding.set_return_ty(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsSingleton) => {
+                        let ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        binding.set_return_ty(Type::BooleanLiteral(ty.is_singleton(db)));
+                        CallOutcome::callable(binding)
+                    }
+                    Some(KnownFunction::IsSingleValued) => {
+                        let ty = binding.first_parameter().unwrap_or(Type::Unknown);
+                        binding.set_return_ty(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        CallOutcome::callable(binding)
+                    }
 
                     Some(KnownFunction::Len) => {
                         if let Some(first_arg) = binding.first_parameter() {
@@ -2058,6 +2120,7 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::Unknown,
             }),
+            Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::Unknown),
             Type::Todo(_) => Ok(*self),
             _ => Ok(todo_type!(
                 "Unsupported or invalid type in a type expression"
@@ -2564,6 +2627,14 @@ pub enum KnownInstanceType<'db> {
     TypeVar(TypeVarInstance<'db>),
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
+    /// The symbol `knot_extensions.Unknown`
+    Unknown,
+    /// The symbol `knot_extensions.Not`
+    Not,
+    /// The symbol `knot_extensions.Intersection`
+    Intersection,
+    /// The symbol `knot_extensions.TypeOf`
+    TypeOf,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
@@ -2618,6 +2689,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => "ChainMap",
             Self::OrderedDict => "OrderedDict",
             Self::ReadOnly => "ReadOnly",
+            Self::Unknown => "Unknown",
+            Self::Not => "Not",
+            Self::Intersection => "Intersection",
+            Self::TypeOf => "TypeOf",
         }
     }
 
@@ -2656,7 +2731,11 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ChainMap
             | Self::OrderedDict
             | Self::ReadOnly
-            | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
+            | Self::TypeAliasType(_)
+            | Self::Unknown
+            | Self::Not
+            | Self::Intersection
+            | Self::TypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -2696,6 +2775,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
+            Self::Unknown => "knot_extensions.Unknown",
+            Self::Not => "knot_extensions.Not",
+            Self::Intersection => "knot_extensions.Intersection",
+            Self::TypeOf => "knot_extensions.TypeOf",
         }
     }
 
@@ -2735,6 +2818,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::OrderedDict => KnownClass::StdlibAlias,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::TypeOf => KnownClass::SpecialForm,
+            Self::Not => KnownClass::SpecialForm,
+            Self::Intersection => KnownClass::SpecialForm,
+            Self::Unknown => KnownClass::Object,
         }
     }
 
@@ -2785,6 +2872,10 @@ impl<'db> KnownInstanceType<'db> {
             "Concatenate" => Self::Concatenate,
             "NotRequired" => Self::NotRequired,
             "LiteralString" => Self::LiteralString,
+            "Unknown" => Self::Unknown,
+            "Not" => Self::Not,
+            "Intersection" => Self::Intersection,
+            "TypeOf" => Self::TypeOf,
             _ => return None,
         };
 
@@ -2833,6 +2924,9 @@ impl<'db> KnownInstanceType<'db> {
             | Self::TypeAliasType(_)
             | Self::TypeVar(_) => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+            Self::Unknown | Self::Not | Self::Intersection | Self::TypeOf => {
+                module.is_knot_extensions()
             }
         }
     }
@@ -3072,13 +3166,41 @@ pub enum KnownFunction {
 
     /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
+
+    /// `knot_extensions.static_assert`
+    StaticAssert,
+    /// `knot_extensions.is_equivalent_to`
+    IsEquivalentTo,
+    /// `knot_extensions.is_subtype_of`
+    IsSubtypeOf,
+    /// `knot_extensions.is_assignable_to`
+    IsAssignableTo,
+    /// `knot_extensions.is_disjoint_from`
+    IsDisjointFrom,
+    /// `knot_extensions.is_fully_static`
+    IsFullyStatic,
+    /// `knot_extensions.is_singleton`
+    IsSingleton,
+    /// `knot_extensions.is_single_valued`
+    IsSingleValued,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType | Self::Len | Self::Final | Self::NoTypeCheck => None,
+            Self::RevealType
+            | Self::Len
+            | Self::Final
+            | Self::NoTypeCheck
+            | Self::StaticAssert
+            | Self::IsEquivalentTo
+            | Self::IsSubtypeOf
+            | Self::IsAssignableTo
+            | Self::IsDisjointFrom
+            | Self::IsFullyStatic
+            | Self::IsSingleton
+            | Self::IsSingleValued => None,
         }
     }
 
@@ -3100,7 +3222,53 @@ impl KnownFunction {
             "no_type_check" if definition.is_typing_definition(db) => {
                 Some(KnownFunction::NoTypeCheck)
             }
+            "static_assert" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::StaticAssert)
+            }
+            "is_subtype_of" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsSubtypeOf)
+            }
+            "is_disjoint_from" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsDisjointFrom)
+            }
+            "is_equivalent_to" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsEquivalentTo)
+            }
+            "is_assignable_to" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsAssignableTo)
+            }
+            "is_fully_static" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsFullyStatic)
+            }
+            "is_singleton" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsSingleton)
+            }
+            "is_single_valued" if definition.is_knot_extensions_definition(db) => {
+                Some(KnownFunction::IsSingleValued)
+            }
+
             _ => None,
+        }
+    }
+
+    /// Whether or not a particular function takes type expression as arguments, i.e. should
+    /// the argument of a call like `f(int)` be interpreted as the type int (true) or as the
+    /// type of the expression `int`, i.e. `Literal[int]` (false).
+    fn takes_type_expression_arguments(self) -> bool {
+        match self {
+            KnownFunction::IsEquivalentTo
+            | KnownFunction::IsSubtypeOf
+            | KnownFunction::IsAssignableTo
+            | KnownFunction::IsDisjointFrom
+            | KnownFunction::IsFullyStatic
+            | KnownFunction::IsSingleton
+            | KnownFunction::IsSingleValued => true,
+            KnownFunction::ConstraintFunction(_)
+            | KnownFunction::RevealType
+            | KnownFunction::Len
+            | KnownFunction::Final
+            | KnownFunction::NoTypeCheck
+            | KnownFunction::StaticAssert => false,
         }
     }
 }

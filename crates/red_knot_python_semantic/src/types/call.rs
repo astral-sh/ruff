@@ -1,6 +1,8 @@
 use super::context::InferContext;
 use super::diagnostic::CALL_NON_CALLABLE;
 use super::{Severity, Signature, Type, TypeArrayDisplay, UnionBuilder};
+use crate::types::diagnostic::STATIC_ASSERT_ERROR;
+use crate::types::Truthiness;
 use crate::Db;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_python_ast as ast;
@@ -30,6 +32,10 @@ pub(super) enum CallOutcome<'db> {
     PossiblyUnboundDunderCall {
         called_ty: Type<'db>,
         call_outcome: Box<CallOutcome<'db>>,
+    },
+    StaticAssertionError {
+        parameter_ty: Type<'db>,
+        truthiness: Truthiness,
     },
 }
 
@@ -89,16 +95,18 @@ impl<'db> CallOutcome<'db> {
                 })
                 .map(UnionBuilder::build),
             Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
+            Self::StaticAssertionError { .. } => Some(Type::none(db)),
         }
     }
 
     /// Get the return type of the call, emitting default diagnostics if needed.
     pub(super) fn unwrap_with_diagnostic(
         &self,
+        db: &'db dyn Db,
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
     ) -> Type<'db> {
-        match self.return_ty_result(context, node) {
+        match self.return_ty_result(db, context, node) {
             Ok(return_ty) => return_ty,
             Err(NotCallableError::Type {
                 not_callable_ty,
@@ -166,6 +174,7 @@ impl<'db> CallOutcome<'db> {
     /// Get the return type of the call as a result.
     pub(super) fn return_ty_result(
         &self,
+        db: &'db dyn Db,
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
     ) -> Result<Type<'db>, NotCallableError<'db>> {
@@ -223,10 +232,10 @@ impl<'db> CallOutcome<'db> {
                                 binding.return_ty()
                             } else {
                                 revealed = true;
-                                outcome.unwrap_with_diagnostic(context, node)
+                                outcome.unwrap_with_diagnostic(db, context, node)
                             }
                         }
-                        _ => outcome.unwrap_with_diagnostic(context, node),
+                        _ => outcome.unwrap_with_diagnostic(db, context, node),
                     };
                     union_builder = union_builder.add(return_ty);
                 }
@@ -248,6 +257,54 @@ impl<'db> CallOutcome<'db> {
                         return_ty,
                     }),
                 }
+            }
+            CallOutcome::StaticAssertionError {
+                parameter_ty: Type::BooleanLiteral(false),
+                truthiness: _,
+            } => {
+                context.report_lint(
+                    &STATIC_ASSERT_ERROR,
+                    node,
+                    format_args!("Static assertion error: argument evaluates to `False`"),
+                );
+
+                Ok(Type::Unknown)
+            }
+            CallOutcome::StaticAssertionError {
+                parameter_ty,
+                truthiness,
+            } if truthiness.is_always_false() => {
+                context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!("Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy", parameter_ty=parameter_ty.display(db)),
+                        );
+
+                Ok(Type::Unknown)
+            }
+            CallOutcome::StaticAssertionError {
+                parameter_ty,
+                truthiness,
+            } if truthiness.is_ambiguous() => {
+                context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!("Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness", parameter_ty=parameter_ty.display(db)),
+                        );
+
+                Ok(Type::Unknown)
+            }
+            CallOutcome::StaticAssertionError {
+                parameter_ty,
+                truthiness: _,
+            } => {
+                context.report_lint(
+                            &STATIC_ASSERT_ERROR,
+                            node,
+                            format_args!("Static assertion error: expected argument of type `{parameter_ty}` to have static truthiness", parameter_ty=parameter_ty.display(db)),
+                        );
+
+                Ok(Type::Unknown)
             }
         }
     }
