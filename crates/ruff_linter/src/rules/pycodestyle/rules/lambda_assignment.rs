@@ -1,9 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Stmt,
+    self as ast, AstNode, Expr, ExprLambda, ExpressionRef, Identifier, Parameter,
+    ParameterWithDefault, Parameters, Stmt,
 };
-use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
@@ -65,10 +66,7 @@ pub(crate) fn lambda_assignment(
         return;
     };
 
-    let Expr::Lambda(ast::ExprLambda {
-        parameters, body, ..
-    }) = value
-    else {
+    let Expr::Lambda(lambda) = value else {
         return;
     };
 
@@ -85,16 +83,9 @@ pub(crate) fn lambda_assignment(
         let first_line = checker.locator().line_str(stmt.start());
         let indentation = leading_indentation(first_line);
         let mut indented = String::new();
-        for (idx, line) in function(
-            id,
-            parameters.as_deref(),
-            body,
-            annotation,
-            checker.semantic(),
-            checker.generator(),
-        )
-        .universal_newlines()
-        .enumerate()
+        for (idx, line) in function(id, lambda, annotation, checker)
+            .universal_newlines()
+            .enumerate()
         {
             if idx == 0 {
                 indented.push_str(&line);
@@ -186,19 +177,17 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
 /// Generate a function definition from a `lambda` expression.
 fn function(
     name: &str,
-    parameters: Option<&Parameters>,
-    body: &Expr,
+    lambda: &ExprLambda,
     annotation: Option<&Expr>,
-    semantic: &SemanticModel,
-    generator: Generator,
+    checker: &Checker,
 ) -> String {
     let body = Stmt::Return(ast::StmtReturn {
-        value: Some(Box::new(body.clone())),
+        value: Some(Box::new(Expr::EllipsisLiteral(Default::default()))),
         range: TextRange::default(),
     });
-    let parameters = parameters.cloned().unwrap_or_default();
+    let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
-        if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
+        if let Some((arg_types, return_type)) = extract_types(annotation, checker.semantic()) {
             // A `lambda` expression can only have positional-only and positional-or-keyword
             // arguments. The order is always positional-only first, then positional-or-keyword.
             let new_posonlyargs = parameters
@@ -243,10 +232,12 @@ fn function(
                 type_params: None,
                 range: TextRange::default(),
             });
-            return generator.stmt(&func);
+            let generated = checker.generator().stmt(&func);
+
+            return replace_trailing_ellipsis_with_original_expr(generated, lambda, checker);
         }
     }
-    let func = Stmt::FunctionDef(ast::StmtFunctionDef {
+    let function = Stmt::FunctionDef(ast::StmtFunctionDef {
         is_async: false,
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters),
@@ -256,5 +247,29 @@ fn function(
         type_params: None,
         range: TextRange::default(),
     });
-    generator.stmt(&func)
+    let generated = checker.generator().stmt(&function);
+
+    replace_trailing_ellipsis_with_original_expr(generated, lambda, checker)
+}
+
+fn replace_trailing_ellipsis_with_original_expr(
+    mut generated: String,
+    lambda: &ExprLambda,
+    checker: &Checker,
+) -> String {
+    let expr = &lambda.body;
+    let expr_ref = ExpressionRef::from(expr);
+    let parent = lambda.as_any_node_ref();
+    let (comment_ranges, source) = (checker.comment_ranges(), checker.source());
+
+    let original_expr_range =
+        parenthesized_range(expr_ref, parent, comment_ranges, source).unwrap_or(expr.range());
+    let original_expr_in_source = checker.locator().slice(original_expr_range);
+
+    let placeholder_ellipsis_start = generated.rfind("...").unwrap();
+    let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();
+    let placeholder_ellipsis_range = placeholder_ellipsis_start..placeholder_ellipsis_end;
+
+    generated.replace_range(placeholder_ellipsis_range, original_expr_in_source);
+    generated
 }

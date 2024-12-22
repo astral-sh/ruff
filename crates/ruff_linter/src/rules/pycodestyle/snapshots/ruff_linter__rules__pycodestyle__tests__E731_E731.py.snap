@@ -279,7 +279,7 @@ E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 126 126 | 
 127     |-    f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
     127 |+    def f(a: str, b: int) -> tuple[str, int]:
-    128 |+        return a, b
+    128 |+        return (a, b)
 128 129 | 
 129 130 | 
 130 131 | def scope():
@@ -364,7 +364,50 @@ E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 148     |-        i := 1,
 149     |-    )
     147 |+    def f():
-    148 |+        return (i := 1),
-150 149 | 
-151 150 | 
-152 151 | from dataclasses import dataclass
+    148 |+        return (
+    149 |+            i := 1,
+    150 |+        )
+150 151 | 
+151 152 | 
+152 153 | from dataclasses import dataclass
+
+E731.py:163:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+161 |   # Regression tests for:
+162 |   # * https://github.com/astral-sh/ruff/issues/7720
+163 | / x = lambda: """
+164 | |         a
+165 | |     b
+166 | | """
+    | |___^ E731
+167 |   
+168 |   # * https://github.com/astral-sh/ruff/issues/10277
+    |
+    = help: Rewrite `x` as a `def`
+
+ℹ Unsafe fix
+160 160 | 
+161 161 | # Regression tests for:
+162 162 | # * https://github.com/astral-sh/ruff/issues/7720
+163     |-x = lambda: """
+    163 |+def x():
+    164 |+    return """
+164 165 |         a
+165 166 |     b
+166 167 | """
+
+E731.py:169:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+168 | # * https://github.com/astral-sh/ruff/issues/10277
+169 | at_least_one_million = lambda _: _ >= 1_000_000
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |
+    = help: Rewrite `at_least_one_million` as a `def`
+
+ℹ Unsafe fix
+166 166 | """
+167 167 | 
+168 168 | # * https://github.com/astral-sh/ruff/issues/10277
+169     |-at_least_one_million = lambda _: _ >= 1_000_000
+    169 |+def at_least_one_million(_):
+    170 |+    return _ >= 1_000_000
