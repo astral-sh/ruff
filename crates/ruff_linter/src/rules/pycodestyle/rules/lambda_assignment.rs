@@ -2,8 +2,8 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, AstNode, Expr, ExprLambda, ExpressionRef, Identifier, Parameter,
-    ParameterWithDefault, Parameters, Stmt,
+    self as ast, AstNode, Expr, ExprEllipsisLiteral, ExprLambda, ExpressionRef, Identifier,
+    Parameter, ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
@@ -182,7 +182,9 @@ fn function(
     checker: &Checker,
 ) -> String {
     let body = Stmt::Return(ast::StmtReturn {
-        value: Some(Box::new(Expr::EllipsisLiteral(Default::default()))),
+        value: Some(Box::new(Expr::EllipsisLiteral(
+            ExprEllipsisLiteral::default(),
+        ))),
         range: TextRange::default(),
     });
     let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
