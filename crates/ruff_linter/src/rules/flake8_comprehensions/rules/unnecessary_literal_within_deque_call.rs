@@ -4,18 +4,17 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
-/// TODO: CHANGE THIS
 /// ## What it does
-/// TODO
+/// Checks for usages of `collections.deque` that have an empty literal as the first argument.
 ///
 /// ## Why is this bad?
-/// TODO
+/// It's unnecessary to use an empty literal as a deque's iterable, since this is already the default behavior.
 ///
 /// ## Examples
 /// ```python
 /// from collections import deque
 /// queue = deque(set())
-/// queue = deque([], maxlen=10)
+/// queue = deque([], 10)
 /// ```
 ///
 /// Use instead:
@@ -28,16 +27,16 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: `collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque)
 #[derive(ViolationMetadata)]
-pub(crate) struct UnnecessaryLiteralInDeque {
+pub(crate) struct UnnecessaryLiteralWithinDequeCall {
     has_maxlen: bool,
 }
 
-impl Violation for UnnecessaryLiteralInDeque {
+impl Violation for UnnecessaryLiteralWithinDequeCall {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Unnecessary literal inside a deque expression; remove the literal".to_string()
+        "Unnecessary literal within a deque call; remove the literal".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -51,18 +50,18 @@ impl Violation for UnnecessaryLiteralInDeque {
 }
 
 /// C421
-pub(crate) fn unnecessary_literal_in_deque(checker: &mut Checker, deque: &ast::ExprCall) {
-    let semantic = checker.semantic();
+pub(crate) fn unnecessary_literal_within_deque_call(checker: &mut Checker, deque: &ast::ExprCall) {
     let ast::ExprCall {
         func, arguments, ..
     } = deque;
-    let func = func.as_ref();
-    let Some(qualified) = semantic.resolve_qualified_name(func) else {
+
+    let Some(qualified) = checker.semantic().resolve_qualified_name(func) else {
         return;
     };
     if !matches!(qualified.segments(), ["collections", "deque"]) {
         return;
     }
+
     let Some(iterable) = arguments
         .find_positional(0)
         .or_else(|| arguments.find_keyword("iterable").map(|kw| &kw.value))
@@ -72,14 +71,20 @@ pub(crate) fn unnecessary_literal_in_deque(checker: &mut Checker, deque: &ast::E
     let maxlen = arguments
         .find_positional(1)
         .or_else(|| arguments.find_keyword("maxlen").map(|kw| &kw.value));
+
     let is_empty_literal = match iterable {
         Expr::Dict(dict) => dict.is_empty(),
         Expr::List(list) => list.is_empty(),
         Expr::Tuple(tuple) => tuple.is_empty(),
         Expr::Call(call) => {
-            semantic
+            checker
+                .semantic()
                 .resolve_builtin_symbol(&call.func)
-                .is_some_and(|name| name == "set")
+                // other lints should handle empty list/dict/tuple calls,
+                // but this means that the lint still applies before those are fixed
+                .is_some_and(|name| {
+                    name == "set" || name == "list" || name == "dict" || name == "tuple"
+                })
                 && call.arguments.is_empty()
         }
         _ => false,
@@ -89,8 +94,8 @@ pub(crate) fn unnecessary_literal_in_deque(checker: &mut Checker, deque: &ast::E
     }
 
     let mut diagnostic = Diagnostic::new(
-        UnnecessaryLiteralInDeque {
-            has_maxlen: maxlen.is_some(), // TODO: fix this
+        UnnecessaryLiteralWithinDequeCall {
+            has_maxlen: maxlen.is_some(),
         },
         deque.range,
     );

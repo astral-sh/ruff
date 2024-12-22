@@ -1108,8 +1108,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
                 ruff::rules::pytest_raises_ambiguous_pattern(checker, call);
             }
-            if checker.enabled(Rule::UnnecessaryLiteralInDeque) {
-                flake8_comprehensions::rules::unnecessary_literal_in_deque(checker, call);
+            if checker.enabled(Rule::UnnecessaryLiteralWithinDequeCall) {
+                flake8_comprehensions::rules::unnecessary_literal_within_deque_call(checker, call);
             }
         }
         Expr::Dict(dict) => {
