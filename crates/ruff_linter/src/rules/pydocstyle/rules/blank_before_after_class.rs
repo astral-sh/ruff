@@ -170,7 +170,8 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
         return;
     }
 
-    if checker.enabled(Rule::IncorrectBlankLineBeforeClass) || checker.enabled(Rule::BlankLineBeforeClass)
+    if checker.enabled(Rule::IncorrectBlankLineBeforeClass)
+        || checker.enabled(Rule::BlankLineBeforeClass)
     {
         let mut lines = UniversalNewlineIterator::with_offset(
             checker.locator().slice(between_range),
@@ -203,7 +204,8 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
         }
         if checker.enabled(Rule::IncorrectBlankLineBeforeClass) {
             if blank_lines_before != 1 {
-                let mut diagnostic = Diagnostic::new(IncorrectBlankLineBeforeClass, docstring.range());
+                let mut diagnostic =
+                    Diagnostic::new(IncorrectBlankLineBeforeClass, docstring.range());
                 // Insert one blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     checker.stylist().line_ending().to_string(),
@@ -242,7 +244,8 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
             if let Some(next_statement) = trailing.strip_prefix(';') {
                 let indentation = indentation_at_offset(docstring.start(), checker.source())
                     .expect("Own line docstring must have indentation");
-                let mut diagnostic = Diagnostic::new(IncorrectBlankLineAfterClass, docstring.range());
+                let mut diagnostic =
+                    Diagnostic::new(IncorrectBlankLineAfterClass, docstring.range());
                 let line_ending = checker.stylist().line_ending().as_str();
                 // We have to trim the whitespace twice, once before the semicolon above and
                 // once after the semicolon here, or we get invalid indents:

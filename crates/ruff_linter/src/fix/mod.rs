@@ -144,7 +144,9 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     .then_with(|| match (&rule1, &rule2) {
         // Apply `MissingTrailingPeriod` fixes before `NewLineAfterLastParagraph` fixes.
         (Rule::MissingTrailingPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
-        (Rule::NewLineAfterLastParagraph, Rule::MissingTrailingPeriod) => std::cmp::Ordering::Greater,
+        (Rule::NewLineAfterLastParagraph, Rule::MissingTrailingPeriod) => {
+            std::cmp::Ordering::Greater
+        }
         // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
         (Rule::IfElseBlockInsteadOfDictGet, Rule::IfElseBlockInsteadOfIfExp) => {
             std::cmp::Ordering::Less

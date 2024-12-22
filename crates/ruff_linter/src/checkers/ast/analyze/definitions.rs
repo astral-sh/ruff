@@ -223,10 +223,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryMultilineDocstring) {
                 pydocstyle::rules::one_liner(checker, &docstring);
             }
-            if checker.any_enabled(&[
-                Rule::BlankLineAfterFunction,
-                Rule::BlankLineBeforeFunction,
-            ]) {
+            if checker.any_enabled(&[Rule::BlankLineAfterFunction, Rule::BlankLineBeforeFunction]) {
                 pydocstyle::rules::blank_before_after_function(checker, &docstring);
             }
             if checker.any_enabled(&[
