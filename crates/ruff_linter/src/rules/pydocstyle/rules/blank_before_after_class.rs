@@ -140,7 +140,7 @@ impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
 /// ## Options
 /// - `lint.pydocstyle.convention`
 ///
-/// [D203]: https://docs.astral.sh/ruff/rules/one-blank-line-before-class
+/// [D203]: https://docs.astral.sh/ruff/rules/incorrect-blank-line-before-class
 #[derive(ViolationMetadata)]
 pub(crate) struct BlankLineBeforeClass;
 
