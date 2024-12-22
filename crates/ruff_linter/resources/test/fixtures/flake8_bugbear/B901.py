@@ -1,6 +1,6 @@
 """
 Should emit:
-B901 - on lines 9, 36
+B901 - on lines 9, 36, 56, 61, 72, 83, 87
 """
 
 
@@ -52,16 +52,16 @@ def not_broken5():
     yield inner()
 
 
-def not_broken6():
+def broken3():
     return (yield from [])
 
 
-def not_broken7():
+def broken4():
     x = yield from []
     return x
 
 
-def not_broken8():
+def not_broken6():
     x = None
 
     def inner(ex):
@@ -72,7 +72,19 @@ def not_broken8():
     return x
 
 
-class NotBroken9(object):
+class NotBroken7(object):
     def __await__(self):
         yield from function()
         return 42
+
+def broken5():
+    x = yield
+    print(x)
+    return 42
+
+def broken6():
+    if True:
+        return 42
+
+    for i in range(10):
+        (yield a for a in range(i))

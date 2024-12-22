@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B901.py:9:9: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
    |
@@ -19,4 +18,46 @@ B901.py:36:5: B901 Using `yield` and `return {value}` in a generator function ca
    |     ^^^^^^^^^^^^^^^^ B901
 37 | 
 38 |     yield from not_broken()
+   |
+
+B901.py:56:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+55 | def broken3():
+56 |     return (yield from [])
+   |     ^^^^^^^^^^^^^^^^^^^^^^ B901
+   |
+
+B901.py:61:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+59 | def broken4():
+60 |     x = yield from []
+61 |     return x
+   |     ^^^^^^^^ B901
+   |
+
+B901.py:72:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+71 |     inner((yield from []))
+72 |     return x
+   |     ^^^^^^^^ B901
+   |
+
+B901.py:83:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+81 |     x = yield
+82 |     print(x)
+83 |     return 42
+   |     ^^^^^^^^^ B901
+84 | 
+85 | def broken6():
+   |
+
+B901.py:87:9: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+85 | def broken6():
+86 |     if True:
+87 |         return 42
+   |         ^^^^^^^^^ B901
+88 | 
+89 |     for i in range(10):
    |

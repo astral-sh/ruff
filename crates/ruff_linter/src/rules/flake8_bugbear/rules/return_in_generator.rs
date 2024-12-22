@@ -3,7 +3,12 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::statement_visitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
+
+use ruff_python_ast::{
+    self as ast,
+    visitor::{walk_expr, Visitor as ExpressionVisitor},
+    Expr, Stmt, StmtFunctionDef,
+};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -97,7 +102,7 @@ pub(crate) fn return_in_generator(checker: &mut Checker, function_def: &StmtFunc
     }
 
     let mut visitor = ReturnInGeneratorVisitor::default();
-    visitor.visit_body(&function_def.body);
+    StatementVisitor::visit_body(&mut visitor, &function_def.body);
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {
@@ -117,22 +122,40 @@ struct ReturnInGeneratorVisitor {
 impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
-                Expr::Yield(_) | Expr::YieldFrom(_) => {
-                    self.has_yield = true;
+            Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                self.visit_expr(value);
+            }
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                for target in targets {
+                    self.visit_expr(target);
                 }
-                _ => {}
-            },
+                self.visit_expr(value);
+            }
             Stmt::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.
             }
             Stmt::Return(ast::StmtReturn {
-                value: Some(_),
+                value: Some(value),
                 range,
             }) => {
+                self.visit_expr(value);
                 self.return_ = Some(*range);
             }
             _ => statement_visitor::walk_stmt(self, stmt),
+        }
+    }
+}
+
+impl<'a> ExpressionVisitor<'a> for ReturnInGeneratorVisitor {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Yield(_) | Expr::YieldFrom(_) => {
+                self.has_yield = true;
+            }
+            Expr::Lambda(_) => {
+                // Do not recurse into lambdas; they're evaluated separately.
+            }
+            _ => walk_expr(self, expr),
         }
     }
 }
