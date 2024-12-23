@@ -248,6 +248,7 @@ def _(
     d: type[DeferredClass],
     ta: type[TruthyClass | AmbiguousClass],
     af: type[AmbiguousClass] | type[FalsyClass],
+    flag: bool,
 ):
     reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass]
     if ta:
