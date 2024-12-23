@@ -33,11 +33,15 @@ mod visibility_constraints;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 
-/// Creates a new registry with all known semantic lints.
-pub fn default_lint_registry() -> LintRegistry {
-    let mut registry = LintRegistryBuilder::default();
-    register_lints(&mut registry);
-    registry.build()
+/// Returns the default registry with all known semantic lints.
+pub fn default_lint_registry() -> &'static LintRegistry {
+    static REGISTRY: std::sync::LazyLock<LintRegistry> = std::sync::LazyLock::new(|| {
+        let mut registry = LintRegistryBuilder::default();
+        register_lints(&mut registry);
+        registry.build()
+    });
+
+    &REGISTRY
 }
 
 /// Register all known semantic lints.
