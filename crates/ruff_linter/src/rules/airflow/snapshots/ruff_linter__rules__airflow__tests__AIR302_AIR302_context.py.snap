@@ -1,0 +1,378 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
+---
+AIR302_context.py:14:30: AIR302 `execution_date` is removed in Airflow 3.0
+   |
+13 |     # Removed usage - should trigger violations
+14 |     execution_date = context["execution_date"]
+   |                              ^^^^^^^^^^^^^^^^ AIR302
+15 |     next_ds = context["next_ds"]
+16 |     next_ds_nodash = context["next_ds_nodash"]
+   |
+
+AIR302_context.py:15:23: AIR302 `next_ds` is removed in Airflow 3.0
+   |
+13 |     # Removed usage - should trigger violations
+14 |     execution_date = context["execution_date"]
+15 |     next_ds = context["next_ds"]
+   |                       ^^^^^^^^^ AIR302
+16 |     next_ds_nodash = context["next_ds_nodash"]
+17 |     next_execution_date = context["next_execution_date"]
+   |
+
+AIR302_context.py:16:30: AIR302 `next_ds_nodash` is removed in Airflow 3.0
+   |
+14 |     execution_date = context["execution_date"]
+15 |     next_ds = context["next_ds"]
+16 |     next_ds_nodash = context["next_ds_nodash"]
+   |                              ^^^^^^^^^^^^^^^^ AIR302
+17 |     next_execution_date = context["next_execution_date"]
+18 |     prev_ds = context["prev_ds"]
+   |
+
+AIR302_context.py:17:35: AIR302 `next_execution_date` is removed in Airflow 3.0
+   |
+15 |     next_ds = context["next_ds"]
+16 |     next_ds_nodash = context["next_ds_nodash"]
+17 |     next_execution_date = context["next_execution_date"]
+   |                                   ^^^^^^^^^^^^^^^^^^^^^ AIR302
+18 |     prev_ds = context["prev_ds"]
+19 |     prev_ds_nodash = context["prev_ds_nodash"]
+   |
+
+AIR302_context.py:18:23: AIR302 `prev_ds` is removed in Airflow 3.0
+   |
+16 |     next_ds_nodash = context["next_ds_nodash"]
+17 |     next_execution_date = context["next_execution_date"]
+18 |     prev_ds = context["prev_ds"]
+   |                       ^^^^^^^^^ AIR302
+19 |     prev_ds_nodash = context["prev_ds_nodash"]
+20 |     prev_execution_date = context["prev_execution_date"]
+   |
+
+AIR302_context.py:19:30: AIR302 `prev_ds_nodash` is removed in Airflow 3.0
+   |
+17 |     next_execution_date = context["next_execution_date"]
+18 |     prev_ds = context["prev_ds"]
+19 |     prev_ds_nodash = context["prev_ds_nodash"]
+   |                              ^^^^^^^^^^^^^^^^ AIR302
+20 |     prev_execution_date = context["prev_execution_date"]
+21 |     prev_execution_date_success = context["prev_execution_date_success"]
+   |
+
+AIR302_context.py:20:35: AIR302 `prev_execution_date` is removed in Airflow 3.0
+   |
+18 |     prev_ds = context["prev_ds"]
+19 |     prev_ds_nodash = context["prev_ds_nodash"]
+20 |     prev_execution_date = context["prev_execution_date"]
+   |                                   ^^^^^^^^^^^^^^^^^^^^^ AIR302
+21 |     prev_execution_date_success = context["prev_execution_date_success"]
+22 |     tomorrow_ds = context["tomorrow_ds"]
+   |
+
+AIR302_context.py:21:43: AIR302 `prev_execution_date_success` is removed in Airflow 3.0
+   |
+19 |     prev_ds_nodash = context["prev_ds_nodash"]
+20 |     prev_execution_date = context["prev_execution_date"]
+21 |     prev_execution_date_success = context["prev_execution_date_success"]
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+22 |     tomorrow_ds = context["tomorrow_ds"]
+23 |     yesterday_ds = context["yesterday_ds"]
+   |
+
+AIR302_context.py:22:27: AIR302 `tomorrow_ds` is removed in Airflow 3.0
+   |
+20 |     prev_execution_date = context["prev_execution_date"]
+21 |     prev_execution_date_success = context["prev_execution_date_success"]
+22 |     tomorrow_ds = context["tomorrow_ds"]
+   |                           ^^^^^^^^^^^^^ AIR302
+23 |     yesterday_ds = context["yesterday_ds"]
+24 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |
+
+AIR302_context.py:23:28: AIR302 `yesterday_ds` is removed in Airflow 3.0
+   |
+21 |     prev_execution_date_success = context["prev_execution_date_success"]
+22 |     tomorrow_ds = context["tomorrow_ds"]
+23 |     yesterday_ds = context["yesterday_ds"]
+   |                            ^^^^^^^^^^^^^^ AIR302
+24 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |
+
+AIR302_context.py:24:35: AIR302 `yesterday_ds_nodash` is removed in Airflow 3.0
+   |
+22 |     tomorrow_ds = context["tomorrow_ds"]
+23 |     yesterday_ds = context["yesterday_ds"]
+24 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |                                   ^^^^^^^^^^^^^^^^^^^^^ AIR302
+25 | 
+26 | with DAG(
+   |
+
+AIR302_context.py:28:5: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
+   |
+26 | with DAG(
+27 |     dag_id="example_dag",
+28 |     schedule_interval="@daily",
+   |     ^^^^^^^^^^^^^^^^^ AIR302
+29 |     start_date=datetime(2023, 1, 1),
+30 |     template_searchpath=["/templates"],
+   |
+   = help: Use `schedule` instead
+
+ℹ Safe fix
+25 25 | 
+26 26 | with DAG(
+27 27 |     dag_id="example_dag",
+28    |-    schedule_interval="@daily",
+   28 |+    schedule="@daily",
+29 29 |     start_date=datetime(2023, 1, 1),
+30 30 |     template_searchpath=["/templates"],
+31 31 | ) as dag:
+
+AIR302_context.py:32:13: AIR302 `airflow.operators.dummy.DummyOperator` is removed in Airflow 3.0
+   |
+30 |     template_searchpath=["/templates"],
+31 | ) as dag:
+32 |     task1 = DummyOperator(
+   |             ^^^^^^^^^^^^^ AIR302
+33 |         task_id="task1",
+34 |         params={
+   |
+   = help: Use `airflow.operators.empty.EmptyOperator` instead
+
+AIR302_context.py:45:57: AIR302 `execution_date` is removed in Airflow 3.0
+   |
+43 |     name = "custom_macros"
+44 |     macros = {
+45 |         "execution_date_macro": lambda context: context["execution_date"],
+   |                                                         ^^^^^^^^^^^^^^^^ AIR302
+46 |         "next_ds_macro": lambda context: context["next_ds"]
+47 |     }
+   |
+
+AIR302_context.py:46:50: AIR302 `next_ds` is removed in Airflow 3.0
+   |
+44 |     macros = {
+45 |         "execution_date_macro": lambda context: context["execution_date"],
+46 |         "next_ds_macro": lambda context: context["next_ds"]
+   |                                                  ^^^^^^^^^ AIR302
+47 |     }
+   |
+
+AIR302_context.py:52:30: AIR302 `execution_date` is removed in Airflow 3.0
+   |
+50 | def print_config():
+51 |     context = get_current_context()
+52 |     execution_date = context["execution_date"]
+   |                              ^^^^^^^^^^^^^^^^ AIR302
+53 |     next_ds = context["next_ds"]
+54 |     next_ds_nodash = context["next_ds_nodash"]
+   |
+
+AIR302_context.py:53:23: AIR302 `next_ds` is removed in Airflow 3.0
+   |
+51 |     context = get_current_context()
+52 |     execution_date = context["execution_date"]
+53 |     next_ds = context["next_ds"]
+   |                       ^^^^^^^^^ AIR302
+54 |     next_ds_nodash = context["next_ds_nodash"]
+55 |     next_execution_date = context["next_execution_date"]
+   |
+
+AIR302_context.py:54:30: AIR302 `next_ds_nodash` is removed in Airflow 3.0
+   |
+52 |     execution_date = context["execution_date"]
+53 |     next_ds = context["next_ds"]
+54 |     next_ds_nodash = context["next_ds_nodash"]
+   |                              ^^^^^^^^^^^^^^^^ AIR302
+55 |     next_execution_date = context["next_execution_date"]
+56 |     prev_ds = context["prev_ds"]
+   |
+
+AIR302_context.py:55:35: AIR302 `next_execution_date` is removed in Airflow 3.0
+   |
+53 |     next_ds = context["next_ds"]
+54 |     next_ds_nodash = context["next_ds_nodash"]
+55 |     next_execution_date = context["next_execution_date"]
+   |                                   ^^^^^^^^^^^^^^^^^^^^^ AIR302
+56 |     prev_ds = context["prev_ds"]
+57 |     prev_ds_nodash = context["prev_ds_nodash"]
+   |
+
+AIR302_context.py:56:23: AIR302 `prev_ds` is removed in Airflow 3.0
+   |
+54 |     next_ds_nodash = context["next_ds_nodash"]
+55 |     next_execution_date = context["next_execution_date"]
+56 |     prev_ds = context["prev_ds"]
+   |                       ^^^^^^^^^ AIR302
+57 |     prev_ds_nodash = context["prev_ds_nodash"]
+58 |     prev_execution_date = context["prev_execution_date"]
+   |
+
+AIR302_context.py:57:30: AIR302 `prev_ds_nodash` is removed in Airflow 3.0
+   |
+55 |     next_execution_date = context["next_execution_date"]
+56 |     prev_ds = context["prev_ds"]
+57 |     prev_ds_nodash = context["prev_ds_nodash"]
+   |                              ^^^^^^^^^^^^^^^^ AIR302
+58 |     prev_execution_date = context["prev_execution_date"]
+59 |     prev_execution_date_success = context["prev_execution_date_success"]
+   |
+
+AIR302_context.py:58:35: AIR302 `prev_execution_date` is removed in Airflow 3.0
+   |
+56 |     prev_ds = context["prev_ds"]
+57 |     prev_ds_nodash = context["prev_ds_nodash"]
+58 |     prev_execution_date = context["prev_execution_date"]
+   |                                   ^^^^^^^^^^^^^^^^^^^^^ AIR302
+59 |     prev_execution_date_success = context["prev_execution_date_success"]
+60 |     tomorrow_ds = context["tomorrow_ds"]
+   |
+
+AIR302_context.py:59:43: AIR302 `prev_execution_date_success` is removed in Airflow 3.0
+   |
+57 |     prev_ds_nodash = context["prev_ds_nodash"]
+58 |     prev_execution_date = context["prev_execution_date"]
+59 |     prev_execution_date_success = context["prev_execution_date_success"]
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+60 |     tomorrow_ds = context["tomorrow_ds"]
+61 |     yesterday_ds = context["yesterday_ds"]
+   |
+
+AIR302_context.py:60:27: AIR302 `tomorrow_ds` is removed in Airflow 3.0
+   |
+58 |     prev_execution_date = context["prev_execution_date"]
+59 |     prev_execution_date_success = context["prev_execution_date_success"]
+60 |     tomorrow_ds = context["tomorrow_ds"]
+   |                           ^^^^^^^^^^^^^ AIR302
+61 |     yesterday_ds = context["yesterday_ds"]
+62 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |
+
+AIR302_context.py:61:28: AIR302 `yesterday_ds` is removed in Airflow 3.0
+   |
+59 |     prev_execution_date_success = context["prev_execution_date_success"]
+60 |     tomorrow_ds = context["tomorrow_ds"]
+61 |     yesterday_ds = context["yesterday_ds"]
+   |                            ^^^^^^^^^^^^^^ AIR302
+62 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |
+
+AIR302_context.py:62:35: AIR302 `yesterday_ds_nodash` is removed in Airflow 3.0
+   |
+60 |     tomorrow_ds = context["tomorrow_ds"]
+61 |     yesterday_ds = context["yesterday_ds"]
+62 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |                                   ^^^^^^^^^^^^^^^^^^^^^ AIR302
+63 | 
+64 | class CustomOperator(BaseOperator):
+   |
+
+AIR302_context.py:66:34: AIR302 `execution_date` is removed in Airflow 3.0
+   |
+64 | class CustomOperator(BaseOperator):
+65 |     def execute(self, context):
+66 |         execution_date = context["execution_date"]
+   |                                  ^^^^^^^^^^^^^^^^ AIR302
+67 |         next_ds = context["next_ds"]
+68 |         next_ds_nodash = context["next_ds_nodash"]
+   |
+
+AIR302_context.py:67:27: AIR302 `next_ds` is removed in Airflow 3.0
+   |
+65 |     def execute(self, context):
+66 |         execution_date = context["execution_date"]
+67 |         next_ds = context["next_ds"]
+   |                           ^^^^^^^^^ AIR302
+68 |         next_ds_nodash = context["next_ds_nodash"]
+69 |         next_execution_date = context["next_execution_date"]
+   |
+
+AIR302_context.py:68:34: AIR302 `next_ds_nodash` is removed in Airflow 3.0
+   |
+66 |         execution_date = context["execution_date"]
+67 |         next_ds = context["next_ds"]
+68 |         next_ds_nodash = context["next_ds_nodash"]
+   |                                  ^^^^^^^^^^^^^^^^ AIR302
+69 |         next_execution_date = context["next_execution_date"]
+70 |         prev_ds = context["prev_ds"]
+   |
+
+AIR302_context.py:69:39: AIR302 `next_execution_date` is removed in Airflow 3.0
+   |
+67 |         next_ds = context["next_ds"]
+68 |         next_ds_nodash = context["next_ds_nodash"]
+69 |         next_execution_date = context["next_execution_date"]
+   |                                       ^^^^^^^^^^^^^^^^^^^^^ AIR302
+70 |         prev_ds = context["prev_ds"]
+71 |         prev_ds_nodash = context["prev_ds_nodash"]
+   |
+
+AIR302_context.py:70:27: AIR302 `prev_ds` is removed in Airflow 3.0
+   |
+68 |         next_ds_nodash = context["next_ds_nodash"]
+69 |         next_execution_date = context["next_execution_date"]
+70 |         prev_ds = context["prev_ds"]
+   |                           ^^^^^^^^^ AIR302
+71 |         prev_ds_nodash = context["prev_ds_nodash"]
+72 |         prev_execution_date = context["prev_execution_date"]
+   |
+
+AIR302_context.py:71:34: AIR302 `prev_ds_nodash` is removed in Airflow 3.0
+   |
+69 |         next_execution_date = context["next_execution_date"]
+70 |         prev_ds = context["prev_ds"]
+71 |         prev_ds_nodash = context["prev_ds_nodash"]
+   |                                  ^^^^^^^^^^^^^^^^ AIR302
+72 |         prev_execution_date = context["prev_execution_date"]
+73 |         prev_execution_date_success = context["prev_execution_date_success"]
+   |
+
+AIR302_context.py:72:39: AIR302 `prev_execution_date` is removed in Airflow 3.0
+   |
+70 |         prev_ds = context["prev_ds"]
+71 |         prev_ds_nodash = context["prev_ds_nodash"]
+72 |         prev_execution_date = context["prev_execution_date"]
+   |                                       ^^^^^^^^^^^^^^^^^^^^^ AIR302
+73 |         prev_execution_date_success = context["prev_execution_date_success"]
+74 |         tomorrow_ds = context["tomorrow_ds"]
+   |
+
+AIR302_context.py:73:47: AIR302 `prev_execution_date_success` is removed in Airflow 3.0
+   |
+71 |         prev_ds_nodash = context["prev_ds_nodash"]
+72 |         prev_execution_date = context["prev_execution_date"]
+73 |         prev_execution_date_success = context["prev_execution_date_success"]
+   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+74 |         tomorrow_ds = context["tomorrow_ds"]
+75 |         yesterday_ds = context["yesterday_ds"]
+   |
+
+AIR302_context.py:74:31: AIR302 `tomorrow_ds` is removed in Airflow 3.0
+   |
+72 |         prev_execution_date = context["prev_execution_date"]
+73 |         prev_execution_date_success = context["prev_execution_date_success"]
+74 |         tomorrow_ds = context["tomorrow_ds"]
+   |                               ^^^^^^^^^^^^^ AIR302
+75 |         yesterday_ds = context["yesterday_ds"]
+76 |         yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |
+
+AIR302_context.py:75:32: AIR302 `yesterday_ds` is removed in Airflow 3.0
+   |
+73 |         prev_execution_date_success = context["prev_execution_date_success"]
+74 |         tomorrow_ds = context["tomorrow_ds"]
+75 |         yesterday_ds = context["yesterday_ds"]
+   |                                ^^^^^^^^^^^^^^ AIR302
+76 |         yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |
+
+AIR302_context.py:76:39: AIR302 `yesterday_ds_nodash` is removed in Airflow 3.0
+   |
+74 |         tomorrow_ds = context["tomorrow_ds"]
+75 |         yesterday_ds = context["yesterday_ds"]
+76 |         yesterday_ds_nodash = context["yesterday_ds_nodash"]
+   |                                       ^^^^^^^^^^^^^^^^^^^^^ AIR302
+   |
