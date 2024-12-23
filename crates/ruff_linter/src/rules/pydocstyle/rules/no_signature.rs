@@ -41,9 +41,9 @@ use crate::docstrings::Docstring;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-pub(crate) struct NoSignature;
+pub(crate) struct SignatureInDocstring;
 
-impl Violation for NoSignature {
+impl Violation for SignatureInDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         "First line should not be the function's signature".to_string()
@@ -88,6 +88,6 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(NoSignature, docstring.range()));
+            .push(Diagnostic::new(SignatureInDocstring, docstring.range()));
     }
 }

@@ -41,16 +41,16 @@ use crate::docstrings::Docstring;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-pub(crate) struct BlankLineAfterSummary {
+pub(crate) struct MissingBlankLineAfterSummary {
     num_lines: usize,
 }
 
-impl Violation for BlankLineAfterSummary {
+impl Violation for MissingBlankLineAfterSummary {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineAfterSummary { num_lines } = self;
+        let MissingBlankLineAfterSummary { num_lines } = self;
         if *num_lines == 0 {
             "1 blank line required between summary line and description".to_string()
         } else {
@@ -85,7 +85,7 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
     }
     if lines_count > 1 && blanks_count != 1 {
         let mut diagnostic = Diagnostic::new(
-            BlankLineAfterSummary {
+            MissingBlankLineAfterSummary {
                 num_lines: blanks_count,
             },
             docstring.range(),

@@ -33,9 +33,9 @@ use crate::docstrings::Docstring;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-pub(crate) struct FitsOnOneLine;
+pub(crate) struct UnnecessaryMultilineDocstring;
 
-impl Violation for FitsOnOneLine {
+impl Violation for UnnecessaryMultilineDocstring {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -63,7 +63,7 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
     }
 
     if non_empty_line_count == 1 && line_count > 1 {
-        let mut diagnostic = Diagnostic::new(FitsOnOneLine, docstring.range());
+        let mut diagnostic = Diagnostic::new(UnnecessaryMultilineDocstring, docstring.range());
         if let (Some(leading), Some(trailing)) = (
             leading_quote(docstring.contents),
             trailing_quote(docstring.contents),

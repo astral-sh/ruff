@@ -357,9 +357,9 @@ impl Rule {
 pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     (
         Rule::BlankLineBeforeClass,
-        Rule::OneBlankLineBeforeClass,
-        "`one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
-         incompatible. Ignoring `one-blank-line-before-class`.",
+        Rule::IncorrectBlankLineBeforeClass,
+        "`incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
+         incompatible. Ignoring `incorrect-blank-line-before-class`.",
     ),
     (
         Rule::MultiLineSummaryFirstLine,
