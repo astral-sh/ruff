@@ -41,7 +41,7 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// A `knot: ignore[code]` directive with a `code` that doesn't match
-    /// any known rule is probably mistake.
+    /// any known rule will not suppress any type errors, and is probably a mistake.
     ///
     /// ## Examples
     /// ```py
