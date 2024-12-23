@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName,
-    StmtClassDef,
+    ExprStringLiteral, ExprSubscript, StmtClassDef,
 };
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
@@ -71,6 +71,63 @@ impl Violation for Airflow3Removal {
     }
 }
 
+fn extract_name_from_slice(slice: &Expr) -> Option<String> {
+    match slice {
+        Expr::StringLiteral(ExprStringLiteral { value, .. }) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+pub(crate) fn removed_context_variable(checker: &mut Checker, expr: &Expr) {
+    const REMOVED_CONTEXT_KEYS: [&str; 12] = [
+        "conf",
+        "execution_date",
+        "next_ds",
+        "next_ds_nodash",
+        "next_execution_date",
+        "prev_ds",
+        "prev_ds_nodash",
+        "prev_execution_date",
+        "prev_execution_date_success",
+        "tomorrow_ds",
+        "yesterday_ds",
+        "yesterday_ds_nodash",
+    ];
+
+    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
+        if let Expr::Name(ExprName { id, .. }) = &**value {
+            if id.as_str() == "context" {
+                if let Some(key) = extract_name_from_slice(slice) {
+                    if REMOVED_CONTEXT_KEYS.contains(&key.as_str()) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            Airflow3Removal {
+                                deprecated: key,
+                                replacement: Replacement::None,
+                            },
+                            slice.range(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = expr {
+        let value_str = value.to_string();
+        for key in REMOVED_CONTEXT_KEYS {
+            if value_str.contains(&format!("{{{{ {key} }}}}")) {
+                checker.diagnostics.push(Diagnostic::new(
+                    Airflow3Removal {
+                        deprecated: key.to_string(),
+                        replacement: Replacement::None,
+                    },
+                    expr.range(),
+                ));
+            }
+        }
+    }
+}
+
 /// AIR302
 pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
@@ -99,6 +156,9 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                     check_airflow_plugin_extension(checker, expr, id, class_def);
                 }
             }
+        }
+        Expr::Subscript(_) => {
+            removed_context_variable(checker, expr);
         }
         _ => {}
     }
