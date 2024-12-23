@@ -156,3 +156,24 @@ from typing import Callable
 class FilterDataclass:
     # OK
     filter: Callable[[str], bool] = lambda _: True
+
+
+# Regression tests for:
+# * https://github.com/astral-sh/ruff/issues/7720
+x = lambda: """
+        a
+    b
+"""
+
+# * https://github.com/astral-sh/ruff/issues/10277
+at_least_one_million = lambda _: _ >= 1_000_000
+
+x = lambda: (
+    # comment
+    5 + 10
+)
+
+x = lambda: (
+    # comment
+    y := 10
+)
