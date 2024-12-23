@@ -17,7 +17,7 @@ use crate::settings::types::PythonVersion;
 /// Under [preview mode](https://docs.astral.sh/ruff/preview),
 /// this rule triggers for all replacements listed
 /// in [PEP 585]. Otherwise, this rule only triggers for the following
-/// commonly occurring instances of of modules present in the
+/// commonly occurring instances of modules present in the
 /// `typing` or `typing_extensions` package:
 ///
 /// - `Dict`
