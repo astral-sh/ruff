@@ -9,6 +9,8 @@ pub(crate) enum TypeApiError {
     WrongArity,
     #[error("Unknown API expression")]
     UnknownApiExpression,
+    #[error("Failed assertion")]
+    FailedAssertion,
 }
 
 type Result<T> = std::result::Result<T, TypeApiError>;
@@ -92,6 +94,24 @@ pub(crate) fn resolve_type_predicate<'db>(
         "is_single_valued" => {
             let ty = expect_one_argument(arguments)?;
             Ok(Type::BooleanLiteral(ty.is_single_valued(db)))
+        }
+
+        // Special operations
+        "assert_true" => {
+            let ty = expect_one_argument(arguments)?;
+            if ty == Type::BooleanLiteral(true) {
+                Ok(Type::none(db))
+            } else {
+                Err(TypeApiError::FailedAssertion)
+            }
+        }
+        "assert_false" => {
+            let ty = expect_one_argument(arguments)?;
+            if ty == Type::BooleanLiteral(false) {
+                Ok(Type::none(db))
+            } else {
+                Err(TypeApiError::FailedAssertion)
+            }
         }
 
         _ => Err(TypeApiError::UnknownApiExpression),

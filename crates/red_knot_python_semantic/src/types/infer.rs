@@ -4234,10 +4234,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if file_to_module(self.db(), function.body_scope(self.db()).file(self.db()))
                     .is_some_and(|module| module.is_known(KnownModule::RedKnot)) =>
             {
-                let argument_types = arguments
-                    .args
-                    .iter()
-                    .map(|arg| self.infer_type_expression(arg));
+                let name = function.name(db).as_str();
+
+                let is_assertion = matches!(name, "assert_true" | "assert_false");
+
+                let argument_types = arguments.args.iter().map(|arg| {
+                    if is_assertion {
+                        self.infer_expression(arg)
+                    } else {
+                        self.infer_type_expression(arg)
+                    }
+                });
 
                 Some(
                     type_api::resolve_type_predicate(
