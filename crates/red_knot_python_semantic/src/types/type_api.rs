@@ -18,7 +18,7 @@ type Result<T> = std::result::Result<T, TypeApiError>;
 fn expect_one_argument<'db>(mut arguments: impl Iterator<Item = Type<'db>>) -> Result<Type<'db>> {
     let first = arguments.next().ok_or(TypeApiError::WrongArity)?;
     if arguments.next().is_some() {
-        return Err(TypeApiError::WrongArity.into());
+        return Err(TypeApiError::WrongArity);
     }
     Ok(first)
 }
@@ -29,7 +29,7 @@ fn expect_two_arguments<'db>(
     let first = arguments.next().ok_or(TypeApiError::WrongArity)?;
     let second = arguments.next().ok_or(TypeApiError::WrongArity)?;
     if arguments.next().is_some() {
-        return Err(TypeApiError::WrongArity.into());
+        return Err(TypeApiError::WrongArity);
     }
     Ok((first, second))
 }
