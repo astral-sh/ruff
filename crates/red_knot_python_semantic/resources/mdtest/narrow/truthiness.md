@@ -242,7 +242,10 @@ class DeferredClass(metaclass=MetaDeferred): ...
 
 
 def _(
-    a: type[AmbiguousClass], t: type[TruthyClass], f: type[FalsyClass], d: type[DeferredClass],
+    a: type[AmbiguousClass],
+    t: type[TruthyClass],
+    f: type[FalsyClass],
+    d: type[DeferredClass],
     ta: type[TruthyClass | AmbiguousClass],
     af: type[AmbiguousClass] | type[FalsyClass],
 ):
@@ -258,6 +261,14 @@ def _(
     if d:
         # TODO: Should be `Unknown`
         reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
+
+    tf = TruthyClass if flag else FalsyClass
+    reveal_type(tf)  # Literal[TruthyClass, FalsyClass]
+
+    if tf:
+        reveal_type(tf)  # Literal[TruthyClass]
+    else:
+        reveal_type(tf)  # Literal[FalsyClass]
 ```
 
 ## Narrowing in chained boolean expressions
