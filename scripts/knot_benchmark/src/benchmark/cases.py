@@ -71,7 +71,7 @@ class Knot(Tool):
         assert len(project.include) < 2, "Knot doesn't support multiple source folders"
 
         if project.include:
-            command.extend(["--current-directory", project.include[0]])
+            command.extend(["--project", project.include[0]])
 
         command.extend(["--venv-path", str(venv.path)])
 
