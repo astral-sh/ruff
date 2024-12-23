@@ -6,15 +6,17 @@ use ruff_db::{
     files::File,
 };
 use ruff_python_ast::AnyNodeRef;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
+use super::{binding_ty, KnownFunction, TypeCheckDiagnostic, TypeCheckDiagnostics};
+
+use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::ScopeId;
 use crate::{
     lint::{LintId, LintMetadata},
     suppression::suppressions,
     Db,
 };
-
-use super::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 
 /// Context for inferring the types of a single file.
 ///
@@ -30,16 +32,18 @@ use super::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 /// on the current [`TypeInference`](super::infer::TypeInference) result.
 pub(crate) struct InferContext<'db> {
     db: &'db dyn Db,
+    scope: ScopeId<'db>,
     file: File,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     bomb: DebugDropBomb,
 }
 
 impl<'db> InferContext<'db> {
-    pub(crate) fn new(db: &'db dyn Db, file: File) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
         Self {
             db,
-            file,
+            scope,
+            file: scope.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             bomb: DebugDropBomb::new("`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics."),
         }
@@ -68,10 +72,18 @@ impl<'db> InferContext<'db> {
         node: AnyNodeRef,
         message: fmt::Arguments,
     ) {
+        if !self.db.is_file_open(self.file) {
+            return;
+        }
+
         // Skip over diagnostics if the rule is disabled.
         let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
             return;
         };
+
+        if self.is_in_no_type_check(node.range()) {
+            return;
+        }
 
         let suppressions = suppressions(self.db, self.file);
 
@@ -110,6 +122,52 @@ impl<'db> InferContext<'db> {
             range: node.range(),
             severity,
         });
+    }
+
+    fn is_in_no_type_check(&self, range: TextRange) -> bool {
+        // Accessing the semantic index here is fine because
+        // the index belongs to the same file as for which we emit the diagnostic.
+        let index = semantic_index(self.db, self.file);
+
+        let scope_id = self.scope.file_scope_id(self.db);
+
+        // Unfortunately, we can't just use the `scope_id` here because the default values, return type
+        // and other parts of a function declaration are inferred in the outer scope, and not in the function's scope.
+        // That's why we walk all child-scopes to see if there's any child scope that fully contains the diagnostic range
+        // and if there's any, use that scope as the starting scope instead.
+        // We could probably use a binary search here but it's probably not worth it, considering that most
+        // scopes have only very few child scopes and binary search also isn't free.
+        let enclosing_scope = index
+            .child_scopes(scope_id)
+            .find_map(|(child_scope_id, scope)| {
+                if scope
+                    .node()
+                    .as_function()
+                    .is_some_and(|function| function.range().contains_range(range))
+                {
+                    Some(child_scope_id)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(scope_id);
+
+        // Inspect all enclosing function scopes walking bottom up and infer the function's type.
+        let mut function_scope_tys = index
+            .ancestor_scopes(enclosing_scope)
+            .filter_map(|(_, scope)| scope.node().as_function())
+            .filter_map(|function| {
+                binding_ty(self.db, index.definition(function)).into_function_literal()
+            });
+
+        // Iterate over all functions and test if any is decorated with `@no_type_check`.
+        function_scope_tys.any(|function_ty| {
+            function_ty
+                .decorators(self.db)
+                .iter()
+                .filter_map(|decorator| decorator.into_function_literal())
+                .any(|decorator_ty| decorator_ty.is_known(self.db, KnownFunction::NoTypeCheck))
+        })
     }
 
     #[must_use]
