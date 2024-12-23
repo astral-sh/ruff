@@ -99,9 +99,15 @@ pub(crate) fn fastapi_non_annotated_dependency(
 
     let mut updatable_count = 0;
     let mut has_non_updatable_default = false;
-    let total_params = function_def.parameters.args.len();
+    let total_params =
+        function_def.parameters.args.len() + function_def.parameters.kwonlyargs.len();
 
-    for parameter in &function_def.parameters.args {
+    for parameter in function_def
+        .parameters
+        .args
+        .iter()
+        .chain(&function_def.parameters.kwonlyargs)
+    {
         let needs_update = matches!(
             (&parameter.parameter.annotation, &parameter.default),
             (Some(_annotation), Some(default)) if is_fastapi_dependency(checker, default)
