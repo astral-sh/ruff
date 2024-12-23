@@ -18,6 +18,7 @@ mod tests {
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_names.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_class_attribute.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_airflow_plugin.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR302_context.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR303.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
