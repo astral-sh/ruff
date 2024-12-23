@@ -14,24 +14,53 @@ a = 4 + test  # knot: ignore
 a = 4 + test  # knot: ignore[unresolved-reference]
 ```
 
-## Useless suppression
-
-TODO: Red Knot should emit an `unused-suppression` diagnostic for the
-`possibly-unresolved-reference` suppression.
+## Unused suppression
 
 ```py
 test = 10
+# error: [unused-ignore-comment] "Unused `knot: ignore` directive: 'possibly-unresolved-reference'"
 a = test + 3  # knot: ignore[possibly-unresolved-reference]
 ```
 
-## Useless suppression if the error codes don't match
-
-TODO: Red Knot should emit a `unused-suppression` diagnostic for the `possibly-unresolved-reference`
-suppression because it doesn't match the actual `unresolved-reference` diagnostic.
+## Unused suppression if the error codes don't match
 
 ```py
 # error: [unresolved-reference]
+# error: [unused-ignore-comment] "Unused `knot: ignore` directive: 'possibly-unresolved-reference'"
 a = test + 3  # knot: ignore[possibly-unresolved-reference]
+```
+
+## Suppressed unused comment
+
+```py
+# error: [unused-ignore-comment]
+a = 10 / 2  # knot: ignore[division-by-zero]
+a = 10 / 2  # knot: ignore[division-by-zero, unused-ignore-comment]
+a = 10 / 2  # knot: ignore[unused-ignore-comment, division-by-zero]
+a = 10 / 2  # knot: ignore[unused-ignore-comment] # type: ignore
+a = 10 / 2  # type: ignore # knot: ignore[unused-ignore-comment]
+```
+
+## Unused ignore comment
+
+```py
+# error: [unused-ignore-comment] "Unused `knot: ignore` directive: 'unused-ignore-comment'"
+a = 10 / 0  # knot: ignore[division-by-zero, unused-ignore-comment]
+```
+
+## Multiple unused comments
+
+Today, Red Knot emits a diagnostic for every unused code. We might want to group the codes by
+comment at some point in the future.
+
+```py
+# error: [unused-ignore-comment] "Unused `knot: ignore` directive: 'division-by-zero'"
+# error: [unused-ignore-comment] "Unused `knot: ignore` directive: 'unresolved-reference'"
+a = 10 / 2  # knot: ignore[division-by-zero, unresolved-reference]
+
+# error: [unused-ignore-comment] "Unused `knot: ignore` directive: 'invalid-assignment'"
+# error: [unused-ignore-comment] "Unused `knot: ignore` directive: 'unresolved-reference'"
+a = 10 / 0  # knot: ignore[invalid-assignment, division-by-zero, unresolved-reference]
 ```
 
 ## Multiple suppressions
@@ -47,6 +76,7 @@ def test(a: f"f-string type annotation", b: b"byte-string-type-annotation"): ...
 
 ```py
 # error: [invalid-syntax]
+# error: [unused-ignore-comment]
 def test(  # knot: ignore
 ```
 
@@ -54,10 +84,12 @@ def test(  # knot: ignore
 
 ## Can't suppress `revealed-type` diagnostics
 
+TODO: Emit an error that the rule code is unknown: `unknown-rule`
+
 ```py
 a = 10
 # revealed: Literal[10]
-reveal_type(a)  # knot: ignore
+reveal_type(a)  # knot: ignore[revealed-type]
 ```
 
 ## Extra whitespace in type ignore comments is allowed
@@ -116,6 +148,7 @@ An empty codes array suppresses no-diagnostics and is always useless
 
 ```py
 # error: [division-by-zero]
+# error: [unused-ignore-comment] "Unused `knot: ignore` without a code"
 a = 4 / 0  # knot: ignore[]
 ```
 
@@ -126,6 +159,7 @@ if they should use a different syntax that also supports enabling rules or chang
 severity: `knot: possibly-undefined-reference=error`
 
 ```py
+# error: [unused-ignore-comment]
 # knot: ignore[division-by-zero]
 
 a = 4 / 0  # error: [division-by-zero]

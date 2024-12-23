@@ -1,5 +1,7 @@
+use super::context::InferContext;
 use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::suppression::FileSuppressionId;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -10,12 +12,11 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
-
-use super::context::InferContext;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -512,11 +513,11 @@ declare_lint! {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TypeCheckDiagnostic {
-    pub(super) id: DiagnosticId,
-    pub(super) message: String,
-    pub(super) range: TextRange,
-    pub(super) severity: Severity,
-    pub(super) file: File,
+    pub(crate) id: DiagnosticId,
+    pub(crate) message: String,
+    pub(crate) range: TextRange,
+    pub(crate) severity: Severity,
+    pub(crate) file: File,
 }
 
 impl TypeCheckDiagnostic {
@@ -570,41 +571,41 @@ impl Ranged for TypeCheckDiagnostic {
 /// each Salsa-struct comes with an overhead.
 #[derive(Default, Eq, PartialEq)]
 pub struct TypeCheckDiagnostics {
-    inner: Vec<std::sync::Arc<TypeCheckDiagnostic>>,
+    diagnostics: Vec<Arc<TypeCheckDiagnostic>>,
+    used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
 impl TypeCheckDiagnostics {
-    pub(super) fn push(&mut self, diagnostic: TypeCheckDiagnostic) {
-        self.inner.push(Arc::new(diagnostic));
+    pub(crate) fn push(&mut self, diagnostic: TypeCheckDiagnostic) {
+        self.diagnostics.push(Arc::new(diagnostic));
+    }
+
+    pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
+        self.diagnostics.extend_from_slice(&other.diagnostics);
+        self.used_suppressions.extend(&other.used_suppressions);
+    }
+
+    pub(crate) fn mark_used(&mut self, suppression_id: FileSuppressionId) {
+        self.used_suppressions.insert(suppression_id);
+    }
+
+    pub(crate) fn is_used(&self, suppression_id: FileSuppressionId) -> bool {
+        self.used_suppressions.contains(&suppression_id)
+    }
+
+    pub(crate) fn used_len(&self) -> usize {
+        self.used_suppressions.len()
     }
 
     pub(crate) fn shrink_to_fit(&mut self) {
-        self.inner.shrink_to_fit();
-    }
-}
-
-impl Extend<TypeCheckDiagnostic> for TypeCheckDiagnostics {
-    fn extend<T: IntoIterator<Item = TypeCheckDiagnostic>>(&mut self, iter: T) {
-        self.inner.extend(iter.into_iter().map(std::sync::Arc::new));
-    }
-}
-
-impl Extend<std::sync::Arc<TypeCheckDiagnostic>> for TypeCheckDiagnostics {
-    fn extend<T: IntoIterator<Item = Arc<TypeCheckDiagnostic>>>(&mut self, iter: T) {
-        self.inner.extend(iter);
-    }
-}
-
-impl<'a> Extend<&'a std::sync::Arc<TypeCheckDiagnostic>> for TypeCheckDiagnostics {
-    fn extend<T: IntoIterator<Item = &'a Arc<TypeCheckDiagnostic>>>(&mut self, iter: T) {
-        self.inner
-            .extend(iter.into_iter().map(std::sync::Arc::clone));
+        self.used_suppressions.shrink_to_fit();
+        self.diagnostics.shrink_to_fit();
     }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.inner.fmt(f)
+        self.diagnostics.fmt(f)
     }
 }
 
@@ -612,7 +613,7 @@ impl Deref for TypeCheckDiagnostics {
     type Target = [std::sync::Arc<TypeCheckDiagnostic>];
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.diagnostics
     }
 }
 
@@ -621,7 +622,7 @@ impl IntoIterator for TypeCheckDiagnostics {
     type IntoIter = std::vec::IntoIter<std::sync::Arc<TypeCheckDiagnostic>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.inner.into_iter()
+        self.diagnostics.into_iter()
     }
 }
 
@@ -630,7 +631,7 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     type IntoIter = std::slice::Iter<'a, std::sync::Arc<TypeCheckDiagnostic>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.inner.iter()
+        self.diagnostics.iter()
     }
 }
 
