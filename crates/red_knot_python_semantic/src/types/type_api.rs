@@ -85,6 +85,14 @@ pub(crate) fn resolve_type_predicate<'db>(
             let ty = expect_one_argument(arguments)?;
             Ok(Type::BooleanLiteral(ty.is_fully_static(db)))
         }
+        "is_singleton" => {
+            let ty = expect_one_argument(arguments)?;
+            Ok(Type::BooleanLiteral(ty.is_singleton(db)))
+        }
+        "is_single_valued" => {
+            let ty = expect_one_argument(arguments)?;
+            Ok(Type::BooleanLiteral(ty.is_single_valued(db)))
+        }
 
         _ => Err(TypeApiError::UnknownApiExpression),
     }

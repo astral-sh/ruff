@@ -140,6 +140,31 @@ reveal_type(is_fully_static(int | Any))  # revealed: Literal[False]
 reveal_type(is_fully_static(type[Any]))  # revealed: Literal[False]
 ```
 
+### Singleton types
+
+```py
+from red_knot import is_singleton
+
+reveal_type(is_singleton(None))  # revealed: Literal[True]
+reveal_type(is_singleton(Literal[True]))  # revealed: Literal[True]
+
+reveal_type(is_singleton(int))  # revealed: Literal[False]
+reveal_type(is_singleton(Literal["a"]))  # revealed: Literal[False]
+```
+
+### Single-valued types
+
+```py
+from red_knot import is_single_valued
+
+reveal_type(is_single_valued(None))  # revealed: Literal[True]
+reveal_type(is_single_valued(Literal[True]))  # revealed: Literal[True]
+reveal_type(is_single_valued(Literal["a"]))  # revealed: Literal[True]
+
+reveal_type(is_single_valued(int))  # revealed: Literal[False]
+reveal_type(is_single_valued(Literal["a"] | Literal["b"]))  # revealed: Literal[False]
+```
+
 ## Special operations
 
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
