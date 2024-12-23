@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assignment_split_value_first.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -242,22 +241,7 @@ type A[VeryLongTypeNameThatShouldBreakFirstToTheRightBeforeSplitngtinthatExceeds
 
 ```
 
-## Outputs
-### Output 1
-```
-indent-style               = space
-line-width                 = 88
-indent-width               = 4
-quote-style                = Double
-line-ending                = LineFeed
-magic-trailing-comma       = Respect
-docstring-code             = Disabled
-docstring-code-line-width  = "dynamic"
-preview                    = Enabled
-target_version             = Py39
-source_type                = Python
-```
-
+## Output
 ```python
 #######
 # Unsplittable target and value

@@ -212,50 +212,47 @@ assert (
 
 
 def test():
-    assert (
-        {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-        == expected
-    ), "Not what we expected and the message is too long to fit ineeeeee one line"
+    assert {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    } == expected, (
+        "Not what we expected and the message is too long to fit ineeeeee one line"
+    )
 
-    assert (
-        {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-        == expected
-    ), "Not what we expected and the message is too long to fit in one lineeeee"
+    assert {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    } == expected, (
+        "Not what we expected and the message is too long to fit in one lineeeee"
+    )
 
-    assert (
-        {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-        == expected
-    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeee"
+    assert {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    } == expected, (
+        "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeee"
+    )
 
     assert (
         {
@@ -285,7 +282,9 @@ def test():
             key9: value9,
         }
         == expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeee"
+    ), (
+        "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeee"
+    )
 
     assert expected == {
         key1: value1,
@@ -299,20 +298,19 @@ def test():
         key9: value9,
     }, "Not what we expected and the message is too long to fit ineeeeee one line"
 
-    assert (
-        expected
-        == {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeeeeee"
+    assert expected == {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    }, (
+        "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeeeeee"
+    )
 
     assert (
         expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
@@ -342,7 +340,9 @@ def test():
             key8: value8,
             key9: value9,
         }
-    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeee"
+    ), (
+        "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeee"
+    )
 
 
 # Test for https://github.com/astral-sh/ruff/issues/7246
@@ -360,157 +360,4 @@ assert package.files == [
         "hash": "sha256:fae491d1874f199537fd5872b5e1f0e74a009b979df9d53d1553fd03da1703e1",  # noqa: E501
     },
 ]
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -30,50 +30,47 @@
- 
- 
- def test():
--    assert (
--        {
--            key1: value1,
--            key2: value2,
--            key3: value3,
--            key4: value4,
--            key5: value5,
--            key6: value6,
--            key7: value7,
--            key8: value8,
--            key9: value9,
--        }
--        == expected
--    ), "Not what we expected and the message is too long to fit ineeeeee one line"
-+    assert {
-+        key1: value1,
-+        key2: value2,
-+        key3: value3,
-+        key4: value4,
-+        key5: value5,
-+        key6: value6,
-+        key7: value7,
-+        key8: value8,
-+        key9: value9,
-+    } == expected, (
-+        "Not what we expected and the message is too long to fit ineeeeee one line"
-+    )
- 
--    assert (
--        {
--            key1: value1,
--            key2: value2,
--            key3: value3,
--            key4: value4,
--            key5: value5,
--            key6: value6,
--            key7: value7,
--            key8: value8,
--            key9: value9,
--        }
--        == expected
--    ), "Not what we expected and the message is too long to fit in one lineeeee"
-+    assert {
-+        key1: value1,
-+        key2: value2,
-+        key3: value3,
-+        key4: value4,
-+        key5: value5,
-+        key6: value6,
-+        key7: value7,
-+        key8: value8,
-+        key9: value9,
-+    } == expected, (
-+        "Not what we expected and the message is too long to fit in one lineeeee"
-+    )
- 
--    assert (
--        {
--            key1: value1,
--            key2: value2,
--            key3: value3,
--            key4: value4,
--            key5: value5,
--            key6: value6,
--            key7: value7,
--            key8: value8,
--            key9: value9,
--        }
--        == expected
--    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeee"
-+    assert {
-+        key1: value1,
-+        key2: value2,
-+        key3: value3,
-+        key4: value4,
-+        key5: value5,
-+        key6: value6,
-+        key7: value7,
-+        key8: value8,
-+        key9: value9,
-+    } == expected, (
-+        "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeee"
-+    )
- 
-     assert (
-         {
-@@ -103,7 +100,9 @@
-             key9: value9,
-         }
-         == expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
--    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeee"
-+    ), (
-+        "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeee"
-+    )
- 
-     assert expected == {
-         key1: value1,
-@@ -117,20 +116,19 @@
-         key9: value9,
-     }, "Not what we expected and the message is too long to fit ineeeeee one line"
- 
--    assert (
--        expected
--        == {
--            key1: value1,
--            key2: value2,
--            key3: value3,
--            key4: value4,
--            key5: value5,
--            key6: value6,
--            key7: value7,
--            key8: value8,
--            key9: value9,
--        }
--    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeeeeee"
-+    assert expected == {
-+        key1: value1,
-+        key2: value2,
-+        key3: value3,
-+        key4: value4,
-+        key5: value5,
-+        key6: value6,
-+        key7: value7,
-+        key8: value8,
-+        key9: value9,
-+    }, (
-+        "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeeeeee"
-+    )
- 
-     assert (
-         expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-@@ -160,7 +158,9 @@
-             key8: value8,
-             key9: value9,
-         }
--    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeee"
-+    ), (
-+        "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeee"
-+    )
- 
- 
- # Test for https://github.com/astral-sh/ruff/issues/7246
 ```

@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/f_docstring.py
+---
+## Input
+
+```python
+def foo(e):
+    f""" {'.'.join(e)}"""
+
+def bar(e):
+    f"{'.'.join(e)}"
+
+def baz(e):
+    F""" {'.'.join(e)}"""
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,5 +1,5 @@
+ def foo(e):
+-    f""" {'.'.join(e)}"""
++    f""" {".".join(e)}"""
+ 
+ 
+ def bar(e):
+@@ -7,4 +7,4 @@
+ 
+ 
+ def baz(e):
+-    f""" {'.'.join(e)}"""
++    f""" {".".join(e)}"""
+```
+
+## Ruff Output
+
+```python
+def foo(e):
+    f""" {".".join(e)}"""
+
+
+def bar(e):
+    f"{'.'.join(e)}"
+
+
+def baz(e):
+    f""" {".".join(e)}"""
+```
+
+## Black Output
+
+```python
+def foo(e):
+    f""" {'.'.join(e)}"""
+
+
+def bar(e):
+    f"{'.'.join(e)}"
+
+
+def baz(e):
+    f""" {'.'.join(e)}"""
+```

@@ -3,7 +3,6 @@ use ruff_python_ast::PatternMatchValue;
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
-use crate::preview::is_match_case_parentheses_enabled;
 
 #[derive(Default)]
 pub struct FormatPatternMatchValue;
@@ -21,10 +20,6 @@ impl NeedsParentheses for PatternMatchValue {
         parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if is_match_case_parentheses_enabled(context) {
-            self.value.needs_parentheses(parent, context)
-        } else {
-            OptionalParentheses::Never
-        }
+        self.value.needs_parentheses(parent, context)
     }
 }
