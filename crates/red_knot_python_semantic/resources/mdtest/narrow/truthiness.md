@@ -264,12 +264,12 @@ def _(
         reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
 
     tf = TruthyClass if flag else FalsyClass
-    reveal_type(tf)  # Literal[TruthyClass, FalsyClass]
+    reveal_type(tf)  # revealed: Literal[TruthyClass, FalsyClass]
 
     if tf:
-        reveal_type(tf)  # Literal[TruthyClass]
+        reveal_type(tf)  # revealed: Literal[TruthyClass]
     else:
-        reveal_type(tf)  # Literal[FalsyClass]
+        reveal_type(tf)  # revealed: Literal[FalsyClass]
 ```
 
 ## Narrowing in chained boolean expressions
