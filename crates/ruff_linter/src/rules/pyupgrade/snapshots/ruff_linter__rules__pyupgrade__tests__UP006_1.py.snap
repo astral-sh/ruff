@@ -17,30 +17,4 @@ UP006_1.py:9:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Defa
    9  |+def f(x: defaultdict[str, str]) -> None:
 10 10 |     ...
 11 11 | 
-12 12 | 
-
-UP006_1.py:17:10: UP006 [*] Use `collections.abc.Set` instead of `typing.AbstractSet` for type annotation
-   |
-17 | def f(x: typing.AbstractSet[str]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^ UP006
-18 |     ...
-   |
-   = help: Replace with `collections.abc.Set`
-
-ℹ Safe fix
-14 14 | from typing_extensions import Awaitable
-15 15 | 
-16 16 | 
-17    |-def f(x: typing.AbstractSet[str]) -> None:
-   17 |+def f(x: Set[str]) -> None:
-18 18 |     ...
-19 19 | 
-20 20 | 
-
-UP006_1.py:25:10: UP006 Use `collections.abc.Awaitable` instead of `Awaitable` for type annotation
-   |
-25 | def f(x: Awaitable) -> None:
-   |          ^^^^^^^^^ UP006
-26 |     ...
-   |
-   = help: Replace with `collections.abc.Awaitable`
+12 12 |
