@@ -1,4 +1,4 @@
-use crate::lint::{Level, LintRegistry, LintStatus};
+use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
 use crate::types::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::{declare_lint, lint::LintId, Db};
 use ruff_db::diagnostic::DiagnosticId;
@@ -35,6 +35,31 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Checks for `knot: ignore[code]` where `code` isn't a known lint rule.
+    ///
+    /// ## Why is this bad?
+    /// A `knot: ignore[code]` directive with a `code` that doesn't match
+    /// any known rule will not suppress any type errors, and is probably a mistake.
+    ///
+    /// ## Examples
+    /// ```py
+    /// a = 20 / 0  # knot: ignore[division-by-zer]
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```py
+    /// a = 20 / 0  # knot: ignore[division-by-zero]
+    /// ```
+    pub(crate) static UNKNOWN_RULE = {
+        summary: "detects `knot: ignore` comments that reference unknown rules",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
 #[salsa::tracked(return_ref)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db.upcast(), file);
@@ -66,33 +91,59 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     builder.finish()
 }
 
+pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut TypeCheckDiagnostics) {
+    let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
+
+    check_unknown_rule(&mut context);
+    check_unused_suppressions(&mut context);
+}
+
+/// Checks for `knot: ignore` comments that reference unknown rules.
+fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
+    if context.is_lint_disabled(&UNKNOWN_RULE) {
+        return;
+    };
+
+    for unknown in &context.suppressions.unknown {
+        match &unknown.reason {
+            GetLintError::Removed(removed) => {
+                context.report_lint(
+                    &UNKNOWN_RULE,
+                    unknown.range,
+                    format_args!("Removed rule `{removed}`"),
+                );
+            }
+            GetLintError::Unknown(rule) => {
+                context.report_lint(
+                    &UNKNOWN_RULE,
+                    unknown.range,
+                    format_args!("Unknown rule `{rule}`"),
+                );
+            }
+        };
+    }
+}
+
 /// Checks for unused suppression comments in `file` and
 /// adds diagnostic for each of them to `diagnostics`.
 ///
 /// Does nothing if the [`UNUSED_IGNORE_COMMENT`] rule is disabled.
-pub(crate) fn check_unused_suppressions(
-    db: &dyn Db,
-    file: File,
-    diagnostics: &mut TypeCheckDiagnostics,
-) {
-    let Some(severity) = db
-        .rule_selection()
-        .severity(LintId::of(&UNUSED_IGNORE_COMMENT))
-    else {
+fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
+    if context.is_lint_disabled(&UNUSED_IGNORE_COMMENT) {
         return;
-    };
+    }
 
-    let all = suppressions(db, file);
+    let all = context.suppressions;
     let mut unused = Vec::with_capacity(
         all.file
             .len()
             .saturating_add(all.line.len())
-            .saturating_sub(diagnostics.used_len()),
+            .saturating_sub(context.diagnostics.used_len()),
     );
 
     // Collect all suppressions that are unused after type-checking.
     for suppression in all {
-        if diagnostics.is_used(suppression.id()) {
+        if context.diagnostics.is_used(suppression.id()) {
             continue;
         }
 
@@ -106,7 +157,7 @@ pub(crate) fn check_unused_suppressions(
             // A `unused-ignore-comment` suppression can't ignore itself.
             // It can only ignore other suppressions.
             if unused_suppression.id() != suppression.id() {
-                diagnostics.mark_used(unused_suppression.id());
+                context.diagnostics.mark_used(unused_suppression.id());
                 continue;
             }
         }
@@ -120,37 +171,93 @@ pub(crate) fn check_unused_suppressions(
         // ```py
         // a = 10 / 2  # knot: ignore[unused-ignore-comment, division-by-zero]
         // ```
-        if diagnostics.is_used(suppression.id()) {
+        if context.diagnostics.is_used(suppression.id()) {
             continue;
         }
 
-        let message = match suppression.target {
-            SuppressionTarget::All => {
-                format!("Unused blanket `{}` directive", suppression.kind)
-            }
-            SuppressionTarget::Lint(lint) => {
-                format!(
+        match suppression.target {
+            SuppressionTarget::All => context.report_unchecked(
+                &UNUSED_IGNORE_COMMENT,
+                suppression.range,
+                format_args!("Unused blanket `{}` directive", suppression.kind),
+            ),
+            SuppressionTarget::Lint(lint) => context.report_unchecked(
+                &UNUSED_IGNORE_COMMENT,
+                suppression.range,
+                format_args!(
                     "Unused `{kind}` directive: '{code}'",
                     kind = suppression.kind,
                     code = lint.name()
-                )
-            }
-            SuppressionTarget::Empty => {
-                format!("Unused `{}` without a code", suppression.kind)
-            }
+                ),
+            ),
+            SuppressionTarget::Empty => context.report_unchecked(
+                &UNUSED_IGNORE_COMMENT,
+                suppression.range,
+                format_args!("Unused `{kind}` without a code", kind = suppression.kind),
+            ),
         };
-        diagnostics.push(TypeCheckDiagnostic {
-            id: DiagnosticId::Lint(UNUSED_IGNORE_COMMENT.name()),
-            message,
-            range: suppression.range,
-            severity,
+    }
+}
+
+struct CheckSuppressionsContext<'a> {
+    db: &'a dyn Db,
+    file: File,
+    suppressions: &'a Suppressions,
+    diagnostics: &'a mut TypeCheckDiagnostics,
+}
+
+impl<'a> CheckSuppressionsContext<'a> {
+    fn new(db: &'a dyn Db, file: File, diagnostics: &'a mut TypeCheckDiagnostics) -> Self {
+        let suppressions = suppressions(db, file);
+        Self {
+            db,
             file,
+            suppressions,
+            diagnostics,
+        }
+    }
+
+    fn is_lint_disabled(&self, lint: &'static LintMetadata) -> bool {
+        !self.db.rule_selection().is_enabled(LintId::of(lint))
+    }
+
+    fn report_lint(
+        &mut self,
+        lint: &'static LintMetadata,
+        range: TextRange,
+        message: fmt::Arguments,
+    ) {
+        if let Some(suppression) = self.suppressions.find_suppression(range, LintId::of(lint)) {
+            self.diagnostics.mark_used(suppression.id());
+            return;
+        }
+
+        self.report_unchecked(lint, range, message);
+    }
+
+    /// Reports a diagnostic without checking if the lint at the given range is suppressed or marking
+    /// the suppression as used.
+    fn report_unchecked(
+        &mut self,
+        lint: &'static LintMetadata,
+        range: TextRange,
+        message: fmt::Arguments,
+    ) {
+        let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
+            return;
+        };
+        self.diagnostics.push(TypeCheckDiagnostic {
+            id: DiagnosticId::Lint(lint.name()),
+            message: message.to_string(),
+            range,
+            severity,
+            file: self.file,
         });
     }
 }
 
 /// The suppressions of a single file.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct Suppressions {
     /// Suppressions that apply to the entire file.
     ///
@@ -158,7 +265,7 @@ pub(crate) struct Suppressions {
     /// spans the entire file.
     ///
     /// For now, this is limited to `type: ignore` comments.
-    file: Vec<Suppression>,
+    file: SmallVec<[Suppression; 1]>,
 
     /// Suppressions that apply to a specific line (or lines).
     ///
@@ -166,6 +273,9 @@ pub(crate) struct Suppressions {
     ///
     /// The suppressions are sorted by [`Suppression::range`] (which implies [`Suppression::comment_range`]).
     line: Vec<Suppression>,
+
+    /// Suppressions with lint codes that are unknown.
+    unknown: Vec<UnknownSuppression>,
 }
 
 impl Suppressions {
@@ -309,7 +419,8 @@ struct SuppressionsBuilder<'a> {
     seen_non_trivia_token: bool,
 
     line: Vec<Suppression>,
-    file: Vec<Suppression>,
+    file: SmallVec<[Suppression; 1]>,
+    unknown: Vec<UnknownSuppression>,
 }
 
 impl<'a> SuppressionsBuilder<'a> {
@@ -319,7 +430,8 @@ impl<'a> SuppressionsBuilder<'a> {
             lint_registry,
             seen_non_trivia_token: false,
             line: Vec::new(),
-            file: Vec::new(),
+            file: SmallVec::new(),
+            unknown: Vec::new(),
         }
     }
 
@@ -330,37 +442,42 @@ impl<'a> SuppressionsBuilder<'a> {
     fn finish(mut self) -> Suppressions {
         self.line.shrink_to_fit();
         self.file.shrink_to_fit();
+        self.unknown.shrink_to_fit();
 
         Suppressions {
             file: self.file,
             line: self.line,
+            unknown: self.unknown,
         }
     }
 
     fn add_comment(&mut self, comment: &SuppressionComment, line_range: TextRange) {
-        let (suppressions, suppressed_range) =
-            // `type: ignore` comments at the start of the file apply to the entire range.
-            // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
-            // > imports, or other executable code, silences all errors in the file.
-            // > Blank lines and other comments, such as shebang lines and coding cookies,
-            // > may precede the # type: ignore comment.
-            // > https://typing.readthedocs.io/en/latest/spec/directives.html#type-ignore-comments
-            if comment.kind.is_type_ignore() && !self.seen_non_trivia_token {
-                (
-                    &mut self.file,
-                    TextRange::new(0.into(), self.source.text_len()),
-                )
+        // `type: ignore` comments at the start of the file apply to the entire range.
+        // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
+        // > imports, or other executable code, silences all errors in the file.
+        // > Blank lines and other comments, such as shebang lines and coding cookies,
+        // > may precede the # type: ignore comment.
+        // > https://typing.readthedocs.io/en/latest/spec/directives.html#type-ignore-comments
+        let is_file_suppression = comment.kind.is_type_ignore() && !self.seen_non_trivia_token;
+
+        let suppressed_range = if is_file_suppression {
+            TextRange::new(0.into(), self.source.text_len())
+        } else {
+            line_range
+        };
+
+        let mut push_type_ignore_suppression = |suppression: Suppression| {
+            if is_file_suppression {
+                self.file.push(suppression);
             } else {
-                (
-                    &mut self.line,
-                    line_range,
-                )
-            };
+                self.line.push(suppression);
+            }
+        };
 
         match comment.codes.as_deref() {
             // `type: ignore`
             None => {
-                suppressions.push(Suppression {
+                push_type_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
                     kind: comment.kind,
                     comment_range: comment.range,
@@ -373,7 +490,7 @@ impl<'a> SuppressionsBuilder<'a> {
             // The suppression applies to all lints if it is a `type: ignore`
             // comment. `type: ignore` apply to all lints for better mypy compatibility.
             Some(_) if comment.kind.is_type_ignore() => {
-                suppressions.push(Suppression {
+                push_type_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
                     kind: comment.kind,
                     comment_range: comment.range,
@@ -384,7 +501,7 @@ impl<'a> SuppressionsBuilder<'a> {
 
             // `knot: ignore[]`
             Some([]) => {
-                suppressions.push(Suppression {
+                self.line.push(Suppression {
                     target: SuppressionTarget::Empty,
                     kind: comment.kind,
                     range: comment.range,
@@ -397,15 +514,15 @@ impl<'a> SuppressionsBuilder<'a> {
             Some(codes) => {
                 for code_range in codes {
                     let code = &self.source[*code_range];
+                    let range = if codes.len() == 1 {
+                        comment.range
+                    } else {
+                        *code_range
+                    };
+
                     match self.lint_registry.get(code) {
                         Ok(lint) => {
-                            let range = if codes.len() == 1 {
-                                comment.range
-                            } else {
-                                *code_range
-                            };
-
-                            suppressions.push(Suppression {
+                            self.line.push(Suppression {
                                 target: SuppressionTarget::Lint(lint),
                                 kind: comment.kind,
                                 range,
@@ -413,15 +530,28 @@ impl<'a> SuppressionsBuilder<'a> {
                                 suppressed_range,
                             });
                         }
-                        Err(error) => {
-                            tracing::debug!("Invalid suppression: {error}");
-                            // TODO(micha): Handle invalid lint codes
-                        }
+                        Err(error) => self.unknown.push(UnknownSuppression {
+                            range,
+                            comment_range: comment.range,
+                            reason: error,
+                        }),
                     }
                 }
             }
         }
     }
+}
+
+/// Suppression for an unknown lint rule.
+#[derive(Debug, PartialEq, Eq)]
+struct UnknownSuppression {
+    /// The range of the code.
+    range: TextRange,
+
+    /// The range of the suppression comment
+    comment_range: TextRange,
+
+    reason: GetLintError,
 }
 
 struct SuppressionParser<'src> {

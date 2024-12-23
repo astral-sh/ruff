@@ -374,7 +374,7 @@ impl LintRegistry {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum GetLintError {
     /// The name maps to this removed lint.
     #[error("lint {0} has been removed")]
@@ -442,6 +442,11 @@ impl RuleSelection {
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
     pub fn severity(&self, lint: LintId) -> Option<Severity> {
         self.lints.get(&lint).copied()
+    }
+
+    /// Returns `true` if the `lint` is enabled.
+    pub fn is_enabled(&self, lint: LintId) -> bool {
+        self.severity(lint).is_some()
     }
 
     /// Enables `lint` and configures with the given `severity`.
