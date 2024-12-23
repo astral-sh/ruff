@@ -5,21 +5,25 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 /// ## What it does
-/// Checks for usages of `collections.deque` that have an empty literal as the first argument.
+/// Checks for usages of `collections.deque` that have an empty iterable as the first argument.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to use an empty literal as a deque's iterable, since this is already the default behavior.
 ///
 /// ## Examples
+///
 /// ```python
 /// from collections import deque
+///
 /// queue = deque(set())
 /// queue = deque([], 10)
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from collections import deque
+///
 /// queue = deque()
 /// queue = deque(maxlen=10)
 /// ```
@@ -27,16 +31,16 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: `collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque)
 #[derive(ViolationMetadata)]
-pub(crate) struct UnnecessaryLiteralWithinDequeCall {
+pub(crate) struct UnnecessaryEmptyIterableWithinDequeCall {
     has_maxlen: bool,
 }
 
-impl Violation for UnnecessaryLiteralWithinDequeCall {
+impl Violation for UnnecessaryEmptyIterableWithinDequeCall {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Unnecessary literal within a deque call; remove the literal".to_string()
+        "Unnecessary empty iterable within a deque call".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -58,7 +62,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &mut Checker, deque
     let Some(qualified) = checker.semantic().resolve_qualified_name(func) else {
         return;
     };
-    if !matches!(qualified.segments(), ["collections", "deque"]) {
+    if !matches!(qualified.segments(), ["collections", "deque"]) || arguments.len() > 2 {
         return;
     }
 
@@ -94,7 +98,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &mut Checker, deque
     }
 
     let mut diagnostic = Diagnostic::new(
-        UnnecessaryLiteralWithinDequeCall {
+        UnnecessaryEmptyIterableWithinDequeCall {
             has_maxlen: maxlen.is_some(),
         },
         deque.range,

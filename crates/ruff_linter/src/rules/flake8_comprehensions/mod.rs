@@ -22,7 +22,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419.py"))]
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_2.py"))]
     #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("C420.py"))]
-    #[test_case(Rule::UnnecessaryLiteralWithinDequeCall, Path::new("C421.py"))]
+    #[test_case(Rule::UnnecessaryEmptyIterableWithinDequeCall, Path::new("C421.py"))]
     #[test_case(Rule::UnnecessaryDoubleCastOrProcess, Path::new("C414.py"))]
     #[test_case(Rule::UnnecessaryGeneratorDict, Path::new("C402.py"))]
     #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400.py"))]
