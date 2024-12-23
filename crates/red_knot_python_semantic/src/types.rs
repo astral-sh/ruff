@@ -1206,14 +1206,6 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
 
-            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
-                // TODO: Once we have support for final classes, we can determine disjointness in some cases
-                // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
-                // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
-                // final classes inside `Type::SubclassOf` everywhere.
-                false
-            }
-
             (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
                 // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
@@ -1222,6 +1214,14 @@ impl<'db> Type<'db> {
             (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
                 // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
                 matches!(ty.bool(db), Truthiness::AlwaysTrue)
+            }
+
+            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
+                // TODO: Once we have support for final classes, we can determine disjointness in some cases
+                // here. However, note that it might be better to turn `Type::SubclassOf('FinalClass')` into
+                // `Type::ClassLiteral('FinalClass')` during construction, instead of adding special cases for
+                // final classes inside `Type::SubclassOf` everywhere.
+                false
             }
 
             (Type::KnownInstance(left), right) => {
@@ -1678,15 +1678,13 @@ impl<'db> Type<'db> {
             Type::Any | Type::Todo(_) | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
-            Type::ClassLiteral(_) => {
-                // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
-                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                Truthiness::Ambiguous
+            Type::ClassLiteral(ClassLiteralType { class }) => {
+                class.metaclass(db).to_instance(db).bool(db)
             }
-            Type::SubclassOf(_) => {
-                // TODO: see above
-                Truthiness::Ambiguous
-            }
+            Type::SubclassOf(SubclassOfType { base }) => base
+                .into_class()
+                .map(|class| Type::class_literal(class).bool(db))
+                .unwrap_or(Truthiness::Ambiguous),
             Type::AlwaysTruthy => Truthiness::AlwaysTrue,
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
             instance_ty @ Type::Instance(InstanceType { class }) => {
