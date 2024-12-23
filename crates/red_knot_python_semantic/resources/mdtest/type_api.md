@@ -29,7 +29,7 @@ def _() -> None:
 ### Intersection
 
 ```py
-from red_knot import Intersection, Negate, is_subtype_of
+from red_knot import Intersection, Negate, is_subtype_of, assert_true, assert_false
 from typing_extensions import Never
 
 x1: Intersection[int, str]
@@ -59,13 +59,13 @@ class C: ...
 
 type ABC = Intersection[A, B, C]
 
-reveal_type(is_subtype_of(ABC, A))  # revealed: Literal[True]
-reveal_type(is_subtype_of(ABC, B))  # revealed: Literal[True]
-reveal_type(is_subtype_of(ABC, C))  # revealed: Literal[True]
+assert_true(is_subtype_of(ABC, A))
+assert_true(is_subtype_of(ABC, B))
+assert_true(is_subtype_of(ABC, C))
 
 class D: ...
 
-reveal_type(is_subtype_of(ABC, D))  # revealed: Literal[False]
+assert_false(is_subtype_of(ABC, D))
 ```
 
 ## Type predicates
@@ -77,92 +77,92 @@ the test.
 ### Equivalence
 
 ```py
-from red_knot import is_equivalent_to
+from red_knot import is_equivalent_to, assert_true, assert_false
 
-reveal_type(is_equivalent_to(int, int))  # revealed: Literal[True]
-reveal_type(is_equivalent_to(int, str))  # revealed: Literal[False]
+assert_true(is_equivalent_to(int, int))
+assert_false(is_equivalent_to(int, str))
 ```
 
 ### Subtyping
 
 ```py
-from red_knot import is_subtype_of
+from red_knot import is_subtype_of, assert_true, assert_false
 
-reveal_type(is_subtype_of(bool, int))  # revealed: Literal[True]
-reveal_type(is_subtype_of(str, int))  # revealed: Literal[False]
+assert_true(is_subtype_of(bool, int))
+assert_false(is_subtype_of(str, int))
 
-reveal_type(is_subtype_of(bool, int | str))  # revealed: Literal[True]
-reveal_type(is_subtype_of(str, int | str))  # revealed: Literal[True]
-reveal_type(is_subtype_of(bytes, int | str))  # revealed: Literal[False]
+assert_true(is_subtype_of(bool, int | str))
+assert_true(is_subtype_of(str, int | str))
+assert_false(is_subtype_of(bytes, int | str))
 
 class Base: ...
 class Derived(Base): ...
 class Unrelated: ...
 
-reveal_type(is_subtype_of(Derived, Base))  # revealed: Literal[True]
-reveal_type(is_subtype_of(Base, Derived))  # revealed: Literal[False]
-reveal_type(is_subtype_of(Base, Base))  # revealed: Literal[True]
+assert_true(is_subtype_of(Derived, Base))
+assert_false(is_subtype_of(Base, Derived))
+assert_true(is_subtype_of(Base, Base))
 
-reveal_type(is_subtype_of(Unrelated, Base))  # revealed: Literal[False]
-reveal_type(is_subtype_of(Base, Unrelated))  # revealed: Literal[False]
+assert_false(is_subtype_of(Unrelated, Base))
+assert_false(is_subtype_of(Base, Unrelated))
 ```
 
 ### Assignability
 
 ```py
-from red_knot import is_assignable_to
+from red_knot import is_assignable_to, assert_true, assert_false
 from typing import Any
 
-reveal_type(is_assignable_to(int, Any))  # revealed: Literal[True]
-reveal_type(is_assignable_to(Any, str))  # revealed: Literal[True]
-reveal_type(is_assignable_to(int, str))  # revealed: Literal[False]
+assert_true(is_assignable_to(int, Any))
+assert_true(is_assignable_to(Any, str))
+assert_false(is_assignable_to(int, str))
 ```
 
 ### Disjointness
 
 ```py
-from red_knot import is_disjoint_from
+from red_knot import is_disjoint_from, assert_true, assert_false
 
-reveal_type(is_disjoint_from(None, int))  # revealed: Literal[True]
-reveal_type(is_disjoint_from(Literal[2] | str, int))  # revealed: Literal[False]
+assert_true(is_disjoint_from(None, int))
+assert_false(is_disjoint_from(Literal[2] | str, int))
 ```
 
 ### Fully static types
 
 ```py
-from red_knot import is_fully_static
+from red_knot import is_fully_static, assert_true, assert_false
 from typing import Any
 
-reveal_type(is_fully_static(int | str))  # revealed: Literal[True]
-reveal_type(is_fully_static(type[int]))  # revealed: Literal[True]
+assert_true(is_fully_static(int | str))
+assert_true(is_fully_static(type[int]))
 
-reveal_type(is_fully_static(int | Any))  # revealed: Literal[False]
-reveal_type(is_fully_static(type[Any]))  # revealed: Literal[False]
+assert_false(is_fully_static(int | Any))
+assert_false(is_fully_static(type[Any]))
 ```
 
 ### Singleton types
 
 ```py
-from red_knot import is_singleton
+from red_knot import is_singleton, assert_true, assert_false
 
-reveal_type(is_singleton(None))  # revealed: Literal[True]
-reveal_type(is_singleton(Literal[True]))  # revealed: Literal[True]
+assert_true(is_singleton(None))
+assert_true(is_singleton(Literal[True]))
 
-reveal_type(is_singleton(int))  # revealed: Literal[False]
-reveal_type(is_singleton(Literal["a"]))  # revealed: Literal[False]
+assert_false(is_singleton(int))
+assert_false(is_singleton(Literal["a"]))
 ```
 
 ### Single-valued types
 
 ```py
-from red_knot import is_single_valued
+from red_knot import is_single_valued, assert_true, assert_false
 
-reveal_type(is_single_valued(None))  # revealed: Literal[True]
-reveal_type(is_single_valued(Literal[True]))  # revealed: Literal[True]
-reveal_type(is_single_valued(Literal["a"]))  # revealed: Literal[True]
+assert_true(is_single_valued(None))
+assert_true(is_single_valued(Literal[True]))
+assert_true(is_single_valued(Literal["a"]))
 
-reveal_type(is_single_valued(int))  # revealed: Literal[False]
-reveal_type(is_single_valued(Literal["a"] | Literal["b"]))  # revealed: Literal[False]
+assert_false(is_single_valued(int))
+assert_false(is_single_valued(Literal["a"] | Literal["b"]))
 ```
 
 ## Special operations
@@ -174,11 +174,11 @@ type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]`
 the expression `str`:
 
 ```py
-from red_knot import TypeOf, is_subtype_of
+from red_knot import TypeOf, is_subtype_of, assert_true, assert_false
 
 # Not as intended, returns False:
-reveal_type(is_subtype_of(str, type[str]))  # revealed: Literal[False]
+assert_false(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
-reveal_type(is_subtype_of(TypeOf[str], type[str]))  # revealed: Literal[True]
+assert_true(is_subtype_of(TypeOf[str], type[str]))
 ```
