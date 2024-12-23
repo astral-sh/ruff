@@ -466,7 +466,7 @@ impl<'a> SuppressionsBuilder<'a> {
             line_range
         };
 
-        let mut push_suppression = |suppression: Suppression| {
+        let mut push_type_ignore_suppression = |suppression: Suppression| {
             if is_file_suppression {
                 self.file.push(suppression);
             } else {
@@ -477,7 +477,7 @@ impl<'a> SuppressionsBuilder<'a> {
         match comment.codes.as_deref() {
             // `type: ignore`
             None => {
-                push_suppression(Suppression {
+                push_type_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
                     kind: comment.kind,
                     comment_range: comment.range,
@@ -490,7 +490,7 @@ impl<'a> SuppressionsBuilder<'a> {
             // The suppression applies to all lints if it is a `type: ignore`
             // comment. `type: ignore` apply to all lints for better mypy compatibility.
             Some(_) if comment.kind.is_type_ignore() => {
-                push_suppression(Suppression {
+                push_type_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
                     kind: comment.kind,
                     comment_range: comment.range,
@@ -501,7 +501,7 @@ impl<'a> SuppressionsBuilder<'a> {
 
             // `knot: ignore[]`
             Some([]) => {
-                push_suppression(Suppression {
+                self.line.push(Suppression {
                     target: SuppressionTarget::Empty,
                     kind: comment.kind,
                     range: comment.range,
@@ -522,7 +522,7 @@ impl<'a> SuppressionsBuilder<'a> {
 
                     match self.lint_registry.get(code) {
                         Ok(lint) => {
-                            push_suppression(Suppression {
+                            self.line.push(Suppression {
                                 target: SuppressionTarget::Lint(lint),
                                 kind: comment.kind,
                                 range,
