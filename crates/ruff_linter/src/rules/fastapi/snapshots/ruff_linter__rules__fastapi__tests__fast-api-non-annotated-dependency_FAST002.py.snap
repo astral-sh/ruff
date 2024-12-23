@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
+snapshot_kind: text
 ---
 FAST002.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
    |
@@ -320,13 +321,40 @@ FAST002.py:53:5: FAST002 [*] FastAPI dependency without `Annotated`
 55 56 |     limit: int = 10,
 56 57 | ):
 
-FAST002.py:67:5: FAST002 FastAPI dependency without `Annotated`
+FAST002.py:61:25: FAST002 [*] FastAPI dependency without `Annotated`
    |
-65 |     skip: int = 0,
-66 |     limit: int = 10,
-67 |     current_user: User = Depends(get_current_user),
+60 | @app.get("/items/{item_id}")
+61 | async def read_items(*, item_id: int = Path(title="The ID of the item to get"), q: str):
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+62 |     pass
+   |
+   = help: Replace with `typing.Annotated`
+
+ℹ Unsafe fix
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
+--------------------------------------------------------------------------------
+58 59 | 
+59 60 | 
+60 61 | @app.get("/items/{item_id}")
+61    |-async def read_items(*, item_id: int = Path(title="The ID of the item to get"), q: str):
+   62 |+async def read_items(*, item_id: Annotated[int, Path(title="The ID of the item to get")], q: str):
+62 63 |     pass
+63 64 | 
+64 65 | # Non fixable errors
+
+FAST002.py:70:5: FAST002 FastAPI dependency without `Annotated`
+   |
+68 |     skip: int = 0,
+69 |     limit: int = 10,
+70 |     current_user: User = Depends(get_current_user),
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
-68 | ):
-69 |     pass
+71 | ):
+72 |     pass
    |
    = help: Replace with `typing.Annotated`
