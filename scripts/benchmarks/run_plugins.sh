@@ -40,4 +40,4 @@ cargo build --release && hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache --silent --extend-select PLW --exit-zero" \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache --silent --extend-select PIE --exit-zero" \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache --silent --extend-select COM --exit-zero" \
-  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache --silent --extend-select R --exit-zero"
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache --silent --extend-select RUF --exit-zero"

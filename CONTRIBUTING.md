@@ -467,7 +467,7 @@ cargo build --release && hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
-You can run `uv venv --project ./scripts/benchmarks`, activate the venv and then run `uv venv --project ./scripts/benchmarks` to create a working environment for the
+You can run `uv venv --project ./scripts/benchmarks`, activate the venv and then run `uv sync --project ./scripts/benchmarks` to create a working environment for the
 above. All reported benchmarks were computed using the versions specified by
 `./scripts/benchmarks/pyproject.toml` on Python 3.11.
 
