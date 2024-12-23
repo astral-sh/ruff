@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, AstNode, Expr, ExprEllipsisLiteral, ExprLambda, ExpressionRef, Identifier,
+    self as ast, AstNode, Expr, ExprEllipsisLiteral, ExprLambda, Identifier,
     Parameter, ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
@@ -181,6 +181,8 @@ fn function(
     annotation: Option<&Expr>,
     checker: &Checker,
 ) -> String {
+    // Use a dummy body. It gets replaced at the end with the actual body.
+    // This allows preserving the source formatting for the body.
     let body = Stmt::Return(ast::StmtReturn {
         value: Some(Box::new(Expr::EllipsisLiteral(
             ExprEllipsisLiteral::default(),
@@ -259,19 +261,22 @@ fn replace_trailing_ellipsis_with_original_expr(
     lambda: &ExprLambda,
     checker: &Checker,
 ) -> String {
-    let expr = &lambda.body;
-    let expr_ref = ExpressionRef::from(expr);
-    let parent = lambda.as_any_node_ref();
-    let (comment_ranges, source) = (checker.comment_ranges(), checker.source());
+    let original_expr_range = parenthesized_range(
+        (&lambda.body).into(),
+        lambda.as_any_node_ref(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(lambda.body.range());
 
-    let original_expr_range =
-        parenthesized_range(expr_ref, parent, comment_ranges, source).unwrap_or(expr.range());
     let original_expr_in_source = checker.locator().slice(original_expr_range);
 
     let placeholder_ellipsis_start = generated.rfind("...").unwrap();
     let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();
-    let placeholder_ellipsis_range = placeholder_ellipsis_start..placeholder_ellipsis_end;
 
-    generated.replace_range(placeholder_ellipsis_range, original_expr_in_source);
+    generated.replace_range(
+        placeholder_ellipsis_start..placeholder_ellipsis_end,
+        original_expr_in_source,
+    );
     generated
 }

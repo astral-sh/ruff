@@ -167,3 +167,13 @@ x = lambda: """
 
 # * https://github.com/astral-sh/ruff/issues/10277
 at_least_one_million = lambda _: _ >= 1_000_000
+
+x = lambda: (
+    # comment
+    5 + 10
+)
+
+x = lambda: (
+    # comment
+    y := 10
+)

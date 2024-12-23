@@ -401,6 +401,8 @@ E731.py:169:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 168 | # * https://github.com/astral-sh/ruff/issues/10277
 169 | at_least_one_million = lambda _: _ >= 1_000_000
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+170 | 
+171 | x = lambda: (
     |
     = help: Rewrite `at_least_one_million` as a `def`
 
@@ -411,3 +413,54 @@ E731.py:169:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 169     |-at_least_one_million = lambda _: _ >= 1_000_000
     169 |+def at_least_one_million(_):
     170 |+    return _ >= 1_000_000
+170 171 | 
+171 172 | x = lambda: (
+172 173 |     # comment
+
+E731.py:171:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+169 |   at_least_one_million = lambda _: _ >= 1_000_000
+170 |   
+171 | / x = lambda: (
+172 | |     # comment
+173 | |     5 + 10
+174 | | )
+    | |_^ E731
+175 |   
+176 |   x = lambda: (
+    |
+    = help: Rewrite `x` as a `def`
+
+ℹ Unsafe fix
+168 168 | # * https://github.com/astral-sh/ruff/issues/10277
+169 169 | at_least_one_million = lambda _: _ >= 1_000_000
+170 170 | 
+171     |-x = lambda: (
+    171 |+def x():
+    172 |+    return (
+172 173 |     # comment
+173 174 |     5 + 10
+174 175 | )
+
+E731.py:176:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+174 |   )
+175 |   
+176 | / x = lambda: (
+177 | |     # comment
+178 | |     y := 10
+179 | | )
+    | |_^ E731
+    |
+    = help: Rewrite `x` as a `def`
+
+ℹ Unsafe fix
+173 173 |     5 + 10
+174 174 | )
+175 175 | 
+176     |-x = lambda: (
+    176 |+def x():
+    177 |+    return (
+177 178 |     # comment
+178 179 |     y := 10
+179 180 | )
