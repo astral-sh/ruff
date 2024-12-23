@@ -3,7 +3,7 @@ ruff==0.8.3
 mkdocs==1.6.1
 mkdocs-material @ git+ssh://git@github.com/astral-sh/mkdocs-material-insiders.git@39da7a5e761410349e9a1b8abf593b0cdd5453ff
 mkdocs-redirects==1.2.2
-mdformat==0.7.19
+mdformat==0.7.21
 mdformat-mkdocs==4.0.0
 # Using a commit from pygments main branch so we get
 # https://github.com/pygments/pygments/pull/2773 before it's been released
