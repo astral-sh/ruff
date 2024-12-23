@@ -7,8 +7,10 @@ use ruff_python_parser::TokenKind;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::{smallvec, SmallVec};
+use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
+use thiserror::Error;
 
 declare_lint! {
     /// ## What it does
@@ -60,6 +62,30 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Checks for `type: ignore` and `knot: ignore` comments that are syntactically incorrect.
+    ///
+    /// ## Why is this bad?
+    /// A syntactically incorrect ignore comment is probably a mistake and is useless.
+    ///
+    /// ## Examples
+    /// ```py
+    /// a = 20 / 0  # type: ignoree
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```py
+    /// a = 20 / 0  # type: ignore
+    /// ```
+    pub(crate) static INVALID_IGNORE_COMMENT = {
+        summary: "detects ignore comments that use invalid syntax",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
 #[salsa::tracked(return_ref)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db.upcast(), file);
@@ -78,7 +104,23 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                 let parser = SuppressionParser::new(&source, token.range());
 
                 for comment in parser {
-                    builder.add_comment(&comment, TextRange::new(line_start, token.end()));
+                    match comment {
+                        Ok(comment) => {
+                            builder.add_comment(&comment, TextRange::new(line_start, token.end()));
+                        }
+                        Err(error) => match error.kind {
+                            ParseErrorKind::NotASuppression
+                            | ParseErrorKind::CommentWithoutHash => {
+                                // Skip non suppression comments and comments that miss a hash (shouldn't ever happen)
+                            }
+                            ParseErrorKind::NoWhitespaceAfterIgnore(kind)
+                            | ParseErrorKind::CodesMissingComma(kind)
+                            | ParseErrorKind::InvalidCode(kind)
+                            | ParseErrorKind::CodesMissingClosingBracket(kind) => {
+                                builder.add_invalid_comment(kind, error);
+                            }
+                        },
+                    }
                 }
             }
             TokenKind::Newline | TokenKind::NonLogicalNewline => {
@@ -95,6 +137,7 @@ pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut Type
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
 
     check_unknown_rule(&mut context);
+    check_invalid_suppression(&mut context);
     check_unused_suppressions(&mut context);
 }
 
@@ -121,6 +164,24 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
                 );
             }
         };
+    }
+}
+
+fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
+    if context.is_lint_disabled(&INVALID_IGNORE_COMMENT) {
+        return;
+    }
+
+    for invalid in &context.suppressions.invalid {
+        context.report_lint(
+            &INVALID_IGNORE_COMMENT,
+            invalid.error.range,
+            format_args!(
+                "Invalid `{kind}` comment: {reason}",
+                kind = invalid.kind,
+                reason = &invalid.error
+            ),
+        );
     }
 }
 
@@ -246,6 +307,7 @@ impl<'a> CheckSuppressionsContext<'a> {
         let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
             return;
         };
+
         self.diagnostics.push(TypeCheckDiagnostic {
             id: DiagnosticId::Lint(lint.name()),
             message: message.to_string(),
@@ -276,6 +338,9 @@ pub(crate) struct Suppressions {
 
     /// Suppressions with lint codes that are unknown.
     unknown: Vec<UnknownSuppression>,
+
+    /// Suppressions that are syntactically invalid.
+    invalid: Vec<InvalidSuppression>,
 }
 
 impl Suppressions {
@@ -421,6 +486,7 @@ struct SuppressionsBuilder<'a> {
     line: Vec<Suppression>,
     file: SmallVec<[Suppression; 1]>,
     unknown: Vec<UnknownSuppression>,
+    invalid: Vec<InvalidSuppression>,
 }
 
 impl<'a> SuppressionsBuilder<'a> {
@@ -432,6 +498,7 @@ impl<'a> SuppressionsBuilder<'a> {
             line: Vec::new(),
             file: SmallVec::new(),
             unknown: Vec::new(),
+            invalid: Vec::new(),
         }
     }
 
@@ -443,11 +510,13 @@ impl<'a> SuppressionsBuilder<'a> {
         self.line.shrink_to_fit();
         self.file.shrink_to_fit();
         self.unknown.shrink_to_fit();
+        self.invalid.shrink_to_fit();
 
         Suppressions {
             file: self.file,
             line: self.line,
             unknown: self.unknown,
+            invalid: self.invalid,
         }
     }
 
@@ -540,6 +609,10 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
     }
+
+    fn add_invalid_comment(&mut self, kind: SuppressionKind, error: ParseError) {
+        self.invalid.push(InvalidSuppression { kind, error });
+    }
 }
 
 /// Suppression for an unknown lint rule.
@@ -554,6 +627,12 @@ struct UnknownSuppression {
     reason: GetLintError,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct InvalidSuppression {
+    kind: SuppressionKind,
+    error: ParseError,
+}
+
 struct SuppressionParser<'src> {
     cursor: Cursor<'src>,
     range: TextRange,
@@ -566,36 +645,41 @@ impl<'src> SuppressionParser<'src> {
         Self { cursor, range }
     }
 
-    fn parse_comment(&mut self) -> Option<SuppressionComment> {
+    fn parse_comment(&mut self) -> Result<SuppressionComment, ParseError> {
         let comment_start = self.offset();
         self.cursor.start_token();
 
         if !self.cursor.eat_char('#') {
-            return None;
+            return self.syntax_error(ParseErrorKind::CommentWithoutHash);
         }
 
         self.eat_whitespace();
 
         // type: ignore[code]
         // ^^^^^^^^^^^^
-        let kind = self.eat_kind()?;
+        let Some(kind) = self.eat_kind() else {
+            return Err(ParseError::new(
+                ParseErrorKind::NotASuppression,
+                TextRange::new(comment_start, self.offset()),
+            ));
+        };
 
         let has_trailing_whitespace = self.eat_whitespace();
 
         // type: ignore[code1, code2]
         //             ^^^^^^
-        let codes = self.eat_codes();
+        let codes = self.eat_codes(kind)?;
 
         if self.cursor.is_eof() || codes.is_some() || has_trailing_whitespace {
             // Consume the comment until its end or until the next "sub-comment" starts.
             self.cursor.eat_while(|c| c != '#');
-            Some(SuppressionComment {
+            Ok(SuppressionComment {
                 kind,
                 codes,
                 range: TextRange::at(comment_start, self.cursor.token_len()),
             })
         } else {
-            None
+            self.syntax_error(ParseErrorKind::NoWhitespaceAfterIgnore(kind))
         }
     }
 
@@ -627,28 +711,31 @@ impl<'src> SuppressionParser<'src> {
         Some(kind)
     }
 
-    fn eat_codes(&mut self) -> Option<SmallVec<[TextRange; 2]>> {
+    fn eat_codes(
+        &mut self,
+        kind: SuppressionKind,
+    ) -> Result<Option<SmallVec<[TextRange; 2]>>, ParseError> {
         if !self.cursor.eat_char('[') {
-            return None;
+            return Ok(None);
         }
 
         let mut codes: SmallVec<[TextRange; 2]> = smallvec![];
 
         loop {
             if self.cursor.is_eof() {
-                return None;
+                return self.syntax_error(ParseErrorKind::CodesMissingClosingBracket(kind));
             }
 
             self.eat_whitespace();
 
             // `knot: ignore[]` or `knot: ignore[a,]`
             if self.cursor.eat_char(']') {
-                break Some(codes);
+                break Ok(Some(codes));
             }
 
             let code_start = self.offset();
             if !self.eat_word() {
-                return None;
+                return self.syntax_error(ParseErrorKind::InvalidCode(kind));
             }
 
             codes.push(TextRange::new(code_start, self.offset()));
@@ -659,10 +746,10 @@ impl<'src> SuppressionParser<'src> {
                 self.eat_whitespace();
 
                 if self.cursor.eat_char(']') {
-                    break Some(codes);
+                    break Ok(Some(codes));
                 }
                 // `knot: ignore[a b]
-                return None;
+                return self.syntax_error(ParseErrorKind::CodesMissingComma(kind));
             }
         }
     }
@@ -686,25 +773,35 @@ impl<'src> SuppressionParser<'src> {
         }
     }
 
+    fn syntax_error<T>(&self, kind: ParseErrorKind) -> Result<T, ParseError> {
+        let len = if self.cursor.is_eof() {
+            TextSize::default()
+        } else {
+            self.cursor.first().text_len()
+        };
+
+        Err(ParseError::new(kind, TextRange::at(self.offset(), len)))
+    }
+
     fn offset(&self) -> TextSize {
         self.range.start() + self.range.len() - self.cursor.text_len()
     }
 }
 
 impl Iterator for SuppressionParser<'_> {
-    type Item = SuppressionComment;
+    type Item = Result<SuppressionComment, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.cursor.is_eof() {
-                return None;
-            }
+        if self.cursor.is_eof() {
+            return None;
+        }
 
-            if let Some(suppression) = self.parse_comment() {
-                return Some(suppression);
+        match self.parse_comment() {
+            Ok(result) => Some(Ok(result)),
+            Err(error) => {
+                self.cursor.eat_while(|c| c != '#');
+                Some(Err(error))
             }
-
-            self.cursor.eat_while(|c| c != '#');
         }
     }
 }
@@ -759,6 +856,58 @@ impl fmt::Display for SuppressionKind {
             SuppressionKind::Knot => f.write_str("knot: ignore"),
         }
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+struct ParseError {
+    kind: ParseErrorKind,
+
+    /// The position/range at which the parse error occurred.
+    range: TextRange,
+}
+
+impl ParseError {
+    fn new(kind: ParseErrorKind, range: TextRange) -> Self {
+        Self { kind, range }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+
+impl Error for ParseError {}
+
+#[derive(Debug, Eq, PartialEq, Clone, Error)]
+enum ParseErrorKind {
+    /// The comment isn't a suppression comment.
+    #[error("not a suppression comment")]
+    NotASuppression,
+
+    #[error("the comment doesn't start with a `#`")]
+    CommentWithoutHash,
+
+    /// A valid suppression `type: ignore` but it misses a whitespaces after the `ignore` keyword.
+    ///
+    /// ```py
+    /// type: ignoree
+    /// ```
+    #[error("no whitespace after `ignore`")]
+    NoWhitespaceAfterIgnore(SuppressionKind),
+
+    /// Missing comma between two codes
+    #[error("expected a comma separating the rule codes")]
+    CodesMissingComma(SuppressionKind),
+
+    /// `knot: ignore[*.*]`
+    #[error("expected a alphanumeric character or `-` or `_` as code")]
+    InvalidCode(SuppressionKind),
+
+    /// `knot: ignore[a, b`
+    #[error("expected a closing bracket")]
+    CodesMissingClosingBracket(SuppressionKind),
 }
 
 #[cfg(test)]
@@ -964,7 +1113,9 @@ mod tests {
             for comment in SuppressionParser::new(
                 self.source,
                 TextRange::new(0.into(), self.source.text_len()),
-            ) {
+            )
+            .flatten()
+            {
                 list.entry(&comment.debug(self.source));
             }
 
