@@ -3086,13 +3086,16 @@ pub enum KnownFunction {
     Len,
     /// `typing(_extensions).final`
     Final,
+
+    /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
+    NoTypeCheck,
 }
 
 impl KnownFunction {
     pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
             Self::ConstraintFunction(f) => Some(f),
-            Self::RevealType | Self::Len | Self::Final => None,
+            Self::RevealType | Self::Len | Self::Final | Self::NoTypeCheck => None,
         }
     }
 
@@ -3111,6 +3114,9 @@ impl KnownFunction {
             ),
             "len" if definition.is_builtin_definition(db) => Some(KnownFunction::Len),
             "final" if definition.is_typing_definition(db) => Some(KnownFunction::Final),
+            "no_type_check" if definition.is_typing_definition(db) => {
+                Some(KnownFunction::NoTypeCheck)
+            }
             _ => None,
         }
     }

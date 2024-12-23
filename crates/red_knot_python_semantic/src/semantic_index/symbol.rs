@@ -475,6 +475,13 @@ impl NodeWithScopeKind {
             _ => panic!("expected type alias"),
         }
     }
+
+    pub const fn as_function(&self) -> Option<&ast::StmtFunctionDef> {
+        match self {
+            Self::Function(function) => Some(function.node()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]

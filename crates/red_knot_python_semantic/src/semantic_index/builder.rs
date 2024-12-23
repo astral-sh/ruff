@@ -8,8 +8,7 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast, Pattern};
-use ruff_python_ast::{BoolOp, Expr};
+use ruff_python_ast::{self as ast};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
@@ -289,7 +288,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         constraint
     }
 
-    fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
+    fn build_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
         let expression = self.add_standalone_expression(constraint_node);
         Constraint {
             node: ConstraintNode::Expression(expression),
@@ -408,11 +407,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         let guard = guard.map(|guard| self.add_standalone_expression(guard));
 
         let kind = match pattern {
-            Pattern::MatchValue(pattern) => {
+            ast::Pattern::MatchValue(pattern) => {
                 let value = self.add_standalone_expression(&pattern.value);
                 PatternConstraintKind::Value(value, guard)
             }
-            Pattern::MatchSingleton(singleton) => {
+            ast::Pattern::MatchSingleton(singleton) => {
                 PatternConstraintKind::Singleton(singleton.value, guard)
             }
             _ => PatternConstraintKind::Unsupported,
@@ -1492,8 +1491,8 @@ where
                     if index < values.len() - 1 {
                         let constraint = self.build_constraint(value);
                         let (constraint, constraint_id) = match op {
-                            BoolOp::And => (constraint, self.add_constraint(constraint)),
-                            BoolOp::Or => self.add_negated_constraint(constraint),
+                            ast::BoolOp::And => (constraint, self.add_constraint(constraint)),
+                            ast::BoolOp::Or => self.add_negated_constraint(constraint),
                         };
                         let visibility_constraint = self
                             .add_visibility_constraint(VisibilityConstraint::VisibleIf(constraint));
