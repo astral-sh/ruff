@@ -465,8 +465,14 @@ pub enum DefinitionKind<'db> {
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
 }
 
-impl Ranged for DefinitionKind<'_> {
-    fn range(&self) -> TextRange {
+impl DefinitionKind<'_> {
+    /// Returns the [`TextRange`] of the definition target.
+    ///
+    /// A definition target would mainly be the node representing the symbol being defined i.e.,
+    /// [`ast::ExprName`] or [`ast::Identifier`] but could also be other nodes.
+    ///
+    /// This is mainly used for logging and debugging purposes.
+    pub(crate) fn target_range(&self) -> TextRange {
         match self {
             DefinitionKind::Import(alias) => alias.range(),
             DefinitionKind::ImportFrom(import) => import.alias().range(),
@@ -490,9 +496,7 @@ impl Ranged for DefinitionKind<'_> {
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.name.range(),
         }
     }
-}
 
-impl DefinitionKind<'_> {
     pub(crate) fn category(&self) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
