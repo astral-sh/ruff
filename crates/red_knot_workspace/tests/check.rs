@@ -207,14 +207,12 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
                 for target in &assign.targets {
                     self.visit_target(target);
                 }
-                // TODO
-                //self.visit_expr(&assign.value);
+                self.visit_expr(&assign.value);
                 return;
             }
             Stmt::For(for_stmt) => {
                 self.visit_target(&for_stmt.target);
-                // TODO
-                //self.visit_expr(&for_stmt.iter);
+                self.visit_expr(&for_stmt.iter);
                 self.visit_body(&for_stmt.body);
                 self.visit_body(&for_stmt.orelse);
                 return;

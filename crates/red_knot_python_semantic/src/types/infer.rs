@@ -1826,11 +1826,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    /// Infer the definition type involved in a `target` expression.
+    /// Infer the definition types involved in a `target` expression.
     ///
     /// This is used for assignment statements, for statements, etc. with a single or multiple
     /// targets (unpacking).
-    // TODO: Remove the `value` argument once we handle all possible assignment targets.
+    ///
+    /// # Panics
+    ///
+    /// If the `value` is not a standalone expression.
     fn infer_target(&mut self, target: &ast::Expr, value: &ast::Expr) {
         match target {
             ast::Expr::Name(name) => self.infer_definition(name),
@@ -1838,6 +1841,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for element in elts {
                     self.infer_target(element, value);
+                }
+                if elts.is_empty() {
+                    self.infer_standalone_expression(value);
                 }
             }
             _ => {
