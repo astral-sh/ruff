@@ -148,6 +148,7 @@ An empty codes array suppresses no-diagnostics and is always useless
 
 ```py
 # error: [division-by-zero]
+# error: [unused-ignore-comment] "Unused `knot: ignore` without a code"
 a = 4 / 0  # knot: ignore[]
 ```
 

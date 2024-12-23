@@ -53,7 +53,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                 let parser = SuppressionParser::new(&source, token.range());
 
                 for comment in parser {
-                    builder.add_comment(comment, TextRange::new(line_start, token.end()));
+                    builder.add_comment(&comment, TextRange::new(line_start, token.end()));
                 }
             }
             TokenKind::Newline | TokenKind::NonLogicalNewline => {
@@ -126,7 +126,7 @@ pub(crate) fn check_unused_suppressions(
 
         let message = match suppression.target {
             SuppressionTarget::All => {
-                format!("Unused blanked `{}` directive", suppression.kind)
+                format!("Unused blanket `{}` directive", suppression.kind)
             }
             SuppressionTarget::Lint(lint) => {
                 format!(
@@ -134,6 +134,9 @@ pub(crate) fn check_unused_suppressions(
                     kind = suppression.kind,
                     code = lint.name()
                 )
+            }
+            SuppressionTarget::Empty => {
+                format!("Unused `{}` without a code", suppression.kind)
             }
         };
         diagnostics.push(TypeCheckDiagnostic {
@@ -261,6 +264,7 @@ impl Suppression {
         match self.target {
             SuppressionTarget::All => true,
             SuppressionTarget::Lint(suppressed_id) => tested_id == suppressed_id,
+            SuppressionTarget::Empty => false,
         }
     }
 
@@ -285,6 +289,9 @@ enum SuppressionTarget {
 
     /// Suppress the lint with the given id
     Lint(LintId),
+
+    /// Suppresses no lint, e.g. `knot: ignore[]`
+    Empty,
 }
 
 impl SuppressionTarget {
@@ -330,7 +337,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange) {
+    fn add_comment(&mut self, comment: &SuppressionComment, line_range: TextRange) {
         let (suppressions, suppressed_range) =
             // `type: ignore` comments at the start of the file apply to the entire range.
             // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
@@ -350,7 +357,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 )
             };
 
-        match comment.codes {
+        match comment.codes.as_deref() {
             // `type: ignore`
             None => {
                 suppressions.push(Suppression {
@@ -375,9 +382,20 @@ impl<'a> SuppressionsBuilder<'a> {
                 });
             }
 
+            // `knot: ignore[]`
+            Some([]) => {
+                suppressions.push(Suppression {
+                    target: SuppressionTarget::Empty,
+                    kind: comment.kind,
+                    range: comment.range,
+                    comment_range: comment.range,
+                    suppressed_range,
+                });
+            }
+
             // `knot: ignore[a, b]`
             Some(codes) => {
-                for code_range in &codes {
+                for code_range in codes {
                     let code = &self.source[*code_range];
                     match self.lint_registry.get(code) {
                         Ok(lint) => {

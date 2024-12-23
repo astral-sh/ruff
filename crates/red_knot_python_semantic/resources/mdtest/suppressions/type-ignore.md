@@ -153,7 +153,7 @@ File level suppressions must come before any non-trivia token,
 including module docstrings. 
 """
 
-# error: [unused-ignore-comment] "Unused blanked `type: ignore` directive"
+# error: [unused-ignore-comment] "Unused blanket `type: ignore` directive"
 # type: ignore
 
 a = 10 / 0  # error: [division-by-zero]

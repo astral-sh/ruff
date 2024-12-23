@@ -43,7 +43,7 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:579:12 Name `char` used when possibly not defined",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:580:63 Name `char` used when possibly not defined",
     "warning[lint:possibly-unresolved-reference] /src/tomllib/_parser.py:629:38 Name `datetime_obj` used when possibly not defined",
-    "warning[lint:unused-ignore-comment] /src/tomllib/_parser.py:682:31 Unused blanked `type: ignore` directive"
+    "warning[lint:unused-ignore-comment] /src/tomllib/_parser.py:682:31 Unused blanket `type: ignore` directive"
 ];
 
 fn get_test_file(name: &str) -> TestFile {
