@@ -2,8 +2,8 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, AstNode, Expr, ExprEllipsisLiteral, ExprLambda, Identifier,
-    Parameter, ParameterWithDefault, Parameters, Stmt,
+    self as ast, AstNode, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
