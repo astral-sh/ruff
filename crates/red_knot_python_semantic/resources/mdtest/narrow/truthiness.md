@@ -220,6 +220,46 @@ else:
 reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
 ```
 
+## Truthiness of classes
+
+```py
+class MetaAmbiguous(type):
+    def __bool__(self) -> bool: ...
+
+class MetaFalsy(type):
+    def __bool__(self) -> Literal[False]: ...
+
+class MetaTruthy(type):
+    def __bool__(self) -> Literal[True]: ...
+
+class MetaDeferred(type):
+    def __bool__(self) -> MetaAmbiguous: ...
+
+class AmbiguousClass(metaclass=MetaAmbiguous): ...
+class FalsyClass(metaclass=MetaFalsy): ...
+class TruthyClass(metaclass=MetaTruthy): ...
+class DeferredClass(metaclass=MetaDeferred): ...
+
+
+def _(
+    a: type[AmbiguousClass], t: type[TruthyClass], f: type[FalsyClass], d: type[DeferredClass],
+    ta: type[TruthyClass | AmbiguousClass],
+    af: type[AmbiguousClass] | type[FalsyClass],
+):
+    reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass]
+    if ta:
+        reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass] & ~AlwaysFalsy
+
+    reveal_type(af)  # revealed: type[AmbiguousClass] | type[FalsyClass]
+    if af:
+        reveal_type(af)  # revealed: type[AmbiguousClass] & ~AlwaysFalsy
+
+    # TODO: Emit a diagnostic (`d` is not valid in boolean context)
+    if d:
+        # TODO: Should be `Unknown`
+        reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
+```
+
 ## Narrowing in chained boolean expressions
 
 ```py
@@ -253,17 +293,12 @@ class MetaFalsy(type):
     def __bool__(self) -> Literal[False]: ...
 
 class MetaTruthy(type):
-    def __bool__(self) -> Literal[False]: ...
+    def __bool__(self) -> Literal[True]: ...
 
 class FalsyClass(metaclass=MetaFalsy): ...
 class TruthyClass(metaclass=MetaTruthy): ...
 
 def _(x: type[FalsyClass] | type[TruthyClass]):
-    # TODO: Should be `type[TruthyClass] | A`
-    # revealed: type[FalsyClass] & ~AlwaysFalsy | type[TruthyClass] & ~AlwaysFalsy | A
-    reveal_type(x or A())
-
-    # TODO: Should be `type[FalsyClass] | A`
-    # revealed: type[FalsyClass] & ~AlwaysTruthy | type[TruthyClass] & ~AlwaysTruthy | A
-    reveal_type(x and A())
+    reveal_type(x or A())  # revealed: type[TruthyClass] | A
+    reveal_type(x and A())  # revealed: type[FalsyClass] | A
 ```
