@@ -1,11 +1,12 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use salsa::plumbing::AsId;
+
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use salsa::plumbing::AsId;
 
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
