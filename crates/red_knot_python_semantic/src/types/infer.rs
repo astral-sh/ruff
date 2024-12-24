@@ -51,14 +51,15 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{
-    report_invalid_assignment, report_unresolved_module, TypeCheckDiagnostics, CALL_NON_CALLABLE,
-    CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE,
-    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    report_base_with_incompatible_slots, report_invalid_assignment, report_unresolved_module,
+    TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
+    CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
+    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE, INVALID_CONTEXT_MANAGER, INVALID_DECLARATION,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
-use crate::types::mro::MroErrorKind;
+use crate::types::mro::{MroErrorKind, SlotsKind};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
@@ -585,40 +586,75 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // (3) Check that the class's MRO is resolvable
-            if let Err(mro_error) = class.try_mro(self.db()).as_ref() {
-                match mro_error.reason() {
-                    MroErrorKind::DuplicateBases(duplicates) => {
-                        let base_nodes = class_node.bases();
-                        for (index, duplicate) in duplicates {
-                            self.context.report_lint(
-                                &DUPLICATE_BASE,
-                                (&base_nodes[*index]).into(),
-                                format_args!("Duplicate base class `{}`", duplicate.name(self.db())),
-                            );
+            match class.try_mro(self.db()).as_ref() {
+                Err(mro_error) => {
+                    match mro_error.reason() {
+                        MroErrorKind::DuplicateBases(duplicates) => {
+                            let base_nodes = class_node.bases();
+                            for (index, duplicate) in duplicates {
+                                self.context.report_lint(
+                                    &DUPLICATE_BASE,
+                                    (&base_nodes[*index]).into(),
+                                    format_args!("Duplicate base class `{}`", duplicate.name(self.db())),
+                                );
+                            }
                         }
-                    }
-                    MroErrorKind::InvalidBases(bases) => {
-                        let base_nodes = class_node.bases();
-                        for (index, base_ty) in bases {
-                            self.context.report_lint(
-                                &INVALID_BASE,
-                                (&base_nodes[*index]).into(),
-                                format_args!(
-                                    "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
-                                    base_ty.display(self.db())
-                                ),
-                            );
+                        MroErrorKind::InvalidBases(bases) => {
+                            let base_nodes = class_node.bases();
+                            for (index, base_ty) in bases {
+                                self.context.report_lint(
+                                    &INVALID_BASE,
+                                    (&base_nodes[*index]).into(),
+                                    format_args!(
+                                        "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
+                                        base_ty.display(self.db())
+                                    ),
+                                );
+                            }
                         }
+                        MroErrorKind::UnresolvableMro { bases_list } => self.context.report_lint(
+                            &INCONSISTENT_MRO,
+                            class_node.into(),
+                            format_args!(
+                                "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
+                                class.name(self.db()),
+                                bases_list.iter().map(|base| base.display(self.db())).join(", ")
+                            ),
+                        )
                     }
-                    MroErrorKind::UnresolvableMro { bases_list } => self.context.report_lint(
-                        &INCONSISTENT_MRO,
-                        class_node.into(),
-                        format_args!(
-                            "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
-                            class.name(self.db()),
-                            bases_list.iter().map(|base| base.display(self.db())).join(", ")
-                        ),
-                    )
+                }
+                Ok(_) => {
+                    let mut first_non_empty = None;
+                    let mut has_incompatible = false;
+
+                    for (index, base) in class.explicit_bases(self.db()).iter().enumerate() {
+                        let Some(ClassLiteralType { class: base }) = base.into_class_literal()
+                        else {
+                            continue;
+                        };
+
+                        let slots_kind = SlotsKind::from(self.db(), base);
+                        let base_node = &class_node.bases()[index];
+
+                        if !matches!(slots_kind, SlotsKind::NotEmpty) {
+                            continue;
+                        }
+
+                        if first_non_empty.is_none() {
+                            first_non_empty = Some(index);
+                            continue;
+                        }
+
+                        has_incompatible = true;
+                        report_base_with_incompatible_slots(&self.context, base_node);
+                    }
+
+                    if has_incompatible {
+                        if let Some(index) = first_non_empty {
+                            let base_node = &class_node.bases()[index];
+                            report_base_with_incompatible_slots(&self.context, base_node);
+                        };
+                    }
                 }
             }
 
