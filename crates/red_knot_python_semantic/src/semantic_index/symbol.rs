@@ -463,16 +463,20 @@ impl NodeWithScopeKind {
     }
 
     pub fn expect_function(&self) -> &ast::StmtFunctionDef {
-        match self {
-            Self::Function(function) => function.node(),
-            _ => panic!("expected function"),
-        }
+        self.as_function().expect("expected function")
     }
 
     pub fn expect_type_alias(&self) -> &ast::StmtTypeAlias {
         match self {
             Self::TypeAlias(type_alias) => type_alias.node(),
             _ => panic!("expected type alias"),
+        }
+    }
+
+    pub const fn as_function(&self) -> Option<&ast::StmtFunctionDef> {
+        match self {
+            Self::Function(function) => Some(function.node()),
+            _ => None,
         }
     }
 }

@@ -43,7 +43,7 @@ impl<T> AstNodeRef<T> {
     }
 
     /// Returns a reference to the wrapped node.
-    pub fn node(&self) -> &T {
+    pub const fn node(&self) -> &T {
         // SAFETY: Holding on to `parsed` ensures that the AST to which `node` belongs is still
         // alive and not moved.
         unsafe { self.node.as_ref() }
