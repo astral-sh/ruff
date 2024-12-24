@@ -6,9 +6,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;

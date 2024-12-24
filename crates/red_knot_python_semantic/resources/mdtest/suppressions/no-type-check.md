@@ -36,15 +36,28 @@ def test() -> int:
             return a + 5
 ```
 
-## Error in decorator
+## Error in preceding decorator
 
-Both MyPy and Pyright flag the `unknown_decorator` but we don't. 
+Don't suppress diagnostics for decorators appearing before the `no_type_check` decorator.
 
 ```py
 from typing import no_type_check
 
-@unknown_decorator
+@unknown_decorator  # error: [unresolved-reference]
 @no_type_check
+def test() -> int:
+    return a + 5
+```
+
+## Error in following decorator
+
+Suppress diagnostics for decorators appearing after the `no_type_check` decorator.
+
+```py
+from typing import no_type_check
+
+@no_type_check
+@unknown_decorator
 def test() -> int:
     return a + 5
 ```
@@ -71,7 +84,11 @@ def test() -> Undefined:
 
 ## `no_type_check` on classes isn't supported
 
-Similar to Pyright, Red Knot does not support `no_type_check` annotations on classes.
+
+Red Knot does not support `no_type_check` annotations on classes currently. 
+The behaviour of `no_type_check` when applied to classes is [not fully specified currently](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check), and applying the decorator to classes is not supported by Pyright and possibly other type checkers.
+
+A future improvement might be to emit a diagnostic if a `no_type_check` annotation is applied to a class.
 
 ```py
 from typing import no_type_check
@@ -89,6 +106,6 @@ from typing import no_type_check
 
 @no_type_check
 def test():
-    #  error: [unused-ignore-comment]
+    # error: [unused-ignore-comment]
     return x + 5  # knot: ignore[unresolved-reference]
 ```
