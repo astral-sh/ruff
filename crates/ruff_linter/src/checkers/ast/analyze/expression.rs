@@ -1039,6 +1039,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::RootLoggerCall) {
                 flake8_logging::rules::root_logger_call(checker, call);
             }
+            if checker.enabled(Rule::ExcInfoOutsideExceptionHandler) {
+                flake8_logging::rules::exc_info_outside_exception_handler(checker, call);
+            }
             if checker.enabled(Rule::IsinstanceTypeNone) {
                 refurb::rules::isinstance_type_none(checker, call);
             }
