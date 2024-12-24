@@ -462,11 +462,8 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub fn expect_function(&self) -> &ast::StmtFunctionDef {
-        match self {
-            Self::Function(function) => function.node(),
-            _ => panic!("expected function"),
-        }
+    pub const fn expect_function(&self) -> &ast::StmtFunctionDef {
+        self.as_function().expect("expected function")
     }
 
     pub fn expect_type_alias(&self) -> &ast::StmtTypeAlias {

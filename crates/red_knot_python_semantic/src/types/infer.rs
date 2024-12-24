@@ -72,7 +72,7 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::context::{InferContext, WithDiagnostics};
+use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_non_subscriptable,
@@ -1028,10 +1028,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        let decorator_tys: Box<[Type]> = decorator_list
-            .iter()
-            .map(|decorator| self.infer_decorator(decorator))
-            .collect();
+        let mut decorator_tys = Vec::with_capacity(decorator_list.len());
+        for decorator in decorator_list {
+            let ty = self.infer_decorator(decorator);
+            decorator_tys.push(ty);
+
+            // Check if the function is decorated with the `no_type_check` decorator
+            // and, if so, suppress any errors.
+            if let Type::FunctionLiteral(function) = ty {
+                if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
+                    self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                }
+            }
+        }
 
         for default in parameters
             .iter_non_variadic_params()
@@ -1053,6 +1062,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_parameters(parameters);
             }
         }
+
+        let decorator_tys = decorator_tys.into_boxed_slice();
 
         let function_kind =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
