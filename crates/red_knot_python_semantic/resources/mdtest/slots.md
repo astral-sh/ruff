@@ -14,7 +14,6 @@ class C:
 class AB(A, B): ...  # fine
 class AC(A, C): ...  # fine
 class BC(B, C): ...  # fine
-
 class ABC(A, B, C): ...  # fine
 ```
 
@@ -55,7 +54,7 @@ class A:
     __slots__ = "abc"
 
 class B:
-    __slots__ = ("abc")
+    __slots__ = ("abc",)
 
 class AB(
     A,  # error: [incompatible-slots]
@@ -96,7 +95,6 @@ class C:
     __slots__ = ("c", "d")
 
 class D(C): ...
-
 class E(
     B,  # error: [incompatible-slots]
     D,  # error: [incompatible-slots]
