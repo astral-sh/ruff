@@ -8,6 +8,7 @@ use ruff_python_stdlib::typing::{
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
     is_mutable_return_type, is_pep_593_generic_member, is_pep_593_generic_type,
     is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
+    is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
 
@@ -34,6 +35,10 @@ pub enum SubscriptKind {
     Generic,
     /// A subscript of the form `typing.Annotated[int, "foo"]`, i.e., a PEP 593 annotation.
     PEP593Annotation,
+    /// A subscript of the form `typing.TypedDict[{"key": Type}]`, i.e., a [PEP 764] annotation.
+    ///
+    /// [PEP 764]: https://github.com/python/peps/pull/4082
+    TypedDict,
 }
 
 pub fn match_annotated_subscript<'a>(
@@ -62,6 +67,10 @@ pub fn match_annotated_subscript<'a>(
                 return Some(SubscriptKind::PEP593Annotation);
             }
 
+            if is_typed_dict(qualified_name.segments()) {
+                return Some(SubscriptKind::TypedDict);
+            }
+
             for module in typing_modules {
                 let module_qualified_name = QualifiedName::user_defined(module);
                 if qualified_name.starts_with(&module_qualified_name) {
@@ -74,6 +83,9 @@ pub fn match_annotated_subscript<'a>(
                         }
                         if is_pep_593_generic_member(member) {
                             return Some(SubscriptKind::PEP593Annotation);
+                        }
+                        if is_typed_dict_member(member) {
+                            return Some(SubscriptKind::TypedDict);
                         }
                     }
                 }
