@@ -27,6 +27,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
+    registry.register_lint(&INCOMPATIBLE_SLOTS);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_ASSIGNMENT);
@@ -143,6 +144,63 @@ declare_lint! {
     /// TODO #14889
     pub(crate) static DUPLICATE_BASE = {
         summary: "detects class definitions with duplicate bases",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for classes whose bases define incompatible `__slots__`.
+    ///
+    /// ## Why is this bad?
+    /// Inheriting from bases with incompatible `__slots__`s
+    /// will lead to a `TypeError` at runtime.
+    ///
+    /// Classes with no or empty `__slots__` is always compatible:
+    ///
+    /// ```python
+    /// class A: ...
+    /// class B:
+    ///     __slots__ = ()
+    /// class C:
+    ///     __slots__ = ("a", "b")
+    ///
+    /// # fine
+    /// class D(A, B, C): ...
+    /// ```
+    ///
+    /// Class with non-empty `__slots__` cannot participate in multiple inheritance:
+    ///
+    /// ```python
+    /// class A:
+    ///     __slots__ = ("a", "b")
+    ///
+    /// class B:
+    ///     __slots__ = ("a", "b")  # Even if the values are the same
+    ///
+    /// # TypeError: multiple bases have instance lay-out conflict
+    /// class C(A, B): ...
+    /// ```
+    ///
+    /// ## Known problems
+    /// Dynamic (not tuple or string literal) `__slots__` are not checked.
+    /// Additionally, classes inheriting from built-in classes with implicit layouts
+    /// like `str` or `int` are also not checked.
+    ///
+    /// ```pycon
+    /// >>> hasattr(int, "__slots__")
+    /// False
+    /// >>> hasattr(str, "__slots__")
+    /// False
+    /// >>> class A(int, str): ...
+    /// Traceback (most recent call last):
+    ///   File "<python-input-0>", line 1, in <module>
+    ///     class A(int, str): ...
+    /// TypeError: multiple bases have instance lay-out conflict
+    /// ```
+    pub(crate) static INCOMPATIBLE_SLOTS = {
+        summary: "detects class definitions whose MRO has conflicting `__slots__`",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -811,5 +869,13 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
             (must be a `BaseException` subclass or instance or `None`)",
             ty.display(context.db())
         ),
+    );
+}
+
+pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
+    context.report_lint(
+        &INCOMPATIBLE_SLOTS,
+        node.into(),
+        format_args!("Class base has incompatible `__slots__`"),
     );
 }
