@@ -195,3 +195,20 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
     f"""aaaa{
     10}aaaaa""" fr"""bbbbbbbbbbbbbbbbbbbb"""
 )
+
+# In docstring positions
+def docstring():
+    (
+        r"aaaaaaaaa"
+        "bbbbbbbbbbbbbbbbbbbb"
+    )
+
+def docstring_flat():
+    (
+        r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
+    )
+
+def docstring_flat_overlong():
+    (
+        r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    )
