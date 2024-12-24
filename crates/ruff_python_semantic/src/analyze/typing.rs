@@ -8,7 +8,7 @@ use ruff_python_stdlib::typing::{
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
     is_mutable_return_type, is_pep_593_generic_member, is_pep_593_generic_type,
     is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
-    is_typeddict, is_typeddict_member,
+    is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
 
@@ -67,7 +67,7 @@ pub fn match_annotated_subscript<'a>(
                 return Some(SubscriptKind::PEP593Annotation);
             }
 
-            if is_typeddict(qualified_name.segments()) {
+            if is_typed_dict(qualified_name.segments()) {
                 return Some(SubscriptKind::TypedDict);
             }
 
@@ -84,7 +84,7 @@ pub fn match_annotated_subscript<'a>(
                         if is_pep_593_generic_member(member) {
                             return Some(SubscriptKind::PEP593Annotation);
                         }
-                        if is_typeddict_member(member) {
+                        if is_typed_dict_member(member) {
                             return Some(SubscriptKind::TypedDict);
                         }
                     }

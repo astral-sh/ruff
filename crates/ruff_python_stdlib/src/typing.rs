@@ -126,7 +126,7 @@ pub fn is_pep_593_generic_type(qualified_name: &[&str]) -> bool {
     )
 }
 
-pub fn is_typeddict(qualified_name: &[&str]) -> bool {
+pub fn is_typed_dict(qualified_name: &[&str]) -> bool {
     matches!(
         qualified_name,
         ["typing" | "typing_extensions", "TypedDict"]
@@ -226,7 +226,7 @@ pub fn is_pep_593_generic_member(member: &str) -> bool {
 /// Returns `true` if a name matches that of `TypedDict`.
 ///
 /// See: <https://docs.python.org/3/library/typing.html>
-pub fn is_typeddict_member(member: &str) -> bool {
+pub fn is_typed_dict_member(member: &str) -> bool {
     // Constructed by taking every pattern from `is_pep_593_generic`, removing all but
     // the last element in each pattern, and de-duplicating the values.
     matches!(member, "TypedDict")
