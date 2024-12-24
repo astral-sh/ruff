@@ -149,3 +149,100 @@ def foo():
         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
     raise ValueError  # DOC501
     return 42
+
+
+
+# DOC501
+def calculate_speed(distance: float, time: float) -> float:
+    """
+    Calculate speed as distance divided by time.
+
+    Parameters
+    ----------
+    distance : float
+        Distance traveled.
+    time : float
+        Time spent traveling.
+
+    Returns
+    -------
+    float
+        Speed as distance divided by time.
+
+        Raises
+    ------
+    FasterThanLightError
+
+    """
+    try:
+        return distance / time
+    except ZeroDivisionError as exc:
+        raise FasterThanLightError from exc
+
+
+# DOC501
+def calculate_speed(distance: float, time: float) -> float:
+    """Calculate speed as distance divided by time.
+
+    ACalculate speed as distance divided by time.
+
+    Parameters
+    ----------
+    distance : float
+        Distance traveled.
+    time : float
+        Time spent traveling.
+
+    Returns
+    -------
+    float
+        Speed as distance divided by time.
+
+    Raises
+    ------
+    ZeroDivisionError
+    TypeError
+        Some type error
+    """
+    try:
+        return distance / time
+    except ZeroDivisionError:
+        print("Oh no, why would you divide something by zero?")
+        raise
+    except TypeError:
+        print("Not a number? Shame on you!")
+        raise
+
+
+# DOC501
+def calculate_speed(distance: float, time: float) -> float:
+    """Calculate speed as distance divided by time.
+
+    ACalculate speed as distance divided by time.
+
+    Parameters
+    ----------
+    distance : float
+        Distance traveled.
+    time : float
+        Time spent traveling.
+
+    Returns
+    -------
+    float
+        Speed as distance divided by time.
+
+    Raises
+    ------
+    ZeroDivisionError
+        If attempting to divide by zero.
+    TypeError
+    """
+    try:
+        return distance / time
+    except ZeroDivisionError:
+        print("Oh no, why would you divide something by zero?")
+        raise
+    except TypeError:
+        print("Not a number? Shame on you!")
+        raise
