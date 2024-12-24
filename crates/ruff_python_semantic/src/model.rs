@@ -1935,11 +1935,6 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::ATTRIBUTE_DOCSTRING)
     }
 
-    /// Return `true` if the model is in an inline `TypedDict`.
-    pub const fn in_inline_typeddict(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::INLINE_TYPEDDICT)
-    }
-
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
@@ -2481,16 +2476,6 @@ bitflags! {
         /// assert (y := x**2) > 42, y
         /// ```
         const ASSERT_STATEMENT = 1 << 29;
-
-        /// The model is visiting a [PEP 764] inline `TypedDict`.
-        ///
-        /// For example, the model might be visiting `"key"` in
-        /// ```python
-        /// a: TypedDict[{"key": Type}]
-        /// ```
-        ///
-        /// [PEP 764]: https://github.com/python/peps/pull/4082
-        const INLINE_TYPEDDICT = 1 << 30;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

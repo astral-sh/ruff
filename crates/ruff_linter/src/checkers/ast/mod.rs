@@ -1506,8 +1506,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                         Some(typing::SubscriptKind::TypedDict) => {
-                            self.semantic.flags |= SemanticModelFlags::INLINE_TYPEDDICT;
-
                             if let Expr::Dict(ast::ExprDict { items, range: _ }) = slice.as_ref() {
                                 for item in items {
                                     if let Some(key) = &item.key {
