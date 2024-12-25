@@ -9,10 +9,6 @@ def func2() -> None | int:
     ...
 
 
-def func2() -> None | int: 
-    ...
-
-
 def func3(arg: None | None | int): 
     ...
 
