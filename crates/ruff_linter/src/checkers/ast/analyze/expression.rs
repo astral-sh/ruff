@@ -1114,6 +1114,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FalsyDictGetFallback) {
                 ruff::rules::falsy_dict_get_fallback(checker, expr);
             }
+            if checker.enabled(Rule::UnnecessaryRound) {
+                ruff::rules::unnecessary_round(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
