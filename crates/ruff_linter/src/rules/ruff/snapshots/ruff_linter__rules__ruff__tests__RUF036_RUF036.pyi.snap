@@ -2,15 +2,26 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF036.pyi:4:16: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:4:16: RUF036 [*] `None` not at the end of the type annotation.
   |
 4 | def func1(arg: None | int): ...
   |                ^^^^ RUF036
 5 | 
 6 | def func2() -> None | int: ...
   |
+  = help: Move `None` to the end of the type annotation
 
-RUF036.pyi:6:16: RUF036 `None` not at the end of the type annotation.
+ℹ Safe fix
+1 1 | from typing import Union as U
+2 2 | 
+3 3 | 
+4   |-def func1(arg: None | int): ...
+  4 |+def func1(arg: int | None): ...
+5 5 | 
+6 6 | def func2() -> None | int: ...
+7 7 | 
+
+RUF036.pyi:6:16: RUF036 [*] `None` not at the end of the type annotation.
   |
 4 | def func1(arg: None | int): ...
 5 | 
@@ -19,6 +30,17 @@ RUF036.pyi:6:16: RUF036 `None` not at the end of the type annotation.
 7 | 
 8 | def func3(arg: None | None | int): ...
   |
+  = help: Move `None` to the end of the type annotation
+
+ℹ Safe fix
+3 3 | 
+4 4 | def func1(arg: None | int): ...
+5 5 | 
+6   |-def func2() -> None | int: ...
+  6 |+def func2() -> int | None: ...
+7 7 | 
+8 8 | def func3(arg: None | None | int): ...
+9 9 | 
 
 RUF036.pyi:8:16: RUF036 `None` not at the end of the type annotation.
    |
@@ -29,8 +51,9 @@ RUF036.pyi:8:16: RUF036 `None` not at the end of the type annotation.
  9 | 
 10 | def func4(arg: U[None, int]): ...
    |
+   = help: Move `None` to the end of the type annotation
 
-RUF036.pyi:8:23: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:8:23: RUF036 [*] `None` not at the end of the type annotation.
    |
  6 | def func2() -> None | int: ...
  7 | 
@@ -39,8 +62,19 @@ RUF036.pyi:8:23: RUF036 `None` not at the end of the type annotation.
  9 | 
 10 | def func4(arg: U[None, int]): ...
    |
+   = help: Move `None` to the end of the type annotation
 
-RUF036.pyi:10:18: RUF036 `None` not at the end of the type annotation.
+ℹ Safe fix
+5 5 | 
+6 6 | def func2() -> None | int: ...
+7 7 | 
+8   |-def func3(arg: None | None | int): ...
+  8 |+def func3(arg: int | None): ...
+9 9 | 
+10 10 | def func4(arg: U[None, int]): ...
+11 11 | 
+
+RUF036.pyi:10:18: RUF036 [*] `None` not at the end of the type annotation.
    |
  8 | def func3(arg: None | None | int): ...
  9 | 
@@ -49,8 +83,19 @@ RUF036.pyi:10:18: RUF036 `None` not at the end of the type annotation.
 11 | 
 12 | def func5() -> U[None, int]: ...
    |
+   = help: Move `None` to the end of the type annotation
 
-RUF036.pyi:12:18: RUF036 `None` not at the end of the type annotation.
+ℹ Safe fix
+7  7  | 
+8  8  | def func3(arg: None | None | int): ...
+9  9  | 
+10    |-def func4(arg: U[None, int]): ...
+   10 |+def func4(arg: U[int, None]): ...
+11 11 | 
+12 12 | def func5() -> U[None, int]: ...
+13 13 | 
+
+RUF036.pyi:12:18: RUF036 [*] `None` not at the end of the type annotation.
    |
 10 | def func4(arg: U[None, int]): ...
 11 | 
@@ -59,6 +104,17 @@ RUF036.pyi:12:18: RUF036 `None` not at the end of the type annotation.
 13 | 
 14 | def func6(arg: U[None, None, int]): ...
    |
+   = help: Move `None` to the end of the type annotation
+
+ℹ Safe fix
+9  9  | 
+10 10 | def func4(arg: U[None, int]): ...
+11 11 | 
+12    |-def func5() -> U[None, int]: ...
+   12 |+def func5() -> U[int, None]: ...
+13 13 | 
+14 14 | def func6(arg: U[None, None, int]): ...
+15 15 | 
 
 RUF036.pyi:14:18: RUF036 `None` not at the end of the type annotation.
    |
@@ -69,8 +125,9 @@ RUF036.pyi:14:18: RUF036 `None` not at the end of the type annotation.
 15 | 
 16 | # Ok
    |
+   = help: Move `None` to the end of the type annotation
 
-RUF036.pyi:14:24: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:14:24: RUF036 [*] `None` not at the end of the type annotation.
    |
 12 | def func5() -> U[None, int]: ...
 13 | 
@@ -79,3 +136,14 @@ RUF036.pyi:14:24: RUF036 `None` not at the end of the type annotation.
 15 | 
 16 | # Ok
    |
+   = help: Move `None` to the end of the type annotation
+
+ℹ Safe fix
+11 11 | 
+12 12 | def func5() -> U[None, int]: ...
+13 13 | 
+14    |-def func6(arg: U[None, None, int]): ...
+   14 |+def func6(arg: U[int, None]): ...
+15 15 | 
+16 16 | # Ok
+17 17 | def good_func1(arg: int | None): ...

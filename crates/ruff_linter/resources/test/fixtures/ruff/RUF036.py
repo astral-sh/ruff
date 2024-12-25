@@ -9,6 +9,10 @@ def func2() -> None | int:
     ...
 
 
+def func2() -> None | int: 
+    ...
+
+
 def func3(arg: None | None | int): 
     ...
 
@@ -22,6 +26,14 @@ def func5() -> U[None, int]:
 
 
 def func6(arg: U[None, None, int]): 
+    ...
+
+
+def func7() -> U[
+    None,
+    # comment
+    int
+]: 
     ...
 
 
