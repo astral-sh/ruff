@@ -3,6 +3,10 @@ from datetime import timedelta
 from airflow import DAG, dag
 from airflow.operators.datetime import BranchDateTimeOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from airflow.providers.amazon.aws.log.s3_task_handler import S3TaskHandler
+from airflow.providers.apache.hdfs.log.hdfs_task_handler import HdfsTaskHandler
+from airflow.providers.elasticsearch.log.es_task_handler import ElasticsearchTaskHandler
+from airflow.providers.google.cloud.log.gcs_task_handler import GCSTaskHandler
 from airflow.providers.standard.operators import datetime, trigger_dagrun
 from airflow.providers.standard.sensors import weekday
 from airflow.sensors.weekday import BranchDayOfWeekOperator, DayOfWeekSensor
@@ -68,3 +72,10 @@ def decorator_deprecated_operator_args():
     branch_dt_op >> branch_dt_op2
     dof_task_sensor >> dof_task_sensor2
     bdow_op >> bdow_op2
+
+
+# deprecated filename_template arugment in FileTaskHandler
+S3TaskHandler(filename_template="/tmp/test")
+HdfsTaskHandler(filename_template="/tmp/test")
+ElasticsearchTaskHandler(filename_template="/tmp/test")
+GCSTaskHandler(filename_template="/tmp/test")

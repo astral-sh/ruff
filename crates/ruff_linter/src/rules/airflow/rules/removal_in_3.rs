@@ -79,6 +79,24 @@ fn is_airflow_operator(segments: &[&str]) -> bool {
     }
 }
 
+fn is_airflow_task_handler(segments: &[&str]) -> bool {
+    match segments {
+        ["airflow", "utils", "log", "file_task_handler", "FileTaskHandler"] => true,
+
+        ["airflow", "providers", rest @ ..] => {
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == "log"), rest.last())
+            {
+                pos + 1 < rest.len() && last_element.ends_with("TaskHandler")
+            } else {
+                false
+            }
+        }
+
+        _ => false,
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 enum Replacement {
     None,
@@ -195,12 +213,17 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 None::<&str>,
             ));
         }
-        _ if is_airflow_operator(qualname.segments()) => {
+        _ if is_airflow_task_handler(qualname.segments()) => {
             checker.diagnostics.extend(diagnostic_for_argument(
                 arguments,
-                "sla",
-                Some("logical_date"),
+                "filename_template",
+                None::<&str>,
             ));
+        }
+        _ if is_airflow_operator(qualname.segments()) => {
+            checker
+                .diagnostics
+                .extend(diagnostic_for_argument(arguments, "sla", None::<&str>));
             checker.diagnostics.extend(diagnostic_for_argument(
                 arguments,
                 "task_concurrency",
