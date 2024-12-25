@@ -38,10 +38,18 @@ RUF036.py:8:16: RUF036 [*] `None` not at the end of the type annotation.
 10 10 | 
 11 11 | 
 
-RUF036.py:12:16: RUF036 [*] `None` not at the end of the type annotation.
+RUF036.py:12:16: RUF036 `None` not at the end of the type annotation.
    |
-12 | def func2() -> None | int: 
+12 | def func3(arg: None | None | int): 
    |                ^^^^ RUF036
+13 |     ...
+   |
+   = help: Move `None` to the end of the type annotation
+
+RUF036.py:12:23: RUF036 [*] `None` not at the end of the type annotation.
+   |
+12 | def func3(arg: None | None | int): 
+   |                       ^^^^ RUF036
 13 |     ...
    |
    = help: Move `None` to the end of the type annotation
@@ -50,24 +58,16 @@ RUF036.py:12:16: RUF036 [*] `None` not at the end of the type annotation.
 9  9  |     ...
 10 10 | 
 11 11 | 
-12    |-def func2() -> None | int: 
-   12 |+def func2() -> int | None: 
+12    |-def func3(arg: None | None | int): 
+   12 |+def func3(arg: int | None): 
 13 13 |     ...
 14 14 | 
 15 15 | 
 
-RUF036.py:16:16: RUF036 `None` not at the end of the type annotation.
+RUF036.py:16:18: RUF036 [*] `None` not at the end of the type annotation.
    |
-16 | def func3(arg: None | None | int): 
-   |                ^^^^ RUF036
-17 |     ...
-   |
-   = help: Move `None` to the end of the type annotation
-
-RUF036.py:16:23: RUF036 [*] `None` not at the end of the type annotation.
-   |
-16 | def func3(arg: None | None | int): 
-   |                       ^^^^ RUF036
+16 | def func4(arg: U[None, int]): 
+   |                  ^^^^ RUF036
 17 |     ...
    |
    = help: Move `None` to the end of the type annotation
@@ -76,15 +76,15 @@ RUF036.py:16:23: RUF036 [*] `None` not at the end of the type annotation.
 13 13 |     ...
 14 14 | 
 15 15 | 
-16    |-def func3(arg: None | None | int): 
-   16 |+def func3(arg: int | None): 
+16    |-def func4(arg: U[None, int]): 
+   16 |+def func4(arg: U[int, None]): 
 17 17 |     ...
 18 18 | 
 19 19 | 
 
 RUF036.py:20:18: RUF036 [*] `None` not at the end of the type annotation.
    |
-20 | def func4(arg: U[None, int]): 
+20 | def func5() -> U[None, int]: 
    |                  ^^^^ RUF036
 21 |     ...
    |
@@ -94,16 +94,24 @@ RUF036.py:20:18: RUF036 [*] `None` not at the end of the type annotation.
 17 17 |     ...
 18 18 | 
 19 19 | 
-20    |-def func4(arg: U[None, int]): 
-   20 |+def func4(arg: U[int, None]): 
+20    |-def func5() -> U[None, int]: 
+   20 |+def func5() -> U[int, None]: 
 21 21 |     ...
 22 22 | 
 23 23 | 
 
-RUF036.py:24:18: RUF036 [*] `None` not at the end of the type annotation.
+RUF036.py:24:18: RUF036 `None` not at the end of the type annotation.
    |
-24 | def func5() -> U[None, int]: 
+24 | def func6(arg: U[None, None, int]): 
    |                  ^^^^ RUF036
+25 |     ...
+   |
+   = help: Move `None` to the end of the type annotation
+
+RUF036.py:24:24: RUF036 [*] `None` not at the end of the type annotation.
+   |
+24 | def func6(arg: U[None, None, int]): 
+   |                        ^^^^ RUF036
 25 |     ...
    |
    = help: Move `None` to the end of the type annotation
@@ -112,56 +120,30 @@ RUF036.py:24:18: RUF036 [*] `None` not at the end of the type annotation.
 21 21 |     ...
 22 22 | 
 23 23 | 
-24    |-def func5() -> U[None, int]: 
-   24 |+def func5() -> U[int, None]: 
+24    |-def func6(arg: U[None, None, int]): 
+   24 |+def func6(arg: U[int, None]): 
 25 25 |     ...
 26 26 | 
 27 27 | 
 
-RUF036.py:28:18: RUF036 `None` not at the end of the type annotation.
+RUF036.py:29:5: RUF036 [*] `None` not at the end of the type annotation.
    |
-28 | def func6(arg: U[None, None, int]): 
-   |                  ^^^^ RUF036
-29 |     ...
-   |
-   = help: Move `None` to the end of the type annotation
-
-RUF036.py:28:24: RUF036 [*] `None` not at the end of the type annotation.
-   |
-28 | def func6(arg: U[None, None, int]): 
-   |                        ^^^^ RUF036
-29 |     ...
-   |
-   = help: Move `None` to the end of the type annotation
-
-ℹ Safe fix
-25 25 |     ...
-26 26 | 
-27 27 | 
-28    |-def func6(arg: U[None, None, int]): 
-   28 |+def func6(arg: U[int, None]): 
-29 29 |     ...
-30 30 | 
-31 31 | 
-
-RUF036.py:33:5: RUF036 [*] `None` not at the end of the type annotation.
-   |
-32 | def func7() -> U[
-33 |     None,
+28 | def func7() -> U[
+29 |     None,
    |     ^^^^ RUF036
-34 |     # comment
-35 |     int
+30 |     # comment
+31 |     int
    |
    = help: Move `None` to the end of the type annotation
 
 ℹ Unsafe fix
-30 30 | 
-31 31 | 
-32 32 | def func7() -> U[
-33    |-    None,
-34    |-    # comment
-35    |-    int
-   33 |+    int, None
-36 34 | ]: 
-37 35 |     ...
-38 36 |
+26 26 | 
+27 27 | 
+28 28 | def func7() -> U[
+29    |-    None,
+30    |-    # comment
+31    |-    int
+   29 |+    int, None
+32 30 | ]: 
+33 31 |     ...
+34 32 |

@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use itertools::{Itertools, Position};
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr};
@@ -78,41 +78,37 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Exp
         return;
     }
 
-    if let Some(last) = none_exprs.pop() {
-        let mut elements = non_none_exprs
-            .iter()
-            .map(|expr| checker.locator().slice(expr.range()).to_string())
-            .chain(std::iter::once("None".to_string()));
-        let fix = if let Expr::Subscript(ast::ExprSubscript { slice, .. }) = union {
-            let applicability = if checker.comment_ranges().intersects(slice.range()) {
-                Applicability::Unsafe
+    for (pos, none_expr) in none_exprs.iter().with_position() {
+        let mut diagnostic = Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range());
+        if matches!(pos, Position::Last | Position::Only) {
+            let mut elements = non_none_exprs
+                .iter()
+                .map(|expr| checker.locator().slice(expr.range()).to_string())
+                .chain(std::iter::once("None".to_string()));
+            let fix = if let Expr::Subscript(ast::ExprSubscript { slice, .. }) = union {
+                let applicability = if checker.comment_ranges().intersects(slice.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                };
+                Fix::applicable_edit(
+                    Edit::range_replacement(elements.join(", "), slice.range()),
+                    applicability,
+                )
             } else {
-                Applicability::Safe
+                let applicability = if checker.comment_ranges().intersects(union.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                };
+                Fix::applicable_edit(
+                    Edit::range_replacement(elements.join(" | "), union.range()),
+                    applicability,
+                )
             };
-            Fix::applicable_edit(
-                Edit::range_replacement(elements.join(", "), slice.range()),
-                applicability,
-            )
-        } else {
-            let applicability = if checker.comment_ranges().intersects(union.range()) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            };
-            Fix::applicable_edit(
-                Edit::range_replacement(elements.join(" | "), union.range()),
-                applicability,
-            )
-        };
+            diagnostic.set_fix(fix);
+        }
 
-        let mut diagnostic = Diagnostic::new(NoneNotAtEndOfUnion, last.range());
-        diagnostic.set_fix(fix);
         checker.diagnostics.push(diagnostic);
-    }
-
-    for none_expr in none_exprs {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
     }
 }
