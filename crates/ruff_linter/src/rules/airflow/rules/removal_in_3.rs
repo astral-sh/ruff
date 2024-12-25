@@ -4,16 +4,58 @@ use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprC
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
-use std::sync::LazyLock;
 
 use crate::checkers::ast::Checker;
-use regex::Regex;
 
-static SECRET_BACKEND_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"airflow\..*secrets\.\w+\.\w+Backend").unwrap());
+fn is_airflow_secret_backend(qualname: &QualifiedName) -> bool {
+    match qualname.segments() {
+        ["airflow", "secrets", rest @ ..] => {
+            if let Some(last_element) = rest.last() {
+                last_element.ends_with("Backend")
+            } else {
+                false
+            }
+        }
 
-static AIRFLOW_HOOK_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"airflow\..*hooks\.\w+\.\w+Hook").unwrap());
+        ["airflow", "providers", rest @ ..] => {
+            // Ensure 'operators' exists somewhere in the middle
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == "secrets"), rest.last())
+            {
+                pos + 1 < rest.len() && last_element.ends_with("Backend") // Check that 'operators' is not the last element
+            } else {
+                false
+            }
+        }
+
+        _ => false,
+    }
+}
+
+fn is_airflow_hook(qualname: &QualifiedName) -> bool {
+    match qualname.segments() {
+        ["airflow", "hooks", rest @ ..] => {
+            if let Some(last_element) = rest.last() {
+                last_element.ends_with("Hook")
+            } else {
+                false
+            }
+        }
+
+        ["airflow", "providers", rest @ ..] => {
+            // Ensure 'operators' exists somewhere in the middle
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == "hooks"), rest.last())
+            {
+                pos + 1 < rest.len() && last_element.ends_with("Hook")
+            } else {
+                false
+            }
+        }
+
+        _ => false,
+    }
+}
 
 #[derive(Debug, Eq, PartialEq)]
 enum Replacement {
@@ -172,14 +214,6 @@ fn removed_class_attribute(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    // checker.diagnostics.push(Diagnostic::new(
-    //     Airflow3Removal {
-    //         deprecated: qualname.to_string(),
-    //         replacement: Replacement::Name("te"),
-    //     },
-    //     attr.range(),
-    // ));
-
     let replacement = match *qualname.segments() {
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "dataset_factories" => Some(Replacement::Name("asset_factories")),
@@ -252,12 +286,12 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
             "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
             &_ => None,
         },
-        _ if SECRET_BACKEND_REGEX.is_match(&qualname.segments().join(".")) => match attr.as_str() {
+        _ if is_airflow_secret_backend(&qualname) => match attr.as_str() {
             "get_conn_uri" => Some(Replacement::Name("get_conn_value")),
             "get_connections" => Some(Replacement::Name("get_connection")),
             &_ => None,
         },
-        _ if AIRFLOW_HOOK_REGEX.is_match(&qualname.segments().join(".")) => match attr.as_str() {
+        _ if is_airflow_hook(&qualname) => match attr.as_str() {
             "get_connections" => Some(Replacement::Name("get_connection")),
             &_ => None,
         },
