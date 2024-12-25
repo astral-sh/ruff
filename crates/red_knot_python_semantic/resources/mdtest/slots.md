@@ -109,7 +109,6 @@ class A:
 
 class B(A): ...
 class C(A): ...
-
 class D(B, A): ...  # fine
 class E(B, C, A): ...  # fine
 ```
