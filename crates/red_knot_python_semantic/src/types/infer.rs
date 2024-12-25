@@ -624,8 +624,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
                 Ok(_) => {
-                    let mut first_non_empty = None;
-                    let mut has_incompatible = false;
+                    let mut first_with_solid_base = None;
+                    let mut common_solid_base = None;
+                    let mut found_second = false;
 
                     for (index, base) in class.explicit_bases(self.db()).iter().enumerate() {
                         let Some(ClassLiteralType { class: base }) = base.into_class_literal()
@@ -633,24 +634,40 @@ impl<'db> TypeInferenceBuilder<'db> {
                             continue;
                         };
 
-                        let slots_kind = SlotsKind::from(self.db(), base);
+                        let solid_base = base.iter_mro(self.db()).find_map(|current| {
+                            let ClassBase::Class(current) = current else {
+                                return None;
+                            };
+
+                            match SlotsKind::from(self.db(), current) {
+                                SlotsKind::NotEmpty => Some(current),
+                                SlotsKind::NotSpecified | SlotsKind::Empty => None,
+                                SlotsKind::Dynamic => None,
+                            }
+                        });
+
                         let base_node = &class_node.bases()[index];
 
-                        if !matches!(slots_kind, SlotsKind::NotEmpty) {
+                        if solid_base.is_none() {
                             continue;
                         }
 
-                        if first_non_empty.is_none() {
-                            first_non_empty = Some(index);
+                        if first_with_solid_base.is_none() {
+                            first_with_solid_base = Some(index);
+                            common_solid_base = solid_base;
                             continue;
                         }
 
-                        has_incompatible = true;
+                        if solid_base == common_solid_base {
+                            continue;
+                        }
+
+                        found_second = true;
                         report_base_with_incompatible_slots(&self.context, base_node);
                     }
 
-                    if has_incompatible {
-                        if let Some(index) = first_non_empty {
+                    if found_second {
+                        if let Some(index) = first_with_solid_base {
                             let base_node = &class_node.bases()[index];
                             report_base_with_incompatible_slots(&self.context, base_node);
                         };

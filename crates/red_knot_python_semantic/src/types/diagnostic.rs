@@ -157,7 +157,7 @@ declare_lint! {
     /// Inheriting from bases with incompatible `__slots__`s
     /// will lead to a `TypeError` at runtime.
     ///
-    /// Classes with no or empty `__slots__` is always compatible:
+    /// Classes with no or empty `__slots__` are always compatible:
     ///
     /// ```python
     /// class A: ...
@@ -170,7 +170,8 @@ declare_lint! {
     /// class D(A, B, C): ...
     /// ```
     ///
-    /// Class with non-empty `__slots__` cannot participate in multiple inheritance:
+    /// Multiple inheritance from more than one different class
+    /// defining non-empty `__slots__` is not allowed:
     ///
     /// ```python
     /// class A:

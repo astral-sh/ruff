@@ -101,6 +101,19 @@ class E(
 ): ...
 ```
 
+## Single solid base
+
+```py
+class A:
+    __slots__ = ("a", "b")
+
+class B(A): ...
+class C(A): ...
+
+class D(B, A): ...  # fine
+class E(B, C, A): ...  # fine
+```
+
 ## False negatives
 
 ### Possibly unbound

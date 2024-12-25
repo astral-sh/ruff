@@ -346,7 +346,7 @@ pub(super) enum SlotsKind {
 
 impl SlotsKind {
     pub(super) fn from(db: &dyn Db, base: Class) -> Self {
-        let Symbol::Type(slots_ty, bound) = base.class_member(db, "__slots__") else {
+        let Symbol::Type(slots_ty, bound) = base.own_class_member(db, "__slots__") else {
             return Self::NotSpecified;
         };
 
