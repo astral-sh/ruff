@@ -3382,10 +3382,21 @@ impl<'db> Class<'db> {
                 explicit_metaclass_of: class_metaclass_was_from,
             }
         } else {
-            // TODO: If the metaclass is not a class, we should verify that it's a callable
-            // which accepts the same arguments as `type.__new__` (otherwise error), and return
-            // the meta-type of its return type. (And validate that is a class type?)
-            return Ok(todo_type!("metaclass not a class"));
+            let self_ty = Type::class_literal(self);
+            let bases = Type::tuple(db, self.explicit_bases(db));
+            // TODO: Should be `dict[str, Any]`
+            let namespace = KnownClass::Dict.to_instance(db);
+            // TODO: Other keyword arguments?
+
+            let outcome = metaclass.call(db, &[self_ty, bases, namespace]);
+
+            if let CallOutcome::NotCallable { not_callable_ty } = outcome {
+                return Err(MetaclassError {
+                    kind: MetaclassErrorKind::NotCallable(not_callable_ty),
+                });
+            }
+
+            return Ok(outcome.return_ty(db).unwrap().to_meta_type(db));
         };
 
         // Reconcile all base classes' metaclasses with the candidate metaclass.
@@ -3618,6 +3629,8 @@ pub(super) enum MetaclassErrorKind<'db> {
         /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
         candidate1_is_base_class: bool,
     },
+    /// The metaclass is not callable
+    NotCallable(Type<'db>),
 }
 
 #[salsa::interned]
