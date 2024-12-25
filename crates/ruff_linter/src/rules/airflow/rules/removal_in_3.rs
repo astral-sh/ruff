@@ -7,8 +7,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-fn is_airflow_secret_backend(qualname: &QualifiedName) -> bool {
-    match qualname.segments() {
+fn is_airflow_secret_backend(segments: &[&str]) -> bool {
+    match segments {
         ["airflow", "secrets", rest @ ..] => {
             if let Some(last_element) = rest.last() {
                 last_element.ends_with("Backend")
@@ -18,11 +18,10 @@ fn is_airflow_secret_backend(qualname: &QualifiedName) -> bool {
         }
 
         ["airflow", "providers", rest @ ..] => {
-            // Ensure 'operators' exists somewhere in the middle
             if let (Some(pos), Some(last_element)) =
                 (rest.iter().position(|&s| s == "secrets"), rest.last())
             {
-                pos + 1 < rest.len() && last_element.ends_with("Backend") // Check that 'operators' is not the last element
+                pos + 1 < rest.len() && last_element.ends_with("Backend")
             } else {
                 false
             }
@@ -43,11 +42,34 @@ fn is_airflow_hook(qualname: &QualifiedName) -> bool {
         }
 
         ["airflow", "providers", rest @ ..] => {
-            // Ensure 'operators' exists somewhere in the middle
             if let (Some(pos), Some(last_element)) =
                 (rest.iter().position(|&s| s == "hooks"), rest.last())
             {
                 pos + 1 < rest.len() && last_element.ends_with("Hook")
+            } else {
+                false
+            }
+        }
+
+        _ => false,
+    }
+}
+
+fn is_airflow_operator(segments: &[&str]) -> bool {
+    match segments {
+        ["airflow", "operators", rest @ ..] => {
+            if let Some(last_element) = rest.last() {
+                last_element.ends_with("Operator")
+            } else {
+                false
+            }
+        }
+
+        ["airflow", "providers", rest @ ..] => {
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == "operators"), rest.last())
+            {
+                pos + 1 < rest.len() && last_element.ends_with("Operator")
             } else {
                 false
             }
@@ -173,34 +195,50 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 None::<&str>,
             ));
         }
-        ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
+        _ if is_airflow_operator(qualname.segments()) => {
             checker.diagnostics.extend(diagnostic_for_argument(
                 arguments,
-                "execution_date",
+                "sla",
                 Some("logical_date"),
             ));
-        }
-        ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
             checker.diagnostics.extend(diagnostic_for_argument(
                 arguments,
-                "use_task_execution_day",
-                Some("use_task_logical_date"),
+                "task_concurrency",
+                Some("max_active_tis_per_dag"),
             ));
+            match qualname.segments() {
+                ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
+                    checker.diagnostics.extend(diagnostic_for_argument(
+                        arguments,
+                        "execution_date",
+                        Some("logical_date"),
+                    ));
+                }
+                ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
+                    checker.diagnostics.extend(diagnostic_for_argument(
+                        arguments,
+                        "use_task_execution_day",
+                        Some("use_task_logical_date"),
+                    ));
+                }
+                ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
+                    checker.diagnostics.extend(diagnostic_for_argument(
+                        arguments,
+                        "use_task_execution_day",
+                        Some("use_task_logical_date"),
+                    ));
+                }
+                ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
+                    checker.diagnostics.extend(diagnostic_for_argument(
+                        arguments,
+                        "use_task_execution_day",
+                        Some("use_task_logical_date"),
+                    ));
+                }
+                _ => {}
+            }
         }
-        ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
-            checker.diagnostics.extend(diagnostic_for_argument(
-                arguments,
-                "use_task_execution_day",
-                Some("use_task_logical_date"),
-            ));
-        }
-        ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
-            checker.diagnostics.extend(diagnostic_for_argument(
-                arguments,
-                "use_task_execution_day",
-                Some("use_task_logical_date"),
-            ));
-        }
+
         _ => {}
     };
 }
@@ -286,7 +324,7 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
             "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
             &_ => None,
         },
-        _ if is_airflow_secret_backend(&qualname) => match attr.as_str() {
+        _ if is_airflow_secret_backend(qualname.segments()) => match attr.as_str() {
             "get_conn_uri" => Some(Replacement::Name("get_conn_value")),
             "get_connections" => Some(Replacement::Name("get_connection")),
             &_ => None,
