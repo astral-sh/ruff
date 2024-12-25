@@ -177,15 +177,14 @@ reveal_type(A.__class__)  # revealed: type[int]
 def _(n: int):
     # error: [invalid-metaclass]
     class B(metaclass=n): ...
-
     # TODO: Should be `Unknown`
     reveal_type(B)  # revealed: Literal[B]
     reveal_type(B.__class__)  # revealed: type[Unknown]
 
 def _(flag: bool):
     m = f if flag else 42
-    class C(metaclass=m): ...
 
+    class C(metaclass=m): ...
     # TODO: Should be `int | Unknown`
     reveal_type(C)  # revealed: Literal[C]
     reveal_type(C.__class__)  # revealed: type[int] | type[Unknown]
