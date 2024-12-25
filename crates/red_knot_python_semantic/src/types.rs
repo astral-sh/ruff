@@ -3607,10 +3607,60 @@ impl<'db> Class<'db> {
                 explicit_metaclass_of: class_metaclass_was_from,
             }
         } else {
-            // TODO: If the metaclass is not a class, we should verify that it's a callable
-            // which accepts the same arguments as `type.__new__` (otherwise error), and return
-            // the meta-type of its return type. (And validate that is a class type?)
-            return Ok(todo_type!("metaclass not a class"));
+            let self_ty = Type::class_literal(self);
+            let bases = TupleType::from_elements(db, self.explicit_bases(db));
+            // TODO: Should be `dict[str, Any]`
+            let namespace = KnownClass::Dict.to_instance(db);
+
+            // TODO: Other keyword arguments?
+            let arguments = CallArguments::positional([self_ty, bases, namespace]);
+
+            let return_ty_result = match metaclass.call(db, &arguments) {
+                CallOutcome::NotCallable { not_callable_ty } => Err(MetaclassError {
+                    kind: MetaclassErrorKind::NotCallable(not_callable_ty),
+                }),
+
+                CallOutcome::Union {
+                    outcomes,
+                    called_ty,
+                } => {
+                    let mut partly_not_callable = false;
+
+                    let return_ty = outcomes
+                        .iter()
+                        .fold(None, |acc, outcome| {
+                            let ty = outcome.return_ty(db);
+
+                            match (acc, ty) {
+                                (acc, None) => {
+                                    partly_not_callable = true;
+                                    acc
+                                }
+                                (None, Some(ty)) => Some(UnionBuilder::new(db).add(ty)),
+                                (Some(builder), Some(ty)) => Some(builder.add(ty)),
+                            }
+                        })
+                        .map(UnionBuilder::build);
+
+                    if partly_not_callable {
+                        Err(MetaclassError {
+                            kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
+                        })
+                    } else {
+                        Ok(return_ty.unwrap_or(Type::Unknown))
+                    }
+                }
+
+                CallOutcome::PossiblyUnboundDunderCall { called_ty, .. } => Err(MetaclassError {
+                    kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
+                }),
+
+                CallOutcome::Callable { binding }
+                | CallOutcome::RevealType { binding, .. }
+                | CallOutcome::StaticAssertionError { binding, .. } => Ok(binding.return_ty()),
+            };
+
+            return return_ty_result.map(|ty| ty.to_meta_type(db));
         };
 
         // Reconcile all base classes' metaclasses with the candidate metaclass.
@@ -3815,6 +3865,10 @@ pub(super) enum MetaclassErrorKind<'db> {
         /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
         candidate1_is_base_class: bool,
     },
+    /// The metaclass is not callable
+    NotCallable(Type<'db>),
+    /// The metaclass is of a union type whose some members are not callable
+    PartlyNotCallable(Type<'db>),
 }
 
 #[salsa::interned]
