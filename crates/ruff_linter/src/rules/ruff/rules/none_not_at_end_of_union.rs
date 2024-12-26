@@ -85,27 +85,21 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Exp
                 .iter()
                 .map(|expr| checker.locator().slice(expr.range()).to_string())
                 .chain(std::iter::once("None".to_string()));
-            let fix = if let Expr::Subscript(ast::ExprSubscript { slice, .. }) = union {
-                let applicability = if checker.comment_ranges().intersects(slice.range()) {
-                    Applicability::Unsafe
+            let (range, separator) =
+                if let Expr::Subscript(ast::ExprSubscript { slice, .. }) = union {
+                    (slice.range(), ", ")
                 } else {
-                    Applicability::Safe
+                    (union.range(), " | ")
                 };
-                Fix::applicable_edit(
-                    Edit::range_replacement(elements.join(", "), slice.range()),
-                    applicability,
-                )
+            let applicability = if checker.comment_ranges().intersects(range) {
+                Applicability::Unsafe
             } else {
-                let applicability = if checker.comment_ranges().intersects(union.range()) {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                };
-                Fix::applicable_edit(
-                    Edit::range_replacement(elements.join(" | "), union.range()),
-                    applicability,
-                )
+                Applicability::Safe
             };
+            let fix = Fix::applicable_edit(
+                Edit::range_replacement(elements.join(separator), range),
+                applicability,
+            );
             diagnostic.set_fix(fix);
         }
 
