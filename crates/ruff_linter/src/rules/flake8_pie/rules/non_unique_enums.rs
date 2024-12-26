@@ -4,7 +4,8 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall, PySourceType, Stmt};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -55,13 +56,14 @@ impl Violation for NonUniqueEnums {
 
 /// PIE796
 pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
+    let semantic = checker.semantic();
+
     let Stmt::ClassDef(parent) = parent else {
         return;
     };
 
     if !parent.bases().iter().any(|expr| {
-        checker
-            .semantic()
+        semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "Enum"]))
     }) {
@@ -74,23 +76,11 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
             continue;
         };
 
-        if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-            if checker
-                .semantic()
-                .resolve_qualified_name(func)
-                .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "auto"]))
-            {
-                continue;
-            }
+        if member_has_specialized_value(checker, value) {
+            continue;
         }
 
         let comparable = ComparableExpr::from(value);
-
-        if checker.source_type == PySourceType::Stub
-            && comparable == ComparableExpr::EllipsisLiteral
-        {
-            continue;
-        }
 
         if !seen_targets.insert(comparable) {
             let diagnostic = Diagnostic::new(
@@ -102,4 +92,42 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+fn member_has_specialized_value(checker: &Checker, expr: &Expr) -> bool {
+    let semantic = checker.semantic();
+    let source_is_stub = checker.source_type == PySourceType::Stub;
+
+    match expr {
+        Expr::EllipsisLiteral(_) => source_is_stub,
+
+        Expr::Call(ExprCall {
+            func, arguments, ..
+        }) => {
+            let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
+                return false;
+            };
+
+            if matches!(qualified_name.segments(), ["enum", "auto"]) {
+                return true;
+            }
+
+            source_is_stub && is_casted_ellipsis(semantic, func, arguments)
+        }
+
+        _ => false,
+    }
+}
+
+/// Whether the given call is of the form `cast(SomeType, ...)` where `...` is an ellipsis literal.
+fn is_casted_ellipsis(semantic: &SemanticModel, func: &Expr, arguments: &Arguments) -> bool {
+    if !semantic.match_typing_expr(func, "cast") {
+        return false;
+    }
+
+    if !arguments.keywords.is_empty() {
+        return false;
+    }
+
+    matches!(arguments.args.as_ref(), [_, Expr::EllipsisLiteral(_)])
 }
