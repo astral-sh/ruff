@@ -149,10 +149,20 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "auth", "managers", "fab", "security_manager", "override", ..] => Some((
                     qualname.to_string(),
                     Replacement::ImportPathMoved{
-                        original_path: "airflow.auth.managers.fab.security_manager.override",
+                        original_path: "airflow.auth.managers.fab.security_managr.override",
                         new_path: "airflow.providers.fab.auth_manager.security_manager.override",
                         provider: "fab",
                         version: "1.0.0"
+                },
+                )),
+                // apache-airflow-providers-celery
+                ["airflow", "config_templates", "default_celery", "DEFAULT_CELERY_CONFIG"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG",
+                        new_path: "airflow.providers.celery.executors.default_celery.DEFAULT_CELERY_CONFIG",
+                        provider: "celery",
+                        version: "3.3.0"
                 },
                 )),
 
