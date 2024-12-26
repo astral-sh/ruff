@@ -102,7 +102,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 /// line breaks.
 ///
 /// ## Examples
-/// This expression forms one logical line because because the array elements are parenthesized.
+/// This expression forms one logical line because the array elements are parenthesized.
 ///
 /// ```python
 /// a = [
