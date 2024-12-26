@@ -332,7 +332,7 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum SlotsKind {
-    /// `__slots__` is not found in the class nor any of its bases.
+    /// `__slots__` is not found in the class.
     NotSpecified,
     /// `__slots__` is defined but empty: `__slots__ = ()`.
     Empty,
