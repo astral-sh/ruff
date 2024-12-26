@@ -111,7 +111,7 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "1.0.0"
                     },
                 )),
-                ["airflow","auth","managers","fab","fab_auth_manager", "FabAuthManager"] => Some((
+                ["airflow", "auth", "managers", "fab", "fab_auth_manager", "FabAuthManager"] => Some((
                     qualname.to_string(),
                     Replacement::ProviderName{
                         name: "airflow.providers.fab.auth_manager.security_manager.FabAuthManager",
@@ -128,7 +128,7 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "1.0.0"
                 },
                 )),
-                ["airflow", "api","auth","backend","kerberos_auth", ..] => Some((
+                ["airflow", "api", "auth", "backend", "kerberos_auth", ..] => Some((
                     qualname.to_string(),
                     Replacement::ImportPathMoved{
                         original_path:"airflow.api.auth.backend.kerberos_auth",
@@ -146,13 +146,23 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "1.0.0"
                 },
                 )),
-                ["airflow","auth","managers","fab","security_manager","override", ..] => Some((
+                ["airflow", "auth", "managers", "fab", "security_manager", "override", ..] => Some((
                     qualname.to_string(),
                     Replacement::ImportPathMoved{
-                        original_path: "airflow.auth.managers.fab.security_manager.override",
+                        original_path: "airflow.auth.managers.fab.security_managr.override",
                         new_path: "airflow.providers.fab.auth_manager.security_manager.override",
                         provider: "fab",
                         version: "1.0.0"
+                },
+                )),
+                // apache-airflow-providers-celery
+                ["airflow", "config_templates", "default_celery", "DEFAULT_CELERY_CONFIG"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG",
+                        new_path: "airflow.providers.celery.executors.default_celery.DEFAULT_CELERY_CONFIG",
+                        provider: "celery",
+                        version: "3.3.0"
                 },
                 )),
 
