@@ -1028,18 +1028,24 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
+        // Check if the function is decorated with the `no_type_check` decorator
+        // and, if so, suppress any errors that come after the decorators.
         let mut decorator_tys = Vec::with_capacity(decorator_list.len());
+        let mut has_no_type_check_decorator = false;
+
         for decorator in decorator_list {
             let ty = self.infer_decorator(decorator);
             decorator_tys.push(ty);
 
-            // Check if the function is decorated with the `no_type_check` decorator
-            // and, if so, suppress any errors.
             if let Type::FunctionLiteral(function) = ty {
                 if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
-                    self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                    has_no_type_check_decorator = true;
                 }
             }
+        }
+
+        if has_no_type_check_decorator {
+            self.context.set_in_no_type_check(InNoTypeCheck::Yes);
         }
 
         for default in parameters
@@ -1063,8 +1069,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let decorator_tys = decorator_tys.into_boxed_slice();
-
         let function_kind =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
 
@@ -1078,7 +1082,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             &name.id,
             function_kind,
             body_scope,
-            decorator_tys,
+            decorator_tys.into_boxed_slice(),
         ));
 
         self.add_declaration_with_binding(function.into(), definition, function_ty, function_ty);

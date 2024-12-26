@@ -132,14 +132,14 @@ impl<'db> InferContext<'db> {
 
     fn is_in_no_type_check(&self) -> bool {
         match self.no_type_check {
-            InNoTypeCheck::IfEnclosingFunction => {
+            InNoTypeCheck::Possibly => {
                 // Accessing the semantic index here is fine because
                 // the index belongs to the same file as for which we emit the diagnostic.
                 let index = semantic_index(self.db, self.file);
 
                 let scope_id = self.scope.file_scope_id(self.db);
 
-                // Inspect all enclosing function scopes walking bottom up and infer the function's type.
+                // Inspect all ancestor function scopes by walking bottom up and infer the function's type.
                 let mut function_scope_tys = index
                     .ancestor_scopes(scope_id)
                     .filter_map(|(_, scope)| scope.node().as_function())
@@ -184,9 +184,9 @@ impl fmt::Debug for InferContext<'_> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub(crate) enum InNoTypeCheck {
     /// The inference might be in a `no_type_check` block but only if any
-    /// enclosing function is decorated with `@no_type_check`.
+    /// ancestor function is decorated with `@no_type_check`.
     #[default]
-    IfEnclosingFunction,
+    Possibly,
 
     /// The inference is known to be in an `@no_type_check` decorated function.
     Yes,
