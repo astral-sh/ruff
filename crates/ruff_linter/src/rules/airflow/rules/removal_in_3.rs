@@ -35,6 +35,30 @@ fn is_airflow_secret_backend(segments: &[&str]) -> bool {
     }
 }
 
+fn is_airflow_auth_manager(segments: &[&str]) -> bool {
+    match segments {
+        ["airflow", "auth", "manager", rest @ ..] => {
+            if let Some(last_element) = rest.last() {
+                last_element.ends_with("AuthManager")
+            } else {
+                false
+            }
+        }
+
+        ["airflow", "providers", rest @ ..] => {
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == "auth_manager"), rest.last())
+            {
+                pos + 1 < rest.len() && last_element.ends_with("AuthManager")
+            } else {
+                false
+            }
+        }
+
+        _ => false,
+    }
+}
+
 fn is_airflow_hook(qualname: &QualifiedName) -> bool {
     match qualname.segments() {
         ["airflow", "hooks", rest @ ..] => {
@@ -216,6 +240,20 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 "sla_miss_callback",
                 None::<&str>,
             ));
+        }
+        _ if is_airflow_auth_manager(qualname.segments()) => {
+            if !arguments.is_empty() {
+                checker.diagnostics.push(Diagnostic::new(
+                    Airflow3Removal {
+                        // deprecated: (*arguments).to_string(),
+                        deprecated: "appbuilder".to_string(),
+                        replacement: Replacement::Message(
+                            "The constructor takes no parameter now.",
+                        ),
+                    },
+                    arguments.range(),
+                ));
+            }
         }
         _ if is_airflow_task_handler(qualname.segments()) => {
             checker.diagnostics.extend(diagnostic_for_argument(
