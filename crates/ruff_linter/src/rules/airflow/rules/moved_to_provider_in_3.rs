@@ -111,7 +111,7 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "1.0.0"
                     },
                 )),
-                ["airflow","auth","managers","fab","fab_auth_manager", "FabAuthManager"] => Some((
+                ["airflow", "auth", "managers", "fab", "fab_auth_manager", "FabAuthManager"] => Some((
                     qualname.to_string(),
                     Replacement::ProviderName{
                         name: "airflow.providers.fab.auth_manager.security_manager.FabAuthManager",
@@ -128,7 +128,7 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "1.0.0"
                 },
                 )),
-                ["airflow", "api","auth","backend","kerberos_auth", ..] => Some((
+                ["airflow", "api", "auth", "backend", "kerberos_auth", ..] => Some((
                     qualname.to_string(),
                     Replacement::ImportPathMoved{
                         original_path:"airflow.api.auth.backend.kerberos_auth",
@@ -146,7 +146,7 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "1.0.0"
                 },
                 )),
-                ["airflow","auth","managers","fab","security_manager","override", ..] => Some((
+                ["airflow", "auth", "managers", "fab", "security_manager", "override", ..] => Some((
                     qualname.to_string(),
                     Replacement::ImportPathMoved{
                         original_path: "airflow.auth.managers.fab.security_manager.override",
