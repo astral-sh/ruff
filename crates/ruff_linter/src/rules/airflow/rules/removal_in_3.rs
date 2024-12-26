@@ -1,8 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{
+    name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName,
+    StmtClassDef,
+};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -806,6 +810,37 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
     }
 }
 
+fn removed_airflow_plugin_extension(
+    checker: &mut Checker,
+    expr: &Expr,
+    name: &str,
+    class_def: &StmtClassDef,
+) {
+    if matches!(name, "executors" | "operators" | "sensors" | "hooks") {
+        if class_def.bases().iter().any(|expr| {
+            checker
+                .semantic()
+                .resolve_qualified_name(expr)
+                .is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        ["airflow", "plugins_manager", "AirflowPlugin"]
+                    )
+                })
+        }) {
+            checker.diagnostics.push(Diagnostic::new(
+                Airflow3Removal {
+                    deprecated: name.to_string(),
+                    replacement: Replacement::Message(
+                        "This extension should just be imported as a regular python module.",
+                    ),
+                },
+                expr.range(),
+            ));
+        }
+    }
+}
+
 /// AIR302
 pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
@@ -826,7 +861,14 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
             removed_name(checker, expr, ranged);
             removed_class_attribute(checker, expr);
         }
-        ranged @ Expr::Name(_) => removed_name(checker, expr, ranged),
+        ranged @ Expr::Name(ExprName { id, ctx, .. }) => {
+            removed_name(checker, expr, ranged);
+            if ctx == &ExprContext::Store {
+                if let ScopeKind::Class(class_def) = &checker.semantic().current_scope().kind {
+                    removed_airflow_plugin_extension(checker, expr, id, class_def);
+                }
+            }
+        }
         _ => {}
     }
 }

@@ -279,6 +279,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             );
                         }
                     }
+                    if checker.enabled(Rule::Airflow3Removal) {
+                        airflow::rules::removed_in_3(checker, expr);
+                    }
                     if checker.enabled(Rule::MixedCaseVariableInGlobalScope) {
                         if matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             pep8_naming::rules::mixed_case_variable_in_global_scope(
