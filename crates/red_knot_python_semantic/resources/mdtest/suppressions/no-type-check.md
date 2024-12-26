@@ -88,7 +88,7 @@ def test() -> Undefined:
 
 Red Knot does not support `no_type_check` annotations on classes currently. The behaviour of
 `no_type_check` when applied to classes is
-[not fully specified currently](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check),
+[not specified currently](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check),
 and applying the decorator to classes is not supported by Pyright and possibly other type checkers.
 
 A future improvement might be to emit a diagnostic if a `no_type_check` annotation is applied to a
