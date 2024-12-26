@@ -17,7 +17,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 ///
 /// Use instead:
 /// ```python
-/// class Foo:
+/// def foo():
 ///     bar = 1
 ///
 ///     def get_bar(self):
