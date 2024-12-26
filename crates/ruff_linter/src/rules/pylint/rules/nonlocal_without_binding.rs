@@ -9,7 +9,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 ///
 /// ## Example
 /// ```python
-/// class Foo:
+/// def foo():
 ///     def get_bar(self):
 ///         nonlocal bar
 ///         ...
