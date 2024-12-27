@@ -13,7 +13,7 @@ python-version = "3.10"
 class A: ...
 class B: ...
 
-reveal_type(A | B)  # revealed: UnionType
+reveal_type(A | B)  # revealed: Literal[A, B]
 ```
 
 ## Union of two classes (prior to 3.10)
