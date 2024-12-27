@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
+---
+conftest.py:3:5: PLR0917 Too many positional arguments (8/5)
+  |
+1 | # Errors
+2 | 
+3 | def this_is_not_a_hook(a, b, c, d, e, f, g, h): ...
+  |     ^^^^^^^^^^^^^^^^^^ PLR0917
+  |

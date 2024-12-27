@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
+snapshot_kind: text
+---
+test_foo.py:3:24: FBT001 Boolean-typed positional argument in function definition
+  |
+1 | # Errors
+2 | 
+3 | def this_is_not_a_test(a: bool): ...
+  |                        ^ FBT001
+4 | 
+5 | class TestClassLookalike:
+  |
+
+test_foo.py:7:39: FBT001 Boolean-typed positional argument in function definition
+  |
+5 | class TestClassLookalike:
+6 |     def __init__(self): ...
+7 |     def test_this_is_not_a_test(self, a: bool): ...
+  |                                       ^ FBT001
+  |

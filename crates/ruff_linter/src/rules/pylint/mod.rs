@@ -133,6 +133,14 @@ mod tests {
         Rule::TooManyPositionalArguments,
         Path::new("too_many_positional_arguments.py")
     )]
+    #[test_case(
+        Rule::TooManyPositionalArguments,
+        Path::new("too_many_positional_arguments_pytest/test_foo.py")
+    )]
+    #[test_case(
+        Rule::TooManyPositionalArguments,
+        Path::new("too_many_positional_arguments_pytest/conftest.py")
+    )]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
         Rule::TooManyReturnStatements,

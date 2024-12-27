@@ -1,10 +1,15 @@
+use std::ffi::OsStr;
 use std::fmt;
+use std::path::Path;
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
+use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_python_trivia::PythonWhitespace;
+
+use crate::checkers::ast::Checker;
 
 pub(super) fn get_mark_decorators(
     decorators: &[Decorator],
@@ -44,6 +49,84 @@ pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
         })
+}
+
+/// Whether `path` likely leads to a Pytest test file.
+///
+/// Pytest determines a test file using [a number of conventions and settings][1].
+/// Only the conventions are reflected here.
+/// This function returns true if the file name (`.py` notwithstanding):
+///
+/// * Starts with `test_`, or
+/// * Ends with `_test`
+///
+/// It is thus prone to both false positives and false negatives.
+///
+/// [1]: https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery
+pub(crate) fn is_likely_pytest_test_file(path: &Path) -> bool {
+    if !matches!(path.extension().and_then(OsStr::to_str), Some("py")) {
+        return false;
+    }
+
+    let Some(file_stem) = path.file_stem().and_then(OsStr::to_str) else {
+        return false;
+    };
+
+    file_stem.starts_with("test_") || file_stem.ends_with("_test")
+}
+
+/// Whether the currently checked `func` is likely to be a Pytest test.
+///
+/// A normal Pytest test function is one whose name starts with `test` and is either:
+///
+/// * Placed at module-level, or
+/// * Placed within a class whose name starts with `Test` and does not have an `__init__` method.
+///
+/// See also [`is_likely_pytest_test_file`]
+pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -> bool {
+    if !is_likely_pytest_test_file(checker.path()) {
+        return false;
+    }
+
+    let semantic = checker.semantic();
+
+    if !func.name.starts_with("test") {
+        return false;
+    }
+
+    if semantic.scope_id.is_global() {
+        return true;
+    }
+
+    let ScopeKind::Class(class) = semantic.current_scope().kind else {
+        return false;
+    };
+
+    if !class.name.starts_with("Test") {
+        return false;
+    }
+
+    fn stmt_is_not_dunder_init(stmt: &Stmt) -> bool {
+        let Stmt::FunctionDef(function) = stmt else {
+            return true;
+        };
+
+        !visibility::is_init(&function.name)
+    }
+
+    class.body.iter().all(stmt_is_not_dunder_init)
+}
+
+/// Whether `path` leads to a `conftest.py` file.
+pub(crate) fn is_conftest(path: &Path) -> bool {
+    matches!(
+        path.file_name().and_then(OsStr::to_str),
+        Some("conftest.py")
+    )
+}
+
+pub(crate) fn is_likely_pytest_hook(func: &StmtFunctionDef, checker: &Checker) -> bool {
+    is_conftest(checker.path()) && func.name.starts_with("pytest_")
 }
 
 pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {

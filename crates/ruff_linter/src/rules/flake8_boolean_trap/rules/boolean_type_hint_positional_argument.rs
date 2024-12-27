@@ -2,13 +2,16 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, StmtFunctionDef};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
+use crate::rules::flake8_pytest_style::rules::helpers::{
+    is_likely_pytest_hook, is_likely_pytest_test,
+};
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
@@ -111,14 +114,25 @@ impl Violation for BooleanTypeHintPositionalArgument {
 /// FBT001
 pub(crate) fn boolean_type_hint_positional_argument(
     checker: &mut Checker,
-    name: &str,
-    decorator_list: &[Decorator],
-    parameters: &Parameters,
+    function_def: &StmtFunctionDef,
 ) {
+    let StmtFunctionDef {
+        name,
+        decorator_list,
+        parameters,
+        ..
+    } = function_def;
+
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
     }
+
+    if is_likely_pytest_test(function_def, checker) || is_likely_pytest_hook(function_def, checker)
+    {
+        return;
+    }
+
     // Allow Boolean type hints in explicitly-allowed functions.
     if is_allowed_func_def(name) {
         return;

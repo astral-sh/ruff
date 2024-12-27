@@ -333,9 +333,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::BooleanTypeHintPositionalArgument) {
                 flake8_boolean_trap::rules::boolean_type_hint_positional_argument(
                     checker,
-                    name,
-                    decorator_list,
-                    parameters,
+                    function_def,
                 );
             }
             if checker.enabled(Rule::BooleanDefaultValuePositionalArgument) {

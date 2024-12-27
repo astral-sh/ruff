@@ -10,7 +10,7 @@ pub(crate) use raises::*;
 mod assertion;
 mod fail;
 mod fixture;
-mod helpers;
+pub(crate) mod helpers;
 mod imports;
 mod marks;
 mod parametrize;

@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+snapshot_kind: text
+---
+test_foo.py:3:5: PLR0917 Too many positional arguments (8/5)
+  |
+1 | # Errors
+2 | 
+3 | def this_is_not_a_test(a, b, c, d, e, f, g, h): ...
+  |     ^^^^^^^^^^^^^^^^^^ PLR0917
+4 | 
+5 | class TestClassLookalike:
+  |
+
+test_foo.py:7:9: PLR0917 Too many positional arguments (8/5)
+  |
+5 | class TestClassLookalike:
+6 |     def __init__(self): ...
+7 |     def test_this_is_not_a_test(self, a, b, c, d, e, f, g, h): ...
+  |         ^^^^^^^^^^^^^^^^^^^^^^^ PLR0917
+  |

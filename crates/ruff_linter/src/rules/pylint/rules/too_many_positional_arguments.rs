@@ -4,6 +4,9 @@ use ruff_python_ast::{self as ast, identifier::Identifier};
 use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_pytest_style::rules::helpers::{
+    is_likely_pytest_hook, is_likely_pytest_test,
+};
 
 /// ## What it does
 /// Checks for function definitions that include too many positional arguments.
@@ -64,6 +67,12 @@ pub(crate) fn too_many_positional_arguments(
     if checker.source_type.is_stub() {
         return;
     }
+
+    if is_likely_pytest_test(function_def, checker) || is_likely_pytest_hook(function_def, checker)
+    {
+        return;
+    }
+
     let semantic = checker.semantic();
 
     // Count the number of positional arguments.
