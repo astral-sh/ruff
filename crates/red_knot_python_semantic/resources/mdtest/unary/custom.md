@@ -34,6 +34,10 @@ reveal_type(~No())  # revealed: Unknown
 
 ## Classes
 
+Dunder methods defined in a class are available to instances of that class, but not to the class
+itself.  (For these operators to work on the class itself, they would have to be defined on the
+class's type, i.e. `type`.)
+
 ```py
 class Yes:
     def __pos__(self) -> bool:

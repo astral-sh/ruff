@@ -9,6 +9,30 @@ reveal_type(3 * -1)  # revealed: Literal[-3]
 reveal_type(-3 // 3)  # revealed: Literal[-1]
 reveal_type(-3 / 3)  # revealed: float
 reveal_type(5 % 3)  # revealed: Literal[2]
+
+def lhs(x: int):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(x - 4)  # revealed: int
+    reveal_type(x * -1)  # revealed: int
+    reveal_type(x // 3)  # revealed: int
+    reveal_type(x / 3)  # revealed: float
+    reveal_type(x % 3)  # revealed: int
+
+def rhs(x: int):
+    reveal_type(2 + x)  # revealed: int
+    reveal_type(3 - x)  # revealed: int
+    reveal_type(3 * x)  # revealed: int
+    reveal_type(-3 // x)  # revealed: int
+    reveal_type(-3 / x)  # revealed: float
+    reveal_type(5 % x)  # revealed: int
+
+def both(x: int):
+    reveal_type(x + x)  # revealed: int
+    reveal_type(x - x)  # revealed: int
+    reveal_type(x * x)  # revealed: int
+    reveal_type(x // x)  # revealed: int
+    reveal_type(x / x)  # revealed: float
+    reveal_type(x % x)  # revealed: int
 ```
 
 ## Power
@@ -21,6 +45,11 @@ largest_u32 = 4_294_967_295
 reveal_type(2**2)  # revealed: Literal[4]
 reveal_type(1 ** (largest_u32 + 1))  # revealed: int
 reveal_type(2**largest_u32)  # revealed: int
+
+def variable(x: int):
+    reveal_type(x ** 2)  # revealed: @Todo(return type)
+    reveal_type(2 ** x)  # revealed: @Todo(return type)
+    reveal_type(x ** x)  # revealed: @Todo(return type)
 ```
 
 ## Division by Zero
