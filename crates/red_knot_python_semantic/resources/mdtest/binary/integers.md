@@ -10,6 +10,10 @@ reveal_type(-3 // 3)  # revealed: Literal[-1]
 reveal_type(-3 / 3)  # revealed: float
 reveal_type(5 % 3)  # revealed: Literal[2]
 
+# TODO: We don't currently verify that the actual parameter to int.__add__ matches the declared
+# formal parameter type.
+reveal_type(2 + "f")  # revealed: int
+
 def lhs(x: int):
     reveal_type(x + 1)  # revealed: int
     reveal_type(x - 4)  # revealed: int
