@@ -3455,6 +3455,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Some(ty)
             }
 
+            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitOr) => {
+                Some(Type::BooleanLiteral(b1 | b2))
+            }
+
+            (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
+                Type::IntLiteral(i64::from(bool_value)),
+                right,
+                op,
+            ),
+            (left, Type::BooleanLiteral(bool_value), op) => {
+                self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
+            }
+
             (Type::Instance(_), Type::IntLiteral(_), op) => self.infer_binary_expression_type(
                 left_ty,
                 KnownClass::Int.to_instance(self.db()),
@@ -3542,18 +3555,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
             }
 
-            (Type::BooleanLiteral(b1), Type::BooleanLiteral(b2), ast::Operator::BitOr) => {
-                Some(Type::BooleanLiteral(b1 | b2))
-            }
-
-            (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
-                Type::IntLiteral(i64::from(bool_value)),
-                right,
-                op,
-            ),
-            (left, Type::BooleanLiteral(bool_value), op) => {
-                self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
-            }
             _ => Some(todo_type!("Support for more binary expressions")),
         }
     }
