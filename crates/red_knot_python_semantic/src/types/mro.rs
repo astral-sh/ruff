@@ -3,7 +3,6 @@ use std::ops::Deref;
 
 use rustc_hash::FxHashSet;
 
-use crate::symbol::{Boundness, Symbol};
 use crate::types::class_base::ClassBase;
 use crate::types::{Class, KnownClass, Type};
 use crate::Db;
@@ -326,48 +325,6 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
             if sequence[0] == mro_entry {
                 sequence.pop_front();
             }
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(super) enum SlotsKind {
-    /// `__slots__` is not found in the class.
-    NotSpecified,
-    /// `__slots__` is defined but empty: `__slots__ = ()`.
-    Empty,
-    /// `__slots__` is defined and is not empty: `__slots__ = ("a", "b")`.
-    NotEmpty,
-    /// `__slots__` is defined but its value is dynamic:
-    /// * `__slots__ = tuple(a for a in b)`
-    /// * `__slots__ = ["a", "b"]`
-    Dynamic,
-}
-
-impl SlotsKind {
-    pub(super) fn from(db: &dyn Db, base: Class) -> Self {
-        let Symbol::Type(slots_ty, bound) = base.own_class_member(db, "__slots__") else {
-            return Self::NotSpecified;
-        };
-
-        if matches!(bound, Boundness::PossiblyUnbound) {
-            return Self::Dynamic;
-        };
-
-        match slots_ty {
-            // __slots__ = ("a", "b")
-            Type::Tuple(tuple) => {
-                if tuple.elements(db).is_empty() {
-                    Self::Empty
-                } else {
-                    Self::NotEmpty
-                }
-            }
-
-            // __slots__ = "abc"  # Same as `("abc",)`
-            Type::StringLiteral(_) => Self::NotEmpty,
-
-            _ => Self::Dynamic,
         }
     }
 }

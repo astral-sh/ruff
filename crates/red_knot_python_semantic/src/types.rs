@@ -46,6 +46,7 @@ mod infer;
 mod mro;
 mod narrow;
 mod signatures;
+mod slots;
 mod string_annotation;
 mod unpacker;
 

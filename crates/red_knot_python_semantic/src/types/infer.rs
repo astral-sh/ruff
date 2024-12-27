@@ -51,15 +51,14 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{
-    report_base_with_incompatible_slots, report_invalid_assignment, report_unresolved_module,
-    TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
-    CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
-    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE, INVALID_CONTEXT_MANAGER, INVALID_DECLARATION,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    report_invalid_assignment, report_unresolved_module, TypeCheckDiagnostics, CALL_NON_CALLABLE,
+    CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE,
+    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
-use crate::types::mro::{MroErrorKind, SlotsKind};
+use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type,
@@ -80,6 +79,7 @@ use super::diagnostic::{
     report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
     SUBCLASS_OF_FINAL_CLASS,
 };
+use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
@@ -623,56 +623,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         )
                     }
                 }
-                Ok(_) => {
-                    let mut first_with_solid_base = None;
-                    let mut common_solid_base = None;
-                    let mut found_second = false;
-
-                    for (index, base) in class.explicit_bases(self.db()).iter().enumerate() {
-                        let Some(ClassLiteralType { class: base }) = base.into_class_literal()
-                        else {
-                            continue;
-                        };
-
-                        let solid_base = base.iter_mro(self.db()).find_map(|current| {
-                            let ClassBase::Class(current) = current else {
-                                return None;
-                            };
-
-                            match SlotsKind::from(self.db(), current) {
-                                SlotsKind::NotEmpty => Some(current),
-                                SlotsKind::NotSpecified | SlotsKind::Empty => None,
-                                SlotsKind::Dynamic => None,
-                            }
-                        });
-
-                        let base_node = &class_node.bases()[index];
-
-                        if solid_base.is_none() {
-                            continue;
-                        }
-
-                        if first_with_solid_base.is_none() {
-                            first_with_solid_base = Some(index);
-                            common_solid_base = solid_base;
-                            continue;
-                        }
-
-                        if solid_base == common_solid_base {
-                            continue;
-                        }
-
-                        found_second = true;
-                        report_base_with_incompatible_slots(&self.context, base_node);
-                    }
-
-                    if found_second {
-                        if let Some(index) = first_with_solid_base {
-                            let base_node = &class_node.bases()[index];
-                            report_base_with_incompatible_slots(&self.context, base_node);
-                        };
-                    }
-                }
+                Ok(_) => check_class_slots(&self.context, class, class_node)
             }
 
             // (4) Check that the class's metaclass can be determined without error.
