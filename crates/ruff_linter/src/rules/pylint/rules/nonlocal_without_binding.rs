@@ -6,6 +6,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 ///
 /// ## Why is this bad?
 /// `nonlocal` names must be bound to a name in an outer scope.
+/// Violating this rule leads to a `SyntaxError` at runtime.
 ///
 /// ## Example
 /// ```python
