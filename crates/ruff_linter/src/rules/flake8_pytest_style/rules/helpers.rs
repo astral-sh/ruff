@@ -106,15 +106,13 @@ pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -
         return false;
     }
 
-    fn stmt_is_not_dunder_init(stmt: &Stmt) -> bool {
+    class.body.iter().all(|stmt| {
         let Stmt::FunctionDef(function) = stmt else {
             return true;
         };
 
         !visibility::is_init(&function.name)
-    }
-
-    class.body.iter().all(stmt_is_not_dunder_init)
+    })
 }
 
 /// Whether `path` leads to a `conftest.py` file.
