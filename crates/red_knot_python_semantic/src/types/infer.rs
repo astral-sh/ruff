@@ -79,6 +79,7 @@ use super::diagnostic::{
     report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
     SUBCLASS_OF_FINAL_CLASS,
 };
+use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
@@ -585,41 +586,44 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // (3) Check that the class's MRO is resolvable
-            if let Err(mro_error) = class.try_mro(self.db()).as_ref() {
-                match mro_error.reason() {
-                    MroErrorKind::DuplicateBases(duplicates) => {
-                        let base_nodes = class_node.bases();
-                        for (index, duplicate) in duplicates {
-                            self.context.report_lint(
-                                &DUPLICATE_BASE,
-                                (&base_nodes[*index]).into(),
-                                format_args!("Duplicate base class `{}`", duplicate.name(self.db())),
-                            );
+            match class.try_mro(self.db()).as_ref() {
+                Err(mro_error) => {
+                    match mro_error.reason() {
+                        MroErrorKind::DuplicateBases(duplicates) => {
+                            let base_nodes = class_node.bases();
+                            for (index, duplicate) in duplicates {
+                                self.context.report_lint(
+                                    &DUPLICATE_BASE,
+                                    (&base_nodes[*index]).into(),
+                                    format_args!("Duplicate base class `{}`", duplicate.name(self.db())),
+                                );
+                            }
                         }
-                    }
-                    MroErrorKind::InvalidBases(bases) => {
-                        let base_nodes = class_node.bases();
-                        for (index, base_ty) in bases {
-                            self.context.report_lint(
-                                &INVALID_BASE,
-                                (&base_nodes[*index]).into(),
-                                format_args!(
-                                    "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
-                                    base_ty.display(self.db())
-                                ),
-                            );
+                        MroErrorKind::InvalidBases(bases) => {
+                            let base_nodes = class_node.bases();
+                            for (index, base_ty) in bases {
+                                self.context.report_lint(
+                                    &INVALID_BASE,
+                                    (&base_nodes[*index]).into(),
+                                    format_args!(
+                                        "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
+                                        base_ty.display(self.db())
+                                    ),
+                                );
+                            }
                         }
+                        MroErrorKind::UnresolvableMro { bases_list } => self.context.report_lint(
+                            &INCONSISTENT_MRO,
+                            class_node.into(),
+                            format_args!(
+                                "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
+                                class.name(self.db()),
+                                bases_list.iter().map(|base| base.display(self.db())).join(", ")
+                            ),
+                        )
                     }
-                    MroErrorKind::UnresolvableMro { bases_list } => self.context.report_lint(
-                        &INCONSISTENT_MRO,
-                        class_node.into(),
-                        format_args!(
-                            "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
-                            class.name(self.db()),
-                            bases_list.iter().map(|base| base.display(self.db())).join(", ")
-                        ),
-                    )
                 }
+                Ok(_) => check_class_slots(&self.context, class, class_node)
             }
 
             // (4) Check that the class's metaclass can be determined without error.
