@@ -3357,6 +3357,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             // When interacting with Todo, Any and Unknown should propagate (as if we fix this
             // `Todo` in the future, the result would then become Any or Unknown, respectively.)
             (Type::Any, _, _) | (_, Type::Any, _) => Some(Type::Any),
+            (todo @ Type::Todo(_), _, _) | (_, todo @ Type::Todo(_), _) => Some(todo),
+            (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
             (Type::Unknown, _, _) | (_, Type::Unknown, _) => Some(Type::Unknown),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
