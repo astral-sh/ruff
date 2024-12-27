@@ -165,7 +165,81 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "3.3.0"
                 },
                 )),
-
+                ["airflow", "executors", "celery_executor", "app"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.executors.celery_executor.app",
+                        new_path: "airflow.providers.celery.executors.celery_executor_utils.app",
+                        provider: "celery",
+                        version: "3.3.0"
+                },
+                )),
+                // apache-airflow-providers-common-sql
+                ["airflow", "hooks", "dbapi", "ConnectorProtocol"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.hooks.dbapi.ConnectorProtocol",
+                        new_path: "airflow.providers.common.sql.hooks.sql.ConnectorProtocol",
+                        provider: "Common SQL",
+                        version: "1.0.0"
+                },
+                )),
+                ["airflow", "hooks", "dbapi", "DbApiHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.hooks.dbapi.DbApiHook",
+                        new_path: "airflow.providers.common.sql.hooks.sql.DbApiHook",
+                        provider: "Common SQL",
+                        version: "1.0.0"
+                },
+                )),
+                // apache-airflow-providers-cncf-kubernetes
+                ["airflow", "executors", "kubernetes_executor_types", "ALL_NAMESPACES"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.executors.kubernetes_executor_types.ALL_NAMESPACES",
+                        new_path: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES",
+                        provider: "Kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "executors", "kubernetes_executor_types", "POD_EXECUTOR_DONE_KEY"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
+                        new_path: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
+                        provider: "Kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                // apache-airflow-providers-apache-hive
+                ["airflow", "hooks", "hive_hooks", "HIVE_QUEUE_PRIORITIES"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES",
+                        new_path: "airflow.providers.apache.hive.hooks.hive.HIVE_QUEUE_PRIORITIES",
+                        provider: "Apache Hive",
+                        version: "1.0.0"
+                },
+                )),
+                ["airflow", "macros", "hive", "closest_ds_partition"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.macros.hive.closest_ds_partition",
+                        new_path: "airflow.providers.apache.hive.macros.hive.closest_ds_partition",
+                        provider: "Apache Hive",
+                        version: "5.1.0"
+                },
+                )),
+                ["airflow", "macros", "hive", "max_partition"] => Some((
+                    qualname.to_string(),
+                    Replacement::ImportPathMoved{
+                        original_path: "airflow.macros.hive.max_partition",
+                        new_path: "airflow.providers.apache.hive.macros.hive.max_partition",
+                        provider: "Apache Hive",
+                        version: "5.1.0"
+                },
+                )),
                 _ => None,
             });
     if let Some((deprecated, replacement)) = result {
