@@ -19,12 +19,14 @@ use ruff_text_size::{Ranged, TextRange};
 ///
 /// ```python
 /// if dict.get(key, False):
-///      ...
+///     ...
 /// ```
+///
 /// Use instead:
+///
 /// ```python
 /// if dict.get(key):
-///      ...
+///     ...
 /// ```
 ///
 /// ## Fix safety
