@@ -146,6 +146,7 @@ pub enum Command {
 pub enum AnalyzeCommand {
     /// Generate a map of Python file dependencies or dependents.
     Graph(AnalyzeGraphCommand),
+    Live(AnalyzeLiveCommand),
 }
 
 #[derive(Clone, Debug, clap::Parser)]
@@ -169,6 +170,20 @@ pub struct AnalyzeGraphCommand {
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     target_version: Option<PythonVersion>,
+}
+
+#[derive(Clone, Debug, clap::Parser)]
+pub struct AnalyzeLiveCommand {
+    #[clap(help = "Command to run on changed files")]
+    pub cmd: Vec<String>,
+    #[clap(
+        long,
+        help = "Comma-separated list of files or directories to trigger command on [default: .]"
+    )]
+    pub paths: String,
+    /// Args passed to `analyze graph`
+    #[clap(long)]
+    pub detect_string_imports: bool,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -801,6 +816,37 @@ impl AnalyzeGraphCommand {
     }
 }
 
+impl AnalyzeLiveCommand {
+    /// Partition the CLI into command-line arguments and configuration
+    /// overrides.
+    pub fn partition(
+        self,
+        global_options: GlobalConfigArgs,
+    ) -> anyhow::Result<(AnalyzeLiveArgs, ConfigArguments)> {
+        let format_arguments = AnalyzeLiveArgs {
+            paths: self
+                .paths
+                .split(",")
+                .map(PathBuf::from)
+                .collect::<Vec<PathBuf>>(),
+            cmd: self.cmd,
+        };
+
+        let cli_overrides = ExplicitConfigOverrides {
+            detect_string_imports: if self.detect_string_imports {
+                Some(true)
+            } else {
+                None
+            },
+            preview: Some(PreviewMode::Enabled),
+            ..ExplicitConfigOverrides::default()
+        };
+
+        let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
+        Ok((format_arguments, config_args))
+    }
+}
+
 fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     match (yes, no) {
         (true, false) => Some(true),
@@ -1209,6 +1255,13 @@ impl LineColumnParseError {
 pub struct AnalyzeGraphArgs {
     pub files: Vec<PathBuf>,
     pub direction: Direction,
+}
+
+/// CLI settings that are distinct from configuration (commands, lists of files, etc.).
+#[derive(Clone, Debug)]
+pub struct AnalyzeLiveArgs {
+    pub paths: Vec<PathBuf>,
+    pub cmd: Vec<String>,
 }
 
 /// Configuration overrides provided via dedicated CLI flags:
