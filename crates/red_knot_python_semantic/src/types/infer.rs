@@ -3470,54 +3470,50 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
             }
 
-            (Type::Instance(_), Type::IntLiteral(_), op) => self.infer_binary_expression_type(
-                left_ty,
-                KnownClass::Int.to_instance(self.db()),
+            // We've handled all of the special cases that we support for literals, so we need to
+            // fall back on looking for dunder methods on one of the operand types.
+            (
+                Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::Instance(_)
+                | Type::KnownInstance(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::IntLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)
+                | Type::SliceLiteral(_)
+                | Type::Tuple(_),
+                Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::Instance(_)
+                | Type::KnownInstance(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::IntLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)
+                | Type::SliceLiteral(_)
+                | Type::Tuple(_),
                 op,
-            ),
-
-            (Type::IntLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
-                KnownClass::Int.to_instance(self.db()),
-                right_ty,
-                op,
-            ),
-
-            (Type::Instance(_), Type::Tuple(_), op) => self.infer_binary_expression_type(
-                left_ty,
-                KnownClass::Tuple.to_instance(self.db()),
-                op,
-            ),
-
-            (Type::Tuple(_), Type::Instance(_), op) => self.infer_binary_expression_type(
-                KnownClass::Tuple.to_instance(self.db()),
-                right_ty,
-                op,
-            ),
-
-            (Type::Instance(_), Type::StringLiteral(_) | Type::LiteralString, op) => self
-                .infer_binary_expression_type(left_ty, KnownClass::Str.to_instance(self.db()), op),
-
-            (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(_), op) => self
-                .infer_binary_expression_type(KnownClass::Str.to_instance(self.db()), right_ty, op),
-
-            (Type::Instance(_), Type::BytesLiteral(_), op) => self.infer_binary_expression_type(
-                left_ty,
-                KnownClass::Bytes.to_instance(self.db()),
-                op,
-            ),
-
-            (Type::BytesLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
-                KnownClass::Bytes.to_instance(self.db()),
-                right_ty,
-                op,
-            ),
-
-            (Type::Instance(left), Type::Instance(right), op) => {
-                if left != right && right.is_subtype_of(self.db(), left) {
+            ) => {
+                let left_class = left_ty.to_meta_type(self.db());
+                let right_class = right_ty.to_meta_type(self.db());
+                if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
                     let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right.class.class_member(self.db(), reflected_dunder);
+                    let rhs_reflected = right_class.member(self.db(), reflected_dunder);
                     if !rhs_reflected.is_unbound()
-                        && rhs_reflected != left.class.class_member(self.db(), reflected_dunder)
+                        && rhs_reflected != left_class.member(self.db(), reflected_dunder)
                     {
                         return right_ty
                             .call_dunder(self.db(), reflected_dunder, &[right_ty, left_ty])
@@ -3531,7 +3527,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let call_on_left_instance = if let Symbol::Type(class_member, _) =
-                    left.class.class_member(self.db(), op.dunder())
+                    left_class.member(self.db(), op.dunder())
                 {
                     class_member
                         .call(self.db(), &[left_ty, right_ty])
@@ -3541,11 +3537,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 call_on_left_instance.or_else(|| {
-                    if left == right {
+                    if left_ty == right_ty {
                         None
                     } else {
                         if let Symbol::Type(class_member, _) =
-                            right.class.class_member(self.db(), op.reflected_dunder())
+                            right_class.member(self.db(), op.reflected_dunder())
                         {
                             class_member
                                 .call(self.db(), &[right_ty, left_ty])
@@ -3556,8 +3552,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 })
             }
-
-            _ => Some(todo_type!("Support for more binary expressions")),
         }
     }
 
