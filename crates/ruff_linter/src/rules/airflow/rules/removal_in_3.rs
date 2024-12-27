@@ -592,6 +592,11 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                     qualname.to_string(),
                     Replacement::Name("airflow.lineage.hook.AssetLineageInfo"),
                 )),
+                // airflow.hooks
+                ["airflow", "hooks", "base_hook", "BaseHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.hooks.base.BaseHook"),
+                )),
                 // airflow.operators
                 ["airflow", "operators", "subdag", ..] => {
                     Some((

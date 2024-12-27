@@ -36,6 +36,7 @@ from airflow.datasets.manager import (
     dataset_manager,
     resolve_dataset_manager,
 )
+from airflow.hooks.base_hook import BaseHook
 from airflow.lineage.hook import DatasetLineageInfo
 from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
 from airflow.metrics.validators import AllowListValidator, BlockListValidator
@@ -137,6 +138,9 @@ any_to_test_method_call.iter_dataset_aliases()
 
 # airflow.datasets.manager
 DatasetManager, dataset_manager, resolve_dataset_manager
+
+# airflow.hooks
+BaseHook()
 
 # airflow.lineage.hook
 DatasetLineageInfo
