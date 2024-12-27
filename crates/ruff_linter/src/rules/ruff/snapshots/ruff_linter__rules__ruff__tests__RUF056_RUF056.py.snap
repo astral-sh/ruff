@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF056.py:112:43: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:112:43: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 111 | # dict.get in ternary expression
 112 | value = "not found" if my_dict.get("key", False) else "default"  # [RUF056]
@@ -21,7 +21,7 @@ RUF056.py:112:43: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 114 114 | # dict.get in an if statement
 115 115 | if my_dict.get("key", False):  # [RUF056]
 
-RUF056.py:115:23: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:115:23: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 114 | # dict.get in an if statement
 115 | if my_dict.get("key", False):  # [RUF056]
@@ -40,7 +40,7 @@ RUF056.py:115:23: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 117 117 | 
 118 118 | # dict.get in an assert statement
 
-RUF056.py:119:27: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:119:27: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 118 | # dict.get in an assert statement
 119 | assert my_dict.get("key", False)  # [RUF056]
@@ -60,7 +60,7 @@ RUF056.py:119:27: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 121 121 | # dict.get in a while statement
 122 122 | while my_dict.get("key", False):  # [RUF056]
 
-RUF056.py:122:26: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:122:26: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 121 | # dict.get in a while statement
 122 | while my_dict.get("key", False):  # [RUF056]
@@ -79,7 +79,7 @@ RUF056.py:122:26: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 124 124 | 
 125 125 | # dict.get in unary not expression
 
-RUF056.py:126:32: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:126:32: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 125 | # dict.get in unary not expression
 126 | value = not my_dict.get("key", False)  # [RUF056]
@@ -99,7 +99,7 @@ RUF056.py:126:32: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 128 128 | # dict.get in or expression
 129 129 | value = my_dict.get("key", False) or "default"  # [RUF056]
 
-RUF056.py:129:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:129:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 128 | # dict.get in or expression
 129 | value = my_dict.get("key", False) or "default"  # [RUF056]
@@ -119,7 +119,7 @@ RUF056.py:129:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 131 131 | # dict.get in and expression
 132 132 | value = my_dict.get("key", False) and "default"  # [RUF056]
 
-RUF056.py:132:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:132:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 131 | # dict.get in and expression
 132 | value = my_dict.get("key", False) and "default"  # [RUF056]
@@ -139,7 +139,7 @@ RUF056.py:132:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 134 134 | # testing all falsy fallbacks
 135 135 | value = my_dict.get("key", False) and "default"  # [RUF056]
 
-RUF056.py:135:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:135:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 134 | # testing all falsy fallbacks
 135 | value = my_dict.get("key", False) and "default"  # [RUF056]
@@ -159,7 +159,7 @@ RUF056.py:135:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 137 137 | value = my_dict.get("key", list()) and "default"  # [RUF056]
 138 138 | value = my_dict.get("key", {}) and "default"  # [RUF056]
 
-RUF056.py:136:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:136:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 134 | # testing all falsy fallbacks
 135 | value = my_dict.get("key", False) and "default"  # [RUF056]
@@ -180,7 +180,7 @@ RUF056.py:136:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 138 138 | value = my_dict.get("key", {}) and "default"  # [RUF056]
 139 139 | value = my_dict.get("key", dict()) and "default"  # [RUF056]
 
-RUF056.py:137:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:137:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 135 | value = my_dict.get("key", False) and "default"  # [RUF056]
 136 | value = my_dict.get("key", []) and "default"  # [RUF056]
@@ -201,7 +201,7 @@ RUF056.py:137:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 139 139 | value = my_dict.get("key", dict()) and "default"  # [RUF056]
 140 140 | value = my_dict.get("key", set()) and "default"  # [RUF056]
 
-RUF056.py:138:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:138:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 136 | value = my_dict.get("key", []) and "default"  # [RUF056]
 137 | value = my_dict.get("key", list()) and "default"  # [RUF056]
@@ -222,7 +222,7 @@ RUF056.py:138:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 140 140 | value = my_dict.get("key", set()) and "default"  # [RUF056]
 141 141 | value = my_dict.get("key", None) and "default"  # [RUF056]
 
-RUF056.py:139:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:139:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 137 | value = my_dict.get("key", list()) and "default"  # [RUF056]
 138 | value = my_dict.get("key", {}) and "default"  # [RUF056]
@@ -243,7 +243,7 @@ RUF056.py:139:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 141 141 | value = my_dict.get("key", None) and "default"  # [RUF056]
 142 142 | value = my_dict.get("key", 0) and "default"  # [RUF056]
 
-RUF056.py:140:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:140:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 138 | value = my_dict.get("key", {}) and "default"  # [RUF056]
 139 | value = my_dict.get("key", dict()) and "default"  # [RUF056]
@@ -264,7 +264,7 @@ RUF056.py:140:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 142 142 | value = my_dict.get("key", 0) and "default"  # [RUF056]
 143 143 | value = my_dict.get("key", 0.0) and "default"  # [RUF056]
 
-RUF056.py:141:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:141:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 139 | value = my_dict.get("key", dict()) and "default"  # [RUF056]
 140 | value = my_dict.get("key", set()) and "default"  # [RUF056]
@@ -285,7 +285,7 @@ RUF056.py:141:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 143 143 | value = my_dict.get("key", 0.0) and "default"  # [RUF056]
 144 144 | value = my_dict.get("key", "") and "default"  # [RUF056]
 
-RUF056.py:142:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:142:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 140 | value = my_dict.get("key", set()) and "default"  # [RUF056]
 141 | value = my_dict.get("key", None) and "default"  # [RUF056]
@@ -306,7 +306,7 @@ RUF056.py:142:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 144 144 | value = my_dict.get("key", "") and "default"  # [RUF056]
 145 145 | 
 
-RUF056.py:143:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:143:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 141 | value = my_dict.get("key", None) and "default"  # [RUF056]
 142 | value = my_dict.get("key", 0) and "default"  # [RUF056]
@@ -325,7 +325,7 @@ RUF056.py:143:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. T
 144 144 | value = my_dict.get("key", "") and "default"  # [RUF056]
 145 145 | 
 
-RUF056.py:144:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+RUF056.py:144:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.
     |
 142 | value = my_dict.get("key", 0) and "default"  # [RUF056]
 143 | value = my_dict.get("key", 0.0) and "default"  # [RUF056]
