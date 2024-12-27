@@ -1,0 +1,322 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF056.py:26:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+25 | # Using dict.get with a falsy fallback: False
+26 | value = my_dict.get("key", False)  # [RUF056]
+   |                            ^^^^^ RUF056
+27 | 
+28 | # Using dict.get with a falsy fallback: empty string
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+23 23 | # Invalid
+24 24 | 
+25 25 | # Using dict.get with a falsy fallback: False
+26    |-value = my_dict.get("key", False)  # [RUF056]
+   26 |+value = my_dict.get("key")  # [RUF056]
+27 27 | 
+28 28 | # Using dict.get with a falsy fallback: empty string
+29 29 | value = my_dict.get("key", "")  # [RUF056]
+
+RUF056.py:29:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+28 | # Using dict.get with a falsy fallback: empty string
+29 | value = my_dict.get("key", "")  # [RUF056]
+   |                            ^^ RUF056
+30 | 
+31 | # Using dict.get with a falsy fallback: empty list
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+26 26 | value = my_dict.get("key", False)  # [RUF056]
+27 27 | 
+28 28 | # Using dict.get with a falsy fallback: empty string
+29    |-value = my_dict.get("key", "")  # [RUF056]
+   29 |+value = my_dict.get("key")  # [RUF056]
+30 30 | 
+31 31 | # Using dict.get with a falsy fallback: empty list
+32 32 | value = my_dict.get("key", [])  # [RUF056]
+
+RUF056.py:32:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+31 | # Using dict.get with a falsy fallback: empty list
+32 | value = my_dict.get("key", [])  # [RUF056]
+   |                            ^^ RUF056
+33 | 
+34 | # Using dict.get with a falsy fallback: empty dict
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+29 29 | value = my_dict.get("key", "")  # [RUF056]
+30 30 | 
+31 31 | # Using dict.get with a falsy fallback: empty list
+32    |-value = my_dict.get("key", [])  # [RUF056]
+   32 |+value = my_dict.get("key")  # [RUF056]
+33 33 | 
+34 34 | # Using dict.get with a falsy fallback: empty dict
+35 35 | value = my_dict.get("key", {})  # [RUF056]
+
+RUF056.py:35:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+34 | # Using dict.get with a falsy fallback: empty dict
+35 | value = my_dict.get("key", {})  # [RUF056]
+   |                            ^^ RUF056
+36 | 
+37 | # Using dict.get with a falsy fallback: empty set
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+32 32 | value = my_dict.get("key", [])  # [RUF056]
+33 33 | 
+34 34 | # Using dict.get with a falsy fallback: empty dict
+35    |-value = my_dict.get("key", {})  # [RUF056]
+   35 |+value = my_dict.get("key")  # [RUF056]
+36 36 | 
+37 37 | # Using dict.get with a falsy fallback: empty set
+38 38 | value = my_dict.get("key", set())  # [RUF056]
+
+RUF056.py:38:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+37 | # Using dict.get with a falsy fallback: empty set
+38 | value = my_dict.get("key", set())  # [RUF056]
+   |                            ^^^^^ RUF056
+39 | 
+40 | # Using dict.get with a falsy fallback: zero integer
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+35 35 | value = my_dict.get("key", {})  # [RUF056]
+36 36 | 
+37 37 | # Using dict.get with a falsy fallback: empty set
+38    |-value = my_dict.get("key", set())  # [RUF056]
+   38 |+value = my_dict.get("key")  # [RUF056]
+39 39 | 
+40 40 | # Using dict.get with a falsy fallback: zero integer
+41 41 | value = my_dict.get("key", 0)  # [RUF056]
+
+RUF056.py:41:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+40 | # Using dict.get with a falsy fallback: zero integer
+41 | value = my_dict.get("key", 0)  # [RUF056]
+   |                            ^ RUF056
+42 | 
+43 | # Using dict.get with a falsy fallback: zero float
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+38 38 | value = my_dict.get("key", set())  # [RUF056]
+39 39 | 
+40 40 | # Using dict.get with a falsy fallback: zero integer
+41    |-value = my_dict.get("key", 0)  # [RUF056]
+   41 |+value = my_dict.get("key")  # [RUF056]
+42 42 | 
+43 43 | # Using dict.get with a falsy fallback: zero float
+44 44 | value = my_dict.get("key", 0.0)  # [RUF056]
+
+RUF056.py:44:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+43 | # Using dict.get with a falsy fallback: zero float
+44 | value = my_dict.get("key", 0.0)  # [RUF056]
+   |                            ^^^ RUF056
+45 | 
+46 | # Using dict.get with a falsy fallback: None
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+41 41 | value = my_dict.get("key", 0)  # [RUF056]
+42 42 | 
+43 43 | # Using dict.get with a falsy fallback: zero float
+44    |-value = my_dict.get("key", 0.0)  # [RUF056]
+   44 |+value = my_dict.get("key")  # [RUF056]
+45 45 | 
+46 46 | # Using dict.get with a falsy fallback: None
+47 47 | value = my_dict.get("key", None)  # [RUF056]
+
+RUF056.py:47:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+46 | # Using dict.get with a falsy fallback: None
+47 | value = my_dict.get("key", None)  # [RUF056]
+   |                            ^^^^ RUF056
+48 | 
+49 | # Using dict.get with a falsy fallback via function call
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+44 44 | value = my_dict.get("key", 0.0)  # [RUF056]
+45 45 | 
+46 46 | # Using dict.get with a falsy fallback: None
+47    |-value = my_dict.get("key", None)  # [RUF056]
+   47 |+value = my_dict.get("key")  # [RUF056]
+48 48 | 
+49 49 | # Using dict.get with a falsy fallback via function call
+50 50 | value = my_dict.get("key", list())  # [RUF056]
+
+RUF056.py:50:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+49 | # Using dict.get with a falsy fallback via function call
+50 | value = my_dict.get("key", list())  # [RUF056]
+   |                            ^^^^^^ RUF056
+51 | value = my_dict.get("key", dict())  # [RUF056]
+52 | value = my_dict.get("key", set())   # [RUF056]
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+47 47 | value = my_dict.get("key", None)  # [RUF056]
+48 48 | 
+49 49 | # Using dict.get with a falsy fallback via function call
+50    |-value = my_dict.get("key", list())  # [RUF056]
+   50 |+value = my_dict.get("key")  # [RUF056]
+51 51 | value = my_dict.get("key", dict())  # [RUF056]
+52 52 | value = my_dict.get("key", set())   # [RUF056]
+53 53 | 
+
+RUF056.py:51:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+49 | # Using dict.get with a falsy fallback via function call
+50 | value = my_dict.get("key", list())  # [RUF056]
+51 | value = my_dict.get("key", dict())  # [RUF056]
+   |                            ^^^^^^ RUF056
+52 | value = my_dict.get("key", set())   # [RUF056]
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+48 48 | 
+49 49 | # Using dict.get with a falsy fallback via function call
+50 50 | value = my_dict.get("key", list())  # [RUF056]
+51    |-value = my_dict.get("key", dict())  # [RUF056]
+   51 |+value = my_dict.get("key")  # [RUF056]
+52 52 | value = my_dict.get("key", set())   # [RUF056]
+53 53 | 
+54 54 | # Reassigning with falsy fallback
+
+RUF056.py:52:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+50 | value = my_dict.get("key", list())  # [RUF056]
+51 | value = my_dict.get("key", dict())  # [RUF056]
+52 | value = my_dict.get("key", set())   # [RUF056]
+   |                            ^^^^^ RUF056
+53 | 
+54 | # Reassigning with falsy fallback
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+49 49 | # Using dict.get with a falsy fallback via function call
+50 50 | value = my_dict.get("key", list())  # [RUF056]
+51 51 | value = my_dict.get("key", dict())  # [RUF056]
+52    |-value = my_dict.get("key", set())   # [RUF056]
+   52 |+value = my_dict.get("key")   # [RUF056]
+53 53 | 
+54 54 | # Reassigning with falsy fallback
+55 55 | def get_value(d):
+
+RUF056.py:60:30: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+58 | # Multiple dict.get calls with mixed fallbacks
+59 | value1 = my_dict.get("key1", "default")
+60 | value2 = my_dict.get("key2", 0)  # [RUF056]
+   |                              ^ RUF056
+61 | value3 = my_dict.get("key3", "another default")
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+57 57 | 
+58 58 | # Multiple dict.get calls with mixed fallbacks
+59 59 | value1 = my_dict.get("key1", "default")
+60    |-value2 = my_dict.get("key2", 0)  # [RUF056]
+   60 |+value2 = my_dict.get("key2")  # [RUF056]
+61 61 | value3 = my_dict.get("key3", "another default")
+62 62 | 
+63 63 | # Using dict.get in a class with falsy fallback
+
+RUF056.py:71:35: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+   |
+69 | def outer():
+70 |     def inner():
+71 |         return my_dict.get("key", "")  # [RUF056]
+   |                                   ^^ RUF056
+72 |     return inner()
+   |
+   = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+68 68 | # Using dict.get in a nested function with falsy fallback
+69 69 | def outer():
+70 70 |     def inner():
+71    |-        return my_dict.get("key", "")  # [RUF056]
+   71 |+        return my_dict.get("key")  # [RUF056]
+72 72 |     return inner()
+73 73 | 
+74 74 | # Using dict.get with variable fallback that is falsy
+
+RUF056.py:98:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+    |
+ 97 | # Falsy fallback in a ternary expression
+ 98 | value = my_dict.get("key", 0) if condition else "default"  # [RUF056]
+    |                            ^ RUF056
+ 99 | 
+100 | # Falsy fallback with comments
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+95 95 | results = (d.get("key", None) for d in dicts)  # [RUF056]
+96 96 | 
+97 97 | # Falsy fallback in a ternary expression
+98    |-value = my_dict.get("key", 0) if condition else "default"  # [RUF056]
+   98 |+value = my_dict.get("key") if condition else "default"  # [RUF056]
+99 99 | 
+100 100 | # Falsy fallback with comments
+101 101 | value = my_dict.get("key", [])  # Falsy fallback used here [RUF056]
+
+RUF056.py:101:28: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+    |
+100 | # Falsy fallback with comments
+101 | value = my_dict.get("key", [])  # Falsy fallback used here [RUF056]
+    |                            ^^ RUF056
+102 | 
+103 | # Falsy fallback with inline comment
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+98  98  | value = my_dict.get("key", 0) if condition else "default"  # [RUF056]
+99  99  | 
+100 100 | # Falsy fallback with comments
+101     |-value = my_dict.get("key", [])  # Falsy fallback used here [RUF056]
+    101 |+value = my_dict.get("key")  # Falsy fallback used here [RUF056]
+102 102 | 
+103 103 | # Falsy fallback with inline comment
+104 104 | value = my_dict.get("key", # comment1
+
+RUF056.py:105:22: RUF056 [*] Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.
+    |
+103 | # Falsy fallback with inline comment
+104 | value = my_dict.get("key", # comment1
+105 |                      [] # comment2
+    |                      ^^ RUF056
+106 |                      ) # comment3
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+ℹ Unsafe fix
+101 101 | value = my_dict.get("key", [])  # Falsy fallback used here [RUF056]
+102 102 | 
+103 103 | # Falsy fallback with inline comment
+104     |-value = my_dict.get("key", # comment1
+105     |-                     [] # comment2
+    104 |+value = my_dict.get("key" # comment2
+106 105 |                      ) # comment3
