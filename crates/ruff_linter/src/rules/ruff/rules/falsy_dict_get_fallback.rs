@@ -10,7 +10,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
-/// Checks for `dict.get(key, falsy_value)` or similar.
+/// Checks for `dict.get(key, falsy_value)` used as implicit casts to boolean values.
 ///
 /// ## Why is this bad?
 /// The default fallback `None` is already falsy.
@@ -18,7 +18,13 @@ use ruff_text_size::{Ranged, TextRange};
 /// ## Example
 ///
 /// ```python
-/// dict.get(key, False)
+/// if dict.get(key, False):
+///      ...
+/// ```
+/// Use instead:
+/// ```python
+/// if dict.get(key):
+///      ...
 /// ```
 ///
 /// ## Fix safety
@@ -29,7 +35,7 @@ pub(crate) struct FalsyDictGetFallback;
 impl AlwaysFixableViolation for FalsyDictGetFallback {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Avoid providing a falsy fallback to `dict.get()`. The default fallback `None` is already falsy.".to_string()
+        "Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.".to_string()
     }
 
     fn fix_title(&self) -> String {
