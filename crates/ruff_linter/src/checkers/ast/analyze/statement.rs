@@ -1238,6 +1238,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::IfKeyInDictDel) {
                 ruff::rules::if_key_in_dict_del(checker, if_);
             }
+            if checker.enabled(Rule::FalsyDictGetFallback) {
+                ruff::rules::falsy_dict_get_fallback(checker, test);
+            }
+            if checker.enabled(Rule::FalsyDictGetFallback) {
+                for clause in elif_else_clauses {
+                    if let Some(test) = clause.test.as_ref() {
+                        ruff::rules::falsy_dict_get_fallback(checker, test);
+                    }
+                }
+            }
         }
         Stmt::Assert(
             assert_stmt @ ast::StmtAssert {
@@ -1281,6 +1291,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::InvalidAssertMessageLiteralArgument) {
                 ruff::rules::invalid_assert_message_literal_argument(checker, assert_stmt);
+            }
+            if checker.enabled(Rule::FalsyDictGetFallback) {
+                ruff::rules::falsy_dict_get_fallback(checker, test);
             }
         }
         Stmt::With(
@@ -1328,7 +1341,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
+        Stmt::While(
+            while_stmt @ ast::StmtWhile {
+                test, body, orelse, ..
+            },
+        ) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
@@ -1343,6 +1360,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::AsyncBusyWait) {
                 flake8_async::rules::async_busy_wait(checker, while_stmt);
+            }
+            if checker.enabled(Rule::FalsyDictGetFallback) {
+                ruff::rules::falsy_dict_get_fallback(checker, test);
             }
         }
         Stmt::For(
