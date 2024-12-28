@@ -1,12 +1,11 @@
-use itertools::Itertools;
 use std::ops::BitOr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    ExceptHandler, Expr, ExprName, Identifier, Stmt, StmtAnnAssign, StmtAssign, StmtFor,
-    StmtFunctionDef, StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith,
+    Expr, ExprName, Identifier, Stmt, StmtAnnAssign, StmtAssign, StmtFunctionDef,
 };
+use ruff_python_semantic::analyze::class::any_single_stmt;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -57,10 +56,7 @@ impl Violation for EqWithoutHash {
 
 /// W1641
 pub(crate) fn object_without_hash_method(checker: &mut Checker, name: &Identifier, body: &[Stmt]) {
-    if matches!(
-        has_eq_hash(body, false),
-        (HasEq::Yes | HasEq::Maybe, HasHash::No)
-    ) {
+    if matches!(has_eq_hash(body), (HasMethod::Yes | HasMethod::Maybe, HasMethod::No)) {
         let diagnostic = Diagnostic::new(EqWithoutHash, name.range());
         checker.diagnostics.push(diagnostic);
     }
@@ -91,104 +87,52 @@ impl BitOr for HasMethod {
 type HasEq = HasMethod;
 type HasHash = HasMethod;
 
-fn has_eq_hash(body: &[Stmt], nested: bool) -> (HasEq, HasHash) {
-    let mut has_eq = HasMethod::No;
-    let mut has_hash = HasMethod::No;
+fn has_eq_hash(body: &[Stmt]) -> (HasEq, HasHash) {
+    let (mut has_eq, mut has_hash) = (HasMethod::No, HasMethod::No);
 
-    let likeliness = if nested {
-        HasMethod::Maybe
-    } else {
-        HasMethod::Yes
-    };
-
-    for stmt in body {
-        if !has_eq.is_no() && !has_hash.is_no() {
-            break;
-        }
+    any_single_stmt(body, &mut |stmt, nested| {
+        let likeliness = if nested {
+            HasMethod::Maybe
+        } else {
+            HasMethod::Yes
+        };
 
         match stmt {
             Stmt::FunctionDef(StmtFunctionDef {
                 name: Identifier { id, .. },
                 ..
             }) => match id.as_str() {
-                "__eq__" => has_eq = likeliness,
-                "__hash__" => has_hash = likeliness,
+                "__eq__" => has_eq = has_eq | likeliness,
+                "__hash__" => has_hash = has_hash | likeliness,
                 _ => {}
             },
 
             Stmt::Assign(StmtAssign { targets, .. }) => {
                 let [Expr::Name(ExprName { id, .. })] = &targets[..] else {
-                    continue;
+                    return false;
                 };
 
                 match id.as_str() {
-                    "__eq__" => has_eq = likeliness,
-                    "__hash__" => has_hash = likeliness,
+                    "__eq__" => has_eq = has_eq | likeliness,
+                    "__hash__" => has_hash = has_hash | likeliness,
                     _ => {}
                 }
             }
 
             Stmt::AnnAssign(StmtAnnAssign { target, .. }) => {
                 let Expr::Name(ExprName { id, .. }) = target.as_ref() else {
-                    continue;
+                    return false;
                 };
 
                 match id.as_str() {
-                    "__eq__" => has_eq = likeliness,
-                    "__hash__" => has_hash = likeliness,
+                    "__eq__" => has_eq = has_eq | likeliness,
+                    "__hash__" => has_hash = has_hash | likeliness,
                     _ => {}
                 }
             }
 
-            Stmt::With(StmtWith { body, .. }) => {
-                let bodies = [body];
-
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
-            }
-
-            Stmt::For(StmtFor { body, orelse, .. })
-            | Stmt::While(StmtWhile { body, orelse, .. }) => {
-                let bodies = [body, orelse];
-
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
-            }
-
-            Stmt::If(StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
-                let mut bodies = vec![body];
-                bodies.extend(elif_else_clauses.iter().map(|it| &it.body));
-
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
-            }
-
-            Stmt::Match(StmtMatch { cases, .. }) => {
-                let bodies = cases.iter().map(|it| &it.body).collect_vec();
-
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
-            }
-
-            Stmt::Try(StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                let mut bodies = vec![body, orelse, finalbody];
-                bodies.extend(
-                    handlers
-                        .iter()
-                        .map(|ExceptHandler::ExceptHandler(it)| &it.body),
-                );
-
-                (has_eq, has_hash) = any_has_eq_hash(has_eq, has_hash, &bodies[..]);
-            }
-
             _ => {
-                // Technically, a method can be defined in a few more manners:
+                // Technically, a method can be defined using a few more methods:
                 //
                 // ```python
                 // class C1:
@@ -203,21 +147,9 @@ fn has_eq_hash(body: &[Stmt], nested: bool) -> (HasEq, HasHash) {
                 // Those cases are not covered here due to their extreme rarity.
             }
         };
-    }
+
+        !has_eq.is_no() && !has_hash.is_no()
+    });
 
     (has_eq, has_hash)
-}
-
-fn any_has_eq_hash(has_eq: HasEq, has_hash: HasHash, bodies: &[&Vec<Stmt>]) -> (HasEq, HasHash) {
-    bodies
-        .iter()
-        .fold((has_eq, has_hash), |(has_eq, has_hash), body| {
-            if !has_eq.is_no() && !has_hash.is_no() {
-                return (has_eq, has_hash);
-            }
-
-            let (body_has_eq, body_has_hash) = has_eq_hash(body, true);
-
-            (has_eq | body_has_eq, has_hash | body_has_hash)
-        })
 }

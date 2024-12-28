@@ -5,7 +5,10 @@ use crate::{BindingId, SemanticModel};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple};
+use ruff_python_ast::{
+    ExceptHandler, Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple, Stmt, StmtFor, StmtIf,
+    StmtMatch, StmtTry, StmtWhile, StmtWith,
+};
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
 pub fn any_qualified_base_class(
@@ -107,6 +110,63 @@ pub fn any_super_class(
     }
 
     inner(class_def, semantic, func, &mut FxHashSet::default())
+}
+
+type MemberIsNested = bool;
+
+pub fn any_single_stmt(
+    class_body: &[Stmt],
+    func: &mut dyn FnMut(&Stmt, MemberIsNested) -> bool,
+) -> bool {
+    fn any_stmt_in_body(
+        body: &[Stmt],
+        func: &mut dyn FnMut(&Stmt, MemberIsNested) -> bool,
+        nested: bool,
+    ) -> bool {
+        body.iter().any(|stmt| match stmt {
+            Stmt::With(StmtWith { body, .. }) => any_stmt_in_body(body, func, true),
+
+            Stmt::For(StmtFor { body, orelse, .. })
+            | Stmt::While(StmtWhile { body, orelse, .. }) => {
+                any_stmt_in_body(body, func, true) || any_stmt_in_body(orelse, func, true)
+            }
+
+            Stmt::If(StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                any_stmt_in_body(body, func, true)
+                    || elif_else_clauses
+                        .iter()
+                        .any(|it| any_stmt_in_body(&it.body, func, true))
+            }
+
+            Stmt::Match(StmtMatch { cases, .. }) => cases
+                .iter()
+                .any(|it| any_stmt_in_body(&it.body, func, true)),
+
+            Stmt::Try(StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                any_stmt_in_body(body, func, true)
+                    || any_stmt_in_body(orelse, func, true)
+                    || any_stmt_in_body(finalbody, func, true)
+                    || handlers.iter().any(|ExceptHandler::ExceptHandler(it)| {
+                        any_stmt_in_body(&it.body, func, true)
+                    })
+            }
+
+            _ => func(stmt, nested),
+        })
+    }
+
+    let nested = false;
+    any_stmt_in_body(class_body, func, nested)
 }
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro
