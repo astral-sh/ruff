@@ -102,11 +102,17 @@ impl From<&Expr> for ConstantLikelihood {
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
             Expr::Dict(dict) => {
-                if dict.is_empty() {
-                    ConstantLikelihood::Definitely
-                } else {
-                    ConstantLikelihood::Probably
+                let mut acc = ConstantLikelihood::Definitely;
+
+                for item in &dict.items {
+                    if let Some(key) = &item.key {
+                        acc = cmp::min(acc, ConstantLikelihood::from(key));
+                    }
+
+                    acc = cmp::min(acc, ConstantLikelihood::from(&item.value));
                 }
+
+                acc
             }
             Expr::BinOp(ast::ExprBinOp { left, right, .. }) => cmp::min(
                 ConstantLikelihood::from(&**left),
