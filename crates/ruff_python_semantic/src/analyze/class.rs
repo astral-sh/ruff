@@ -165,8 +165,7 @@ pub fn any_single_stmt(
         })
     }
 
-    let nested = false;
-    any_stmt_in_body(class_body, func, nested)
+    any_stmt_in_body(class_body, func, false)
 }
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro
