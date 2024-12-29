@@ -25,3 +25,24 @@ def f(): ...
 
 f: int = 1
 ```
+
+## Explicit shadowing involving `def` statements
+
+```py path=a.py
+from typing_extensions import reveal_type
+
+f = 1
+reveal_type(f)  # revealed: Literal[1]
+
+def f(): ...
+reveal_type(f)  # revealed: Literal[f]
+
+def f(x: int) -> int: ...
+reveal_type(f)  # revealed: Literal[f]
+
+f: int = 1
+reveal_type(f)  # revealed: Literal[1]
+
+def f(x: int) -> int: ...
+reveal_type(f)  # revealed: Literal[f]
+```
