@@ -1282,7 +1282,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
 
-                            if self.enabled(Rule::RuntimeCastValue) {
+                            if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
                                 flake8_type_checking::rules::runtime_cast_value(self, arg);
                             }
                         }
