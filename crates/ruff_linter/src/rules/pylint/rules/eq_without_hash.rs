@@ -56,10 +56,7 @@ impl Violation for EqWithoutHash {
 
 /// W1641
 pub(crate) fn object_without_hash_method(checker: &mut Checker, name: &Identifier, body: &[Stmt]) {
-    if matches!(
-        has_eq_hash(body),
-        (HasEq::Yes | HasEq::Maybe, HasHash::No)
-    ) {
+    if matches!(has_eq_hash(body), (HasEq::Yes | HasEq::Maybe, HasHash::No)) {
         let diagnostic = Diagnostic::new(EqWithoutHash, name.range());
         checker.diagnostics.push(diagnostic);
     }

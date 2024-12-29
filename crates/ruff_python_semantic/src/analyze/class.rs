@@ -112,15 +112,15 @@ pub fn any_super_class(
     inner(class_def, semantic, func, &mut FxHashSet::default())
 }
 
-type MemberIsNested = bool;
+type StmtIsNested = bool;
 
 pub fn any_single_stmt(
     class_body: &[Stmt],
-    func: &mut dyn FnMut(&Stmt, MemberIsNested) -> bool,
+    func: &mut dyn FnMut(&Stmt, StmtIsNested) -> bool,
 ) -> bool {
     fn any_stmt_in_body(
         body: &[Stmt],
-        func: &mut dyn FnMut(&Stmt, MemberIsNested) -> bool,
+        func: &mut dyn FnMut(&Stmt, StmtIsNested) -> bool,
         nested: bool,
     ) -> bool {
         body.iter().any(|stmt| match stmt {
