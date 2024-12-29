@@ -35,14 +35,17 @@ f = 1
 reveal_type(f)  # revealed: Literal[1]
 
 def f(): ...
+
 reveal_type(f)  # revealed: Literal[f]
 
 def f(x: int) -> int: ...
+
 reveal_type(f)  # revealed: Literal[f]
 
 f: int = 1
 reveal_type(f)  # revealed: Literal[1]
 
 def f(x: int) -> int: ...
+
 reveal_type(f)  # revealed: Literal[f]
 ```
