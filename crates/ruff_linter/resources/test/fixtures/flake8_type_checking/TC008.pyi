@@ -15,9 +15,9 @@ type D = 'Foo.bar'  # TC008
 
 
 class Baz:
-    a: TypeAlias = 'Baz'  # TC008
+    a: TypeAlias = 'Baz'  # False negative in stubs
     type A = 'Baz'  # TC008
 
     class Nested:
-        a: TypeAlias = 'Baz'  # TC008
+        a: TypeAlias = 'Baz'  # False negative in stubs
         type A = 'Baz'  # TC008

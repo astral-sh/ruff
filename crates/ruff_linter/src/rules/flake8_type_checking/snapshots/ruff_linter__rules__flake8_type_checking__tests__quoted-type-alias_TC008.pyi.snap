@@ -142,29 +142,10 @@ TC008.pyi:14:10: TC008 [*] Remove quotes from type alias
 16 16 | 
 17 17 | class Baz:
 
-TC008.pyi:18:20: TC008 [*] Remove quotes from type alias
-   |
-17 | class Baz:
-18 |     a: TypeAlias = 'Baz'  # TC008
-   |                    ^^^^^ TC008
-19 |     type A = 'Baz'  # TC008
-   |
-   = help: Remove quotes
-
-ℹ Safe fix
-15 15 | 
-16 16 | 
-17 17 | class Baz:
-18    |-    a: TypeAlias = 'Baz'  # TC008
-   18 |+    a: TypeAlias = Baz  # TC008
-19 19 |     type A = 'Baz'  # TC008
-20 20 | 
-21 21 |     class Nested:
-
 TC008.pyi:19:14: TC008 [*] Remove quotes from type alias
    |
 17 | class Baz:
-18 |     a: TypeAlias = 'Baz'  # TC008
+18 |     a: TypeAlias = 'Baz'  # False negative in stubs
 19 |     type A = 'Baz'  # TC008
    |              ^^^^^ TC008
 20 | 
@@ -175,34 +156,17 @@ TC008.pyi:19:14: TC008 [*] Remove quotes from type alias
 ℹ Safe fix
 16 16 | 
 17 17 | class Baz:
-18 18 |     a: TypeAlias = 'Baz'  # TC008
+18 18 |     a: TypeAlias = 'Baz'  # False negative in stubs
 19    |-    type A = 'Baz'  # TC008
    19 |+    type A = Baz  # TC008
 20 20 | 
 21 21 |     class Nested:
-22 22 |         a: TypeAlias = 'Baz'  # TC008
-
-TC008.pyi:22:24: TC008 [*] Remove quotes from type alias
-   |
-21 |     class Nested:
-22 |         a: TypeAlias = 'Baz'  # TC008
-   |                        ^^^^^ TC008
-23 |         type A = 'Baz'  # TC008
-   |
-   = help: Remove quotes
-
-ℹ Safe fix
-19 19 |     type A = 'Baz'  # TC008
-20 20 | 
-21 21 |     class Nested:
-22    |-        a: TypeAlias = 'Baz'  # TC008
-   22 |+        a: TypeAlias = Baz  # TC008
-23 23 |         type A = 'Baz'  # TC008
+22 22 |         a: TypeAlias = 'Baz'  # False negative in stubs
 
 TC008.pyi:23:18: TC008 [*] Remove quotes from type alias
    |
 21 |     class Nested:
-22 |         a: TypeAlias = 'Baz'  # TC008
+22 |         a: TypeAlias = 'Baz'  # False negative in stubs
 23 |         type A = 'Baz'  # TC008
    |                  ^^^^^ TC008
    |
@@ -211,6 +175,6 @@ TC008.pyi:23:18: TC008 [*] Remove quotes from type alias
 ℹ Safe fix
 20 20 | 
 21 21 |     class Nested:
-22 22 |         a: TypeAlias = 'Baz'  # TC008
+22 22 |         a: TypeAlias = 'Baz'  # False negative in stubs
 23    |-        type A = 'Baz'  # TC008
    23 |+        type A = Baz  # TC008

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     h: TypeAlias = 'Bar'   # TC008
     i: TypeAlias = Foo['str']   # TC008
     j: TypeAlias = 'Baz'   # TC008
-    k: TypeAlias = 'k | None'  # TC008
+    k: TypeAlias = 'k | None'  # False negative in type checking block
     l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
     m: TypeAlias = ('int'  # TC008
         | None)

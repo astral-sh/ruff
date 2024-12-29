@@ -216,6 +216,7 @@ fn should_be_fstring(
                         id,
                         literal.range(),
                         semantic.scope_id,
+                        false,
                     )
                     .map_or(true, |id| semantic.binding(id).kind.is_builtin())
                 {
