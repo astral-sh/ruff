@@ -174,6 +174,31 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "3.3.0"
                 },
                 )),
+                ["airflow", "executors", "celery_executor", "CeleryExecutor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.celery.executors.celery_executor.CeleryExecutor",
+                        provider: "celery",
+                        version: "3.3.0"
+                },
+                )),
+                ["airflow", "executors", "celery_kubernetes_executor", "CeleryKubernetesExecutor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.celery.executors.celery_kubernetes_executor.CeleryKubernetesExecutor",
+                        provider: "celery",
+                        version: "3.3.0"
+                },
+                )),
+                // apache-airflow-providers-daskexecutor
+                ["airflow", "executors", "dask_executor", "DaskExecutor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.daskexecutor.executors.dask_executor.DaskExecutor",
+                        provider: "daskexecutor",
+                        version: "1.0.0"
+                },
+                )),
                 // apache-airflow-providers-common-sql
                 ["airflow", "hooks", "dbapi", "ConnectorProtocol"] => Some((
                     qualname.to_string(),

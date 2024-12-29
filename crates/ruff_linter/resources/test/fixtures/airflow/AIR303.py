@@ -6,7 +6,9 @@ from airflow.auth.managers.fab.api.auth.backend import (
 from airflow.auth.managers.fab.fab_auth_manager import FabAuthManager
 from airflow.auth.managers.fab.security_manager import override as fab_override
 from airflow.config_templates.default_celery import DEFAULT_CELERY_CONFIG
-from airflow.executors.celery_executor import app
+from airflow.executors.celery_executor import CeleryExecutor, app
+from airflow.executors.celery_kubernetes_executor import CeleryKubernetesExecutor
+from airflow.executors.dask_executor import DaskExecutor
 from airflow.executors.kubernetes_executor_types import (
     ALL_NAMESPACES,
     POD_EXECUTOR_DONE_KEY,
@@ -28,6 +30,11 @@ FabAirflowSecurityManagerOverride()
 # apache-airflow-providers-celery
 DEFAULT_CELERY_CONFIG
 app
+CeleryExecutor()
+CeleryKubernetesExecutor()
+
+# apache-airflow-providers-daskexecutor
+DaskExecutor()
 
 # apache-airflow-providers-common-sql
 ConnectorProtocol()
