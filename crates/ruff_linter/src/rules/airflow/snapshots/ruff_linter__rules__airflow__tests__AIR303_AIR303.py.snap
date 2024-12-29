@@ -2,195 +2,468 @@
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 snapshot_kind: text
 ---
-AIR303.py:22:1: AIR303 Import path `airflow.api.auth.backend.basic_auth` is moved into `fab` provider in Airflow 3.0;
+AIR303.py:45:1: AIR303 Import path `airflow.api.auth.backend.basic_auth` is moved into `fab` provider in Airflow 3.0;
    |
-21 | # apache-airflow-providers-fab
-22 | basic_auth, kerberos_auth
+44 | # apache-airflow-providers-fab
+45 | basic_auth, kerberos_auth
    | ^^^^^^^^^^ AIR303
-23 | auth_current_user
-24 | backend_kerberos_auth
+46 | auth_current_user
+47 | backend_kerberos_auth
    |
    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth` instead.
 
-AIR303.py:22:13: AIR303 Import path `airflow.api.auth.backend.kerberos_auth` is moved into `fab` provider in Airflow 3.0;
+AIR303.py:45:13: AIR303 Import path `airflow.api.auth.backend.kerberos_auth` is moved into `fab` provider in Airflow 3.0;
    |
-21 | # apache-airflow-providers-fab
-22 | basic_auth, kerberos_auth
+44 | # apache-airflow-providers-fab
+45 | basic_auth, kerberos_auth
    |             ^^^^^^^^^^^^^ AIR303
-23 | auth_current_user
-24 | backend_kerberos_auth
+46 | auth_current_user
+47 | backend_kerberos_auth
    |
    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
 
-AIR303.py:23:1: AIR303 Import path `airflow.api.auth.backend.basic_auth` is moved into `fab` provider in Airflow 3.0;
+AIR303.py:46:1: AIR303 Import path `airflow.api.auth.backend.basic_auth` is moved into `fab` provider in Airflow 3.0;
    |
-21 | # apache-airflow-providers-fab
-22 | basic_auth, kerberos_auth
-23 | auth_current_user
+44 | # apache-airflow-providers-fab
+45 | basic_auth, kerberos_auth
+46 | auth_current_user
    | ^^^^^^^^^^^^^^^^^ AIR303
-24 | backend_kerberos_auth
-25 | fab_override
+47 | backend_kerberos_auth
+48 | fab_override
    |
    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth` instead.
 
-AIR303.py:24:1: AIR303 Import path `airflow.auth_manager.api.auth.backend.kerberos_auth` is moved into `fab` provider in Airflow 3.0;
+AIR303.py:47:1: AIR303 Import path `airflow.auth_manager.api.auth.backend.kerberos_auth` is moved into `fab` provider in Airflow 3.0;
    |
-22 | basic_auth, kerberos_auth
-23 | auth_current_user
-24 | backend_kerberos_auth
+45 | basic_auth, kerberos_auth
+46 | auth_current_user
+47 | backend_kerberos_auth
    | ^^^^^^^^^^^^^^^^^^^^^ AIR303
-25 | fab_override
+48 | fab_override
    |
    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
 
-AIR303.py:25:1: AIR303 Import path `airflow.auth.managers.fab.security_managr.override` is moved into `fab` provider in Airflow 3.0;
+AIR303.py:48:1: AIR303 Import path `airflow.auth.managers.fab.security_managr.override` is moved into `fab` provider in Airflow 3.0;
    |
-23 | auth_current_user
-24 | backend_kerberos_auth
-25 | fab_override
+46 | auth_current_user
+47 | backend_kerberos_auth
+48 | fab_override
    | ^^^^^^^^^^^^ AIR303
-26 | 
-27 | FabAuthManager()
+49 | 
+50 | FabAuthManager()
    |
    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.security_manager.override` instead.
 
-AIR303.py:27:1: AIR303 `airflow.auth.managers.fab.fab_auth_manager.FabAuthManager` is moved into `fab` provider in Airflow 3.0;
+AIR303.py:50:1: AIR303 `airflow.auth.managers.fab.fab_auth_manager.FabAuthManager` is moved into `fab` provider in Airflow 3.0;
    |
-25 | fab_override
-26 | 
-27 | FabAuthManager()
+48 | fab_override
+49 | 
+50 | FabAuthManager()
    | ^^^^^^^^^^^^^^ AIR303
-28 | FabAirflowSecurityManagerOverride()
+51 | FabAirflowSecurityManagerOverride()
    |
    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.FabAuthManager` instead.
 
-AIR303.py:28:1: AIR303 `airflow.www.security.FabAirflowSecurityManagerOverride` is moved into `fab` provider in Airflow 3.0;
+AIR303.py:51:1: AIR303 `airflow.www.security.FabAirflowSecurityManagerOverride` is moved into `fab` provider in Airflow 3.0;
    |
-27 | FabAuthManager()
-28 | FabAirflowSecurityManagerOverride()
+50 | FabAuthManager()
+51 | FabAirflowSecurityManagerOverride()
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR303
-29 | 
-30 | # apache-airflow-providers-celery
+52 | 
+53 | # apache-airflow-providers-celery
    |
    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride` instead.
 
-AIR303.py:31:1: AIR303 Import path `airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG` is moved into `celery` provider in Airflow 3.0;
+AIR303.py:54:1: AIR303 Import path `airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG` is moved into `celery` provider in Airflow 3.0;
    |
-30 | # apache-airflow-providers-celery
-31 | DEFAULT_CELERY_CONFIG
+53 | # apache-airflow-providers-celery
+54 | DEFAULT_CELERY_CONFIG
    | ^^^^^^^^^^^^^^^^^^^^^ AIR303
-32 | app
-33 | CeleryExecutor()
+55 | app
+56 | CeleryExecutor()
    |
    = help: Install `apache-airflow-provider-celery>=3.3.0` and import from `airflow.providers.celery.executors.default_celery.DEFAULT_CELERY_CONFIG` instead.
 
-AIR303.py:32:1: AIR303 Import path `airflow.executors.celery_executor.app` is moved into `celery` provider in Airflow 3.0;
+AIR303.py:55:1: AIR303 Import path `airflow.executors.celery_executor.app` is moved into `celery` provider in Airflow 3.0;
    |
-30 | # apache-airflow-providers-celery
-31 | DEFAULT_CELERY_CONFIG
-32 | app
+53 | # apache-airflow-providers-celery
+54 | DEFAULT_CELERY_CONFIG
+55 | app
    | ^^^ AIR303
-33 | CeleryExecutor()
-34 | CeleryKubernetesExecutor()
+56 | CeleryExecutor()
+57 | CeleryKubernetesExecutor()
    |
    = help: Install `apache-airflow-provider-celery>=3.3.0` and import from `airflow.providers.celery.executors.celery_executor_utils.app` instead.
 
-AIR303.py:33:1: AIR303 `airflow.executors.celery_executor.CeleryExecutor` is moved into `celery` provider in Airflow 3.0;
+AIR303.py:56:1: AIR303 `airflow.executors.celery_executor.CeleryExecutor` is moved into `celery` provider in Airflow 3.0;
    |
-31 | DEFAULT_CELERY_CONFIG
-32 | app
-33 | CeleryExecutor()
+54 | DEFAULT_CELERY_CONFIG
+55 | app
+56 | CeleryExecutor()
    | ^^^^^^^^^^^^^^ AIR303
-34 | CeleryKubernetesExecutor()
+57 | CeleryKubernetesExecutor()
    |
    = help: Install `apache-airflow-provider-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_executor.CeleryExecutor` instead.
 
-AIR303.py:34:1: AIR303 `airflow.executors.celery_kubernetes_executor.CeleryKubernetesExecutor` is moved into `celery` provider in Airflow 3.0;
+AIR303.py:57:1: AIR303 `airflow.executors.celery_kubernetes_executor.CeleryKubernetesExecutor` is moved into `celery` provider in Airflow 3.0;
    |
-32 | app
-33 | CeleryExecutor()
-34 | CeleryKubernetesExecutor()
+55 | app
+56 | CeleryExecutor()
+57 | CeleryKubernetesExecutor()
    | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR303
-35 | 
-36 | # apache-airflow-providers-daskexecutor
+58 | 
+59 | # apache-airflow-providers-daskexecutor
    |
    = help: Install `apache-airflow-provider-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_kubernetes_executor.CeleryKubernetesExecutor` instead.
 
-AIR303.py:37:1: AIR303 `airflow.executors.dask_executor.DaskExecutor` is moved into `daskexecutor` provider in Airflow 3.0;
+AIR303.py:60:1: AIR303 `airflow.executors.dask_executor.DaskExecutor` is moved into `daskexecutor` provider in Airflow 3.0;
    |
-36 | # apache-airflow-providers-daskexecutor
-37 | DaskExecutor()
+59 | # apache-airflow-providers-daskexecutor
+60 | DaskExecutor()
    | ^^^^^^^^^^^^ AIR303
-38 | 
-39 | # apache-airflow-providers-common-sql
+61 | 
+62 | # apache-airflow-providers-common-sql
    |
    = help: Install `apache-airflow-provider-daskexecutor>=1.0.0` and use `airflow.providers.daskexecutor.executors.dask_executor.DaskExecutor` instead.
 
-AIR303.py:40:1: AIR303 Import path `airflow.hooks.dbapi.ConnectorProtocol` is moved into `Common SQL` provider in Airflow 3.0;
+AIR303.py:63:1: AIR303 Import path `airflow.hooks.dbapi.ConnectorProtocol` is moved into `Common SQL` provider in Airflow 3.0;
    |
-39 | # apache-airflow-providers-common-sql
-40 | ConnectorProtocol()
+62 | # apache-airflow-providers-common-sql
+63 | ConnectorProtocol()
    | ^^^^^^^^^^^^^^^^^ AIR303
-41 | DbApiHook()
+64 | DbApiHook()
    |
    = help: Install `apache-airflow-provider-Common SQL>=1.0.0` and import from `airflow.providers.common.sql.hooks.sql.ConnectorProtocol` instead.
 
-AIR303.py:41:1: AIR303 Import path `airflow.hooks.dbapi.DbApiHook` is moved into `Common SQL` provider in Airflow 3.0;
+AIR303.py:64:1: AIR303 Import path `airflow.hooks.dbapi.DbApiHook` is moved into `Common SQL` provider in Airflow 3.0;
    |
-39 | # apache-airflow-providers-common-sql
-40 | ConnectorProtocol()
-41 | DbApiHook()
+62 | # apache-airflow-providers-common-sql
+63 | ConnectorProtocol()
+64 | DbApiHook()
    | ^^^^^^^^^ AIR303
-42 | 
-43 | # apache-airflow-providers-cncf-kubernetes
+65 | 
+66 | # apache-airflow-providers-cncf-kubernetes
    |
    = help: Install `apache-airflow-provider-Common SQL>=1.0.0` and import from `airflow.providers.common.sql.hooks.sql.DbApiHook` instead.
 
-AIR303.py:44:1: AIR303 Import path `airflow.executors.kubernetes_executor_types.ALL_NAMESPACES` is moved into `Kubernetes` provider in Airflow 3.0;
+AIR303.py:67:1: AIR303 Import path `airflow.executors.kubernetes_executor_types.ALL_NAMESPACES` is moved into `Kubernetes` provider in Airflow 3.0;
    |
-43 | # apache-airflow-providers-cncf-kubernetes
-44 | ALL_NAMESPACES
+66 | # apache-airflow-providers-cncf-kubernetes
+67 | ALL_NAMESPACES
    | ^^^^^^^^^^^^^^ AIR303
-45 | POD_EXECUTOR_DONE_KEY
+68 | POD_EXECUTOR_DONE_KEY
    |
    = help: Install `apache-airflow-provider-Kubernetes>=7.4.0` and import from `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES` instead.
 
-AIR303.py:45:1: AIR303 Import path `airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` is moved into `Kubernetes` provider in Airflow 3.0;
+AIR303.py:68:1: AIR303 Import path `airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` is moved into `Kubernetes` provider in Airflow 3.0;
    |
-43 | # apache-airflow-providers-cncf-kubernetes
-44 | ALL_NAMESPACES
-45 | POD_EXECUTOR_DONE_KEY
+66 | # apache-airflow-providers-cncf-kubernetes
+67 | ALL_NAMESPACES
+68 | POD_EXECUTOR_DONE_KEY
    | ^^^^^^^^^^^^^^^^^^^^^ AIR303
-46 | 
-47 | # apache-airflow-providers-apache-hive
+69 | 
+70 | # apache-airflow-providers-apache-hive
    |
    = help: Install `apache-airflow-provider-Kubernetes>=7.4.0` and import from `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` instead.
 
-AIR303.py:48:1: AIR303 Import path `airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES` is moved into `Apache Hive` provider in Airflow 3.0;
+AIR303.py:71:1: AIR303 `airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES` is moved into `Apache Hive` provider in Airflow 3.0;
    |
-47 | # apache-airflow-providers-apache-hive
-48 | HIVE_QUEUE_PRIORITIES
+70 | # apache-airflow-providers-apache-hive
+71 | HIVE_QUEUE_PRIORITIES
    | ^^^^^^^^^^^^^^^^^^^^^ AIR303
-49 | closest_ds_partition()
-50 | max_partition()
+72 | closest_ds_partition()
+73 | max_partition()
    |
-   = help: Install `apache-airflow-provider-Apache Hive>=1.0.0` and import from `airflow.providers.apache.hive.hooks.hive.HIVE_QUEUE_PRIORITIES` instead.
+   = help: Install `apache-airflow-provider-Apache Hive>=1.0.0` and use `HIVE_QUEUE_PRIORITIES` instead.
 
-AIR303.py:49:1: AIR303 Import path `airflow.macros.hive.closest_ds_partition` is moved into `Apache Hive` provider in Airflow 3.0;
+AIR303.py:72:1: AIR303 Import path `airflow.macros.hive.closest_ds_partition` is moved into `Apache Hive` provider in Airflow 3.0;
    |
-47 | # apache-airflow-providers-apache-hive
-48 | HIVE_QUEUE_PRIORITIES
-49 | closest_ds_partition()
+70 | # apache-airflow-providers-apache-hive
+71 | HIVE_QUEUE_PRIORITIES
+72 | closest_ds_partition()
    | ^^^^^^^^^^^^^^^^^^^^ AIR303
-50 | max_partition()
+73 | max_partition()
    |
    = help: Install `apache-airflow-provider-Apache Hive>=5.1.0` and import from `airflow.providers.apache.hive.macros.hive.closest_ds_partition` instead.
 
-AIR303.py:50:1: AIR303 Import path `airflow.macros.hive.max_partition` is moved into `Apache Hive` provider in Airflow 3.0;
+AIR303.py:73:1: AIR303 Import path `airflow.macros.hive.max_partition` is moved into `Apache Hive` provider in Airflow 3.0;
    |
-48 | HIVE_QUEUE_PRIORITIES
-49 | closest_ds_partition()
-50 | max_partition()
+71 | HIVE_QUEUE_PRIORITIES
+72 | closest_ds_partition()
+73 | max_partition()
    | ^^^^^^^^^^^^^ AIR303
+74 | 
+75 | # TODO: reorganize
    |
    = help: Install `apache-airflow-provider-Apache Hive>=5.1.0` and import from `airflow.providers.apache.hive.macros.hive.max_partition` instead.
+
+AIR303.py:76:1: AIR303 `airflow.hooks.S3_hook.S3Hook` is moved into `Amazon` provider in Airflow 3.0;
+   |
+75 | # TODO: reorganize
+76 | S3Hook()
+   | ^^^^^^ AIR303
+77 | provide_bucket_name()
+78 | BaseHook()
+   |
+   = help: Install `apache-airflow-provider-Amazon>=TBD` and use `S3Hook` instead.
+
+AIR303.py:77:1: AIR303 `airflow.hooks.S3_hook.provide_bucket_name` is moved into `Amazon` provider in Airflow 3.0;
+   |
+75 | # TODO: reorganize
+76 | S3Hook()
+77 | provide_bucket_name()
+   | ^^^^^^^^^^^^^^^^^^^ AIR303
+78 | BaseHook()
+79 | DbApiHook2()
+   |
+   = help: Install `apache-airflow-provider-Amazon>=TBD` and use `provide_bucket_name` instead.
+
+AIR303.py:78:1: AIR303 `airflow.hooks.base_hook.BaseHook` is moved into `Base` provider in Airflow 3.0;
+   |
+76 | S3Hook()
+77 | provide_bucket_name()
+78 | BaseHook()
+   | ^^^^^^^^ AIR303
+79 | DbApiHook2()
+80 | DockerHook()
+   |
+   = help: Install `apache-airflow-provider-Base>=TBD` and use `BaseHook` instead.
+
+AIR303.py:79:1: AIR303 `airflow.hooks.dbapi_hook.DbApiHook` is moved into `Common Sql` provider in Airflow 3.0;
+   |
+77 | provide_bucket_name()
+78 | BaseHook()
+79 | DbApiHook2()
+   | ^^^^^^^^^^ AIR303
+80 | DockerHook()
+81 | DruidDbApiHook()
+   |
+   = help: Install `apache-airflow-provider-Common Sql>=TBD` and use `DbApiHook` instead.
+
+AIR303.py:80:1: AIR303 `airflow.hooks.docker_hook.DockerHook` is moved into `Docker` provider in Airflow 3.0;
+   |
+78 | BaseHook()
+79 | DbApiHook2()
+80 | DockerHook()
+   | ^^^^^^^^^^ AIR303
+81 | DruidDbApiHook()
+82 | DruidHook()
+   |
+   = help: Install `apache-airflow-provider-Docker>=TBD` and use `DockerHook` instead.
+
+AIR303.py:81:1: AIR303 `airflow.hooks.druid_hook.DruidDbApiHook` is moved into `Apache Druid` provider in Airflow 3.0;
+   |
+79 | DbApiHook2()
+80 | DockerHook()
+81 | DruidDbApiHook()
+   | ^^^^^^^^^^^^^^ AIR303
+82 | DruidHook()
+83 | HIVE_QUEUE_PRIORITIES()
+   |
+   = help: Install `apache-airflow-provider-Apache Druid>=TBD` and use `DruidDbApiHook` instead.
+
+AIR303.py:82:1: AIR303 `airflow.hooks.druid_hook.DruidHook` is moved into `Apache Druid` provider in Airflow 3.0;
+   |
+80 | DockerHook()
+81 | DruidDbApiHook()
+82 | DruidHook()
+   | ^^^^^^^^^ AIR303
+83 | HIVE_QUEUE_PRIORITIES()
+84 | HiveCliHook()
+   |
+   = help: Install `apache-airflow-provider-Apache Druid>=TBD` and use `DruidHook` instead.
+
+AIR303.py:83:1: AIR303 `airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES` is moved into `Apache Hive` provider in Airflow 3.0;
+   |
+81 | DruidDbApiHook()
+82 | DruidHook()
+83 | HIVE_QUEUE_PRIORITIES()
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR303
+84 | HiveCliHook()
+85 | HiveMetastoreHook()
+   |
+   = help: Install `apache-airflow-provider-Apache Hive>=1.0.0` and use `HIVE_QUEUE_PRIORITIES` instead.
+
+AIR303.py:84:1: AIR303 `airflow.hooks.hive_hooks.HiveCliHook` is moved into `Apache Hive` provider in Airflow 3.0;
+   |
+82 | DruidHook()
+83 | HIVE_QUEUE_PRIORITIES()
+84 | HiveCliHook()
+   | ^^^^^^^^^^^ AIR303
+85 | HiveMetastoreHook()
+86 | HiveServer2Hook()
+   |
+   = help: Install `apache-airflow-provider-Apache Hive>=TBD` and use `HiveCliHook` instead.
+
+AIR303.py:85:1: AIR303 `airflow.hooks.hive_hooks.HiveMetastoreHook` is moved into `Apache Hive` provider in Airflow 3.0;
+   |
+83 | HIVE_QUEUE_PRIORITIES()
+84 | HiveCliHook()
+85 | HiveMetastoreHook()
+   | ^^^^^^^^^^^^^^^^^ AIR303
+86 | HiveServer2Hook()
+87 | HttpHook()
+   |
+   = help: Install `apache-airflow-provider-Apache Hive>=TBD` and use `HiveMetastoreHook` instead.
+
+AIR303.py:86:1: AIR303 `airflow.hooks.hive_hooks.HiveServer2Hook` is moved into `Apache Hive` provider in Airflow 3.0;
+   |
+84 | HiveCliHook()
+85 | HiveMetastoreHook()
+86 | HiveServer2Hook()
+   | ^^^^^^^^^^^^^^^ AIR303
+87 | HttpHook()
+88 | JdbcHook()
+   |
+   = help: Install `apache-airflow-provider-Apache Hive>=TBD` and use `HiveServer2Hook` instead.
+
+AIR303.py:87:1: AIR303 `airflow.hooks.http_hook.HttpHook` is moved into `Http` provider in Airflow 3.0;
+   |
+85 | HiveMetastoreHook()
+86 | HiveServer2Hook()
+87 | HttpHook()
+   | ^^^^^^^^ AIR303
+88 | JdbcHook()
+89 | jaydebeapi()
+   |
+   = help: Install `apache-airflow-provider-Http>=TBD` and use `HttpHook` instead.
+
+AIR303.py:88:1: AIR303 `airflow.hooks.jdbc_hook.JdbcHook` is moved into `Jdbc` provider in Airflow 3.0;
+   |
+86 | HiveServer2Hook()
+87 | HttpHook()
+88 | JdbcHook()
+   | ^^^^^^^^ AIR303
+89 | jaydebeapi()
+90 | MsSqlHook()
+   |
+   = help: Install `apache-airflow-provider-Jdbc>=TBD` and use `JdbcHook` instead.
+
+AIR303.py:89:1: AIR303 `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `Jdbc` provider in Airflow 3.0;
+   |
+87 | HttpHook()
+88 | JdbcHook()
+89 | jaydebeapi()
+   | ^^^^^^^^^^ AIR303
+90 | MsSqlHook()
+91 | MySqlHook()
+   |
+   = help: Install `apache-airflow-provider-Jdbc>=TBD` and use `jaydebeapi` instead.
+
+AIR303.py:90:1: AIR303 `airflow.hooks.mssql_hook.MsSqlHook` is moved into `Microsoft` provider in Airflow 3.0;
+   |
+88 | JdbcHook()
+89 | jaydebeapi()
+90 | MsSqlHook()
+   | ^^^^^^^^^ AIR303
+91 | MySqlHook()
+92 | OracleHook()
+   |
+   = help: Install `apache-airflow-provider-Microsoft>=TBD` and use `MsSqlHook` instead.
+
+AIR303.py:91:1: AIR303 `airflow.hooks.mysql_hook.MySqlHook` is moved into `Mysql` provider in Airflow 3.0;
+   |
+89 | jaydebeapi()
+90 | MsSqlHook()
+91 | MySqlHook()
+   | ^^^^^^^^^ AIR303
+92 | OracleHook()
+93 | PigCliHook()
+   |
+   = help: Install `apache-airflow-provider-Mysql>=TBD` and use `MySqlHook` instead.
+
+AIR303.py:92:1: AIR303 `airflow.hooks.oracle_hook.OracleHook` is moved into `Oracle` provider in Airflow 3.0;
+   |
+90 | MsSqlHook()
+91 | MySqlHook()
+92 | OracleHook()
+   | ^^^^^^^^^^ AIR303
+93 | PigCliHook()
+94 | PostgresHook()
+   |
+   = help: Install `apache-airflow-provider-Oracle>=TBD` and use `OracleHook` instead.
+
+AIR303.py:93:1: AIR303 `airflow.hooks.pig_hook.PigCliHook` is moved into `Apache Pig` provider in Airflow 3.0;
+   |
+91 | MySqlHook()
+92 | OracleHook()
+93 | PigCliHook()
+   | ^^^^^^^^^^ AIR303
+94 | PostgresHook()
+95 | PrestoHook()
+   |
+   = help: Install `apache-airflow-provider-Apache Pig>=TBD` and use `PigCliHook` instead.
+
+AIR303.py:94:1: AIR303 `airflow.hooks.postgres_hook.PostgresHook` is moved into `Postgres` provider in Airflow 3.0;
+   |
+92 | OracleHook()
+93 | PigCliHook()
+94 | PostgresHook()
+   | ^^^^^^^^^^^^ AIR303
+95 | PrestoHook()
+96 | SambaHook()
+   |
+   = help: Install `apache-airflow-provider-Postgres>=TBD` and use `PostgresHook` instead.
+
+AIR303.py:95:1: AIR303 `airflow.hooks.presto_hook.PrestoHook` is moved into `Presto` provider in Airflow 3.0;
+   |
+93 | PigCliHook()
+94 | PostgresHook()
+95 | PrestoHook()
+   | ^^^^^^^^^^ AIR303
+96 | SambaHook()
+97 | SlackHook()
+   |
+   = help: Install `apache-airflow-provider-Presto>=TBD` and use `PrestoHook` instead.
+
+AIR303.py:96:1: AIR303 `airflow.hooks.samba_hook.SambaHook` is moved into `Samba` provider in Airflow 3.0;
+   |
+94 | PostgresHook()
+95 | PrestoHook()
+96 | SambaHook()
+   | ^^^^^^^^^ AIR303
+97 | SlackHook()
+98 | SqliteHook()
+   |
+   = help: Install `apache-airflow-provider-Samba>=TBD` and use `SambaHook` instead.
+
+AIR303.py:97:1: AIR303 `airflow.hooks.slack_hook.SlackHook` is moved into `Slack` provider in Airflow 3.0;
+   |
+95 | PrestoHook()
+96 | SambaHook()
+97 | SlackHook()
+   | ^^^^^^^^^ AIR303
+98 | SqliteHook()
+99 | WebHDFSHook()
+   |
+   = help: Install `apache-airflow-provider-Slack>=TBD` and use `SlackHook` instead.
+
+AIR303.py:98:1: AIR303 `airflow.hooks.sqlite_hook.SqliteHook` is moved into `Sqlite` provider in Airflow 3.0;
+    |
+ 96 | SambaHook()
+ 97 | SlackHook()
+ 98 | SqliteHook()
+    | ^^^^^^^^^^ AIR303
+ 99 | WebHDFSHook()
+100 | ZendeskHook()
+    |
+    = help: Install `apache-airflow-provider-Sqlite>=TBD` and use `SqliteHook` instead.
+
+AIR303.py:99:1: AIR303 `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved into `Apache Hdfs` provider in Airflow 3.0;
+    |
+ 97 | SlackHook()
+ 98 | SqliteHook()
+ 99 | WebHDFSHook()
+    | ^^^^^^^^^^^ AIR303
+100 | ZendeskHook()
+    |
+    = help: Install `apache-airflow-provider-Apache Hdfs>=TBD` and use `WebHDFSHook` instead.
+
+AIR303.py:100:1: AIR303 `airflow.hooks.zendesk_hook.ZendeskHook` is moved into `Zendesk` provider in Airflow 3.0;
+    |
+ 98 | SqliteHook()
+ 99 | WebHDFSHook()
+100 | ZendeskHook()
+    | ^^^^^^^^^^^ AIR303
+    |
+    = help: Install `apache-airflow-provider-Zendesk>=TBD` and use `ZendeskHook` instead.

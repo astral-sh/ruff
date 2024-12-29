@@ -240,9 +240,8 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 // apache-airflow-providers-apache-hive
                 ["airflow", "hooks", "hive_hooks", "HIVE_QUEUE_PRIORITIES"] => Some((
                     qualname.to_string(),
-                    Replacement::ImportPathMoved{
-                        original_path: "airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES",
-                        new_path: "airflow.providers.apache.hive.hooks.hive.HIVE_QUEUE_PRIORITIES",
+                    Replacement::ProviderName{
+                        name: "HIVE_QUEUE_PRIORITIES",
                         provider: "Apache Hive",
                         version: "1.0.0"
                 },
@@ -265,6 +264,225 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         version: "5.1.0"
                 },
                 )),
+
+                // TODO: reorganize
+                ["airflow", "hooks", "S3_hook", "S3Hook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "S3Hook",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "S3_hook", "provide_bucket_name"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "provide_bucket_name",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "base_hook", "BaseHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "BaseHook",
+                        provider: "Base",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "dbapi_hook", "DbApiHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "DbApiHook",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "docker_hook", "DockerHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "DockerHook",
+                        provider: "Docker",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "druid_hook", "DruidDbApiHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "DruidDbApiHook",
+                        provider: "Apache Druid",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "druid_hook", "DruidHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "DruidHook",
+                        provider: "Apache Druid",
+                        version: "TBD"
+                },
+                )),
+
+
+                ["airflow", "hooks", "hive_hooks", "HiveCliHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveCliHook",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "hive_hooks", "HiveMetastoreHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveMetastoreHook",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "hive_hooks", "HiveServer2Hook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveServer2Hook",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "http_hook", "HttpHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HttpHook",
+                        provider: "Http",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "jdbc_hook", "JdbcHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "JdbcHook",
+                        provider: "Jdbc",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "jdbc_hook", "jaydebeapi"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "jaydebeapi",
+                        provider: "Jdbc",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "mssql_hook", "MsSqlHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MsSqlHook",
+                        provider: "Microsoft",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "mysql_hook", "MySqlHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MySqlHook",
+                        provider: "Mysql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "oracle_hook", "OracleHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "OracleHook",
+                        provider: "Oracle",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "pig_hook", "PigCliHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PigCliHook",
+                        provider: "Apache Pig",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "postgres_hook", "PostgresHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PostgresHook",
+                        provider: "Postgres",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "presto_hook", "PrestoHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PrestoHook",
+                        provider: "Presto",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "samba_hook", "SambaHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SambaHook",
+                        provider: "Samba",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "slack_hook", "SlackHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SlackHook",
+                        provider: "Slack",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "sqlite_hook", "SqliteHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SqliteHook",
+                        provider: "Sqlite",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "webhdfs_hook", "WebHDFSHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "WebHDFSHook",
+                        provider: "Apache Hdfs",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "hooks", "zendesk_hook", "ZendeskHook"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "ZendeskHook",
+                        provider: "Zendesk",
+                        version: "TBD"
+                },
+                )),
+
                 _ => None,
             });
     if let Some((deprecated, replacement)) = result {
