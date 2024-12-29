@@ -31,7 +31,7 @@ f: int = 1
 Since a `def` statement is a declaration, one `def` can shadow another `def`, or shadow a previous
 non-`def` declaration, without error.
 
-```py path=a.py
+```py
 f = 1
 reveal_type(f)  # revealed: Literal[1]
 
