@@ -260,7 +260,8 @@ pub(crate) fn quoted_type_alias(
 
     // explicit type aliases require some additional checks to avoid false positives
     if checker.semantic().in_annotated_type_alias_value()
-        && checker.semantic().execution_context().is_runtime()
+        && !checker.source_type.is_stub()
+        && !checker.semantic().in_type_checking_block()
         && quotes_are_unremovable(checker.semantic(), expr)
     {
         return;
