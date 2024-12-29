@@ -38,7 +38,8 @@ def f(): ...
 
 reveal_type(f)  # revealed: Literal[f]
 
-def f(): ...
+def f(x: int) -> int:
+    raise NotImplementedError
 
 reveal_type(f)  # revealed: Literal[f]
 
