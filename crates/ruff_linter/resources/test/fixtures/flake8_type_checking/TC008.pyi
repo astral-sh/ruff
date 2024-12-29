@@ -8,10 +8,12 @@ a: TypeAlias = 'int'  # TC008
 b: TypeAlias = 'Foo'   # TC008
 c: TypeAlias = 'Foo[str]'  # TC008
 d: TypeAlias = 'Foo.bar'  # TC008
+e: TypeAlias = 'Baz'  # OK
 
 type B = 'Foo'  # TC008
 type C = 'Foo[str]'  # TC008
 type D = 'Foo.bar'  # TC008
+type E = 'Baz'  # TC008
 
 
 class Baz:

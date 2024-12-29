@@ -19,10 +19,13 @@ if TYPE_CHECKING:
     g: TypeAlias = 'OptStr'   # TC008
     h: TypeAlias = 'Bar'   # TC008
     i: TypeAlias = Foo['str']   # TC008
-    j: TypeAlias = 'Baz'   # TC008
+    j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
     k: TypeAlias = 'k | None'  # False negative in type checking block
     l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
     m: TypeAlias = ('int'  # TC008
         | None)
     n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
         ' | None')
+
+
+    class Baz: ...

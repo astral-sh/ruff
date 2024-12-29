@@ -145,7 +145,7 @@ TC008_typing_execution_context.py:19:20: TC008 [*] Remove quotes from type alias
    19 |+    g: TypeAlias = OptStr   # TC008
 20 20 |     h: TypeAlias = 'Bar'   # TC008
 21 21 |     i: TypeAlias = Foo['str']   # TC008
-22 22 |     j: TypeAlias = 'Baz'   # TC008
+22 22 |     j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
 
 TC008_typing_execution_context.py:20:20: TC008 [*] Remove quotes from type alias
    |
@@ -154,7 +154,7 @@ TC008_typing_execution_context.py:20:20: TC008 [*] Remove quotes from type alias
 20 |     h: TypeAlias = 'Bar'   # TC008
    |                    ^^^^^ TC008
 21 |     i: TypeAlias = Foo['str']   # TC008
-22 |     j: TypeAlias = 'Baz'   # TC008
+22 |     j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
    |
    = help: Remove quotes
 
@@ -165,7 +165,7 @@ TC008_typing_execution_context.py:20:20: TC008 [*] Remove quotes from type alias
 20    |-    h: TypeAlias = 'Bar'   # TC008
    20 |+    h: TypeAlias = Bar   # TC008
 21 21 |     i: TypeAlias = Foo['str']   # TC008
-22 22 |     j: TypeAlias = 'Baz'   # TC008
+22 22 |     j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
 23 23 |     k: TypeAlias = 'k | None'  # False negative in type checking block
 
 TC008_typing_execution_context.py:21:24: TC008 [*] Remove quotes from type alias
@@ -174,7 +174,7 @@ TC008_typing_execution_context.py:21:24: TC008 [*] Remove quotes from type alias
 20 |     h: TypeAlias = 'Bar'   # TC008
 21 |     i: TypeAlias = Foo['str']   # TC008
    |                        ^^^^^ TC008
-22 |     j: TypeAlias = 'Baz'   # TC008
+22 |     j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
 23 |     k: TypeAlias = 'k | None'  # False negative in type checking block
    |
    = help: Remove quotes
@@ -185,34 +185,13 @@ TC008_typing_execution_context.py:21:24: TC008 [*] Remove quotes from type alias
 20 20 |     h: TypeAlias = 'Bar'   # TC008
 21    |-    i: TypeAlias = Foo['str']   # TC008
    21 |+    i: TypeAlias = Foo[str]   # TC008
-22 22 |     j: TypeAlias = 'Baz'   # TC008
+22 22 |     j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
 23 23 |     k: TypeAlias = 'k | None'  # False negative in type checking block
 24 24 |     l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
-
-TC008_typing_execution_context.py:22:20: TC008 [*] Remove quotes from type alias
-   |
-20 |     h: TypeAlias = 'Bar'   # TC008
-21 |     i: TypeAlias = Foo['str']   # TC008
-22 |     j: TypeAlias = 'Baz'   # TC008
-   |                    ^^^^^ TC008
-23 |     k: TypeAlias = 'k | None'  # False negative in type checking block
-24 |     l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
-   |
-   = help: Remove quotes
-
-ℹ Safe fix
-19 19 |     g: TypeAlias = 'OptStr'   # TC008
-20 20 |     h: TypeAlias = 'Bar'   # TC008
-21 21 |     i: TypeAlias = Foo['str']   # TC008
-22    |-    j: TypeAlias = 'Baz'   # TC008
-   22 |+    j: TypeAlias = Baz   # TC008
-23 23 |     k: TypeAlias = 'k | None'  # False negative in type checking block
-24 24 |     l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
-25 25 |     m: TypeAlias = ('int'  # TC008
 
 TC008_typing_execution_context.py:24:20: TC008 [*] Remove quotes from type alias
    |
-22 |     j: TypeAlias = 'Baz'   # TC008
+22 |     j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
 23 |     k: TypeAlias = 'k | None'  # False negative in type checking block
 24 |     l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
    |                    ^^^^^ TC008
@@ -223,7 +202,7 @@ TC008_typing_execution_context.py:24:20: TC008 [*] Remove quotes from type alias
 
 ℹ Safe fix
 21 21 |     i: TypeAlias = Foo['str']   # TC008
-22 22 |     j: TypeAlias = 'Baz'   # TC008
+22 22 |     j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
 23 23 |     k: TypeAlias = 'k | None'  # False negative in type checking block
 24    |-    l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
    24 |+    l: TypeAlias = int | None  # TC008 (because TC010 is not enabled)
@@ -243,7 +222,7 @@ TC008_typing_execution_context.py:25:21: TC008 [*] Remove quotes from type alias
    = help: Remove quotes
 
 ℹ Safe fix
-22 22 |     j: TypeAlias = 'Baz'   # TC008
+22 22 |     j: TypeAlias = 'Baz'   # OK (this would be treated as use before define)
 23 23 |     k: TypeAlias = 'k | None'  # False negative in type checking block
 24 24 |     l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
 25    |-    m: TypeAlias = ('int'  # TC008
@@ -270,3 +249,6 @@ TC008_typing_execution_context.py:27:21: TC008 [*] Remove quotes from type alias
 27    |-    n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
 28    |-        ' | None')
    27 |+    n: TypeAlias = (int | None)
+29 28 | 
+30 29 | 
+31 30 |     class Baz: ...
