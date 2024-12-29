@@ -1,0 +1,216 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC008.pyi:7:16: TC008 [*] Remove quotes from type alias
+  |
+5 | from foo import Foo
+6 | 
+7 | a: TypeAlias = 'int'  # TC008
+  |                ^^^^^ TC008
+8 | b: TypeAlias = 'Foo'   # TC008
+9 | c: TypeAlias = 'Foo[str]'  # TC008
+  |
+  = help: Remove quotes
+
+ℹ Safe fix
+4 4 | 
+5 5 | from foo import Foo
+6 6 | 
+7   |-a: TypeAlias = 'int'  # TC008
+  7 |+a: TypeAlias = int  # TC008
+8 8 | b: TypeAlias = 'Foo'   # TC008
+9 9 | c: TypeAlias = 'Foo[str]'  # TC008
+10 10 | d: TypeAlias = 'Foo.bar'  # TC008
+
+TC008.pyi:8:16: TC008 [*] Remove quotes from type alias
+   |
+ 7 | a: TypeAlias = 'int'  # TC008
+ 8 | b: TypeAlias = 'Foo'   # TC008
+   |                ^^^^^ TC008
+ 9 | c: TypeAlias = 'Foo[str]'  # TC008
+10 | d: TypeAlias = 'Foo.bar'  # TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+5 5 | from foo import Foo
+6 6 | 
+7 7 | a: TypeAlias = 'int'  # TC008
+8   |-b: TypeAlias = 'Foo'   # TC008
+  8 |+b: TypeAlias = Foo   # TC008
+9 9 | c: TypeAlias = 'Foo[str]'  # TC008
+10 10 | d: TypeAlias = 'Foo.bar'  # TC008
+11 11 | 
+
+TC008.pyi:9:16: TC008 [*] Remove quotes from type alias
+   |
+ 7 | a: TypeAlias = 'int'  # TC008
+ 8 | b: TypeAlias = 'Foo'   # TC008
+ 9 | c: TypeAlias = 'Foo[str]'  # TC008
+   |                ^^^^^^^^^^ TC008
+10 | d: TypeAlias = 'Foo.bar'  # TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+6  6  | 
+7  7  | a: TypeAlias = 'int'  # TC008
+8  8  | b: TypeAlias = 'Foo'   # TC008
+9     |-c: TypeAlias = 'Foo[str]'  # TC008
+   9  |+c: TypeAlias = Foo[str]  # TC008
+10 10 | d: TypeAlias = 'Foo.bar'  # TC008
+11 11 | 
+12 12 | type B = 'Foo'  # TC008
+
+TC008.pyi:10:16: TC008 [*] Remove quotes from type alias
+   |
+ 8 | b: TypeAlias = 'Foo'   # TC008
+ 9 | c: TypeAlias = 'Foo[str]'  # TC008
+10 | d: TypeAlias = 'Foo.bar'  # TC008
+   |                ^^^^^^^^^ TC008
+11 | 
+12 | type B = 'Foo'  # TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+7  7  | a: TypeAlias = 'int'  # TC008
+8  8  | b: TypeAlias = 'Foo'   # TC008
+9  9  | c: TypeAlias = 'Foo[str]'  # TC008
+10    |-d: TypeAlias = 'Foo.bar'  # TC008
+   10 |+d: TypeAlias = Foo.bar  # TC008
+11 11 | 
+12 12 | type B = 'Foo'  # TC008
+13 13 | type C = 'Foo[str]'  # TC008
+
+TC008.pyi:12:10: TC008 [*] Remove quotes from type alias
+   |
+10 | d: TypeAlias = 'Foo.bar'  # TC008
+11 | 
+12 | type B = 'Foo'  # TC008
+   |          ^^^^^ TC008
+13 | type C = 'Foo[str]'  # TC008
+14 | type D = 'Foo.bar'  # TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+9  9  | c: TypeAlias = 'Foo[str]'  # TC008
+10 10 | d: TypeAlias = 'Foo.bar'  # TC008
+11 11 | 
+12    |-type B = 'Foo'  # TC008
+   12 |+type B = Foo  # TC008
+13 13 | type C = 'Foo[str]'  # TC008
+14 14 | type D = 'Foo.bar'  # TC008
+15 15 | 
+
+TC008.pyi:13:10: TC008 [*] Remove quotes from type alias
+   |
+12 | type B = 'Foo'  # TC008
+13 | type C = 'Foo[str]'  # TC008
+   |          ^^^^^^^^^^ TC008
+14 | type D = 'Foo.bar'  # TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+10 10 | d: TypeAlias = 'Foo.bar'  # TC008
+11 11 | 
+12 12 | type B = 'Foo'  # TC008
+13    |-type C = 'Foo[str]'  # TC008
+   13 |+type C = Foo[str]  # TC008
+14 14 | type D = 'Foo.bar'  # TC008
+15 15 | 
+16 16 | 
+
+TC008.pyi:14:10: TC008 [*] Remove quotes from type alias
+   |
+12 | type B = 'Foo'  # TC008
+13 | type C = 'Foo[str]'  # TC008
+14 | type D = 'Foo.bar'  # TC008
+   |          ^^^^^^^^^ TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+11 11 | 
+12 12 | type B = 'Foo'  # TC008
+13 13 | type C = 'Foo[str]'  # TC008
+14    |-type D = 'Foo.bar'  # TC008
+   14 |+type D = Foo.bar  # TC008
+15 15 | 
+16 16 | 
+17 17 | class Baz:
+
+TC008.pyi:18:20: TC008 [*] Remove quotes from type alias
+   |
+17 | class Baz:
+18 |     a: TypeAlias = 'Baz'  # TC008
+   |                    ^^^^^ TC008
+19 |     type A = 'Baz'  # TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+15 15 | 
+16 16 | 
+17 17 | class Baz:
+18    |-    a: TypeAlias = 'Baz'  # TC008
+   18 |+    a: TypeAlias = Baz  # TC008
+19 19 |     type A = 'Baz'  # TC008
+20 20 | 
+21 21 |     class Nested:
+
+TC008.pyi:19:14: TC008 [*] Remove quotes from type alias
+   |
+17 | class Baz:
+18 |     a: TypeAlias = 'Baz'  # TC008
+19 |     type A = 'Baz'  # TC008
+   |              ^^^^^ TC008
+20 | 
+21 |     class Nested:
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+16 16 | 
+17 17 | class Baz:
+18 18 |     a: TypeAlias = 'Baz'  # TC008
+19    |-    type A = 'Baz'  # TC008
+   19 |+    type A = Baz  # TC008
+20 20 | 
+21 21 |     class Nested:
+22 22 |         a: TypeAlias = 'Baz'  # TC008
+
+TC008.pyi:22:24: TC008 [*] Remove quotes from type alias
+   |
+21 |     class Nested:
+22 |         a: TypeAlias = 'Baz'  # TC008
+   |                        ^^^^^ TC008
+23 |         type A = 'Baz'  # TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+19 19 |     type A = 'Baz'  # TC008
+20 20 | 
+21 21 |     class Nested:
+22    |-        a: TypeAlias = 'Baz'  # TC008
+   22 |+        a: TypeAlias = Baz  # TC008
+23 23 |         type A = 'Baz'  # TC008
+
+TC008.pyi:23:18: TC008 [*] Remove quotes from type alias
+   |
+21 |     class Nested:
+22 |         a: TypeAlias = 'Baz'  # TC008
+23 |         type A = 'Baz'  # TC008
+   |                  ^^^^^ TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+20 20 | 
+21 21 |     class Nested:
+22 22 |         a: TypeAlias = 'Baz'  # TC008
+23    |-        type A = 'Baz'  # TC008
+   23 |+        type A = Baz  # TC008
