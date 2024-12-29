@@ -28,7 +28,8 @@ f: int = 1
 
 ## Explicit shadowing involving `def` statements
 
-Since a `def` statement is a declaration, one `def` can shadow another `def`, or shadow a previous non-`def` declaration, without error.
+Since a `def` statement is a declaration, one `def` can shadow another `def`, or shadow a previous
+non-`def` declaration, without error.
 
 ```py path=a.py
 f = 1
