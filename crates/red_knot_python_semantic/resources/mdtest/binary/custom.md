@@ -155,6 +155,33 @@ reveal_type(Sub + Sub)  # revealed: Unknown
 reveal_type(No + No)  # revealed: Unknown
 ```
 
+## Subclass
+
+```py
+class Yes:
+    def __add__(self, other) -> Literal["+"]:
+        return "+"
+
+class Sub(Yes): ...
+class No: ...
+
+def yes() -> type[Yes]:
+    return Yes
+
+def sub() -> type[Sub]:
+    return Sub
+
+def no() -> type[No]:
+    return No
+
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[Yes]` and `type[Yes]`"
+reveal_type(yes() + yes())  # revealed: Unknown
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[Sub]` and `type[Sub]`"
+reveal_type(sub() + sub())  # revealed: Unknown
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[No]` and `type[No]`"
+reveal_type(no() + no())  # revealed: Unknown
+```
+
 ## Function literals
 
 ```py
@@ -187,31 +214,4 @@ reveal_type(f ^ f)  # revealed: Unknown
 reveal_type(f & f)  # revealed: Unknown
 # error: [unsupported-operator] "Operator `//` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
 reveal_type(f // f)  # revealed: Unknown
-```
-
-## Subclass
-
-```py
-class Yes:
-    def __add__(self, other) -> Literal["+"]:
-        return "+"
-
-class Sub(Yes): ...
-class No: ...
-
-def yes() -> type[Yes]:
-    return Yes
-
-def sub() -> type[Sub]:
-    return Sub
-
-def no() -> type[No]:
-    return No
-
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[Yes]` and `type[Yes]`"
-reveal_type(yes() + yes())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[Sub]` and `type[Sub]`"
-reveal_type(sub() + sub())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `type[No]` and `type[No]`"
-reveal_type(no() + no())  # revealed: Unknown
 ```
