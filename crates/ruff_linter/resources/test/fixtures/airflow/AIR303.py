@@ -13,7 +13,6 @@ from airflow.executors.kubernetes_executor_types import (
     ALL_NAMESPACES,
     POD_EXECUTOR_DONE_KEY,
 )
-from airflow.hooks.base_hook import BaseHook
 from airflow.hooks.dbapi import ConnectorProtocol, DbApiHook
 from airflow.hooks.dbapi_hook import DbApiHook as DbApiHook2
 from airflow.hooks.docker_hook import DockerHook
@@ -63,7 +62,6 @@ from airflow.operators.hive_to_mysql import HiveToMySqlOperator, HiveToMySqlTran
 from airflow.operators.hive_to_samba_operator import HiveToSambaOperator
 from airflow.operators.http_operator import SimpleHttpOperator
 from airflow.operators.jdbc_operator import JdbcOperator
-from airflow.operators.latest_only_operator import LatestOnlyOperator
 from airflow.operators.mssql_operator import MsSqlOperator
 from airflow.operators.mssql_to_hive import MsSqlToHiveOperator, MsSqlToHiveTransfer
 from airflow.operators.mysql_operator import MySqlOperator
@@ -107,7 +105,6 @@ from airflow.operators.sql import (
     _convert_to_float_if_possible,
     parse_boolean,
 )
-from airflow.operators.sql_branch_operator import BranchSqlOperator
 from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.sensors.hive_partition_sensor import HivePartitionSensor
 from airflow.sensors.http_sensor import HttpSensor
@@ -119,14 +116,18 @@ from airflow.sensors.sql_sensor import SqlSensor2
 from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
 from airflow.www.security import FabAirflowSecurityManagerOverride
 
-# apache-airflow-providers-fab
-basic_auth, kerberos_auth
-auth_current_user
-backend_kerberos_auth
-fab_override
-
-FabAuthManager()
-FabAirflowSecurityManagerOverride()
+# apache-airflow-providers-amazon
+provide_bucket_name()
+GCSToS3Operator()
+GoogleApiToS3Operator()
+GoogleApiToS3Transfer()
+RedshiftToS3Operator()
+RedshiftToS3Transfer()
+S3FileTransformOperator()
+S3Hook()
+S3KeySensor()
+S3ToRedshiftOperator()
+S3ToRedshiftTransfer()
 
 # apache-airflow-providers-celery
 DEFAULT_CELERY_CONFIG
@@ -134,118 +135,139 @@ app
 CeleryExecutor()
 CeleryKubernetesExecutor()
 
+# apache-airflow-providers-common-sql
+_convert_to_float_if_possible()
+parse_boolean()
+BaseSQLOperator()
+BranchSQLOperator()
+CheckOperator()
+ConnectorProtocol()
+DbApiHook()
+DbApiHook2()
+IntervalCheckOperator()
+PrestoCheckOperator()
+PrestoIntervalCheckOperator()
+PrestoValueCheckOperator()
+SQLCheckOperator()
+SQLCheckOperator2()
+SQLCheckOperator3()
+SQLColumnCheckOperator2()
+SQLIntervalCheckOperator()
+SQLIntervalCheckOperator2()
+SQLIntervalCheckOperator3()
+SQLTableCheckOperator()
+SQLThresholdCheckOperator()
+SQLThresholdCheckOperator2()
+SQLValueCheckOperator()
+SQLValueCheckOperator2()
+SQLValueCheckOperator3()
+SqlSensor()
+SqlSensor2()
+ThresholdCheckOperator()
+ValueCheckOperator()
+
 # apache-airflow-providers-daskexecutor
 DaskExecutor()
 
-# apache-airflow-providers-common-sql
-ConnectorProtocol()
-DbApiHook()
+# apache-airflow-providers-docker
+DockerHook()
+DockerOperator()
 
-# apache-airflow-providers-cncf-kubernetes
-ALL_NAMESPACES
-POD_EXECUTOR_DONE_KEY
+# apache-airflow-providers-apache-druid
+DruidDbApiHook()
+DruidHook()
+DruidCheckOperator()
+
+# apache-airflow-providers-apache-hdfs
+WebHDFSHook()
+WebHdfsSensor()
 
 # apache-airflow-providers-apache-hive
 HIVE_QUEUE_PRIORITIES
 closest_ds_partition()
 max_partition()
-
-# TODO: reorganize
-S3Hook()
-provide_bucket_name()
-BaseHook()
-DbApiHook2()
-DockerHook()
-DruidDbApiHook()
-DruidHook()
-HIVE_QUEUE_PRIORITIES()
 HiveCliHook()
 HiveMetastoreHook()
-HiveServer2Hook()
-HttpHook()
-JdbcHook()
-jaydebeapi()
-MsSqlHook()
-MySqlHook()
-OracleHook()
-PigCliHook()
-PostgresHook()
-PrestoHook()
-SambaHook()
-SlackHook()
-SqliteHook()
-WebHDFSHook()
-ZendeskHook()
-
-SQLCheckOperator()
-SQLIntervalCheckOperator()
-SQLThresholdCheckOperator()
-SQLValueCheckOperator()
-CheckOperator()
-IntervalCheckOperator()
-ThresholdCheckOperator()
-ValueCheckOperator()
-DockerOperator()
-DruidCheckOperator()
-GCSToS3Operator()
-GoogleApiToS3Operator()
-GoogleApiToS3Transfer()
 HiveOperator()
+HivePartitionSensor()
+HiveServer2Hook()
 HiveStatsCollectionOperator()
 HiveToDruidOperator()
 HiveToDruidTransfer()
-HiveToMySqlOperator()
-HiveToMySqlTransfer()
 HiveToSambaOperator()
+S3ToHiveOperator()
+S3ToHiveTransfer()
+MetastorePartitionSensor()
+NamedHivePartitionSensor()
+
+# apache-airflow-providers-http
+HttpHook()
+HttpSensor()
 SimpleHttpOperator()
+
+# apache-airflow-providers-jdbc
+jaydebeapi
+JdbcHook()
 JdbcOperator()
-LatestOnlyOperator()
+
+# apache-airflow-providers-fab
+basic_auth, kerberos_auth
+auth_current_user
+backend_kerberos_auth
+fab_override
+FabAuthManager()
+FabAirflowSecurityManagerOverride()
+
+# apache-airflow-providers-cncf-kubernetes
+ALL_NAMESPACES
+POD_EXECUTOR_DONE_KEY
+
+# apache-airflow-providers-microsoft-mssql
+MsSqlHook()
 MsSqlOperator()
 MsSqlToHiveOperator()
 MsSqlToHiveTransfer()
+
+# apache-airflow-providers-mysql
+HiveToMySqlOperator()
+HiveToMySqlTransfer()
+MySqlHook()
 MySqlOperator()
 MySqlToHiveOperator()
 MySqlToHiveTransfer()
-OracleOperator()
-PapermillOperator()
-PigOperator()
-Mapping()
-PostgresOperator()
-SQLCheckOperator2()
-SQLIntervalCheckOperator2()
-SQLValueCheckOperator2()
-PrestoCheckOperator()
-PrestoIntervalCheckOperator()
-PrestoValueCheckOperator()
 PrestoToMySqlOperator()
 PrestoToMySqlTransfer()
-RedshiftToS3Operator()
-RedshiftToS3Transfer()
-S3FileTransformOperator()
-S3ToHiveOperator()
-S3ToHiveTransfer()
-S3ToRedshiftOperator()
-S3ToRedshiftTransfer()
+
+# apache-airflow-providers-oracle
+OracleHook()
+OracleOperator()
+
+# apache-airflow-providers-papermill
+PapermillOperator()
+
+# apache-airflow-providers-apache-pig
+PigCliHook()
+PigOperator()
+
+# apache-airflow-providers-postgres
+Mapping
+PostgresHook()
+PostgresOperator()
+
+# apache-airflow-providers-presto
+PrestoHook()
+
+# apache-airflow-providers-samba
+SambaHook()
+
+# apache-airflow-providers-slack
+SlackHook()
 SlackAPIOperator()
 SlackAPIPostOperator()
-BaseSQLOperator()
-BranchSQLOperator()
-SQLCheckOperator3()
-SQLColumnCheckOperator2()
-SQLIntervalCheckOperator3()
-SQLTableCheckOperator()
-SQLThresholdCheckOperator2()
-SQLValueCheckOperator3()
-_convert_to_float_if_possible()
-parse_boolean()
-BranchSQLOperator()
-BranchSqlOperator()
+
+# apache-airflow-providers-sqlite
+SqliteHook()
 SqliteOperator()
-HivePartitionSensor()
-HttpSensor()
-MetastorePartitionSensor()
-NamedHivePartitionSensor()
-S3KeySensor()
-SqlSensor()
-SqlSensor2()
-WebHdfsSensor()
+
+# apache-airflow-providers-zendesk
+ZendeskHook()
