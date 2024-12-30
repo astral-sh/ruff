@@ -13,7 +13,6 @@ use ruff_python_semantic::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::rules::flake8_type_checking::settings::Settings;
-use crate::settings::types::IdentifierPattern;
 use crate::Locator;
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
