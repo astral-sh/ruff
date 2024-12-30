@@ -8,8 +8,8 @@ use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class_base::ClassBase;
 use crate::types::{
-    ClassLiteralType, IntersectionType, KnownClass, StringLiteralType,
-    SubclassOfType, Type, UnionType,
+    ClassLiteralType, IntersectionType, KnownClass, StringLiteralType, SubclassOfType, Type,
+    UnionType,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
