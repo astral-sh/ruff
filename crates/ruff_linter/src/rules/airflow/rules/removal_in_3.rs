@@ -11,21 +11,21 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-fn is_airflow_secret_backend(segments: &[&str]) -> bool {
+fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix: &str) -> bool {
     match segments {
-        ["airflow", "secrets", rest @ ..] => {
-            if let Some(last_element) = rest.last() {
-                last_element.ends_with("Backend")
+        ["airflow", "providers", rest @ ..] => {
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == module), rest.last())
+            {
+                pos + 1 < rest.len() && last_element.ends_with(symbol_suffix)
             } else {
                 false
             }
         }
 
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == "secrets"), rest.last())
-            {
-                pos + 1 < rest.len() && last_element.ends_with("Backend")
+        ["airflow", rest @ ..] => {
+            if let (Some(start_element), Some(last_element)) = (rest.first(), rest.last()) {
+                start_element.starts_with(module) & last_element.ends_with(symbol_suffix)
             } else {
                 false
             }
@@ -33,6 +33,22 @@ fn is_airflow_secret_backend(segments: &[&str]) -> bool {
 
         _ => false,
     }
+}
+
+fn is_airflow_secret_backend(segments: &[&str]) -> bool {
+    is_airflow_builtin_or_provider(segments, "secrets", "Backend")
+}
+
+fn is_airflow_hook(segments: &[&str]) -> bool {
+    is_airflow_builtin_or_provider(segments, "hooks", "Hook")
+}
+
+fn is_airflow_operator(segments: &[&str]) -> bool {
+    is_airflow_builtin_or_provider(segments, "operators", "Operator")
+}
+
+fn is_airflow_task_handler(segments: &[&str]) -> bool {
+    is_airflow_builtin_or_provider(segments, "log", "TaskHandler")
 }
 
 fn is_airflow_auth_manager(segments: &[&str]) -> bool {
@@ -50,72 +66,6 @@ fn is_airflow_auth_manager(segments: &[&str]) -> bool {
                 (rest.iter().position(|&s| s == "auth_manager"), rest.last())
             {
                 pos + 1 < rest.len() && last_element.ends_with("AuthManager")
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    }
-}
-
-fn is_airflow_hook(qualname: &QualifiedName) -> bool {
-    match qualname.segments() {
-        ["airflow", "hooks", rest @ ..] => {
-            if let Some(last_element) = rest.last() {
-                last_element.ends_with("Hook")
-            } else {
-                false
-            }
-        }
-
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == "hooks"), rest.last())
-            {
-                pos + 1 < rest.len() && last_element.ends_with("Hook")
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    }
-}
-
-fn is_airflow_operator(segments: &[&str]) -> bool {
-    match segments {
-        ["airflow", "operators", rest @ ..] => {
-            if let Some(last_element) = rest.last() {
-                last_element.ends_with("Operator")
-            } else {
-                false
-            }
-        }
-
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == "operators"), rest.last())
-            {
-                pos + 1 < rest.len() && last_element.ends_with("Operator")
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    }
-}
-
-fn is_airflow_task_handler(segments: &[&str]) -> bool {
-    match segments {
-        ["airflow", "utils", "log", "file_task_handler", "FileTaskHandler"] => true,
-
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == "log"), rest.last())
-            {
-                pos + 1 < rest.len() && last_element.ends_with("TaskHandler")
             } else {
                 false
             }
@@ -241,70 +191,68 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
                 None::<&str>,
             ));
         }
-        _ if is_airflow_auth_manager(qualname.segments()) => {
-            if !arguments.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
-                    Airflow3Removal {
-                        // deprecated: (*arguments).to_string(),
-                        deprecated: "appbuilder".to_string(),
-                        replacement: Replacement::Message(
-                            "The constructor takes no parameter now.",
-                        ),
-                    },
-                    arguments.range(),
+        _ => {
+            if is_airflow_auth_manager(qualname.segments()) {
+                if !arguments.is_empty() {
+                    checker.diagnostics.push(Diagnostic::new(
+                        Airflow3Removal {
+                            // deprecated: (*arguments).to_string(),
+                            deprecated: "appbuilder".to_string(),
+                            replacement: Replacement::Message(
+                                "The constructor takes no parameter now.",
+                            ),
+                        },
+                        arguments.range(),
+                    ));
+                }
+            } else if is_airflow_task_handler(qualname.segments()) {
+                checker.diagnostics.extend(diagnostic_for_argument(
+                    arguments,
+                    "filename_template",
+                    None::<&str>,
                 ));
+            } else if is_airflow_operator(qualname.segments()) {
+                checker
+                    .diagnostics
+                    .extend(diagnostic_for_argument(arguments, "sla", None::<&str>));
+                checker.diagnostics.extend(diagnostic_for_argument(
+                    arguments,
+                    "task_concurrency",
+                    Some("max_active_tis_per_dag"),
+                ));
+                match qualname.segments() {
+                    ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
+                        checker.diagnostics.extend(diagnostic_for_argument(
+                            arguments,
+                            "execution_date",
+                            Some("logical_date"),
+                        ));
+                    }
+                    ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
+                        checker.diagnostics.extend(diagnostic_for_argument(
+                            arguments,
+                            "use_task_execution_day",
+                            Some("use_task_logical_date"),
+                        ));
+                    }
+                    ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
+                        checker.diagnostics.extend(diagnostic_for_argument(
+                            arguments,
+                            "use_task_execution_day",
+                            Some("use_task_logical_date"),
+                        ));
+                    }
+                    ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
+                        checker.diagnostics.extend(diagnostic_for_argument(
+                            arguments,
+                            "use_task_execution_day",
+                            Some("use_task_logical_date"),
+                        ));
+                    }
+                    _ => {}
+                }
             }
         }
-        _ if is_airflow_task_handler(qualname.segments()) => {
-            checker.diagnostics.extend(diagnostic_for_argument(
-                arguments,
-                "filename_template",
-                None::<&str>,
-            ));
-        }
-        _ if is_airflow_operator(qualname.segments()) => {
-            checker
-                .diagnostics
-                .extend(diagnostic_for_argument(arguments, "sla", None::<&str>));
-            checker.diagnostics.extend(diagnostic_for_argument(
-                arguments,
-                "task_concurrency",
-                Some("max_active_tis_per_dag"),
-            ));
-            match qualname.segments() {
-                ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
-                    checker.diagnostics.extend(diagnostic_for_argument(
-                        arguments,
-                        "execution_date",
-                        Some("logical_date"),
-                    ));
-                }
-                ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
-                    checker.diagnostics.extend(diagnostic_for_argument(
-                        arguments,
-                        "use_task_execution_day",
-                        Some("use_task_logical_date"),
-                    ));
-                }
-                ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
-                    checker.diagnostics.extend(diagnostic_for_argument(
-                        arguments,
-                        "use_task_execution_day",
-                        Some("use_task_logical_date"),
-                    ));
-                }
-                ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
-                    checker.diagnostics.extend(diagnostic_for_argument(
-                        arguments,
-                        "use_task_execution_day",
-                        Some("use_task_logical_date"),
-                    ));
-                }
-                _ => {}
-            }
-        }
-
-        _ => {}
     };
 }
 
@@ -389,16 +337,22 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
             "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
             &_ => None,
         },
-        _ if is_airflow_secret_backend(qualname.segments()) => match attr.as_str() {
-            "get_conn_uri" => Some(Replacement::Name("get_conn_value")),
-            "get_connections" => Some(Replacement::Name("get_connection")),
-            &_ => None,
-        },
-        _ if is_airflow_hook(&qualname) => match attr.as_str() {
-            "get_connections" => Some(Replacement::Name("get_connection")),
-            &_ => None,
-        },
-        _ => None,
+        _ => {
+            if is_airflow_secret_backend(qualname.segments()) {
+                match attr.as_str() {
+                    "get_conn_uri" => Some(Replacement::Name("get_conn_value")),
+                    "get_connections" => Some(Replacement::Name("get_connection")),
+                    &_ => None,
+                }
+            } else if is_airflow_hook(qualname.segments()) {
+                match attr.as_str() {
+                    "get_connections" => Some(Replacement::Name("get_connection")),
+                    &_ => None,
+                }
+            } else {
+                None
+            }
+        }
     };
     if let Some(replacement) = replacement {
         checker.diagnostics.push(Diagnostic::new(
