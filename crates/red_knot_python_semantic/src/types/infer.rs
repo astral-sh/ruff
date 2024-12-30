@@ -630,6 +630,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                         class_node.into(),
                         format_args!("Metaclass type `{}` is not callable", ty.display(self.db())),
                     ),
+                    MetaclassErrorKind::PartlyNotCallable(ty) => self.context.report_lint(
+                        &INVALID_METACLASS,
+                        class_node.into(),
+                        format_args!(
+                            "Metaclass type `{}` is partly not callable",
+                            ty.display(self.db())
+                        ),
+                    ),
                     MetaclassErrorKind::Conflict {
                         candidate1:
                             MetaclassCandidate {

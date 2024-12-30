@@ -184,10 +184,11 @@ def _(n: int):
 def _(flag: bool):
     m = f if flag else 42
 
+    # error: [invalid-metaclass]
     class C(metaclass=m): ...
     # TODO: Should be `int | Unknown`
     reveal_type(C)  # revealed: Literal[C]
-    reveal_type(C.__class__)  # revealed: type[int] | type[Unknown]
+    reveal_type(C.__class__)  # revealed: type[Unknown]
 
 class SignatureMismatch: ...
 
