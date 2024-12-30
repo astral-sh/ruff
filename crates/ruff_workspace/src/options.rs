@@ -3471,8 +3471,8 @@ pub struct AnalyzeOptions {
         scope = "include-dependencies",
         value_type = "dict[str, list[str]]",
         example = r#"
-            "foo/bar.py" = ["foo/baz/*.py"],
-            "foo/baz/bar_config_reader.py" = ["configs/bar.json"],
+            "foo/bar.py" = ["foo/baz/*.py"]
+            "foo/baz/bar_config_reader.py" = ["configs/bar.json"]
         "#
     )]
     pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
