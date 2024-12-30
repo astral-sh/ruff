@@ -20,10 +20,12 @@ stub file only.
 ```py path=test.pyi
 y: bytes = ...
 reveal_type(y)  # revealed: bytes
+x = ...
+reveal_type(x)  # revealed: Unknown
 
 class Foo:
     y: int = ...
-    
+
 reveal_type(Foo.y)  # revealed: int
 ```
 
