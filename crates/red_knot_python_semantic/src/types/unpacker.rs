@@ -20,14 +20,18 @@ pub(crate) struct Unpacker<'db> {
     context: InferContext<'db>,
     scope: ScopeId<'db>,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
+    /// This flag determines if we are unpacking for assignment or not.
+    /// In stubs files, assigning ellipsis literal to multiple targets is allowed.
+    is_assignment: bool,
 }
 
 impl<'db> Unpacker<'db> {
-    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>, is_assignment: bool) -> Self {
         Self {
             context: InferContext::new(db, scope),
             targets: FxHashMap::default(),
             scope,
+            is_assignment,
         }
     }
 
@@ -37,14 +41,6 @@ impl<'db> Unpacker<'db> {
 
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
-        debug_assert!(
-            matches!(
-                target,
-                ast::Expr::List(_) | ast::Expr::Tuple(_) | ast::Expr::EllipsisLiteral(_)
-            ),
-            "Unpacking target must be a list or tuple or ellipsis literal expression"
-        );
-
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
 
@@ -53,9 +49,16 @@ impl<'db> Unpacker<'db> {
             .expression()
             .node_ref(self.db())
             .is_ellipsis_literal_expr();
-        // Unpacking Ellipsis Literal is allowed in stub files.
-        if file.is_stub(self.db().upcast()) && is_ellipsis_literal {
+        if file.is_stub(self.db().upcast()) && is_ellipsis_literal && self.is_assignment {
             value_ty = Type::Unknown;
+        } else {
+            debug_assert!(
+                matches!(
+                    target,
+                    ast::Expr::List(_) | ast::Expr::Tuple(_) | ast::Expr::EllipsisLiteral(_)
+                ),
+                "Unpacking target must be a list or tuple or ellipsis literal expression"
+            );
         }
 
         if value.is_iterable() {

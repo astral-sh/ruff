@@ -1,6 +1,6 @@
 # Ellipsis
 
-## Function and Methods
+## Function and methods
 
 The ellipsis literal `...` can be used as a placeholder default value for a function parameter, in a
 stub file only, regardless of the type of the parameter.
@@ -13,7 +13,7 @@ def f2(x: str = ...) -> None:
     reveal_type(x)  # revealed: str
 ```
 
-## Class and Module Level Attributes
+## Class and module level attributes
 
 The ellipsis literal can be assigned to a class or module attribute, regardless of its type, in a
 stub file only.
@@ -30,7 +30,7 @@ class Foo:
 reveal_type(Foo.y)  # revealed: int
 ```
 
-## Assigning Ellipsis Literal to Multiple Targets
+## Unpacking ellipsis literal in assignment
 
 ```py path=test.pyi
 x, y = ...
@@ -38,7 +38,16 @@ reveal_type(x)  # revealed: Unknown
 reveal_type(y)  # revealed: Unknown
 ```
 
-## Ellipsis Usage In Non Stub File
+## Unpacking ellipsis literal in for loops
+
+```py path=test.pyi
+# error: [not-iterable] "Object of type `ellipsis` is not iterable"
+for a, b in ...:
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+```
+
+## Ellipsis usage in non stub file
 
 In a non-stub file, there's no special treatment of ellipsis literals. An ellipsis literal can only
 be assigned if `EllipsisType` is actually assignable to the annotated type.
@@ -53,7 +62,7 @@ b = ...
 reveal_type(b)  # revealed: ellipsis
 ```
 
-## Use of Ellipsis Symbol
+## Use of ellipsis symbol
 
 There is no special treatment of the builtin name `Ellipsis`, only of `...` literals.
 
