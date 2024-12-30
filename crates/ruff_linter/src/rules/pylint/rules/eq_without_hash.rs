@@ -1,8 +1,13 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{
+    Expr, ExprName, Identifier, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef,
+};
+use ruff_python_semantic::analyze::class::{
+    any_member_declaration, ClassMemberBoundness, ClassMemberKind,
+};
 use ruff_text_size::Ranged;
+use std::ops::BitOr;
 
 use crate::checkers::ast::Checker;
 
@@ -105,47 +110,96 @@ impl Violation for EqWithoutHash {
 }
 
 /// W1641
-pub(crate) fn object_without_hash_method(
-    checker: &mut Checker,
-    ast::StmtClassDef { name, body, .. }: &ast::StmtClassDef,
-) {
-    if has_eq_without_hash(body) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(EqWithoutHash, name.range()));
+pub(crate) fn object_without_hash_method(checker: &mut Checker, class: &StmtClassDef) {
+    let eq_hash = EqHash::from_class(class);
+    if matches!(
+        eq_hash,
+        EqHash {
+            eq: HasMethod::Yes | HasMethod::Maybe,
+            hash: HasMethod::No
+        }
+    ) {
+        let diagnostic = Diagnostic::new(EqWithoutHash, class.name.range());
+        checker.diagnostics.push(diagnostic);
     }
 }
 
-fn has_eq_without_hash(body: &[Stmt]) -> bool {
-    let mut has_hash = false;
-    let mut has_eq = false;
-    for statement in body {
-        match statement {
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
-                    continue;
-                };
+#[derive(Debug)]
+struct EqHash {
+    hash: HasMethod,
+    eq: HasMethod,
+}
 
-                // Check if `__hash__` was explicitly set, as in:
-                // ```python
-                // class Class(SuperClass):
-                //     def __eq__(self, other):
-                //         return True
-                //
-                //     __hash__ = SuperClass.__hash__
-                // ```
+impl EqHash {
+    fn from_class(class: &StmtClassDef) -> Self {
+        let (mut has_eq, mut has_hash) = (HasMethod::No, HasMethod::No);
 
-                if id == "__hash__" {
-                    has_hash = true;
+        any_member_declaration(class, &mut |declaration| {
+            let id = match declaration.kind() {
+                ClassMemberKind::Assign(StmtAssign { targets, .. }) => {
+                    let [Expr::Name(ExprName { id, .. })] = &targets[..] else {
+                        return false;
+                    };
+
+                    id
                 }
-            }
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => match name.as_str() {
-                "__hash__" => has_hash = true,
-                "__eq__" => has_eq = true,
+                ClassMemberKind::AnnAssign(StmtAnnAssign { target, .. }) => {
+                    let Expr::Name(ExprName { id, .. }) = target.as_ref() else {
+                        return false;
+                    };
+
+                    id
+                }
+                ClassMemberKind::FunctionDef(StmtFunctionDef {
+                    name: Identifier { id, .. },
+                    ..
+                }) => id.as_str(),
+            };
+
+            match id {
+                "__eq__" => has_eq = has_eq | declaration.boundness().into(),
+                "__hash__" => has_hash = has_hash | declaration.boundness().into(),
                 _ => {}
-            },
-            _ => {}
+            }
+
+            !has_eq.is_no() && !has_hash.is_no()
+        });
+
+        Self {
+            eq: has_eq,
+            hash: has_hash,
         }
     }
-    has_eq && !has_hash
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, is_macro::Is, Default)]
+enum HasMethod {
+    /// There is no assignment or declaration.
+    #[default]
+    No,
+    /// The assignment or declaration is placed directly within the class body.
+    Yes,
+    /// The assignment or declaration is placed within an intermediate block
+    /// (`if`/`elif`/`else`, `for`/`else`, `while`/`else`, `with`, `case`, `try`/`except`).
+    Maybe,
+}
+
+impl From<ClassMemberBoundness> for HasMethod {
+    fn from(value: ClassMemberBoundness) -> Self {
+        match value {
+            ClassMemberBoundness::PossiblyUnbound => Self::Maybe,
+            ClassMemberBoundness::Bound => Self::Yes,
+        }
+    }
+}
+
+impl BitOr<HasMethod> for HasMethod {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (HasMethod::No, _) => rhs,
+            (_, _) => self,
+        }
+    }
 }

@@ -1,4 +1,6 @@
-class Person:  # [eq-without-hash]
+### Errors
+
+class Person:
     def __init__(self):
         self.name = "monty"
 
@@ -6,7 +8,108 @@ class Person:  # [eq-without-hash]
         return isinstance(other, Person) and other.name == self.name
 
 
-# OK
+class MaybeEqIf:
+    if ...:
+        def __eq__(self, other): ...
+
+
+class MaybeEqElif:
+    if ...:
+        ...
+    elif ...:
+        def __eq__(self, other): ...
+
+
+class MaybeEqElse:
+    if ...:
+        ...
+    else:
+        def __eq__(self, other): ...
+
+
+class MaybeEqWith:
+    with ...:
+        def __eq__(self, other): ...
+
+
+class MaybeEqFor:
+    for _ in ...:
+        def __eq__(self, other): ...
+
+
+class MaybeEqForElse:
+    for _ in ...:
+        ...
+    else:
+        def __eq__(self, other): ...
+
+
+class MaybeEqWhile:
+    while ...:
+        def __eq__(self, other): ...
+
+
+class MaybeEqWhileElse:
+    while ...:
+        ...
+    else:
+        def __eq__(self, other): ...
+
+
+class MaybeEqTry:
+    try:
+        def __eq__(self, other): ...
+    except Exception:
+        ...
+
+
+class MaybeEqTryExcept:
+    try:
+        ...
+    except Exception:
+        def __eq__(self, other): ...
+
+
+class MaybeEqTryExceptElse:
+    try:
+        ...
+    except Exception:
+        ...
+    else:
+        def __eq__(self, other): ...
+
+
+class MaybeEqTryFinally:
+    try:
+        ...
+    finally:
+        def __eq__(self, other): ...
+
+
+class MaybeEqMatchCase:
+    match ...:
+        case int():
+            def __eq__(self, other): ...
+
+
+class MaybeEqMatchCaseWildcard:
+    match ...:
+        case int(): ...
+        case _:
+            def __eq__(self, other): ...
+
+
+class MaybeEqDeeplyNested:
+    if ...:
+        ...
+    else:
+        with ...:
+            for _ in ...:
+                def __eq__(self, other): ...
+
+
+### OK
+
 class Language:
     def __init__(self):
         self.name = "python"

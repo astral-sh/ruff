@@ -5,7 +5,10 @@ use crate::{BindingId, SemanticModel};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple};
+use ruff_python_ast::{
+    ExceptHandler, Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple, Stmt, StmtFor, StmtIf,
+    StmtMatch, StmtTry, StmtWhile, StmtWith,
+};
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
 pub fn any_qualified_base_class(
@@ -107,6 +110,166 @@ pub fn any_super_class(
     }
 
     inner(class_def, semantic, func, &mut FxHashSet::default())
+}
+
+#[derive(Clone, Debug)]
+pub struct ClassMemberDeclaration<'a> {
+    kind: ClassMemberKind<'a>,
+    boundness: ClassMemberBoundness,
+}
+
+impl<'a> ClassMemberDeclaration<'a> {
+    pub fn kind(&self) -> &ClassMemberKind<'a> {
+        &self.kind
+    }
+
+    pub fn boundness(&self) -> ClassMemberBoundness {
+        self.boundness
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ClassMemberBoundness {
+    PossiblyUnbound,
+    Bound,
+}
+
+impl ClassMemberBoundness {
+    pub const fn is_bound(self) -> bool {
+        matches!(self, Self::Bound)
+    }
+
+    pub const fn is_possibly_unbound(self) -> bool {
+        matches!(self, Self::PossiblyUnbound)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum ClassMemberKind<'a> {
+    Assign(&'a ast::StmtAssign),
+    AnnAssign(&'a ast::StmtAnnAssign),
+    FunctionDef(&'a ast::StmtFunctionDef),
+}
+
+pub fn any_member_declaration(
+    class: &ast::StmtClassDef,
+    func: &mut dyn FnMut(ClassMemberDeclaration) -> bool,
+) -> bool {
+    fn any_stmt_in_body(
+        body: &[Stmt],
+        func: &mut dyn FnMut(ClassMemberDeclaration) -> bool,
+        boundness: ClassMemberBoundness,
+    ) -> bool {
+        body.iter().any(|stmt| {
+            let kind = match stmt {
+                Stmt::FunctionDef(function_def) => Some(ClassMemberKind::FunctionDef(function_def)),
+                Stmt::Assign(assign) => Some(ClassMemberKind::Assign(assign)),
+                Stmt::AnnAssign(assign) => Some(ClassMemberKind::AnnAssign(assign)),
+                Stmt::With(StmtWith { body, .. }) => {
+                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound) {
+                        return true;
+                    }
+
+                    None
+                }
+
+                Stmt::For(StmtFor { body, orelse, .. })
+                | Stmt::While(StmtWhile { body, orelse, .. }) => {
+                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
+                        || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
+                    {
+                        return true;
+                    }
+
+                    None
+                }
+
+                Stmt::If(StmtIf {
+                    body,
+                    elif_else_clauses,
+                    ..
+                }) => {
+                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
+                        || elif_else_clauses.iter().any(|it| {
+                            any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
+                        })
+                    {
+                        return true;
+                    }
+                    None
+                }
+
+                Stmt::Match(StmtMatch { cases, .. }) => {
+                    if cases.iter().any(|it| {
+                        any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
+                    }) {
+                        return true;
+                    }
+
+                    None
+                }
+
+                Stmt::Try(StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                }) => {
+                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
+                        || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
+                        || any_stmt_in_body(finalbody, func, ClassMemberBoundness::PossiblyUnbound)
+                        || handlers.iter().any(|ExceptHandler::ExceptHandler(it)| {
+                            any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
+                        })
+                    {
+                        return true;
+                    }
+
+                    None
+                }
+                // Technically, a method can be defined using a few more methods:
+                //
+                // ```python
+                // class C1:
+                //     # Import
+                //     import __eq__  # Callable module
+                //     # ImportFrom
+                //     from module import __eq__  # Top level callable
+                //     # ExprNamed
+                //     (__eq__ := lambda self, other: True)
+                // ```
+                //
+                // Those cases are not yet supported because they're rare.
+                Stmt::ClassDef(_)
+                | Stmt::Return(_)
+                | Stmt::Delete(_)
+                | Stmt::AugAssign(_)
+                | Stmt::TypeAlias(_)
+                | Stmt::Raise(_)
+                | Stmt::Assert(_)
+                | Stmt::Import(_)
+                | Stmt::ImportFrom(_)
+                | Stmt::Global(_)
+                | Stmt::Nonlocal(_)
+                | Stmt::Expr(_)
+                | Stmt::Pass(_)
+                | Stmt::Break(_)
+                | Stmt::Continue(_)
+                | Stmt::IpyEscapeCommand(_) => None,
+            };
+
+            if let Some(kind) = kind {
+                if func(ClassMemberDeclaration { kind, boundness }) {
+                    return true;
+                }
+            }
+
+            false
+        })
+    }
+
+    any_stmt_in_body(&class.body, func, ClassMemberBoundness::Bound)
 }
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro
