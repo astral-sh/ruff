@@ -1059,7 +1059,77 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 },
                 )),
 
+                ["airflow", "sensors", "hive_partition_sensor", "HivePartitionSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HivePartitionSensor",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
 
+                ["airflow", "sensors", "http_sensor", "HttpSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HttpSensor",
+                        provider: "Http",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "sensors", "metastore_partition_sensor", "MetastorePartitionSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MetastorePartitionSensor",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "sensors", "named_hive_partition_sensor", "NamedHivePartitionSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "NamedHivePartitionSensor",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "sensors", "s3_key_sensor", "S3KeySensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "S3KeySensor",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "sensors", "sql", "SqlSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SqlSensor",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "sensors", "sql_sensor", "SqlSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SqlSensor",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "sensors", "web_hdfs_sensor", "WebHdfsSensor"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "WebHdfsSensor",
+                        provider: "Apache Hdfs",
+                        version: "TBD"
+                },
+                )),
                 _ => None,
             });
     if let Some((deprecated, replacement)) = result {

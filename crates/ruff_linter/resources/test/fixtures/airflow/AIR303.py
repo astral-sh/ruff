@@ -109,6 +109,14 @@ from airflow.operators.sql import (
 )
 from airflow.operators.sql_branch_operator import BranchSqlOperator
 from airflow.operators.sqlite_operator import SqliteOperator
+from airflow.sensors.hive_partition_sensor import HivePartitionSensor
+from airflow.sensors.http_sensor import HttpSensor
+from airflow.sensors.metastore_partition_sensor import MetastorePartitionSensor
+from airflow.sensors.named_hive_partition_sensor import NamedHivePartitionSensor
+from airflow.sensors.s3_key_sensor import S3KeySensor
+from airflow.sensors.sql import SqlSensor
+from airflow.sensors.sql_sensor import SqlSensor2
+from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
 from airflow.www.security import FabAirflowSecurityManagerOverride
 
 # apache-airflow-providers-fab
@@ -233,3 +241,11 @@ parse_boolean()
 BranchSQLOperator()
 BranchSqlOperator()
 SqliteOperator()
+HivePartitionSensor()
+HttpSensor()
+MetastorePartitionSensor()
+NamedHivePartitionSensor()
+S3KeySensor()
+SqlSensor()
+SqlSensor2()
+WebHdfsSensor()
