@@ -1,12 +1,13 @@
-use std::ops::BitOr;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    Expr, ExprName, Identifier, Stmt, StmtAnnAssign, StmtAssign, StmtFunctionDef,
+    Expr, ExprName, Identifier, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef,
 };
-use ruff_python_semantic::analyze::class::any_single_stmt;
+use ruff_python_semantic::analyze::class::{
+    any_member_declaration, ClassMemberBoundness, ClassMemberKind,
+};
 use ruff_text_size::Ranged;
+use std::ops::BitOr;
 
 use crate::checkers::ast::Checker;
 
@@ -55,16 +56,72 @@ impl Violation for EqWithoutHash {
 }
 
 /// W1641
-pub(crate) fn object_without_hash_method(checker: &mut Checker, name: &Identifier, body: &[Stmt]) {
-    if matches!(has_eq_hash(body), (HasEq::Yes | HasEq::Maybe, HasHash::No)) {
-        let diagnostic = Diagnostic::new(EqWithoutHash, name.range());
+pub(crate) fn object_without_hash_method(checker: &mut Checker, class: &StmtClassDef) {
+    let eq_hash = EqHash::from_class(class);
+    if matches!(
+        eq_hash,
+        EqHash {
+            eq: HasMethod::Yes | HasMethod::Maybe,
+            hash: HasMethod::No
+        }
+    ) {
+        let diagnostic = Diagnostic::new(EqWithoutHash, class.name.range());
         checker.diagnostics.push(diagnostic);
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, is_macro::Is)]
+#[derive(Debug)]
+struct EqHash {
+    hash: HasMethod,
+    eq: HasMethod,
+}
+
+impl EqHash {
+    fn from_class(class: &StmtClassDef) -> Self {
+        let (mut has_eq, mut has_hash) = (HasMethod::No, HasMethod::No);
+
+        any_member_declaration(class, &mut |declaration| {
+            let id = match declaration.kind() {
+                ClassMemberKind::Assign(StmtAssign { targets, .. }) => {
+                    let [Expr::Name(ExprName { id, .. })] = &targets[..] else {
+                        return false;
+                    };
+
+                    id
+                }
+                ClassMemberKind::AnnAssign(StmtAnnAssign { target, .. }) => {
+                    let Expr::Name(ExprName { id, .. }) = target.as_ref() else {
+                        return false;
+                    };
+
+                    id
+                }
+                ClassMemberKind::FunctionDef(StmtFunctionDef {
+                    name: Identifier { id, .. },
+                    ..
+                }) => id.as_str(),
+            };
+
+            match id {
+                "__eq__" => has_eq = has_eq | declaration.boundness().into(),
+                "__hash__" => has_hash = has_hash | declaration.boundness().into(),
+                _ => {}
+            }
+
+            !has_eq.is_no() && !has_hash.is_no()
+        });
+
+        Self {
+            eq: has_eq,
+            hash: has_hash,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, is_macro::Is, Default)]
 enum HasMethod {
     /// There is no assignment or declaration.
+    #[default]
     No,
     /// The assignment or declaration is placed directly within the class body.
     Yes,
@@ -73,7 +130,16 @@ enum HasMethod {
     Maybe,
 }
 
-impl BitOr for HasMethod {
+impl From<ClassMemberBoundness> for HasMethod {
+    fn from(value: ClassMemberBoundness) -> Self {
+        match value {
+            ClassMemberBoundness::PossiblyUnbound => Self::Maybe,
+            ClassMemberBoundness::Bound => Self::Yes,
+        }
+    }
+}
+
+impl BitOr<HasMethod> for HasMethod {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
@@ -82,74 +148,4 @@ impl BitOr for HasMethod {
             (_, _) => self,
         }
     }
-}
-
-type HasEq = HasMethod;
-type HasHash = HasMethod;
-
-fn has_eq_hash(body: &[Stmt]) -> (HasEq, HasHash) {
-    let (mut has_eq, mut has_hash) = (HasMethod::No, HasMethod::No);
-
-    any_single_stmt(body, &mut |stmt, nested| {
-        let likeliness = if nested {
-            HasMethod::Maybe
-        } else {
-            HasMethod::Yes
-        };
-
-        match stmt {
-            Stmt::FunctionDef(StmtFunctionDef {
-                name: Identifier { id, .. },
-                ..
-            }) => match id.as_str() {
-                "__eq__" => has_eq = has_eq | likeliness,
-                "__hash__" => has_hash = has_hash | likeliness,
-                _ => {}
-            },
-
-            Stmt::Assign(StmtAssign { targets, .. }) => {
-                let [Expr::Name(ExprName { id, .. })] = &targets[..] else {
-                    return false;
-                };
-
-                match id.as_str() {
-                    "__eq__" => has_eq = has_eq | likeliness,
-                    "__hash__" => has_hash = has_hash | likeliness,
-                    _ => {}
-                }
-            }
-
-            Stmt::AnnAssign(StmtAnnAssign { target, .. }) => {
-                let Expr::Name(ExprName { id, .. }) = target.as_ref() else {
-                    return false;
-                };
-
-                match id.as_str() {
-                    "__eq__" => has_eq = has_eq | likeliness,
-                    "__hash__" => has_hash = has_hash | likeliness,
-                    _ => {}
-                }
-            }
-
-            _ => {
-                // Technically, a method can be defined using a few more methods:
-                //
-                // ```python
-                // class C1:
-                //     # Import
-                //     import __eq__  # Callable module
-                //     # ImportFrom
-                //     from module import __eq__  # Top level callable
-                //     # ExprNamed
-                //     (__eq__ := lambda self, other: True)
-                // ```
-                //
-                // Those cases are not covered here due to their extreme rarity.
-            }
-        };
-
-        !has_eq.is_no() && !has_hash.is_no()
-    });
-
-    (has_eq, has_hash)
 }

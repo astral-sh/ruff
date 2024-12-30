@@ -424,7 +424,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::EqWithoutHash) {
-                pylint::rules::object_without_hash_method(checker, name, body);
+                pylint::rules::object_without_hash_method(checker, class_def);
             }
             if checker.enabled(Rule::TooManyPublicMethods) {
                 pylint::rules::too_many_public_methods(
