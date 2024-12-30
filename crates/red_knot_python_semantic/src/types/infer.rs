@@ -70,7 +70,7 @@ use crate::types::{
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, Program, PythonVersion};
+use crate::Db;
 
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
@@ -3378,12 +3378,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             (todo @ Type::Todo(_), _, _) | (_, todo @ Type::Todo(_), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
             (Type::Unknown, _, _) | (_, Type::Unknown, _) => Some(Type::Unknown),
-
-            (Type::ClassLiteral(_), Type::ClassLiteral(_), ast::Operator::BitOr)
-                if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 =>
-            {
-                Some(UnionType::from_elements(self.db(), [left_ty, right_ty]))
-            }
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
                 n.checked_add(m)
