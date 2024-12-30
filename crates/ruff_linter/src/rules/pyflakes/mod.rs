@@ -159,6 +159,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_26.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_27.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_28.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_30.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -325,6 +326,7 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+
     #[test_case(Rule::UnusedImport, Path::new("F401_31.py"))]
     fn f401_allowed_unused_imports_option(rule_code: Rule, path: &Path) -> Result<()> {
         let diagnostics = test_path(
