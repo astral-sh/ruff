@@ -2,1039 +2,1102 @@
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 snapshot_kind: text
 ---
-AIR302_names.py:97:1: AIR302 `airflow.PY36` is removed in Airflow 3.0
-   |
-96 | # airflow root
-97 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-   | ^^^^ AIR302
-98 | DatasetFromRoot
-   |
-   = help: Use `sys.version_info` instead
-
-AIR302_names.py:97:7: AIR302 `airflow.PY37` is removed in Airflow 3.0
-   |
-96 | # airflow root
-97 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-   |       ^^^^ AIR302
-98 | DatasetFromRoot
-   |
-   = help: Use `sys.version_info` instead
-
-AIR302_names.py:97:13: AIR302 `airflow.PY38` is removed in Airflow 3.0
-   |
-96 | # airflow root
-97 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-   |             ^^^^ AIR302
-98 | DatasetFromRoot
-   |
-   = help: Use `sys.version_info` instead
-
-AIR302_names.py:97:19: AIR302 `airflow.PY39` is removed in Airflow 3.0
-   |
-96 | # airflow root
-97 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-   |                   ^^^^ AIR302
-98 | DatasetFromRoot
-   |
-   = help: Use `sys.version_info` instead
-
-AIR302_names.py:97:25: AIR302 `airflow.PY310` is removed in Airflow 3.0
-   |
-96 | # airflow root
-97 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-   |                         ^^^^^ AIR302
-98 | DatasetFromRoot
-   |
-   = help: Use `sys.version_info` instead
-
-AIR302_names.py:97:32: AIR302 `airflow.PY311` is removed in Airflow 3.0
-   |
-96 | # airflow root
-97 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-   |                                ^^^^^ AIR302
-98 | DatasetFromRoot
-   |
-   = help: Use `sys.version_info` instead
-
-AIR302_names.py:97:39: AIR302 `airflow.PY312` is removed in Airflow 3.0
-   |
-96 | # airflow root
-97 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
-   |                                       ^^^^^ AIR302
-98 | DatasetFromRoot
-   |
-   = help: Use `sys.version_info` instead
-
-AIR302_names.py:98:1: AIR302 `airflow.Dataset` is removed in Airflow 3.0
+AIR302_names.py:105:1: AIR302 `airflow.PY36` is removed in Airflow 3.0
     |
- 96 | # airflow root
- 97 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
- 98 | DatasetFromRoot
+104 | # airflow root
+105 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+    | ^^^^ AIR302
+106 | DatasetFromRoot()
+    |
+    = help: Use `sys.version_info` instead
+
+AIR302_names.py:105:7: AIR302 `airflow.PY37` is removed in Airflow 3.0
+    |
+104 | # airflow root
+105 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+    |       ^^^^ AIR302
+106 | DatasetFromRoot()
+    |
+    = help: Use `sys.version_info` instead
+
+AIR302_names.py:105:13: AIR302 `airflow.PY38` is removed in Airflow 3.0
+    |
+104 | # airflow root
+105 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+    |             ^^^^ AIR302
+106 | DatasetFromRoot()
+    |
+    = help: Use `sys.version_info` instead
+
+AIR302_names.py:105:19: AIR302 `airflow.PY39` is removed in Airflow 3.0
+    |
+104 | # airflow root
+105 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+    |                   ^^^^ AIR302
+106 | DatasetFromRoot()
+    |
+    = help: Use `sys.version_info` instead
+
+AIR302_names.py:105:25: AIR302 `airflow.PY310` is removed in Airflow 3.0
+    |
+104 | # airflow root
+105 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+    |                         ^^^^^ AIR302
+106 | DatasetFromRoot()
+    |
+    = help: Use `sys.version_info` instead
+
+AIR302_names.py:105:32: AIR302 `airflow.PY311` is removed in Airflow 3.0
+    |
+104 | # airflow root
+105 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+    |                                ^^^^^ AIR302
+106 | DatasetFromRoot()
+    |
+    = help: Use `sys.version_info` instead
+
+AIR302_names.py:105:39: AIR302 `airflow.PY312` is removed in Airflow 3.0
+    |
+104 | # airflow root
+105 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+    |                                       ^^^^^ AIR302
+106 | DatasetFromRoot()
+    |
+    = help: Use `sys.version_info` instead
+
+AIR302_names.py:106:1: AIR302 `airflow.Dataset` is removed in Airflow 3.0
+    |
+104 | # airflow root
+105 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+106 | DatasetFromRoot()
     | ^^^^^^^^^^^^^^^ AIR302
- 99 | 
-100 | dataset_from_root = DatasetFromRoot()
+107 | 
+108 | dataset_from_root = DatasetFromRoot()
     |
     = help: Use `airflow.sdk.definitions.asset.Asset` instead
 
-AIR302_names.py:100:21: AIR302 `airflow.Dataset` is removed in Airflow 3.0
+AIR302_names.py:108:21: AIR302 `airflow.Dataset` is removed in Airflow 3.0
     |
- 98 | DatasetFromRoot
- 99 | 
-100 | dataset_from_root = DatasetFromRoot()
+106 | DatasetFromRoot()
+107 | 
+108 | dataset_from_root = DatasetFromRoot()
     |                     ^^^^^^^^^^^^^^^ AIR302
-101 | dataset_from_root.iter_datasets()
-102 | dataset_from_root.iter_dataset_aliases()
+109 | dataset_from_root.iter_datasets()
+110 | dataset_from_root.iter_dataset_aliases()
     |
     = help: Use `airflow.sdk.definitions.asset.Asset` instead
 
-AIR302_names.py:101:19: AIR302 `iter_datasets` is removed in Airflow 3.0
+AIR302_names.py:109:19: AIR302 `iter_datasets` is removed in Airflow 3.0
     |
-100 | dataset_from_root = DatasetFromRoot()
-101 | dataset_from_root.iter_datasets()
+108 | dataset_from_root = DatasetFromRoot()
+109 | dataset_from_root.iter_datasets()
     |                   ^^^^^^^^^^^^^ AIR302
-102 | dataset_from_root.iter_dataset_aliases()
+110 | dataset_from_root.iter_dataset_aliases()
     |
     = help: Use `iter_assets` instead
 
-AIR302_names.py:102:19: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
+AIR302_names.py:110:19: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
     |
-100 | dataset_from_root = DatasetFromRoot()
-101 | dataset_from_root.iter_datasets()
-102 | dataset_from_root.iter_dataset_aliases()
+108 | dataset_from_root = DatasetFromRoot()
+109 | dataset_from_root.iter_datasets()
+110 | dataset_from_root.iter_dataset_aliases()
     |                   ^^^^^^^^^^^^^^^^^^^^ AIR302
-103 | 
-104 | # airflow.api_connexion.security
+111 | 
+112 | # airflow.api_connexion.security
     |
     = help: Use `iter_asset_aliases` instead
 
-AIR302_names.py:105:1: AIR302 `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0
+AIR302_names.py:113:1: AIR302 `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0
     |
-104 | # airflow.api_connexion.security
-105 | requires_access, requires_access_dataset
+112 | # airflow.api_connexion.security
+113 | requires_access, requires_access_dataset
     | ^^^^^^^^^^^^^^^ AIR302
-106 | 
-107 | # airflow.auth.managers
+114 | 
+115 | # airflow.auth.managers
     |
     = help: Use `airflow.api_connexion.security.requires_access_*` instead
 
-AIR302_names.py:105:18: AIR302 `airflow.api_connexion.security.requires_access_dataset` is removed in Airflow 3.0
+AIR302_names.py:113:18: AIR302 `airflow.api_connexion.security.requires_access_dataset` is removed in Airflow 3.0
     |
-104 | # airflow.api_connexion.security
-105 | requires_access, requires_access_dataset
+112 | # airflow.api_connexion.security
+113 | requires_access, requires_access_dataset
     |                  ^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-106 | 
-107 | # airflow.auth.managers
+114 | 
+115 | # airflow.auth.managers
     |
     = help: Use `airflow.api_connexion.security.requires_access_asset` instead
 
-AIR302_names.py:108:1: AIR302 `airflow.auth.managers.base_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
+AIR302_names.py:116:1: AIR302 `airflow.auth.managers.base_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
     |
-107 | # airflow.auth.managers
-108 | is_authorized_dataset
+115 | # airflow.auth.managers
+116 | is_authorized_dataset
     | ^^^^^^^^^^^^^^^^^^^^^ AIR302
-109 | DatasetDetails
+117 | DatasetDetails()
     |
     = help: Use `airflow.auth.managers.base_auth_manager.is_authorized_asset` instead
 
-AIR302_names.py:109:1: AIR302 `airflow.auth.managers.models.resource_details.DatasetDetails` is removed in Airflow 3.0
+AIR302_names.py:117:1: AIR302 `airflow.auth.managers.models.resource_details.DatasetDetails` is removed in Airflow 3.0
     |
-107 | # airflow.auth.managers
-108 | is_authorized_dataset
-109 | DatasetDetails
+115 | # airflow.auth.managers
+116 | is_authorized_dataset
+117 | DatasetDetails()
     | ^^^^^^^^^^^^^^ AIR302
-110 | 
-111 | # airflow.configuration
+118 | 
+119 | # airflow.configuration
     |
     = help: Use `airflow.auth.managers.models.resource_details.AssetDetails` instead
 
-AIR302_names.py:112:1: AIR302 `airflow.configuration.get` is removed in Airflow 3.0
+AIR302_names.py:120:1: AIR302 `airflow.configuration.get` is removed in Airflow 3.0
     |
-111 | # airflow.configuration
-112 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+119 | # airflow.configuration
+120 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
     | ^^^ AIR302
     |
     = help: Use `airflow.configuration.conf.get` instead
 
-AIR302_names.py:112:6: AIR302 `airflow.configuration.getboolean` is removed in Airflow 3.0
+AIR302_names.py:120:6: AIR302 `airflow.configuration.getboolean` is removed in Airflow 3.0
     |
-111 | # airflow.configuration
-112 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+119 | # airflow.configuration
+120 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
     |      ^^^^^^^^^^ AIR302
     |
     = help: Use `airflow.configuration.conf.getboolean` instead
 
-AIR302_names.py:112:18: AIR302 `airflow.configuration.getfloat` is removed in Airflow 3.0
+AIR302_names.py:120:18: AIR302 `airflow.configuration.getfloat` is removed in Airflow 3.0
     |
-111 | # airflow.configuration
-112 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+119 | # airflow.configuration
+120 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
     |                  ^^^^^^^^ AIR302
     |
     = help: Use `airflow.configuration.conf.getfloat` instead
 
-AIR302_names.py:112:28: AIR302 `airflow.configuration.getint` is removed in Airflow 3.0
+AIR302_names.py:120:28: AIR302 `airflow.configuration.getint` is removed in Airflow 3.0
     |
-111 | # airflow.configuration
-112 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+119 | # airflow.configuration
+120 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
     |                            ^^^^^^ AIR302
     |
     = help: Use `airflow.configuration.conf.getint` instead
 
-AIR302_names.py:112:36: AIR302 `airflow.configuration.has_option` is removed in Airflow 3.0
+AIR302_names.py:120:36: AIR302 `airflow.configuration.has_option` is removed in Airflow 3.0
     |
-111 | # airflow.configuration
-112 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+119 | # airflow.configuration
+120 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
     |                                    ^^^^^^^^^^ AIR302
     |
     = help: Use `airflow.configuration.conf.has_option` instead
 
-AIR302_names.py:112:48: AIR302 `airflow.configuration.remove_option` is removed in Airflow 3.0
+AIR302_names.py:120:48: AIR302 `airflow.configuration.remove_option` is removed in Airflow 3.0
     |
-111 | # airflow.configuration
-112 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+119 | # airflow.configuration
+120 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
     |                                                ^^^^^^^^^^^^^ AIR302
     |
     = help: Use `airflow.configuration.conf.remove_option` instead
 
-AIR302_names.py:112:63: AIR302 `airflow.configuration.as_dict` is removed in Airflow 3.0
+AIR302_names.py:120:63: AIR302 `airflow.configuration.as_dict` is removed in Airflow 3.0
     |
-111 | # airflow.configuration
-112 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+119 | # airflow.configuration
+120 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
     |                                                               ^^^^^^^ AIR302
     |
     = help: Use `airflow.configuration.conf.as_dict` instead
 
-AIR302_names.py:112:72: AIR302 `airflow.configuration.set` is removed in Airflow 3.0
+AIR302_names.py:120:72: AIR302 `airflow.configuration.set` is removed in Airflow 3.0
     |
-111 | # airflow.configuration
-112 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+119 | # airflow.configuration
+120 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
     |                                                                        ^^^ AIR302
     |
     = help: Use `airflow.configuration.conf.set` instead
 
-AIR302_names.py:116:1: AIR302 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0; The whole `airflow.contrib` module has been removed.
+AIR302_names.py:124:1: AIR302 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0; The whole `airflow.contrib` module has been removed.
     |
-115 | # airflow.contrib.*
-116 | AWSAthenaHook
+123 | # airflow.contrib.*
+124 | AWSAthenaHook()
     | ^^^^^^^^^^^^^ AIR302
-117 | 
-118 | # airflow.datasets
+125 | 
+126 | # airflow.datasets
     |
 
-AIR302_names.py:119:1: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3.0
+AIR302_names.py:127:1: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3.0
     |
-118 | # airflow.datasets
-119 | Dataset
+126 | # airflow.datasets
+127 | Dataset()
     | ^^^^^^^ AIR302
-120 | DatasetAlias
-121 | DatasetAliasEvent
+128 | DatasetAlias()
+129 | DatasetAliasEvent()
     |
     = help: Use `airflow.sdk.definitions.asset.Asset` instead
 
-AIR302_names.py:120:1: AIR302 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
+AIR302_names.py:128:1: AIR302 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
     |
-118 | # airflow.datasets
-119 | Dataset
-120 | DatasetAlias
+126 | # airflow.datasets
+127 | Dataset()
+128 | DatasetAlias()
     | ^^^^^^^^^^^^ AIR302
-121 | DatasetAliasEvent
-122 | DatasetAll
+129 | DatasetAliasEvent()
+130 | DatasetAll()
     |
     = help: Use `airflow.sdk.definitions.asset.AssetAlias` instead
 
-AIR302_names.py:121:1: AIR302 `airflow.datasets.DatasetAliasEvent` is removed in Airflow 3.0
+AIR302_names.py:129:1: AIR302 `airflow.datasets.DatasetAliasEvent` is removed in Airflow 3.0
     |
-119 | Dataset
-120 | DatasetAlias
-121 | DatasetAliasEvent
+127 | Dataset()
+128 | DatasetAlias()
+129 | DatasetAliasEvent()
     | ^^^^^^^^^^^^^^^^^ AIR302
-122 | DatasetAll
-123 | DatasetAny
+130 | DatasetAll()
+131 | DatasetAny()
     |
 
-AIR302_names.py:122:1: AIR302 `airflow.datasets.DatasetAll` is removed in Airflow 3.0
+AIR302_names.py:130:1: AIR302 `airflow.datasets.DatasetAll` is removed in Airflow 3.0
     |
-120 | DatasetAlias
-121 | DatasetAliasEvent
-122 | DatasetAll
+128 | DatasetAlias()
+129 | DatasetAliasEvent()
+130 | DatasetAll()
     | ^^^^^^^^^^ AIR302
-123 | DatasetAny
-124 | expand_alias_to_datasets
+131 | DatasetAny()
+132 | expand_alias_to_datasets
     |
     = help: Use `airflow.sdk.definitions.asset.AssetAll` instead
 
-AIR302_names.py:123:1: AIR302 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
+AIR302_names.py:131:1: AIR302 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
     |
-121 | DatasetAliasEvent
-122 | DatasetAll
-123 | DatasetAny
+129 | DatasetAliasEvent()
+130 | DatasetAll()
+131 | DatasetAny()
     | ^^^^^^^^^^ AIR302
-124 | expand_alias_to_datasets
-125 | Metadata
+132 | expand_alias_to_datasets
+133 | Metadata()
     |
     = help: Use `airflow.sdk.definitions.asset.AssetAny` instead
 
-AIR302_names.py:124:1: AIR302 `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0
+AIR302_names.py:132:1: AIR302 `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0
     |
-122 | DatasetAll
-123 | DatasetAny
-124 | expand_alias_to_datasets
+130 | DatasetAll()
+131 | DatasetAny()
+132 | expand_alias_to_datasets
     | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-125 | Metadata
+133 | Metadata()
     |
     = help: Use `airflow.sdk.definitions.asset.expand_alias_to_assets` instead
 
-AIR302_names.py:125:1: AIR302 `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0
+AIR302_names.py:133:1: AIR302 `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0
     |
-123 | DatasetAny
-124 | expand_alias_to_datasets
-125 | Metadata
+131 | DatasetAny()
+132 | expand_alias_to_datasets
+133 | Metadata()
     | ^^^^^^^^ AIR302
-126 | 
-127 | dataset_to_test_method_call = Dataset()
+134 | 
+135 | dataset_to_test_method_call = Dataset()
     |
     = help: Use `airflow.sdk.definitions.asset.metadata.Metadata` instead
 
-AIR302_names.py:127:31: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3.0
+AIR302_names.py:135:31: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3.0
     |
-125 | Metadata
-126 | 
-127 | dataset_to_test_method_call = Dataset()
+133 | Metadata()
+134 | 
+135 | dataset_to_test_method_call = Dataset()
     |                               ^^^^^^^ AIR302
-128 | dataset_to_test_method_call.iter_datasets()
-129 | dataset_to_test_method_call.iter_dataset_aliases()
+136 | dataset_to_test_method_call.iter_datasets()
+137 | dataset_to_test_method_call.iter_dataset_aliases()
     |
     = help: Use `airflow.sdk.definitions.asset.Asset` instead
 
-AIR302_names.py:128:29: AIR302 `iter_datasets` is removed in Airflow 3.0
+AIR302_names.py:136:29: AIR302 `iter_datasets` is removed in Airflow 3.0
     |
-127 | dataset_to_test_method_call = Dataset()
-128 | dataset_to_test_method_call.iter_datasets()
+135 | dataset_to_test_method_call = Dataset()
+136 | dataset_to_test_method_call.iter_datasets()
     |                             ^^^^^^^^^^^^^ AIR302
-129 | dataset_to_test_method_call.iter_dataset_aliases()
+137 | dataset_to_test_method_call.iter_dataset_aliases()
     |
     = help: Use `iter_assets` instead
 
-AIR302_names.py:129:29: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
+AIR302_names.py:137:29: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
     |
-127 | dataset_to_test_method_call = Dataset()
-128 | dataset_to_test_method_call.iter_datasets()
-129 | dataset_to_test_method_call.iter_dataset_aliases()
+135 | dataset_to_test_method_call = Dataset()
+136 | dataset_to_test_method_call.iter_datasets()
+137 | dataset_to_test_method_call.iter_dataset_aliases()
     |                             ^^^^^^^^^^^^^^^^^^^^ AIR302
-130 | 
-131 | alias_to_test_method_call = DatasetAlias()
+138 | 
+139 | alias_to_test_method_call = DatasetAlias()
     |
     = help: Use `iter_asset_aliases` instead
 
-AIR302_names.py:131:29: AIR302 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
+AIR302_names.py:139:29: AIR302 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
     |
-129 | dataset_to_test_method_call.iter_dataset_aliases()
-130 | 
-131 | alias_to_test_method_call = DatasetAlias()
+137 | dataset_to_test_method_call.iter_dataset_aliases()
+138 | 
+139 | alias_to_test_method_call = DatasetAlias()
     |                             ^^^^^^^^^^^^ AIR302
-132 | alias_to_test_method_call.iter_datasets()
-133 | alias_to_test_method_call.iter_dataset_aliases()
+140 | alias_to_test_method_call.iter_datasets()
+141 | alias_to_test_method_call.iter_dataset_aliases()
     |
     = help: Use `airflow.sdk.definitions.asset.AssetAlias` instead
 
-AIR302_names.py:132:27: AIR302 `iter_datasets` is removed in Airflow 3.0
+AIR302_names.py:140:27: AIR302 `iter_datasets` is removed in Airflow 3.0
     |
-131 | alias_to_test_method_call = DatasetAlias()
-132 | alias_to_test_method_call.iter_datasets()
+139 | alias_to_test_method_call = DatasetAlias()
+140 | alias_to_test_method_call.iter_datasets()
     |                           ^^^^^^^^^^^^^ AIR302
-133 | alias_to_test_method_call.iter_dataset_aliases()
+141 | alias_to_test_method_call.iter_dataset_aliases()
     |
     = help: Use `iter_assets` instead
 
-AIR302_names.py:133:27: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
+AIR302_names.py:141:27: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
     |
-131 | alias_to_test_method_call = DatasetAlias()
-132 | alias_to_test_method_call.iter_datasets()
-133 | alias_to_test_method_call.iter_dataset_aliases()
+139 | alias_to_test_method_call = DatasetAlias()
+140 | alias_to_test_method_call.iter_datasets()
+141 | alias_to_test_method_call.iter_dataset_aliases()
     |                           ^^^^^^^^^^^^^^^^^^^^ AIR302
-134 | 
-135 | any_to_test_method_call = DatasetAny()
+142 | 
+143 | any_to_test_method_call = DatasetAny()
     |
     = help: Use `iter_asset_aliases` instead
 
-AIR302_names.py:135:27: AIR302 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
+AIR302_names.py:143:27: AIR302 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
     |
-133 | alias_to_test_method_call.iter_dataset_aliases()
-134 | 
-135 | any_to_test_method_call = DatasetAny()
+141 | alias_to_test_method_call.iter_dataset_aliases()
+142 | 
+143 | any_to_test_method_call = DatasetAny()
     |                           ^^^^^^^^^^ AIR302
-136 | any_to_test_method_call.iter_datasets()
-137 | any_to_test_method_call.iter_dataset_aliases()
+144 | any_to_test_method_call.iter_datasets()
+145 | any_to_test_method_call.iter_dataset_aliases()
     |
     = help: Use `airflow.sdk.definitions.asset.AssetAny` instead
 
-AIR302_names.py:136:25: AIR302 `iter_datasets` is removed in Airflow 3.0
+AIR302_names.py:144:25: AIR302 `iter_datasets` is removed in Airflow 3.0
     |
-135 | any_to_test_method_call = DatasetAny()
-136 | any_to_test_method_call.iter_datasets()
+143 | any_to_test_method_call = DatasetAny()
+144 | any_to_test_method_call.iter_datasets()
     |                         ^^^^^^^^^^^^^ AIR302
-137 | any_to_test_method_call.iter_dataset_aliases()
+145 | any_to_test_method_call.iter_dataset_aliases()
     |
     = help: Use `iter_assets` instead
 
-AIR302_names.py:137:25: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
+AIR302_names.py:145:25: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
     |
-135 | any_to_test_method_call = DatasetAny()
-136 | any_to_test_method_call.iter_datasets()
-137 | any_to_test_method_call.iter_dataset_aliases()
+143 | any_to_test_method_call = DatasetAny()
+144 | any_to_test_method_call.iter_datasets()
+145 | any_to_test_method_call.iter_dataset_aliases()
     |                         ^^^^^^^^^^^^^^^^^^^^ AIR302
-138 | 
-139 | # airflow.datasets.manager
+146 | 
+147 | # airflow.datasets.manager
     |
     = help: Use `iter_asset_aliases` instead
 
-AIR302_names.py:140:17: AIR302 `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
+AIR302_names.py:148:19: AIR302 `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
     |
-139 | # airflow.datasets.manager
-140 | DatasetManager, dataset_manager, resolve_dataset_manager
-    |                 ^^^^^^^^^^^^^^^ AIR302
-141 | 
-142 | # airflow.hooks
+147 | # airflow.datasets.manager
+148 | DatasetManager(), dataset_manager, resolve_dataset_manager
+    |                   ^^^^^^^^^^^^^^^ AIR302
+149 | 
+150 | # airflow.hooks
     |
     = help: Use `airflow.assets.manager` instead
 
-AIR302_names.py:140:34: AIR302 `airflow.datasets.manager.resolve_dataset_manager` is removed in Airflow 3.0
+AIR302_names.py:148:36: AIR302 `airflow.datasets.manager.resolve_dataset_manager` is removed in Airflow 3.0
     |
-139 | # airflow.datasets.manager
-140 | DatasetManager, dataset_manager, resolve_dataset_manager
-    |                                  ^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-141 | 
-142 | # airflow.hooks
+147 | # airflow.datasets.manager
+148 | DatasetManager(), dataset_manager, resolve_dataset_manager
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+149 | 
+150 | # airflow.hooks
     |
     = help: Use `airflow.assets.resolve_asset_manager` instead
 
-AIR302_names.py:143:1: AIR302 `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
+AIR302_names.py:151:1: AIR302 `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
     |
-142 | # airflow.hooks
-143 | BaseHook()
+150 | # airflow.hooks
+151 | BaseHook()
     | ^^^^^^^^ AIR302
-144 | 
-145 | # airflow.lineage.hook
+152 | 
+153 | # airflow.lineage.hook
     |
     = help: Use `airflow.hooks.base.BaseHook` instead
 
-AIR302_names.py:146:1: AIR302 `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+AIR302_names.py:154:1: AIR302 `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
     |
-145 | # airflow.lineage.hook
-146 | DatasetLineageInfo
+153 | # airflow.lineage.hook
+154 | DatasetLineageInfo()
     | ^^^^^^^^^^^^^^^^^^ AIR302
-147 | 
-148 | # airflow.listeners.spec.dataset
+155 | 
+156 | # airflow.listeners.spec.dataset
     |
     = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
 
-AIR302_names.py:149:1: AIR302 `airflow.listeners.spec.dataset.on_dataset_changed` is removed in Airflow 3.0
+AIR302_names.py:157:1: AIR302 `airflow.listeners.spec.dataset.on_dataset_changed` is removed in Airflow 3.0
     |
-148 | # airflow.listeners.spec.dataset
-149 | on_dataset_changed, on_dataset_created
+156 | # airflow.listeners.spec.dataset
+157 | on_dataset_changed, on_dataset_created
     | ^^^^^^^^^^^^^^^^^^ AIR302
-150 | 
-151 | # airflow.metrics.validators
+158 | 
+159 | # airflow.metrics.validators
     |
     = help: Use `airflow.listeners.spec.asset.on_asset_changed` instead
 
-AIR302_names.py:149:21: AIR302 `airflow.listeners.spec.dataset.on_dataset_created` is removed in Airflow 3.0
+AIR302_names.py:157:21: AIR302 `airflow.listeners.spec.dataset.on_dataset_created` is removed in Airflow 3.0
     |
-148 | # airflow.listeners.spec.dataset
-149 | on_dataset_changed, on_dataset_created
+156 | # airflow.listeners.spec.dataset
+157 | on_dataset_changed, on_dataset_created
     |                     ^^^^^^^^^^^^^^^^^^ AIR302
-150 | 
-151 | # airflow.metrics.validators
+158 | 
+159 | # airflow.metrics.validators
     |
     = help: Use `airflow.listeners.spec.asset.on_asset_created` instead
 
-AIR302_names.py:152:1: AIR302 `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0
+AIR302_names.py:160:1: AIR302 `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0
     |
-151 | # airflow.metrics.validators
-152 | AllowListValidator, BlockListValidator
+159 | # airflow.metrics.validators
+160 | AllowListValidator(), BlockListValidator()
     | ^^^^^^^^^^^^^^^^^^ AIR302
-153 | 
-154 | # airflow.operators.dummy_operator
+161 | 
+162 | # airflow.operators.dummy_operator
     |
     = help: Use `airflow.metrics.validators.PatternAllowListValidator` instead
 
-AIR302_names.py:152:21: AIR302 `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0
+AIR302_names.py:160:23: AIR302 `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0
     |
-151 | # airflow.metrics.validators
-152 | AllowListValidator, BlockListValidator
-    |                     ^^^^^^^^^^^^^^^^^^ AIR302
-153 | 
-154 | # airflow.operators.dummy_operator
+159 | # airflow.metrics.validators
+160 | AllowListValidator(), BlockListValidator()
+    |                       ^^^^^^^^^^^^^^^^^^ AIR302
+161 | 
+162 | # airflow.operators.dummy_operator
     |
     = help: Use `airflow.metrics.validators.PatternBlockListValidator` instead
 
-AIR302_names.py:155:16: AIR302 `airflow.operators.dummy_operator.EmptyOperator` is removed in Airflow 3.0
+AIR302_names.py:163:16: AIR302 `airflow.operators.dummy_operator.EmptyOperator` is removed in Airflow 3.0
     |
-154 | # airflow.operators.dummy_operator
-155 | dummy_operator.EmptyOperator
+162 | # airflow.operators.dummy_operator
+163 | dummy_operator.EmptyOperator()
     |                ^^^^^^^^^^^^^ AIR302
-156 | dummy_operator.DummyOperator
+164 | dummy_operator.DummyOperator()
     |
     = help: Use `airflow.operators.empty.EmptyOperator` instead
 
-AIR302_names.py:156:16: AIR302 `airflow.operators.dummy_operator.DummyOperator` is removed in Airflow 3.0
+AIR302_names.py:164:16: AIR302 `airflow.operators.dummy_operator.DummyOperator` is removed in Airflow 3.0
     |
-154 | # airflow.operators.dummy_operator
-155 | dummy_operator.EmptyOperator
-156 | dummy_operator.DummyOperator
+162 | # airflow.operators.dummy_operator
+163 | dummy_operator.EmptyOperator()
+164 | dummy_operator.DummyOperator()
     |                ^^^^^^^^^^^^^ AIR302
-157 | 
-158 | # airflow.operators.bash_operator
+165 | 
+166 | # airflow.operators.bash_operator
     |
     = help: Use `airflow.operators.empty.EmptyOperator` instead
 
-AIR302_names.py:159:1: AIR302 `airflow.operators.bash_operator.BashOperator` is removed in Airflow 3.0
+AIR302_names.py:167:1: AIR302 `airflow.operators.bash_operator.BashOperator` is removed in Airflow 3.0
     |
-158 | # airflow.operators.bash_operator
-159 | BashOperator
+166 | # airflow.operators.bash_operator
+167 | BashOperator()
     | ^^^^^^^^^^^^ AIR302
-160 | 
-161 | # airflow.operators.branch_operator
+168 | 
+169 | # airflow.operators.branch_operator
     |
     = help: Use `airflow.operators.bash.BashOperator` instead
 
-AIR302_names.py:162:1: AIR302 `airflow.operators.branch_operator.BaseBranchOperator` is removed in Airflow 3.0
+AIR302_names.py:170:1: AIR302 `airflow.operators.branch_operator.BaseBranchOperator` is removed in Airflow 3.0
     |
-161 | # airflow.operators.branch_operator
-162 | BaseBranchOperator
+169 | # airflow.operators.branch_operator
+170 | BaseBranchOperator()
     | ^^^^^^^^^^^^^^^^^^ AIR302
-163 | 
-164 | # airflow.operators.dummy
+171 | 
+172 | # airflow.operators.dagrun_operator
     |
     = help: Use `airflow.operators.branch.BaseBranchOperator` instead
 
-AIR302_names.py:165:16: AIR302 `airflow.operators.dummy.DummyOperator` is removed in Airflow 3.0
+AIR302_names.py:173:1: AIR302 `airflow.operators.dagrun_operator.TriggerDagRunLink` is removed in Airflow 3.0
     |
-164 | # airflow.operators.dummy
-165 | EmptyOperator, DummyOperator
-    |                ^^^^^^^^^^^^^ AIR302
-166 | 
-167 | # airflow.operators.email_operator
+172 | # airflow.operators.dagrun_operator
+173 | TriggerDagRunLink()
+    | ^^^^^^^^^^^^^^^^^ AIR302
+174 | TriggerDagRunOperator()
+    |
+    = help: Use `airflow.operators.trigger_dagrun.TriggerDagRunLink` instead
+
+AIR302_names.py:174:1: AIR302 `airflow.operators.dagrun_operator.TriggerDagRunOperator` is removed in Airflow 3.0
+    |
+172 | # airflow.operators.dagrun_operator
+173 | TriggerDagRunLink()
+174 | TriggerDagRunOperator()
+    | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+175 | 
+176 | # airflow.operators.dummy
+    |
+    = help: Use `airflow.operators.trigger_dagrun.TriggerDagRunOperator` instead
+
+AIR302_names.py:177:18: AIR302 `airflow.operators.dummy.DummyOperator` is removed in Airflow 3.0
+    |
+176 | # airflow.operators.dummy
+177 | EmptyOperator(), DummyOperator()
+    |                  ^^^^^^^^^^^^^ AIR302
+178 | 
+179 | # airflow.operators.email_operator
     |
     = help: Use `airflow.operators.empty.EmptyOperator` instead
 
-AIR302_names.py:168:1: AIR302 `airflow.operators.email_operator.EmailOperator` is removed in Airflow 3.0
+AIR302_names.py:180:1: AIR302 `airflow.operators.email_operator.EmailOperator` is removed in Airflow 3.0
     |
-167 | # airflow.operators.email_operator
-168 | EmailOperator
+179 | # airflow.operators.email_operator
+180 | EmailOperator()
     | ^^^^^^^^^^^^^ AIR302
-169 | 
-170 | # airflow.operators.subdag.*
+181 | 
+182 | # airflow.operators.latest_only_operator
     |
     = help: Use `airflow.operators.email.EmailOperator` instead
 
-AIR302_names.py:171:1: AIR302 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0; The whole `airflow.subdag` module has been removed.
+AIR302_names.py:183:1: AIR302 `airflow.operators.latest_only_operator.LatestOnlyOperator` is removed in Airflow 3.0
     |
-170 | # airflow.operators.subdag.*
-171 | SubDagOperator
+182 | # airflow.operators.latest_only_operator
+183 | LatestOnlyOperator()
+    | ^^^^^^^^^^^^^^^^^^ AIR302
+184 | 
+185 | # airflow.operators.python_operator
+    |
+    = help: Use `     airflow.operators.latest_only.LatestOnlyOperator` instead
+
+AIR302_names.py:186:1: AIR302 `airflow.operators.python_operator.BranchPythonOperator` is removed in Airflow 3.0
+    |
+185 | # airflow.operators.python_operator
+186 | BranchPythonOperator()
+    | ^^^^^^^^^^^^^^^^^^^^ AIR302
+187 | PythonOperator()
+188 | PythonVirtualenvOperator()
+    |
+    = help: Use `airflow.operators.python.BranchPythonOperator` instead
+
+AIR302_names.py:187:1: AIR302 `airflow.operators.python_operator.PythonOperator` is removed in Airflow 3.0
+    |
+185 | # airflow.operators.python_operator
+186 | BranchPythonOperator()
+187 | PythonOperator()
     | ^^^^^^^^^^^^^^ AIR302
-172 | 
-173 | # airflow.providers.amazon
+188 | PythonVirtualenvOperator()
+189 | ShortCircuitOperator()
+    |
+    = help: Use `airflow.operators.python.PythonOperator` instead
+
+AIR302_names.py:188:1: AIR302 `airflow.operators.python_operator.PythonVirtualenvOperator` is removed in Airflow 3.0
+    |
+186 | BranchPythonOperator()
+187 | PythonOperator()
+188 | PythonVirtualenvOperator()
+    | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+189 | ShortCircuitOperator()
+    |
+    = help: Use `airflow.operators.python.PythonVirtualenvOperator` instead
+
+AIR302_names.py:189:1: AIR302 `airflow.operators.python_operator.ShortCircuitOperator` is removed in Airflow 3.0
+    |
+187 | PythonOperator()
+188 | PythonVirtualenvOperator()
+189 | ShortCircuitOperator()
+    | ^^^^^^^^^^^^^^^^^^^^ AIR302
+190 | 
+191 | # airflow.operators.subdag.*
+    |
+    = help: Use `airflow.operators.python.ShortCircuitOperator` instead
+
+AIR302_names.py:192:1: AIR302 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0; The whole `airflow.subdag` module has been removed.
+    |
+191 | # airflow.operators.subdag.*
+192 | SubDagOperator()
+    | ^^^^^^^^^^^^^^ AIR302
+193 | 
+194 | # airflow.providers.amazon
     |
 
-AIR302_names.py:174:13: AIR302 `airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.DATASET` is removed in Airflow 3.0
+AIR302_names.py:195:13: AIR302 `airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.DATASET` is removed in Airflow 3.0
     |
-173 | # airflow.providers.amazon
-174 | AvpEntities.DATASET
+194 | # airflow.providers.amazon
+195 | AvpEntities.DATASET
     |             ^^^^^^^ AIR302
-175 | s3.create_dataset
-176 | s3.convert_dataset_to_openlineage
+196 | s3.create_dataset
+197 | s3.convert_dataset_to_openlineage
     |
     = help: Use `airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.ASSET` instead
 
-AIR302_names.py:175:4: AIR302 `airflow.providers.amazon.aws.datasets.s3.create_dataset` is removed in Airflow 3.0
+AIR302_names.py:196:4: AIR302 `airflow.providers.amazon.aws.datasets.s3.create_dataset` is removed in Airflow 3.0
     |
-173 | # airflow.providers.amazon
-174 | AvpEntities.DATASET
-175 | s3.create_dataset
+194 | # airflow.providers.amazon
+195 | AvpEntities.DATASET
+196 | s3.create_dataset
     |    ^^^^^^^^^^^^^^ AIR302
-176 | s3.convert_dataset_to_openlineage
-177 | s3.sanitize_uri
+197 | s3.convert_dataset_to_openlineage
+198 | s3.sanitize_uri
     |
     = help: Use `airflow.providers.amazon.aws.assets.s3.create_asset` instead
 
-AIR302_names.py:176:4: AIR302 `airflow.providers.amazon.aws.datasets.s3.convert_dataset_to_openlineage` is removed in Airflow 3.0
+AIR302_names.py:197:4: AIR302 `airflow.providers.amazon.aws.datasets.s3.convert_dataset_to_openlineage` is removed in Airflow 3.0
     |
-174 | AvpEntities.DATASET
-175 | s3.create_dataset
-176 | s3.convert_dataset_to_openlineage
+195 | AvpEntities.DATASET
+196 | s3.create_dataset
+197 | s3.convert_dataset_to_openlineage
     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-177 | s3.sanitize_uri
+198 | s3.sanitize_uri
     |
     = help: Use `airflow.providers.amazon.aws.assets.s3.convert_asset_to_openlineage` instead
 
-AIR302_names.py:177:4: AIR302 `airflow.providers.amazon.aws.datasets.s3.sanitize_uri` is removed in Airflow 3.0
+AIR302_names.py:198:4: AIR302 `airflow.providers.amazon.aws.datasets.s3.sanitize_uri` is removed in Airflow 3.0
     |
-175 | s3.create_dataset
-176 | s3.convert_dataset_to_openlineage
-177 | s3.sanitize_uri
+196 | s3.create_dataset
+197 | s3.convert_dataset_to_openlineage
+198 | s3.sanitize_uri
     |    ^^^^^^^^^^^^ AIR302
-178 | 
-179 | # airflow.providers.common.io
+199 | 
+200 | # airflow.providers.common.io
     |
     = help: Use `airflow.providers.amazon.aws.assets.s3.sanitize_uri` instead
 
-AIR302_names.py:180:16: AIR302 `airflow.providers.common.io.datasets.file.convert_dataset_to_openlineage` is removed in Airflow 3.0
+AIR302_names.py:201:16: AIR302 `airflow.providers.common.io.datasets.file.convert_dataset_to_openlineage` is removed in Airflow 3.0
     |
-179 | # airflow.providers.common.io
-180 | common_io_file.convert_dataset_to_openlineage
+200 | # airflow.providers.common.io
+201 | common_io_file.convert_dataset_to_openlineage
     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-181 | common_io_file.create_dataset
-182 | common_io_file.sanitize_uri
+202 | common_io_file.create_dataset
+203 | common_io_file.sanitize_uri
     |
     = help: Use `airflow.providers.common.io.assets.file.convert_asset_to_openlineage` instead
 
-AIR302_names.py:181:16: AIR302 `airflow.providers.common.io.datasets.file.create_dataset` is removed in Airflow 3.0
+AIR302_names.py:202:16: AIR302 `airflow.providers.common.io.datasets.file.create_dataset` is removed in Airflow 3.0
     |
-179 | # airflow.providers.common.io
-180 | common_io_file.convert_dataset_to_openlineage
-181 | common_io_file.create_dataset
+200 | # airflow.providers.common.io
+201 | common_io_file.convert_dataset_to_openlineage
+202 | common_io_file.create_dataset
     |                ^^^^^^^^^^^^^^ AIR302
-182 | common_io_file.sanitize_uri
+203 | common_io_file.sanitize_uri
     |
     = help: Use `airflow.providers.common.io.assets.file.create_asset` instead
 
-AIR302_names.py:182:16: AIR302 `airflow.providers.common.io.datasets.file.sanitize_uri` is removed in Airflow 3.0
+AIR302_names.py:203:16: AIR302 `airflow.providers.common.io.datasets.file.sanitize_uri` is removed in Airflow 3.0
     |
-180 | common_io_file.convert_dataset_to_openlineage
-181 | common_io_file.create_dataset
-182 | common_io_file.sanitize_uri
+201 | common_io_file.convert_dataset_to_openlineage
+202 | common_io_file.create_dataset
+203 | common_io_file.sanitize_uri
     |                ^^^^^^^^^^^^ AIR302
-183 | 
-184 | # airflow.providers.fab
+204 | 
+205 | # airflow.providers.fab
     |
     = help: Use `airflow.providers.common.io.assets.file.sanitize_uri` instead
 
-AIR302_names.py:185:18: AIR302 `airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
+AIR302_names.py:206:18: AIR302 `airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
     |
-184 | # airflow.providers.fab
-185 | fab_auth_manager.is_authorized_dataset
+205 | # airflow.providers.fab
+206 | fab_auth_manager.is_authorized_dataset
     |                  ^^^^^^^^^^^^^^^^^^^^^ AIR302
-186 | 
-187 | # airflow.providers.google
+207 | 
+208 | # airflow.providers.google
     |
     = help: Use `airflow.providers.fab.auth_manager.fab_auth_manager.is_authorized_asset` instead
 
-AIR302_names.py:190:5: AIR302 `airflow.providers.google.datasets.gcs.create_dataset` is removed in Airflow 3.0
+AIR302_names.py:211:5: AIR302 `airflow.providers.google.datasets.gcs.create_dataset` is removed in Airflow 3.0
     |
-188 | bigquery.sanitize_uri
-189 | 
-190 | gcs.create_dataset
+209 | bigquery.sanitize_uri
+210 | 
+211 | gcs.create_dataset
     |     ^^^^^^^^^^^^^^ AIR302
-191 | gcs.sanitize_uri
-192 | gcs.convert_dataset_to_openlineage
+212 | gcs.sanitize_uri
+213 | gcs.convert_dataset_to_openlineage
     |
     = help: Use `airflow.providers.google.assets.gcs.create_asset` instead
 
-AIR302_names.py:191:5: AIR302 `airflow.providers.google.datasets.gcs.sanitize_uri` is removed in Airflow 3.0
+AIR302_names.py:212:5: AIR302 `airflow.providers.google.datasets.gcs.sanitize_uri` is removed in Airflow 3.0
     |
-190 | gcs.create_dataset
-191 | gcs.sanitize_uri
+211 | gcs.create_dataset
+212 | gcs.sanitize_uri
     |     ^^^^^^^^^^^^ AIR302
-192 | gcs.convert_dataset_to_openlineage
+213 | gcs.convert_dataset_to_openlineage
     |
     = help: Use `airflow.providers.google.assets.gcs.sanitize_uri` instead
 
-AIR302_names.py:192:5: AIR302 `airflow.providers.google.datasets.gcs.convert_dataset_to_openlineage` is removed in Airflow 3.0
+AIR302_names.py:213:5: AIR302 `airflow.providers.google.datasets.gcs.convert_dataset_to_openlineage` is removed in Airflow 3.0
     |
-190 | gcs.create_dataset
-191 | gcs.sanitize_uri
-192 | gcs.convert_dataset_to_openlineage
+211 | gcs.create_dataset
+212 | gcs.sanitize_uri
+213 | gcs.convert_dataset_to_openlineage
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-193 | 
-194 | # airflow.providers.mysql
+214 | 
+215 | # airflow.providers.mysql
     |
     = help: Use `airflow.providers.google.assets.gcs.convert_asset_to_openlineage` instead
 
-AIR302_names.py:195:7: AIR302 `airflow.providers.mysql.datasets.mysql.sanitize_uri` is removed in Airflow 3.0
+AIR302_names.py:216:7: AIR302 `airflow.providers.mysql.datasets.mysql.sanitize_uri` is removed in Airflow 3.0
     |
-194 | # airflow.providers.mysql
-195 | mysql.sanitize_uri
+215 | # airflow.providers.mysql
+216 | mysql.sanitize_uri
     |       ^^^^^^^^^^^^ AIR302
-196 | 
-197 | # airflow.providers.openlineage
+217 | 
+218 | # airflow.providers.openlineage
     |
     = help: Use `airflow.providers.mysql.assets.mysql.sanitize_uri` instead
 
-AIR302_names.py:198:1: AIR302 `airflow.providers.openlineage.utils.utils.DatasetInfo` is removed in Airflow 3.0
+AIR302_names.py:219:1: AIR302 `airflow.providers.openlineage.utils.utils.DatasetInfo` is removed in Airflow 3.0
     |
-197 | # airflow.providers.openlineage
-198 | DatasetInfo, translate_airflow_dataset
+218 | # airflow.providers.openlineage
+219 | DatasetInfo(), translate_airflow_dataset
     | ^^^^^^^^^^^ AIR302
-199 | 
-200 | # airflow.providers.postgres
+220 | 
+221 | # airflow.providers.postgres
     |
     = help: Use `airflow.providers.openlineage.utils.utils.AssetInfo` instead
 
-AIR302_names.py:198:14: AIR302 `airflow.providers.openlineage.utils.utils.translate_airflow_dataset` is removed in Airflow 3.0
+AIR302_names.py:219:16: AIR302 `airflow.providers.openlineage.utils.utils.translate_airflow_dataset` is removed in Airflow 3.0
     |
-197 | # airflow.providers.openlineage
-198 | DatasetInfo, translate_airflow_dataset
-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-199 | 
-200 | # airflow.providers.postgres
+218 | # airflow.providers.openlineage
+219 | DatasetInfo(), translate_airflow_dataset
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+220 | 
+221 | # airflow.providers.postgres
     |
     = help: Use `airflow.providers.openlineage.utils.utils.translate_airflow_asset` instead
 
-AIR302_names.py:201:10: AIR302 `airflow.providers.postgres.datasets.postgres.sanitize_uri` is removed in Airflow 3.0
+AIR302_names.py:222:10: AIR302 `airflow.providers.postgres.datasets.postgres.sanitize_uri` is removed in Airflow 3.0
     |
-200 | # airflow.providers.postgres
-201 | postgres.sanitize_uri
+221 | # airflow.providers.postgres
+222 | postgres.sanitize_uri
     |          ^^^^^^^^^^^^ AIR302
-202 | 
-203 | # airflow.providers.trino
+223 | 
+224 | # airflow.providers.trino
     |
     = help: Use `airflow.providers.postgres.assets.postgres.sanitize_uri` instead
 
-AIR302_names.py:204:7: AIR302 `airflow.providers.trino.datasets.trino.sanitize_uri` is removed in Airflow 3.0
+AIR302_names.py:225:7: AIR302 `airflow.providers.trino.datasets.trino.sanitize_uri` is removed in Airflow 3.0
     |
-203 | # airflow.providers.trino
-204 | trino.sanitize_uri
+224 | # airflow.providers.trino
+225 | trino.sanitize_uri
     |       ^^^^^^^^^^^^ AIR302
-205 | 
-206 | # airflow.secrets
+226 | 
+227 | # airflow.secrets
     |
     = help: Use `airflow.providers.trino.assets.trino.sanitize_uri` instead
 
-AIR302_names.py:207:1: AIR302 `airflow.secrets.local_filesystem.get_connection` is removed in Airflow 3.0
+AIR302_names.py:228:1: AIR302 `airflow.secrets.local_filesystem.get_connection` is removed in Airflow 3.0
     |
-206 | # airflow.secrets
-207 | get_connection, load_connections
+227 | # airflow.secrets
+228 | get_connection, load_connections
     | ^^^^^^^^^^^^^^ AIR302
-208 | 
-209 | # airflow.security.permissions
+229 | 
+230 | # airflow.security.permissions
     |
     = help: Use `airflow.secrets.local_filesystem.load_connections_dict` instead
 
-AIR302_names.py:207:17: AIR302 `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0
+AIR302_names.py:228:17: AIR302 `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0
     |
-206 | # airflow.secrets
-207 | get_connection, load_connections
+227 | # airflow.secrets
+228 | get_connection, load_connections
     |                 ^^^^^^^^^^^^^^^^ AIR302
-208 | 
-209 | # airflow.security.permissions
+229 | 
+230 | # airflow.security.permissions
     |
     = help: Use `airflow.secrets.local_filesystem.load_connections_dict` instead
 
-AIR302_names.py:210:1: AIR302 `airflow.security.permissions.RESOURCE_DATASET` is removed in Airflow 3.0
+AIR302_names.py:231:1: AIR302 `airflow.security.permissions.RESOURCE_DATASET` is removed in Airflow 3.0
     |
-209 | # airflow.security.permissions
-210 | RESOURCE_DATASET
+230 | # airflow.security.permissions
+231 | RESOURCE_DATASET
     | ^^^^^^^^^^^^^^^^ AIR302
-211 | 
-212 | # airflow.sensors.base_sensor_operator
+232 | 
+233 | # airflow.sensors.base_sensor_operator
     |
     = help: Use `airflow.security.permissions.RESOURCE_ASSET` instead
 
-AIR302_names.py:213:1: AIR302 `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
+AIR302_names.py:234:1: AIR302 `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
     |
-212 | # airflow.sensors.base_sensor_operator
-213 | BaseSensorOperator
+233 | # airflow.sensors.base_sensor_operator
+234 | BaseSensorOperator()
     | ^^^^^^^^^^^^^^^^^^ AIR302
-214 | 
-215 | # airflow.sensors.date_time_sensor
+235 | 
+236 | # airflow.sensors.date_time_sensor
     |
     = help: Use `airflow.sensors.base.BaseSensorOperator` instead
 
-AIR302_names.py:216:1: AIR302 `airflow.sensors.date_time_sensor.DateTimeSensor` is removed in Airflow 3.0
+AIR302_names.py:237:1: AIR302 `airflow.sensors.date_time_sensor.DateTimeSensor` is removed in Airflow 3.0
     |
-215 | # airflow.sensors.date_time_sensor
-216 | DateTimeSensor
+236 | # airflow.sensors.date_time_sensor
+237 | DateTimeSensor()
     | ^^^^^^^^^^^^^^ AIR302
-217 | 
-218 | # airflow.sensors.external_task
+238 | 
+239 | # airflow.sensors.external_task
     |
     = help: Use `airflow.sensors.date_time.DateTimeSensor` instead
 
-AIR302_names.py:219:1: AIR302 `airflow.sensors.external_task.ExternalTaskSensorLink` is removed in Airflow 3.0
+AIR302_names.py:240:1: AIR302 `airflow.sensors.external_task.ExternalTaskSensorLink` is removed in Airflow 3.0
     |
-218 | # airflow.sensors.external_task
-219 | ExternalTaskSensorLinkFromExternalTask
+239 | # airflow.sensors.external_task
+240 | ExternalTaskSensorLinkFromExternalTask()
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-220 | 
-221 | # airflow.sensors.external_task_sensor
+241 | 
+242 | # airflow.sensors.external_task_sensor
     |
     = help: Use `airflow.sensors.external_task.ExternalDagLink` instead
 
-AIR302_names.py:222:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskMarker` is removed in Airflow 3.0
+AIR302_names.py:243:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskMarker` is removed in Airflow 3.0
     |
-221 | # airflow.sensors.external_task_sensor
-222 | ExternalTaskMarker
+242 | # airflow.sensors.external_task_sensor
+243 | ExternalTaskMarker()
     | ^^^^^^^^^^^^^^^^^^ AIR302
-223 | ExternalTaskSensor
-224 | ExternalTaskSensorLinkFromExternalTaskSensor
+244 | ExternalTaskSensor()
+245 | ExternalTaskSensorLinkFromExternalTaskSensor()
     |
     = help: Use `airflow.sensors.external_task.ExternalTaskMarker` instead
 
-AIR302_names.py:223:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensor` is removed in Airflow 3.0
+AIR302_names.py:244:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensor` is removed in Airflow 3.0
     |
-221 | # airflow.sensors.external_task_sensor
-222 | ExternalTaskMarker
-223 | ExternalTaskSensor
+242 | # airflow.sensors.external_task_sensor
+243 | ExternalTaskMarker()
+244 | ExternalTaskSensor()
     | ^^^^^^^^^^^^^^^^^^ AIR302
-224 | ExternalTaskSensorLinkFromExternalTaskSensor
+245 | ExternalTaskSensorLinkFromExternalTaskSensor()
     |
     = help: Use `airflow.sensors.external_task.ExternalTaskSensor` instead
 
-AIR302_names.py:224:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is removed in Airflow 3.0
+AIR302_names.py:245:1: AIR302 `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is removed in Airflow 3.0
     |
-222 | ExternalTaskMarker
-223 | ExternalTaskSensor
-224 | ExternalTaskSensorLinkFromExternalTaskSensor
+243 | ExternalTaskMarker()
+244 | ExternalTaskSensor()
+245 | ExternalTaskSensorLinkFromExternalTaskSensor()
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-225 | 
-226 | # airflow.sensors.time_delta_sensor
+246 | 
+247 | # airflow.sensors.time_delta_sensor
     |
     = help: Use `airflow.sensors.external_task.ExternalDagLink` instead
 
-AIR302_names.py:227:1: AIR302 `airflow.sensors.time_delta_sensor.TimeDeltaSensor` is removed in Airflow 3.0
+AIR302_names.py:248:1: AIR302 `airflow.sensors.time_delta_sensor.TimeDeltaSensor` is removed in Airflow 3.0
     |
-226 | # airflow.sensors.time_delta_sensor
-227 | TimeDeltaSensor
+247 | # airflow.sensors.time_delta_sensor
+248 | TimeDeltaSensor()
     | ^^^^^^^^^^^^^^^ AIR302
-228 | 
-229 | # airflow.timetables
+249 | 
+250 | # airflow.timetables
     |
     = help: Use `airflow.sensors.time_delta.TimeDeltaSensor` instead
 
-AIR302_names.py:230:1: AIR302 `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0
+AIR302_names.py:251:1: AIR302 `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0
     |
-229 | # airflow.timetables
-230 | DatasetOrTimeSchedule
+250 | # airflow.timetables
+251 | DatasetOrTimeSchedule()
     | ^^^^^^^^^^^^^^^^^^^^^ AIR302
-231 | DatasetTriggeredTimetable
+252 | DatasetTriggeredTimetable()
     |
     = help: Use `airflow.timetables.assets.AssetOrTimeSchedule` instead
 
-AIR302_names.py:231:1: AIR302 `airflow.timetables.simple.DatasetTriggeredTimetable` is removed in Airflow 3.0
+AIR302_names.py:252:1: AIR302 `airflow.timetables.simple.DatasetTriggeredTimetable` is removed in Airflow 3.0
     |
-229 | # airflow.timetables
-230 | DatasetOrTimeSchedule
-231 | DatasetTriggeredTimetable
+250 | # airflow.timetables
+251 | DatasetOrTimeSchedule()
+252 | DatasetTriggeredTimetable()
     | ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-232 | 
-233 | # airflow.triggers.external_task
+253 | 
+254 | # airflow.triggers.external_task
     |
     = help: Use `airflow.timetables.simple.AssetTriggeredTimetable` instead
 
-AIR302_names.py:234:1: AIR302 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
+AIR302_names.py:255:1: AIR302 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
     |
-233 | # airflow.triggers.external_task
-234 | TaskStateTrigger
+254 | # airflow.triggers.external_task
+255 | TaskStateTrigger()
     | ^^^^^^^^^^^^^^^^ AIR302
-235 | 
-236 | # airflow.utils.date
-    |
-
-AIR302_names.py:237:7: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
-    |
-236 | # airflow.utils.date
-237 | dates.date_range
-    |       ^^^^^^^^^^ AIR302
-238 | dates.days_ago
-    |
-    = help: Use `airflow.timetables.` instead
-
-AIR302_names.py:238:7: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
-    |
-236 | # airflow.utils.date
-237 | dates.date_range
-238 | dates.days_ago
-    |       ^^^^^^^^ AIR302
-239 | 
-240 | date_range
-    |
-    = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
-
-AIR302_names.py:240:1: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
-    |
-238 | dates.days_ago
-239 | 
-240 | date_range
-    | ^^^^^^^^^^ AIR302
-241 | days_ago
-242 | infer_time_unit
-    |
-    = help: Use `airflow.timetables.` instead
-
-AIR302_names.py:241:1: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
-    |
-240 | date_range
-241 | days_ago
-    | ^^^^^^^^ AIR302
-242 | infer_time_unit
-243 | parse_execution_date
-    |
-    = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
-
-AIR302_names.py:242:1: AIR302 `airflow.utils.dates.infer_time_unit` is removed in Airflow 3.0
-    |
-240 | date_range
-241 | days_ago
-242 | infer_time_unit
-    | ^^^^^^^^^^^^^^^ AIR302
-243 | parse_execution_date
-244 | round_time
-    |
-
-AIR302_names.py:243:1: AIR302 `airflow.utils.dates.parse_execution_date` is removed in Airflow 3.0
-    |
-241 | days_ago
-242 | infer_time_unit
-243 | parse_execution_date
-    | ^^^^^^^^^^^^^^^^^^^^ AIR302
-244 | round_time
-245 | scale_time_units
-    |
-
-AIR302_names.py:244:1: AIR302 `airflow.utils.dates.round_time` is removed in Airflow 3.0
-    |
-242 | infer_time_unit
-243 | parse_execution_date
-244 | round_time
-    | ^^^^^^^^^^ AIR302
-245 | scale_time_units
-    |
-
-AIR302_names.py:245:1: AIR302 `airflow.utils.dates.scale_time_units` is removed in Airflow 3.0
-    |
-243 | parse_execution_date
-244 | round_time
-245 | scale_time_units
-    | ^^^^^^^^^^^^^^^^ AIR302
-246 | 
-247 | # This one was not deprecated.
-    |
-
-AIR302_names.py:252:1: AIR302 `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
-    |
-251 | # airflow.utils.dag_cycle_tester
-252 | test_cycle
-    | ^^^^^^^^^^ AIR302
-253 | 
-254 | # airflow.utils.decorators
-    |
-
-AIR302_names.py:255:1: AIR302 `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0; `apply_defaults` is now unconditionally done and can be safely removed.
-    |
-254 | # airflow.utils.decorators
-255 | apply_defaults
-    | ^^^^^^^^^^^^^^ AIR302
 256 | 
-257 | # airflow.utils.file
+257 | # airflow.utils.date
     |
 
-AIR302_names.py:258:1: AIR302 `airflow.utils.file.TemporaryDirectory` is removed in Airflow 3.0
+AIR302_names.py:258:7: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
     |
-257 | # airflow.utils.file
-258 | TemporaryDirectory, mkdirs
-    | ^^^^^^^^^^^^^^^^^^ AIR302
-259 | 
-260 | #  airflow.utils.helpers
+257 | # airflow.utils.date
+258 | dates.date_range
+    |       ^^^^^^^^^^ AIR302
+259 | dates.days_ago
     |
+    = help: Use `airflow.timetables.` instead
 
-AIR302_names.py:258:21: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 3.0
+AIR302_names.py:259:7: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
     |
-257 | # airflow.utils.file
-258 | TemporaryDirectory, mkdirs
-    |                     ^^^^^^ AIR302
-259 | 
-260 | #  airflow.utils.helpers
+257 | # airflow.utils.date
+258 | dates.date_range
+259 | dates.days_ago
+    |       ^^^^^^^^ AIR302
+260 | 
+261 | date_range
     |
     = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
 
-AIR302_names.py:261:1: AIR302 `airflow.utils.helpers.chain` is removed in Airflow 3.0
+AIR302_names.py:261:1: AIR302 `airflow.utils.dates.date_range` is removed in Airflow 3.0
     |
-260 | #  airflow.utils.helpers
-261 | chain, cross_downstream
+259 | dates.days_ago
+260 | 
+261 | date_range
+    | ^^^^^^^^^^ AIR302
+262 | days_ago
+263 | infer_time_unit
+    |
+    = help: Use `airflow.timetables.` instead
+
+AIR302_names.py:262:1: AIR302 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
+    |
+261 | date_range
+262 | days_ago
+    | ^^^^^^^^ AIR302
+263 | infer_time_unit
+264 | parse_execution_date
+    |
+    = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
+
+AIR302_names.py:263:1: AIR302 `airflow.utils.dates.infer_time_unit` is removed in Airflow 3.0
+    |
+261 | date_range
+262 | days_ago
+263 | infer_time_unit
+    | ^^^^^^^^^^^^^^^ AIR302
+264 | parse_execution_date
+265 | round_time
+    |
+
+AIR302_names.py:264:1: AIR302 `airflow.utils.dates.parse_execution_date` is removed in Airflow 3.0
+    |
+262 | days_ago
+263 | infer_time_unit
+264 | parse_execution_date
+    | ^^^^^^^^^^^^^^^^^^^^ AIR302
+265 | round_time
+266 | scale_time_units
+    |
+
+AIR302_names.py:265:1: AIR302 `airflow.utils.dates.round_time` is removed in Airflow 3.0
+    |
+263 | infer_time_unit
+264 | parse_execution_date
+265 | round_time
+    | ^^^^^^^^^^ AIR302
+266 | scale_time_units
+    |
+
+AIR302_names.py:266:1: AIR302 `airflow.utils.dates.scale_time_units` is removed in Airflow 3.0
+    |
+264 | parse_execution_date
+265 | round_time
+266 | scale_time_units
+    | ^^^^^^^^^^^^^^^^ AIR302
+267 | 
+268 | # This one was not deprecated.
+    |
+
+AIR302_names.py:273:1: AIR302 `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
+    |
+272 | # airflow.utils.dag_cycle_tester
+273 | test_cycle
+    | ^^^^^^^^^^ AIR302
+274 | 
+275 | # airflow.utils.decorators
+    |
+
+AIR302_names.py:276:1: AIR302 `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0; `apply_defaults` is now unconditionally done and can be safely removed.
+    |
+275 | # airflow.utils.decorators
+276 | apply_defaults
+    | ^^^^^^^^^^^^^^ AIR302
+277 | 
+278 | # airflow.utils.file
+    |
+
+AIR302_names.py:279:22: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 3.0
+    |
+278 | # airflow.utils.file
+279 | TemporaryDirector(), mkdirs
+    |                      ^^^^^^ AIR302
+280 | 
+281 | #  airflow.utils.helpers
+    |
+    = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
+
+AIR302_names.py:282:1: AIR302 `airflow.utils.helpers.chain` is removed in Airflow 3.0
+    |
+281 | #  airflow.utils.helpers
+282 | chain, cross_downstream
     | ^^^^^ AIR302
-262 | 
-263 | # airflow.utils.state
+283 | 
+284 | # airflow.utils.state
     |
     = help: Use `airflow.models.baseoperator.chain` instead
 
-AIR302_names.py:261:8: AIR302 `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
+AIR302_names.py:282:8: AIR302 `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
     |
-260 | #  airflow.utils.helpers
-261 | chain, cross_downstream
+281 | #  airflow.utils.helpers
+282 | chain, cross_downstream
     |        ^^^^^^^^^^^^^^^^ AIR302
-262 | 
-263 | # airflow.utils.state
+283 | 
+284 | # airflow.utils.state
     |
     = help: Use `airflow.models.baseoperator.cross_downstream` instead
 
-AIR302_names.py:264:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
+AIR302_names.py:285:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
     |
-263 | # airflow.utils.state
-264 | SHUTDOWN, terminating_states
+284 | # airflow.utils.state
+285 | SHUTDOWN, terminating_states
     | ^^^^^^^^ AIR302
-265 | 
-266 | #  airflow.utils.trigger_rule
+286 | 
+287 | #  airflow.utils.trigger_rule
     |
 
-AIR302_names.py:264:11: AIR302 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
+AIR302_names.py:285:11: AIR302 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
     |
-263 | # airflow.utils.state
-264 | SHUTDOWN, terminating_states
+284 | # airflow.utils.state
+285 | SHUTDOWN, terminating_states
     |           ^^^^^^^^^^^^^^^^^^ AIR302
-265 | 
-266 | #  airflow.utils.trigger_rule
+286 | 
+287 | #  airflow.utils.trigger_rule
     |
 
-AIR302_names.py:267:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
+AIR302_names.py:288:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
     |
-266 | #  airflow.utils.trigger_rule
-267 | TriggerRule.DUMMY
+287 | #  airflow.utils.trigger_rule
+288 | TriggerRule.DUMMY
     |             ^^^^^ AIR302
-268 | TriggerRule.NONE_FAILED_OR_SKIPPED
+289 | TriggerRule.NONE_FAILED_OR_SKIPPED
     |
 
-AIR302_names.py:268:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+AIR302_names.py:289:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
     |
-266 | #  airflow.utils.trigger_rule
-267 | TriggerRule.DUMMY
-268 | TriggerRule.NONE_FAILED_OR_SKIPPED
+287 | #  airflow.utils.trigger_rule
+288 | TriggerRule.DUMMY
+289 | TriggerRule.NONE_FAILED_OR_SKIPPED
     |             ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-269 | 
-270 | # airflow.www.auth
+290 | 
+291 | # airflow.www.auth
     |
 
-AIR302_names.py:271:1: AIR302 `airflow.www.auth.has_access` is removed in Airflow 3.0
+AIR302_names.py:292:1: AIR302 `airflow.www.auth.has_access` is removed in Airflow 3.0
     |
-270 | # airflow.www.auth
-271 | has_access
+291 | # airflow.www.auth
+292 | has_access
     | ^^^^^^^^^^ AIR302
-272 | has_access_dataset
+293 | has_access_dataset
     |
     = help: Use `airflow.www.auth.has_access_*` instead
 
-AIR302_names.py:272:1: AIR302 `airflow.www.auth.has_access_dataset` is removed in Airflow 3.0
+AIR302_names.py:293:1: AIR302 `airflow.www.auth.has_access_dataset` is removed in Airflow 3.0
     |
-270 | # airflow.www.auth
-271 | has_access
-272 | has_access_dataset
+291 | # airflow.www.auth
+292 | has_access
+293 | has_access_dataset
     | ^^^^^^^^^^^^^^^^^^ AIR302
-273 | 
-274 | # airflow.www.utils
+294 | 
+295 | # airflow.www.utils
     |
     = help: Use `airflow.www.auth.has_access_dataset.has_access_asset` instead
 
-AIR302_names.py:275:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
+AIR302_names.py:296:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
     |
-274 | # airflow.www.utils
-275 | get_sensitive_variables_fields, should_hide_value_for_key
+295 | # airflow.www.utils
+296 | get_sensitive_variables_fields, should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
     |
     = help: Use `airflow.utils.log.secrets_masker.get_sensitive_variables_fields` instead
 
-AIR302_names.py:275:33: AIR302 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
+AIR302_names.py:296:33: AIR302 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
     |
-274 | # airflow.www.utils
-275 | get_sensitive_variables_fields, should_hide_value_for_key
+295 | # airflow.www.utils
+296 | get_sensitive_variables_fields, should_hide_value_for_key
     |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
     |
     = help: Use `airflow.utils.log.secrets_masker.should_hide_value_for_key` instead

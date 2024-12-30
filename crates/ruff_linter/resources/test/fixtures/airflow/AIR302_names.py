@@ -30,12 +30,12 @@ from airflow.datasets import (
     DatasetAny,
     expand_alias_to_datasets,
 )
-from airflow.datasets.metadata import Metadata
 from airflow.datasets.manager import (
     DatasetManager,
     dataset_manager,
     resolve_dataset_manager,
 )
+from airflow.datasets.metadata import Metadata
 from airflow.hooks.base_hook import BaseHook
 from airflow.lineage.hook import DatasetLineageInfo
 from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
@@ -43,8 +43,16 @@ from airflow.metrics.validators import AllowListValidator, BlockListValidator
 from airflow.operators import dummy_operator
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.branch_operator import BaseBranchOperator
+from airflow.operators.dagrun_operator import TriggerDagRunLink, TriggerDagRunOperator
 from airflow.operators.dummy import DummyOperator, EmptyOperator
 from airflow.operators.email_operator import EmailOperator
+from airflow.operators.latest_only_operator import LatestOnlyOperator
+from airflow.operators.python_operator import (
+    BranchPythonOperator,
+    PythonOperator,
+    PythonVirtualenvOperator,
+    ShortCircuitOperator,
+)
 from airflow.operators.subdag import SubDagOperator
 from airflow.providers.amazon.auth_manager.avp.entities import AvpEntities
 from airflow.providers.amazon.aws.datasets import s3
@@ -86,7 +94,7 @@ from airflow.utils.dates import (
     scale_time_units,
 )
 from airflow.utils.decorators import apply_defaults
-from airflow.utils.file import TemporaryDirectory, mkdirs
+from airflow.utils.file import mkdirs
 from airflow.utils.helpers import chain, cross_downstream
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.trigger_rule import TriggerRule
@@ -95,7 +103,7 @@ from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_
 
 # airflow root
 PY36, PY37, PY38, PY39, PY310, PY311, PY312
-DatasetFromRoot
+DatasetFromRoot()
 
 dataset_from_root = DatasetFromRoot()
 dataset_from_root.iter_datasets()
@@ -106,23 +114,23 @@ requires_access, requires_access_dataset
 
 # airflow.auth.managers
 is_authorized_dataset
-DatasetDetails
+DatasetDetails()
 
 # airflow.configuration
 get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 
 
 # airflow.contrib.*
-AWSAthenaHook
+AWSAthenaHook()
 
 # airflow.datasets
-Dataset
-DatasetAlias
-DatasetAliasEvent
-DatasetAll
-DatasetAny
+Dataset()
+DatasetAlias()
+DatasetAliasEvent()
+DatasetAll()
+DatasetAny()
 expand_alias_to_datasets
-Metadata
+Metadata()
 
 dataset_to_test_method_call = Dataset()
 dataset_to_test_method_call.iter_datasets()
@@ -137,38 +145,51 @@ any_to_test_method_call.iter_datasets()
 any_to_test_method_call.iter_dataset_aliases()
 
 # airflow.datasets.manager
-DatasetManager, dataset_manager, resolve_dataset_manager
+DatasetManager(), dataset_manager, resolve_dataset_manager
 
 # airflow.hooks
 BaseHook()
 
 # airflow.lineage.hook
-DatasetLineageInfo
+DatasetLineageInfo()
 
 # airflow.listeners.spec.dataset
 on_dataset_changed, on_dataset_created
 
 # airflow.metrics.validators
-AllowListValidator, BlockListValidator
+AllowListValidator(), BlockListValidator()
 
 # airflow.operators.dummy_operator
-dummy_operator.EmptyOperator
-dummy_operator.DummyOperator
+dummy_operator.EmptyOperator()
+dummy_operator.DummyOperator()
 
 # airflow.operators.bash_operator
-BashOperator
+BashOperator()
 
 # airflow.operators.branch_operator
-BaseBranchOperator
+BaseBranchOperator()
+
+# airflow.operators.dagrun_operator
+TriggerDagRunLink()
+TriggerDagRunOperator()
 
 # airflow.operators.dummy
-EmptyOperator, DummyOperator
+EmptyOperator(), DummyOperator()
 
 # airflow.operators.email_operator
-EmailOperator
+EmailOperator()
+
+# airflow.operators.latest_only_operator
+LatestOnlyOperator()
+
+# airflow.operators.python_operator
+BranchPythonOperator()
+PythonOperator()
+PythonVirtualenvOperator()
+ShortCircuitOperator()
 
 # airflow.operators.subdag.*
-SubDagOperator
+SubDagOperator()
 
 # airflow.providers.amazon
 AvpEntities.DATASET
@@ -195,7 +216,7 @@ gcs.convert_dataset_to_openlineage
 mysql.sanitize_uri
 
 # airflow.providers.openlineage
-DatasetInfo, translate_airflow_dataset
+DatasetInfo(), translate_airflow_dataset
 
 # airflow.providers.postgres
 postgres.sanitize_uri
@@ -210,28 +231,28 @@ get_connection, load_connections
 RESOURCE_DATASET
 
 # airflow.sensors.base_sensor_operator
-BaseSensorOperator
+BaseSensorOperator()
 
 # airflow.sensors.date_time_sensor
-DateTimeSensor
+DateTimeSensor()
 
 # airflow.sensors.external_task
-ExternalTaskSensorLinkFromExternalTask
+ExternalTaskSensorLinkFromExternalTask()
 
 # airflow.sensors.external_task_sensor
-ExternalTaskMarker
-ExternalTaskSensor
-ExternalTaskSensorLinkFromExternalTaskSensor
+ExternalTaskMarker()
+ExternalTaskSensor()
+ExternalTaskSensorLinkFromExternalTaskSensor()
 
 # airflow.sensors.time_delta_sensor
-TimeDeltaSensor
+TimeDeltaSensor()
 
 # airflow.timetables
-DatasetOrTimeSchedule
-DatasetTriggeredTimetable
+DatasetOrTimeSchedule()
+DatasetTriggeredTimetable()
 
 # airflow.triggers.external_task
-TaskStateTrigger
+TaskStateTrigger()
 
 # airflow.utils.date
 dates.date_range
@@ -255,7 +276,7 @@ test_cycle
 apply_defaults
 
 # airflow.utils.file
-TemporaryDirectory, mkdirs
+TemporaryDirector(), mkdirs
 
 #  airflow.utils.helpers
 chain, cross_downstream

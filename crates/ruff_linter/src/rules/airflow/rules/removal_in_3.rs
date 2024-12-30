@@ -560,10 +560,6 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                         ),
                     ))
                 },
-                ["airflow", "sensors", "external_task", "ExternalTaskSensorLink"] => Some((
-                    qualname.to_string(),
-                    Replacement::Name("airflow.sensors.external_task.ExternalDagLink"),
-                )),
                 ["airflow", "operators", "bash_operator", "BashOperator"] => Some((
                     qualname.to_string(),
                     Replacement::Name("airflow.operators.bash.BashOperator"),
@@ -591,6 +587,53 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 ["airflow", "operators", "email_operator", "EmailOperator"] => Some((
                     qualname.to_string(),
                     Replacement::Name("airflow.operators.email.EmailOperator"),
+                )),
+                ["airflow", "operators", "dagrun_operator", "TriggerDagRunLink"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.operators.trigger_dagrun.TriggerDagRunLink",
+                    ),
+                )),
+                ["airflow", "operators", "dagrun_operator", "TriggerDagRunOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.operators.trigger_dagrun.TriggerDagRunOperator",
+                    ),
+                )),
+                ["airflow", "operators", "python_operator", "BranchPythonOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.operators.python.BranchPythonOperator",
+                    ),
+                )),
+                ["airflow", "operators", "python_operator", "PythonOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.operators.python.PythonOperator",
+                    ),
+                )),
+                ["airflow", "operators", "python_operator", "PythonVirtualenvOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.operators.python.PythonVirtualenvOperator",
+                    ),
+                )),
+                ["airflow", "operators", "python_operator", "ShortCircuitOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "airflow.operators.python.ShortCircuitOperator",
+                    ),
+                )),
+                ["airflow", "operators", "latest_only_operator", "LatestOnlyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name(
+                        "     airflow.operators.latest_only.LatestOnlyOperator",
+                    ),
+                )),
+                // airflow.sensors
+                ["airflow", "sensors", "external_task", "ExternalTaskSensorLink"] => Some((
+                    qualname.to_string(),
+                    Replacement::Name("airflow.sensors.external_task.ExternalDagLink"),
                 )),
                 ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => Some((
                     qualname.to_string(),
