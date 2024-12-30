@@ -483,6 +483,583 @@ fn moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
                 },
                 )),
 
+                ["airflow", "operators", "check_operator", "SQLCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "check_operator", "SQLIntervalCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLIntervalCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "check_operator", "SQLThresholdCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLThresholdCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "check_operator", "SQLValueCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLValueCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "check_operator", "CheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "CheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "check_operator", "IntervalCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "IntervalCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "check_operator", "ThresholdCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "ThresholdCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "check_operator", "ValueCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "ValueCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "docker_operator", "DockerOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "DockerOperator",
+                        provider: "Docker",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "druid_check_operator", "DruidCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "DruidCheckOperator",
+                        provider: "Apache Druid",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "gcs_to_s3", "GCSToS3Operator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "GCSToS3Operator",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "google_api_to_s3_transfer", "GoogleApiToS3Operator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "GoogleApiToS3Operator",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "google_api_to_s3_transfer", "GoogleApiToS3Transfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "GoogleApiToS3Transfer",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "hive_operator", "HiveOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveOperator",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "hive_stats_operator", "HiveStatsCollectionOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveStatsCollectionOperator",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "hive_to_druid", "HiveToDruidOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveToDruidOperator",
+                        provider: "Apache Druid",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "hive_to_druid", "HiveToDruidTransfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveToDruidTransfer",
+                        provider: "Apache Druid",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "hive_to_mysql", "HiveToMySqlOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveToMySqlOperator",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "hive_to_mysql", "HiveToMySqlTransfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveToMySqlTransfer",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "hive_to_samba_operator", "HiveToSambaOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "HiveToSambaOperator",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "http_operator", "SimpleHttpOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SimpleHttpOperator",
+                        provider: "Http",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "jdbc_operator", "JdbcOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "JdbcOperator",
+                        provider: "Jdbc",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "latest_only_operator", "LatestOnlyOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "LatestOnlyOperator",
+                        provider: "Latest_only",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "mssql_operator", "MsSqlOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MsSqlOperator",
+                        provider: "Microsoft",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "mssql_to_hive", "MsSqlToHiveOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MsSqlToHiveOperator",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "mssql_to_hive", "MsSqlToHiveTransfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MsSqlToHiveTransfer",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "mysql_operator", "MySqlOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MySqlOperator",
+                        provider: "Mysql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "mysql_to_hive", "MySqlToHiveOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MySqlToHiveOperator",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "mysql_to_hive", "MySqlToHiveTransfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "MySqlToHiveTransfer",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "oracle_operator", "OracleOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "OracleOperator",
+                        provider: "Oracle",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "papermill_operator", "PapermillOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PapermillOperator",
+                        provider: "Papermill",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "pig_operator", "PigOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PigOperator",
+                        provider: "Apache Pig",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "postgres_operator", "Mapping"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "Mapping",
+                        provider: "Postgres",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "postgres_operator", "PostgresOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PostgresOperator",
+                        provider: "Postgres",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "presto_check_operator", "SQLCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "presto_check_operator", "SQLIntervalCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLIntervalCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "presto_check_operator", "SQLValueCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLValueCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "presto_check_operator", "PrestoCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PrestoCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "presto_check_operator", "PrestoIntervalCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PrestoIntervalCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "presto_check_operator", "PrestoValueCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PrestoValueCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "presto_to_mysql", "PrestoToMySqlOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PrestoToMySqlOperator",
+                        provider: "Mysql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "presto_to_mysql", "PrestoToMySqlTransfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "PrestoToMySqlTransfer",
+                        provider: "Mysql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "redshift_to_s3_operator", "RedshiftToS3Operator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "RedshiftToS3Operator",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "redshift_to_s3_operator", "RedshiftToS3Transfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "RedshiftToS3Transfer",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "s3_file_transform_operator", "S3FileTransformOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "S3FileTransformOperator",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "s3_to_hive_operator", "S3ToHiveOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "S3ToHiveOperator",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "s3_to_hive_operator", "S3ToHiveTransfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "S3ToHiveTransfer",
+                        provider: "Apache Hive",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "s3_to_redshift_operator", "S3ToRedshiftOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "S3ToRedshiftOperator",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "s3_to_redshift_operator", "S3ToRedshiftTransfer"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "S3ToRedshiftTransfer",
+                        provider: "Amazon",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "slack_operator", "SlackAPIOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SlackAPIOperator",
+                        provider: "Slack",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "slack_operator", "SlackAPIPostOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SlackAPIPostOperator",
+                        provider: "Slack",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "BaseSQLOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "BaseSQLOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "BranchSQLOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "BranchSQLOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "SQLCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "SQLColumnCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLColumnCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "SQLIntervalCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLIntervalCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "SQLTableCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLTableCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "SQLThresholdCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLThresholdCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "SQLValueCheckOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SQLValueCheckOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "_convert_to_float_if_possible"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "_convert_to_float_if_possible",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql", "parse_boolean"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "parse_boolean",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql_branch_operator", "BranchSQLOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "BranchSQLOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sql_branch_operator", "BranchSqlOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "BranchSqlOperator",
+                        provider: "Common Sql",
+                        version: "TBD"
+                },
+                )),
+
+                ["airflow", "operators", "sqlite_operator", "SqliteOperator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "SqliteOperator",
+                        provider: "Sqlite",
+                        version: "TBD"
+                },
+                )),
+
+
                 _ => None,
             });
     if let Some((deprecated, replacement)) = result {
