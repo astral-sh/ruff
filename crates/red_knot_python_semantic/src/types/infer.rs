@@ -437,7 +437,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Are we currently inferring types in a stub file?
     fn is_stub(&self) -> bool {
-        return self.file().is_stub(self.db().upcast());
+        self.file().is_stub(self.db().upcast())
     }
 
     /// Get the already-inferred type of an expression node.
