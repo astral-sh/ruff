@@ -1980,11 +1980,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if let Some(value) = value.as_deref() {
             let value_ty = self.infer_expression(value);
-            let value_ty = if self.file().is_stub(self.db().upcast()) && value.is_ellipsis_literal_expr() {
+            let value_ty = if self.is_stub() && value.is_ellipsis_literal_expr() {
                 annotation_ty
             } else {
                 value_ty
-            }
+            };
             self.add_declaration_with_binding(
                 assignment.into(),
                 definition,
