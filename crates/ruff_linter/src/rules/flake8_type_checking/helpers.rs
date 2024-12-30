@@ -51,7 +51,7 @@ pub(crate) fn is_valid_runtime_import(
 /// Returns `true` if a function's parameters should be treated as runtime-required.
 pub(crate) fn runtime_required_function(
     function_def: &ast::StmtFunctionDef,
-    decorators: &[IdentifierPattern],
+    decorators: &[String],
     semantic: &SemanticModel,
 ) -> bool {
     if runtime_required_decorators(&function_def.decorator_list, decorators, semantic) {
@@ -64,7 +64,7 @@ pub(crate) fn runtime_required_function(
 pub(crate) fn runtime_required_class(
     class_def: &ast::StmtClassDef,
     base_classes: &[String],
-    decorators: &[IdentifierPattern],
+    decorators: &[String],
     semantic: &SemanticModel,
 ) -> bool {
     if runtime_required_base_class(class_def, base_classes, semantic) {
@@ -91,7 +91,7 @@ fn runtime_required_base_class(
 
 fn runtime_required_decorators(
     decorator_list: &[Decorator],
-    decorators: &[IdentifierPattern],
+    decorators: &[String],
     semantic: &SemanticModel,
 ) -> bool {
     if decorators.is_empty() {
@@ -122,10 +122,9 @@ fn runtime_required_decorators(
                 })
             })
             .is_some_and(|qualified_name| {
-                let qualified_name = qualified_name.to_string();
                 decorators
                     .iter()
-                    .any(|pattern| pattern.matches(&qualified_name))
+                    .any(|decorator| QualifiedName::from_dotted_name(decorator) == qualified_name)
             })
     })
 }

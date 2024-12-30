@@ -1819,9 +1819,6 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Common examples include Pydantic's `@pydantic.validate_call` decorator
     /// (for functions) and attrs' `@attrs.define` decorator (for classes).
-    ///
-    /// Supports glob patterns. For more information on the glob syntax, refer
-    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -1884,26 +1881,16 @@ pub struct Flake8TypeCheckingOptions {
 }
 
 impl Flake8TypeCheckingOptions {
-    pub fn try_into_settings(self) -> anyhow::Result<flake8_type_checking::settings::Settings> {
-        Ok(flake8_type_checking::settings::Settings {
+    pub fn into_settings(self) -> flake8_type_checking::settings::Settings {
+        flake8_type_checking::settings::Settings {
             strict: self.strict.unwrap_or(false),
             exempt_modules: self
                 .exempt_modules
                 .unwrap_or_else(|| vec!["typing".to_string()]),
             runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
-            runtime_required_decorators: self
-                .runtime_evaluated_decorators
-                .map(|patterns| {
-                    patterns
-                        .into_iter()
-                        .map(|pattern| IdentifierPattern::new(&pattern))
-                        .collect()
-                })
-                .transpose()
-                .map_err(flake8_type_checking::settings::SettingsError::InvalidRuntimeEvaluatedDecorators)?
-                .unwrap_or_default(),
+            runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
             quote_annotations: self.quote_annotations.unwrap_or_default(),
-        })
+        }
     }
 }
 

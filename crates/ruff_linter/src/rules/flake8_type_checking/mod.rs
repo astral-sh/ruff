@@ -13,7 +13,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
-    use crate::settings::types::IdentifierPattern;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
@@ -225,9 +224,9 @@ mod tests {
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_decorators: vec![
-                        IdentifierPattern::new("attrs.define")?,
-                        IdentifierPattern::new("attrs.frozen")?,
-                        IdentifierPattern::new("pydantic.validate_call")?,
+                        "attrs.define".to_string(),
+                        "attrs.frozen".to_string(),
+                        "pydantic.validate_call".to_string(),
                     ],
                     ..Default::default()
                 },
@@ -269,8 +268,12 @@ mod tests {
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_decorators: vec![
-                        IdentifierPattern::new("fastapi.FastAPI.*")?,
-                        IdentifierPattern::new("module.app.app[12].*")?,
+                        "fastapi.FastAPI.get".to_string(),
+                        "fastapi.FastAPI.put".to_string(),
+                        "module.app.app1.get".to_string(),
+                        "module.app.app1.put".to_string(),
+                        "module.app.app2.get".to_string(),
+                        "module.app.app2.put".to_string(),
                     ],
                     ..Default::default()
                 },
