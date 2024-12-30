@@ -781,7 +781,7 @@
           }
         },
         "include-dependencies": {
-          "description": "A map from file path to the list of file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
+          "description": "A map from file path to the list of file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected. These can also include non-Python files (for instance, if you want to mark a data file as a dependency of a Python file that reads it)",
           "type": [
             "object",
             "null"
