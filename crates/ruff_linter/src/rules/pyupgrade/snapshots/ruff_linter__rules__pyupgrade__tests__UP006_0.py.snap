@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
 ---
 UP006_0.py:4:10: UP006 [*] Use `list` instead of `typing.List` for type annotation
   |
@@ -280,5 +281,3 @@ UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Def
 65    |-def f(x: typing.DefaultDict[str, str]) -> None:
    66 |+def f(x: defaultdict[str, str]) -> None:
 66 67 |     ...
-67 68 | 
-68 69 |
