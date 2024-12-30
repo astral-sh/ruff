@@ -14,6 +14,21 @@ use crate::settings::types::PythonVersion;
 /// Checks for the use of generics that can be replaced with standard library
 /// variants based on [PEP 585].
 ///
+/// Under [preview mode](https://docs.astral.sh/ruff/preview),
+/// this rule triggers for all replacements listed
+/// in [PEP 585]. Otherwise, this rule only triggers for the following
+/// commonly occurring instances of modules present in the
+/// `typing` or `typing_extensions` package:
+///
+/// - `Dict`
+/// - `FrozenSet`
+/// - `List`
+/// - `Set`
+/// - `Tuple`
+/// - `Type`
+/// - `Deque`
+/// - `DefaultDict`
+///
 /// ## Why is this bad?
 /// [PEP 585] enabled collections in the Python standard library (like `list`)
 /// to be used as generics directly, instead of importing analogous members
@@ -81,6 +96,9 @@ pub(crate) fn use_pep585_annotation(
     expr: &Expr,
     replacement: &ModuleMember,
 ) {
+    if !checker.settings.preview.is_enabled() && !is_restricted_pep585_generic(replacement) {
+        return;
+    }
     let Some(from) = UnqualifiedName::from_expr(expr) else {
         return;
     };
@@ -137,4 +155,12 @@ pub(crate) fn use_pep585_annotation(
         }
     }
     checker.diagnostics.push(diagnostic);
+}
+
+fn is_restricted_pep585_generic(module_member: &ModuleMember) -> bool {
+    matches!(
+        module_member,
+        ModuleMember::BuiltIn("dict" | "frozenset" | "list" | "set" | "tuple" | "type")
+            | ModuleMember::Member("collections", "deque" | "defaultdict")
+    )
 }
