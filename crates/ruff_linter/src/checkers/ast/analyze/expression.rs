@@ -983,7 +983,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
             if checker.enabled(Rule::PathConstructorCurrentDirectory) {
-                flake8_use_pathlib::rules::path_constructor_current_directory(checker, expr, func);
+                flake8_use_pathlib::rules::path_constructor_current_directory(checker, call);
             }
             if checker.enabled(Rule::OsSepSplit) {
                 flake8_use_pathlib::rules::os_sep_split(checker, call);

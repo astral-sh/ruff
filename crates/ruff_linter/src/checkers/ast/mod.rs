@@ -1282,7 +1282,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
 
-                            if self.enabled(Rule::RuntimeCastValue) {
+                            if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
                                 flake8_type_checking::rules::runtime_cast_value(self, arg);
                             }
                         }
@@ -1503,6 +1503,20 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 self.visit_expr_context(ctx);
                             } else {
                                 debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                            }
+                        }
+                        Some(typing::SubscriptKind::TypedDict) => {
+                            if let Expr::Dict(ast::ExprDict { items, range: _ }) = slice.as_ref() {
+                                for item in items {
+                                    if let Some(key) = &item.key {
+                                        self.visit_non_type_definition(key);
+                                        self.visit_type_definition(&item.value);
+                                    } else {
+                                        self.visit_non_type_definition(&item.value);
+                                    }
+                                }
+                            } else {
+                                self.visit_non_type_definition(slice);
                             }
                         }
                         None => {

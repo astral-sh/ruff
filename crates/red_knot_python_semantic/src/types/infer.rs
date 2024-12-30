@@ -31,7 +31,7 @@ use std::num::NonZeroU32;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -72,7 +72,7 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::{Db, Program, PythonVersion};
 
-use super::context::{InferContext, WithDiagnostics};
+use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_non_subscriptable,
@@ -169,7 +169,6 @@ pub(crate) fn infer_deferred_types<'db>(
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
-#[allow(unused)]
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
@@ -208,6 +207,7 @@ fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult
 }
 
 /// A region within which we can infer types.
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum InferenceRegion<'db> {
     /// infer types for a standalone [`Expression`]
     Expression(Expression<'db>),
@@ -217,6 +217,18 @@ pub(crate) enum InferenceRegion<'db> {
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
     Scope(ScopeId<'db>),
+}
+
+impl<'db> InferenceRegion<'db> {
+    fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        match self {
+            InferenceRegion::Expression(expression) => expression.scope(db),
+            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
+                definition.scope(db)
+            }
+            InferenceRegion::Scope(scope) => scope,
+        }
+    }
 }
 
 /// The inferred types for a single region.
@@ -377,16 +389,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         region: InferenceRegion<'db>,
         index: &'db SemanticIndex<'db>,
     ) -> Self {
-        let (file, scope) = match region {
-            InferenceRegion::Expression(expression) => (expression.file(db), expression.scope(db)),
-            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                (definition.file(db), definition.scope(db))
-            }
-            InferenceRegion::Scope(scope) => (scope.file(db), scope),
-        };
+        let scope = region.scope(db);
 
         Self {
-            context: InferContext::new(db, file),
+            context: InferContext::new(db, scope),
             index,
             region,
             deferred_state: DeferredExpressionState::None,
@@ -1022,10 +1028,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        let decorator_tys: Box<[Type]> = decorator_list
-            .iter()
-            .map(|decorator| self.infer_decorator(decorator))
-            .collect();
+        // Check if the function is decorated with the `no_type_check` decorator
+        // and, if so, suppress any errors that come after the decorators.
+        let mut decorator_tys = Vec::with_capacity(decorator_list.len());
+
+        for decorator in decorator_list {
+            let ty = self.infer_decorator(decorator);
+            decorator_tys.push(ty);
+
+            if let Type::FunctionLiteral(function) = ty {
+                if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
+                    self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                }
+            }
+        }
 
         for default in parameters
             .iter_non_variadic_params()
@@ -1061,7 +1077,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             &name.id,
             function_kind,
             body_scope,
-            decorator_tys,
+            decorator_tys.into_boxed_slice(),
         ));
 
         self.add_declaration_with_binding(function.into(), definition, function_ty, function_ty);
@@ -3239,17 +3255,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             (_, Type::Never) => Type::Never,
             (_, Type::Unknown) => Type::Unknown,
 
-            (UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
-            (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
-            (UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
+            (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
+            (ast::UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            (ast::UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
 
-            (UnaryOp::UAdd, Type::BooleanLiteral(bool)) => Type::IntLiteral(i64::from(bool)),
-            (UnaryOp::USub, Type::BooleanLiteral(bool)) => Type::IntLiteral(-i64::from(bool)),
-            (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
+            (ast::UnaryOp::UAdd, Type::BooleanLiteral(bool)) => Type::IntLiteral(i64::from(bool)),
+            (ast::UnaryOp::USub, Type::BooleanLiteral(bool)) => Type::IntLiteral(-i64::from(bool)),
+            (ast::UnaryOp::Invert, Type::BooleanLiteral(bool)) => {
+                Type::IntLiteral(!i64::from(bool))
+            }
 
-            (UnaryOp::Not, ty) => ty.bool(self.db()).negate().into_type(self.db()),
+            (ast::UnaryOp::Not, ty) => ty.bool(self.db()).negate().into_type(self.db()),
             (
-                op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert),
+                op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
@@ -3267,10 +3285,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::Tuple(_),
             ) => {
                 let unary_dunder_method = match op {
-                    UnaryOp::Invert => "__invert__",
-                    UnaryOp::UAdd => "__pos__",
-                    UnaryOp::USub => "__neg__",
-                    UnaryOp::Not => {
+                    ast::UnaryOp::Invert => "__invert__",
+                    ast::UnaryOp::UAdd => "__pos__",
+                    ast::UnaryOp::USub => "__neg__",
+                    ast::UnaryOp::Not => {
                         unreachable!("Not operator is handled in its own case");
                     }
                 };
@@ -5218,7 +5236,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             // for negative and positive numbers
             ast::Expr::UnaryOp(ref u)
-                if matches!(u.op, UnaryOp::USub | UnaryOp::UAdd)
+                if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
                     && u.operand.is_number_literal_expr() =>
             {
                 self.infer_unary_expression(u)

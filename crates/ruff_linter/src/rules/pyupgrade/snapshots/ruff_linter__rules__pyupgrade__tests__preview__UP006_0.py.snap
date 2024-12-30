@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP006_0.py:4:10: UP006 [*] Use `list` instead of `typing.List` for type annotation
   |
@@ -282,4 +281,90 @@ UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Def
    66 |+def f(x: defaultdict[str, str]) -> None:
 66 67 |     ...
 67 68 | 
-68 69 |
+68 69 | 
+
+UP006_0.py:69:10: UP006 [*] Use `collections.abc.Set` instead of `typing.AbstractSet` for type annotation
+   |
+69 | def f(x: typing.AbstractSet[str]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^ UP006
+70 |     ...
+   |
+   = help: Replace with `collections.abc.Set`
+
+ℹ Safe fix
+20 20 | 
+21 21 | 
+22 22 | from typing import List as IList
+   23 |+from collections.abc import Set
+23 24 | 
+24 25 | 
+25 26 | def f(x: IList[str]) -> None:
+--------------------------------------------------------------------------------
+66 67 |     ...
+67 68 | 
+68 69 | 
+69    |-def f(x: typing.AbstractSet[str]) -> None:
+   70 |+def f(x: Set[str]) -> None:
+70 71 |     ...
+71 72 | 
+72 73 | 
+
+UP006_0.py:73:10: UP006 [*] Use `re.Pattern` instead of `typing.Pattern` for type annotation
+   |
+73 | def f(x: typing.Pattern[str]) -> None:
+   |          ^^^^^^^^^^^^^^ UP006
+74 |     ...
+   |
+   = help: Replace with `re.Pattern`
+
+ℹ Safe fix
+20 20 | 
+21 21 | 
+22 22 | from typing import List as IList
+   23 |+from re import Pattern
+23 24 | 
+24 25 | 
+25 26 | def f(x: IList[str]) -> None:
+--------------------------------------------------------------------------------
+70 71 |     ...
+71 72 | 
+72 73 | 
+73    |-def f(x: typing.Pattern[str]) -> None:
+   74 |+def f(x: Pattern[str]) -> None:
+74 75 |     ...
+75 76 | 
+76 77 | 
+
+UP006_0.py:77:10: UP006 [*] Use `collections.abc.Sequence` instead of `typing.Sequence` for type annotation
+   |
+77 | def f(x: typing.Sequence[str]) -> None:
+   |          ^^^^^^^^^^^^^^^ UP006
+78 |     ...
+   |
+   = help: Replace with `collections.abc.Sequence`
+
+ℹ Safe fix
+20 20 | 
+21 21 | 
+22 22 | from typing import List as IList
+   23 |+from collections.abc import Sequence
+23 24 | 
+24 25 | 
+25 26 | def f(x: IList[str]) -> None:
+--------------------------------------------------------------------------------
+74 75 |     ...
+75 76 | 
+76 77 | 
+77    |-def f(x: typing.Sequence[str]) -> None:
+   78 |+def f(x: Sequence[str]) -> None:
+78 79 |     ...
+79 80 | 
+80 81 | 
+
+UP006_0.py:84:10: UP006 Use `collections.abc.Collection` instead of `typing.Collection` for type annotation
+   |
+84 | def f(x: typing.Collection[str]) -> None:
+   |          ^^^^^^^^^^^^^^^^^ UP006
+85 |     ...
+   |
+   = help: Replace with `collections.abc.Collection`

@@ -101,13 +101,13 @@ impl From<&Expr> for ConstantLikelihood {
                 .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::Dict(dict) => {
-                if dict.is_empty() {
-                    ConstantLikelihood::Definitely
-                } else {
-                    ConstantLikelihood::Probably
-                }
-            }
+            Expr::Dict(dict) => dict
+                .items
+                .iter()
+                .flat_map(|item| std::iter::once(&item.value).chain(item.key.as_ref()))
+                .map(ConstantLikelihood::from)
+                .min()
+                .unwrap_or(ConstantLikelihood::Definitely),
             Expr::BinOp(ast::ExprBinOp { left, right, .. }) => cmp::min(
                 ConstantLikelihood::from(&**left),
                 ConstantLikelihood::from(&**right),
