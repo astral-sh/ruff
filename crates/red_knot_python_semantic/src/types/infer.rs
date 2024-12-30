@@ -1031,7 +1031,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         // Check if the function is decorated with the `no_type_check` decorator
         // and, if so, suppress any errors that come after the decorators.
         let mut decorator_tys = Vec::with_capacity(decorator_list.len());
-        let mut has_no_type_check_decorator = false;
 
         for decorator in decorator_list {
             let ty = self.infer_decorator(decorator);
@@ -1039,13 +1038,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             if let Type::FunctionLiteral(function) = ty {
                 if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
-                    has_no_type_check_decorator = true;
+                    self.context.set_in_no_type_check(InNoTypeCheck::Yes);
                 }
             }
-        }
-
-        if has_no_type_check_decorator {
-            self.context.set_in_no_type_check(InNoTypeCheck::Yes);
         }
 
         for default in parameters

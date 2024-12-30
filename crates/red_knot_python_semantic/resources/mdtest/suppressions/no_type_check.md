@@ -53,15 +53,16 @@ def test() -> int:
 
 ## Error in following decorator
 
-Don't suppress diagnostics for decorators appearing after the `no_type_check` decorator. This
-matches mypy's and Pyright's behavior where both tools consider decorators to be outside the
-function definition.
+Unlike Pyright and mypy, suppress diagnostics appearing after the `no_type_check` decorator. We do
+this because it more closely matches Python's runtime semantics of decorators. For more details, see
+the discussion on the
+[PR adding `@no_type_check` support](https://github.com/astral-sh/ruff/pull/15122#discussion_r1896869411).
 
 ```py
 from typing import no_type_check
 
 @no_type_check
-@unknown_decorator  # error: [unresolved-reference]
+@unknown_decorator
 def test() -> int:
     return a + 5
 ```
