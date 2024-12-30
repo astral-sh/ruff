@@ -38,12 +38,25 @@ impl<'db> Unpacker<'db> {
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         debug_assert!(
-            matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
-            "Unpacking target must be a list or tuple expression"
+            matches!(
+                target,
+                ast::Expr::List(_) | ast::Expr::Tuple(_) | ast::Expr::EllipsisLiteral(_)
+            ),
+            "Unpacking target must be a list or tuple or ellipsis literal expression"
         );
 
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
+
+        let file = value.expression().file(self.db());
+        let is_ellipsis_literal = value
+            .expression()
+            .node_ref(self.db())
+            .is_ellipsis_literal_expr();
+        // Unpacking Ellipsis Literal is allowed in stub files.
+        if file.is_stub(self.db().upcast()) && is_ellipsis_literal {
+            value_ty = Type::Unknown;
+        }
 
         if value.is_iterable() {
             // If the value is an iterable, then the type that needs to be unpacked is the iterator

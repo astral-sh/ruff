@@ -2,12 +2,13 @@
 
 ## Function and Methods
 
-The ellipsis literal `...` can be used as a placeholder default value for a function parameter,
- in a stub file only, regardless of the type of the parameter.
+The ellipsis literal `...` can be used as a placeholder default value for a function parameter, in a
+stub file only, regardless of the type of the parameter.
 
 ```py path=test.pyi
 def f(x: int = ...) -> None:
     reveal_type(x)  # revealed: int
+
 def f2(x: str = ...) -> None:
     reveal_type(x)  # revealed: str
 ```
@@ -29,19 +30,27 @@ class Foo:
 reveal_type(Foo.y)  # revealed: int
 ```
 
+## Assigning Ellipsis Literal to Multiple Targets
+
+```py path=test.pyi
+x, y = ...
+reveal_type(x)  # revealed: Unknown
+reveal_type(y)  # revealed: Unknown
+```
+
 ## Ellipsis Usage In Non Stub File
 
-In a non-stub file, there's no special treatment of ellipsis literals. An ellipsis literal can only be assigned if
-`EllipsisType` is actually assignable to the annotated type.
+In a non-stub file, there's no special treatment of ellipsis literals. An ellipsis literal can only
+be assigned if `EllipsisType` is actually assignable to the annotated type.
 
 ```py
-# error: [invalid-parameter-default] "Default value of type `EllipsisType | ellipsis` is not assignable to annotated parameter type `int`"
+# error: 7 [invalid-parameter-default] "Default value of type `ellipsis` is not assignable to annotated parameter type `int`"
 def f(x: int = ...) -> None: ...
 
-# error: [invalid-assignment] "Object of type `EllipsisType | ellipsis` is not assignable to `int`"
+# error: 1 [invalid-assignment] "Object of type `ellipsis` is not assignable to `int`"
 a: int = ...
 b = ...
-reveal_type(b)  # revealed: EllipsisType | ellipsis
+reveal_type(b)  # revealed: ellipsis
 ```
 
 ## Use of Ellipsis Symbol
@@ -49,6 +58,6 @@ reveal_type(b)  # revealed: EllipsisType | ellipsis
 There is no special treatment of the builtin name `Ellipsis`, only of `...` literals.
 
 ```py path=test.pyi
-# error: [invalid-parameter-default] "Default value of type `EllipsisType | ellipsis` is not assignable to annotated parameter type `int`"
+# error: 7 [invalid-parameter-default] "Default value of type `ellipsis` is not assignable to annotated parameter type `int`"
 def f(x: int = Ellipsis) -> None: ...
 ```
