@@ -115,18 +115,6 @@ pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -
     })
 }
 
-/// Whether `path` leads to a `conftest.py` file.
-pub(crate) fn is_conftest(path: &Path) -> bool {
-    matches!(
-        path.file_name().and_then(OsStr::to_str),
-        Some("conftest.py")
-    )
-}
-
-pub(crate) fn is_likely_pytest_hook(func: &StmtFunctionDef, checker: &Checker) -> bool {
-    is_conftest(checker.path()) && func.name.starts_with("pytest_")
-}
-
 pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &keyword.value {
         value == literal

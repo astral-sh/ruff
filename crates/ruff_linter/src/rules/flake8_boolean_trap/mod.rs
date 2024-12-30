@@ -23,10 +23,6 @@ mod tests {
         Rule::BooleanTypeHintPositionalArgument,
         Path::new("FBT_pytest/test_foo.py")
     )]
-    #[test_case(
-        Rule::BooleanTypeHintPositionalArgument,
-        Path::new("FBT_pytest/conftest.py")
-    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
