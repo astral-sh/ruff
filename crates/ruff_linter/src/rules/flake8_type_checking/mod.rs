@@ -13,6 +13,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::settings::types::IdentifierPattern;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
@@ -224,9 +225,9 @@ mod tests {
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_decorators: vec![
-                        "attrs.define".to_string(),
-                        "attrs.frozen".to_string(),
-                        "pydantic.validate_call".to_string(),
+                        IdentifierPattern::new("attrs.define")?,
+                        IdentifierPattern::new("attrs.frozen")?,
+                        IdentifierPattern::new("pydantic.validate_call")?,
                     ],
                     ..Default::default()
                 },
@@ -250,6 +251,27 @@ mod tests {
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
                     runtime_required_base_classes: vec!["module.direct.MyBaseClass".to_string()],
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("module/app.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/routes.py"))]
+    fn decorator_same_file_and_glob(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    runtime_required_decorators: vec![
+                        IdentifierPattern::new("fastapi.FastAPI.*")?,
+                        IdentifierPattern::new("module.app.app[12].*")?,
+                    ],
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

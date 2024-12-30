@@ -364,7 +364,8 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_type_checking: lint
                     .flake8_type_checking
-                    .map(Flake8TypeCheckingOptions::into_settings)
+                    .map(Flake8TypeCheckingOptions::try_into_settings)
+                    .transpose()?
                     .unwrap_or_default(),
                 flake8_unused_arguments: lint
                     .flake8_unused_arguments

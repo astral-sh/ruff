@@ -1,15 +1,18 @@
 //! Settings for the `flake8-type-checking` plugin.
+use std::error::Error;
+use std::fmt::{Display, Formatter, Result};
+
+use ruff_macros::CacheKey;
 
 use crate::display_settings;
-use ruff_macros::CacheKey;
-use std::fmt::{Display, Formatter};
+use crate::settings::types::IdentifierPattern;
 
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub strict: bool,
     pub exempt_modules: Vec<String>,
     pub runtime_required_base_classes: Vec<String>,
-    pub runtime_required_decorators: Vec<String>,
+    pub runtime_required_decorators: Vec<IdentifierPattern>,
     pub quote_annotations: bool,
 }
 
@@ -39,5 +42,29 @@ impl Display for Settings {
             ]
         }
         Ok(())
+    }
+}
+
+/// Error returned by the [`TryFrom`] implementation of [`Settings`].
+#[derive(Debug)]
+pub enum SettingsError {
+    InvalidRuntimeEvaluatedDecorators(glob::PatternError),
+}
+
+impl Display for SettingsError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            SettingsError::InvalidRuntimeEvaluatedDecorators(err) => {
+                write!(f, "invalid runtime-evaluated-decorators pattern: {err}")
+            }
+        }
+    }
+}
+
+impl Error for SettingsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            SettingsError::InvalidRuntimeEvaluatedDecorators(err) => Some(err),
+        }
     }
 }

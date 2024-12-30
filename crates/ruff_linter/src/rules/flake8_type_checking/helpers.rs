@@ -13,6 +13,7 @@ use ruff_python_semantic::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::rules::flake8_type_checking::settings::Settings;
+use crate::settings::types::IdentifierPattern;
 use crate::Locator;
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
@@ -50,7 +51,7 @@ pub(crate) fn is_valid_runtime_import(
 /// Returns `true` if a function's parameters should be treated as runtime-required.
 pub(crate) fn runtime_required_function(
     function_def: &ast::StmtFunctionDef,
-    decorators: &[String],
+    decorators: &[IdentifierPattern],
     semantic: &SemanticModel,
 ) -> bool {
     if runtime_required_decorators(&function_def.decorator_list, decorators, semantic) {
@@ -63,7 +64,7 @@ pub(crate) fn runtime_required_function(
 pub(crate) fn runtime_required_class(
     class_def: &ast::StmtClassDef,
     base_classes: &[String],
-    decorators: &[String],
+    decorators: &[IdentifierPattern],
     semantic: &SemanticModel,
 ) -> bool {
     if runtime_required_base_class(class_def, base_classes, semantic) {
@@ -90,7 +91,7 @@ fn runtime_required_base_class(
 
 fn runtime_required_decorators(
     decorator_list: &[Decorator],
-    decorators: &[String],
+    decorators: &[IdentifierPattern],
     semantic: &SemanticModel,
 ) -> bool {
     if decorators.is_empty() {
@@ -98,12 +99,33 @@ fn runtime_required_decorators(
     }
 
     decorator_list.iter().any(|decorator| {
+        let expression = map_callable(&decorator.expression);
         semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
+            .resolve_qualified_name(expression)
+            // if we can't resolve the name, then try resolving the assignment
+            .or_else(|| {
+                let mut source = expression;
+                let mut tail = vec![];
+                while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = source {
+                    source = value;
+                    tail.push(attr.as_str());
+                }
+                analyze::typing::resolve_assignment(source, semantic).map(|head| {
+                    let mut qualified_name = head;
+                    for member in tail {
+                        // extend the full name with the attributes we accessed
+                        // i.e. for `app.get` when `app` resolves to `fastapi.FastApi`
+                        // then we want to get back `fastapi.FastApi.get`.
+                        qualified_name = qualified_name.append_member(member);
+                    }
+                    qualified_name
+                })
+            })
             .is_some_and(|qualified_name| {
+                let qualified_name = qualified_name.to_string();
                 decorators
                     .iter()
-                    .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
+                    .any(|pattern| pattern.matches(&qualified_name))
             })
     })
 }
