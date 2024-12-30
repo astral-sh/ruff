@@ -10,7 +10,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
-/// Checks for `dict.get(key, falsy_value)` used as implicit casts to boolean values.
+/// Checks for `dict.get(key, falsy_value)` calls in boolean test positions.
 ///
 /// ## Why is this bad?
 /// The default fallback `None` is already falsy.
