@@ -93,7 +93,7 @@ fn generate_classinfo_constraint<'db, F>(
     to_constraint: F,
 ) -> Option<Type<'db>>
 where
-    F: Fn(ClassLiteralType<'db>) -> Type<'db> + Copy,
+    F: Fn(&'db dyn Db, ClassLiteralType<'db>) -> Type<'db> + Copy,
 {
     match classinfo {
         Type::Tuple(tuple) => {
@@ -103,7 +103,7 @@ where
             }
             Some(builder.build())
         }
-        Type::ClassLiteral(class_literal_type) => Some(to_constraint(*class_literal_type)),
+        Type::ClassLiteral(class_literal_type) => Some(to_constraint(db, *class_literal_type)),
         _ => None,
     }
 }
@@ -431,10 +431,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                 let to_constraint = match function {
                     KnownConstraintFunction::IsInstance => {
-                        |class_literal: ClassLiteralType<'db>| Type::instance(class_literal.class)
+                        |db: &'db dyn Db, class_literal: ClassLiteralType<'db>| {
+                            Type::instance(db, class_literal.class)
+                        }
                     }
                     KnownConstraintFunction::IsSubclass => {
-                        |class_literal: ClassLiteralType<'db>| {
+                        |db: &'db dyn Db, class_literal: ClassLiteralType<'db>| {
                             Type::subclass_of(class_literal.class)
                         }
                     }

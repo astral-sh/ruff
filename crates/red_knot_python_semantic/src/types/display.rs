@@ -68,11 +68,11 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::Instance(InstanceType { class }) => {
-                let representation = match class.known(self.db) {
+            Type::Instance(instance) => {
+                let representation = match instance.class(self.db).known(self.db) {
                     Some(KnownClass::NoneType) => "None",
                     Some(KnownClass::NoDefaultType) => "NoDefault",
-                    _ => class.name(self.db),
+                    _ => instance.class(self.db).name(self.db),
                 };
                 f.write_str(representation)
             }
