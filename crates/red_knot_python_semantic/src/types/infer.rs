@@ -3525,6 +3525,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::Tuple(_),
                 op,
             ) => {
+                // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
+                // the Python spec [1] is:
+                //
+                //   - If rhs is a (proper) subclass of lhs, and it provides a different
+                //     implementation of __rop__, use that.
+                //   - Otherwise, if lhs implements __op__, use that.
+                //   - Otherwise, if lhs and rhs are different types, and rhs implements __rop__,
+                //     use that.
+                //
+                // [1] https://docs.python.org/3/reference/datamodel.html#object.__radd__
+
+                // Technically we don't have to check left_ty != right_ty here, since if the types
+                // are the same, they will trivially have the same implementation of the reflected
+                // dunder, and so we'll fail the inner check. But the type equality check will be
+                // faster for the common case, and allow us to skip the (two) class member lookups.
                 let left_class = left_ty.to_meta_type(self.db());
                 let right_class = right_ty.to_meta_type(self.db());
                 if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {

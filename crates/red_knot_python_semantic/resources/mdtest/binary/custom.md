@@ -133,6 +133,160 @@ reveal_type(No() & Yes())  # revealed: Unknown
 reveal_type(No() // Yes())  # revealed: Unknown
 ```
 
+## Subclass reflections override superclass dunders
+
+```py
+class Yes:
+    def __add__(self, other) -> Literal["+"]:
+        return "+"
+
+    def __sub__(self, other) -> Literal["-"]:
+        return "-"
+
+    def __mul__(self, other) -> Literal["*"]:
+        return "*"
+
+    def __matmul__(self, other) -> Literal["@"]:
+        return "@"
+
+    def __truediv__(self, other) -> Literal["/"]:
+        return "/"
+
+    def __mod__(self, other) -> Literal["%"]:
+        return "%"
+
+    def __pow__(self, other) -> Literal["**"]:
+        return "**"
+
+    def __lshift__(self, other) -> Literal["<<"]:
+        return "<<"
+
+    def __rshift__(self, other) -> Literal[">>"]:
+        return ">>"
+
+    def __or__(self, other) -> Literal["|"]:
+        return "|"
+
+    def __xor__(self, other) -> Literal["^"]:
+        return "^"
+
+    def __and__(self, other) -> Literal["&"]:
+        return "&"
+
+    def __floordiv__(self, other) -> Literal["//"]:
+        return "//"
+
+class Sub(Yes):
+    def __radd__(self, other) -> Literal["r+"]:
+        return "r+"
+
+    def __rsub__(self, other) -> Literal["r-"]:
+        return "r-"
+
+    def __rmul__(self, other) -> Literal["r*"]:
+        return "r*"
+
+    def __rmatmul__(self, other) -> Literal["r@"]:
+        return "r@"
+
+    def __rtruediv__(self, other) -> Literal["r/"]:
+        return "r/"
+
+    def __rmod__(self, other) -> Literal["r%"]:
+        return "r%"
+
+    def __rpow__(self, other) -> Literal["r**"]:
+        return "r**"
+
+    def __rlshift__(self, other) -> Literal["r<<"]:
+        return "r<<"
+
+    def __rrshift__(self, other) -> Literal["r>>"]:
+        return "r>>"
+
+    def __ror__(self, other) -> Literal["r|"]:
+        return "r|"
+
+    def __rxor__(self, other) -> Literal["r^"]:
+        return "r^"
+
+    def __rand__(self, other) -> Literal["r&"]:
+        return "r&"
+
+    def __rfloordiv__(self, other) -> Literal["r//"]:
+        return "r//"
+
+class No:
+    def __radd__(self, other) -> Literal["r+"]:
+        return "r+"
+
+    def __rsub__(self, other) -> Literal["r-"]:
+        return "r-"
+
+    def __rmul__(self, other) -> Literal["r*"]:
+        return "r*"
+
+    def __rmatmul__(self, other) -> Literal["r@"]:
+        return "r@"
+
+    def __rtruediv__(self, other) -> Literal["r/"]:
+        return "r/"
+
+    def __rmod__(self, other) -> Literal["r%"]:
+        return "r%"
+
+    def __rpow__(self, other) -> Literal["r**"]:
+        return "r**"
+
+    def __rlshift__(self, other) -> Literal["r<<"]:
+        return "r<<"
+
+    def __rrshift__(self, other) -> Literal["r>>"]:
+        return "r>>"
+
+    def __ror__(self, other) -> Literal["r|"]:
+        return "r|"
+
+    def __rxor__(self, other) -> Literal["r^"]:
+        return "r^"
+
+    def __rand__(self, other) -> Literal["r&"]:
+        return "r&"
+
+    def __rfloordiv__(self, other) -> Literal["r//"]:
+        return "r//"
+
+# Subclass reflected dunder methods take precedence over the superclass's regular dunders.
+reveal_type(Yes() + Sub())  # revealed: Literal["r+"]
+reveal_type(Yes() - Sub())  # revealed: Literal["r-"]
+reveal_type(Yes() * Sub())  # revealed: Literal["r*"]
+reveal_type(Yes() @ Sub())  # revealed: Literal["r@"]
+reveal_type(Yes() / Sub())  # revealed: Literal["r/"]
+reveal_type(Yes() % Sub())  # revealed: Literal["r%"]
+reveal_type(Yes() ** Sub())  # revealed: Literal["r**"]
+reveal_type(Yes() << Sub())  # revealed: Literal["r<<"]
+reveal_type(Yes() >> Sub())  # revealed: Literal["r>>"]
+reveal_type(Yes() | Sub())  # revealed: Literal["r|"]
+reveal_type(Yes() ^ Sub())  # revealed: Literal["r^"]
+reveal_type(Yes() & Sub())  # revealed: Literal["r&"]
+reveal_type(Yes() // Sub())  # revealed: Literal["r//"]
+
+# But for an unrelated class, the superclass regular dunders are used.
+reveal_type(Yes() + No())  # revealed: Literal["+"]
+reveal_type(Yes() - No())  # revealed: Literal["-"]
+reveal_type(Yes() * No())  # revealed: Literal["*"]
+reveal_type(Yes() @ No())  # revealed: Literal["@"]
+reveal_type(Yes() / No())  # revealed: Literal["/"]
+reveal_type(Yes() % No())  # revealed: Literal["%"]
+reveal_type(Yes() ** No())  # revealed: Literal["**"]
+reveal_type(Yes() << No())  # revealed: Literal["<<"]
+reveal_type(Yes() >> No())  # revealed: Literal[">>"]
+reveal_type(Yes() | No())  # revealed: Literal["|"]
+reveal_type(Yes() ^ No())  # revealed: Literal["^"]
+reveal_type(Yes() & No())  # revealed: Literal["&"]
+reveal_type(Yes() // No())  # revealed: Literal["//"]
+```
+
 ## Classes
 
 Dunder methods defined in a class are available to instances of that class, but not to the class
