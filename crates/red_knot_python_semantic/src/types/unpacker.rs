@@ -25,7 +25,7 @@ pub(crate) struct Unpacker<'db> {
 impl<'db> Unpacker<'db> {
     pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
         Self {
-            context: InferContext::new(db, scope.file(db)),
+            context: InferContext::new(db, scope),
             targets: FxHashMap::default(),
             scope,
         }
