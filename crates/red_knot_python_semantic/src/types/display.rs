@@ -8,7 +8,7 @@ use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class_base::ClassBase;
 use crate::types::{
-    ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
+    ClassLiteralType, IntersectionType, KnownClass, StringLiteralType,
     SubclassOfType, Type, UnionType,
 };
 use crate::Db;

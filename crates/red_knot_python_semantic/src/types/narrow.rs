@@ -436,7 +436,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         }
                     }
                     KnownConstraintFunction::IsSubclass => {
-                        |db: &'db dyn Db, class_literal: ClassLiteralType<'db>| {
+                        |_db: &'db dyn Db, class_literal: ClassLiteralType<'db>| {
                             Type::subclass_of(class_literal.class)
                         }
                     }

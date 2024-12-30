@@ -26,7 +26,7 @@
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
 
-use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
+use crate::types::{IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
