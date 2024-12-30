@@ -322,67 +322,59 @@ type ModuleMember = (&'static str, &'static str);
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
 pub fn as_pep_585_generic(call_path: &[&str]) -> Option<ModuleMember> {
-    match call_path {
+    let ["typing" | "typing_extensions", member @ ..] = call_path else {
+        return None;
+    };
+
+    match member {
         // Builtins
-        ["typing" | "typing_extensions", "Tuple"] => Some(("", "tuple")),
-        ["typing" | "typing_extensions", "List"] => Some(("", "list")),
-        ["typing" | "typing_extensions", "Dict"] => Some(("", "dict")),
-        ["typing" | "typing_extensions", "Set"] => Some(("", "set")),
-        ["typing" | "typing_extensions", "FrozenSet"] => Some(("", "frozenset")),
-        ["typing" | "typing_extensions", "Type"] => Some(("", "type")),
+        ["Tuple"] => Some(("", "tuple")),
+        ["List"] => Some(("", "list")),
+        ["Dict"] => Some(("", "dict")),
+        ["Set"] => Some(("", "set")),
+        ["FrozenSet"] => Some(("", "frozenset")),
+        ["Type"] => Some(("", "type")),
 
         // collections
-        ["typing" | "typing_extensions", "Deque"] => Some(("collections", "deque")),
-        ["typing" | "typing_extensions", "DefaultDict"] => Some(("collections", "defaultdict")),
-        ["typing" | "typing_extensions", "OrderedDict"] => Some(("collections", "OrderedDict")),
-        ["typing" | "typing_extensions", "Counter"] => Some(("collections", "Counter")),
-        ["typing" | "typing_extensions", "ChainMap"] => Some(("collections", "ChainMap")),
+        ["Deque"] => Some(("collections", "deque")),
+        ["DefaultDict"] => Some(("collections", "defaultdict")),
+        ["OrderedDict"] => Some(("collections", "OrderedDict")),
+        ["Counter"] => Some(("collections", "Counter")),
+        ["ChainMap"] => Some(("collections", "ChainMap")),
 
         // collections.abc
-        ["typing" | "typing_extensions", "Awaitable"] => Some(("collections.abc", "Awaitable")),
-        ["typing" | "typing_extensions", "Coroutine"] => Some(("collections.abc", "Coroutine")),
-        ["typing" | "typing_extensions", "AsyncIterable"] => {
-            Some(("collections.abc", "AsyncIterable"))
-        }
-        ["typing" | "typing_extensions", "AsyncGenerator"] => {
-            Some(("collections.abc", "AsyncGenerator"))
-        }
-        ["typing" | "typing_extensions", "Iterable"] => Some(("collections.abc", "Iterable")),
-        ["typing" | "typing_extensions", "Iterator"] => Some(("collections.abc", "Iterator")),
-        ["typing" | "typing_extensions", "Generator"] => Some(("collections.abc", "Generator")),
-        ["typing" | "typing_extensions", "Reversible"] => Some(("collections.abc", "Reversible")),
-        ["typing" | "typing_extensions", "Container"] => Some(("collections.abc", "Container")),
-        ["typing" | "typing_extensions", "Collection"] => Some(("collections.abc", "Collection")),
-        ["typing" | "typing_extensions", "Callable"] => Some(("collections.abc", "Callable")),
-        ["typing" | "typing_extensions", "AbstractSet"] => Some(("collections.abc", "Set")),
-        ["typing" | "typing_extensions", "MutableSet"] => Some(("collections.abc", "MutableSet")),
-        ["typing" | "typing_extensions", "Mapping"] => Some(("collections.abc", "Mapping")),
-        ["typing" | "typing_extensions", "MutableMapping"] => {
-            Some(("collections.abc", "MutableMapping"))
-        }
-        ["typing" | "typing_extensions", "Sequence"] => Some(("collections.abc", "Sequence")),
-        ["typing" | "typing_extensions", "MutableSequence"] => {
-            Some(("collections.abc", "MutableSequence"))
-        }
-        ["typing" | "typing_extensions", "ByteString"] => Some(("collections.abc", "ByteString")),
-        ["typing" | "typing_extensions", "MappingView"] => Some(("collections.abc", "MappingView")),
-        ["typing" | "typing_extensions", "KeysView"] => Some(("collections.abc", "KeysView")),
-        ["typing" | "typing_extensions", "ItemsView"] => Some(("collections.abc", "ItemsView")),
-        ["typing" | "typing_extensions", "ValuesView"] => Some(("collections.abc", "ValuesView")),
+        ["Awaitable"] => Some(("collections.abc", "Awaitable")),
+        ["Coroutine"] => Some(("collections.abc", "Coroutine")),
+        ["AsyncIterable"] => Some(("collections.abc", "AsyncIterable")),
+        ["AsyncGenerator"] => Some(("collections.abc", "AsyncGenerator")),
+        ["Iterable"] => Some(("collections.abc", "Iterable")),
+        ["Iterator"] => Some(("collections.abc", "Iterator")),
+        ["Generator"] => Some(("collections.abc", "Generator")),
+        ["Reversible"] => Some(("collections.abc", "Reversible")),
+        ["Container"] => Some(("collections.abc", "Container")),
+        ["Collection"] => Some(("collections.abc", "Collection")),
+        ["Callable"] => Some(("collections.abc", "Callable")),
+        ["AbstractSet"] => Some(("collections.abc", "Set")),
+        ["MutableSet"] => Some(("collections.abc", "MutableSet")),
+        ["Mapping"] => Some(("collections.abc", "Mapping")),
+        ["MutableMapping"] => Some(("collections.abc", "MutableMapping")),
+        ["Sequence"] => Some(("collections.abc", "Sequence")),
+        ["MutableSequence"] => Some(("collections.abc", "MutableSequence")),
+        ["ByteString"] => Some(("collections.abc", "ByteString")),
+        ["MappingView"] => Some(("collections.abc", "MappingView")),
+        ["KeysView"] => Some(("collections.abc", "KeysView")),
+        ["ItemsView"] => Some(("collections.abc", "ItemsView")),
+        ["ValuesView"] => Some(("collections.abc", "ValuesView")),
 
         // contextlib
-        ["typing" | "typing_extensions", "ContextManager"] => {
-            Some(("contextlib", "AbstractContextManager"))
-        }
-        ["typing" | "typing_extensions", "AsyncContextManager"] => {
-            Some(("contextlib", "AbstractAsyncContextManager"))
-        }
+        ["ContextManager"] => Some(("contextlib", "AbstractContextManager")),
+        ["AsyncContextManager"] => Some(("contextlib", "AbstractAsyncContextManager")),
 
         // re
-        ["typing" | "typing_extensions", "Pattern"] => Some(("re", "Pattern")),
-        ["typing" | "typing_extensions", "Match"] => Some(("re", "Match")),
-        ["typing" | "typing_extensions", "re", "Pattern"] => Some(("re", "Pattern")),
-        ["typing" | "typing_extensions", "re", "Match"] => Some(("re", "Match")),
+        ["Pattern"] => Some(("re", "Pattern")),
+        ["Match"] => Some(("re", "Match")),
+        ["re", "Pattern"] => Some(("re", "Pattern")),
+        ["re", "Match"] => Some(("re", "Match")),
 
         _ => None,
     }
