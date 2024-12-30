@@ -1108,6 +1108,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PytestRaisesAmbiguousPattern) {
                 ruff::rules::pytest_raises_ambiguous_pattern(checker, call);
             }
+            if checker.enabled(Rule::FalsyDictGetFallback) {
+                ruff::rules::falsy_dict_get_fallback(checker, expr);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
@@ -1380,9 +1383,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::DoubleNegation) {
                 flake8_simplify::rules::double_negation(checker, expr, *op, operand);
             }
-            if checker.enabled(Rule::FalsyDictGetFallback) && *op == ruff_python_ast::UnaryOp::Not {
-                ruff::rules::falsy_dict_get_fallback(checker, operand);
-            }
         }
         Expr::Compare(
             compare @ ast::ExprCompare {
@@ -1514,9 +1514,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SliceToRemovePrefixOrSuffix) {
                 refurb::rules::slice_to_remove_affix_expr(checker, if_exp);
             }
-            if checker.enabled(Rule::FalsyDictGetFallback) {
-                ruff::rules::falsy_dict_get_fallback(checker, test);
-            }
         }
         Expr::ListComp(
             comp @ ast::ExprListComp {
@@ -1643,7 +1640,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::reimplemented_starmap(checker, &generator.into());
             }
         }
-        Expr::BoolOp(bool_op @ ast::ExprBoolOp { values, .. }) => {
+        Expr::BoolOp(bool_op) => {
             if checker.enabled(Rule::BooleanChainedComparison) {
                 pylint::rules::boolean_chained_comparison(checker, bool_op);
             }
@@ -1676,11 +1673,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ParenthesizeChainedOperators) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
-            }
-            if checker.enabled(Rule::FalsyDictGetFallback) {
-                for value in values {
-                    ruff::rules::falsy_dict_get_fallback(checker, value);
-                }
             }
         }
         Expr::Lambda(lambda_expr) => {

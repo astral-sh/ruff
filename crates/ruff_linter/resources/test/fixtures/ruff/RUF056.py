@@ -83,6 +83,11 @@ value = my_dict.get("key", truthy_value)
 value = my_dict.get("key", 0 or "default")  
 value = my_dict.get("key", [] if condition else {})  
 
+# testing dict.get call using kwargs
+value = my_dict.get(key="key", default=False)  
+value = my_dict.get(default=[], key="key")  
+
+
 # Edge Cases
 
 dicts = [my_dict, my_dict, my_dict]
@@ -115,6 +120,13 @@ value = "not found" if my_dict.get("key", False) else "default"  # [RUF056]
 if my_dict.get("key", False):  # [RUF056]
     pass
 
+# dict.get in compound if statement
+if True and my_dict.get("key", False):  # [RUF056]
+    pass
+
+if my_dict.get("key", False) or True:  # [RUF056]
+    pass
+
 # dict.get in an assert statement
 assert my_dict.get("key", False)  # [RUF056]
 
@@ -125,21 +137,31 @@ while my_dict.get("key", False):  # [RUF056]
 # dict.get in unary not expression
 value = not my_dict.get("key", False)  # [RUF056]
 
-# dict.get in or expression
-value = my_dict.get("key", False) or "default"  # [RUF056]
-
-# dict.get in and expression
-value = my_dict.get("key", False) and "default"  # [RUF056]
-
 # testing all falsy fallbacks
-value = my_dict.get("key", False) and "default"  # [RUF056]
-value = my_dict.get("key", []) and "default"  # [RUF056]
-value = my_dict.get("key", list()) and "default"  # [RUF056]
-value = my_dict.get("key", {}) and "default"  # [RUF056]
-value = my_dict.get("key", dict()) and "default"  # [RUF056]
-value = my_dict.get("key", set()) and "default"  # [RUF056]
-value = my_dict.get("key", None) and "default"  # [RUF056]
-value = my_dict.get("key", 0) and "default"  # [RUF056]
-value = my_dict.get("key", 0.0) and "default"  # [RUF056]
-value = my_dict.get("key", "") and "default"  # [RUF056]
+value = not my_dict.get("key", False)  # [RUF056]
+value = not my_dict.get("key", [])  # [RUF056]
+value = not my_dict.get("key", list())  # [RUF056]
+value = not my_dict.get("key", {})  # [RUF056]
+value = not my_dict.get("key", dict())  # [RUF056]
+value = not my_dict.get("key", set())  # [RUF056]
+value = not my_dict.get("key", None)  # [RUF056]
+value = not my_dict.get("key", 0)  # [RUF056]
+value = not my_dict.get("key", 0.0)  # [RUF056]
+value = not my_dict.get("key", "")  # [RUF056]
 
+# testing dict.get call using kwargs
+value = not my_dict.get(key="key", default=False)  # [RUF056]
+value = not my_dict.get(default=[], key="key")  # [RUF056]
+
+# testing invalid dict.get call with inline comment
+value = not my_dict.get("key", # comment1
+                     [] # comment2
+                     ) # [RUF056]
+
+# testing invalid dict.get call with kwargs and inline comment
+value = not my_dict.get(key="key", # comment1
+                        default=False # comment2
+                        )  # [RUF056]
+value = not my_dict.get(default=[], # comment1
+                        key="key" # comment2
+                        )  # [RUF056]

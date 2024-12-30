@@ -1,10 +1,8 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit};
+use crate::fix::edits::{remove_argument, Parentheses};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{
-    Expr, ExprAttribute, ExprBooleanLiteral, ExprCall, ExprDict, ExprList, ExprName,
-    ExprNoneLiteral, ExprNumberLiteral, ExprSet, ExprStringLiteral, Int, Number,
-};
+use ruff_python_ast::{helpers::Truthiness, Expr, ExprAttribute, ExprCall, ExprName};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -37,7 +35,7 @@ pub(crate) struct FalsyDictGetFallback;
 impl AlwaysFixableViolation for FalsyDictGetFallback {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Avoid providing a falsy fallback to `dict.get()` when used in a boolean context. The default fallback `None` is already falsy.".to_string()
+        "Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -46,6 +44,8 @@ impl AlwaysFixableViolation for FalsyDictGetFallback {
 }
 
 pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
+    let semantic = checker.semantic();
+
     // Check if the expression is a call
     let Expr::Call(ExprCall { func, .. }) = expr else {
         return;
@@ -61,9 +61,14 @@ pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
+    // Check if we are in a boolean test
+    if !semantic.in_boolean_test() {
+        return;
+    }
+
     // Check if the object is a dictionary using the semantic model
     if let Expr::Name(expr_name) = &**value {
-        if !is_known_to_be_of_type_dict(checker.semantic(), expr_name) {
+        if !is_known_to_be_of_type_dict(semantic, expr_name) {
             return;
         }
     } else {
@@ -74,100 +79,76 @@ pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    // Check if a fallback arg is provided
-    if arguments.args.len() < 2 {
+    // Get the fallback argument
+    let Some(fallback_arg) = arguments.find_argument("default", 1) else {
+        return;
+    };
+
+    // Check if the fallback is a falsy value
+    let is_falsy = matches!(
+        Truthiness::from_expr(fallback_arg, |id| semantic.has_builtin_binding(id)),
+        Truthiness::Falsey | Truthiness::False | Truthiness::None
+    );
+
+    if !is_falsy {
         return;
     }
 
-    // Get the fallback argument
-    let fallback_arg = &arguments.args[1];
+    let mut diagnostic = Diagnostic::new(FalsyDictGetFallback, fallback_arg.range());
 
-    // Define what is considered a falsy value
-    let is_falsy = is_falsy_fallback(fallback_arg);
+    let key_arg = arguments.find_argument("key", 0).unwrap();
+    let comment_ranges = checker.comment_ranges();
 
-    if is_falsy {
-        let diagnostic = Diagnostic::new(FalsyDictGetFallback, fallback_arg.range());
+    let Some(full_fallback_arg) = arguments.find_keyword("default") else {
+        // Fallback not specified as a keyword.
 
-        if let Some(arg) = arguments.args.get(1) {
-            if let Some(prev_arg) = arguments.args.first() {
-                // Start from the end of the first argument (which is the key)
-                let start = prev_arg.range().end();
-                // End at the end of the fallback argument
-                let end = arg.range().end();
-                // Create an edit that deletes from the comma to the end of the fallback
-                let edit = Edit::deletion(start, end);
-
-                // Determine applicability based on the presence of comments
-                let comment_ranges = checker.comment_ranges();
-                let applicability = if comment_ranges.intersects(TextRange::new(start, end)) {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                };
-
-                // Create an automatic fix with the deletion edit and appropriate applicability
-                let fix = ruff_diagnostics::Fix::applicable_edit(edit, applicability);
-
-                // Attach the fix to the diagnostic and add it to the checker's diagnostics
-                checker.diagnostics.push(diagnostic.with_fix(fix));
-                return;
-            }
-        }
-
-        // If unable to determine the arguments correctly, push the diagnostic without a fix
+        // Determine applicability based on the presence of comments
+        let applicability = if comment_ranges.intersects(TextRange::new(
+            key_arg.range().end(),
+            fallback_arg.range().end(),
+        )) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+        diagnostic.try_set_fix(|| {
+            remove_argument(
+                fallback_arg,
+                arguments,
+                Parentheses::Preserve,
+                checker.locator().contents(),
+            )
+            .map(|edit| Fix::applicable_edit(edit, applicability))
+        });
         checker.diagnostics.push(diagnostic);
-    }
-}
+        return;
+    };
+    // Fallback is specified as a keyword.
+    // Get range for the fallback argument (else clause handling case where args are supplied out of positional order)
+    let (range_start, range_end) = if key_arg.range().end() <= full_fallback_arg.range().end() {
+        (key_arg.range().end(), full_fallback_arg.range().end())
+    } else {
+        (full_fallback_arg.range().start(), key_arg.range().start())
+    };
 
-/// Determines if the given expression is a falsy fallback value.
-///
-/// A falsy fallback is one of the following:
-/// 1. `False`
-/// 2. `""`
-/// 3. `[]` or `list()`
-/// 4. `{}` or `dict()`
-/// 5. `set()`
-/// 6. `0`
-/// 7. `0.0`
-/// 8. `None`
-fn is_falsy_fallback(expr: &Expr) -> bool {
-    match expr {
-        // Handle boolean literals: False is falsy, True is truthy
-        Expr::BooleanLiteral(ExprBooleanLiteral { value, .. }) => !*value,
+    // Determine applicability based on the presence of comments
+    let applicability = if comment_ranges.intersects(TextRange::new(range_start, range_end)) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
 
-        // Handle string literals: Empty string is falsy
-        Expr::StringLiteral(ExprStringLiteral { value, .. }) => value.is_empty(),
-        // Handle list literals: Empty list is falsy
-        Expr::List(ExprList { elts, .. }) => elts.is_empty(),
+    diagnostic.try_set_fix(|| {
+        remove_argument(
+            full_fallback_arg,
+            arguments,
+            Parentheses::Preserve,
+            checker.locator().contents(),
+        )
+        .map(|edit| Fix::applicable_edit(edit, applicability))
+    });
 
-        // Handle dict literals: Empty dict is falsy
-        Expr::Dict(ExprDict { items, .. }) => items.is_empty(),
-
-        // Handle set literals: Empty set is falsy
-        Expr::Set(ExprSet { elts, .. }) => elts.is_empty(),
-
-        // Handle integer or float literals: Zero is falsy
-        Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => {
-            *value == Number::Int(Int::ZERO) || *value == Number::Float(0.0)
-        }
-
-        // Handle None literal: None is falsy
-        Expr::NoneLiteral(ExprNoneLiteral { .. }) => true,
-
-        // Handle function calls like list(), dict(), set() with no arguments
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
-            if let Expr::Name(ExprName { id, .. }) = &**func {
-                matches!(id.as_str(), "list" | "dict" | "set") && arguments.args.is_empty()
-            } else {
-                false
-            }
-        }
-
-        // All other expressions are considered truthy
-        _ => false,
-    }
+    checker.diagnostics.push(diagnostic);
 }
 
 fn is_known_to_be_of_type_dict(semantic: &SemanticModel, expr: &ExprName) -> bool {
