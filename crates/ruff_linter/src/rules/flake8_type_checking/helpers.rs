@@ -111,7 +111,7 @@ fn runtime_required_decorators(
                 }
                 analyze::typing::resolve_assignment(source, semantic).map(|head| {
                     let mut qualified_name = head;
-                    for member in tail {
+                    for member in tail.iter().rev() {
                         // extend the full name with the attributes we accessed
                         // i.e. for `app.get` when `app` resolves to `fastapi.FastApi`
                         // then we want to get back `fastapi.FastApi.get`.

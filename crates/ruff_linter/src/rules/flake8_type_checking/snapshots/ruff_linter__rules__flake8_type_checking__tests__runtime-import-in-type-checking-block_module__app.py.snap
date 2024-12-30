@@ -20,7 +20,7 @@ app.py:9:12: TC004 [*] Move import `datetime` out of type-checking block. Import
 9     |-    import datetime  # TC004
 10 10 |     from array import array  # TC004
 11 11 | 
-12 12 | app1 = fastapi.FastAPI("First application")
+12 12 | app = fastapi.FastAPI("First application")
 
 app.py:10:23: TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
    |
@@ -29,7 +29,7 @@ app.py:10:23: TC004 [*] Move import `array.array` out of type-checking block. Im
 10 |     from array import array  # TC004
    |                       ^^^^^ TC004
 11 | 
-12 | app1 = fastapi.FastAPI("First application")
+12 | app = fastapi.FastAPI("First application")
    |
    = help: Move out of type-checking block
 
@@ -43,5 +43,5 @@ app.py:10:23: TC004 [*] Move import `array.array` out of type-checking block. Im
 9  10 |     import datetime  # TC004
 10    |-    from array import array  # TC004
 11 11 | 
-12 12 | app1 = fastapi.FastAPI("First application")
-13 13 | app2 = Api("Second application")
+12 12 | app = fastapi.FastAPI("First application")
+13 13 |

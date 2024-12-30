@@ -9,13 +9,17 @@ if TYPE_CHECKING:
     import datetime  # TC004
     from array import array  # TC004
 
-app1 = fastapi.FastAPI("First application")
-app2 = Api("Second application")
+app = fastapi.FastAPI("First application")
 
-@app1.put("/datetime")
+class AppContainer:
+    app = Api("Second application")
+
+app_container = AppContainer()
+
+@app.put("/datetime")
 def set_datetime(value: datetime.datetime):
     pass
 
-@app2.get("/array")
+@app_container.app.get("/array")
 def get_array() -> array:
     pass

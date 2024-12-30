@@ -270,10 +270,12 @@ mod tests {
                     runtime_required_decorators: vec![
                         "fastapi.FastAPI.get".to_string(),
                         "fastapi.FastAPI.put".to_string(),
-                        "module.app.app1.get".to_string(),
-                        "module.app.app1.put".to_string(),
-                        "module.app.app2.get".to_string(),
-                        "module.app.app2.put".to_string(),
+                        "module.app.AppContainer.app.get".to_string(),
+                        "module.app.AppContainer.app.put".to_string(),
+                        "module.app.app.get".to_string(),
+                        "module.app.app.put".to_string(),
+                        "module.app.app_container.app.get".to_string(),
+                        "module.app.app_container.app.put".to_string(),
                     ],
                     ..Default::default()
                 },

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import pathlib  # OK
+from datetime import date  # OK
 
-from module.app import app1, app2
+from module.app import app, app_container
 
-@app1.get("/path")
+@app.get("/path")
 def get_path() -> pathlib.Path:
     pass
 
-@app2.put("/pure_path")
-def set_pure_path(df: pathlib.PurePath):
+@app_container.app.put("/date")
+def set_date(d: date):
     pass
