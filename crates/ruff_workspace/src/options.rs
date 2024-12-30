@@ -3494,15 +3494,15 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub detect_string_imports: Option<bool>,
-    /// A map from file path to the list of file paths or globs that should be considered
-    /// dependencies of that file, regardless of whether relevant imports are detected.
+    /// A map from file path to the list of Python or non-Python file paths or globs that should be
+    /// considered dependencies of that file, regardless of whether relevant imports are detected.
     #[option(
         default = "{}",
+        scope = "include-dependencies",
         value_type = "dict[str, list[str]]",
         example = r#"
-            include-dependencies = {
-                "foo/bar.py": ["foo/baz/*.py"],
-            }
+            "foo/bar.py" = ["foo/baz/*.py"]
+            "foo/baz/reader.py" = ["configs/bar.json"]
         "#
     )]
     pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
