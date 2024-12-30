@@ -1932,7 +1932,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Handle various singletons.
         if let Type::Instance(instance) = annotation_ty {
-            if instance.class(self.db()).is_known(self.db(), KnownClass::SpecialForm) {
+            if instance
+                .class(self.db())
+                .is_known(self.db(), KnownClass::SpecialForm)
+            {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
                         self.db(),
@@ -1985,8 +1988,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
             }
             Type::Instance(instance) => {
-                if let Symbol::Type(class_member, boundness) =
-                    instance.class(self.db()).class_member(self.db(), op.in_place_dunder())
+                if let Symbol::Type(class_member, boundness) = instance
+                    .class(self.db())
+                    .class_member(self.db(), op.in_place_dunder())
                 {
                     let call = class_member.call(self.db(), &[target_type, value_type]);
                     let augmented_return_ty = match call
@@ -3500,9 +3504,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::Instance(left), Type::Instance(right), op) => {
                 if left != right && right.is_subtype_of(self.db(), left) {
                     let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right.class(self.db()).class_member(self.db(), reflected_dunder);
+                    let rhs_reflected = right
+                        .class(self.db())
+                        .class_member(self.db(), reflected_dunder);
                     if !rhs_reflected.is_unbound()
-                        && rhs_reflected != left.class(self.db()).class_member(self.db(), reflected_dunder)
+                        && rhs_reflected
+                            != left
+                                .class(self.db())
+                                .class_member(self.db(), reflected_dunder)
                     {
                         return right_ty
                             .call_dunder(self.db(), reflected_dunder, &[right_ty, left_ty])
@@ -3529,8 +3538,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if left == right {
                         None
                     } else {
-                        if let Symbol::Type(class_member, _) =
-                            right.class(self.db()).class_member(self.db(), op.reflected_dunder())
+                        if let Symbol::Type(class_member, _) = right
+                            .class(self.db())
+                            .class_member(self.db(), op.reflected_dunder())
                         {
                             class_member
                                 .call(self.db(), &[right_ty, left_ty])
@@ -3970,12 +3980,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 KnownClass::Bytes.to_instance(self.db()),
             ),
             (Type::Tuple(_), Type::Instance(instance))
-                if instance.class(self.db()).is_known(self.db(), KnownClass::VersionInfo) =>
+                if instance
+                    .class(self.db())
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(left, op, Type::version_info_tuple(self.db()))
             }
             (Type::Instance(instance), Type::Tuple(_))
-                if instance.class(self.db()).is_known(self.db(), KnownClass::VersionInfo) =>
+                if instance
+                    .class(self.db())
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(Type::version_info_tuple(self.db()), op, right)
             }
@@ -4189,12 +4203,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             (
                 Type::Instance(instance),
                 Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
-            ) if instance.class(self.db()).is_known(self.db(), KnownClass::VersionInfo) => self
-                .infer_subscript_expression_types(
+            ) if instance
+                .class(self.db())
+                .is_known(self.db(), KnownClass::VersionInfo) =>
+            {
+                self.infer_subscript_expression_types(
                     value_node,
                     Type::version_info_tuple(self.db()),
                     slice_ty,
-                ),
+                )
+            }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
@@ -4440,7 +4458,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::Instance(instance))
-                if instance.class(self.db()).is_known(self.db(), KnownClass::NoneType) =>
+                if instance
+                    .class(self.db())
+                    .is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
             }

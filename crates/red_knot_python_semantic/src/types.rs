@@ -1019,11 +1019,7 @@ impl<'db> Type<'db> {
         // TODO: The following is a workaround that is required to unify the two different versions
         // of `NoneType` and `NoDefaultType` in typeshed. This should not be required anymore once
         // we understand `sys.version_info` branches.
-        if let (
-            Type::Instance(instance),
-            Type::Instance(target_instance),
-        ) = (self, other)
-        {
+        if let (Type::Instance(instance), Type::Instance(target_instance)) = (self, other) {
             let self_known = instance.class(db).known(db);
             if matches!(
                 self_known,
@@ -1232,20 +1228,17 @@ impl<'db> Type<'db> {
                 left.is_disjoint_from(db, right.instance_fallback(db))
             }
 
-            (
-                Type::Instance(instance_none),
-                Type::Instance(instance_other),
-            )
-            | (
-                Type::Instance(instance_other),
-                Type::Instance(instance_none),
-            ) if instance_none.class(db).is_known(db, KnownClass::NoneType) => !matches!(
-                instance_other.class(db).known(db),
-                Some(KnownClass::NoneType | KnownClass::Object)
-            ),
+            (Type::Instance(instance_none), Type::Instance(instance_other))
+            | (Type::Instance(instance_other), Type::Instance(instance_none))
+                if instance_none.class(db).is_known(db, KnownClass::NoneType) =>
+            {
+                !matches!(
+                    instance_other.class(db).known(db),
+                    Some(KnownClass::NoneType | KnownClass::Object)
+                )
+            }
 
-            (Type::Instance(instance_none), _)
-            | (_, Type::Instance(instance_none))
+            (Type::Instance(instance_none), _) | (_, Type::Instance(instance_none))
                 if instance_none.class(db).is_known(db, KnownClass::NoneType) =>
             {
                 true
@@ -1268,15 +1261,17 @@ impl<'db> Type<'db> {
             (Type::StringLiteral(..), Type::LiteralString)
             | (Type::LiteralString, Type::StringLiteral(..)) => false,
             (Type::StringLiteral(..), Type::Instance(instance))
-            | (Type::Instance(instance), Type::StringLiteral(..)) => {
-                !matches!(instance.class(db).known(db), Some(KnownClass::Str | KnownClass::Object))
-            }
+            | (Type::Instance(instance), Type::StringLiteral(..)) => !matches!(
+                instance.class(db).known(db),
+                Some(KnownClass::Str | KnownClass::Object)
+            ),
 
             (Type::LiteralString, Type::LiteralString) => false,
             (Type::LiteralString, Type::Instance(instance))
-            | (Type::Instance(instance), Type::LiteralString) => {
-                !matches!(instance.class(db).known(db), Some(KnownClass::Str | KnownClass::Object))
-            }
+            | (Type::Instance(instance), Type::LiteralString) => !matches!(
+                instance.class(db).known(db),
+                Some(KnownClass::Str | KnownClass::Object)
+            ),
             (Type::LiteralString, _) | (_, Type::LiteralString) => true,
 
             (Type::BytesLiteral(..), Type::Instance(instance))
@@ -1436,9 +1431,10 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
-            Type::Instance(instance) => {
-                instance.class(db).known(db).is_some_and(KnownClass::is_singleton)
-            }
+            Type::Instance(instance) => instance
+                .class(db)
+                .known(db)
+                .is_some_and(KnownClass::is_singleton),
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
                 // implementations such as GraalPy. Its *use* as a singleton is discouraged and
