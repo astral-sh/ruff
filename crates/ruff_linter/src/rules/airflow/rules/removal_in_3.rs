@@ -11,77 +11,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix: &str) -> bool {
-    match segments {
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == module), rest.last())
-            {
-                pos + 1 < rest.len() && last_element.ends_with(symbol_suffix)
-            } else {
-                false
-            }
-        }
-
-        ["airflow", rest @ ..] => {
-            if let (Some(start_element), Some(last_element)) = (rest.first(), rest.last()) {
-                start_element.starts_with(module) & last_element.ends_with(symbol_suffix)
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    }
-}
-
-fn is_airflow_secret_backend(segments: &[&str]) -> bool {
-    is_airflow_builtin_or_provider(segments, "secrets", "Backend")
-}
-
-fn is_airflow_hook(segments: &[&str]) -> bool {
-    is_airflow_builtin_or_provider(segments, "hooks", "Hook")
-}
-
-fn is_airflow_operator(segments: &[&str]) -> bool {
-    is_airflow_builtin_or_provider(segments, "operators", "Operator")
-}
-
-fn is_airflow_task_handler(segments: &[&str]) -> bool {
-    is_airflow_builtin_or_provider(segments, "log", "TaskHandler")
-}
-
-fn is_airflow_auth_manager(segments: &[&str]) -> bool {
-    match segments {
-        ["airflow", "auth", "manager", rest @ ..] => {
-            if let Some(last_element) = rest.last() {
-                last_element.ends_with("AuthManager")
-            } else {
-                false
-            }
-        }
-
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == "auth_manager"), rest.last())
-            {
-                pos + 1 < rest.len() && last_element.ends_with("AuthManager")
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-enum Replacement {
-    None,
-    Name(&'static str),
-    Message(&'static str),
-}
-
 /// ## What it does
 /// Checks for uses of deprecated Airflow functions and values.
 ///
@@ -141,36 +70,51 @@ impl Violation for Airflow3Removal {
     }
 }
 
-fn diagnostic_for_argument(
-    arguments: &Arguments,
-    deprecated: &str,
-    replacement: Option<&'static str>,
-) -> Option<Diagnostic> {
-    let keyword = arguments.find_keyword(deprecated)?;
-    let mut diagnostic = Diagnostic::new(
-        Airflow3Removal {
-            deprecated: (*deprecated).to_string(),
-            replacement: match replacement {
-                Some(name) => Replacement::Name(name),
-                None => Replacement::None,
-            },
-        },
-        keyword
-            .arg
-            .as_ref()
-            .map_or_else(|| keyword.range(), Ranged::range),
-    );
-
-    if let Some(replacement) = replacement {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement.to_string(),
-            diagnostic.range,
-        )));
+/// AIR302
+pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return;
     }
 
-    Some(diagnostic)
+    match expr {
+        Expr::Call(ExprCall {
+            func, arguments, ..
+        }) => {
+            if let Some(qualname) = checker.semantic().resolve_qualified_name(func) {
+                removed_argument(checker, &qualname, arguments);
+            };
+
+            removed_method(checker, expr);
+        }
+        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => {
+            removed_name(checker, expr, ranged);
+            removed_class_attribute(checker, expr);
+        }
+        ranged @ Expr::Name(ExprName { id, ctx, .. }) => {
+            removed_name(checker, expr, ranged);
+            if ctx == &ExprContext::Store {
+                if let ScopeKind::Class(class_def) = &checker.semantic().current_scope().kind {
+                    removed_airflow_plugin_extension(checker, expr, id, class_def);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum Replacement {
+    None,
+    Name(&'static str),
+    Message(&'static str),
+}
+
+// Check whether a removed Airflow argument is passed.
+//
+// Example:
+//
+// from airflow import DAG
+// DAG(schedule_interval="@daily")
 fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {
     #[allow(clippy::single_match)]
     match qualname.segments() {
@@ -256,6 +200,13 @@ fn removed_argument(checker: &mut Checker, qualname: &QualifiedName, arguments: 
     };
 }
 
+// Check whether a removed Airflow class attribute (include property) is called.
+//
+// Example:
+//
+// from airflow.linesage.hook import DatasetLineageInfo
+// info = DatasetLineageInfo()
+// info.dataset
 fn removed_class_attribute(checker: &mut Checker, expr: &Expr) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = expr else {
         return;
@@ -291,6 +242,14 @@ fn removed_class_attribute(checker: &mut Checker, expr: &Expr) {
     }
 }
 
+// Check whether a removed Airflow class method is called.
+//
+// Example:
+//
+// from airflow.datasets.manager import DatasetManager
+//
+// manager = DatasetManager()
+// manger.register_datsaet_change()
 fn removed_method(checker: &mut Checker, expr: &Expr) {
     let Expr::Call(ExprCall { func, .. }) = expr else {
         return;
@@ -365,6 +324,11 @@ fn removed_method(checker: &mut Checker, expr: &Expr) {
     }
 }
 
+// Check whether a removed Airflow name is used.
+//
+// Example:
+//
+// from airflow.operators.subdag import SubDagOperator
 fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
     let result =
         checker
@@ -850,6 +814,12 @@ fn removed_name(checker: &mut Checker, expr: &Expr, ranged: impl Ranged) {
     }
 }
 
+// Check whether a customized Airflow plugin contains removed extensions.
+//
+// Example:
+//
+// class CustomizePlugin(AirflowPlugin)
+//     executors = "some.third.party.executor"
 fn removed_airflow_plugin_extension(
     checker: &mut Checker,
     expr: &Expr,
@@ -881,34 +851,120 @@ fn removed_airflow_plugin_extension(
     }
 }
 
-/// AIR302
-pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
-    if !checker.semantic().seen_module(Modules::AIRFLOW) {
-        return;
+fn diagnostic_for_argument(
+    arguments: &Arguments,
+    deprecated: &str,
+    replacement: Option<&'static str>,
+) -> Option<Diagnostic> {
+    let keyword = arguments.find_keyword(deprecated)?;
+    let mut diagnostic = Diagnostic::new(
+        Airflow3Removal {
+            deprecated: (*deprecated).to_string(),
+            replacement: match replacement {
+                Some(name) => Replacement::Name(name),
+                None => Replacement::None,
+            },
+        },
+        keyword
+            .arg
+            .as_ref()
+            .map_or_else(|| keyword.range(), Ranged::range),
+    );
+
+    if let Some(replacement) = replacement {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            replacement.to_string(),
+            diagnostic.range,
+        )));
     }
 
-    match expr {
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
-            if let Some(qualname) = checker.semantic().resolve_qualified_name(func) {
-                removed_argument(checker, &qualname, arguments);
-            };
+    Some(diagnostic)
+}
 
-            removed_method(checker, expr);
-        }
-        Expr::Attribute(ExprAttribute { attr: ranged, .. }) => {
-            removed_name(checker, expr, ranged);
-            removed_class_attribute(checker, expr);
-        }
-        ranged @ Expr::Name(ExprName { id, ctx, .. }) => {
-            removed_name(checker, expr, ranged);
-            if ctx == &ExprContext::Store {
-                if let ScopeKind::Class(class_def) = &checker.semantic().current_scope().kind {
-                    removed_airflow_plugin_extension(checker, expr, id, class_def);
-                }
+/// Check whether the segments corresponding to the fully qualified name points to a symbol that's
+/// either a builtin or coming from one of the providers in Airflow.
+///
+/// The pattern it looks for are:
+/// - `airflow.providers.**.<module>.**.*<symbol_suffix>` for providers
+/// - `airflow.<module>.**.*<symbol_suffix>` for builtins
+///
+/// where `**` is one or more segments separated by a dot, and `*` is one or more characters.
+///
+/// Examples for the above patterns:
+/// - `airflow.providers.google.cloud.secrets.secret_manager.CloudSecretManagerBackend` (provider)
+/// - `airflow.secrets.base_secrets.BaseSecretsBackend` (builtin)
+fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix: &str) -> bool {
+    match segments {
+        ["airflow", "providers", rest @ ..] => {
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == module), rest.last())
+            {
+                // Check that the module is not the last element i.e., there's a symbol that's
+                // being used from the `module` that ends with `symbol_suffix`.
+                pos + 1 < rest.len() && last_element.ends_with(symbol_suffix)
+            } else {
+                false
             }
         }
-        _ => {}
+
+        ["airflow", first, rest @ ..] => {
+            if let Some(last) = rest.last() {
+                *first == module && last.ends_with(symbol_suffix)
+            } else {
+                false
+            }
+        }
+
+        _ => false,
+    }
+}
+
+/// Check whether the symbol is coming from the `secrets` builtin or provider module which ends
+/// with `Backend`.
+fn is_airflow_secret_backend(segments: &[&str]) -> bool {
+    is_airflow_builtin_or_provider(segments, "secrets", "Backend")
+}
+
+/// Check whether the symbol is coming from the `hooks` builtin or provider module which ends
+/// with `Hook`.
+fn is_airflow_hook(segments: &[&str]) -> bool {
+    is_airflow_builtin_or_provider(segments, "hooks", "Hook")
+}
+
+/// Check whether the symbol is coming from the `operators` builtin or provider module which ends
+/// with `Operator`.
+fn is_airflow_operator(segments: &[&str]) -> bool {
+    is_airflow_builtin_or_provider(segments, "operators", "Operator")
+}
+
+/// Check whether the symbol is coming from the `log` builtin or provider module which ends
+/// with `TaskHandler`.
+fn is_airflow_task_handler(segments: &[&str]) -> bool {
+    is_airflow_builtin_or_provider(segments, "log", "TaskHandler")
+}
+
+/// Check whether the symbol is coming from the `auth.manager` builtin or provider `auth_manager` module which ends
+/// with `AuthManager`.
+fn is_airflow_auth_manager(segments: &[&str]) -> bool {
+    match segments {
+        ["airflow", "auth", "manager", rest @ ..] => {
+            if let Some(last_element) = rest.last() {
+                last_element.ends_with("AuthManager")
+            } else {
+                false
+            }
+        }
+
+        ["airflow", "providers", rest @ ..] => {
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == "auth_manager"), rest.last())
+            {
+                pos + 1 < rest.len() && last_element.ends_with("AuthManager")
+            } else {
+                false
+            }
+        }
+
+        _ => false,
     }
 }
