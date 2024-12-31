@@ -161,7 +161,7 @@ pub(super) fn rounded_and_ndigits<'a>(
         Some(Expr::Name(name)) => {
             let semantic = checker.semantic();
 
-            match semantic.only_binding(&name).map(|id| semantic.binding(id)) {
+            match semantic.only_binding(name).map(|id| semantic.binding(id)) {
                 Some(binding) if typing::is_int(binding, semantic) => {
                     NdigitsValue::Int(InferredType::AssignableTo)
                 }
