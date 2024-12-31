@@ -35,12 +35,7 @@ impl<'db> Unpacker<'db> {
         self.context.db()
     }
 
-    pub(crate) fn unpack(
-        &mut self,
-        target: &ast::Expr,
-        value: UnpackValue<'db>,
-        is_assignment_stmt: bool,
-    ) {
+    pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
 
@@ -52,7 +47,7 @@ impl<'db> Unpacker<'db> {
             .expression()
             .node_ref(self.db())
             .is_ellipsis_literal_expr();
-        if is_assignment_stmt && is_in_stub_file && value_is_ellipsis_literal {
+        if matches!(value, UnpackValue::Assign(_)) && is_in_stub_file && value_is_ellipsis_literal {
             value_ty = Type::Unknown;
         } else {
             debug_assert!(

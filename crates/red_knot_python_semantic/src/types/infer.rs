@@ -195,18 +195,14 @@ pub(crate) fn infer_expression_types<'db>(
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
 #[salsa::tracked(return_ref)]
-fn infer_unpack_types<'db>(
-    db: &'db dyn Db,
-    unpack: Unpack<'db>,
-    is_assignment_stmt: bool,
-) -> UnpackResult<'db> {
+fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
         tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
             .entered();
 
     let mut unpacker = Unpacker::new(db, unpack.scope(db));
-    unpacker.unpack(unpack.target(db), unpack.value(db), is_assignment_stmt);
+    unpacker.unpack(unpack.target(db), unpack.value(db));
     unpacker.finish()
 }
 
@@ -1901,7 +1897,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut target_ty = match assignment.target() {
             TargetKind::Sequence(unpack) => {
-                let unpacked = infer_unpack_types(self.db(), unpack, true);
+                let unpacked = infer_unpack_types(self.db(), unpack);
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
                 // unpack assignments.
                 if assignment.is_first() {
@@ -2167,7 +2163,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             match for_stmt.target() {
                 TargetKind::Sequence(unpack) => {
-                    let unpacked = infer_unpack_types(self.db(), unpack, false);
+                    let unpacked = infer_unpack_types(self.db(), unpack);
                     if for_stmt.is_first() {
                         self.context.extend(unpacked);
                     }
