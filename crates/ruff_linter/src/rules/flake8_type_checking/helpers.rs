@@ -11,6 +11,7 @@ use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
 use ruff_text_size::{Ranged, TextRange};
+use smallvec::{smallvec, SmallVec};
 
 use crate::rules::flake8_type_checking::settings::Settings;
 use crate::Locator;
@@ -104,7 +105,7 @@ fn runtime_required_decorators(
             // if we can't resolve the name, then try resolving the assignment
             .or_else(|| {
                 let mut source = expression;
-                let mut reversed_tail = vec![];
+                let mut reversed_tail: SmallVec<[_; 4]> = smallvec![];
                 while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = source {
                     source = value;
                     reversed_tail.push(attr.as_str());
