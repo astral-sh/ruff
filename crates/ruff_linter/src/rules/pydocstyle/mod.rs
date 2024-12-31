@@ -170,8 +170,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
-                // With explicit Google convention, we should flag every function.
-                pydocstyle: Settings::new(Some(Convention::Google), [], [], false),
+                pydocstyle: Settings::new(Some(Convention::Google), [], [], true),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
