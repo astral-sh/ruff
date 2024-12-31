@@ -177,7 +177,7 @@ pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            if let Some(exception) = call.arguments.find_argument("expected_exception", 0) {
+            if let Some(exception) = call.arguments.find_argument_value("expected_exception", 0) {
                 if call
                     .arguments
                     .find_keyword("match")

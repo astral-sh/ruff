@@ -148,7 +148,7 @@ pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::Exp
 }
 
 fn is_p_wait(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
-    let Some(arg) = call.arguments.find_argument("mode", 0) else {
+    let Some(arg) = call.arguments.find_argument_value("mode", 0) else {
         return true;
     };
 

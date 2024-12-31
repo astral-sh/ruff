@@ -115,7 +115,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                 // ```
                 if call
                     .arguments
-                    .find_argument("closefd", 6)
+                    .find_argument_value("closefd", 6)
                     .is_some_and(|expr| {
                         !matches!(
                             expr,
@@ -124,7 +124,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                     })
                     || call
                         .arguments
-                        .find_argument("opener", 7)
+                        .find_argument_value("opener", 7)
                         .is_some_and(|expr| !expr.is_none_literal_expr())
                     || call
                         .arguments

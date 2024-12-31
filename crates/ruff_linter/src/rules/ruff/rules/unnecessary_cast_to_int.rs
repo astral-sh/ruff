@@ -175,8 +175,8 @@ fn round_applicability(checker: &Checker, arguments: &Arguments) -> Option<Appli
         return None;
     }
 
-    let number = arguments.find_argument("number", 0)?;
-    let ndigits = arguments.find_argument("ndigits", 1);
+    let number = arguments.find_argument_value("number", 0)?;
+    let ndigits = arguments.find_argument_value("ndigits", 1);
 
     let number_kind = match number {
         Expr::Name(name) => {

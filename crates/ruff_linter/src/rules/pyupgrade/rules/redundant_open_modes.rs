@@ -71,7 +71,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     }
 
-    let Some(mode_param) = call.arguments.find_argument("mode", 1) else {
+    let Some(mode_param) = call.arguments.find_argument_value("mode", 1) else {
         return;
     };
     let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param else {

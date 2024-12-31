@@ -60,7 +60,10 @@ pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, call: &ast::ExprCall
         return;
     }
 
-    if call.arguments.find_argument("stacklevel", 2).is_some()
+    if call
+        .arguments
+        .find_argument_value("stacklevel", 2)
+        .is_some()
         || call
             .arguments
             .args

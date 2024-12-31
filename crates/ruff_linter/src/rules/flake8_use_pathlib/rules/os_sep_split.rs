@@ -82,7 +82,7 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let Some(sep) = call.arguments.find_argument("sep", 0) else {
+    let Some(sep) = call.arguments.find_argument_value("sep", 0) else {
         return;
     };
 

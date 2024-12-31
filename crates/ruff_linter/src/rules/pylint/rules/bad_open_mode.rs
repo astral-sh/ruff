@@ -107,7 +107,7 @@ fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
 /// Returns the mode argument, if present.
 fn extract_mode(call: &ast::ExprCall, kind: Kind) -> Option<&Expr> {
     match kind {
-        Kind::Builtin => call.arguments.find_argument("mode", 1),
-        Kind::Pathlib => call.arguments.find_argument("mode", 0),
+        Kind::Builtin => call.arguments.find_argument_value("mode", 1),
+        Kind::Pathlib => call.arguments.find_argument_value("mode", 0),
     }
 }

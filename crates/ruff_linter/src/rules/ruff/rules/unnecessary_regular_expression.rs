@@ -173,14 +173,14 @@ impl<'a> ReFunc<'a> {
             // have already been filtered out from the `pattern`
             ("split", 2) => Some(ReFunc {
                 kind: ReFuncKind::Split,
-                pattern: call.arguments.find_argument("pattern", 0)?,
-                string: call.arguments.find_argument("string", 1)?,
+                pattern: call.arguments.find_argument_value("pattern", 0)?,
+                string: call.arguments.find_argument_value("string", 1)?,
             }),
             // `sub` is only safe to fix if `repl` is a string. `re.sub` also
             // allows it to be a function, which will *not* work in the str
             // version
             ("sub", 3) => {
-                let repl = call.arguments.find_argument("repl", 1)?;
+                let repl = call.arguments.find_argument_value("repl", 1)?;
                 let lit = resolve_string_literal(repl, semantic)?;
                 let mut fixable = true;
                 for (c, next) in lit.value.chars().tuple_windows() {
@@ -207,24 +207,24 @@ impl<'a> ReFunc<'a> {
                     kind: ReFuncKind::Sub {
                         repl: fixable.then_some(repl),
                     },
-                    pattern: call.arguments.find_argument("pattern", 0)?,
-                    string: call.arguments.find_argument("string", 2)?,
+                    pattern: call.arguments.find_argument_value("pattern", 0)?,
+                    string: call.arguments.find_argument_value("string", 2)?,
                 })
             }
             ("match", 2) if in_if_context => Some(ReFunc {
                 kind: ReFuncKind::Match,
-                pattern: call.arguments.find_argument("pattern", 0)?,
-                string: call.arguments.find_argument("string", 1)?,
+                pattern: call.arguments.find_argument_value("pattern", 0)?,
+                string: call.arguments.find_argument_value("string", 1)?,
             }),
             ("search", 2) if in_if_context => Some(ReFunc {
                 kind: ReFuncKind::Search,
-                pattern: call.arguments.find_argument("pattern", 0)?,
-                string: call.arguments.find_argument("string", 1)?,
+                pattern: call.arguments.find_argument_value("pattern", 0)?,
+                string: call.arguments.find_argument_value("string", 1)?,
             }),
             ("fullmatch", 2) if in_if_context => Some(ReFunc {
                 kind: ReFuncKind::Fullmatch,
-                pattern: call.arguments.find_argument("pattern", 0)?,
-                string: call.arguments.find_argument("string", 1)?,
+                pattern: call.arguments.find_argument_value("pattern", 0)?,
+                string: call.arguments.find_argument_value("string", 1)?,
             }),
             _ => None,
         }

@@ -128,7 +128,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
 
 /// Returns `true` if the `start` argument to a `sum()` call is an empty list.
 fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool {
-    let Some(start_arg) = arguments.find_argument("start", 1) else {
+    let Some(start_arg) = arguments.find_argument_value("start", 1) else {
         return false;
     };
 
