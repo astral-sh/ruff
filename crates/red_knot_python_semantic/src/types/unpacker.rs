@@ -47,7 +47,7 @@ impl<'db> Unpacker<'db> {
             .expression()
             .node_ref(self.db())
             .is_ellipsis_literal_expr();
-        if matches!(value, UnpackValue::Assign(_)) && is_in_stub_file && value_is_ellipsis_literal {
+        if value.is_assign() && is_in_stub_file && value_is_ellipsis_literal {
             value_ty = Type::Unknown;
         } else {
             debug_assert!(
