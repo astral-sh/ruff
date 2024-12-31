@@ -11,8 +11,8 @@ round(42, 3 + 4)                                  # Error (safe)
 round(42, foo)                                    # No error
 
 
-round(42.)                                        # Error (safe)
-round(42., None)                                  # Error (safe)
+round(42.)                                        # No error
+round(42., None)                                  # No error
 round(42., 2)                                     # No error
 round(42., inferred_int)                          # No error
 round(42., 3 + 4)                                 # No error
@@ -27,8 +27,8 @@ round(4 + 2, 3 + 4)                               # Error (safe)
 round(4 + 2, foo)                                 # No error
 
 
-round(4. + 2.)                                    # Error (safe)
-round(4. + 2., None)                              # Error (safe)
+round(4. + 2.)                                    # No error
+round(4. + 2., None)                              # No error
 round(4. + 2., 2)                                 # No error
 round(4. + 2., inferred_int)                      # No error
 round(4. + 2., 3 + 4)                             # No error
@@ -43,8 +43,8 @@ round(inferred_int, 3 + 4)                        # Error (unsafe)
 round(inferred_int, foo)                          # No error
 
 
-round(inferred_float)                             # Error (unsafe)
-round(inferred_float, None)                       # Error (unsafe)
+round(inferred_float)                             # No error
+round(inferred_float, None)                       # No error
 round(inferred_float, 2)                          # No error
 round(inferred_float, inferred_int)               # No error
 round(inferred_float, 3 + 4)                      # No error

@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 ///
 /// ## Why is this bad?
 /// Rounding a value that's already an integer is unnecessary.
-/// It's more clear to use the value directly.
+/// It's clearer to use the value directly.
 ///
 /// ## Example
 ///
@@ -46,29 +46,38 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let Some((rounded, rounded_kind, ndigits_kind)) = rounded_and_ndigits(checker, arguments)
+    let Some((rounded, rounded_value, ndigits_value)) = rounded_and_ndigits(checker, arguments)
     else {
         return;
     };
 
-    if matches!(ndigits_kind, NdigitsKind::Other) {
+    if matches!(ndigits_value, NdigitsValue::Other) {
         return;
     }
 
-    let applicability = match (rounded_kind, ndigits_kind) {
-        (RoundedKind::Int(InferredType::Equivalent), _) => Applicability::Safe,
+    let applicability = match rounded_value {
+        // ```python
+        // some_int: int
+        //
+        // rounded(1)
+        // rounded(1, None)
+        // rounded(1, 42)
+        // rounded(1, 4 + 2)
+        // rounded(1, some_int)
+        // ```
+        RoundedValue::Int(InferredType::Equivalent) => Applicability::Safe,
 
-        (
-            RoundedKind::Float(InferredType::Equivalent),
-            NdigitsKind::NotGiven | NdigitsKind::LiteralNone,
-        ) => Applicability::Safe,
-
-        (RoundedKind::Int(InferredType::AssignableTo), _) => Applicability::Unsafe,
-
-        (
-            RoundedKind::Float(InferredType::AssignableTo),
-            NdigitsKind::NotGiven | NdigitsKind::LiteralNone,
-        ) => Applicability::Unsafe,
+        // ```python
+        // some_int: int
+        // some_other_int: int
+        //
+        // rounded(some_int)
+        // rounded(some_int, None)
+        // rounded(some_int, 42)
+        // rounded(some_int, 4 + 2)
+        // rounded(some_int, some_other_int)
+        // ```
+        RoundedValue::Int(InferredType::AssignableTo) => Applicability::Unsafe,
 
         _ => return,
     };
@@ -91,7 +100,7 @@ pub(super) enum InferredType {
 
 /// The type of the first argument to `round()`
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum RoundedKind {
+pub(super) enum RoundedValue {
     Int(InferredType),
     Float(InferredType),
     Other,
@@ -99,10 +108,8 @@ pub(super) enum RoundedKind {
 
 /// The type of the second argument to `round()`
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum NdigitsKind {
-    /// The argument is omitted entirely.
+pub(super) enum NdigitsValue {
     NotGiven,
-    /// The argument is explicitly given as `None`.
     LiteralNone,
     Int(InferredType),
     Other,
@@ -113,13 +120,13 @@ type Rounded = Expr;
 pub(super) fn rounded_and_ndigits<'a>(
     checker: &Checker,
     arguments: &'a Arguments,
-) -> Option<(&'a Rounded, RoundedKind, NdigitsKind)> {
+) -> Option<(&'a Rounded, RoundedValue, NdigitsValue)> {
     if arguments.len() > 2 {
         return None;
     }
 
-    let rounded = arguments.find_argument("number", 0)?.value();
-    let ndigits = arguments.find_argument("ndigits", 1).map(|it| it.value());
+    let rounded = arguments.find_argument_value("number", 0)?;
+    let ndigits = arguments.find_argument_value("ndigits", 1);
 
     let rounded_kind = match rounded {
         Expr::Name(name) => {
@@ -127,46 +134,46 @@ pub(super) fn rounded_and_ndigits<'a>(
 
             match semantic.only_binding(name).map(|id| semantic.binding(id)) {
                 Some(binding) if typing::is_int(binding, semantic) => {
-                    RoundedKind::Int(InferredType::AssignableTo)
+                    RoundedValue::Int(InferredType::AssignableTo)
                 }
                 Some(binding) if typing::is_float(binding, semantic) => {
-                    RoundedKind::Float(InferredType::AssignableTo)
+                    RoundedValue::Float(InferredType::AssignableTo)
                 }
-                _ => RoundedKind::Other,
+                _ => RoundedValue::Other,
             }
         }
 
         _ => match ResolvedPythonType::from(rounded) {
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)) => {
-                RoundedKind::Int(InferredType::Equivalent)
+                RoundedValue::Int(InferredType::Equivalent)
             }
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float)) => {
-                RoundedKind::Float(InferredType::Equivalent)
+                RoundedValue::Float(InferredType::Equivalent)
             }
-            _ => RoundedKind::Other,
+            _ => RoundedValue::Other,
         },
     };
 
     let ndigits_kind = match ndigits {
-        None => NdigitsKind::NotGiven,
-        Some(Expr::NoneLiteral(_)) => NdigitsKind::LiteralNone,
+        None => NdigitsValue::NotGiven,
+        Some(Expr::NoneLiteral(_)) => NdigitsValue::LiteralNone,
 
         Some(Expr::Name(name)) => {
             let semantic = checker.semantic();
 
             match semantic.only_binding(&name).map(|id| semantic.binding(id)) {
                 Some(binding) if typing::is_int(binding, semantic) => {
-                    NdigitsKind::Int(InferredType::AssignableTo)
+                    NdigitsValue::Int(InferredType::AssignableTo)
                 }
-                _ => NdigitsKind::Other,
+                _ => NdigitsValue::Other,
             }
         }
 
         Some(ndigits) => match ResolvedPythonType::from(ndigits) {
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)) => {
-                NdigitsKind::Int(InferredType::Equivalent)
+                NdigitsValue::Int(InferredType::Equivalent)
             }
-            _ => NdigitsKind::Other,
+            _ => NdigitsValue::Other,
         },
     };
 

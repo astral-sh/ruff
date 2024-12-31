@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::unnecessary_round::{
-    rounded_and_ndigits, InferredType, NdigitsKind, RoundedKind,
+    rounded_and_ndigits, InferredType, NdigitsValue, RoundedValue,
 };
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -155,28 +155,28 @@ fn single_argument_to_int_call<'a>(
 ///
 /// The Applicability depends on the `ndigits` and the number argument.
 fn round_applicability(checker: &Checker, arguments: &Arguments) -> Option<Applicability> {
-    let (_rounded, rounded_kind, ndigits_kind) = rounded_and_ndigits(checker, arguments)?;
+    let (_rounded, rounded_value, ndigits_value) = rounded_and_ndigits(checker, arguments)?;
 
-    match (rounded_kind, ndigits_kind) {
+    match (rounded_value, ndigits_value) {
         (
-            RoundedKind::Int(InferredType::Equivalent),
-            NdigitsKind::Int(InferredType::Equivalent),
+            RoundedValue::Int(InferredType::Equivalent),
+            NdigitsValue::Int(InferredType::Equivalent),
         )
         | (
-            RoundedKind::Int(InferredType::Equivalent)
-            | RoundedKind::Float(InferredType::Equivalent),
-            NdigitsKind::NotGiven | NdigitsKind::LiteralNone,
+            RoundedValue::Int(InferredType::Equivalent)
+            | RoundedValue::Float(InferredType::Equivalent),
+            NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
         ) => Some(Applicability::Safe),
 
         (
-            RoundedKind::Int(InferredType::AssignableTo),
-            NdigitsKind::Int(InferredType::Equivalent),
+            RoundedValue::Int(InferredType::AssignableTo),
+            NdigitsValue::Int(InferredType::Equivalent),
         )
         | (
-            RoundedKind::Int(InferredType::AssignableTo)
-            | RoundedKind::Float(InferredType::AssignableTo)
-            | RoundedKind::Other,
-            NdigitsKind::NotGiven | NdigitsKind::LiteralNone,
+            RoundedValue::Int(InferredType::AssignableTo)
+            | RoundedValue::Float(InferredType::AssignableTo)
+            | RoundedValue::Other,
+            NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
         ) => Some(Applicability::Unsafe),
 
         _ => None,
