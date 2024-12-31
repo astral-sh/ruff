@@ -261,7 +261,7 @@ mod tests {
 
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("module/app.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/routes.py"))]
-    fn decorator_same_file_and_glob(rule_code: Rule, path: &Path) -> Result<()> {
+    fn decorator_same_file(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),

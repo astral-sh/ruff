@@ -104,17 +104,17 @@ fn runtime_required_decorators(
             // if we can't resolve the name, then try resolving the assignment
             .or_else(|| {
                 let mut source = expression;
-                let mut tail = vec![];
+                let mut reversed_tail = vec![];
                 while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = source {
                     source = value;
-                    tail.push(attr.as_str());
+                    reversed_tail.push(attr.as_str());
                 }
                 analyze::typing::resolve_assignment(source, semantic).map(|head| {
                     let mut qualified_name = head;
-                    for member in tail.iter().rev() {
+                    for member in reversed_tail.iter().rev() {
                         // extend the full name with the attributes we accessed
-                        // i.e. for `app.get` when `app` resolves to `fastapi.FastApi`
-                        // then we want to get back `fastapi.FastApi.get`.
+                        // e.g. for `app.get` when `app` resolves to `fastapi.FastAPI`
+                        // then we want to return `fastapi.FastAPI.get`.
                         qualified_name = qualified_name.append_member(member);
                     }
                     qualified_name
