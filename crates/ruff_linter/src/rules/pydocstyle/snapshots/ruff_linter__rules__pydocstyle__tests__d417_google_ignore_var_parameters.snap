@@ -58,26 +58,10 @@ D417.py:98:5: D417 Missing argument description in the docstring for `f`: `x`
 99 |     """Do something.
    |
 
-D417.py:108:5: D417 Missing argument description in the docstring for `f`: `*args`
-    |
-108 | def f(x, *args, **kwargs):
-    |     ^ D417
-109 |     """Do something.
-    |
-
 D417.py:155:5: D417 Missing argument description in the docstring for `select_data`: `auto_save`
     |
 155 | def select_data(
     |     ^^^^^^^^^^^ D417
 156 |     query: str,
 157 |     args: tuple,
-    |
-
-D417.py:172:5: D417 Missing argument description in the docstring for `f`: `**kwargs`
-    |
-170 |     """
-171 | 
-172 | def f(x, *args, **kwargs):
-    |     ^ D417
-173 |     """Do something.
     |

@@ -2549,6 +2549,13 @@
             "type": "string"
           }
         },
+        "ignore-var-parameters": {
+          "description": "If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "property-decorators": {
           "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
           "type": [

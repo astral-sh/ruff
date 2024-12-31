@@ -87,25 +87,13 @@ impl fmt::Display for Convention {
 
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
-    convention: Option<Convention>,
-    ignore_decorators: BTreeSet<String>,
-    property_decorators: BTreeSet<String>,
+    pub convention: Option<Convention>,
+    pub ignore_decorators: BTreeSet<String>,
+    pub property_decorators: BTreeSet<String>,
+    pub ignore_var_parameters: bool,
 }
 
 impl Settings {
-    #[must_use]
-    pub fn new(
-        convention: Option<Convention>,
-        ignore_decorators: impl IntoIterator<Item = String>,
-        property_decorators: impl IntoIterator<Item = String>,
-    ) -> Self {
-        Self {
-            convention,
-            ignore_decorators: ignore_decorators.into_iter().collect(),
-            property_decorators: property_decorators.into_iter().collect(),
-        }
-    }
-
     pub fn convention(&self) -> Option<Convention> {
         self.convention
     }
@@ -117,6 +105,10 @@ impl Settings {
     pub fn property_decorators(&self) -> DecoratorIterator {
         DecoratorIterator::new(&self.property_decorators)
     }
+
+    pub fn ignore_var_parameters(&self) -> bool {
+        self.ignore_var_parameters
+    }
 }
 
 impl fmt::Display for Settings {
@@ -127,7 +119,8 @@ impl fmt::Display for Settings {
             fields = [
                 self.convention | optional,
                 self.ignore_decorators | set,
-                self.property_decorators | set
+                self.property_decorators | set,
+                self.ignore_var_parameters
             ]
         }
         Ok(())

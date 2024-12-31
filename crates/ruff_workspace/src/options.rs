@@ -2,7 +2,7 @@ use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
@@ -2836,6 +2836,16 @@ pub struct PydocstyleOptions {
         "#
     )]
     pub property_decorators: Option<Vec<String>>,
+
+    /// If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            ignore_var_parameters = true
+        "#
+    )]
+    pub ignore_var_parameters: Option<bool>,
 }
 
 impl PydocstyleOptions {
@@ -2844,12 +2854,14 @@ impl PydocstyleOptions {
             convention,
             ignore_decorators,
             property_decorators,
+            ignore_var_parameters: ignore_variadics,
         } = self;
-        pydocstyle::settings::Settings::new(
+        pydocstyle::settings::Settings {
             convention,
-            ignore_decorators.unwrap_or_default(),
-            property_decorators.unwrap_or_default(),
-        )
+            ignore_decorators: BTreeSet::from_iter(ignore_decorators.unwrap_or_default()),
+            property_decorators: BTreeSet::from_iter(property_decorators.unwrap_or_default()),
+            ignore_var_parameters: ignore_variadics.unwrap_or_default(),
+        }
     }
 }
 

@@ -12,10 +12,9 @@ mod tests {
 
     use crate::registry::Rule;
 
+    use super::settings::{Convention, Settings};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
-
-    use super::settings::{Convention, Settings};
 
     #[test_case(Rule::MissingBlankLineAfterLastSection, Path::new("sections.py"))]
     #[test_case(Rule::NoBlankLineAfterSection, Path::new("sections.py"))]
@@ -100,11 +99,13 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle").join(path).as_path(),
             &settings::LinterSettings {
-                pydocstyle: Settings::new(
-                    None,
-                    ["functools.wraps".to_string()],
-                    ["gi.repository.GObject.Property".to_string()],
-                ),
+                pydocstyle: Settings {
+                    ignore_decorators: ["functools.wraps".to_string()].into_iter().collect(),
+                    property_decorators: ["gi.repository.GObject.Property".to_string()]
+                        .into_iter()
+                        .collect(),
+                    ..Settings::default()
+                },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -138,12 +139,45 @@ mod tests {
     }
 
     #[test]
+    fn d417_unspecified_ignore_var_parameters() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D417.py"),
+            &settings::LinterSettings {
+                pydocstyle: Settings::default(),
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn d417_google() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 // With explicit Google convention, we should flag every function.
-                pydocstyle: Settings::new(Some(Convention::Google), [], []),
+                pydocstyle: Settings {
+                    convention: Some(Convention::Google),
+                    ..Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_google_ignore_var_parameters() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D417.py"),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    convention: Some(Convention::Google),
+                    ignore_var_parameters: true,
+                    ..Settings::default()
+                },
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -157,7 +191,10 @@ mod tests {
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 // With explicit numpy convention, we shouldn't flag anything.
-                pydocstyle: Settings::new(Some(Convention::Numpy), [], []),
+                pydocstyle: Settings {
+                    convention: Some(Convention::Numpy),
+                    ..Settings::default()
+                },
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
