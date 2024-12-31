@@ -2,7 +2,7 @@ use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
@@ -2856,12 +2856,12 @@ impl PydocstyleOptions {
             property_decorators,
             optional_variadics,
         } = self;
-        pydocstyle::settings::Settings::new(
+        pydocstyle::settings::Settings {
             convention,
-            ignore_decorators.unwrap_or_default(),
-            property_decorators.unwrap_or_default(),
-            optional_variadics.unwrap_or_default(),
-        )
+            ignore_decorators: BTreeSet::from_iter(ignore_decorators.unwrap_or_default()),
+            property_decorators: BTreeSet::from_iter(property_decorators.unwrap_or_default()),
+            optional_variadics: optional_variadics.unwrap_or_default(),
+        }
     }
 }
 

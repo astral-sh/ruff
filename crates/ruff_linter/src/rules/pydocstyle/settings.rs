@@ -87,28 +87,13 @@ impl fmt::Display for Convention {
 
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
-    convention: Option<Convention>,
-    ignore_decorators: BTreeSet<String>,
-    property_decorators: BTreeSet<String>,
-    optional_variadics: bool,
+    pub convention: Option<Convention>,
+    pub ignore_decorators: BTreeSet<String>,
+    pub property_decorators: BTreeSet<String>,
+    pub optional_variadics: bool,
 }
 
 impl Settings {
-    #[must_use]
-    pub fn new(
-        convention: Option<Convention>,
-        ignore_decorators: impl IntoIterator<Item = String>,
-        property_decorators: impl IntoIterator<Item = String>,
-        optional_variadics: bool,
-    ) -> Self {
-        Self {
-            convention,
-            ignore_decorators: ignore_decorators.into_iter().collect(),
-            property_decorators: property_decorators.into_iter().collect(),
-            optional_variadics,
-        }
-    }
-
     pub fn convention(&self) -> Option<Convention> {
         self.convention
     }
