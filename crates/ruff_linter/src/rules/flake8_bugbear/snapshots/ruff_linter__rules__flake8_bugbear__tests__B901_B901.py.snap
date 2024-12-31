@@ -12,11 +12,59 @@ B901.py:9:9: B901 Using `yield` and `return {value}` in a generator function can
 11 |     yield 3
    |
 
-B901.py:36:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+B901.py:17:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
    |
-35 | def broken2():
-36 |     return [3, 2, 1]
+16 | def broken2():
+17 |     return [3, 2, 1]
    |     ^^^^^^^^^^^^^^^^ B901
-37 | 
-38 |     yield from not_broken()
+18 | 
+19 |     yield from not_broken()
+   |
+
+B901.py:25:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+23 |     x = yield
+24 |     print(x)
+25 |     return 42
+   |     ^^^^^^^^^ B901
+   |
+
+B901.py:30:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+28 | def broken4():
+29 |     (yield from range(5))
+30 |     return 10
+   |     ^^^^^^^^^ B901
+   |
+
+B901.py:35:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+33 | def broken5():
+34 |     x, y = ((yield from []), 7)
+35 |     return y
+   |     ^^^^^^^^ B901
+   |
+
+B901.py:42:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+40 |     w, z = ("a", 10)
+41 |     x
+42 |     return z
+   |     ^^^^^^^^ B901
+   |
+
+B901.py:48:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+46 |     x = yield from []
+47 |     x = 5
+48 |     return x
+   |     ^^^^^^^^ B901
+   |
+
+B901.py:53:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   |
+51 | def broken8():
+52 |     ((x, y), z) = ((a, b), c) = (((yield 2), 3), 4)
+53 |     return b
+   |     ^^^^^^^^ B901
    |
