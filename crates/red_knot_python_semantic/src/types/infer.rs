@@ -198,15 +198,15 @@ pub(crate) fn infer_expression_types<'db>(
 fn infer_unpack_types<'db>(
     db: &'db dyn Db,
     unpack: Unpack<'db>,
-    is_assignment: bool,
+    is_assignment_stmt: bool,
 ) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
         tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
             .entered();
 
-    let mut unpacker = Unpacker::new(db, unpack.scope(db), is_assignment);
-    unpacker.unpack(unpack.target(db), unpack.value(db));
+    let mut unpacker = Unpacker::new(db, unpack.scope(db));
+    unpacker.unpack(unpack.target(db), unpack.value(db), is_assignment_stmt);
     unpacker.finish()
 }
 

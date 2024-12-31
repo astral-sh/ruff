@@ -20,18 +20,14 @@ pub(crate) struct Unpacker<'db> {
     context: InferContext<'db>,
     scope: ScopeId<'db>,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
-    /// This flag determines if we are unpacking for assignment or not.
-    /// In stubs files, assigning ellipsis literal to multiple targets is allowed.
-    is_assignment: bool,
 }
 
 impl<'db> Unpacker<'db> {
-    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>, is_assignment: bool) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
         Self {
             context: InferContext::new(db, scope),
             targets: FxHashMap::default(),
             scope,
-            is_assignment,
         }
     }
 
@@ -39,25 +35,29 @@ impl<'db> Unpacker<'db> {
         self.context.db()
     }
 
-    /// Unpack the value to the target expression.
-    pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
+    pub(crate) fn unpack(
+        &mut self,
+        target: &ast::Expr,
+        value: UnpackValue<'db>,
+        is_assignment_stmt: bool,
+    ) {
         let mut value_ty = infer_expression_types(self.db(), value.expression())
             .expression_ty(value.scoped_expression_id(self.db(), self.scope));
 
-        let file = value.expression().file(self.db());
-        let is_ellipsis_literal = value
+        let is_in_stub_file = value
+            .expression()
+            .file(self.db())
+            .is_stub(self.db().upcast());
+        let value_is_ellipsis_literal = value
             .expression()
             .node_ref(self.db())
             .is_ellipsis_literal_expr();
-        if file.is_stub(self.db().upcast()) && is_ellipsis_literal && self.is_assignment {
+        if is_assignment_stmt && is_in_stub_file && value_is_ellipsis_literal {
             value_ty = Type::Unknown;
         } else {
             debug_assert!(
-                matches!(
-                    target,
-                    ast::Expr::List(_) | ast::Expr::Tuple(_) | ast::Expr::EllipsisLiteral(_)
-                ),
-                "Unpacking target must be a list or tuple or ellipsis literal expression"
+                matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
+                "Unpacking target must be a list or tuple"
             );
         }
 
