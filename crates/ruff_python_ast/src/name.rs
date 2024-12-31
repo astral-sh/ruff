@@ -277,16 +277,12 @@ impl<'a> QualifiedName<'a> {
         inner.push(member);
         Self(inner)
     }
-}
 
-impl<'a: 'b, 'b> QualifiedName<'a> {
     /// Extends the qualified name using the given members.
     #[must_use]
-    pub fn extend_members<T: IntoIterator<Item = &'b &'a str>>(self, members: T) -> Self {
+    pub fn extend_members<T: IntoIterator<Item = &'a str>>(self, members: T) -> Self {
         let mut inner = self.0;
-        for member in members {
-            inner.push(member);
-        }
+        inner.extend(members);
         Self(inner)
     }
 }

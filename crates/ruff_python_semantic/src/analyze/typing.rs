@@ -990,13 +990,17 @@ pub fn resolve_assignment<'a>(
     expr: &'a Expr,
     semantic: &'a SemanticModel<'a>,
 ) -> Option<QualifiedName<'a>> {
-    let mut source = expr;
+    // Resolve any attribute chain.
+    let mut head_expr = expr;
     let mut reversed_tail: SmallVec<[_; 4]> = smallvec![];
-    while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = source {
-        source = value;
+    while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = head_expr {
+        head_expr = value;
         reversed_tail.push(attr.as_str());
     }
-    let name = source.as_name_expr()?;
+
+    // Resolve the left-most name, e.g. `foo` in `foo.bar.baz` to a qualified name,
+    // then append the attributes.
+    let name = head_expr.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
     match statement {
@@ -1005,9 +1009,9 @@ pub fn resolve_assignment<'a>(
             value: Some(value), ..
         }) => {
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic
-                .resolve_qualified_name(func)
-                .map(|qualified_name| qualified_name.extend_members(reversed_tail.iter().rev()))
+
+            let qualified_name = semantic.resolve_qualified_name(func)?;
+            Some(qualified_name.extend_members(reversed_tail.into_iter().rev()))
         }
         _ => None,
     }
