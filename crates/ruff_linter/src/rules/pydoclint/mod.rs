@@ -41,7 +41,7 @@ mod tests {
                     Some(Convention::Google),
                     [],
                     [],
-                    None,
+                    false,
                 ),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
@@ -65,7 +65,7 @@ mod tests {
                     Some(Convention::Numpy),
                     [],
                     [],
-                    None,
+                    false,
                 ),
                 ..settings::LinterSettings::for_rule(rule_code)
             },

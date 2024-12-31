@@ -1810,12 +1810,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if checker
-        .settings
-        .pydocstyle
-        .required_variadics()
-        .unwrap_or_default()
-    {
+    if !checker.settings.pydocstyle.optional_variadics() {
         if let Some(arg) = function.parameters.vararg.as_ref() {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("*{arg_name}");

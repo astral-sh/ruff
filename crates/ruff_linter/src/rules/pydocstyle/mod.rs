@@ -104,7 +104,7 @@ mod tests {
                     None,
                     ["functools.wraps".to_string()],
                     ["gi.repository.GObject.Property".to_string()],
-                    None,
+                    false,
                 ),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
@@ -139,11 +139,11 @@ mod tests {
     }
 
     #[test]
-    fn d417_unspecified_required_variadics() -> Result<()> {
+    fn d417_unspecified_optional_variadics() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
-                pydocstyle: Settings::new(None, [], [], Some(true)),
+                pydocstyle: Settings::new(None, [], [], true),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -157,7 +157,7 @@ mod tests {
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 // With explicit Google convention, we should flag every function.
-                pydocstyle: Settings::new(Some(Convention::Google), [], [], None),
+                pydocstyle: Settings::new(Some(Convention::Google), [], [], false),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -166,12 +166,12 @@ mod tests {
     }
 
     #[test]
-    fn d417_google_required_variadics() -> Result<()> {
+    fn d417_google_optional_variadics() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 // With explicit Google convention, we should flag every function.
-                pydocstyle: Settings::new(Some(Convention::Google), [], [], Some(true)),
+                pydocstyle: Settings::new(Some(Convention::Google), [], [], false),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -185,21 +185,7 @@ mod tests {
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 // With explicit numpy convention, we shouldn't flag anything.
-                pydocstyle: Settings::new(Some(Convention::Numpy), [], [], None),
-                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn d417_numpy_required_variadics() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pydocstyle/D417.py"),
-            &settings::LinterSettings {
-                // With explicit numpy convention, we shouldn't flag anything.
-                pydocstyle: Settings::new(Some(Convention::Numpy), [], [], Some(true)),
+                pydocstyle: Settings::new(Some(Convention::Numpy), [], [], false),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
