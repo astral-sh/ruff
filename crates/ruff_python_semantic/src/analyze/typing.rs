@@ -10,6 +10,7 @@ use ruff_python_stdlib::typing::{
     is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
 };
 use ruff_text_size::Ranged;
+use smallvec::{smallvec, SmallVec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
@@ -974,14 +975,31 @@ fn find_parameter<'a>(
 /// ```
 ///
 /// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
+///
+/// This function will also automatically expand attribute accesses, so given:
+/// ```python
+/// from module import AppContainer
+///
+/// container = AppContainer()
+/// container.app.get(...)
+/// ```
+///
+/// This function will return `["module", "AppContainer", "app", "get"] for the
+/// attribute access `container.app.get`.
 pub fn resolve_assignment<'a>(
     expr: &'a Expr,
     semantic: &'a SemanticModel<'a>,
 ) -> Option<QualifiedName<'a>> {
-    let name = expr.as_name_expr()?;
+    let mut source = expr;
+    let mut reversed_tail: SmallVec<[_; 4]> = smallvec![];
+    while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = source {
+        source = value;
+        reversed_tail.push(attr.as_str());
+    }
+    let name = source.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
-    match statement {
+    let mut qualified_name = match statement {
         Stmt::Assign(ast::StmtAssign { value, .. }) => {
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
             semantic.resolve_qualified_name(func)
@@ -993,7 +1011,14 @@ pub fn resolve_assignment<'a>(
             semantic.resolve_qualified_name(func)
         }
         _ => None,
+    }?;
+    for member in reversed_tail.iter().rev() {
+        // extend the qualified name with the attributes we accessed
+        // e.g. for `app.get` when `app` resolves to `fastapi.FastAPI`
+        // then we want to return `fastapi.FastAPI.get`.
+        qualified_name = qualified_name.append_member(member);
     }
+    Some(qualified_name)
 }
 
 /// Find the assigned [`Expr`] for a given symbol, if any.

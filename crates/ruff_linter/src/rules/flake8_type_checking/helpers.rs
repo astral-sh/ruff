@@ -11,7 +11,6 @@ use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
 use ruff_text_size::{Ranged, TextRange};
-use smallvec::{smallvec, SmallVec};
 
 use crate::rules::flake8_type_checking::settings::Settings;
 use crate::Locator;
@@ -103,24 +102,7 @@ fn runtime_required_decorators(
         semantic
             .resolve_qualified_name(expression)
             // if we can't resolve the name, then try resolving the assignment
-            .or_else(|| {
-                let mut source = expression;
-                let mut reversed_tail: SmallVec<[_; 4]> = smallvec![];
-                while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = source {
-                    source = value;
-                    reversed_tail.push(attr.as_str());
-                }
-                analyze::typing::resolve_assignment(source, semantic).map(|head| {
-                    let mut qualified_name = head;
-                    for member in reversed_tail.iter().rev() {
-                        // extend the full name with the attributes we accessed
-                        // e.g. for `app.get` when `app` resolves to `fastapi.FastAPI`
-                        // then we want to return `fastapi.FastAPI.get`.
-                        qualified_name = qualified_name.append_member(member);
-                    }
-                    qualified_name
-                })
-            })
+            .or_else(|| analyze::typing::resolve_assignment(expression, semantic))
             .is_some_and(|qualified_name| {
                 decorators
                     .iter()
