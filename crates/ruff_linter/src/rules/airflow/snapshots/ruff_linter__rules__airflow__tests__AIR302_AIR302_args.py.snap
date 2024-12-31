@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-snapshot_kind: text
 ---
 AIR302_args.py:18:39: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
    |
@@ -243,7 +242,7 @@ AIR302_args.py:90:16: AIR302 `filename_template` is removed in Airflow 3.0
 92 | FabAuthManager(None)
    |
 
-AIR302_args.py:92:15: AIR302 `appbuilder` is removed in Airflow 3.0; The constructor takes no parameter now.
+AIR302_args.py:92:15: AIR302 `appbuilder` is removed in Airflow 3.0; The constructor takes no parameter now
    |
 90 | GCSTaskHandler(filename_template="/tmp/test")
 91 | 
