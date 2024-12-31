@@ -115,8 +115,8 @@ pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
         };
 
         let Some(value) = (match method_name {
-            MethodName::FromFloat => call.arguments.find_argument("f", 0),
-            MethodName::FromDecimal => call.arguments.find_argument("dec", 0),
+            MethodName::FromFloat => call.arguments.find_argument_value("f", 0),
+            MethodName::FromDecimal => call.arguments.find_argument_value("dec", 0),
         }) else {
             return;
         };

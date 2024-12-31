@@ -293,10 +293,10 @@ impl Renamer {
         let qualified_name = semantic.resolve_qualified_name(func)?;
 
         let name_argument = match qualified_name.segments() {
-            ["collections", "namedtuple"] => arguments.find_argument("typename", 0),
+            ["collections", "namedtuple"] => arguments.find_argument_value("typename", 0),
 
             ["typing" | "typing_extensions", "TypeVar" | "ParamSpec" | "TypeVarTuple" | "NewType" | "TypeAliasType"] => {
-                arguments.find_argument("name", 0)
+                arguments.find_argument_value("name", 0)
             }
 
             ["enum", "Enum" | "IntEnum" | "StrEnum" | "ReprEnum" | "Flag" | "IntFlag"]

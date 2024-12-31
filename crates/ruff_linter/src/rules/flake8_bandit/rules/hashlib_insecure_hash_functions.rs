@@ -115,7 +115,7 @@ fn detect_insecure_hashlib_calls(
 
     match hashlib_call {
         HashlibCall::New => {
-            let Some(name_arg) = call.arguments.find_argument("name", 0) else {
+            let Some(name_arg) = call.arguments.find_argument_value("name", 0) else {
                 return;
             };
             let Some(hash_func_name) = string_literal(name_arg) else {
@@ -159,7 +159,7 @@ fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
             _ => None,
         })
         .and_then(|(argument_name, position)| {
-            call.arguments.find_argument(argument_name, position)
+            call.arguments.find_argument_value(argument_name, position)
         })
     else {
         return;

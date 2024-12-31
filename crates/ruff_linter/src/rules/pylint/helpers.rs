@@ -10,7 +10,7 @@ use crate::settings::LinterSettings;
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
 pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
     // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
-    let name_param = arguments.find_argument("name", 0)?;
+    let name_param = arguments.find_argument_value("name", 0)?;
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &name_param {
         Some(value.to_str())
     } else {

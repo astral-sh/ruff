@@ -63,7 +63,7 @@ pub(crate) fn invalid_envvar_default(checker: &mut Checker, call: &ast::ExprCall
         })
     {
         // Find the `default` argument, if it exists.
-        let Some(expr) = call.arguments.find_argument("default", 1) else {
+        let Some(expr) = call.arguments.find_argument_value("default", 1) else {
             return;
         };
 

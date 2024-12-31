@@ -2,10 +2,10 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{helpers::Truthiness, Expr, ExprAttribute, ExprCall, ExprName};
+use ruff_python_ast::{helpers::Truthiness, Expr, ExprAttribute, ExprName};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `dict.get(key, falsy_value)` calls in boolean test positions.
@@ -46,13 +46,18 @@ impl AlwaysFixableViolation for FalsyDictGetFallback {
 pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
+    // Check if we are in a boolean test
+    if !semantic.in_boolean_test() {
+        return;
+    }
+
     // Check if the expression is a call
-    let Expr::Call(ExprCall { func, .. }) = expr else {
+    let Expr::Call(call) = expr else {
         return;
     };
 
     // Check if the function being called is an attribute (e.g. `dict.get`)
-    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &**func else {
+    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call.func else {
         return;
     };
 
@@ -61,78 +66,33 @@ pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    // Check if we are in a boolean test
-    if !semantic.in_boolean_test() {
-        return;
-    }
-
     // Check if the object is a dictionary using the semantic model
-    if let Expr::Name(expr_name) = &**value {
-        if !is_known_to_be_of_type_dict(semantic, expr_name) {
-            return;
-        }
-    } else {
+    if !value
+        .as_name_expr()
+        .is_some_and(|name| is_known_to_be_of_type_dict(semantic, name))
+    {
         return;
     }
-
-    let Expr::Call(ExprCall { arguments, .. }) = expr else {
-        return;
-    };
 
     // Get the fallback argument
-    let Some(fallback_arg) = arguments.find_argument("default", 1) else {
+    let Some(fallback_arg) = call.arguments.find_argument("default", 1) else {
         return;
     };
 
     // Check if the fallback is a falsy value
-    let is_falsy = matches!(
-        Truthiness::from_expr(fallback_arg, |id| semantic.has_builtin_binding(id)),
-        Truthiness::Falsey | Truthiness::False | Truthiness::None
-    );
-
-    if !is_falsy {
+    if Truthiness::from_expr(fallback_arg.value(), |id| semantic.has_builtin_binding(id))
+        .into_bool()
+        != Some(false)
+    {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(FalsyDictGetFallback, fallback_arg.range());
 
-    let key_arg = arguments.find_argument("key", 0).unwrap();
     let comment_ranges = checker.comment_ranges();
 
-    let Some(full_fallback_arg) = arguments.find_keyword("default") else {
-        // Fallback not specified as a keyword.
-
-        // Determine applicability based on the presence of comments
-        let applicability = if comment_ranges.intersects(TextRange::new(
-            key_arg.range().end(),
-            fallback_arg.range().end(),
-        )) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
-        diagnostic.try_set_fix(|| {
-            remove_argument(
-                fallback_arg,
-                arguments,
-                Parentheses::Preserve,
-                checker.locator().contents(),
-            )
-            .map(|edit| Fix::applicable_edit(edit, applicability))
-        });
-        checker.diagnostics.push(diagnostic);
-        return;
-    };
-    // Fallback is specified as a keyword.
-    // Get range for the fallback argument (else clause handling case where args are supplied out of positional order)
-    let (range_start, range_end) = if key_arg.range().end() <= full_fallback_arg.range().end() {
-        (key_arg.range().end(), full_fallback_arg.range().end())
-    } else {
-        (full_fallback_arg.range().start(), key_arg.range().start())
-    };
-
     // Determine applicability based on the presence of comments
-    let applicability = if comment_ranges.intersects(TextRange::new(range_start, range_end)) {
+    let applicability = if comment_ranges.intersects(call.arguments.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
@@ -140,8 +100,8 @@ pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
 
     diagnostic.try_set_fix(|| {
         remove_argument(
-            full_fallback_arg,
-            arguments,
+            &fallback_arg,
+            &call.arguments,
             Parentheses::Preserve,
             checker.locator().contents(),
         )

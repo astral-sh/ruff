@@ -67,7 +67,7 @@ pub(crate) fn long_sleep_not_forever(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(arg) = call.arguments.find_argument("seconds", 0) else {
+    let Some(arg) = call.arguments.find_argument_value("seconds", 0) else {
         return;
     };
 

@@ -52,7 +52,7 @@ pub(crate) fn django_raw_sql(checker: &mut Checker, call: &ast::ExprCall) {
     {
         if !call
             .arguments
-            .find_argument("sql", 0)
+            .find_argument_value("sql", 0)
             .is_some_and(Expr::is_string_literal_expr)
         {
             checker

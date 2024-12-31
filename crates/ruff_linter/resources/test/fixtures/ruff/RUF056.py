@@ -165,3 +165,7 @@ value = not my_dict.get(key="key", # comment1
 value = not my_dict.get(default=[], # comment1
                         key="key" # comment2
                         )  # [RUF056]
+
+# testing invalid dict.get calls
+value = not my_dict.get(key="key", other="something", default=False)
+value = not my_dict.get(default=False, other="something", key="test")

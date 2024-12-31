@@ -62,7 +62,7 @@ pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
 
 fn is_call_insecure(call: &ast::ExprCall) -> bool {
     for (argument_name, position) in [("select", 0), ("where", 1), ("tables", 3)] {
-        if let Some(argument) = call.arguments.find_argument(argument_name, position) {
+        if let Some(argument) = call.arguments.find_argument_value(argument_name, position) {
             match argument_name {
                 "select" => match argument {
                     Expr::Dict(dict) => {

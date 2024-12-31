@@ -89,7 +89,7 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    let Some(ast::Expr::StringLiteral(string)) = arguments.find_argument("suffix", 0) else {
+    let Some(ast::Expr::StringLiteral(string)) = arguments.find_argument_value("suffix", 0) else {
         return;
     };
 

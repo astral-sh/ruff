@@ -3780,6 +3780,15 @@ pub enum ArgOrKeyword<'a> {
     Keyword(&'a Keyword),
 }
 
+impl<'a> ArgOrKeyword<'a> {
+    pub const fn value(&self) -> &'a Expr {
+        match self {
+            ArgOrKeyword::Arg(argument) => argument,
+            ArgOrKeyword::Keyword(keyword) => &keyword.value,
+        }
+    }
+}
+
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
     fn from(arg: &'a Expr) -> Self {
         Self::Arg(arg)
@@ -3828,13 +3837,22 @@ impl Arguments {
             .nth(position)
     }
 
-    /// Return the argument with the given name or at the given position, or `None` if no such
-    /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
+    /// Return the value for the argument with the given name or at the given position, or `None` if no such
+    /// argument exists. Used to retrieve argument values that can be provided _either_ as keyword or
     /// positional arguments.
-    pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr> {
+    pub fn find_argument_value(&self, name: &str, position: usize) -> Option<&Expr> {
         self.find_keyword(name)
             .map(|keyword| &keyword.value)
             .or_else(|| self.find_positional(position))
+    }
+
+    /// Return the the argument with the given name or at the given position, or `None` if no such
+    /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
+    /// positional arguments.
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {
+        self.find_keyword(name)
+            .map(ArgOrKeyword::from)
+            .or_else(|| self.find_positional(position).map(ArgOrKeyword::from))
     }
 
     /// Return the positional and keyword arguments in the order of declaration.
