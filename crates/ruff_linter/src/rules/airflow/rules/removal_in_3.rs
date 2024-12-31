@@ -225,7 +225,7 @@ fn removed_class_attribute(checker: &mut Checker, expr: &Expr) {
             }
             &_ => None,
         },
-        ["airflow", "lineage", "hook"] => match attr.as_str() {
+        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => match attr.as_str() {
             "dataset" => Some(Replacement::Name("asset")),
             &_ => None,
         },

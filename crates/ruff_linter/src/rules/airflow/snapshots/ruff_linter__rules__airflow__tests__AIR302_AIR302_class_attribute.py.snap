@@ -218,3 +218,11 @@ AIR302_class_attribute.py:58:11: AIR302 `airflow.lineage.hook.DatasetLineageInfo
 59 | dl_info.dataset
    |
    = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
+
+AIR302_class_attribute.py:59:9: AIR302 `dataset` is removed in Airflow 3.0
+   |
+58 | dl_info = DatasetLineageInfo()
+59 | dl_info.dataset
+   |         ^^^^^^^ AIR302
+   |
+   = help: Use `asset` instead
