@@ -984,7 +984,7 @@ fn find_parameter<'a>(
 /// container.app.get(...)
 /// ```
 ///
-/// This function will return `["module", "AppContainer", "app", "get"] for the
+/// This function will return `["module", "AppContainer", "app", "get"]` for the
 /// attribute access `container.app.get`.
 pub fn resolve_assignment<'a>(
     expr: &'a Expr,
