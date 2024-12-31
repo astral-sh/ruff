@@ -555,7 +555,7 @@ AIR302_names.py:183:1: AIR302 `airflow.operators.latest_only_operator.LatestOnly
 184 | 
 185 | # airflow.operators.python_operator
     |
-    = help: Use `     airflow.operators.latest_only.LatestOnlyOperator` instead
+    = help: Use `airflow.operators.latest_only.LatestOnlyOperator` instead
 
 AIR302_names.py:186:1: AIR302 `airflow.operators.python_operator.BranchPythonOperator` is removed in Airflow 3.0
     |

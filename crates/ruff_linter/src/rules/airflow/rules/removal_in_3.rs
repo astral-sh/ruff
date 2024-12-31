@@ -513,7 +513,7 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.operators.python.ShortCircuitOperator")
         }
         ["airflow", "operators", "latest_only_operator", "LatestOnlyOperator"] => {
-            Replacement::Name("     airflow.operators.latest_only.LatestOnlyOperator")
+            Replacement::Name("airflow.operators.latest_only.LatestOnlyOperator")
         }
 
         // airflow.sensors
