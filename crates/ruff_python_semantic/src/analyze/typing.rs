@@ -999,26 +999,18 @@ pub fn resolve_assignment<'a>(
     let name = source.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
-    let mut qualified_name = match statement {
-        Stmt::Assign(ast::StmtAssign { value, .. }) => {
-            let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_qualified_name(func)
-        }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
+    match statement {
+        Stmt::Assign(ast::StmtAssign { value, .. })
+        | Stmt::AnnAssign(ast::StmtAnnAssign {
             value: Some(value), ..
         }) => {
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_qualified_name(func)
+            semantic
+                .resolve_qualified_name(func)
+                .map(|qualified_name| qualified_name.extend_members(reversed_tail.iter().rev()))
         }
         _ => None,
-    }?;
-    for member in reversed_tail.iter().rev() {
-        // extend the qualified name with the attributes we accessed
-        // e.g. for `app.get` when `app` resolves to `fastapi.FastAPI`
-        // then we want to return `fastapi.FastAPI.get`.
-        qualified_name = qualified_name.append_member(member);
     }
-    Some(qualified_name)
 }
 
 /// Find the assigned [`Expr`] for a given symbol, if any.

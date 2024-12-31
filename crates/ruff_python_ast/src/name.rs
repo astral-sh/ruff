@@ -279,6 +279,18 @@ impl<'a> QualifiedName<'a> {
     }
 }
 
+impl<'a: 'b, 'b> QualifiedName<'a> {
+    /// Extends the qualified name using the given members.
+    #[must_use]
+    pub fn extend_members<T: IntoIterator<Item = &'b &'a str>>(self, members: T) -> Self {
+        let mut inner = self.0;
+        for member in members {
+            inner.push(member);
+        }
+        Self(inner)
+    }
+}
+
 impl Display for QualifiedName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let segments = self.segments();

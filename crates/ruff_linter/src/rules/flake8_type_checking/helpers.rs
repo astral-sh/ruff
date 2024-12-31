@@ -100,8 +100,24 @@ fn runtime_required_decorators(
     decorator_list.iter().any(|decorator| {
         let expression = map_callable(&decorator.expression);
         semantic
+            // First try to resolve the qualified name normally for cases like:
+            // ```python
+            // from mymodule import app
+            //
+            // @app.get(...)
+            // def test(): ...
+            //  ```
             .resolve_qualified_name(expression)
-            // if we can't resolve the name, then try resolving the assignment
+            // If we can't resolve the name, then try resolving the assignment
+            // in order to support cases like:
+            // ```python
+            // from fastapi import FastAPI
+            //
+            // app = FastAPI()
+            //
+            // @app.get(...)
+            // def test(): ...
+            // ```
             .or_else(|| analyze::typing::resolve_assignment(expression, semantic))
             .is_some_and(|qualified_name| {
                 decorators
