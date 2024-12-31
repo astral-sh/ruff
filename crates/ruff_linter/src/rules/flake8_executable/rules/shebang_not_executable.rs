@@ -22,11 +22,8 @@ use crate::rules::flake8_executable::helpers::is_executable;
 /// executable. If a file contains a shebang but is not executable, then the
 /// shebang is misleading, or the file is missing the executable bit.
 ///
-/// If the file is meant to be executable, add add the executable bit to the file
+/// If the file is meant to be executable, add the executable bit to the file
 /// (e.g., `chmod +x __main__.py` or `git update-index --chmod=+x __main__.py`).
-/// ```python
-/// #!/usr/bin/env python
-/// ```
 ///
 /// Otherwise, remove the shebang.
 ///
@@ -41,7 +38,7 @@ use crate::rules::flake8_executable::helpers::is_executable;
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
-/// - [Git documentation: git update-index --chmod](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
+/// - [Git documentation: `git update-index --chmod`](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
 #[derive(ViolationMetadata)]
 pub(crate) struct ShebangNotExecutable;
 
