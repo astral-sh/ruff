@@ -139,14 +139,11 @@ mod tests {
     }
 
     #[test]
-    fn d417_unspecified_optional_variadics() -> Result<()> {
+    fn d417_unspecified_ignore_var_parameters() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
-                pydocstyle: Settings {
-                    optional_variadics: true,
-                    ..Settings::default()
-                },
+                pydocstyle: Settings::default(),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -172,12 +169,13 @@ mod tests {
     }
 
     #[test]
-    fn d417_google_optional_variadics() -> Result<()> {
+    fn d417_google_ignore_var_parameters() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 pydocstyle: Settings {
                     convention: Some(Convention::Google),
+                    ignore_var_parameters: true,
                     ..Settings::default()
                 },
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)

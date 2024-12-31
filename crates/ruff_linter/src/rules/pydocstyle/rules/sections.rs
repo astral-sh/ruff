@@ -1215,6 +1215,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 ///
 /// ## Options
 /// - `lint.pydocstyle.convention`
+/// - `lint.pydocstyle.ignore-var-parameters`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1810,7 +1811,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if !checker.settings.pydocstyle.optional_variadics() {
+    if !checker.settings.pydocstyle.ignore_var_parameters() {
         if let Some(arg) = function.parameters.vararg.as_ref() {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("*{arg_name}");

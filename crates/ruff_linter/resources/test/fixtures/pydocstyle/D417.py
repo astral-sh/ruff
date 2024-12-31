@@ -168,3 +168,12 @@ def select_data(
         database:
             Which database to connect to ("origin" or "destination").
     """
+
+def f(x, *args, **kwargs):
+    """Do something.
+
+    Args:
+        x: the value
+        *args: var-arguments
+    """
+    return x

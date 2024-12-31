@@ -2837,15 +2837,15 @@ pub struct PydocstyleOptions {
     )]
     pub property_decorators: Option<Vec<String>>,
 
-    /// Whether documentation for `*args` and `**kwargs` should be enforced.
+    /// If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.
     #[option(
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-            optional-variadics = true
+            ignore_var_parameters = true
         "#
     )]
-    pub optional_variadics: Option<bool>,
+    pub ignore_var_parameters: Option<bool>,
 }
 
 impl PydocstyleOptions {
@@ -2854,13 +2854,13 @@ impl PydocstyleOptions {
             convention,
             ignore_decorators,
             property_decorators,
-            optional_variadics,
+            ignore_var_parameters: ignore_variadics,
         } = self;
         pydocstyle::settings::Settings {
             convention,
             ignore_decorators: BTreeSet::from_iter(ignore_decorators.unwrap_or_default()),
             property_decorators: BTreeSet::from_iter(property_decorators.unwrap_or_default()),
-            optional_variadics: optional_variadics.unwrap_or_default(),
+            ignore_var_parameters: ignore_variadics.unwrap_or_default(),
         }
     }
 }

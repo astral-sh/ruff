@@ -2549,8 +2549,8 @@
             "type": "string"
           }
         },
-        "optional-variadics": {
-          "description": "Whether documentation for `*args` and `**kwargs` should be enforced.",
+        "ignore-var-parameters": {
+          "description": "If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.",
           "type": [
             "boolean",
             "null"

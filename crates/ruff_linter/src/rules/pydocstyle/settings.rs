@@ -90,7 +90,7 @@ pub struct Settings {
     pub convention: Option<Convention>,
     pub ignore_decorators: BTreeSet<String>,
     pub property_decorators: BTreeSet<String>,
-    pub optional_variadics: bool,
+    pub ignore_var_parameters: bool,
 }
 
 impl Settings {
@@ -106,8 +106,8 @@ impl Settings {
         DecoratorIterator::new(&self.property_decorators)
     }
 
-    pub fn optional_variadics(&self) -> bool {
-        self.optional_variadics
+    pub fn ignore_var_parameters(&self) -> bool {
+        self.ignore_var_parameters
     }
 }
 
@@ -120,7 +120,7 @@ impl fmt::Display for Settings {
                 self.convention | optional,
                 self.ignore_decorators | set,
                 self.property_decorators | set,
-                self.optional_variadics
+                self.ignore_var_parameters
             ]
         }
         Ok(())
