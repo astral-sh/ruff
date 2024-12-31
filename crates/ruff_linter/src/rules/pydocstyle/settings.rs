@@ -90,6 +90,7 @@ pub struct Settings {
     convention: Option<Convention>,
     ignore_decorators: BTreeSet<String>,
     property_decorators: BTreeSet<String>,
+    required_variadics: Option<bool>,
 }
 
 impl Settings {
@@ -98,11 +99,13 @@ impl Settings {
         convention: Option<Convention>,
         ignore_decorators: impl IntoIterator<Item = String>,
         property_decorators: impl IntoIterator<Item = String>,
+        required_variadics: Option<bool>,
     ) -> Self {
         Self {
             convention,
             ignore_decorators: ignore_decorators.into_iter().collect(),
             property_decorators: property_decorators.into_iter().collect(),
+            required_variadics,
         }
     }
 
@@ -117,6 +120,10 @@ impl Settings {
     pub fn property_decorators(&self) -> DecoratorIterator {
         DecoratorIterator::new(&self.property_decorators)
     }
+
+    pub fn required_variadics(&self) -> Option<bool> {
+        self.required_variadics
+    }
 }
 
 impl fmt::Display for Settings {
@@ -127,7 +134,8 @@ impl fmt::Display for Settings {
             fields = [
                 self.convention | optional,
                 self.ignore_decorators | set,
-                self.property_decorators | set
+                self.property_decorators | set,
+                self.required_variadics | optional
             ]
         }
         Ok(())
