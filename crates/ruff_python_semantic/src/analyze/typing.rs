@@ -11,6 +11,7 @@ use ruff_python_stdlib::typing::{
     is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
+use smallvec::{smallvec, SmallVec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
@@ -983,23 +984,43 @@ fn find_parameter<'a>(
 /// ```
 ///
 /// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
+///
+/// This function will also automatically expand attribute accesses, so given:
+/// ```python
+/// from module import AppContainer
+///
+/// container = AppContainer()
+/// container.app.get(...)
+/// ```
+///
+/// This function will return `["module", "AppContainer", "app", "get"]` for the
+/// attribute access `container.app.get`.
 pub fn resolve_assignment<'a>(
     expr: &'a Expr,
     semantic: &'a SemanticModel<'a>,
 ) -> Option<QualifiedName<'a>> {
-    let name = expr.as_name_expr()?;
+    // Resolve any attribute chain.
+    let mut head_expr = expr;
+    let mut reversed_tail: SmallVec<[_; 4]> = smallvec![];
+    while let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = head_expr {
+        head_expr = value;
+        reversed_tail.push(attr.as_str());
+    }
+
+    // Resolve the left-most name, e.g. `foo` in `foo.bar.baz` to a qualified name,
+    // then append the attributes.
+    let name = head_expr.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
     match statement {
-        Stmt::Assign(ast::StmtAssign { value, .. }) => {
-            let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_qualified_name(func)
-        }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
+        Stmt::Assign(ast::StmtAssign { value, .. })
+        | Stmt::AnnAssign(ast::StmtAnnAssign {
             value: Some(value), ..
         }) => {
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_qualified_name(func)
+
+            let qualified_name = semantic.resolve_qualified_name(func)?;
+            Some(qualified_name.extend_members(reversed_tail.into_iter().rev()))
         }
         _ => None,
     }

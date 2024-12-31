@@ -1819,6 +1819,21 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Common examples include Pydantic's `@pydantic.validate_call` decorator
     /// (for functions) and attrs' `@attrs.define` decorator (for classes).
+    ///
+    /// This also supports framework decorators like FastAPI's `fastapi.FastAPI.get`
+    /// which will work across assignments in the same module.
+    ///
+    /// For example:
+    /// ```python
+    /// import fastapi
+    ///
+    /// app = FastAPI("app")
+    ///
+    /// @app.get("/home")
+    /// def home() -> str: ...
+    /// ```
+    ///
+    /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
     #[option(
         default = "[]",
         value_type = "list[str]",
