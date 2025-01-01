@@ -1,6 +1,6 @@
 from _typeshed import Incomplete, StrPath
 from collections.abc import Iterable, Iterator
-from typing import IO, NoReturn, overload
+from typing import IO, ClassVar, NoReturn, overload
 
 from . import grammar
 from .tokenize import _TokenInfo
@@ -46,5 +46,6 @@ class DFAState:
     def addarc(self, next: DFAState, label: str) -> None: ...
     def unifystate(self, old: DFAState, new: DFAState) -> None: ...
     def __eq__(self, other: DFAState) -> bool: ...  # type: ignore[override]
+    __hash__: ClassVar[None]  # type: ignore[assignment]
 
 def generate_grammar(filename: StrPath = "Grammar.txt") -> PgenGrammar: ...

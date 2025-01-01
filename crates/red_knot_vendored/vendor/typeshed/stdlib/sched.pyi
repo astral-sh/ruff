@@ -1,6 +1,6 @@
 import sys
 from collections.abc import Callable
-from typing import Any, NamedTuple, type_check_only
+from typing import Any, ClassVar, NamedTuple, type_check_only
 from typing_extensions import TypeAlias
 
 __all__ = ["scheduler"]
@@ -25,7 +25,8 @@ else:
         argument: tuple[Any, ...]
         kwargs: dict[str, Any]
 
-    class Event(_EventBase): ...
+    class Event(_EventBase):
+        __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class scheduler:
     timefunc: Callable[[], float]

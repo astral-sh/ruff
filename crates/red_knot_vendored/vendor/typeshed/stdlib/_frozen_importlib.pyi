@@ -5,7 +5,7 @@ import types
 from _typeshed.importlib import LoaderProtocol
 from collections.abc import Mapping, Sequence
 from types import ModuleType
-from typing import Any
+from typing import Any, ClassVar
 
 # Signature of `builtins.__import__` should be kept identical to `importlib.__import__`
 def __import__(
@@ -43,6 +43,7 @@ class ModuleSpec:
     def parent(self) -> str | None: ...
     has_location: bool
     def __eq__(self, other: object) -> bool: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     # MetaPathFinder
