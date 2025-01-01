@@ -158,24 +158,48 @@ fn round_applicability(checker: &Checker, arguments: &Arguments) -> Option<Appli
     let (_rounded, rounded_value, ndigits_value) = rounded_and_ndigits(checker, arguments)?;
 
     match (rounded_value, ndigits_value) {
+        // ```python
+        // int(round(2, 0))
+        // int(round(2))
+        // int(round(2, None))
+        // ```
         (
             RoundedValue::Int(InferredType::Equivalent),
-            NdigitsValue::Int(InferredType::Equivalent),
-        )
-        | (
-            RoundedValue::Int(InferredType::Equivalent)
-            | RoundedValue::Float(InferredType::Equivalent),
+            NdigitsValue::Int(InferredType::Equivalent)
+            | NdigitsValue::NotGiven
+            | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Safe),
+
+        // ```python
+        // int(round(2.0))
+        // int(round(2.0, None))
+        // ```
+        (
+            RoundedValue::Float(InferredType::Equivalent),
             NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
         ) => Some(Applicability::Safe),
 
+        // ```python
+        // a: int = 2 # or True
+        // int(round(a, 1))
+        // int(round(a))
+        // int(round(a, None))
+        // ```
         (
             RoundedValue::Int(InferredType::AssignableTo),
-            NdigitsValue::Int(InferredType::Equivalent),
-        )
-        | (
-            RoundedValue::Int(InferredType::AssignableTo)
-            | RoundedValue::Float(InferredType::AssignableTo)
-            | RoundedValue::Other,
+            NdigitsValue::Int(InferredType::Equivalent)
+            | NdigitsValue::NotGiven
+            | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Unsafe),
+
+        // ```python
+        // int(round(2.0))
+        // int(round(2.0, None))
+        // int(round(x))
+        // int(round(x, None))
+        // ```
+        (
+            RoundedValue::Float(InferredType::AssignableTo) | RoundedValue::Other,
             NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
         ) => Some(Applicability::Unsafe),
 

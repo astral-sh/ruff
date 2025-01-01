@@ -115,12 +115,14 @@ pub(super) enum NdigitsValue {
     Other,
 }
 
-type Rounded = Expr;
-
+/// Extracts the rounded and `ndigits` values from `arguments`.
+///
+/// Returns a tripled where the first element is the rounded value's expression, the second is the rounded value,
+///and the third is the `ndigits` value.
 pub(super) fn rounded_and_ndigits<'a>(
     checker: &Checker,
     arguments: &'a Arguments,
-) -> Option<(&'a Rounded, RoundedValue, NdigitsValue)> {
+) -> Option<(&'a Expr, RoundedValue, NdigitsValue)> {
     if arguments.len() > 2 {
         return None;
     }
