@@ -123,3 +123,5 @@ E22.py:184:9: E222 [*] Multiple spaces after operator
 184     |-if a  ==  1:
     184 |+if a  == 1:
 185 185 |     print(a)
+186 186 | 
+187 187 |
