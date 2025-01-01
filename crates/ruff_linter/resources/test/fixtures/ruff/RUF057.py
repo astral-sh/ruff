@@ -8,7 +8,7 @@ round(42, None)                                   # Error (safe)
 round(42, 2)                                      # Error (safe)
 round(42, inferred_int)                           # Error (safe)
 round(42, 3 + 4)                                  # Error (safe)
-round(42, foo)                                    # No error
+round(42, foo)                                    # Error (unsafe)
 
 
 round(42.)                                        # No error
@@ -24,7 +24,7 @@ round(4 + 2, None)                                # Error (safe)
 round(4 + 2, 2)                                   # Error (safe)
 round(4 + 2, inferred_int)                        # Error (safe)
 round(4 + 2, 3 + 4)                               # Error (safe)
-round(4 + 2, foo)                                 # No error
+round(4 + 2, foo)                                 # Error (unsafe)
 
 
 round(4. + 2.)                                    # No error

@@ -51,11 +51,14 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    if matches!(ndigits_value, NdigitsValue::Other) {
-        return;
-    }
+    let applicability = match (rounded_value, ndigits_value) {
+        // ```python
+        // rounded(1, unknown)
+        // ```
+        (RoundedValue::Int(InferredType::Equivalent), NdigitsValue::Other) => Applicability::Unsafe,
 
-    let applicability = match rounded_value {
+        (_, NdigitsValue::Other) => return,
+
         // ```python
         // some_int: int
         //
@@ -65,7 +68,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         // rounded(1, 4 + 2)
         // rounded(1, some_int)
         // ```
-        RoundedValue::Int(InferredType::Equivalent) => Applicability::Safe,
+        (RoundedValue::Int(InferredType::Equivalent), _) => Applicability::Safe,
 
         // ```python
         // some_int: int
@@ -77,7 +80,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         // rounded(some_int, 4 + 2)
         // rounded(some_int, some_other_int)
         // ```
-        RoundedValue::Int(InferredType::AssignableTo) => Applicability::Unsafe,
+        (RoundedValue::Int(InferredType::AssignableTo), _) => Applicability::Unsafe,
 
         _ => return,
     };
