@@ -1,7 +1,7 @@
 import sys
-from _typeshed import ReadOnlyBuffer, SupportsRead
+from _typeshed import ReadOnlyBuffer, SupportsRead, SupportsWrite
 from curses import _ncurses_version
-from typing import IO, Any, final, overload
+from typing import Any, final, overload
 from typing_extensions import TypeAlias
 
 # NOTE: This module is ordinarily only available on Unix, but the windows-curses
@@ -517,7 +517,7 @@ class window:  # undocumented
     def overwrite(
         self, destwin: window, sminrow: int, smincol: int, dminrow: int, dmincol: int, dmaxrow: int, dmaxcol: int
     ) -> None: ...
-    def putwin(self, file: IO[Any], /) -> None: ...
+    def putwin(self, file: SupportsWrite[bytes], /) -> None: ...
     def redrawln(self, beg: int, num: int, /) -> None: ...
     def redrawwin(self) -> None: ...
     @overload

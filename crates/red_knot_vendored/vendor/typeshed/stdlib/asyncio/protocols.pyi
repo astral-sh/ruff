@@ -2,6 +2,7 @@ from _typeshed import ReadableBuffer
 from asyncio import transports
 from typing import Any
 
+# Keep asyncio.__all__ updated with any changes to __all__ here
 __all__ = ("BaseProtocol", "Protocol", "DatagramProtocol", "SubprocessProtocol", "BufferedProtocol")
 
 class BaseProtocol:

@@ -3,6 +3,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, TypeVar, overload
 from typing_extensions import ParamSpec, TypeGuard, TypeIs
 
+# Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 11):
     __all__ = ("iscoroutinefunction", "iscoroutine")
 else:
