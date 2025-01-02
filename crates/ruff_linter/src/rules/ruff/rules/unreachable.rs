@@ -1134,7 +1134,7 @@ mod tests {
         source: &'source str,
     }
 
-    impl<'stmt, 'source> fmt::Display for MermaidGraph<'stmt, 'source> {
+    impl fmt::Display for MermaidGraph<'_, '_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             // Flowchart type of graph, top down.
             writeln!(f, "flowchart TD")?;
