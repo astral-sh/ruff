@@ -105,14 +105,6 @@ pub(crate) fn resolve_type_predicate<'db>(
                 Err(TypeApiError::FailedAssertion)
             }
         }
-        "assert_false" => {
-            let ty = expect_one_argument(arguments)?;
-            if ty == Type::BooleanLiteral(false) {
-                Ok(Type::none(db))
-            } else {
-                Err(TypeApiError::FailedAssertion)
-            }
-        }
 
         _ => Err(TypeApiError::UnknownApiExpression),
     }

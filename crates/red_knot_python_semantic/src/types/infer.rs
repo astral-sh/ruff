@@ -4206,7 +4206,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let argument_types = match arguments {
                     ast::Expr::Tuple(tuple) => Either::Left(
                         tuple
-                            .elts
                             .iter()
                             .map(|element| self.infer_type_expression(element)),
                     ),
@@ -4236,7 +4235,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             {
                 let name = function.name(db).as_str();
 
-                let is_assertion = matches!(name, "assert_true" | "assert_false");
+                let is_assertion = matches!(name, "assert_true");
 
                 let argument_types = arguments.args.iter().map(|arg| {
                     if is_assertion {
