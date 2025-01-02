@@ -849,16 +849,16 @@ AIR303.py:219:1: AIR303 `airflow.www.security.FabAirflowSecurityManagerOverride`
     |
     = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride` instead.
 
-AIR303.py:222:1: AIR303 Import path `airflow.executors.kubernetes_executor_types.ALL_NAMESPACES` is moved into `kubernetes` provider in Airflow 3.0;
+AIR303.py:222:1: AIR303 Import path `airflow.executors.kubernetes_executor_types.ALL_NAMESPACES` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
 221 | # apache-airflow-providers-cncf-kubernetes
 222 | ALL_NAMESPACES
     | ^^^^^^^^^^^^^^ AIR303
 223 | POD_EXECUTOR_DONE_KEY
     |
-    = help: Install `apache-airflow-provider-kubernetes>=7.4.0` and import from `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES` instead.
+    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and import from `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES` instead.
 
-AIR303.py:223:1: AIR303 Import path `airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` is moved into `kubernetes` provider in Airflow 3.0;
+AIR303.py:223:1: AIR303 Import path `airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
 221 | # apache-airflow-providers-cncf-kubernetes
 222 | ALL_NAMESPACES
@@ -867,7 +867,7 @@ AIR303.py:223:1: AIR303 Import path `airflow.executors.kubernetes_executor_types
 224 | 
 225 | # apache-airflow-providers-microsoft-mssql
     |
-    = help: Install `apache-airflow-provider-kubernetes>=7.4.0` and import from `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` instead.
+    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and import from `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` instead.
 
 AIR303.py:226:1: AIR303 `airflow.hooks.mssql_hook.MsSqlHook` is moved into `microsoft-mssql` provider in Airflow 3.0;
     |

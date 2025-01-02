@@ -859,7 +859,7 @@ fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: imp
                     Replacement::ImportPathMoved{
                         original_path: "airflow.executors.kubernetes_executor_types.ALL_NAMESPACES",
                         new_path: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES",
-                        provider: "kubernetes",
+                        provider: "cncf-kubernetes",
                         version: "7.4.0"
                 },
                 )),
@@ -868,10 +868,11 @@ fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: imp
                     Replacement::ImportPathMoved{
                         original_path: "airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
                         new_path: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY",
-                        provider: "kubernetes",
+                        provider: "cncf-kubernetes",
                         version: "7.4.0"
                 },
                 )),
+
 
                 // apache-airflow-providers-microsoft-mssql
                 ["airflow", "hooks", "mssql_hook", "MsSqlHook"] => Some((
