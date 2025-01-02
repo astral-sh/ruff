@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_index::{IndexSlice, IndexVec};
-use ruff_macros::{derive_message_formats, newtype_index, violation};
+use ruff_macros::{derive_message_formats, newtype_index, ViolationMetadata};
 
 /// ## What it does
 /// Checks for unreachable code.
@@ -30,8 +30,8 @@ use ruff_macros::{derive_message_formats, newtype_index, violation};
 /// def function():
 ///     return "reachable"
 /// ```
-#[violation]
-pub struct UnreachableCode {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnreachableCode {
     name: String,
 }
 
