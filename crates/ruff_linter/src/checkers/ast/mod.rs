@@ -449,6 +449,13 @@ impl<'a> Checker<'a> {
             match_fn(expr)
         }
     }
+
+    /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
+    pub(crate) fn push_type_diagnostic(&mut self, diagnostic: Diagnostic) {
+        if !self.semantic.in_no_type_check() {
+            self.diagnostics.push(diagnostic);
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
@@ -2357,15 +2364,13 @@ impl<'a> Checker<'a> {
                 } else {
                     self.semantic.restore(snapshot);
 
-                    if !self.semantic.in_no_type_check() {
-                        if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                            self.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::ForwardAnnotationSyntaxError {
-                                    body: string_expr.value.to_string(),
-                                },
-                                string_expr.range(),
-                            ));
-                        }
+                    if self.enabled(Rule::ForwardAnnotationSyntaxError) {
+                        self.push_type_diagnostic(Diagnostic::new(
+                            pyflakes::rules::ForwardAnnotationSyntaxError {
+                                body: string_expr.value.to_string(),
+                            },
+                            string_expr.range(),
+                        ));
                     }
                 }
             }

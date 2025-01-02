@@ -24,10 +24,6 @@ pub(crate) fn unresolved_references(checker: &mut Checker) {
             }
         } else {
             if checker.enabled(Rule::UndefinedName) {
-                if checker.semantic.in_no_type_check() {
-                    continue;
-                }
-
                 // Avoid flagging if `NameError` is handled.
                 if reference.exceptions().contains(Exceptions::NAME_ERROR) {
                     continue;
@@ -42,7 +38,7 @@ pub(crate) fn unresolved_references(checker: &mut Checker) {
 
                 let symbol_name = reference.name(checker.source());
 
-                checker.diagnostics.push(Diagnostic::new(
+                checker.push_type_diagnostic(Diagnostic::new(
                     pyflakes::rules::UndefinedName {
                         name: symbol_name.to_string(),
                         minor_version_builtin_added: version_builtin_was_added(symbol_name),
