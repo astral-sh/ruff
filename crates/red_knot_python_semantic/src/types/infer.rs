@@ -2672,10 +2672,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             parenthesized: _,
         } = tuple;
 
-        let element_types: Vec<Type<'db>> =
-            elts.iter().map(|elt| self.infer_expression(elt)).collect();
+        let db = self.db();
+        let element_types = elts.iter().map(|elt| self.infer_expression(elt));
 
-        Type::tuple(self.db(), &element_types)
+        TupleType::from_elements(db, element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -4239,8 +4239,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let (start, stop, step) = slice_ty.as_tuple(self.db());
 
                 if let Ok(new_elements) = elements.py_slice(start, stop, step) {
-                    let new_elements: Vec<_> = new_elements.copied().collect();
-                    Type::tuple(self.db(), &new_elements)
+                    TupleType::from_elements(self.db(), new_elements)
                 } else {
                     report_slice_step_size_zero(&self.context, value_node.into());
                     Type::Unknown
@@ -4842,7 +4841,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let ty = if return_todo {
                     todo_type!("full tuple[...] support")
                 } else {
-                    Type::tuple(self.db(), &element_types)
+                    TupleType::from_elements(self.db(), element_types)
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
@@ -4857,7 +4856,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
                     todo_type!("full tuple[...] support")
                 } else {
-                    Type::tuple(self.db(), [single_element_ty])
+                    TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
                 }
             }
         }
