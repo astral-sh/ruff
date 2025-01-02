@@ -5217,7 +5217,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
-            KnownInstanceType::TypingSelf | KnownInstanceType::TypeAlias => {
+            KnownInstanceType::TypingSelf
+            | KnownInstanceType::TypeAlias
+            | KnownInstanceType::RedKnotUnknown => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     subscript.into(),

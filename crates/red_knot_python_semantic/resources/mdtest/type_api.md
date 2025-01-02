@@ -3,7 +3,7 @@
 This document describes the internal `red_knot` API for manipulating types and querying their
 properties.
 
-## Type operations
+## Type extensions
 
 The Python language itself allows us to perform a variety of operations on types. For example, we
 can build a union of types like `int | None`, or we can use type constructors such as `list[int]` or
@@ -66,6 +66,25 @@ assert_true(is_subtype_of(ABC, C))
 class D: ...
 
 assert_true(not is_subtype_of(ABC, D))
+```
+
+### Unknown type
+
+The `Unknown` type is a special type that we use to represent actually unknown types (no
+annotation), as opposed to `Any` which represents an explicitly unknown type.
+
+```py
+from red_knot import Unknown, assert_true, is_assignable_to, is_fully_static
+
+assert_true(is_assignable_to(Unknown, int))
+assert_true(is_assignable_to(int, Unknown))
+
+assert_true(not is_fully_static(Unknown))
+
+x: Unknown = 1
+
+def _() -> None:
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ## Type predicates

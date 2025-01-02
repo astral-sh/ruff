@@ -2085,6 +2085,7 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
                 fallback_type: Type::Unknown,
             }),
+            Type::KnownInstance(KnownInstanceType::RedKnotUnknown) => Ok(Type::Unknown),
             Type::Todo(_) => Ok(*self),
             _ => Ok(todo_type!(
                 "Unsupported or invalid type in a type expression"
@@ -2595,6 +2596,7 @@ pub enum KnownInstanceType<'db> {
     TypeIs,
     ReadOnly,
     // TODO: fill this enum out with more special forms, etc.
+    RedKnotUnknown,
 }
 
 impl<'db> KnownInstanceType<'db> {
@@ -2633,6 +2635,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => "ChainMap",
             Self::OrderedDict => "OrderedDict",
             Self::ReadOnly => "ReadOnly",
+            Self::RedKnotUnknown => "Unknown",
         }
     }
 
@@ -2671,7 +2674,8 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ChainMap
             | Self::OrderedDict
             | Self::ReadOnly
-            | Self::TypeAliasType(_) => Truthiness::AlwaysTrue,
+            | Self::TypeAliasType(_)
+            | Self::RedKnotUnknown => Truthiness::AlwaysTrue,
         }
     }
 
@@ -2711,6 +2715,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
+            Self::RedKnotUnknown => "red_knot.Unknown",
         }
     }
 
@@ -2750,6 +2755,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::OrderedDict => KnownClass::StdlibAlias,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::RedKnotUnknown => KnownClass::Object,
         }
     }
 
@@ -2795,6 +2801,7 @@ impl<'db> KnownInstanceType<'db> {
             "Concatenate" => Self::Concatenate,
             "NotRequired" => Self::NotRequired,
             "LiteralString" => Self::LiteralString,
+            "Unknown" => Self::RedKnotUnknown,
             _ => return None,
         };
 
@@ -2844,6 +2851,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::TypeVar(_) => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
+            Self::RedKnotUnknown => matches!(module, KnownModule::RedKnot),
         }
     }
 
