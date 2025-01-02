@@ -872,7 +872,302 @@ fn check_names_moved_to_provider(checker: &mut Checker, expr: &Expr, ranged: imp
                         version: "7.4.0"
                 },
                 )),
-
+                ["airflow", "kubernetes", "kubernetes_helper_functions", "add_pod_suffix"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.add_pod_suffix",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "kubernetes_helper_functions", "annotations_for_logging_task_metadata"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.annotations_for_logging_task_metadata",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "kubernetes_helper_functions", "annotations_to_key"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.annotations_to_key",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "kubernetes_helper_functions", "create_pod_id"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.create_pod_id",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "kubernetes_helper_functions", "get_logs_task_metadata"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.get_logs_task_metadata",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "kubernetes_helper_functions", "rand_str"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.rand_str",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod", "Port"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "kubernetes.client.models.V1ContainerPort",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod", "Resources"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "kubernetes.client.models.V1ResourceRequirements",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_launcher", "PodLauncher"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_launcher.PodLauncher",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_launcher", "PodStatus"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_launcher.PodStatus",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_launcher_deprecated", "PodLauncher"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodLauncher",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_launcher_deprecated", "PodStatus"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodStatus",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_launcher_deprecated", "get_kube_client"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kube_client.get_kube_client",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_launcher_deprecated", "PodDefaults"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodDefaults",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_runtime_info_env", "PodRuntimeInfoEnv"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "kubernetes.client.models.V1EnvVar",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "volume", "Volume"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "kubernetes.client.models.V1Volume",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "volume_mount", "VolumeMount"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "kubernetes.client.models.V1VolumeMount",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "k8s_model", "K8SModel"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.k8s_model.K8SModel",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "k8s_model", "append_to_pod"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.k8s_model.append_to_pod",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "kube_client", "_disable_verify_ssl"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client._disable_verify_ssl",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "kube_client", "_enable_tcp_keepalive"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client._enable_tcp_keepalive",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "kube_client", "get_kube_client"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client.get_kube_client",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "datetime_to_label_safe_datestring"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator.datetime_to_label_safe_datestring",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "extend_object_field"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.kubernetes.airflow.providers.cncf.kubernetes.pod_generator.extend_object_field",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "label_safe_datestring_to_datetime"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator.label_safe_datestring_to_datetime",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "make_safe_label_value"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator.make_safe_label_value",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "merge_objects"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator.merge_objects",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "PodGenerator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator.PodGenerator",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator_deprecated", "make_safe_label_value"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator_deprecated.make_safe_label_value",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator_deprecated", "PodDefaults"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodDefaults",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator_deprecated", "PodGenerator"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodGenerator",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "secret", "Secret"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.secret.Secret",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "PodGeneratorDeprecated"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator.PodGenerator",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "PodDefaults"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodDefaults",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "add_pod_suffix"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.add_pod_suffix",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "pod_generator", "rand_str"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.rand_str",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
+                ["airflow", "kubernetes", "secret", "K8SModel"] => Some((
+                    qualname.to_string(),
+                    Replacement::ProviderName{
+                        name: "airflow.providers.cncf.kubernetes.k8s_model.K8SModel",
+                        provider: "cncf-kubernetes",
+                        version: "7.4.0"
+                },
+                )),
 
                 // apache-airflow-providers-microsoft-mssql
                 ["airflow", "hooks", "mssql_hook", "MsSqlHook"] => Some((
