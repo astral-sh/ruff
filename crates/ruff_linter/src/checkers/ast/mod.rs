@@ -723,14 +723,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+
                     if self
                         .semantic
                         .match_typing_expr(&decorator.expression, "no_type_check")
                     {
                         self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
                     }
-
-                    self.visit_decorator(decorator);
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
