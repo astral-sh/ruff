@@ -3723,12 +3723,18 @@ impl<'db> TupleType<'db> {
     ) -> Type<'db> {
         let mut elements = vec![];
 
+        let mut is_never = false;
         for ty in types {
             let ty = ty.into();
             if ty.is_never() {
-                return Type::Never;
+                // We can not return early here because we need to consume the whole iterator,
+                // to ensure that all element types are inferred.
+                is_never = true;
             }
             elements.push(ty);
+        }
+        if is_never {
+            return Type::Never;
         }
 
         Type::Tuple(Self::new(db, elements.into_boxed_slice()))
