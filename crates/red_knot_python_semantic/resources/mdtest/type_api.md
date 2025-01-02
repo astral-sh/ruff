@@ -20,10 +20,15 @@ x: Not[int]
 y: Not[Not[int]]
 z: Not[Not[Not[int]]]
 
+not_one: Not[Literal[1]]
+
 def _() -> None:
     reveal_type(x)  # revealed: ~int
     reveal_type(y)  # revealed: int
     reveal_type(z)  # revealed: ~int
+
+    reveal_type(not_one == 1)  # revealed: Literal[False]
+    reveal_type(not_one != 1)  # revealed: Literal[True]
 ```
 
 ### Intersection
