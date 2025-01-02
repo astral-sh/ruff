@@ -303,7 +303,7 @@ enum Condition<'stmt> {
     MaybeRaised,
 }
 
-impl<'stmt> Ranged for Condition<'stmt> {
+impl Ranged for Condition<'_> {
     fn range(&self) -> TextRange {
         match self {
             Condition::Test(expr) | Condition::Iterator(expr) | Condition::Except(expr) => {
@@ -1005,7 +1005,7 @@ impl<'stmt> std::ops::Deref for BasicBlocksBuilder<'stmt> {
     }
 }
 
-impl<'stmt> std::ops::DerefMut for BasicBlocksBuilder<'stmt> {
+impl std::ops::DerefMut for BasicBlocksBuilder<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.blocks
     }
