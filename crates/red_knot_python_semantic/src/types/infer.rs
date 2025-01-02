@@ -59,6 +59,7 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
+use crate::types::type_api::{TypeApiError, TYPE_API_FAILED_ASSERTION, TYPE_API_WRONG_ARITY};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, todo_type, type_api,
@@ -4245,14 +4246,42 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 });
 
-                Some(
-                    type_api::resolve_type_predicate(
-                        db,
-                        function.name(db).as_str(),
-                        argument_types,
-                    )
-                    .unwrap(),
-                )
+                let result = type_api::resolve_type_predicate(
+                    db,
+                    function.name(db).as_str(),
+                    argument_types,
+                );
+
+                match result {
+                    Ok(ty) => Some(ty),
+                    Err(TypeApiError::UnknownApiExpression) => {
+                        // Proper diagnostics (… has no attribute …) will be emitted higher up in the call stack
+                        None
+                    }
+                    Err(TypeApiError::WrongArity(expected)) => {
+                        self.context.report_lint(
+                            &TYPE_API_WRONG_ARITY,
+                            arguments.into(),
+                            format_args!(
+                                "Expected {} argument{} for `{}`",
+                                expected,
+                                if expected == 1 { "" } else { "s" },
+                                name
+                            ),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                    Err(TypeApiError::FailedAssertion(ty)) => {
+                        self.context.report_lint(
+                            &TYPE_API_FAILED_ASSERTION,
+                            arguments.into(),
+                            format_args!("Failed assertion: expected argument type `Literal[True]`, but inferred: `{ty}`.", ty=ty.display(db)),
+                        );
+
+                        Some(Type::Unknown)
+                    }
+                }
             }
             _ => None,
         }

@@ -7,7 +7,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{ClassLiteralType, Type};
+use crate::types::{type_api, ClassLiteralType, Type};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -59,6 +59,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
     registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
+
+    type_api::register_lints(registry);
 }
 
 declare_lint! {

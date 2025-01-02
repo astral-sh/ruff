@@ -93,7 +93,6 @@ impl<'db> InferContext<'db> {
             self.diagnostics.borrow_mut().mark_used(suppression.id());
             return;
         }
-
         self.report_diagnostic(node, DiagnosticId::Lint(lint.name()), severity, message);
     }
 
