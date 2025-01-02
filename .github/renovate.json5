@@ -1,148 +1,111 @@
 {
-  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
   dependencyDashboard: true,
-  suppressNotifications: [
-    'prEditedNotification',
-  ],
-  extends: [
-    'config:recommended',
-  ],
-  labels: [
-    'internal',
-  ],
-  schedule: [
-    'before 4am on Monday',
-  ],
-  semanticCommits: 'disabled',
+  suppressNotifications: ["prEditedNotification"],
+  extends: ["config:recommended"],
+  labels: ["internal"],
+  schedule: ["before 4am on Monday"],
+  semanticCommits: "disabled",
   separateMajorMinor: false,
   prHourlyLimit: 10,
-  enabledManagers: [
-    'github-actions',
-    'pre-commit',
-    'cargo',
-    'pep621',
-    'pip_requirements',
-    'npm',
-  ],
+  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm"],
   cargo: {
-    rangeStrategy: 'update-lockfile',
+    // See https://docs.renovatebot.com/configuration-options/#rangestrategy
+    rangeStrategy: "update-lockfile",
   },
   pep621: {
-    fileMatch: [
-      '^(python|scripts)/.*pyproject\\.toml$',
-    ],
+    // The default for this package manager is to only search for `pyproject.toml` files
+    // found at the repository root: https://docs.renovatebot.com/modules/manager/pep621/#file-matching
+    fileMatch: ["^(python|scripts)/.*pyproject\\.toml$"],
   },
   pip_requirements: {
-    ignorePaths: [
-      '!docs/requirements*.txt',
-    ],
+    // The default for this package manager is to run on all requirements.txt files:
+    // https://docs.renovatebot.com/modules/manager/pip_requirements/#file-matching
+    // `fileMatch` doesn't work for excluding files; to exclude `requirements.txt` files
+    // outside the `doc/` directory, we instead have to use `ignorePaths`. Unlike `fileMatch`,
+    // which takes a regex string, `ignorePaths` takes a glob string, so we have to use
+    // a "negative glob pattern".
+    // See:
+    // - https://docs.renovatebot.com/modules/manager/#ignoring-files-that-match-the-default-filematch
+    // - https://docs.renovatebot.com/configuration-options/#ignorepaths
+    // - https://docs.renovatebot.com/string-pattern-matching/#negative-matching
+    ignorePaths: ["!docs/requirements*.txt"]
   },
   npm: {
-    fileMatch: [
-      '^playground/.*package\\.json$',
-    ],
+    // The default for this package manager is to only search for `package.json` files
+    // found at the repository root: https://docs.renovatebot.com/modules/manager/npm/#file-matching
+    fileMatch: ["^playground/.*package\\.json$"],
   },
-  'pre-commit': {
+  "pre-commit": {
     enabled: true,
   },
   packageRules: [
     {
-      groupName: 'Artifact GitHub Actions dependencies',
-      matchManagers: [
-        'github-actions',
-      ],
-      matchDatasources: [
-        'gitea-tags',
-        'github-tags',
-      ],
-      description: 'Weekly update of artifact-related GitHub Actions dependencies',
-      matchPackageNames: [
-        '/actions/.*-artifact/',
-      ],
+      // Group upload/download artifact updates, the versions are dependent
+      groupName: "Artifact GitHub Actions dependencies",
+      matchManagers: ["github-actions"],
+      matchDatasources: ["gitea-tags", "github-tags"],
+      matchPackageNames: ["actions/.*-artifact"],
+      description: "Weekly update of artifact-related GitHub Actions dependencies",
     },
     {
-      groupName: 'GitHub runners',
-      matchManagers: [
-        'github-actions',
-      ],
-      matchDatasources: [
-        'github-runners',
-      ],
+      // This package rule disables updates for GitHub runners:
+      // we'd only pin them to a specific version
+      // if there was a deliberate reason to do so
+      groupName: "GitHub runners",
+      matchManagers: ["github-actions"],
+      matchDatasources: ["github-runners"],
       description: "Disable PRs updating GitHub runners (e.g. 'runs-on: macos-14')",
       enabled: false,
     },
     {
-      matchManagers: [
-        'cargo',
-      ],
+      // Disable updates of `zip-rs`; intentionally pinned for now due to ownership change
+      // See: https://github.com/astral-sh/uv/issues/3642
+      matchPackageNames: ["zip"],
+      matchManagers: ["cargo"],
       enabled: false,
-      matchPackageNames: [
-        '/zip/',
-      ],
     },
     {
-      matchManagers: [
-        'pip_requirements',
-      ],
+      // `mkdocs-material` requires a manual update to keep the version in sync
+      // with `mkdocs-material-insider`.
+      // See: https://squidfunk.github.io/mkdocs-material/insiders/upgrade/
+      matchManagers: ["pip_requirements"],
+      matchPackageNames: ["mkdocs-material"],
       enabled: false,
-      matchPackageNames: [
-        '/mkdocs-material/',
-      ],
     },
     {
-      groupName: 'pre-commit dependencies',
-      matchManagers: [
-        'pre-commit',
-      ],
-      description: 'Weekly update of pre-commit dependencies',
+      groupName: "pre-commit dependencies",
+      matchManagers: ["pre-commit"],
+      description: "Weekly update of pre-commit dependencies",
     },
     {
-      groupName: 'NPM Development dependencies',
-      matchManagers: [
-        'npm',
-      ],
-      matchDepTypes: [
-        'devDependencies',
-      ],
-      description: 'Weekly update of NPM development dependencies',
+      groupName: "NPM Development dependencies",
+      matchManagers: ["npm"],
+      matchDepTypes: ["devDependencies"],
+      description: "Weekly update of NPM development dependencies",
     },
     {
-      groupName: 'Monaco',
-      matchManagers: [
-        'npm',
-      ],
-      description: 'Weekly update of the Monaco editor',
-      matchPackageNames: [
-        '/monaco/',
-      ],
+      groupName: "Monaco",
+      matchManagers: ["npm"],
+      matchPackageNames: ["monaco"],
+      description: "Weekly update of the Monaco editor",
     },
     {
-      groupName: 'strum',
-      matchManagers: [
-        'cargo',
-      ],
-      description: 'Weekly update of strum dependencies',
-      matchPackageNames: [
-        '/strum/',
-      ],
+      groupName: "strum",
+      matchManagers: ["cargo"],
+      matchPackageNames: ["strum"],
+      description: "Weekly update of strum dependencies",
     },
     {
-      groupName: 'ESLint',
-      matchManagers: [
-        'npm',
-      ],
-      matchPackageNames: [
-        'eslint',
-      ],
-      allowedVersions: '<9',
-      description: 'Constraint ESLint to version 8 until TypeScript-eslint supports ESLint 9',
+      groupName: "ESLint",
+      matchManagers: ["npm"],
+      matchPackageNames: ["eslint"],
+      allowedVersions: "<9",
+      description: "Constraint ESLint to version 8 until TypeScript-eslint supports ESLint 9", // https://github.com/typescript-eslint/typescript-eslint/issues/8211
     },
   ],
   vulnerabilityAlerts: {
-    commitMessageSuffix: '',
-    labels: [
-      'internal',
-      'security',
-    ],
+    commitMessageSuffix: "",
+    labels: ["internal", "security"],
   },
 }
