@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.8.5
+
+### Preview features
+
+- \[`airflow`\] Extend names moved from core to provider (`AIR303`) ([#15145](https://github.com/astral-sh/ruff/pull/15145), [#15159](https://github.com/astral-sh/ruff/pull/15159), [#15196](https://github.com/astral-sh/ruff/pull/15196), [#15216](https://github.com/astral-sh/ruff/pull/15216))
+- \[`airflow`\] Extend rule to check class attributes, methods, arguments (`AIR302`) ([#15054](https://github.com/astral-sh/ruff/pull/15054), [#15083](https://github.com/astral-sh/ruff/pull/15083))
+- \[`fastapi`\] Update `FAST002` to check keyword-only arguments ([#15119](https://github.com/astral-sh/ruff/pull/15119))
+- \[`flake8-type-checking`\] Disable `TC006` and `TC007` in stub files ([#15179](https://github.com/astral-sh/ruff/pull/15179))
+- \[`pylint`\] Detect nested methods correctly (`PLW1641`) ([#15032](https://github.com/astral-sh/ruff/pull/15032))
+- \[`ruff`\] Detect more strict-integer expressions (`RUF046`) ([#14833](https://github.com/astral-sh/ruff/pull/14833))
+- \[`ruff`\] Implement `falsy-dict-get-fallback` (`RUF056`) ([#15160](https://github.com/astral-sh/ruff/pull/15160))
+- \[`ruff`\] Implement `unnecessary-round` (`RUF057`) ([#14828](https://github.com/astral-sh/ruff/pull/14828))
+
+### Rule changes
+
+- Visit PEP 764 inline `TypedDict` keys as non-type-expressions ([#15073](https://github.com/astral-sh/ruff/pull/15073))
+- \[`flake8-comprehensions`\] Skip `C416` if comprehension contains unpacking ([#14909](https://github.com/astral-sh/ruff/pull/14909))
+- \[`flake8-pie`\] Allow `cast(SomeType, ...)` (`PIE796`) ([#15141](https://github.com/astral-sh/ruff/pull/15141))
+- \[`flake8-simplify`\] More precise inference for dictionaries (`SIM300`) ([#15164](https://github.com/astral-sh/ruff/pull/15164))
+- \[`flake8-use-pathlib`\] Catch redundant joins in `PTH201` and avoid syntax errors ([#15177](https://github.com/astral-sh/ruff/pull/15177))
+- \[`pycodestyle`\] Preserve original value format (`E731`) ([#15097](https://github.com/astral-sh/ruff/pull/15097))
+- \[`pydocstyle`\] Split on first whitespace character (`D403`) ([#15082](https://github.com/astral-sh/ruff/pull/15082))
+- \[`pyupgrade`\] Add all PEP-585 names to `UP006` rule ([#5454](https://github.com/astral-sh/ruff/pull/5454))
+
+### Configuration
+
+- \[`flake8-type-checking`\] Improve flexibility of `runtime-evaluated-decorators` ([#15204](https://github.com/astral-sh/ruff/pull/15204))
+- \[`pydocstyle`\] Add setting to ignore missing documentation for `*args` and `**kwargs` parameters (`D417`) ([#15210](https://github.com/astral-sh/ruff/pull/15210))
+- \[`ruff`\] Add an allowlist for `unsafe-markup-use` (`RUF035`) ([#15076](https://github.com/astral-sh/ruff/pull/15076))
+
+### Bug fixes
+
+- Fix type subscript on older python versions ([#15090](https://github.com/astral-sh/ruff/pull/15090))
+- Use `TypeChecker` for detecting `fastapi` routes ([#15093](https://github.com/astral-sh/ruff/pull/15093))
+- \[`pycodestyle`\] Avoid false positives and negatives related to type parameter default syntax (`E225`, `E251`) ([#15214](https://github.com/astral-sh/ruff/pull/15214))
+
+### Documentation
+
+- Fix incorrect doc in `shebang-not-executable` (`EXE001`) and add git+windows solution to executable bit ([#15208](https://github.com/astral-sh/ruff/pull/15208))
+- Rename rules currently not conforming to naming convention ([#15102](https://github.com/astral-sh/ruff/pull/15102))
+
 ## 0.8.4
 
 ### Preview features
