@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF046.py:10:1: RUF046 [*] Value being casted is already an integer
    |
@@ -976,3 +975,44 @@ RUF046.py:76:1: RUF046 [*] Value being casted is already an integer
 77 77 | 
 78 78 | 
 79 79 | ### No errors
+
+RUF046.py:158:1: RUF046 [*] Value being casted is already an integer
+    |
+156 |   int(1. if ... else .2)
+157 |   
+158 | / int(1 +
+159 | |     1)
+    | |______^ RUF046
+160 |   
+161 |   int(round(1,
+    |
+    = help: Remove unnecessary conversion to `int`
+
+ℹ Safe fix
+155 155 | 
+156 156 | int(1. if ... else .2)
+157 157 | 
+158     |-int(1 +
+    158 |+(1 +
+159 159 |     1)
+160 160 | 
+161 161 | int(round(1,
+
+RUF046.py:161:1: RUF046 [*] Value being casted is already an integer
+    |
+159 |       1)
+160 |   
+161 | / int(round(1,
+162 | |           0))
+    | |_____________^ RUF046
+    |
+    = help: Remove unnecessary conversion to `int`
+
+ℹ Safe fix
+158 158 | int(1 +
+159 159 |     1)
+160 160 | 
+161     |-int(round(1,
+162     |-          0))
+    161 |+round(1,
+    162 |+          0)

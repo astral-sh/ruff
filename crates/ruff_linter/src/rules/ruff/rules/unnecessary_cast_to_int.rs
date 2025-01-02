@@ -1,13 +1,18 @@
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{Arguments, Expr, ExprCall};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
+use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::LineRanges;
+use ruff_text_size::Ranged;
+
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::unnecessary_round::{
     rounded_and_ndigits, InferredType, NdigitsValue, RoundedValue,
 };
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprCall};
-use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
-use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `int` conversions of values that are already integers.
@@ -76,31 +81,48 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    let fix = unwrap_int_expression(checker, call, argument, applicability);
-    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
+    let fix = unwrap_int_expression(
+        call,
+        argument,
+        applicability,
+        checker.semantic(),
+        checker.locator(),
+        checker.comment_ranges(),
+        checker.source(),
+    );
+    let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range());
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.
 fn unwrap_int_expression(
-    checker: &Checker,
     call: &ExprCall,
     argument: &Expr,
     applicability: Applicability,
+    semantic: &SemanticModel,
+    locator: &Locator,
+    comment_ranges: &CommentRanges,
+    source: &str,
 ) -> Fix {
-    let (locator, semantic) = (checker.locator(), checker.semantic());
-
-    let argument_expr = locator.slice(argument.range());
-
-    let has_parent_expr = semantic.current_expression_parent().is_some();
-    let new_content = if has_parent_expr || argument.is_named_expr() {
-        format!("({argument_expr})")
+    let content = if let Some(range) = parenthesized_range(
+        argument.into(),
+        (&call.arguments).into(),
+        comment_ranges,
+        source,
+    ) {
+        locator.slice(range).to_string()
     } else {
-        argument_expr.to_string()
+        let parenthesize = semantic.current_expression_parent().is_some()
+            || argument.is_named_expr()
+            || locator.count_lines(argument.range()) > 0;
+        if parenthesize && !has_own_parentheses(argument) {
+            format!("({})", locator.slice(argument.range()))
+        } else {
+            locator.slice(argument.range()).to_string()
+        }
     };
-
-    let edit = Edit::range_replacement(new_content, call.range);
+    let edit = Edit::range_replacement(content, call.range());
     Fix::applicable_edit(edit, applicability)
 }
 
@@ -204,5 +226,22 @@ fn round_applicability(checker: &Checker, arguments: &Arguments) -> Option<Appli
         ) => Some(Applicability::Unsafe),
 
         _ => None,
+    }
+}
+
+/// Returns `true` if the given [`Expr`] has its own parentheses (e.g., `()`, `[]`, `{}`).
+fn has_own_parentheses(expr: &Expr) -> bool {
+    match expr {
+        Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::Subscript(_)
+        | Expr::List(_)
+        | Expr::Set(_)
+        | Expr::Dict(_)
+        | Expr::Call(_) => true,
+        Expr::Generator(generator) => generator.parenthesized,
+        Expr::Tuple(tuple) => tuple.parenthesized,
+        _ => false,
     }
 }
