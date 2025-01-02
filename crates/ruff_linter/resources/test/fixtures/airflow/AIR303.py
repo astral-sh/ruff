@@ -37,6 +37,45 @@ from airflow.hooks.slack_hook import SlackHook
 from airflow.hooks.sqlite_hook import SqliteHook
 from airflow.hooks.webhdfs_hook import WebHDFSHook
 from airflow.hooks.zendesk_hook import ZendeskHook
+from airflow.kubernetes.k8s_model import K8SModel, append_to_pod
+from airflow.kubernetes.kube_client import _disable_verify_ssl, _enable_tcp_keepalive, get_kube_client
+from airflow.kubernetes.kubernetes_helper_functions import (
+    add_pod_suffix,
+    annotations_for_logging_task_metadata,
+    annotations_to_key,
+    create_pod_id,
+    get_logs_task_metadata,
+    rand_str,
+)
+from airflow.kubernetes.pod import Port, Resources
+from airflow.kubernetes.pod_generator import (
+    PodDefaults,
+    PodGenerator,
+    PodGeneratorDeprecated,
+    add_pod_suffix as add_pod_suffix2,
+    datetime_to_label_safe_datestring,
+    extend_object_field,
+    label_safe_datestring_to_datetime,
+    make_safe_label_value,
+    merge_objects,
+    rand_str as rand_str2,
+)
+from airflow.kubernetes.pod_generator_deprecated import (
+    PodDefaults as PodDefaults3,
+    PodGenerator as PodGenerator2,
+    make_safe_label_value as make_safe_label_value2,
+)
+from airflow.kubernetes.pod_launcher import PodLauncher, PodStatus
+from airflow.kubernetes.pod_launcher_deprecated import (
+    PodDefaults as PodDefaults2,
+    PodLauncher as PodLauncher2,
+    PodStatus as PodStatus2,
+    get_kube_client as get_kube_client2,
+)
+from airflow.kubernetes.pod_runtime_info_env import PodRuntimeInfoEnv
+from airflow.kubernetes.secret import K8SModel2, Secret
+from airflow.kubernetes.volume import Volume
+from airflow.kubernetes.volume_mount import VolumeMount
 from airflow.macros.hive import closest_ds_partition, max_partition
 from airflow.operators.check_operator import (
     CheckOperator,
@@ -221,6 +260,45 @@ FabAirflowSecurityManagerOverride()
 # apache-airflow-providers-cncf-kubernetes
 ALL_NAMESPACES
 POD_EXECUTOR_DONE_KEY
+_disable_verify_ssl()
+_enable_tcp_keepalive()
+append_to_pod()
+annotations_for_logging_task_metadata()
+annotations_to_key()
+create_pod_id()
+datetime_to_label_safe_datestring()
+extend_object_field()
+get_logs_task_metadata()
+label_safe_datestring_to_datetime()
+merge_objects()
+Port()
+Resources()
+PodRuntimeInfoEnv()
+PodGeneratorDeprecated()
+Volume()
+VolumeMount()
+Secret()
+
+add_pod_suffix()
+add_pod_suffix2()
+get_kube_client()
+get_kube_client2()
+make_safe_label_value()
+make_safe_label_value2()
+rand_str()
+rand_str2()
+K8SModel()
+K8SModel2()
+PodLauncher()
+PodLauncher2()
+PodStatus()
+PodStatus2()
+PodDefaults()
+PodDefaults2()
+PodDefaults3()
+PodGenerator()
+PodGenerator2()
+
 
 # apache-airflow-providers-microsoft-mssql
 MsSqlHook()
