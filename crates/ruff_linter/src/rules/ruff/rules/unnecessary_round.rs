@@ -1,9 +1,11 @@
 use crate::checkers::ast::Checker;
+use crate::Locator;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -40,13 +42,12 @@ impl AlwaysFixableViolation for UnnecessaryRound {
 
 /// RUF057
 pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
-    let arguments = &call.arguments;
-
     if !checker.semantic().match_builtin_expr(&call.func, "round") {
         return;
     }
 
-    let Some((rounded, rounded_value, ndigits_value)) = rounded_and_ndigits(checker, arguments)
+    let Some((rounded, rounded_value, ndigits_value)) =
+        rounded_and_ndigits(&call.arguments, checker.semantic())
     else {
         return;
     };
@@ -85,10 +86,10 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         _ => return,
     };
 
-    let edit = unwrap_round_call(checker, call, rounded);
+    let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
     let fix = Fix::applicable_edit(edit, applicability);
 
-    let diagnostic = Diagnostic::new(UnnecessaryRound, call.range);
+    let diagnostic = Diagnostic::new(UnnecessaryRound, call.range());
 
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
@@ -123,8 +124,8 @@ pub(super) enum NdigitsValue {
 /// Returns a tripled where the first element is the rounded value's expression, the second is the rounded value,
 ///and the third is the `ndigits` value.
 pub(super) fn rounded_and_ndigits<'a>(
-    checker: &Checker,
     arguments: &'a Arguments,
+    semantic: &'a SemanticModel,
 ) -> Option<(&'a Expr, RoundedValue, NdigitsValue)> {
     if arguments.len() > 2 {
         return None;
@@ -134,19 +135,15 @@ pub(super) fn rounded_and_ndigits<'a>(
     let ndigits = arguments.find_argument_value("ndigits", 1);
 
     let rounded_kind = match rounded {
-        Expr::Name(name) => {
-            let semantic = checker.semantic();
-
-            match semantic.only_binding(name).map(|id| semantic.binding(id)) {
-                Some(binding) if typing::is_int(binding, semantic) => {
-                    RoundedValue::Int(InferredType::AssignableTo)
-                }
-                Some(binding) if typing::is_float(binding, semantic) => {
-                    RoundedValue::Float(InferredType::AssignableTo)
-                }
-                _ => RoundedValue::Other,
+        Expr::Name(name) => match semantic.only_binding(name).map(|id| semantic.binding(id)) {
+            Some(binding) if typing::is_int(binding, semantic) => {
+                RoundedValue::Int(InferredType::AssignableTo)
             }
-        }
+            Some(binding) if typing::is_float(binding, semantic) => {
+                RoundedValue::Float(InferredType::AssignableTo)
+            }
+            _ => RoundedValue::Other,
+        },
 
         _ => match ResolvedPythonType::from(rounded) {
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)) => {
@@ -164,8 +161,6 @@ pub(super) fn rounded_and_ndigits<'a>(
         Some(Expr::NoneLiteral(_)) => NdigitsValue::LiteralNone,
 
         Some(Expr::Name(name)) => {
-            let semantic = checker.semantic();
-
             match semantic.only_binding(name).map(|id| semantic.binding(id)) {
                 Some(binding) if typing::is_int(binding, semantic) => {
                     NdigitsValue::Int(InferredType::AssignableTo)
@@ -185,9 +180,12 @@ pub(super) fn rounded_and_ndigits<'a>(
     Some((rounded, rounded_kind, ndigits_kind))
 }
 
-fn unwrap_round_call(checker: &Checker, call: &ExprCall, rounded: &Expr) -> Edit {
-    let (locator, semantic) = (checker.locator(), checker.semantic());
-
+fn unwrap_round_call(
+    call: &ExprCall,
+    rounded: &Expr,
+    semantic: &SemanticModel,
+    locator: &Locator,
+) -> Edit {
     let rounded_expr = locator.slice(rounded.range());
 
     let has_parent_expr = semantic.current_expression_parent().is_some();

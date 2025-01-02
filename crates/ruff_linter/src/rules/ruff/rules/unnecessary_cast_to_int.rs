@@ -50,19 +50,17 @@ pub(crate) struct UnnecessaryCastToInt;
 impl AlwaysFixableViolation for UnnecessaryCastToInt {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Value being casted is already an integer".to_string()
+        "Value being cast to `int` is already an integer".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Remove unnecessary conversion to `int`".to_string()
+        "Remove unnecessary `int` call".to_string()
     }
 }
 
 /// RUF046
 pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
-    let semantic = checker.semantic();
-
-    let Some(argument) = single_argument_to_int_call(semantic, call) else {
+    let Some(argument) = single_argument_to_int_call(call, checker.semantic()) else {
         return;
     };
 
@@ -141,7 +139,7 @@ fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Ap
         }
 
         // Depends on `ndigits` and `number.__round__`
-        ["" | "builtins", "round"] => round_applicability(checker, arguments),
+        ["" | "builtins", "round"] => round_applicability(arguments, checker.semantic()),
 
         // Depends on `__ceil__`/`__floor__`/`__trunc__`
         ["math", "ceil" | "floor" | "trunc"] => Some(Applicability::Unsafe),
@@ -151,8 +149,8 @@ fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Ap
 }
 
 fn single_argument_to_int_call<'a>(
-    semantic: &SemanticModel,
     call: &'a ExprCall,
+    semantic: &SemanticModel,
 ) -> Option<&'a Expr> {
     let ExprCall {
         func, arguments, ..
@@ -176,8 +174,8 @@ fn single_argument_to_int_call<'a>(
 /// Determines the [`Applicability`] for a `round(..)` call.
 ///
 /// The Applicability depends on the `ndigits` and the number argument.
-fn round_applicability(checker: &Checker, arguments: &Arguments) -> Option<Applicability> {
-    let (_rounded, rounded_value, ndigits_value) = rounded_and_ndigits(checker, arguments)?;
+fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Option<Applicability> {
+    let (_rounded, rounded_value, ndigits_value) = rounded_and_ndigits(arguments, semantic)?;
 
     match (rounded_value, ndigits_value) {
         // ```python
