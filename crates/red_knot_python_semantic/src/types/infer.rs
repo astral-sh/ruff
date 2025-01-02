@@ -2672,10 +2672,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             parenthesized: _,
         } = tuple;
 
-        let db = self.db();
-        let element_types = elts.iter().map(|elt| self.infer_expression(elt));
+        // Collecting all elements is necessary to infer all sub-expressions even if some
+        // element types are `Never` (which leads `from_elements` to return early without
+        // consuming the whole iterator).
+        let element_types: Vec<_> = elts.iter().map(|elt| self.infer_expression(elt)).collect();
 
-        TupleType::from_elements(db, element_types)
+        TupleType::from_elements(self.db(), element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
