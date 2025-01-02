@@ -9,16 +9,16 @@ The Python language itself allows us to perform a variety of operations on types
 can build a union of types like `int | None`, or we can use type constructors such as `list[int]` or
 `type[int]` to create new types. But some type level operations that we rely on in Red Knot, like
 intersections, can not be expressed in Python. The `red_knot` module provides the `Intersection` and
-`Negate` type constructors which allows us to construct these types directly.
+`Not` type constructors which allows us to construct these types directly.
 
 ### Negation
 
 ```py
-from red_knot import Negate
+from red_knot import Not
 
-x: Negate[int]
-y: Negate[Negate[int]]
-z: Negate[Negate[Negate[int]]]
+x: Not[int]
+y: Not[Not[int]]
+z: Not[Not[Not[int]]]
 
 def _() -> None:
     reveal_type(x)  # revealed: ~int
@@ -29,11 +29,11 @@ def _() -> None:
 ### Intersection
 
 ```py
-from red_knot import Intersection, Negate, is_subtype_of, assert_true
+from red_knot import Intersection, Not, is_subtype_of, assert_true
 from typing_extensions import Never
 
 x1: Intersection[int, str]
-x2: Intersection[int, Negate[str]]
+x2: Intersection[int, Not[str]]
 
 def x() -> None:
     reveal_type(x1)  # revealed: int & str
@@ -48,7 +48,7 @@ def y() -> None:
     reveal_type(y2)  # revealed: bool
     reveal_type(y3)  # revealed: Never
 
-z1: Intersection[int, Negate[Literal[1]], Negate[Literal[2]]]
+z1: Intersection[int, Not[Literal[1]], Not[Literal[2]]]
 
 def z() -> None:
     reveal_type(z1)  # revealed: int & ~Literal[1] & ~Literal[2]

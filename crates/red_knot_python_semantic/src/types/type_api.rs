@@ -40,7 +40,7 @@ pub(crate) fn resolve_type_operation<'db>(
     arguments: impl Iterator<Item = Type<'db>>,
 ) -> Result<Type<'db>> {
     match class.name(db).as_str() {
-        "Negate" => {
+        "Not" => {
             let ty = expect_one_argument(arguments)?;
             Ok(ty.negate(db))
         }
