@@ -1818,7 +1818,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 for keyword in &arguments.keywords {
                     self.infer_match_pattern_impl(&keyword.pattern);
                 }
-                self.infer_expression(cls);
+                self.infer_standalone_expression(cls);
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {

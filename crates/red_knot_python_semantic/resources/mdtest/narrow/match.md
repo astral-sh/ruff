@@ -16,3 +16,28 @@ def _(flag: bool):
 
     reveal_type(y)  # revealed: Literal[0] | None
 ```
+
+## Class patterns
+
+```toml
+log = "red_knot_python_semantic=trace,salsa=info,salsa::cycle=debug"
+```
+
+```py
+def get_bool() -> bool: ...
+def get_object() -> object: ...
+class A: ...
+class B: ...
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case A():
+        reveal_type(x)  # revealed: A
+    case B():
+        reveal_type(x)  # revealed: B
+
+reveal_type(x)  # revealed: object
+```

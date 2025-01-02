@@ -414,6 +414,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             ast::Pattern::MatchSingleton(singleton) => {
                 PatternConstraintKind::Singleton(singleton.value, guard)
             }
+            ast::Pattern::MatchClass(pattern) => {
+                let cls = self.add_standalone_expression(&pattern.cls);
+                PatternConstraintKind::Class(cls, guard)
+            }
             _ => PatternConstraintKind::Unsupported,
         };
 

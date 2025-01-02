@@ -22,6 +22,7 @@ pub(crate) enum ConstraintNode<'db> {
 pub(crate) enum PatternConstraintKind<'db> {
     Singleton(Singleton, Option<Expression<'db>>),
     Value(Expression<'db>, Option<Expression<'db>>),
+    Class(Expression<'db>, Option<Expression<'db>>),
     Unsupported,
 }
 
