@@ -723,6 +723,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
+                    if self
+                        .semantic
+                        .match_typing_expr(&decorator.expression, "no_type_check")
+                    {
+                        self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
+                    }
+
                     self.visit_decorator(decorator);
                 }
 
@@ -2348,13 +2355,17 @@ impl<'a> Checker<'a> {
                     }
                     self.parsed_type_annotation = None;
                 } else {
-                    if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                        self.diagnostics.push(Diagnostic::new(
-                            pyflakes::rules::ForwardAnnotationSyntaxError {
-                                body: string_expr.value.to_string(),
-                            },
-                            string_expr.range(),
-                        ));
+                    self.semantic.restore(snapshot);
+
+                    if !self.semantic.in_no_type_check() {
+                        if self.enabled(Rule::ForwardAnnotationSyntaxError) {
+                            self.diagnostics.push(Diagnostic::new(
+                                pyflakes::rules::ForwardAnnotationSyntaxError {
+                                    body: string_expr.value.to_string(),
+                                },
+                                string_expr.range(),
+                            ));
+                        }
                     }
                 }
             }
