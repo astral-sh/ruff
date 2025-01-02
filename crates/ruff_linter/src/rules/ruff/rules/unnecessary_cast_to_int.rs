@@ -1,9 +1,11 @@
 use crate::checkers::ast::Checker;
+use crate::rules::ruff::rules::unnecessary_round::{
+    rounded_and_ndigits, InferredType, NdigitsValue, RoundedValue,
+};
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::{Arguments, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -76,12 +78,13 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
 
     let fix = unwrap_int_expression(checker, call, argument, applicability);
     let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range);
+
     checker.diagnostics.push(diagnostic.with_fix(fix));
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.
 fn unwrap_int_expression(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ExprCall,
     argument: &Expr,
     applicability: Applicability,
@@ -148,78 +151,56 @@ fn single_argument_to_int_call<'a>(
     Some(argument)
 }
 
-/// The type of the first argument to `round()`
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Rounded {
-    InferredInt,
-    InferredFloat,
-    LiteralInt,
-    LiteralFloat,
-    Other,
-}
-
-/// The type of the second argument to `round()`
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Ndigits {
-    NotGiven,
-    LiteralInt,
-    LiteralNone,
-    Other,
-}
-
 /// Determines the [`Applicability`] for a `round(..)` call.
 ///
 /// The Applicability depends on the `ndigits` and the number argument.
 fn round_applicability(checker: &Checker, arguments: &Arguments) -> Option<Applicability> {
-    if arguments.len() > 2 {
-        return None;
-    }
+    let (_rounded, rounded_value, ndigits_value) = rounded_and_ndigits(checker, arguments)?;
 
-    let number = arguments.find_argument_value("number", 0)?;
-    let ndigits = arguments.find_argument_value("ndigits", 1);
+    match (rounded_value, ndigits_value) {
+        // ```python
+        // int(round(2, 0))
+        // int(round(2))
+        // int(round(2, None))
+        // ```
+        (
+            RoundedValue::Int(InferredType::Equivalent),
+            NdigitsValue::Int(InferredType::Equivalent)
+            | NdigitsValue::NotGiven
+            | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Safe),
 
-    let number_kind = match number {
-        Expr::Name(name) => {
-            let semantic = checker.semantic();
+        // ```python
+        // int(round(2.0))
+        // int(round(2.0, None))
+        // ```
+        (
+            RoundedValue::Float(InferredType::Equivalent),
+            NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Safe),
 
-            match semantic.only_binding(name).map(|id| semantic.binding(id)) {
-                Some(binding) if typing::is_int(binding, semantic) => Rounded::InferredInt,
-                Some(binding) if typing::is_float(binding, semantic) => Rounded::InferredFloat,
-                _ => Rounded::Other,
-            }
-        }
+        // ```python
+        // a: int = 2 # or True
+        // int(round(a, 1))
+        // int(round(a))
+        // int(round(a, None))
+        // ```
+        (
+            RoundedValue::Int(InferredType::AssignableTo),
+            NdigitsValue::Int(InferredType::Equivalent)
+            | NdigitsValue::NotGiven
+            | NdigitsValue::LiteralNone,
+        ) => Some(Applicability::Unsafe),
 
-        Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
-            Number::Int(..) => Rounded::LiteralInt,
-            Number::Float(..) => Rounded::LiteralFloat,
-            Number::Complex { .. } => Rounded::Other,
-        },
-
-        _ => Rounded::Other,
-    };
-
-    let ndigits_kind = match ndigits {
-        None => Ndigits::NotGiven,
-        Some(Expr::NoneLiteral(_)) => Ndigits::LiteralNone,
-
-        Some(Expr::NumberLiteral(ExprNumberLiteral {
-            value: Number::Int(..),
-            ..
-        })) => Ndigits::LiteralInt,
-
-        _ => Ndigits::Other,
-    };
-
-    match (number_kind, ndigits_kind) {
-        (Rounded::LiteralInt, Ndigits::LiteralInt)
-        | (Rounded::LiteralInt | Rounded::LiteralFloat, Ndigits::NotGiven | Ndigits::LiteralNone) => {
-            Some(Applicability::Safe)
-        }
-
-        (Rounded::InferredInt, Ndigits::LiteralInt)
-        | (
-            Rounded::InferredInt | Rounded::InferredFloat | Rounded::Other,
-            Ndigits::NotGiven | Ndigits::LiteralNone,
+        // ```python
+        // int(round(2.0))
+        // int(round(2.0, None))
+        // int(round(x))
+        // int(round(x, None))
+        // ```
+        (
+            RoundedValue::Float(InferredType::AssignableTo) | RoundedValue::Other,
+            NdigitsValue::NotGiven | NdigitsValue::LiteralNone,
         ) => Some(Applicability::Unsafe),
 
         _ => None,
