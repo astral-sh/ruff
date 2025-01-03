@@ -19,10 +19,6 @@ def _(flag: bool):
 
 ## Class patterns
 
-```toml
-log = "red_knot_python_semantic=trace,salsa=info,salsa::cycle=debug"
-```
-
 ```py
 def get_bool() -> bool: ...
 def get_object() -> object: ...
