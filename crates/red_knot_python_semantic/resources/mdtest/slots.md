@@ -167,7 +167,7 @@ class A:
     __slots__ = ()
     __slots__ += ("a", "b")
 
-reveal_type(A.__slots__)  # revealed: @Todo(Support for more binary expressions)
+reveal_type(A.__slots__)  # revealed: @Todo(return type)
 
 class B:
     __slots__ = ("c", "d")

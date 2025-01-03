@@ -272,7 +272,8 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // related to circular references in class definitions
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, false),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", true, true),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_27.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F811_19.py", true, false),
     ("crates/ruff_linter/resources/test/fixtures/pyupgrade/UP039.py", true, false),
     // related to circular references in type aliases (salsa cycle panic):
