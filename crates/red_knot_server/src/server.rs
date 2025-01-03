@@ -51,10 +51,6 @@ impl Server {
             crate::version(),
         )?;
 
-        if let Some(trace) = init_params.trace {
-            crate::trace::set_trace_value(trace);
-        }
-
         crate::message::init_messenger(connection.make_sender());
 
         let AllSettings {
@@ -73,7 +69,6 @@ impl Server {
                 .log_level
                 .unwrap_or(crate::trace::LogLevel::Info),
             global_settings.tracing.log_file.as_deref(),
-            init_params.client_info.as_ref(),
         );
 
         let mut workspace_for_url = |url: Url| {

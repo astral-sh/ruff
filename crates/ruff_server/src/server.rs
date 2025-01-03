@@ -73,16 +73,11 @@ impl Server {
             crate::version(),
         )?;
 
-        if let Some(trace) = init_params.trace {
-            crate::trace::set_trace_value(trace);
-        }
-
         crate::message::init_messenger(connection.make_sender());
 
         let InitializeParams {
             initialization_options,
             workspace_folders,
-            client_info,
             ..
         } = init_params;
 
@@ -105,7 +100,6 @@ impl Server {
                 .log_level
                 .unwrap_or(crate::trace::LogLevel::Info),
             global_settings.tracing.log_file.as_deref(),
-            client_info.as_ref(),
         );
 
         let workspaces = Workspaces::from_workspace_folders(
