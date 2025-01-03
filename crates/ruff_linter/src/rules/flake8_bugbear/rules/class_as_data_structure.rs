@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
 
@@ -72,6 +72,12 @@ pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::St
                         // skip `self`
                         .skip(1)
                         .all(|param| param.annotation().is_some() && !param.is_variadic())
+                    // `__init__` should not have complicated logic in it
+                    // only assignments
+                    && func_def
+                        .body
+                        .iter()
+                        .all(is_simple_assignment_to_attribute)
                 {
                     has_dunder_init = true;
                 }
@@ -91,5 +97,23 @@ pub(crate) fn class_as_data_structure(checker: &mut Checker, class_def: &ast::St
         checker
             .diagnostics
             .push(Diagnostic::new(ClassAsDataStructure, class_def.range()));
+    }
+}
+
+// Checks whether a statement
+// is a, possibly augmented,
+// assignment of a name to an attribute.
+fn is_simple_assignment_to_attribute(stmt: &ast::Stmt) -> bool {
+    match stmt {
+        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            let [target] = targets.as_slice() else {
+                return false;
+            };
+            target.is_attribute_expr() & value.is_name_expr()
+        }
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+            target.is_attribute_expr() & value.as_ref().is_some_and(|val| val.is_name_expr())
+        }
+        _ => false,
     }
 }
