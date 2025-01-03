@@ -2595,8 +2595,8 @@ pub enum KnownInstanceType<'db> {
     TypeGuard,
     TypeIs,
     ReadOnly,
-    // TODO: fill this enum out with more special forms, etc.
     RedKnotUnknown,
+    // TODO: fill this enum out with more special forms, etc.
 }
 
 impl<'db> KnownInstanceType<'db> {

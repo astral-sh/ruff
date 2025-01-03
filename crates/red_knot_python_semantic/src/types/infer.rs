@@ -4198,14 +4198,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         api_type: Type<'db>,
         arguments: &ast::Expr,
     ) -> Option<Type<'db>> {
-        match api_type.into_class_literal() {
-            Some(class)
-                if file_to_module(self.db(), class.class.file(self.db()))
+        match api_type {
+            Type::ClassLiteral(ClassLiteralType { class })
+                if file_to_module(self.db(), class.file(self.db()))
                     .is_some_and(|module| module.is_known(KnownModule::RedKnot)) =>
             {
                 let db = self.db();
 
-                let is_type_of = class.class.name(db).as_str() == "TypeOf";
+                let is_type_of = class.name(db) == "TypeOf";
 
                 let argument_types = match arguments {
                     ast::Expr::Tuple(tuple) => Either::Left(
@@ -4220,7 +4220,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     })),
                 };
 
-                let result = type_api::resolve_type_operation(db, class.class, argument_types);
+                let result = type_api::resolve_type_operation(db, class, argument_types);
 
                 match result {
                     Ok(ty) => ty,
@@ -4251,24 +4251,20 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match function.into_function_literal() {
             Some(function)
-                if file_to_module(self.db(), function.body_scope(self.db()).file(self.db()))
+                if file_to_module(db, function.body_scope(db).file(db))
                     .is_some_and(|module| module.is_known(KnownModule::RedKnot)) =>
             {
-                let name = function.name(db).as_str();
+                let function_name = function.name(db);
 
                 let argument_types = arguments.args.iter().map(|arg| {
-                    if matches!(name, "static_assert") {
+                    if function_name == "static_assert" {
                         self.infer_expression(arg)
                     } else {
                         self.infer_type_expression(arg)
                     }
                 });
 
-                let result = type_api::resolve_type_predicate(
-                    db,
-                    function.name(db).as_str(),
-                    argument_types,
-                );
+                let result = type_api::resolve_type_predicate(db, function_name, argument_types);
 
                 match result {
                     Ok(ty) => ty,

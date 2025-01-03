@@ -1,4 +1,4 @@
-from typing import TypeVarTuple, _SpecialForm
+from typing import _SpecialForm
 
 
 # Special operations
@@ -8,8 +8,6 @@ def static_assert(x: object) -> None: ...
 
 
 # Type extensions
-Ts = TypeVarTuple("Ts")
-
 class Not[T]: ...
 class Intersection[*Ts]: ...
 
