@@ -12,12 +12,10 @@ use ruff_text_size::{Ranged, TextRange, TextSlice};
 
 use crate::context::FStringState;
 use crate::prelude::*;
-use crate::preview::is_f_string_formatting_enabled;
-use crate::string::{Quoting, StringQuotes};
+use crate::string::StringQuotes;
 use crate::QuoteStyle;
 
 pub(crate) struct StringNormalizer<'a, 'src> {
-    quoting: Quoting,
     preferred_quote_style: Option<QuoteStyle>,
     context: &'a PyFormatContext<'src>,
 }
@@ -25,7 +23,6 @@ pub(crate) struct StringNormalizer<'a, 'src> {
 impl<'a, 'src> StringNormalizer<'a, 'src> {
     pub(crate) fn from_context(context: &'a PyFormatContext<'src>) -> Self {
         Self {
-            quoting: Quoting::default(),
             preferred_quote_style: None,
             context,
         }
@@ -33,11 +30,6 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
 
     pub(crate) fn with_preferred_quote_style(mut self, quote_style: QuoteStyle) -> Self {
         self.preferred_quote_style = Some(quote_style);
-        self
-    }
-
-    pub(crate) fn with_quoting(mut self, quoting: Quoting) -> Self {
-        self.quoting = quoting;
         self
     }
 
@@ -49,112 +41,106 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     /// Note: If you add more cases here where we return `QuoteStyle::Preserve`,
     /// make sure to also add them to [`FormatImplicitConcatenatedStringFlat::new`].
     pub(super) fn preferred_quote_style(&self, string: StringLikePart) -> QuoteStyle {
-        match self.quoting {
-            Quoting::Preserve => QuoteStyle::Preserve,
-            Quoting::CanChange => {
-                let preferred_quote_style = self
-                    .preferred_quote_style
-                    .unwrap_or(self.context.options().quote_style());
+        let preferred_quote_style = self
+            .preferred_quote_style
+            .unwrap_or(self.context.options().quote_style());
 
-                if preferred_quote_style.is_preserve() {
+        if preferred_quote_style.is_preserve() {
+            return QuoteStyle::Preserve;
+        }
+
+        if let StringLikePart::FString(fstring) = string {
+            // There are two cases where it's necessary to preserve the quotes if the
+            // target version is pre 3.12 and the part is an f-string.
+            if !self.context.options().target_version().supports_pep_701() {
+                // An f-string expression contains a debug text with a quote character
+                // because the formatter will emit the debug expression **exactly** the
+                // same as in the source text.
+                if is_fstring_with_quoted_debug_expression(fstring, self.context) {
                     return QuoteStyle::Preserve;
                 }
 
-                if let StringLikePart::FString(fstring) = string {
-                    // There are two cases where it's necessary to preserve the quotes if the
-                    // target version is pre 3.12 and the part is an f-string.
-                    if !self.context.options().target_version().supports_pep_701() {
-                        // An f-string expression contains a debug text with a quote character
-                        // because the formatter will emit the debug expression **exactly** the
-                        // same as in the source text.
-                        if is_fstring_with_quoted_debug_expression(fstring, self.context) {
-                            return QuoteStyle::Preserve;
-                        }
-
-                        // An f-string expression that contains a triple quoted string literal
-                        // expression that contains a quote.
-                        if is_fstring_with_triple_quoted_literal_expression_containing_quotes(
-                            fstring,
-                            self.context,
-                        ) {
-                            return QuoteStyle::Preserve;
-                        }
-                    }
-
-                    // An f-string expression element contains a debug text and the corresponding
-                    // format specifier has a literal element with a quote character.
-                    if is_fstring_with_quoted_format_spec_and_debug(fstring, self.context) {
-                        return QuoteStyle::Preserve;
-                    }
-                }
-
-                // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
-                if let FStringState::InsideExpressionElement(parent_context) =
-                    self.context.f_string_state()
-                {
-                    let parent_flags = parent_context.f_string().flags();
-
-                    if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
-                        return QuoteStyle::from(parent_flags.quote_style().opposite());
-                    }
-                }
-
-                // Per PEP 8, always prefer double quotes for triple-quoted strings.
-                if string.flags().is_triple_quoted() {
-                    // ... unless we're formatting a code snippet inside a docstring,
-                    // then we specifically want to invert our quote style to avoid
-                    // writing out invalid Python.
-                    //
-                    // It's worth pointing out that we can actually wind up being
-                    // somewhat out of sync with PEP8 in this case. Consider this
-                    // example:
-                    //
-                    //     def foo():
-                    //         '''
-                    //         Something.
-                    //
-                    //         >>> """tricksy"""
-                    //         '''
-                    //         pass
-                    //
-                    // Ideally, this would be reformatted as:
-                    //
-                    //     def foo():
-                    //         """
-                    //         Something.
-                    //
-                    //         >>> '''tricksy'''
-                    //         """
-                    //         pass
-                    //
-                    // But the logic here results in the original quoting being
-                    // preserved. This is because the quoting style of the outer
-                    // docstring is determined, in part, by looking at its contents. In
-                    // this case, it notices that it contains a `"""` and thus infers
-                    // that using `'''` would overall read better because it avoids
-                    // the need to escape the interior `"""`. Except... in this case,
-                    // the `"""` is actually part of a code snippet that could get
-                    // reformatted to using a different quoting style itself.
-                    //
-                    // Fixing this would, I believe, require some fairly seismic
-                    // changes to how formatting strings works. Namely, we would need
-                    // to look for code snippets before normalizing the docstring, and
-                    // then figure out the quoting style more holistically by looking
-                    // at the various kinds of quotes used in the code snippets and
-                    // what reformatting them might look like.
-                    //
-                    // Overall this is a bit of a corner case and just inverting the
-                    // style from what the parent ultimately decided upon works, even
-                    // if it doesn't have perfect alignment with PEP8.
-                    if let Some(quote) = self.context.docstring() {
-                        QuoteStyle::from(quote.opposite())
-                    } else {
-                        QuoteStyle::Double
-                    }
-                } else {
-                    preferred_quote_style
+                // An f-string expression that contains a triple quoted string literal
+                // expression that contains a quote.
+                if is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                    fstring,
+                    self.context,
+                ) {
+                    return QuoteStyle::Preserve;
                 }
             }
+
+            // An f-string expression element contains a debug text and the corresponding
+            // format specifier has a literal element with a quote character.
+            if is_fstring_with_quoted_format_spec_and_debug(fstring, self.context) {
+                return QuoteStyle::Preserve;
+            }
+        }
+
+        // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
+        if let FStringState::InsideExpressionElement(parent_context) = self.context.f_string_state()
+        {
+            let parent_flags = parent_context.f_string().flags();
+
+            if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
+                return QuoteStyle::from(parent_flags.quote_style().opposite());
+            }
+        }
+
+        // Per PEP 8, always prefer double quotes for triple-quoted strings.
+        if string.flags().is_triple_quoted() {
+            // ... unless we're formatting a code snippet inside a docstring,
+            // then we specifically want to invert our quote style to avoid
+            // writing out invalid Python.
+            //
+            // It's worth pointing out that we can actually wind up being
+            // somewhat out of sync with PEP8 in this case. Consider this
+            // example:
+            //
+            //     def foo():
+            //         '''
+            //         Something.
+            //
+            //         >>> """tricksy"""
+            //         '''
+            //         pass
+            //
+            // Ideally, this would be reformatted as:
+            //
+            //     def foo():
+            //         """
+            //         Something.
+            //
+            //         >>> '''tricksy'''
+            //         """
+            //         pass
+            //
+            // But the logic here results in the original quoting being
+            // preserved. This is because the quoting style of the outer
+            // docstring is determined, in part, by looking at its contents. In
+            // this case, it notices that it contains a `"""` and thus infers
+            // that using `'''` would overall read better because it avoids
+            // the need to escape the interior `"""`. Except... in this case,
+            // the `"""` is actually part of a code snippet that could get
+            // reformatted to using a different quoting style itself.
+            //
+            // Fixing this would, I believe, require some fairly seismic
+            // changes to how formatting strings works. Namely, we would need
+            // to look for code snippets before normalizing the docstring, and
+            // then figure out the quoting style more holistically by looking
+            // at the various kinds of quotes used in the code snippets and
+            // what reformatting them might look like.
+            //
+            // Overall this is a bit of a corner case and just inverting the
+            // style from what the parent ultimately decided upon works, even
+            // if it doesn't have perfect alignment with PEP8.
+            if let Some(quote) = self.context.docstring() {
+                QuoteStyle::from(quote.opposite())
+            } else {
+                QuoteStyle::Double
+            }
+        } else {
+            preferred_quote_style
         }
     }
 
@@ -163,7 +149,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
         let raw_content = &self.context.source()[string.content_range()];
         let first_quote_or_normalized_char_offset = raw_content
             .bytes()
-            .position(|b| matches!(b, b'\\' | b'"' | b'\'' | b'\r' | b'{'));
+            .position(|b| matches!(b, b'\\' | b'"' | b'\'' | b'\r'));
         let string_flags = string.flags();
         let preferred_style = self.preferred_quote_style(string);
 
@@ -214,11 +200,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                 raw_content,
                 first_quote_or_escape_offset,
                 quote_selection.flags,
-                // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
-                // `format_fstring` preview style
                 false,
-                false,
-                is_f_string_formatting_enabled(self.context),
             )
         } else {
             Cow::Borrowed(raw_content)
@@ -269,20 +251,14 @@ impl QuoteMetadata {
                 Self::from_str(text, part.flags(), preferred_quote)
             }
             StringLikePart::FString(fstring) => {
-                if is_f_string_formatting_enabled(context) {
-                    let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
+                let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
 
-                    metadata.merge_fstring_elements(
-                        &fstring.elements,
-                        fstring.flags,
-                        context,
-                        preferred_quote,
-                    )
-                } else {
-                    let text = &context.source()[part.content_range()];
-
-                    Self::from_str(text, part.flags(), preferred_quote)
-                }
+                metadata.merge_fstring_elements(
+                    &fstring.elements,
+                    fstring.flags,
+                    context,
+                    preferred_quote,
+                )
             }
         }
     }
@@ -635,8 +611,6 @@ pub(crate) fn normalize_string(
     start_offset: usize,
     new_flags: AnyStringFlags,
     escape_braces: bool,
-    flip_nested_fstring_quotes: bool,
-    format_f_string: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
@@ -653,9 +627,6 @@ pub(crate) fn normalize_string(
 
     let is_raw = new_flags.is_raw_string();
 
-    let is_fstring = !format_f_string && new_flags.is_f_string();
-    let mut formatted_value_nesting = 0u32;
-
     while let Some((index, c)) = chars.next() {
         if matches!(c, '{' | '}') {
             if escape_braces {
@@ -663,17 +634,6 @@ pub(crate) fn normalize_string(
                 output.push_str(&input[last_index..=index]);
                 output.push(c);
                 last_index = index + c.len_utf8();
-                continue;
-            } else if is_fstring {
-                if chars.peek().copied().is_some_and(|(_, next)| next == c) {
-                    // Skip over the second character of the double braces
-                    chars.next();
-                } else if c == '{' {
-                    formatted_value_nesting += 1;
-                } else {
-                    // Safe to assume that `c == '}'` here because of the matched pattern above
-                    formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
-                }
                 continue;
             }
         }
@@ -723,7 +683,7 @@ pub(crate) fn normalize_string(
 
                     if !new_flags.is_triple_quoted() {
                         #[allow(clippy::if_same_then_else)]
-                        if next == opposite_quote && formatted_value_nesting == 0 {
+                        if next == opposite_quote {
                             // Remove the escape by ending before the backslash and starting again with the quote
                             chars.next();
                             output.push_str(&input[last_index..index]);
@@ -734,22 +694,11 @@ pub(crate) fn normalize_string(
                         }
                     }
                 }
-            } else if !new_flags.is_triple_quoted()
-                && c == preferred_quote
-                && formatted_value_nesting == 0
-            {
+            } else if !new_flags.is_triple_quoted() && c == preferred_quote {
                 // Escape the quote
                 output.push_str(&input[last_index..index]);
                 output.push('\\');
                 output.push(c);
-                last_index = index + preferred_quote.len_utf8();
-            } else if c == preferred_quote
-                && flip_nested_fstring_quotes
-                && formatted_value_nesting > 0
-            {
-                // Flip the quotes
-                output.push_str(&input[last_index..index]);
-                output.push(opposite_quote);
                 last_index = index + preferred_quote.len_utf8();
             }
         }
@@ -1099,7 +1048,6 @@ fn contains_opposite_quote(content: &str, flags: AnyStringFlags) -> bool {
 mod tests {
     use std::borrow::Cow;
 
-    use ruff_python_ast::str_prefix::FStringPrefix;
     use ruff_python_ast::{
         str::Quote,
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
@@ -1133,34 +1081,8 @@ mod tests {
                 false,
             ),
             false,
-            false,
-            true,
         );
 
         assert_eq!(r"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", &normalized);
-    }
-
-    #[test]
-    fn normalize_nested_fstring() {
-        let input =
-            r#"With single quote: '  {my_dict['foo']} With double quote: "  {my_dict["bar"]}"#;
-
-        let normalized = normalize_string(
-            input,
-            0,
-            AnyStringFlags::new(
-                AnyStringPrefix::Format(FStringPrefix::Regular),
-                Quote::Double,
-                false,
-            ),
-            false,
-            true,
-            false,
-        );
-
-        assert_eq!(
-            "With single quote: '  {my_dict['foo']} With double quote: \\\"  {my_dict['bar']}",
-            &normalized
-        );
     }
 }

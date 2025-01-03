@@ -132,6 +132,19 @@ variable: (
 ```diff
 --- Black
 +++ Ruff
+@@ -52,9 +52,9 @@
+         pass
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+-):
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]:
+     json = {
+         "k": {
+             "k2": {
 @@ -130,9 +130,7 @@
  
  def foo() -> (
@@ -225,9 +238,9 @@ def f(
         pass
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
-):
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
     json = {
         "k": {
             "k2": {

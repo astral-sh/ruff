@@ -37,7 +37,6 @@ for node_line in node_lines:
     # `FStringLiteralElement`, `FStringFormatSpec` and `FStringExpressionElement` are handled by the `FString`
     # implementation.
     if node in (
-        "FString",
         "FStringLiteralElement",
         "FStringExpressionElement",
         "FStringFormatSpec",
