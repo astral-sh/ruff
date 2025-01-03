@@ -69,7 +69,7 @@ pub(crate) fn resolve_type_operation<'db>(
 pub(crate) enum TypeApiPredicateError<'db> {
     /// Wrong number of arguments in a type API call
     ArgumentsError(TypeApiArgumentsError),
-    /// Argument of `assert_true` did not have type `Literal[True]`
+    /// Argument of `static_assert` did not have type `Literal[True]`
     StaticAssertionError(Type<'db>),
 }
 
@@ -116,7 +116,7 @@ pub(crate) fn resolve_type_predicate<'db>(
         }
 
         // Special operations
-        "assert_true" => {
+        "static_assert" => {
             let ty = expect_one_argument(arguments)?;
             if ty == Type::BooleanLiteral(true) {
                 Some(Type::none(db))
@@ -150,15 +150,15 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Makes sure that the argument of `assert_true` has a type of `Literal[True]`.
+    /// Makes sure that the argument of `static_assert` has a type of `Literal[True]`.
     ///
     /// ## Examples
     /// ```python
-    /// from red_knot import assert_true
+    /// from red_knot import static_assert
     ///
-    /// assert_true(1 + 1 == 3)  # error: evaluates to `False`
+    /// static_assert(1 + 1 == 3)  # error: evaluates to `False`
     ///
-    /// assert_true(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness
+    /// static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness
     /// ```
     pub(crate) static TYPE_API_STATIC_ASSERTION_ERROR = {
         summary: "Failed static assertion",

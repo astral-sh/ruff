@@ -34,7 +34,7 @@ def _() -> None:
 ### Intersection
 
 ```py
-from red_knot import Intersection, Not, is_subtype_of, assert_true
+from red_knot import Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Never
 
 class S: ...
@@ -67,13 +67,13 @@ class C: ...
 
 type ABC = Intersection[A, B, C]
 
-assert_true(is_subtype_of(ABC, A))
-assert_true(is_subtype_of(ABC, B))
-assert_true(is_subtype_of(ABC, C))
+static_assert(is_subtype_of(ABC, A))
+static_assert(is_subtype_of(ABC, B))
+static_assert(is_subtype_of(ABC, C))
 
 class D: ...
 
-assert_true(not is_subtype_of(ABC, D))
+static_assert(not is_subtype_of(ABC, D))
 ```
 
 ### Unknown type
@@ -82,12 +82,12 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from red_knot import Unknown, assert_true, is_assignable_to, is_fully_static
+from red_knot import Unknown, static_assert, is_assignable_to, is_fully_static
 
-assert_true(is_assignable_to(Unknown, int))
-assert_true(is_assignable_to(int, Unknown))
+static_assert(is_assignable_to(Unknown, int))
+static_assert(is_assignable_to(int, Unknown))
 
-assert_true(not is_fully_static(Unknown))
+static_assert(not is_fully_static(Unknown))
 
 x: Unknown = 1
 
@@ -104,92 +104,92 @@ the test.
 ### Equivalence
 
 ```py
-from red_knot import is_equivalent_to, assert_true
+from red_knot import is_equivalent_to, static_assert
 
-assert_true(is_equivalent_to(int, int))
-assert_true(not is_equivalent_to(int, str))
+static_assert(is_equivalent_to(int, int))
+static_assert(not is_equivalent_to(int, str))
 ```
 
 ### Subtyping
 
 ```py
-from red_knot import is_subtype_of, assert_true
+from red_knot import is_subtype_of, static_assert
 
-assert_true(is_subtype_of(bool, int))
-assert_true(not is_subtype_of(str, int))
+static_assert(is_subtype_of(bool, int))
+static_assert(not is_subtype_of(str, int))
 
-assert_true(is_subtype_of(bool, int | str))
-assert_true(is_subtype_of(str, int | str))
-assert_true(not is_subtype_of(bytes, int | str))
+static_assert(is_subtype_of(bool, int | str))
+static_assert(is_subtype_of(str, int | str))
+static_assert(not is_subtype_of(bytes, int | str))
 
 class Base: ...
 class Derived(Base): ...
 class Unrelated: ...
 
-assert_true(is_subtype_of(Derived, Base))
-assert_true(not is_subtype_of(Base, Derived))
-assert_true(is_subtype_of(Base, Base))
+static_assert(is_subtype_of(Derived, Base))
+static_assert(not is_subtype_of(Base, Derived))
+static_assert(is_subtype_of(Base, Base))
 
-assert_true(not is_subtype_of(Unrelated, Base))
-assert_true(not is_subtype_of(Base, Unrelated))
+static_assert(not is_subtype_of(Unrelated, Base))
+static_assert(not is_subtype_of(Base, Unrelated))
 ```
 
 ### Assignability
 
 ```py
-from red_knot import is_assignable_to, assert_true
+from red_knot import is_assignable_to, static_assert
 from typing import Any
 
-assert_true(is_assignable_to(int, Any))
-assert_true(is_assignable_to(Any, str))
-assert_true(not is_assignable_to(int, str))
+static_assert(is_assignable_to(int, Any))
+static_assert(is_assignable_to(Any, str))
+static_assert(not is_assignable_to(int, str))
 ```
 
 ### Disjointness
 
 ```py
-from red_knot import is_disjoint_from, assert_true
+from red_knot import is_disjoint_from, static_assert
 
-assert_true(is_disjoint_from(None, int))
-assert_true(not is_disjoint_from(Literal[2] | str, int))
+static_assert(is_disjoint_from(None, int))
+static_assert(not is_disjoint_from(Literal[2] | str, int))
 ```
 
 ### Fully static types
 
 ```py
-from red_knot import is_fully_static, assert_true
+from red_knot import is_fully_static, static_assert
 from typing import Any
 
-assert_true(is_fully_static(int | str))
-assert_true(is_fully_static(type[int]))
+static_assert(is_fully_static(int | str))
+static_assert(is_fully_static(type[int]))
 
-assert_true(not is_fully_static(int | Any))
-assert_true(not is_fully_static(type[Any]))
+static_assert(not is_fully_static(int | Any))
+static_assert(not is_fully_static(type[Any]))
 ```
 
 ### Singleton types
 
 ```py
-from red_knot import is_singleton, assert_true
+from red_knot import is_singleton, static_assert
 
-assert_true(is_singleton(None))
-assert_true(is_singleton(Literal[True]))
+static_assert(is_singleton(None))
+static_assert(is_singleton(Literal[True]))
 
-assert_true(not is_singleton(int))
-assert_true(not is_singleton(Literal["a"]))
+static_assert(not is_singleton(int))
+static_assert(not is_singleton(Literal["a"]))
 ```
 
 ### Single-valued types
 
 ```py
-from red_knot import is_single_valued, assert_true
+from red_knot import is_single_valued, static_assert
 
-assert_true(is_single_valued(None))
-assert_true(is_single_valued(Literal[True]))
-assert_true(is_single_valued(Literal["a"]))
+static_assert(is_single_valued(None))
+static_assert(is_single_valued(Literal[True]))
+static_assert(is_single_valued(Literal["a"]))
 
-assert_true(not is_single_valued(int))
-assert_true(not is_single_valued(Literal["a"] | Literal["b"]))
+static_assert(not is_single_valued(int))
+static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 ```
 
 ## Special operations
@@ -201,35 +201,35 @@ type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]`
 the expression `str`:
 
 ```py
-from red_knot import TypeOf, is_subtype_of, assert_true
+from red_knot import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
 # error: "Static assertion error: argument evaluates to `False`"
-assert_true(is_subtype_of(str, type[str]))
+static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
-assert_true(is_subtype_of(TypeOf[str], type[str]))
+static_assert(is_subtype_of(TypeOf[str], type[str]))
 ```
 
 ## Error handling
 
 ### Failed assertions
 
-We provide various tailored error messages for wrong argument types to `assert_true`:
+We provide various tailored error messages for wrong argument types to `static_assert`:
 
 ```py
-from red_knot import assert_true
+from red_knot import static_assert
 
-assert_true(2 * 3 == 6)
+static_assert(2 * 3 == 6)
 
 # error: "Static assertion error: argument evaluates to `False`"
-assert_true(2 * 3 == 7)
+static_assert(2 * 3 == 7)
 
 # error: "Static assertion error: argument does not have a statically known truthiness (type is `bool`)"
-assert_true(int(2.0 * 3.0) == 6)
+static_assert(int(2.0 * 3.0) == 6)
 
 # error: "Static assertion error: expected argument type `Literal[True]`, got: `Literal[6]`."
-assert_true(2 * 3)
+static_assert(2 * 3)
 ```
 
 ### Wrong number of arguments for type predicates
