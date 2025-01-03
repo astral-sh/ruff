@@ -1093,6 +1093,8 @@ where
                 cases,
                 range: _,
             }) => {
+                debug_assert!(self.current_match_case.is_none());
+
                 let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
                 if cases.is_empty() {
@@ -1107,17 +1109,24 @@ where
                         post_case_snapshots.push(self.flow_snapshot());
                         self.flow_restore(after_subject.clone());
                     }
+
+                    self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
+                    self.visit_pattern(&case.pattern);
+                    self.current_match_case = None;
+                    if let Some(expr) = &case.guard {
+                        self.visit_expr(expr);
+                    }
                     let constraint_id = self.add_pattern_constraint(
                         subject_expr,
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    self.visit_match_case(case);
 
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
                     let vis_constraint_id = self.record_visibility_constraint(constraint_id);
+                    self.visit_body(&case.body);
                     vis_constraints.push(vis_constraint_id);
                 }
 
@@ -1530,18 +1539,6 @@ where
         for parameter in parameters.iter().map(ast::AnyParameterRef::as_parameter) {
             self.visit_parameter(parameter);
         }
-    }
-
-    fn visit_match_case(&mut self, match_case: &'ast ast::MatchCase) {
-        debug_assert!(self.current_match_case.is_none());
-        self.current_match_case = Some(CurrentMatchCase::new(&match_case.pattern));
-        self.visit_pattern(&match_case.pattern);
-        self.current_match_case = None;
-
-        if let Some(expr) = &match_case.guard {
-            self.visit_expr(expr);
-        }
-        self.visit_body(&match_case.body);
     }
 
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
