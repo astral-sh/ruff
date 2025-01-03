@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::diagnostic::CALL_NON_CALLABLE;
+use super::diagnostic::{CALL_NON_CALLABLE, TYPE_ASSERTION_FAILURE};
 use super::{Severity, Type, TypeArrayDisplay, UnionBuilder};
 use crate::Db;
 use ruff_db::diagnostic::DiagnosticId;
@@ -24,6 +24,11 @@ pub(super) enum CallOutcome<'db> {
     PossiblyUnboundDunderCall {
         called_ty: Type<'db>,
         call_outcome: Box<CallOutcome<'db>>,
+    },
+    AssertType {
+        return_ty: Type<'db>,
+        actual_ty: Type<'db>,
+        asserted_ty: Type<'db>,
     },
 }
 
@@ -57,6 +62,18 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
+    pub(super) fn asserted(
+        return_ty: Type<'db>,
+        actual_ty: Type<'db>,
+        asserted_ty: Type<'db>,
+    ) -> CallOutcome<'db> {
+        CallOutcome::AssertType {
+            return_ty,
+            actual_ty,
+            asserted_ty,
+        }
+    }
+
     /// Get the return type of the call, or `None` if not callable.
     pub(super) fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
@@ -83,6 +100,11 @@ impl<'db> CallOutcome<'db> {
                 })
                 .map(UnionBuilder::build),
             Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_ty(db),
+            Self::AssertType {
+                return_ty,
+                actual_ty: _,
+                asserted_ty: _,
+            } => Some(*return_ty),
         }
     }
 
@@ -236,6 +258,24 @@ impl<'db> CallOutcome<'db> {
                         return_ty,
                     }),
                 }
+            }
+            Self::AssertType {
+                return_ty,
+                actual_ty,
+                asserted_ty,
+            } => {
+                if !actual_ty.is_equals_to(context.db(), *asserted_ty) {
+                    context.report_lint(
+                        &TYPE_ASSERTION_FAILURE,
+                        node,
+                        format_args!(
+                            "Actual type `{}` is not the same as asserted type `{}`",
+                            actual_ty.display(context.db()),
+                            asserted_ty.display(context.db()),
+                        ),
+                    );
+                }
+                Ok(*return_ty)
             }
         }
     }
