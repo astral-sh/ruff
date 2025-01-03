@@ -1113,19 +1113,18 @@ where
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
-                    if let Some(expr) = &case.guard {
-                        self.visit_expr(expr);
-                    }
                     let constraint_id = self.add_pattern_constraint(
                         subject_expr,
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
                     let vis_constraint_id = self.record_visibility_constraint(constraint_id);
+                    if let Some(expr) = &case.guard {
+                        self.visit_expr(expr);
+                    }
                     self.visit_body(&case.body);
                     vis_constraints.push(vis_constraint_id);
                 }
