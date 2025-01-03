@@ -15,8 +15,8 @@ fn expect_n_arguments<'db, const N: usize>(
     mut arguments: impl Iterator<Item = Type<'db>>,
 ) -> Result<[Type<'db>; N], TypeApiArgumentsError> {
     let mut result = [Type::Unknown; N];
-    for i in 0..N {
-        result[i] = arguments.next().ok_or(TypeApiArgumentsError {
+    for (i, ty) in result.iter_mut().enumerate() {
+        *ty = arguments.next().ok_or(TypeApiArgumentsError {
             expected: N,
             actual: i,
         })?;
