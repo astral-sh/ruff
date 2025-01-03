@@ -1,6 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use itertools::{Itertools, Position};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 use smallvec::SmallVec;
@@ -33,9 +34,15 @@ use crate::checkers::ast::Checker;
 pub(crate) struct NoneNotAtEndOfUnion;
 
 impl Violation for NoneNotAtEndOfUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`None` not at the end of the type annotation.".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Move `None` to the end of the type annotation".to_string())
     }
 }
 
@@ -43,11 +50,13 @@ impl Violation for NoneNotAtEndOfUnion {
 pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Expr) {
     let semantic = checker.semantic();
     let mut none_exprs: SmallVec<[&Expr; 1]> = SmallVec::new();
-
+    let mut non_none_exprs: SmallVec<[&Expr; 1]> = SmallVec::new();
     let mut last_expr: Option<&Expr> = None;
     let mut find_none = |expr: &'a Expr, _parent: &Expr| {
         if matches!(expr, Expr::NoneLiteral(_)) {
             none_exprs.push(expr);
+        } else {
+            non_none_exprs.push(expr);
         }
         last_expr = Some(expr);
     };
@@ -59,7 +68,7 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Exp
         return;
     };
 
-    // The must be at least one `None` expression.
+    // There must be at least one `None` expression.
     let Some(last_none) = none_exprs.last() else {
         return;
     };
@@ -69,9 +78,31 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &mut Checker, union: &'a Exp
         return;
     }
 
-    for none_expr in none_exprs {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range()));
+    for (pos, none_expr) in none_exprs.iter().with_position() {
+        let mut diagnostic = Diagnostic::new(NoneNotAtEndOfUnion, none_expr.range());
+        if matches!(pos, Position::Last | Position::Only) {
+            let mut elements = non_none_exprs
+                .iter()
+                .map(|expr| checker.locator().slice(expr.range()).to_string())
+                .chain(std::iter::once("None".to_string()));
+            let (range, separator) =
+                if let Expr::Subscript(ast::ExprSubscript { slice, .. }) = union {
+                    (slice.range(), ", ")
+                } else {
+                    (union.range(), " | ")
+                };
+            let applicability = if checker.comment_ranges().intersects(range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            let fix = Fix::applicable_edit(
+                Edit::range_replacement(elements.join(separator), range),
+                applicability,
+            );
+            diagnostic.set_fix(fix);
+        }
+
+        checker.diagnostics.push(diagnostic);
     }
 }
